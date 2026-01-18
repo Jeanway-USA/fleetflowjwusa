@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Truck, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
+import jwBannerLight from '@/assets/JW_Banner.png';
+import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
@@ -20,7 +23,10 @@ export default function Auth() {
   const [lastName, setLastName] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, user } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
+  
+  const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
 
   // Redirect if already logged in
   if (user) {
@@ -86,10 +92,11 @@ export default function Auth() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-xl gradient-gold flex items-center justify-center mb-4 glow-gold">
-            <Truck className="h-8 w-8 text-primary-foreground" />
-          </div>
-          <h1 className="text-3xl font-bold text-gradient-gold">JeanWay USA</h1>
+          <img 
+            src={bannerSrc} 
+            alt="JeanWay USA" 
+            className="h-24 object-contain mb-2"
+          />
           <p className="text-muted-foreground mt-1">Fleet Management System</p>
         </div>
 
