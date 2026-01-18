@@ -477,8 +477,8 @@ export default function Finance() {
                   <p className="text-2xl font-bold">{formatCurrency(revenueTotals.truckRevenue)}</p>
                 </div>
                 <div className="p-4 bg-success/10 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">NET REVENUE</p>
-                  <p className="text-2xl font-bold text-success">{formatCurrency(revenueTotals.netRevenue)}</p>
+                  <p className="text-sm text-muted-foreground mb-1">NET PROFIT</p>
+                  <p className="text-2xl font-bold text-success">{formatCurrency(netProfit)}</p>
                 </div>
               </div>
             </CardContent>
