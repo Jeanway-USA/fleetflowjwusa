@@ -212,50 +212,65 @@ export type Database = {
       }
       drivers: {
         Row: {
+          avatar_url: string | null
           created_at: string
           email: string | null
+          endorsements: string[] | null
           first_name: string
+          has_twic: boolean | null
           hire_date: string | null
           id: string
           last_name: string
           license_expiry: string | null
           license_number: string | null
+          medical_card_expiry: string | null
           pay_rate: number | null
           pay_type: string | null
           phone: string | null
           status: string
+          twic_expiry: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
+          endorsements?: string[] | null
           first_name: string
+          has_twic?: boolean | null
           hire_date?: string | null
           id?: string
           last_name: string
           license_expiry?: string | null
           license_number?: string | null
+          medical_card_expiry?: string | null
           pay_rate?: number | null
           pay_type?: string | null
           phone?: string | null
           status?: string
+          twic_expiry?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           email?: string | null
+          endorsements?: string[] | null
           first_name?: string
+          has_twic?: boolean | null
           hire_date?: string | null
           id?: string
           last_name?: string
           license_expiry?: string | null
           license_number?: string | null
+          medical_card_expiry?: string | null
           pay_rate?: number | null
           pay_type?: string | null
           phone?: string | null
           status?: string
+          twic_expiry?: string | null
           updated_at?: string
           user_id?: string | null
         }
