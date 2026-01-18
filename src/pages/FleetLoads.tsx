@@ -252,12 +252,9 @@ export default function FleetLoads() {
     const advanceAvailable = fuelSurcharge + (rate * advancePct);
     const advanceTaken = parseFloat(data.advance_taken) || 0;
     
-    let truckRevenue = grossRevenue * truckPct;
-    let trailerRevenue = ownsTrailer ? grossRevenue * trailerPct : 0;
-    
-    if (isPowerOnly) {
-      trailerRevenue = 0;
-    }
+    // Power-only loads use 70% truck revenue and no trailer revenue
+    let truckRevenue = isPowerOnly ? grossRevenue * 0.70 : grossRevenue * truckPct;
+    let trailerRevenue = isPowerOnly ? 0 : (ownsTrailer ? grossRevenue * trailerPct : 0);
 
     const netRevenue = truckRevenue + trailerRevenue;
     const settlement = netRevenue - advanceTaken - lumper;
@@ -595,17 +592,18 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+              </TabsContent>
+
+              <TabsContent value="revenue" className="space-y-4 mt-4">
+                <div className="flex items-center space-x-2 pb-2">
                   <Checkbox 
                     id="is_power_only" 
                     checked={formData.is_power_only || false}
                     onCheckedChange={(checked) => setFormData({ ...formData, is_power_only: checked })}
                   />
-                  <Label htmlFor="is_power_only" className="font-normal cursor-pointer">Power Only (No trailer revenue)</Label>
+                  <Label htmlFor="is_power_only" className="font-normal cursor-pointer">Power Only (70% truck revenue, no trailer)</Label>
                 </div>
-              </TabsContent>
 
-              <TabsContent value="revenue" className="space-y-4 mt-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="rate">Booked Linehaul ($)</Label>
@@ -764,7 +762,7 @@ export default function FleetLoads() {
                       <p className="font-bold">{formatCurrency(calculateRevenue(formData).gross_revenue)}</p>
                     </div>
                     <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-muted-foreground">Truck ({getSetting('truck_percentage', '65')}%)</p>
+                      <p className="text-muted-foreground">Truck ({formData.is_power_only ? '70' : getSetting('truck_percentage', '65')}%)</p>
                       <p className="font-bold">{formatCurrency(calculateRevenue(formData).truck_revenue)}</p>
                     </div>
                     <div className="p-3 bg-muted rounded-lg">
