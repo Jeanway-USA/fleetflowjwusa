@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, DollarSign } from 'lucide-react';
+import { Pencil, Trash2, FileText, DollarSign, User } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
@@ -29,7 +29,24 @@ export default function Trucks() {
   const { data: trucks = [], isLoading } = useQuery({
     queryKey: ['trucks'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('trucks').select('*').order('unit_number');
+      const { data, error } = await supabase
+        .from('trucks')
+        .select('*, drivers!trucks_current_driver_id_fkey(id, first_name, last_name)')
+        .order('unit_number');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch drivers for assignment
+  const { data: drivers = [] } = useQuery({
+    queryKey: ['drivers-for-assignment'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('id, first_name, last_name, status')
+        .eq('status', 'active')
+        .order('first_name');
       if (error) throw error;
       return data;
     },
@@ -103,7 +120,14 @@ export default function Trucks() {
     { key: 'make', header: 'Make' },
     { key: 'model', header: 'Model' },
     { key: 'year', header: 'Year' },
-    { key: 'vin', header: 'VIN' },
+    { 
+      key: 'current_driver', 
+      header: 'Current Driver',
+      render: (truck: any) => {
+        const driver = truck.drivers;
+        return driver ? `${driver.first_name} ${driver.last_name}` : <span className="text-muted-foreground">Unassigned</span>;
+      }
+    },
     { key: 'status', header: 'Status', render: (truck: Truck) => <StatusBadge status={truck.status} /> },
     { 
       key: 'next_inspection_date', 
@@ -197,6 +221,34 @@ export default function Trucks() {
             <div className="space-y-2">
               <Label htmlFor="next_inspection_date">Next Inspection Date</Label>
               <Input id="next_inspection_date" type="date" value={formData.next_inspection_date || ''} onChange={(e) => setFormData({ ...formData, next_inspection_date: e.target.value })} />
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="current_driver_id" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Current Driver
+                </Label>
+                <Select 
+                  value={formData.current_driver_id || 'none'} 
+                  onValueChange={(v) => setFormData({ ...formData, current_driver_id: v === 'none' ? null : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a driver" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No driver assigned</SelectItem>
+                    {drivers.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.id}>
+                        {driver.first_name} {driver.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Assign a driver to this truck to enable their DVIR and maintenance features.
+                </p>
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
