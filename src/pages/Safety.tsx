@@ -4,8 +4,8 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { AlertTriangle, CheckCircle, Clock, Truck, Shield } from 'lucide-react';
-import { format, addDays, isBefore, isAfter } from 'date-fns';
+import { AlertTriangle, CheckCircle, Clock, Truck, Shield, Flame } from 'lucide-react';
+import { format, addDays, isBefore, parseISO } from 'date-fns';
 
 export default function Safety() {
   const { data: trucks = [] } = useQuery({
@@ -32,31 +32,41 @@ export default function Safety() {
   // Trucks with upcoming or overdue inspections
   const inspectionAlerts = trucks.filter(t => {
     if (!t.next_inspection_date) return false;
-    const inspDate = new Date(t.next_inspection_date);
+    const inspDate = parseISO(t.next_inspection_date);
     return isBefore(inspDate, in30Days);
   }).map(t => ({
     ...t,
-    isOverdue: t.next_inspection_date ? isBefore(new Date(t.next_inspection_date), today) : false
+    isOverdue: t.next_inspection_date ? isBefore(parseISO(t.next_inspection_date), today) : false
   }));
 
   // Drivers with license issues
   const licenseAlerts = drivers.filter(d => {
     if (!d.license_expiry) return false;
-    const expDate = new Date(d.license_expiry);
+    const expDate = parseISO(d.license_expiry);
     return isBefore(expDate, in30Days);
   }).map(d => ({
     ...d,
-    isExpired: d.license_expiry ? isBefore(new Date(d.license_expiry), today) : false
+    isExpired: d.license_expiry ? isBefore(parseISO(d.license_expiry), today) : false
   }));
 
   // Drivers with medical card issues
   const medicalAlerts = drivers.filter(d => {
     if (!d.medical_card_expiry) return false;
-    const expDate = new Date(d.medical_card_expiry);
+    const expDate = parseISO(d.medical_card_expiry);
     return isBefore(expDate, in30Days);
   }).map(d => ({
     ...d,
-    isExpired: d.medical_card_expiry ? isBefore(new Date(d.medical_card_expiry), today) : false
+    isExpired: d.medical_card_expiry ? isBefore(parseISO(d.medical_card_expiry), today) : false
+  }));
+
+  // Drivers with HAZMAT issues
+  const hazmatAlerts = drivers.filter(d => {
+    if (!d.hazmat_expiry) return false;
+    const expDate = parseISO(d.hazmat_expiry);
+    return isBefore(expDate, in30Days);
+  }).map(d => ({
+    ...d,
+    isExpired: d.hazmat_expiry ? isBefore(parseISO(d.hazmat_expiry), today) : false
   }));
 
   // Trucks that are down
@@ -66,7 +76,7 @@ export default function Safety() {
     <DashboardLayout>
       <PageHeader title="Safety Dashboard" description="Monitor inspections, compliance, and alerts" />
 
-      <div className="grid gap-6 md:grid-cols-4 mb-6">
+      <div className="grid gap-6 md:grid-cols-5 mb-6">
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Inspection Alerts</CardTitle>
@@ -99,6 +109,16 @@ export default function Safety() {
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">HAZMAT Alerts</CardTitle>
+            <Flame className={`h-4 w-4 ${hazmatAlerts.length > 0 ? 'text-warning' : 'text-muted-foreground'}`} />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{hazmatAlerts.length}</div>
+            <p className="text-xs text-muted-foreground">Expiring within 30 days</p>
+          </CardContent>
+        </Card>
+        <Card className="card-elevated">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Down Trucks</CardTitle>
             <Truck className={`h-4 w-4 ${downTrucks.length > 0 ? 'text-destructive' : 'text-success'}`} />
           </CardHeader>
@@ -109,7 +129,7 @@ export default function Safety() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Inspection Alerts */}
         <Card className="card-elevated">
           <CardHeader>
@@ -135,7 +155,7 @@ export default function Safety() {
                         {truck.isOverdue ? 'OVERDUE' : 'Due'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {truck.next_inspection_date && format(new Date(truck.next_inspection_date), 'MMM d, yyyy')}
+                        {truck.next_inspection_date && format(parseISO(truck.next_inspection_date), 'MMM d, yyyy')}
                       </p>
                     </div>
                   </div>
@@ -170,7 +190,7 @@ export default function Safety() {
                         {driver.isExpired ? 'EXPIRED' : 'Expiring'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {driver.license_expiry && format(new Date(driver.license_expiry), 'MMM d, yyyy')}
+                        {driver.license_expiry && format(parseISO(driver.license_expiry), 'MMM d, yyyy')}
                       </p>
                     </div>
                   </div>
@@ -205,7 +225,7 @@ export default function Safety() {
                         {driver.isExpired ? 'EXPIRED' : 'Expiring'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {driver.medical_card_expiry && format(new Date(driver.medical_card_expiry), 'MMM d, yyyy')}
+                        {driver.medical_card_expiry && format(parseISO(driver.medical_card_expiry), 'MMM d, yyyy')}
                       </p>
                     </div>
                   </div>
@@ -214,8 +234,44 @@ export default function Safety() {
             )}
           </CardContent>
         </Card>
+
+        {/* HAZMAT Alerts */}
+        <Card className="card-elevated">
+          <CardHeader>
+            <CardTitle>HAZMAT Expirations</CardTitle>
+            <CardDescription>Drivers with expiring HAZMAT certifications</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {hazmatAlerts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle className="h-10 w-10 mx-auto mb-3 text-success" />
+                <p>All HAZMAT certifications are current</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {hazmatAlerts.map(driver => (
+                  <div key={driver.id} className={`flex items-center justify-between p-3 rounded-lg ${driver.isExpired ? 'bg-destructive/10' : 'bg-warning/10'}`}>
+                    <div>
+                      <p className="font-medium">{driver.first_name} {driver.last_name}</p>
+                      <p className="text-sm text-muted-foreground">HAZMAT Certification</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-sm font-medium ${driver.isExpired ? 'text-destructive' : 'text-warning'}`}>
+                        {driver.isExpired ? 'EXPIRED' : 'Expiring'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {driver.hazmat_expiry && format(parseISO(driver.hazmat_expiry), 'MMM d, yyyy')}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Down Trucks */}
-        <Card className="card-elevated lg:col-span-3">
+        <Card className="card-elevated lg:col-span-4">
           <CardHeader>
             <CardTitle>Out of Service Trucks</CardTitle>
             <CardDescription>Trucks currently down or out of service</CardDescription>
@@ -227,7 +283,7 @@ export default function Safety() {
                 <p>All trucks are operational</p>
               </div>
             ) : (
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 {downTrucks.map(truck => (
                   <div key={truck.id} className="flex items-center justify-between p-3 rounded-lg bg-destructive/10">
                     <div>

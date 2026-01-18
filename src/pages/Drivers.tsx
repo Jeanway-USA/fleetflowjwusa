@@ -15,7 +15,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User } from 'lucide-react';
+import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, AlertTriangle } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 
 const endorsementOptions = ['H - Hazmat', 'N - Tank', 'P - Passenger', 'S - School Bus', 'T - Double/Triple', 'X - Hazmat + Tank'];
 
@@ -143,10 +144,15 @@ export default function Drivers() {
 
   const isExpiringSoon = (date: string | null) => {
     if (!date) return false;
-    const expiry = new Date(date);
+    const expiry = parseISO(date);
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
     return expiry <= thirtyDaysFromNow;
+  };
+
+  const formatDate = (date: string | null) => {
+    if (!date) return '-';
+    return format(parseISO(date), 'MM/dd/yyyy');
   };
 
   if (isLoading) {
@@ -234,7 +240,7 @@ export default function Drivers() {
                       License
                     </span>
                     <span className={isExpiringSoon(driver.license_expiry) ? 'text-destructive font-medium' : ''}>
-                      {driver.license_expiry ? new Date(driver.license_expiry).toLocaleDateString() : '-'}
+                      {formatDate(driver.license_expiry)}
                     </span>
                   </div>
 
@@ -244,15 +250,27 @@ export default function Drivers() {
                       Medical Card
                     </span>
                     <span className={isExpiringSoon(driver.medical_card_expiry) ? 'text-destructive font-medium' : ''}>
-                      {driver.medical_card_expiry ? new Date(driver.medical_card_expiry).toLocaleDateString() : '-'}
+                      {formatDate(driver.medical_card_expiry)}
                     </span>
                   </div>
+
+                  {driver.hazmat_expiry && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        HAZMAT
+                      </span>
+                      <span className={isExpiringSoon(driver.hazmat_expiry) ? 'text-destructive font-medium' : ''}>
+                        {formatDate(driver.hazmat_expiry)}
+                      </span>
+                    </div>
+                  )}
 
                   {driver.has_twic && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">TWIC Card</span>
                       <span className={isExpiringSoon(driver.twic_expiry) ? 'text-destructive font-medium' : ''}>
-                        {driver.twic_expiry ? new Date(driver.twic_expiry).toLocaleDateString() : 'Yes'}
+                        {driver.twic_expiry ? formatDate(driver.twic_expiry) : 'Yes'}
                       </span>
                     </div>
                   )}
@@ -335,8 +353,8 @@ export default function Drivers() {
             </div>
 
             <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">Endorsements</h4>
-              <div className="grid grid-cols-2 gap-2">
+              <h4 className="font-medium mb-3">Endorsements & HAZMAT</h4>
+              <div className="grid grid-cols-2 gap-2 mb-4">
                 {endorsementOptions.map((endorsement) => (
                   <div key={endorsement} className="flex items-center space-x-2">
                     <Checkbox
@@ -348,6 +366,12 @@ export default function Drivers() {
                   </div>
                 ))}
               </div>
+              {(formData.endorsements || []).some((e: string) => e.includes('Hazmat')) && (
+                <div className="space-y-2">
+                  <Label htmlFor="hazmat_expiry">HAZMAT Certification Expiry</Label>
+                  <Input id="hazmat_expiry" type="date" value={formData.hazmat_expiry || ''} onChange={(e) => setFormData({ ...formData, hazmat_expiry: e.target.value })} />
+                </div>
+              )}
             </div>
 
             <div className="border-t pt-4">
