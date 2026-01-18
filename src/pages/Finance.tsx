@@ -616,10 +616,11 @@ export default function Finance() {
   }), { count: 0, amount: 0 });
 
   const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total;
-  const totalPayrollAndCommissions = payrollTotals.netPay + commissionTotals.amount;
-  const grandTotalExpenses = totalExpenses + totalPayrollAndCommissions;
-  const netProfit = revenueTotals.netRevenue - grandTotalExpenses;
-  const profitMargin = revenueTotals.netRevenue > 0 ? (netProfit / revenueTotals.netRevenue) * 100 : 0;
+  const totalPayroll = payrollTotals.netPay;
+  const grandTotalExpenses = totalExpenses + totalPayroll;
+  const totalRevenueWithCommissions = revenueTotals.netRevenue + commissionTotals.amount;
+  const netProfit = totalRevenueWithCommissions - grandTotalExpenses;
+  const profitMargin = totalRevenueWithCommissions > 0 ? (netProfit / totalRevenueWithCommissions) * 100 : 0;
 
   const getTruckName = (truckId: string | null) => {
     if (!truckId) return '-';
@@ -728,12 +729,22 @@ export default function Finance() {
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Payroll & Commissions</CardTitle>
+            <CardTitle className="text-sm font-medium">Driver Payroll</CardTitle>
             <Users className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{formatCurrency(totalPayrollAndCommissions)}</div>
-            <p className="text-xs text-muted-foreground">{payrollTotals.count} payrolls, {commissionTotals.count} commissions</p>
+            <div className="text-2xl font-bold text-destructive">{formatCurrency(totalPayroll)}</div>
+            <p className="text-xs text-muted-foreground">{payrollTotals.count} payroll entries</p>
+          </CardContent>
+        </Card>
+        <Card className="card-elevated">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Agency Commissions</CardTitle>
+            <Briefcase className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">{formatCurrency(commissionTotals.amount)}</div>
+            <p className="text-xs text-muted-foreground">{commissionTotals.count} commissions earned</p>
           </CardContent>
         </Card>
         <Card className="card-elevated">
@@ -899,16 +910,20 @@ export default function Finance() {
                     <span className="font-mono text-success">{formatCurrency(revenueTotals.netRevenue)}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span>Agency Commissions (Revenue)</span>
+                    <span className="font-mono text-success">+{formatCurrency(commissionTotals.amount)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold border-t pt-2 mt-2">
+                    <span>Total Revenue</span>
+                    <span className="font-mono">{formatCurrency(totalRevenueWithCommissions)}</span>
+                  </div>
+                  <div className="flex justify-between mt-4">
                     <span>Operating Expenses</span>
                     <span className="font-mono text-destructive">-{formatCurrency(totalExpenses)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Driver Payroll</span>
                     <span className="font-mono text-destructive">-{formatCurrency(payrollTotals.netPay)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Agent Commissions</span>
-                    <span className="font-mono text-destructive">-{formatCurrency(commissionTotals.amount)}</span>
                   </div>
                   <div className="border-t pt-3">
                     <div className="flex justify-between items-center">
@@ -1257,9 +1272,9 @@ export default function Finance() {
                   <p className="text-sm text-muted-foreground">Total Commissions</p>
                   <p className="text-2xl font-bold">{commissionTotals.count}</p>
                 </div>
-                <div className="p-4 bg-destructive/10 rounded-lg">
-                  <p className="text-sm text-muted-foreground">Total Amount</p>
-                  <p className="text-2xl font-bold text-destructive">{formatCurrency(commissionTotals.amount)}</p>
+                <div className="p-4 bg-success/10 rounded-lg">
+                  <p className="text-sm text-muted-foreground">Total Revenue</p>
+                  <p className="text-2xl font-bold text-success">{formatCurrency(commissionTotals.amount)}</p>
                 </div>
               </div>
 
