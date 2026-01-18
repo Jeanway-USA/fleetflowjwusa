@@ -115,6 +115,33 @@ export type Database = {
           },
         ]
       }
+      company_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          setting_key: string
+          setting_value: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          setting_key: string
+          setting_value: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           created_at: string
@@ -281,54 +308,99 @@ export type Database = {
       }
       fleet_loads: {
         Row: {
+          accessorials: number | null
+          actual_miles: number | null
+          advance_available: number | null
+          advance_taken: number | null
+          booked_miles: number | null
           created_at: string
           delivery_date: string | null
           destination: string
           detention_pay: number | null
           driver_id: string | null
+          end_miles: number | null
           fuel_advance: number | null
+          fuel_surcharge: number | null
+          gross_revenue: number | null
           id: string
+          is_power_only: boolean | null
           landstar_load_id: string | null
+          lumper: number | null
+          net_revenue: number | null
           notes: string | null
           origin: string
           pickup_date: string | null
           rate: number | null
+          settlement: number | null
+          start_miles: number | null
           status: string
+          trailer_revenue: number | null
           truck_id: string | null
+          truck_revenue: number | null
           updated_at: string
         }
         Insert: {
+          accessorials?: number | null
+          actual_miles?: number | null
+          advance_available?: number | null
+          advance_taken?: number | null
+          booked_miles?: number | null
           created_at?: string
           delivery_date?: string | null
           destination: string
           detention_pay?: number | null
           driver_id?: string | null
+          end_miles?: number | null
           fuel_advance?: number | null
+          fuel_surcharge?: number | null
+          gross_revenue?: number | null
           id?: string
+          is_power_only?: boolean | null
           landstar_load_id?: string | null
+          lumper?: number | null
+          net_revenue?: number | null
           notes?: string | null
           origin: string
           pickup_date?: string | null
           rate?: number | null
+          settlement?: number | null
+          start_miles?: number | null
           status?: string
+          trailer_revenue?: number | null
           truck_id?: string | null
+          truck_revenue?: number | null
           updated_at?: string
         }
         Update: {
+          accessorials?: number | null
+          actual_miles?: number | null
+          advance_available?: number | null
+          advance_taken?: number | null
+          booked_miles?: number | null
           created_at?: string
           delivery_date?: string | null
           destination?: string
           detention_pay?: number | null
           driver_id?: string | null
+          end_miles?: number | null
           fuel_advance?: number | null
+          fuel_surcharge?: number | null
+          gross_revenue?: number | null
           id?: string
+          is_power_only?: boolean | null
           landstar_load_id?: string | null
+          lumper?: number | null
+          net_revenue?: number | null
           notes?: string | null
           origin?: string
           pickup_date?: string | null
           rate?: number | null
+          settlement?: number | null
+          start_miles?: number | null
           status?: string
+          trailer_revenue?: number | null
           truck_id?: string | null
+          truck_revenue?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -389,6 +461,131 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      load_expenses: {
+        Row: {
+          card_load: number | null
+          cell_phone: number | null
+          created_at: string
+          food_bev: number | null
+          fuel_cost: number | null
+          fuel_gallons: number | null
+          household: number | null
+          id: string
+          insurance: number | null
+          laundry: number | null
+          lcn_satellite: number | null
+          licensing_permits: number | null
+          load_id: string
+          lumper: number | null
+          maintenance_fund: number | null
+          misc_operating: number | null
+          motel: number | null
+          notes: string | null
+          office_supplies: number | null
+          oil: number | null
+          operating_total: number | null
+          other_personal: number | null
+          parking: number | null
+          personal_total: number | null
+          prepass_scale: number | null
+          repairs_parts: number | null
+          retirement: number | null
+          road_fuel_tax: number | null
+          savings: number | null
+          shower: number | null
+          tires: number | null
+          tolls: number | null
+          trailer_payment: number | null
+          trip_scanning: number | null
+          truck_payment: number | null
+          updated_at: string
+        }
+        Insert: {
+          card_load?: number | null
+          cell_phone?: number | null
+          created_at?: string
+          food_bev?: number | null
+          fuel_cost?: number | null
+          fuel_gallons?: number | null
+          household?: number | null
+          id?: string
+          insurance?: number | null
+          laundry?: number | null
+          lcn_satellite?: number | null
+          licensing_permits?: number | null
+          load_id: string
+          lumper?: number | null
+          maintenance_fund?: number | null
+          misc_operating?: number | null
+          motel?: number | null
+          notes?: string | null
+          office_supplies?: number | null
+          oil?: number | null
+          operating_total?: number | null
+          other_personal?: number | null
+          parking?: number | null
+          personal_total?: number | null
+          prepass_scale?: number | null
+          repairs_parts?: number | null
+          retirement?: number | null
+          road_fuel_tax?: number | null
+          savings?: number | null
+          shower?: number | null
+          tires?: number | null
+          tolls?: number | null
+          trailer_payment?: number | null
+          trip_scanning?: number | null
+          truck_payment?: number | null
+          updated_at?: string
+        }
+        Update: {
+          card_load?: number | null
+          cell_phone?: number | null
+          created_at?: string
+          food_bev?: number | null
+          fuel_cost?: number | null
+          fuel_gallons?: number | null
+          household?: number | null
+          id?: string
+          insurance?: number | null
+          laundry?: number | null
+          lcn_satellite?: number | null
+          licensing_permits?: number | null
+          load_id?: string
+          lumper?: number | null
+          maintenance_fund?: number | null
+          misc_operating?: number | null
+          motel?: number | null
+          notes?: string | null
+          office_supplies?: number | null
+          oil?: number | null
+          operating_total?: number | null
+          other_personal?: number | null
+          parking?: number | null
+          personal_total?: number | null
+          prepass_scale?: number | null
+          repairs_parts?: number | null
+          retirement?: number | null
+          road_fuel_tax?: number | null
+          savings?: number | null
+          shower?: number | null
+          tires?: number | null
+          tolls?: number | null
+          trailer_payment?: number | null
+          trip_scanning?: number | null
+          truck_payment?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_expenses_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_loads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       maintenance_logs: {
         Row: {
