@@ -12,6 +12,7 @@ import {
   Building2,
   TrendingUp,
   BookOpen,
+  BarChart3,
   LucideIcon
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -69,6 +70,7 @@ export function AppSidebar() {
     { title: 'Finance & P/L', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'] },
     { title: 'Driver Payroll', icon: DollarSign, path: '/payroll', roles: ['owner', 'payroll_admin', 'driver'] },
     { title: 'Commissions', icon: DollarSign, path: '/commissions', roles: ['owner', 'payroll_admin'] },
+    { title: 'Company Insights', icon: BarChart3, path: '/insights', roles: ['owner', 'payroll_admin'] },
   ];
 
   const operationsNavItems: NavItem[] = [
