@@ -110,6 +110,8 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent bubbling to parent forms
+    
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       toast.error('Amount is required');
       return;
