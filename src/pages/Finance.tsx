@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { DollarSign, TrendingUp, TrendingDown, Percent, Truck, Receipt, PiggyBank, Calculator } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, Truck, Receipt, PiggyBank, Calculator, Fuel, Route } from 'lucide-react';
 import { format, parseISO, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, isWithinInterval } from 'date-fns';
 import { useState } from 'react';
 
@@ -261,6 +261,29 @@ export default function Finance() {
         </TabsList>
 
         <TabsContent value="summary" className="mt-6">
+          {/* P&L Header Summary - matching spreadsheet format */}
+          <Card className="card-elevated mb-6">
+            <CardHeader>
+              <CardTitle>Profit/Loss Summary for {selectedPeriod === 'all' ? 'All Time' : selectedPeriod.replace('-', ' ')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-6 text-center">
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">100% GROSS</p>
+                  <p className="text-2xl font-bold">{formatCurrency(revenueTotals.grossRevenue)}</p>
+                </div>
+                <div className="p-4 bg-primary/10 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">TRUCK REVENUE ({getSetting('truck_percentage', '65')}%)</p>
+                  <p className="text-2xl font-bold">{formatCurrency(revenueTotals.truckRevenue)}</p>
+                </div>
+                <div className="p-4 bg-success/10 rounded-lg">
+                  <p className="text-sm text-muted-foreground mb-1">NET REVENUE</p>
+                  <p className="text-2xl font-bold text-success">{formatCurrency(revenueTotals.netRevenue)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-6 md:grid-cols-2">
             {/* Revenue Summary */}
             <Card className="card-elevated">
@@ -274,11 +297,16 @@ export default function Finance() {
                 <Table>
                   <TableBody>
                     <TableRow>
-                      <TableCell>Booked Linehaul</TableCell>
+                      <TableCell>GROSS L/H</TableCell>
                       <TableCell className="text-right">{formatCurrency(revenueTotals.bookedLinehaul)}</TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell>Fuel Surcharge</TableCell>
+                      <TableCell>
+                        FSC REV 
+                        <span className="text-muted-foreground text-xs ml-2">
+                          ({revenueTotals.grossRevenue > 0 ? ((revenueTotals.fuelSurcharge / revenueTotals.grossRevenue) * 100).toFixed(2) : 0}% of Gross)
+                        </span>
+                      </TableCell>
                       <TableCell className="text-right">{formatCurrency(revenueTotals.fuelSurcharge)}</TableCell>
                     </TableRow>
                     <TableRow>
@@ -298,7 +326,7 @@ export default function Finance() {
                       <TableCell className="text-right">{formatCurrency(revenueTotals.trailerRevenue)}</TableCell>
                     </TableRow>
                     <TableRow className="bg-success/10">
-                      <TableCell className="font-bold">Net Revenue</TableCell>
+                      <TableCell className="font-bold">TOTAL REV (Net Revenue)</TableCell>
                       <TableCell className="text-right font-bold text-success">{formatCurrency(revenueTotals.netRevenue)}</TableCell>
                     </TableRow>
                   </TableBody>
@@ -306,20 +334,81 @@ export default function Finance() {
               </CardContent>
             </Card>
 
-            {/* Expense Summary */}
+            {/* Miles Summary */}
             <Card className="card-elevated">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Receipt className="h-5 w-5 text-destructive" />
-                  Expense Summary
+                  <Route className="h-5 w-5 text-primary" />
+                  Miles Summary
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableBody>
                     <TableRow>
+                      <TableCell>Paid Miles (Booked)</TableCell>
+                      <TableCell className="text-right font-mono">{revenueTotals.bookedMiles.toLocaleString()}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Actual Miles</TableCell>
+                      <TableCell className="text-right font-mono">{revenueTotals.actualMiles.toLocaleString()}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Empty Miles</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {(revenueTotals.actualMiles - revenueTotals.bookedMiles).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow className="border-t">
+                      <TableCell className="font-medium">% of Empty Miles</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {revenueTotals.actualMiles > 0 
+                          ? (((revenueTotals.actualMiles - revenueTotals.bookedMiles) / revenueTotals.actualMiles) * 100).toFixed(2)
+                          : 0}%
+                      </TableCell>
+                    </TableRow>
+                    <TableRow className="border-t-2">
+                      <TableCell className="font-medium">Revenue Per Paid Mile</TableCell>
+                      <TableCell className="text-right font-medium text-success">
+                        {revenueTotals.bookedMiles > 0 ? formatCurrency(revenueTotals.netRevenue / revenueTotals.bookedMiles) : '$0.00'}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Revenue Per Actual Mile</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {revenueTotals.actualMiles > 0 ? formatCurrency(revenueTotals.netRevenue / revenueTotals.actualMiles) : '$0.00'}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Expense Summary */}
+          <Card className="card-elevated mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-destructive" />
+                Expense Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead colSpan={2}>Operating Expenses</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
                       <TableCell>Truck Payment</TableCell>
                       <TableCell className="text-right">{formatCurrency(expenseTotals.truckPayment)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Trailer Payment</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expenseTotals.trailerPayment)}</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>Insurance</TableCell>
@@ -330,6 +419,10 @@ export default function Finance() {
                       <TableCell className="text-right">{formatCurrency(expenseTotals.licensingPermits)}</TableCell>
                     </TableRow>
                     <TableRow>
+                      <TableCell>LCN/Satellite</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expenseTotals.lcnSatellite)}</TableCell>
+                    </TableRow>
+                    <TableRow>
                       <TableCell>Cell Phone</TableCell>
                       <TableCell className="text-right">{formatCurrency(expenseTotals.cellPhone)}</TableCell>
                     </TableRow>
@@ -338,55 +431,111 @@ export default function Finance() {
                       <TableCell className="text-right">{formatCurrency(expenseTotals.fuelCost)}</TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell>Repairs & Maintenance</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.repairsParts + expenseTotals.maintenanceFund)}</TableCell>
+                      <TableCell>Tires</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expenseTotals.tires)}</TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell>Savings & Retirement</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.savings + expenseTotals.retirement)}</TableCell>
+                      <TableCell>Oil</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expenseTotals.oil)}</TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell>Other Operating</TableCell>
+                      <TableCell>Repairs & Parts</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expenseTotals.repairsParts)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Tolls</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expenseTotals.tolls)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Prepass/Scale</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expenseTotals.prepassScale)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Maintenance Fund</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expenseTotals.maintenanceFund)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Savings</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expenseTotals.savings)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Retirement</TableCell>
+                      <TableCell className="text-right">{formatCurrency(expenseTotals.retirement)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Misc Operating</TableCell>
                       <TableCell className="text-right">{formatCurrency(expenseTotals.miscOperating)}</TableCell>
                     </TableRow>
                     <TableRow className="bg-destructive/10">
-                      <TableCell className="font-bold">Total Operating Expenses</TableCell>
+                      <TableCell className="font-bold">OPERATING EXPENSES</TableCell>
                       <TableCell className="text-right font-bold text-destructive">{formatCurrency(expenseTotals.operatingTotal)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-bold">PERSONAL EXPENSES</TableCell>
+                      <TableCell className="text-right font-bold">{formatCurrency(expenseTotals.personalTotal)}</TableCell>
+                    </TableRow>
+                    <TableRow className="bg-muted">
+                      <TableCell className="font-bold text-lg">TOTAL EXPENSES</TableCell>
+                      <TableCell className="text-right font-bold text-lg text-destructive">
+                        {formatCurrency(expenseTotals.operatingTotal + expenseTotals.personalTotal)}
+                      </TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Net Profit Card */}
-          <Card className="card-elevated mt-6">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-medium">Net Profit/Loss</h3>
-                  <p className="text-muted-foreground">Net Revenue minus Operating Expenses</p>
-                </div>
-                <div className={`text-4xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {formatCurrency(netProfit)}
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <p className="text-sm text-muted-foreground">Revenue per Mile</p>
-                  <p className="text-lg font-medium">
-                    {revenueTotals.actualMiles > 0 ? formatCurrency(revenueTotals.netRevenue / revenueTotals.actualMiles) : '$0.00'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Miles</p>
-                  <p className="text-lg font-medium">{revenueTotals.actualMiles.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Avg Load Revenue</p>
-                  <p className="text-lg font-medium">
-                    {revenueTotals.loadCount > 0 ? formatCurrency(revenueTotals.netRevenue / revenueTotals.loadCount) : '$0.00'}
-                  </p>
+                {/* P&L Final Calculation */}
+                <div className="space-y-4">
+                  <Card className="bg-muted">
+                    <CardContent className="pt-6">
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span>Revenue</span>
+                          <span className="font-mono">{formatCurrency(revenueTotals.netRevenue)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>FSC</span>
+                          <span className="font-mono">{formatCurrency(revenueTotals.fuelSurcharge)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Expenses</span>
+                          <span className="font-mono text-destructive">-{formatCurrency(expenseTotals.operatingTotal)}</span>
+                        </div>
+                        <div className="border-t pt-3">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-lg">{netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS'}</span>
+                            <span className={`font-bold text-2xl ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                              {formatCurrency(netProfit)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="p-4 bg-muted rounded-lg text-center">
+                      <p className="text-sm text-muted-foreground">Loads</p>
+                      <p className="text-2xl font-bold">{revenueTotals.loadCount}</p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg text-center">
+                      <p className="text-sm text-muted-foreground">Profit Margin</p>
+                      <p className={`text-2xl font-bold ${profitMargin >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {profitMargin.toFixed(1)}%
+                      </p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg text-center">
+                      <p className="text-sm text-muted-foreground">Avg Per Load</p>
+                      <p className="text-xl font-bold">
+                        {revenueTotals.loadCount > 0 ? formatCurrency(netProfit / revenueTotals.loadCount) : '$0.00'}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-muted rounded-lg text-center">
+                      <p className="text-sm text-muted-foreground">Profit Per Mile</p>
+                      <p className="text-xl font-bold">
+                        {revenueTotals.actualMiles > 0 ? formatCurrency(netProfit / revenueTotals.actualMiles) : '$0.00'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

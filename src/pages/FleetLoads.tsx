@@ -15,7 +15,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X } from 'lucide-react';
+
+// Accessorial types commonly used in trucking
+const ACCESSORIAL_TYPES = [
+  'Detention',
+  'Layover',
+  'Lumper',
+  'TONU',
+  'Deadhead',
+  'Stop-off',
+  'Unloading',
+  'Inside Delivery',
+  'Lift Gate',
+  'Other',
+];
+
+interface Accessorial {
+  id?: string;
+  accessorial_type: string;
+  amount: number;
+  percentage: number;
+  notes?: string;
+}
 import { format, parseISO } from 'date-fns';
 
 export default function FleetLoads() {
@@ -24,6 +46,7 @@ export default function FleetLoads() {
   const [editingLoad, setEditingLoad] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [accessorials, setAccessorials] = useState<Accessorial[]>([]);
 
   // Fetch settings for calculations
   const { data: settings = [] } = useQuery({
@@ -49,6 +72,15 @@ export default function FleetLoads() {
     },
   });
 
+  const { data: allAccessorials = [] } = useQuery({
+    queryKey: ['load_accessorials'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('load_accessorials').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: drivers = [] } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
@@ -68,12 +100,26 @@ export default function FleetLoads() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (load: any) => {
-      const { error } = await supabase.from('fleet_loads').insert(load);
+    mutationFn: async ({ load, accessorials: accs }: { load: any; accessorials: Accessorial[] }) => {
+      const { data, error } = await supabase.from('fleet_loads').insert(load).select().single();
       if (error) throw error;
+      
+      // Insert accessorials if any
+      if (accs.length > 0) {
+        const accessorialRecords = accs.map(acc => ({
+          load_id: data.id,
+          accessorial_type: acc.accessorial_type,
+          amount: acc.amount,
+          percentage: acc.percentage,
+          notes: acc.notes,
+        }));
+        const { error: accError } = await supabase.from('load_accessorials').insert(accessorialRecords);
+        if (accError) throw accError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
+      queryClient.invalidateQueries({ queryKey: ['load_accessorials'] });
       toast.success('Load created successfully');
       closeDialog();
     },
@@ -81,12 +127,28 @@ export default function FleetLoads() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: any) => {
+    mutationFn: async ({ id, accessorials: accs, ...updates }: any) => {
       const { error } = await supabase.from('fleet_loads').update(updates).eq('id', id);
       if (error) throw error;
+      
+      // Delete existing accessorials and insert new ones
+      await supabase.from('load_accessorials').delete().eq('load_id', id);
+      
+      if (accs && accs.length > 0) {
+        const accessorialRecords = accs.map((acc: Accessorial) => ({
+          load_id: id,
+          accessorial_type: acc.accessorial_type,
+          amount: acc.amount,
+          percentage: acc.percentage,
+          notes: acc.notes,
+        }));
+        const { error: accError } = await supabase.from('load_accessorials').insert(accessorialRecords);
+        if (accError) throw accError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
+      queryClient.invalidateQueries({ queryKey: ['load_accessorials'] });
       toast.success('Load updated successfully');
       closeDialog();
     },
@@ -100,6 +162,7 @@ export default function FleetLoads() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
+      queryClient.invalidateQueries({ queryKey: ['load_accessorials'] });
       toast.success('Load deleted');
     },
     onError: (error: any) => toast.error(error.message),
@@ -111,6 +174,19 @@ export default function FleetLoads() {
       status: 'pending',
       is_power_only: false,
     });
+    // Load existing accessorials for this load
+    if (load?.id) {
+      const loadAccs = allAccessorials.filter((a: any) => a.load_id === load.id);
+      setAccessorials(loadAccs.map((a: any) => ({
+        id: a.id,
+        accessorial_type: a.accessorial_type,
+        amount: a.amount,
+        percentage: a.percentage,
+        notes: a.notes,
+      })));
+    } else {
+      setAccessorials([]);
+    }
     setDialogOpen(true);
   };
 
@@ -118,14 +194,43 @@ export default function FleetLoads() {
     setDialogOpen(false);
     setEditingLoad(null);
     setFormData({});
+    setAccessorials([]);
+  };
+
+  // Accessorial management
+  const addAccessorial = () => {
+    setAccessorials([...accessorials, { accessorial_type: 'Detention', amount: 0, percentage: 100 }]);
+  };
+
+  const removeAccessorial = (index: number) => {
+    setAccessorials(accessorials.filter((_, i) => i !== index));
+  };
+
+  const updateAccessorial = (index: number, field: keyof Accessorial, value: any) => {
+    const updated = [...accessorials];
+    updated[index] = { ...updated[index], [field]: value };
+    setAccessorials(updated);
+  };
+
+  // Calculate total accessorials amount
+  const calculateAccessorialsTotal = () => {
+    return accessorials.reduce((sum, acc) => sum + (acc.amount * (acc.percentage / 100)), 0);
+  };
+
+  // Get accessorials for a specific load (for display in table)
+  const getLoadAccessorialsTotal = (loadId: string) => {
+    const loadAccs = allAccessorials.filter((a: any) => a.load_id === loadId);
+    return loadAccs.reduce((sum: number, acc: any) => sum + (acc.amount * (acc.percentage / 100)), 0);
   };
 
   // Calculate revenue based on compensation package
-  const calculateRevenue = (data: any) => {
+  const calculateRevenue = (data: any, accs: Accessorial[] = accessorials) => {
     const rate = parseFloat(data.rate) || 0;
     const fuelSurcharge = parseFloat(data.fuel_surcharge) || 0;
-    const accessorials = parseFloat(data.accessorials) || 0;
     const lumper = parseFloat(data.lumper) || 0;
+    
+    // Calculate accessorials total from the new structure
+    const accessorialsTotal = accs.reduce((sum, acc) => sum + (acc.amount * (acc.percentage / 100)), 0);
     
     const truckPct = parseFloat(getSetting('truck_percentage', '65')) / 100;
     const trailerPct = parseFloat(getSetting('trailer_percentage', '7')) / 100;
@@ -133,7 +238,7 @@ export default function FleetLoads() {
     const ownsTrailer = getSetting('owns_trailer', 'false') === 'true';
     const isPowerOnly = data.is_power_only;
 
-    const grossRevenue = rate + fuelSurcharge + accessorials;
+    const grossRevenue = rate + fuelSurcharge + accessorialsTotal;
     const advanceAvailable = rate * advancePct;
     const advanceTaken = parseFloat(data.advance_taken) || 0;
     
@@ -155,6 +260,7 @@ export default function FleetLoads() {
       net_revenue: netRevenue,
       settlement: settlement,
       actual_miles: (parseInt(data.end_miles) || 0) - (parseInt(data.start_miles) || 0),
+      accessorials: accessorialsTotal,
     };
   };
 
@@ -172,9 +278,9 @@ export default function FleetLoads() {
     };
 
     if (editingLoad) {
-      updateMutation.mutate({ id: editingLoad.id, ...payload });
+      updateMutation.mutate({ id: editingLoad.id, accessorials, ...payload });
     } else {
-      createMutation.mutate(payload);
+      createMutation.mutate({ load: payload, accessorials });
     }
   };
 
@@ -324,7 +430,7 @@ export default function FleetLoads() {
                       <TableCell>{load.destination}</TableCell>
                       <TableCell className="text-right">{formatCurrency(load.rate)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(load.fuel_surcharge)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(load.accessorials)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(getLoadAccessorialsTotal(load.id))}</TableCell>
                       <TableCell className="text-right font-medium text-success">{formatCurrency(load.net_revenue)}</TableCell>
                       <TableCell className="text-right">{load.actual_miles?.toLocaleString() || '-'}</TableCell>
                       <TableCell><StatusBadge status={load.status} /></TableCell>
@@ -512,7 +618,7 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="lumper">Lumper ($)</Label>
                     <Input 
@@ -521,17 +627,6 @@ export default function FleetLoads() {
                       step="0.01" 
                       value={formData.lumper || ''} 
                       onChange={(e) => setFormData({ ...formData, lumper: parseFloat(e.target.value) || 0 })} 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="accessorials">Accessorials ($)</Label>
-                    <Input 
-                      id="accessorials" 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.accessorials || ''} 
-                      onChange={(e) => setFormData({ ...formData, accessorials: parseFloat(e.target.value) || 0 })} 
-                      placeholder="300.00"
                     />
                   </div>
                   <div className="space-y-2">
@@ -544,6 +639,89 @@ export default function FleetLoads() {
                       onChange={(e) => setFormData({ ...formData, fuel_advance: parseFloat(e.target.value) || 0 })} 
                     />
                   </div>
+                </div>
+
+                {/* Accessorials Section */}
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-base font-medium">Accessorials</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addAccessorial}>
+                      <Plus className="h-4 w-4 mr-1" /> Add Accessorial
+                    </Button>
+                  </div>
+                  
+                  {accessorials.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No accessorials added. Click "Add Accessorial" to add detention, layover, etc.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {accessorials.map((acc, index) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 items-end p-3 bg-muted/50 rounded-lg">
+                          <div className="col-span-4 space-y-1">
+                            <Label className="text-xs">Type</Label>
+                            <Select 
+                              value={acc.accessorial_type} 
+                              onValueChange={(v) => updateAccessorial(index, 'accessorial_type', v)}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ACCESSORIAL_TYPES.map(type => (
+                                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-3 space-y-1">
+                            <Label className="text-xs">Amount ($)</Label>
+                            <Input 
+                              type="number" 
+                              step="0.01"
+                              className="h-9"
+                              value={acc.amount || ''} 
+                              onChange={(e) => updateAccessorial(index, 'amount', parseFloat(e.target.value) || 0)}
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs">% Paid</Label>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              max="100"
+                              className="h-9"
+                              value={acc.percentage || ''} 
+                              onChange={(e) => updateAccessorial(index, 'percentage', parseFloat(e.target.value) || 100)}
+                              placeholder="100"
+                            />
+                          </div>
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs">Net</Label>
+                            <div className="h-9 px-2 py-1.5 rounded-md border bg-muted text-sm font-medium">
+                              {formatCurrency(acc.amount * (acc.percentage / 100))}
+                            </div>
+                          </div>
+                          <div className="col-span-1">
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-9 w-9 text-destructive"
+                              onClick={() => removeAccessorial(index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex justify-end pt-2">
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Total Accessorials: </span>
+                          <span className="font-bold">{formatCurrency(calculateAccessorialsTotal())}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
