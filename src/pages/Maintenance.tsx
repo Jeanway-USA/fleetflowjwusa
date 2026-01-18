@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
+import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, FileText } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type MaintenanceLog = Database['public']['Tables']['maintenance_logs']['Row'];
@@ -123,6 +124,9 @@ export default function Maintenance() {
       header: 'Actions',
       render: (log: MaintenanceLog) => (
         <div className="flex gap-2">
+          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedLog(log); }}>
+            <FileText className="h-4 w-4" />
+          </Button>
           <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(log); }}>
             <Pencil className="h-4 w-4" />
           </Button>
@@ -133,6 +137,8 @@ export default function Maintenance() {
       ),
     },
   ];
+
+  const [selectedLog, setSelectedLog] = useState<MaintenanceLog | null>(null);
 
   return (
     <DashboardLayout>
@@ -196,6 +202,22 @@ export default function Maintenance() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Documents for {selectedLog?.service_type} - {getTruckUnit(selectedLog?.truck_id || '')}</DialogTitle>
+          </DialogHeader>
+          {selectedLog && (
+            <DocumentUpload
+              relatedType="maintenance"
+              relatedId={selectedLog.id}
+              documentTypes={['Invoice', 'Receipt', 'Work Order', 'Warranty', 'Other']}
+              title="Maintenance Documents"
+            />
+          )}
         </DialogContent>
       </Dialog>
     </DashboardLayout>
