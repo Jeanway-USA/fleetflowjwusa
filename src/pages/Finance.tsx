@@ -23,6 +23,7 @@ type ExpenseInsert = Database['public']['Tables']['expenses']['Insert'];
 
 const expenseTypes = [
   'Fuel',
+  'DEF',
   'Truck Payment',
   'Trailer Payment',
   'Licensing/Permits',
@@ -38,6 +39,8 @@ const expenseTypes = [
   'Parking',
   'Misc'
 ];
+
+const GALLONS_EXPENSE_TYPES = ['Fuel', 'DEF'];
 
 export default function Finance() {
   const queryClient = useQueryClient();
@@ -305,7 +308,7 @@ export default function Finance() {
   const standaloneExpenseTotals = filteredExpenses.reduce((acc: any, exp: Expense) => {
     acc.total += Number(exp.amount) || 0;
     acc.byType[exp.expense_type] = (acc.byType[exp.expense_type] || 0) + (Number(exp.amount) || 0);
-    if (exp.expense_type === 'Fuel' && exp.gallons) {
+    if (GALLONS_EXPENSE_TYPES.includes(exp.expense_type) && exp.gallons) {
       acc.fuelGallons += Number(exp.gallons) || 0;
     }
     return acc;
@@ -987,7 +990,7 @@ export default function Finance() {
                   required 
                 />
               </div>
-              {expenseFormData.expense_type === 'Fuel' && (
+              {GALLONS_EXPENSE_TYPES.includes(expenseFormData.expense_type || '') && (
                 <div className="space-y-2">
                   <Label htmlFor="gallons">Gallons</Label>
                   <Input 
