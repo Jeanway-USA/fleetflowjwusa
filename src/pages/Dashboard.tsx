@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Truck, Package, Users, DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 
 export default function Dashboard() {
   const { roles, hasRole, isOwner, user } = useAuth();
@@ -43,6 +43,12 @@ export default function Dashboard() {
       return data || [];
     },
   });
+
+  // Auto-redirect drivers who only have the driver role to driver dashboard
+  const isDriverOnly = roles.length === 1 && roles[0] === 'driver';
+  if (isDriverOnly) {
+    return <Navigate to="/driver-dashboard" replace />;
+  }
 
   // Calculate stats
   const activeTrucks = trucks?.filter(t => t.status === 'active').length || 0;
