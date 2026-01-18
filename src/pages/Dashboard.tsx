@@ -51,14 +51,14 @@ export default function Dashboard() {
   const totalDrivers = drivers?.length || 0;
   const activeLoads = loads?.filter(l => ['booked', 'in_transit', 'loading', 'unloading'].includes(l.status)).length || 0;
   
-  // Calculate MTD revenue
+  // Calculate YTD revenue
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const mtdRevenue = loads?.filter(l => {
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const ytdRevenue = Math.round((loads?.filter(l => {
     if (!l.pickup_date) return false;
     const pickupDate = new Date(l.pickup_date);
-    return pickupDate >= startOfMonth && pickupDate <= now;
-  }).reduce((sum, l) => sum + (l.net_revenue || 0), 0) || 0;
+    return pickupDate >= startOfYear && pickupDate <= now;
+  }).reduce((sum, l) => sum + (l.net_revenue || 0), 0) || 0) * 100) / 100;
 
   const stats = [
     { 
@@ -86,12 +86,12 @@ export default function Dashboard() {
       description: 'Active drivers'
     },
     { 
-      title: 'Revenue MTD', 
-      value: '$' + mtdRevenue.toLocaleString(), 
+      title: 'Revenue YTD', 
+      value: '$' + ytdRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 
       change: '+0%',
       trend: 'up' as const,
       icon: DollarSign,
-      description: 'Month to date'
+      description: 'Year to date'
     },
   ];
 
