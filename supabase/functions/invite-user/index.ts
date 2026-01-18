@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
 
     try {
       const emailResponse = await resend.emails.send({
-        from: 'JeanWay USA <onboarding@resend.dev>',
+        from: 'JeanWay USA <no-reply@jeanwayusa.com>',
         to: [email],
         subject: `You're invited to join JeanWay USA Fleet Management`,
         html: emailHtml,
