@@ -5,13 +5,15 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, FileText } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
@@ -112,6 +114,9 @@ export default function Trucks() {
       header: 'Actions',
       render: (truck: Truck) => (
         <div className="flex gap-2">
+          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedTruck(truck); }}>
+            <FileText className="h-4 w-4" />
+          </Button>
           <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(truck); }}>
             <Pencil className="h-4 w-4" />
           </Button>
@@ -122,6 +127,8 @@ export default function Trucks() {
       ),
     },
   ];
+
+  const [selectedTruck, setSelectedTruck] = useState<Truck | null>(null);
 
   return (
     <DashboardLayout>
@@ -186,6 +193,22 @@ export default function Trucks() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedTruck} onOpenChange={(open) => !open && setSelectedTruck(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Documents for Truck {selectedTruck?.unit_number}</DialogTitle>
+          </DialogHeader>
+          {selectedTruck && (
+            <DocumentUpload
+              relatedType="truck"
+              relatedId={selectedTruck.id}
+              documentTypes={['Registration', 'Insurance', 'Inspection', 'Title', 'Other']}
+              title="Truck Documents"
+            />
+          )}
         </DialogContent>
       </Dialog>
     </DashboardLayout>

@@ -5,13 +5,14 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, FileText } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type Driver = Database['public']['Tables']['drivers']['Row'];
@@ -107,6 +108,9 @@ export default function Drivers() {
       header: 'Actions',
       render: (driver: Driver) => (
         <div className="flex gap-2">
+          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedDriver(driver); }}>
+            <FileText className="h-4 w-4" />
+          </Button>
           <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(driver); }}>
             <Pencil className="h-4 w-4" />
           </Button>
@@ -117,6 +121,8 @@ export default function Drivers() {
       ),
     },
   ];
+
+  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
 
   return (
     <DashboardLayout>
@@ -198,6 +204,22 @@ export default function Drivers() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedDriver} onOpenChange={(open) => !open && setSelectedDriver(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Documents for {selectedDriver?.first_name} {selectedDriver?.last_name}</DialogTitle>
+          </DialogHeader>
+          {selectedDriver && (
+            <DocumentUpload
+              relatedType="driver"
+              relatedId={selectedDriver.id}
+              documentTypes={['License', 'Medical Card', 'Drug Test', 'Training Certificate', 'Contract', 'Other']}
+              title="Driver Documents"
+            />
+          )}
         </DialogContent>
       </Dialog>
     </DashboardLayout>
