@@ -1,0 +1,169 @@
+import { 
+  LayoutDashboard, 
+  Truck, 
+  Package, 
+  Users, 
+  DollarSign, 
+  FileText, 
+  Wrench, 
+  Settings,
+  LogOut,
+  Shield,
+  Building2,
+  LucideIcon
+} from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+} from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
+import type { Database } from '@/integrations/supabase/types';
+
+type AppRole = Database['public']['Enums']['app_role'];
+
+interface NavItem {
+  title: string;
+  icon: LucideIcon;
+  path: string;
+  roles: AppRole[];
+}
+
+export function AppSidebar() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut, roles, user, hasRole, isOwner } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
+  const mainNavItems: NavItem[] = [
+    { title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'] },
+  ];
+
+  const fleetNavItems: NavItem[] = [
+    { title: 'Trucks', icon: Truck, path: '/trucks', roles: ['owner', 'dispatcher', 'safety'] },
+    { title: 'Drivers', icon: Users, path: '/drivers', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety'] },
+  ];
+
+  const loadsNavItems: NavItem[] = [
+    { title: 'Fleet Loads', icon: Package, path: '/fleet-loads', roles: ['owner', 'dispatcher', 'safety', 'driver'] },
+    { title: 'Agency Loads', icon: Building2, path: '/agency-loads', roles: ['owner', 'dispatcher'] },
+  ];
+
+  const financeNavItems: NavItem[] = [
+    { title: 'Driver Payroll', icon: DollarSign, path: '/payroll', roles: ['owner', 'payroll_admin', 'driver'] },
+    { title: 'Commissions', icon: DollarSign, path: '/commissions', roles: ['owner', 'payroll_admin'] },
+    { title: 'General Ledger', icon: FileText, path: '/ledger', roles: ['owner', 'payroll_admin'] },
+  ];
+
+  const operationsNavItems: NavItem[] = [
+    { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'] },
+    { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'] },
+    { title: 'Safety', icon: Shield, path: '/safety', roles: ['owner', 'safety'] },
+  ];
+
+  const filterByRole = (items: NavItem[]) => items.filter(item => item.roles.some(role => hasRole(role)));
+
+  const renderNavGroup = (label: string, items: NavItem[]) => {
+    const filteredItems = filterByRole(items);
+    if (filteredItems.length === 0) return null;
+
+    return (
+      <SidebarGroup>
+        <SidebarGroupLabel className="text-muted-foreground uppercase text-xs tracking-wider">{label}</SidebarGroupLabel>
+        <SidebarGroupContent>
+          <SidebarMenu>
+            {filteredItems.map((item) => (
+              <SidebarMenuItem key={item.path}>
+                <SidebarMenuButton
+                  isActive={location.pathname === item.path}
+                  onClick={() => navigate(item.path)}
+                  className="hover:bg-sidebar-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.title}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    );
+  };
+
+  return (
+    <Sidebar className="border-r border-sidebar-border">
+      <SidebarHeader className="border-b border-sidebar-border p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg gradient-gold flex items-center justify-center">
+            <Truck className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="font-bold text-lg text-gradient-gold">JeanWay USA</h1>
+            <p className="text-xs text-muted-foreground">Fleet Management</p>
+          </div>
+        </div>
+      </SidebarHeader>
+
+      <SidebarContent className="px-2">
+        {renderNavGroup('Main', mainNavItems)}
+        <SidebarSeparator />
+        {renderNavGroup('Fleet', fleetNavItems)}
+        <SidebarSeparator />
+        {renderNavGroup('Loads', loadsNavItems)}
+        <SidebarSeparator />
+        {renderNavGroup('Finance', financeNavItems)}
+        <SidebarSeparator />
+        {renderNavGroup('Operations', operationsNavItems)}
+        
+        {isOwner && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-muted-foreground uppercase text-xs tracking-wider">Admin</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton isActive={location.pathname === '/settings'} onClick={() => navigate('/settings')} className="hover:bg-sidebar-accent">
+                      <Settings className="h-4 w-4" />
+                      <span>Settings</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
+      </SidebarContent>
+
+      <SidebarFooter className="border-t border-sidebar-border p-4">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+            <span className="text-sm font-medium text-muted-foreground">{user?.email?.charAt(0).toUpperCase()}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{user?.email}</p>
+            <p className="text-xs text-muted-foreground capitalize">{roles.length > 0 ? roles.join(', ').replace(/_/g, ' ') : 'No role assigned'}</p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleSignOut} className="w-full justify-start gap-2 border-border hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50">
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </Button>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
