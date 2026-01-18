@@ -236,7 +236,7 @@ export default function FleetLoads() {
                 <Input id="fuel_advance" type="number" step="0.01" value={formData.fuel_advance || ''} onChange={(e) => setFormData({ ...formData, fuel_advance: parseFloat(e.target.value) || 0 })} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="detention_pay">Detention ($)</Label>
+                <Label htmlFor="detention_pay">Accessorials ($)</Label>
                 <Input id="detention_pay" type="number" step="0.01" value={formData.detention_pay || ''} onChange={(e) => setFormData({ ...formData, detention_pay: parseFloat(e.target.value) || 0 })} />
               </div>
             </div>
