@@ -168,22 +168,30 @@ export default function FleetLoads() {
     onError: (error: any) => toast.error(error.message),
   });
 
-  const openDialog = (load?: any) => {
+  const openDialog = async (load?: any) => {
     setEditingLoad(load || null);
     setFormData(load || { 
       status: 'pending',
       is_power_only: false,
     });
-    // Load existing accessorials for this load
+    // Load existing accessorials for this load - fetch fresh from database
     if (load?.id) {
-      const loadAccs = allAccessorials.filter((a: any) => a.load_id === load.id);
-      setAccessorials(loadAccs.map((a: any) => ({
-        id: a.id,
-        accessorial_type: a.accessorial_type,
-        amount: a.amount,
-        percentage: a.percentage,
-        notes: a.notes,
-      })));
+      const { data: loadAccs } = await supabase
+        .from('load_accessorials')
+        .select('*')
+        .eq('load_id', load.id);
+      
+      if (loadAccs && loadAccs.length > 0) {
+        setAccessorials(loadAccs.map((a: any) => ({
+          id: a.id,
+          accessorial_type: a.accessorial_type,
+          amount: Number(a.amount) || 0,
+          percentage: Number(a.percentage) || 100,
+          notes: a.notes,
+        })));
+      } else {
+        setAccessorials([]);
+      }
     } else {
       setAccessorials([]);
     }
@@ -401,6 +409,7 @@ export default function FleetLoads() {
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Landstar ID</TableHead>
+                  <TableHead>Agent</TableHead>
                   <TableHead>Origin</TableHead>
                   <TableHead>Destination</TableHead>
                   <TableHead className="text-right">Rate</TableHead>
@@ -426,6 +435,7 @@ export default function FleetLoads() {
                     <TableRow key={load.id}>
                       <TableCell>{formatDate(load.pickup_date)}</TableCell>
                       <TableCell className="font-mono">{load.landstar_load_id || '-'}</TableCell>
+                      <TableCell className="font-mono text-xs">{load.agency_code || '-'}</TableCell>
                       <TableCell>{load.origin}</TableCell>
                       <TableCell>{load.destination}</TableCell>
                       <TableCell className="text-right">{formatCurrency(load.rate)}</TableCell>
@@ -449,7 +459,7 @@ export default function FleetLoads() {
                 )}
                 {filteredLoads.length > 0 && (
                   <TableRow className="bg-muted/50 font-medium">
-                    <TableCell colSpan={4}>Totals ({totals.loads} loads)</TableCell>
+                    <TableCell colSpan={5}>Totals ({totals.loads} loads)</TableCell>
                     <TableCell className="text-right">{formatCurrency(totals.rate)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(totals.fuelSurcharge)}</TableCell>
                     <TableCell className="text-right">-</TableCell>
@@ -479,7 +489,7 @@ export default function FleetLoads() {
               </TabsList>
 
               <TabsContent value="details" className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="landstar_load_id">Landstar Load ID</Label>
                     <Input 
@@ -487,6 +497,17 @@ export default function FleetLoads() {
                       value={formData.landstar_load_id || ''} 
                       onChange={(e) => setFormData({ ...formData, landstar_load_id: e.target.value })} 
                       placeholder="8941232" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="agency_code">Agency Code</Label>
+                    <Input 
+                      id="agency_code" 
+                      value={formData.agency_code || ''} 
+                      onChange={(e) => setFormData({ ...formData, agency_code: e.target.value.toUpperCase().slice(0, 3) })} 
+                      placeholder="JNS"
+                      maxLength={3}
+                      className="font-mono uppercase"
                     />
                   </div>
                   <div className="space-y-2">

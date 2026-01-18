@@ -16,6 +16,7 @@ import Payroll from "./pages/Payroll";
 import Commissions from "./pages/Commissions";
 import Ledger from "./pages/Ledger";
 import Finance from "./pages/Finance";
+import Resources from "./pages/Resources";
 import Maintenance from "./pages/Maintenance";
 import Documents from "./pages/Documents";
 import Safety from "./pages/Safety";
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/commissions" element={<Commissions />} />
             <Route path="/ledger" element={<Ledger />} />
             <Route path="/finance" element={<Finance />} />
+            <Route path="/resources" element={<Resources />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/documents" element={<Documents />} />
             <Route path="/safety" element={<Safety />} />
