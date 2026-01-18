@@ -462,6 +462,47 @@ export type Database = {
         }
         Relationships: []
       }
+      load_accessorials: {
+        Row: {
+          accessorial_type: string
+          amount: number
+          created_at: string
+          id: string
+          load_id: string
+          notes: string | null
+          percentage: number | null
+          updated_at: string
+        }
+        Insert: {
+          accessorial_type: string
+          amount?: number
+          created_at?: string
+          id?: string
+          load_id: string
+          notes?: string | null
+          percentage?: number | null
+          updated_at?: string
+        }
+        Update: {
+          accessorial_type?: string
+          amount?: number
+          created_at?: string
+          id?: string
+          load_id?: string
+          notes?: string | null
+          percentage?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_accessorials_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_loads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       load_expenses: {
         Row: {
           card_load: number | null
