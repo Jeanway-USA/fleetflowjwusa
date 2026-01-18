@@ -703,60 +703,67 @@ export default function Finance() {
         </Select>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
+      {/* Summary Cards - Clean 3-column layout */}
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
+        {/* Net Profit Card - Main KPI */}
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
             {netProfit >= 0 ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
           </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+          <CardContent className="space-y-2">
+            <div className={`text-3xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
               {formatCurrency(netProfit)}
             </div>
-            <p className="text-xs text-muted-foreground">{revenueTotals.loadCount} loads</p>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Margin</span>
+              <span className={`font-medium ${profitMargin >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {profitMargin.toFixed(1)}%
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">{revenueTotals.loadCount} loads completed</p>
           </CardContent>
         </Card>
+
+        {/* Total Expenses Card - Combined View */}
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Operating Expenses</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
             <Receipt className="h-4 w-4 text-destructive" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{formatCurrency(totalExpenses)}</div>
-            <p className="text-xs text-muted-foreground">Fuel, maintenance, etc.</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Driver Payroll</CardTitle>
-            <Users className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{formatCurrency(totalPayroll)}</div>
-            <p className="text-xs text-muted-foreground">{payrollTotals.count} payroll entries</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Agency Commissions</CardTitle>
-            <Briefcase className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">{formatCurrency(commissionTotals.amount)}</div>
-            <p className="text-xs text-muted-foreground">{commissionTotals.count} commissions earned</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Profit Margin</CardTitle>
-            <Percent className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${profitMargin >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {profitMargin.toFixed(1)}%
+          <CardContent className="space-y-3">
+            <div className="text-3xl font-bold text-destructive">{formatCurrency(grandTotalExpenses)}</div>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Operating</span>
+                <span className="text-destructive">{formatCurrency(totalExpenses)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Payroll ({payrollTotals.count})</span>
+                <span className="text-destructive">{formatCurrency(totalPayroll)}</span>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">Net profit / Revenue</p>
+          </CardContent>
+        </Card>
+
+        {/* Revenue Card */}
+        <Card className="card-elevated">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-3xl font-bold text-success">{formatCurrency(totalRevenueWithCommissions)}</div>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Fleet Revenue</span>
+                <span>{formatCurrency(revenueTotals.netRevenue)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Commissions ({commissionTotals.count})</span>
+                <span>{formatCurrency(commissionTotals.amount)}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
