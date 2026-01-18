@@ -304,8 +304,12 @@ export default function Finance() {
     operatingTotal: 0, personalTotal: 0,
   });
 
+  // Separate standalone expenses (no load_id) from load-linked expenses
+  const standaloneExpenses = filteredExpenses.filter((e: Expense) => !e.load_id);
+  const loadLinkedExpenses = filteredExpenses.filter((e: Expense) => e.load_id && loadIds.includes(e.load_id));
+
   // Calculate standalone expense totals by type
-  const standaloneExpenseTotals = filteredExpenses.reduce((acc: any, exp: Expense) => {
+  const standaloneExpenseTotals = standaloneExpenses.reduce((acc: any, exp: Expense) => {
     acc.total += Number(exp.amount) || 0;
     acc.byType[exp.expense_type] = (acc.byType[exp.expense_type] || 0) + (Number(exp.amount) || 0);
     if (GALLONS_EXPENSE_TYPES.includes(exp.expense_type) && exp.gallons) {
@@ -314,7 +318,17 @@ export default function Finance() {
     return acc;
   }, { total: 0, byType: {}, fuelGallons: 0 });
 
-  const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total;
+  // Calculate load-linked expense totals from expenses table
+  const loadLinkedExpenseTotals = loadLinkedExpenses.reduce((acc: any, exp: Expense) => {
+    acc.total += Number(exp.amount) || 0;
+    acc.byType[exp.expense_type] = (acc.byType[exp.expense_type] || 0) + (Number(exp.amount) || 0);
+    if (GALLONS_EXPENSE_TYPES.includes(exp.expense_type) && exp.gallons) {
+      acc.fuelGallons += Number(exp.gallons) || 0;
+    }
+    return acc;
+  }, { total: 0, byType: {}, fuelGallons: 0 });
+
+  const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total;
   const netProfit = revenueTotals.netRevenue - totalExpenses;
   const profitMargin = revenueTotals.netRevenue > 0 ? (netProfit / revenueTotals.netRevenue) * 100 : 0;
 
@@ -772,53 +786,46 @@ export default function Finance() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      <TableRow>
-                        <TableCell>Fuel Cost</TableCell>
-                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.fuelCost)}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>Truck Payment</TableCell>
-                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.truckPayment)}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>Trailer Payment</TableCell>
-                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.trailerPayment)}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>Insurance</TableCell>
-                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.insurance)}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>Licensing & Permits</TableCell>
-                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.licensingPermits)}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>LCN/Satellite</TableCell>
-                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.lcnSatellite)}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>Cell Phone</TableCell>
-                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.cellPhone)}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>Repairs & Parts</TableCell>
-                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.repairsParts)}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>Tolls</TableCell>
-                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.tolls)}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>PrePass/Scale</TableCell>
-                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.prepassScale)}</TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell>Misc Operating</TableCell>
-                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.miscOperating)}</TableCell>
-                      </TableRow>
+                      {/* Expenses from expenses table linked to loads */}
+                      {expenseTypes.map(type => {
+                        const amount = loadLinkedExpenseTotals.byType[type] || 0;
+                        if (amount === 0) return null;
+                        return (
+                          <TableRow key={type}>
+                            <TableCell className="flex items-center gap-2">
+                              {(type === 'Fuel' || type === 'DEF') && <Fuel className="h-4 w-4" />}
+                              {(type === 'Truck Payment' || type === 'Maintenance') && <TruckIcon className="h-4 w-4" />}
+                              {type}
+                              {(type === 'Fuel' || type === 'DEF') && loadLinkedExpenseTotals.fuelGallons > 0 && (
+                                <span className="text-xs text-muted-foreground">({loadLinkedExpenseTotals.fuelGallons.toFixed(1)} gal)</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">{formatCurrency(amount)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {/* Legacy load_expenses table data */}
+                      {loadExpenseTotals.fuelCost > 0 && (
+                        <TableRow>
+                          <TableCell>Fuel Cost (Legacy)</TableCell>
+                          <TableCell className="text-right">{formatCurrency(loadExpenseTotals.fuelCost)}</TableCell>
+                        </TableRow>
+                      )}
+                      {loadExpenseTotals.truckPayment > 0 && (
+                        <TableRow>
+                          <TableCell>Truck Payment (Legacy)</TableCell>
+                          <TableCell className="text-right">{formatCurrency(loadExpenseTotals.truckPayment)}</TableCell>
+                        </TableRow>
+                      )}
+                      {loadExpenseTotals.operatingTotal > 0 && (
+                        <TableRow>
+                          <TableCell>Other Operating (Legacy)</TableCell>
+                          <TableCell className="text-right">{formatCurrency(loadExpenseTotals.operatingTotal - loadExpenseTotals.fuelCost - loadExpenseTotals.truckPayment)}</TableCell>
+                        </TableRow>
+                      )}
                       <TableRow className="bg-destructive/10">
-                        <TableCell className="font-bold">Total Load Expenses</TableCell>
-                        <TableCell className="text-right font-bold text-destructive">{formatCurrency(loadExpenseTotals.operatingTotal)}</TableCell>
+                        <TableCell className="font-bold">Total Load-Linked Expenses</TableCell>
+                        <TableCell className="text-right font-bold text-destructive">{formatCurrency(loadLinkedExpenseTotals.total + loadExpenseTotals.operatingTotal)}</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
