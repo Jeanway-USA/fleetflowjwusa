@@ -151,10 +151,10 @@ export default function Commissions() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="load_id">Related Load</Label>
-              <Select value={formData.load_id || ''} onValueChange={(v) => setFormData({ ...formData, load_id: v || null })}>
+              <Select value={formData.load_id || 'none'} onValueChange={(v) => setFormData({ ...formData, load_id: v === 'none' ? null : v })}>
                 <SelectTrigger><SelectValue placeholder="Select load (optional)" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {agencyLoads.map(l => <SelectItem key={l.id} value={l.id}>{l.load_reference || `${l.origin} → ${l.destination}`}</SelectItem>)}
                 </SelectContent>
               </Select>
