@@ -11,6 +11,7 @@ import {
   Shield,
   Building2,
   TrendingUp,
+  BookOpen,
   LucideIcon
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -72,6 +73,7 @@ export function AppSidebar() {
   ];
 
   const operationsNavItems: NavItem[] = [
+    { title: 'Resources', icon: BookOpen, path: '/resources', roles: ['owner', 'dispatcher', 'safety', 'driver'] },
     { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'] },
     { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'] },
     { title: 'Safety', icon: Shield, path: '/safety', roles: ['owner', 'safety'] },

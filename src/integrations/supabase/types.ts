@@ -115,6 +115,54 @@ export type Database = {
           },
         ]
       }
+      company_resources: {
+        Row: {
+          address: string | null
+          agent_code: string | null
+          agent_status: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          resource_type: string
+          service_area: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          agent_code?: string | null
+          agent_status?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          resource_type: string
+          service_area?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          agent_code?: string | null
+          agent_status?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          resource_type?: string
+          service_area?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       company_settings: {
         Row: {
           created_at: string
@@ -312,6 +360,7 @@ export type Database = {
           actual_miles: number | null
           advance_available: number | null
           advance_taken: number | null
+          agency_code: string | null
           booked_miles: number | null
           created_at: string
           delivery_date: string | null
@@ -344,6 +393,7 @@ export type Database = {
           actual_miles?: number | null
           advance_available?: number | null
           advance_taken?: number | null
+          agency_code?: string | null
           booked_miles?: number | null
           created_at?: string
           delivery_date?: string | null
@@ -376,6 +426,7 @@ export type Database = {
           actual_miles?: number | null
           advance_available?: number | null
           advance_taken?: number | null
+          agency_code?: string | null
           booked_miles?: number | null
           created_at?: string
           delivery_date?: string | null
