@@ -132,7 +132,8 @@ export function PostTripForm({ driverId, truckId, onComplete }: PostTripFormProp
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from('driver_inspections').insert({
+      // Type assertion needed because driver_inspections may not be in generated types yet
+      const { error } = await (supabase.from('driver_inspections' as any) as any).insert({
         driver_id: driverId,
         truck_id: truckId,
         inspection_type: 'post_trip',
