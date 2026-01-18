@@ -9,7 +9,7 @@ import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
 import { DVIRButtons } from '@/components/driver/DVIRButtons';
 import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
 import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
-import { Loader2, Sun, Moon } from 'lucide-react';
+import { Loader2, Sun, Moon, AlertTriangle } from 'lucide-react';
 
 export default function DriverDashboard() {
   const { user } = useAuth();
@@ -164,6 +164,19 @@ export default function DriverDashboard() {
           payRate={driver.pay_rate} 
           payType={driver.pay_type} 
         />
+
+        {/* No Truck Assigned Warning */}
+        {!assignedTruck && (
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-warning">No Truck Assigned</p>
+              <p className="text-sm text-muted-foreground">
+                You don't have a truck assigned yet. Contact dispatch to get assigned a truck before you can complete inspections or report maintenance issues.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Quick Actions Row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
