@@ -324,12 +324,13 @@ export default function FleetLoads() {
     loads: acc.loads + 1,
     rate: acc.rate + (load.rate || 0),
     fuelSurcharge: acc.fuelSurcharge + (load.fuel_surcharge || 0),
+    accessorials: acc.accessorials + getLoadAccessorialsTotal(load.id),
     grossRevenue: acc.grossRevenue + (load.gross_revenue || 0),
     netRevenue: acc.netRevenue + (load.net_revenue || 0),
     settlement: acc.settlement + (load.settlement || 0),
     bookedMiles: acc.bookedMiles + (load.booked_miles || 0),
     actualMiles: acc.actualMiles + (load.actual_miles || 0),
-  }), { loads: 0, rate: 0, fuelSurcharge: 0, grossRevenue: 0, netRevenue: 0, settlement: 0, bookedMiles: 0, actualMiles: 0 });
+  }), { loads: 0, rate: 0, fuelSurcharge: 0, accessorials: 0, grossRevenue: 0, netRevenue: 0, settlement: 0, bookedMiles: 0, actualMiles: 0 });
 
   return (
     <DashboardLayout>
@@ -462,7 +463,7 @@ export default function FleetLoads() {
                     <TableCell colSpan={5}>Totals ({totals.loads} loads)</TableCell>
                     <TableCell className="text-right">{formatCurrency(totals.rate)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(totals.fuelSurcharge)}</TableCell>
-                    <TableCell className="text-right">-</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totals.accessorials)}</TableCell>
                     <TableCell className="text-right text-success">{formatCurrency(totals.netRevenue)}</TableCell>
                     <TableCell className="text-right">{totals.actualMiles.toLocaleString()}</TableCell>
                     <TableCell colSpan={2}></TableCell>
