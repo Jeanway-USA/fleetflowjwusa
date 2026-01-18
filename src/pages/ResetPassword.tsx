@@ -62,11 +62,14 @@ export default function ResetPassword() {
 
     setLoading(true);
     const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
 
     if (error) {
+      setLoading(false);
       toast.error(error.message);
     } else {
+      // Sign out the user after password reset so they can log in fresh
+      await supabase.auth.signOut();
+      setLoading(false);
       setSuccess(true);
       toast.success('Password updated successfully!');
     }
