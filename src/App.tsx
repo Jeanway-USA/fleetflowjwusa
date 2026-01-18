@@ -15,6 +15,7 @@ import AgencyLoads from "./pages/AgencyLoads";
 import Payroll from "./pages/Payroll";
 import Commissions from "./pages/Commissions";
 import Finance from "./pages/Finance";
+import CompanyInsights from "./pages/CompanyInsights";
 import Resources from "./pages/Resources";
 import Maintenance from "./pages/Maintenance";
 import Documents from "./pages/Documents";
@@ -43,6 +44,7 @@ const App = () => (
             <Route path="/commissions" element={<Commissions />} />
             <Route path="/finance" element={<Finance />} />
             <Route path="/ledger" element={<Finance />} />
+            <Route path="/insights" element={<CompanyInsights />} />
             <Route path="/resources" element={<Resources />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/documents" element={<Documents />} />
