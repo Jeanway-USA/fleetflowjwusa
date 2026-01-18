@@ -108,10 +108,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
     setShowAddForm(false);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation(); // Prevent bubbling to parent forms
-    
+  const handleAddExpense = () => {
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       toast.error('Amount is required');
       return;
@@ -163,7 +160,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
       </div>
 
       {showAddForm && (
-        <form onSubmit={handleSubmit} className="p-4 border rounded-lg bg-muted/30 space-y-4">
+        <div className="p-4 border rounded-lg bg-muted/30 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Type</Label>
@@ -244,9 +241,16 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
-            <Button type="submit" className="gradient-gold text-primary-foreground">Add Expense</Button>
+            <Button
+              type="button"
+              onClick={handleAddExpense}
+              disabled={createMutation.isPending}
+              className="gradient-gold text-primary-foreground"
+            >
+              {createMutation.isPending ? 'Adding...' : 'Add Expense'}
+            </Button>
           </div>
-        </form>
+        </div>
       )}
 
       {isLoading ? (
