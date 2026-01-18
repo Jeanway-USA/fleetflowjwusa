@@ -9,12 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Users, Shield, Trash2, UserPlus, Sun, Moon, Settings2, Mail, Building2 } from 'lucide-react';
+import { Users, Shield, Trash2, UserPlus, Sun, Moon, Settings2, Mail, Building2, Pencil } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type AppRole = Database['public']['Enums']['app_role'];
@@ -43,13 +44,24 @@ export default function Settings() {
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [selectedRole, setSelectedRole] = useState<AppRole>('driver');
+  const [userToDelete, setUserToDelete] = useState<UserWithRole | null>(null);
+  const [userToEdit, setUserToEdit] = useState<UserWithRole | null>(null);
+  
+  // Edit form state
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editRole, setEditRole] = useState<AppRole>('driver');
+  const [isEditing, setIsEditing] = useState(false);
   
   // Invite form state
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<AppRole>('driver');
   const [isInviting, setIsInviting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Get all profiles with their roles
   const { data: usersWithRoles = [], isLoading } = useQuery({
@@ -135,8 +147,6 @@ export default function Settings() {
     setIsInviting(true);
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
       const response = await supabase.functions.invoke('invite-user', {
         body: { email: inviteEmail, role: inviteRole },
       });
@@ -159,6 +169,95 @@ export default function Settings() {
     } finally {
       setIsInviting(false);
     }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      const response = await supabase.functions.invoke('delete-user', {
+        body: { userId: userToDelete.user_id },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to delete user');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      toast.success('User deleted successfully');
+      setDeleteDialogOpen(false);
+      setUserToDelete(null);
+      queryClient.invalidateQueries({ queryKey: ['users_with_roles'] });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete user');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userToEdit) return;
+    
+    setIsEditing(true);
+    
+    try {
+      // Update profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: editFirstName || null,
+          last_name: editLastName || null,
+        })
+        .eq('user_id', userToEdit.user_id);
+
+      if (profileError) throw profileError;
+
+      // Update role if changed
+      if (editRole !== userToEdit.role) {
+        if (userToEdit.role_id) {
+          // Update existing role
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .update({ role: editRole })
+            .eq('id', userToEdit.role_id);
+          if (roleError) throw roleError;
+        } else {
+          // Insert new role
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .insert({ user_id: userToEdit.user_id, role: editRole });
+          if (roleError) throw roleError;
+        }
+      }
+
+      toast.success('User updated successfully');
+      setEditDialogOpen(false);
+      setUserToEdit(null);
+      queryClient.invalidateQueries({ queryKey: ['users_with_roles'] });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update user');
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  const openEditDialog = (usr: UserWithRole) => {
+    setUserToEdit(usr);
+    setEditFirstName(usr.first_name || '');
+    setEditLastName(usr.last_name || '');
+    setEditRole(usr.role || 'driver');
+    setEditDialogOpen(true);
+  };
+
+  const openDeleteDialog = (usr: UserWithRole) => {
+    setUserToDelete(usr);
+    setDeleteDialogOpen(true);
   };
 
   const usersWithoutRoles = usersWithRoles.filter(u => !u.role);
@@ -278,30 +377,43 @@ export default function Settings() {
                     </div>
                     <div className="flex items-center gap-2 ml-4">
                       {usr.role ? (
-                        <>
-                          <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm whitespace-nowrap">
-                            {roleLabels[usr.role]}
-                          </span>
-                          {usr.user_id !== user?.id && (
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="text-destructive shrink-0"
-                              onClick={() => usr.role_id && removeRoleMutation.mutate(usr.role_id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </>
+                        <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm whitespace-nowrap">
+                          {roleLabels[usr.role]}
+                        </span>
                       ) : (
                         <Button 
                           size="sm" 
+                          variant="outline"
                           onClick={() => {
                             setSelectedUserId(usr.user_id);
                             setDialogOpen(true);
                           }}
                         >
                           Assign Role
+                        </Button>
+                      )}
+                      
+                      {/* Edit button - available for all users except current user */}
+                      {usr.user_id !== user?.id && (
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="text-muted-foreground hover:text-foreground shrink-0"
+                          onClick={() => openEditDialog(usr)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      
+                      {/* Delete button - available for all users except current user */}
+                      {usr.user_id !== user?.id && (
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="text-destructive hover:text-destructive shrink-0"
+                          onClick={() => openDeleteDialog(usr)}
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
@@ -493,6 +605,100 @@ export default function Settings() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user information and role
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditUser} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input 
+                id="edit-email"
+                type="email" 
+                value={userToEdit?.email || ''}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-first-name">First Name</Label>
+                <Input 
+                  id="edit-first-name"
+                  type="text" 
+                  placeholder="First name"
+                  value={editFirstName}
+                  onChange={(e) => setEditFirstName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-last-name">Last Name</Label>
+                <Input 
+                  id="edit-last-name"
+                  type="text" 
+                  placeholder="Last name"
+                  value={editLastName}
+                  onChange={(e) => setEditLastName(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={editRole} onValueChange={(v) => setEditRole(v as AppRole)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">Owner</SelectItem>
+                  <SelectItem value="payroll_admin">Payroll Admin</SelectItem>
+                  <SelectItem value="dispatcher">Dispatcher</SelectItem>
+                  <SelectItem value="safety">Safety</SelectItem>
+                  <SelectItem value="driver">Driver</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" className="gradient-gold text-primary-foreground" disabled={isEditing}>
+                {isEditing ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User Account</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the account for{' '}
+              <span className="font-semibold">
+                {userToDelete?.first_name && userToDelete?.last_name 
+                  ? `${userToDelete.first_name} ${userToDelete.last_name}` 
+                  : userToDelete?.email}
+              </span>
+              ? This action cannot be undone and will permanently remove the user and all their associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteUser}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete User'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
