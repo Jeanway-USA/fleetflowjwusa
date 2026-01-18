@@ -240,6 +240,7 @@ export type Database = {
           inspection_type: string
           odometer_reading: number | null
           signature: string | null
+          signature_url: string | null
           status: string
           truck_id: string
           updated_at: string
@@ -254,6 +255,7 @@ export type Database = {
           inspection_type: string
           odometer_reading?: number | null
           signature?: string | null
+          signature_url?: string | null
           status?: string
           truck_id: string
           updated_at?: string
@@ -268,6 +270,7 @@ export type Database = {
           inspection_type?: string
           odometer_reading?: number | null
           signature?: string | null
+          signature_url?: string | null
           status?: string
           truck_id?: string
           updated_at?: string
@@ -632,6 +635,38 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      inspection_photos: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          inspection_id: string
+          photo_url: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          inspection_id: string
+          photo_url: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          inspection_id?: string
+          photo_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_photos_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "driver_inspections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       load_accessorials: {
         Row: {
