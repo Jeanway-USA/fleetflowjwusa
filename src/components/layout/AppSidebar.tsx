@@ -15,6 +15,7 @@ import {
   BarChart3,
   LucideIcon
 } from 'lucide-react';
+import jwBanner from '@/assets/JW_Banner.png';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -112,14 +113,12 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg gradient-gold flex items-center justify-center">
-            <Truck className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="font-bold text-lg text-gradient-gold">JeanWay USA</h1>
-            <p className="text-xs text-muted-foreground">Fleet Management</p>
-          </div>
+        <div className="flex items-center justify-center">
+          <img 
+            src={jwBanner} 
+            alt="JeanWay USA - Gets You There" 
+            className="h-12 w-auto object-contain"
+          />
         </div>
       </SidebarHeader>
 
