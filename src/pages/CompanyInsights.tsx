@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trophy, Truck, Users, Building2, Receipt, TrendingUp, TrendingDown, DollarSign, FileText } from 'lucide-react';
-import { startOfYear, endOfYear, parseISO, format } from 'date-fns';
+import { startOfYear, endOfYear, format } from 'date-fns';
 
 const CompanyInsights = () => {
   const currentYear = new Date().getFullYear();
