@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { CheckCircle, ClipboardCheck, AlertTriangle } from 'lucide-react';
+import { CheckCircle, ClipboardCheck } from 'lucide-react';
 import { useState } from 'react';
-import { DVIRForm } from './DVIRForm';
+import { PreTripForm } from './PreTripForm';
+import { PostTripForm } from './PostTripForm';
 
 interface DVIRButtonsProps {
   driverId: string;
@@ -33,12 +34,11 @@ export function DVIRButtons({ driverId, truckId, hasPreTrip, hasPostTrip }: DVIR
             <span className="text-xs">Pre-Trip</span>
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Pre-Trip Inspection (DVIR)</DialogTitle>
           </DialogHeader>
-          <DVIRForm 
-            type="pre_trip" 
+          <PreTripForm 
             driverId={driverId} 
             truckId={truckId!}
             onComplete={() => setPreOpen(false)}
@@ -62,12 +62,11 @@ export function DVIRButtons({ driverId, truckId, hasPreTrip, hasPostTrip }: DVIR
             <span className="text-xs">Post-Trip</span>
           </Button>
         </DialogTrigger>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Post-Trip Inspection (DVIR)</DialogTitle>
           </DialogHeader>
-          <DVIRForm 
-            type="post_trip" 
+          <PostTripForm 
             driverId={driverId} 
             truckId={truckId!}
             onComplete={() => setPostOpen(false)}
