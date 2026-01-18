@@ -248,7 +248,8 @@ export default function FleetLoads() {
     const isPowerOnly = data.is_power_only;
 
     const grossRevenue = rate + fuelSurcharge + accessorialsTotal;
-    const advanceAvailable = rate * advancePct;
+    // Advance available = full FSC + 30% of linehaul rate
+    const advanceAvailable = fuelSurcharge + (rate * advancePct);
     const advanceTaken = parseFloat(data.advance_taken) || 0;
     
     let truckRevenue = grossRevenue * truckPct;
@@ -640,27 +641,15 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="lumper">Lumper ($)</Label>
-                    <Input 
-                      id="lumper" 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.lumper || ''} 
-                      onChange={(e) => setFormData({ ...formData, lumper: parseFloat(e.target.value) || 0 })} 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fuel_advance">Fuel Advance ($)</Label>
-                    <Input 
-                      id="fuel_advance" 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.fuel_advance || ''} 
-                      onChange={(e) => setFormData({ ...formData, fuel_advance: parseFloat(e.target.value) || 0 })} 
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lumper">Lumper ($)</Label>
+                  <Input 
+                    id="lumper" 
+                    type="number" 
+                    step="0.01" 
+                    value={formData.lumper || ''} 
+                    onChange={(e) => setFormData({ ...formData, lumper: parseFloat(e.target.value) || 0 })} 
+                  />
                 </div>
 
                 {/* Accessorials Section */}
@@ -759,9 +748,9 @@ export default function FleetLoads() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Advance Available (calculated)</Label>
+                    <Label>Advance Available (FSC + 30% Rate)</Label>
                     <div className="h-10 px-3 py-2 rounded-md border bg-muted text-muted-foreground">
-                      {formatCurrency((parseFloat(formData.rate) || 0) * (parseFloat(getSetting('advance_percentage', '30')) / 100))}
+                      {formatCurrency((parseFloat(formData.fuel_surcharge) || 0) + ((parseFloat(formData.rate) || 0) * (parseFloat(getSetting('advance_percentage', '30')) / 100)))}
                     </div>
                   </div>
                 </div>
