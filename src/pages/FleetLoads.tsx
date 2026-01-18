@@ -207,20 +207,20 @@ export default function FleetLoads() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="driver_id">Driver</Label>
-                <Select value={formData.driver_id || ''} onValueChange={(v) => setFormData({ ...formData, driver_id: v || null })}>
+                <Select value={formData.driver_id || 'none'} onValueChange={(v) => setFormData({ ...formData, driver_id: v === 'none' ? null : v })}>
                   <SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="none">Unassigned</SelectItem>
                     {drivers.map(d => <SelectItem key={d.id} value={d.id}>{d.first_name} {d.last_name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="truck_id">Truck</Label>
-                <Select value={formData.truck_id || ''} onValueChange={(v) => setFormData({ ...formData, truck_id: v || null })}>
+                <Select value={formData.truck_id || 'none'} onValueChange={(v) => setFormData({ ...formData, truck_id: v === 'none' ? null : v })}>
                   <SelectTrigger><SelectValue placeholder="Select truck" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="none">Unassigned</SelectItem>
                     {trucks.map(t => <SelectItem key={t.id} value={t.id}>{t.unit_number}</SelectItem>)}
                   </SelectContent>
                 </Select>
