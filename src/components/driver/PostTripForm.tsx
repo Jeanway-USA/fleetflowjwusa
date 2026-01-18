@@ -168,8 +168,8 @@ export function PostTripForm({ driverId, truckId, onComplete }: PostTripFormProp
     submitMutation.mutate();
   };
 
-  const toggleItem = (itemId: string) => {
-    setCheckedItems(prev => ({ ...prev, [itemId]: !prev[itemId] }));
+  const setItemChecked = (itemId: string, checked: boolean) => {
+    setCheckedItems(prev => ({ ...prev, [itemId]: checked }));
   };
 
   return (
@@ -227,15 +227,17 @@ export function PostTripForm({ driverId, truckId, onComplete }: PostTripFormProp
                   {section.items.map((item) => (
                     <div 
                       key={item.id} 
-                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
-                      onClick={() => toggleItem(item.id)}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50"
                     >
                       <Checkbox
                         id={item.id}
                         checked={checkedItems[item.id]}
-                        onCheckedChange={() => toggleItem(item.id)}
+                        onCheckedChange={(checked) => setItemChecked(item.id, checked === true)}
                       />
-                      <Label htmlFor={item.id} className="text-sm cursor-pointer flex-1">
+                      <Label
+                        htmlFor={item.id}
+                        className="text-sm cursor-pointer flex-1"
+                      >
                         {item.label}
                       </Label>
                       {checkedItems[item.id] && (
