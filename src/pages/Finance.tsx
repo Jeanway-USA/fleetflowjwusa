@@ -14,12 +14,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase } from 'lucide-react';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval } from 'date-fns';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 import type { Database } from '@/integrations/supabase/types';
 
 type Expense = Database['public']['Tables']['expenses']['Row'];
 type ExpenseInsert = Database['public']['Tables']['expenses']['Insert'];
+type DriverPayroll = Database['public']['Tables']['driver_payroll']['Row'];
+type DriverPayrollInsert = Database['public']['Tables']['driver_payroll']['Insert'];
+type AgentCommission = Database['public']['Tables']['agent_commissions']['Row'];
+type AgentCommissionInsert = Database['public']['Tables']['agent_commissions']['Insert'];
 
 const expenseTypes = [
   'Fuel',
@@ -50,6 +55,16 @@ export default function Finance() {
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseFormData, setExpenseFormData] = useState<Partial<ExpenseInsert>>({});
+  
+  // Payroll state
+  const [payrollDialogOpen, setPayrollDialogOpen] = useState(false);
+  const [editingPayroll, setEditingPayroll] = useState<DriverPayroll | null>(null);
+  const [payrollFormData, setPayrollFormData] = useState<Partial<DriverPayrollInsert>>({});
+  
+  // Commission state
+  const [commissionDialogOpen, setCommissionDialogOpen] = useState(false);
+  const [editingCommission, setEditingCommission] = useState<AgentCommission | null>(null);
+  const [commissionFormData, setCommissionFormData] = useState<Partial<AgentCommissionInsert>>({});
 
   const { data: settings = [] } = useQuery({
     queryKey: ['company_settings'],
@@ -91,6 +106,33 @@ export default function Finance() {
     queryKey: ['trucks'],
     queryFn: async () => {
       const { data, error } = await supabase.from('trucks').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: drivers = [] } = useQuery({
+    queryKey: ['drivers'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('drivers').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: payrolls = [], isLoading: payrollsLoading } = useQuery({
+    queryKey: ['driver_payroll'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('driver_payroll').select('*').order('period_end', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: commissions = [], isLoading: commissionsLoading } = useQuery({
+    queryKey: ['agent_commissions'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('agent_commissions').select('*').order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -149,6 +191,84 @@ export default function Finance() {
     onError: (error) => toast.error(error.message),
   });
 
+  // Payroll mutations
+  const createPayrollMutation = useMutation({
+    mutationFn: async (payroll: DriverPayrollInsert) => {
+      const { error } = await supabase.from('driver_payroll').insert(payroll);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['driver_payroll'] });
+      toast.success('Payroll entry created');
+      closePayrollDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updatePayrollMutation = useMutation({
+    mutationFn: async ({ id, net_pay, ...updates }: Partial<DriverPayroll> & { id: string }) => {
+      const { error } = await supabase.from('driver_payroll').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['driver_payroll'] });
+      toast.success('Payroll updated');
+      closePayrollDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const deletePayrollMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('driver_payroll').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['driver_payroll'] });
+      toast.success('Payroll entry deleted');
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  // Commission mutations
+  const createCommissionMutation = useMutation({
+    mutationFn: async (commission: AgentCommissionInsert) => {
+      const { error } = await supabase.from('agent_commissions').insert(commission);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent_commissions'] });
+      toast.success('Commission added');
+      closeCommissionDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updateCommissionMutation = useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<AgentCommission> & { id: string }) => {
+      const { error } = await supabase.from('agent_commissions').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent_commissions'] });
+      toast.success('Commission updated');
+      closeCommissionDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const deleteCommissionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('agent_commissions').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agent_commissions'] });
+      toast.success('Commission deleted');
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   const openExpenseDialog = (expense?: Expense) => {
     setEditingExpense(expense || null);
     setExpenseFormData(expense || { expense_type: 'Fuel' });
@@ -159,6 +279,30 @@ export default function Finance() {
     setExpenseDialogOpen(false);
     setEditingExpense(null);
     setExpenseFormData({});
+  };
+
+  const openPayrollDialog = (payroll?: DriverPayroll) => {
+    setEditingPayroll(payroll || null);
+    setPayrollFormData(payroll || { status: 'pending', gross_pay: 0 });
+    setPayrollDialogOpen(true);
+  };
+
+  const closePayrollDialog = () => {
+    setPayrollDialogOpen(false);
+    setEditingPayroll(null);
+    setPayrollFormData({});
+  };
+
+  const openCommissionDialog = (commission?: AgentCommission) => {
+    setEditingCommission(commission || null);
+    setCommissionFormData(commission || { status: 'pending', commission_rate: 0, commission_amount: 0 });
+    setCommissionDialogOpen(true);
+  };
+
+  const closeCommissionDialog = () => {
+    setCommissionDialogOpen(false);
+    setEditingCommission(null);
+    setCommissionFormData({});
   };
 
   const handleExpenseSubmit = (e: React.FormEvent) => {
@@ -172,6 +316,37 @@ export default function Finance() {
     } else {
       createExpenseMutation.mutate(expenseFormData as ExpenseInsert);
     }
+  };
+
+  const handlePayrollSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payrollFormData.driver_id || !payrollFormData.period_start || !payrollFormData.period_end) {
+      toast.error('Driver, period start and end are required');
+      return;
+    }
+    if (editingPayroll) {
+      updatePayrollMutation.mutate({ id: editingPayroll.id, ...payrollFormData });
+    } else {
+      createPayrollMutation.mutate(payrollFormData as DriverPayrollInsert);
+    }
+  };
+
+  const handleCommissionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commissionFormData.agent_name) {
+      toast.error('Agent name is required');
+      return;
+    }
+    if (editingCommission) {
+      updateCommissionMutation.mutate({ id: editingCommission.id, ...commissionFormData });
+    } else {
+      createCommissionMutation.mutate(commissionFormData as AgentCommissionInsert);
+    }
+  };
+
+  const getDriverName = (driverId: string) => {
+    const driver = drivers.find((d: any) => d.id === driverId);
+    return driver ? `${driver.first_name} ${driver.last_name}` : '-';
   };
 
   const getSetting = (key: string, defaultValue: string = '0') => {
@@ -248,6 +423,71 @@ export default function Finance() {
 
   const filteredLoads = getFilteredLoads();
   const filteredExpenses = getFilteredExpenses();
+
+  // Filter payroll by period
+  const getFilteredPayrolls = () => {
+    if (selectedPeriod === 'all') return payrolls;
+    
+    const [year, period] = selectedPeriod.split('-');
+    const yearNum = parseInt(year);
+    
+    if (period.startsWith('Q')) {
+      const quarter = parseInt(period.substring(1));
+      const startMonth = (quarter - 1) * 3;
+      const start = new Date(yearNum, startMonth, 1);
+      const end = endOfQuarter(start);
+      
+      return payrolls.filter((p: DriverPayroll) => {
+        if (!p.period_end) return false;
+        const date = parseISO(p.period_end);
+        return isWithinInterval(date, { start, end });
+      });
+    } else {
+      const month = parseInt(period) - 1;
+      const start = new Date(yearNum, month, 1);
+      const end = endOfMonth(start);
+      
+      return payrolls.filter((p: DriverPayroll) => {
+        if (!p.period_end) return false;
+        const date = parseISO(p.period_end);
+        return isWithinInterval(date, { start, end });
+      });
+    }
+  };
+
+  // Filter commissions by period
+  const getFilteredCommissions = () => {
+    if (selectedPeriod === 'all') return commissions;
+    
+    const [year, period] = selectedPeriod.split('-');
+    const yearNum = parseInt(year);
+    
+    if (period.startsWith('Q')) {
+      const quarter = parseInt(period.substring(1));
+      const startMonth = (quarter - 1) * 3;
+      const start = new Date(yearNum, startMonth, 1);
+      const end = endOfQuarter(start);
+      
+      return commissions.filter((c: AgentCommission) => {
+        if (!c.payout_date) return false;
+        const date = parseISO(c.payout_date);
+        return isWithinInterval(date, { start, end });
+      });
+    } else {
+      const month = parseInt(period) - 1;
+      const start = new Date(yearNum, month, 1);
+      const end = endOfMonth(start);
+      
+      return commissions.filter((c: AgentCommission) => {
+        if (!c.payout_date) return false;
+        const date = parseISO(c.payout_date);
+        return isWithinInterval(date, { start, end });
+      });
+    }
+  };
+
+  const filteredPayrolls = getFilteredPayrolls();
+  const filteredCommissions = getFilteredCommissions();
 
   // Calculate deadhead miles (empty miles between loads)
   // Sort loads by pickup_date to find consecutive loads
@@ -360,8 +600,25 @@ export default function Finance() {
     return acc;
   }, { total: 0, byType: {}, gallonsByType: {} });
 
+  // Calculate payroll and commission totals
+  const payrollTotals = filteredPayrolls.reduce((acc: any, p: DriverPayroll) => ({
+    count: acc.count + 1,
+    grossPay: acc.grossPay + (p.gross_pay || 0),
+    netPay: acc.netPay + (p.net_pay || 0),
+    fuelDeductions: acc.fuelDeductions + (p.fuel_deductions || 0),
+    repairDeductions: acc.repairDeductions + (p.repair_deductions || 0),
+    otherDeductions: acc.otherDeductions + (p.other_deductions || 0),
+  }), { count: 0, grossPay: 0, netPay: 0, fuelDeductions: 0, repairDeductions: 0, otherDeductions: 0 });
+
+  const commissionTotals = filteredCommissions.reduce((acc: any, c: AgentCommission) => ({
+    count: acc.count + 1,
+    amount: acc.amount + (c.commission_amount || 0),
+  }), { count: 0, amount: 0 });
+
   const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total;
-  const netProfit = revenueTotals.netRevenue - totalExpenses;
+  const totalPayrollAndCommissions = payrollTotals.netPay + commissionTotals.amount;
+  const grandTotalExpenses = totalExpenses + totalPayrollAndCommissions;
+  const netProfit = revenueTotals.netRevenue - grandTotalExpenses;
   const profitMargin = revenueTotals.netRevenue > 0 ? (netProfit / revenueTotals.netRevenue) * 100 : 0;
 
   const getTruckName = (truckId: string | null) => {
@@ -446,7 +703,7 @@ export default function Finance() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
@@ -461,12 +718,22 @@ export default function Finance() {
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+            <CardTitle className="text-sm font-medium">Operating Expenses</CardTitle>
             <Receipt className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">{formatCurrency(totalExpenses)}</div>
-            <p className="text-xs text-muted-foreground">All operating costs</p>
+            <p className="text-xs text-muted-foreground">Fuel, maintenance, etc.</p>
+          </CardContent>
+        </Card>
+        <Card className="card-elevated">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Payroll & Commissions</CardTitle>
+            <Users className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">{formatCurrency(totalPayrollAndCommissions)}</div>
+            <p className="text-xs text-muted-foreground">{payrollTotals.count} payrolls, {commissionTotals.count} commissions</p>
           </CardContent>
         </Card>
         <Card className="card-elevated">
@@ -488,7 +755,8 @@ export default function Finance() {
           <TabsTrigger value="summary">P&L Summary</TabsTrigger>
           <TabsTrigger value="revenue">Revenue Details</TabsTrigger>
           <TabsTrigger value="expenses">Manage Expenses</TabsTrigger>
-          <TabsTrigger value="expense-summary">Expense Summary</TabsTrigger>
+          <TabsTrigger value="payroll">Driver Payroll</TabsTrigger>
+          <TabsTrigger value="commissions">Commissions</TabsTrigger>
           <TabsTrigger value="settings">Compensation Package</TabsTrigger>
         </TabsList>
 
@@ -631,8 +899,16 @@ export default function Finance() {
                     <span className="font-mono text-success">{formatCurrency(revenueTotals.netRevenue)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Total Expenses</span>
+                    <span>Operating Expenses</span>
                     <span className="font-mono text-destructive">-{formatCurrency(totalExpenses)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Driver Payroll</span>
+                    <span className="font-mono text-destructive">-{formatCurrency(payrollTotals.netPay)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Agent Commissions</span>
+                    <span className="font-mono text-destructive">-{formatCurrency(commissionTotals.amount)}</span>
                   </div>
                   <div className="border-t pt-3">
                     <div className="flex justify-between items-center">
@@ -870,7 +1146,172 @@ export default function Finance() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="settings" className="mt-6">
+        {/* Driver Payroll Tab */}
+        <TabsContent value="payroll" className="mt-6">
+          <Card className="card-elevated">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Driver Payroll
+                </CardTitle>
+                <CardDescription>Manage driver pay and deductions</CardDescription>
+              </div>
+              <Button onClick={() => openPayrollDialog()} className="gradient-gold text-primary-foreground">
+                <Plus className="h-4 w-4 mr-2" /> Add Payroll
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {/* Summary Cards */}
+              <div className="grid gap-4 md:grid-cols-3 mb-6">
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Total Gross Pay</p>
+                  <p className="text-2xl font-bold">{formatCurrency(payrollTotals.grossPay)}</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Total Deductions</p>
+                  <p className="text-2xl font-bold text-destructive">
+                    {formatCurrency(payrollTotals.fuelDeductions + payrollTotals.repairDeductions + payrollTotals.otherDeductions)}
+                  </p>
+                </div>
+                <div className="p-4 bg-primary/10 rounded-lg">
+                  <p className="text-sm text-muted-foreground">Total Net Pay</p>
+                  <p className="text-2xl font-bold text-primary">{formatCurrency(payrollTotals.netPay)}</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Driver</TableHead>
+                      <TableHead>Period Start</TableHead>
+                      <TableHead>Period End</TableHead>
+                      <TableHead className="text-right">Gross</TableHead>
+                      <TableHead className="text-right">Fuel Ded.</TableHead>
+                      <TableHead className="text-right">Repair Ded.</TableHead>
+                      <TableHead className="text-right">Net Pay</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payrollsLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8">Loading...</TableCell>
+                      </TableRow>
+                    ) : filteredPayrolls.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No payroll records for this period</TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredPayrolls.map((payroll: DriverPayroll) => (
+                        <TableRow key={payroll.id}>
+                          <TableCell className="font-medium">{getDriverName(payroll.driver_id)}</TableCell>
+                          <TableCell>{payroll.period_start}</TableCell>
+                          <TableCell>{payroll.period_end}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(payroll.gross_pay)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(payroll.fuel_deductions || 0)}</TableCell>
+                          <TableCell className="text-right">{formatCurrency(payroll.repair_deductions || 0)}</TableCell>
+                          <TableCell className="text-right font-semibold text-primary">{formatCurrency(payroll.net_pay || 0)}</TableCell>
+                          <TableCell><StatusBadge status={payroll.status} /></TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button size="icon" variant="ghost" onClick={() => openPayrollDialog(payroll)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deletePayrollMutation.mutate(payroll.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Commissions Tab */}
+        <TabsContent value="commissions" className="mt-6">
+          <Card className="card-elevated">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5" />
+                  Agent Commissions
+                </CardTitle>
+                <CardDescription>Track agent commissions from loads</CardDescription>
+              </div>
+              <Button onClick={() => openCommissionDialog()} className="gradient-gold text-primary-foreground">
+                <Plus className="h-4 w-4 mr-2" /> Add Commission
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {/* Summary Cards */}
+              <div className="grid gap-4 md:grid-cols-2 mb-6">
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Total Commissions</p>
+                  <p className="text-2xl font-bold">{commissionTotals.count}</p>
+                </div>
+                <div className="p-4 bg-destructive/10 rounded-lg">
+                  <p className="text-sm text-muted-foreground">Total Amount</p>
+                  <p className="text-2xl font-bold text-destructive">{formatCurrency(commissionTotals.amount)}</p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Agent</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Payout Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {commissionsLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8">Loading...</TableCell>
+                      </TableRow>
+                    ) : filteredCommissions.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No commissions for this period</TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredCommissions.map((commission: AgentCommission) => (
+                        <TableRow key={commission.id}>
+                          <TableCell className="font-medium">{commission.agent_name}</TableCell>
+                          <TableCell className="text-right">{commission.commission_rate}%</TableCell>
+                          <TableCell className="text-right font-semibold text-destructive">{formatCurrency(commission.commission_amount)}</TableCell>
+                          <TableCell>{commission.payout_date || '-'}</TableCell>
+                          <TableCell><StatusBadge status={commission.status} /></TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button size="icon" variant="ghost" onClick={() => openCommissionDialog(commission)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteCommissionMutation.mutate(commission.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
           <Card className="card-elevated">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1103,6 +1544,129 @@ export default function Finance() {
               <Button type="button" variant="outline" onClick={closeExpenseDialog}>Cancel</Button>
               <Button type="submit" className="gradient-gold text-primary-foreground">
                 {editingExpense ? 'Save Changes' : 'Add Expense'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payroll Dialog */}
+      <Dialog open={payrollDialogOpen} onOpenChange={setPayrollDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingPayroll ? 'Edit Payroll' : 'Add Payroll Entry'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handlePayrollSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="driver_id">Driver *</Label>
+              <Select value={payrollFormData.driver_id || ''} onValueChange={(v) => setPayrollFormData({ ...payrollFormData, driver_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger>
+                <SelectContent>
+                  {drivers.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.first_name} {d.last_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="period_start">Period Start *</Label>
+                <Input id="period_start" type="date" value={payrollFormData.period_start || ''} onChange={(e) => setPayrollFormData({ ...payrollFormData, period_start: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="period_end">Period End *</Label>
+                <Input id="period_end" type="date" value={payrollFormData.period_end || ''} onChange={(e) => setPayrollFormData({ ...payrollFormData, period_end: e.target.value })} required />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="gross_pay">Gross Pay ($) *</Label>
+                <Input id="gross_pay" type="number" step="0.01" value={payrollFormData.gross_pay || ''} onChange={(e) => setPayrollFormData({ ...payrollFormData, gross_pay: parseFloat(e.target.value) || 0 })} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payroll_status">Status</Label>
+                <Select value={payrollFormData.status || 'pending'} onValueChange={(v) => setPayrollFormData({ ...payrollFormData, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fuel_deductions">Fuel Ded. ($)</Label>
+                <Input id="fuel_deductions" type="number" step="0.01" value={payrollFormData.fuel_deductions || ''} onChange={(e) => setPayrollFormData({ ...payrollFormData, fuel_deductions: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="repair_deductions">Repair Ded. ($)</Label>
+                <Input id="repair_deductions" type="number" step="0.01" value={payrollFormData.repair_deductions || ''} onChange={(e) => setPayrollFormData({ ...payrollFormData, repair_deductions: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="other_deductions">Other Ded. ($)</Label>
+                <Input id="other_deductions" type="number" step="0.01" value={payrollFormData.other_deductions || ''} onChange={(e) => setPayrollFormData({ ...payrollFormData, other_deductions: parseFloat(e.target.value) || 0 })} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="payroll_notes">Notes</Label>
+              <Textarea id="payroll_notes" value={payrollFormData.notes || ''} onChange={(e) => setPayrollFormData({ ...payrollFormData, notes: e.target.value })} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closePayrollDialog}>Cancel</Button>
+              <Button type="submit" className="gradient-gold text-primary-foreground">
+                {editingPayroll ? 'Save Changes' : 'Add Payroll'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Commission Dialog */}
+      <Dialog open={commissionDialogOpen} onOpenChange={setCommissionDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingCommission ? 'Edit Commission' : 'Add Commission'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCommissionSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="agent_name">Agent Name *</Label>
+              <Input id="agent_name" value={commissionFormData.agent_name || ''} onChange={(e) => setCommissionFormData({ ...commissionFormData, agent_name: e.target.value })} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="commission_rate">Rate (%)</Label>
+                <Input id="commission_rate" type="number" step="0.01" value={commissionFormData.commission_rate || ''} onChange={(e) => setCommissionFormData({ ...commissionFormData, commission_rate: parseFloat(e.target.value) || 0 })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="commission_amount">Amount ($)</Label>
+                <Input id="commission_amount" type="number" step="0.01" value={commissionFormData.commission_amount || ''} onChange={(e) => setCommissionFormData({ ...commissionFormData, commission_amount: parseFloat(e.target.value) || 0 })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="payout_date">Payout Date</Label>
+                <Input id="payout_date" type="date" value={commissionFormData.payout_date || ''} onChange={(e) => setCommissionFormData({ ...commissionFormData, payout_date: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="commission_status">Status</Label>
+                <Select value={commissionFormData.status || 'pending'} onValueChange={(v) => setCommissionFormData({ ...commissionFormData, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="commission_notes">Notes</Label>
+              <Textarea id="commission_notes" value={commissionFormData.notes || ''} onChange={(e) => setCommissionFormData({ ...commissionFormData, notes: e.target.value })} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeCommissionDialog}>Cancel</Button>
+              <Button type="submit" className="gradient-gold text-primary-foreground">
+                {editingCommission ? 'Save Changes' : 'Add Commission'}
               </Button>
             </DialogFooter>
           </form>
