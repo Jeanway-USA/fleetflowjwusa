@@ -10,6 +10,7 @@ import {
   LogOut,
   Shield,
   Building2,
+  TrendingUp,
   LucideIcon
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -64,6 +65,7 @@ export function AppSidebar() {
   ];
 
   const financeNavItems: NavItem[] = [
+    { title: 'P&L / Finance', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'] },
     { title: 'Driver Payroll', icon: DollarSign, path: '/payroll', roles: ['owner', 'payroll_admin', 'driver'] },
     { title: 'Commissions', icon: DollarSign, path: '/commissions', roles: ['owner', 'payroll_admin'] },
     { title: 'General Ledger', icon: FileText, path: '/ledger', roles: ['owner', 'payroll_admin'] },

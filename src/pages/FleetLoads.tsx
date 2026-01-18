@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,25 +10,40 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Pencil, Trash2 } from 'lucide-react';
-import type { Database } from '@/integrations/supabase/types';
-
-type FleetLoad = Database['public']['Tables']['fleet_loads']['Row'];
-type FleetLoadInsert = Database['public']['Tables']['fleet_loads']['Insert'];
-type Driver = Database['public']['Tables']['drivers']['Row'];
-type Truck = Database['public']['Tables']['trucks']['Row'];
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 
 export default function FleetLoads() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingLoad, setEditingLoad] = useState<FleetLoad | null>(null);
-  const [formData, setFormData] = useState<Partial<FleetLoadInsert>>({});
+  const [editingLoad, setEditingLoad] = useState<any>(null);
+  const [formData, setFormData] = useState<any>({});
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+
+  // Fetch settings for calculations
+  const { data: settings = [] } = useQuery({
+    queryKey: ['company_settings'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('company_settings').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const getSetting = (key: string, defaultValue: string = '0') => {
+    const setting = settings.find((s: any) => s.setting_key === key);
+    return setting?.setting_value || defaultValue;
+  };
 
   const { data: loads = [], isLoading } = useQuery({
     queryKey: ['fleet_loads'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('fleet_loads').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('fleet_loads').select('*').order('pickup_date', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -54,7 +68,7 @@ export default function FleetLoads() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (load: FleetLoadInsert) => {
+    mutationFn: async (load: any) => {
       const { error } = await supabase.from('fleet_loads').insert(load);
       if (error) throw error;
     },
@@ -63,11 +77,11 @@ export default function FleetLoads() {
       toast.success('Load created successfully');
       closeDialog();
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error: any) => toast.error(error.message),
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<FleetLoad> & { id: string }) => {
+    mutationFn: async ({ id, ...updates }: any) => {
       const { error } = await supabase.from('fleet_loads').update(updates).eq('id', id);
       if (error) throw error;
     },
@@ -76,7 +90,7 @@ export default function FleetLoads() {
       toast.success('Load updated successfully');
       closeDialog();
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error: any) => toast.error(error.message),
   });
 
   const deleteMutation = useMutation({
@@ -88,12 +102,15 @@ export default function FleetLoads() {
       queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
       toast.success('Load deleted');
     },
-    onError: (error) => toast.error(error.message),
+    onError: (error: any) => toast.error(error.message),
   });
 
-  const openDialog = (load?: FleetLoad) => {
+  const openDialog = (load?: any) => {
     setEditingLoad(load || null);
-    setFormData(load || { status: 'pending' });
+    setFormData(load || { 
+      status: 'pending',
+      is_power_only: false,
+    });
     setDialogOpen(true);
   };
 
@@ -103,148 +120,520 @@ export default function FleetLoads() {
     setFormData({});
   };
 
+  // Calculate revenue based on compensation package
+  const calculateRevenue = (data: any) => {
+    const rate = parseFloat(data.rate) || 0;
+    const fuelSurcharge = parseFloat(data.fuel_surcharge) || 0;
+    const accessorials = parseFloat(data.accessorials) || 0;
+    const lumper = parseFloat(data.lumper) || 0;
+    
+    const truckPct = parseFloat(getSetting('truck_percentage', '65')) / 100;
+    const trailerPct = parseFloat(getSetting('trailer_percentage', '7')) / 100;
+    const advancePct = parseFloat(getSetting('advance_percentage', '30')) / 100;
+    const ownsTrailer = getSetting('owns_trailer', 'false') === 'true';
+    const isPowerOnly = data.is_power_only;
+
+    const grossRevenue = rate + fuelSurcharge + accessorials;
+    const advanceAvailable = rate * advancePct;
+    const advanceTaken = parseFloat(data.advance_taken) || 0;
+    
+    let truckRevenue = grossRevenue * truckPct;
+    let trailerRevenue = ownsTrailer ? grossRevenue * trailerPct : 0;
+    
+    if (isPowerOnly) {
+      trailerRevenue = 0;
+    }
+
+    const netRevenue = truckRevenue + trailerRevenue;
+    const settlement = netRevenue - advanceTaken - lumper;
+
+    return {
+      gross_revenue: grossRevenue,
+      advance_available: advanceAvailable,
+      truck_revenue: truckRevenue,
+      trailer_revenue: trailerRevenue,
+      net_revenue: netRevenue,
+      settlement: settlement,
+      actual_miles: (parseInt(data.end_miles) || 0) - (parseInt(data.start_miles) || 0),
+    };
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.origin || !formData.destination) {
       toast.error('Origin and destination are required');
       return;
     }
+
+    const calculated = calculateRevenue(formData);
+    const payload = {
+      ...formData,
+      ...calculated,
+    };
+
     if (editingLoad) {
-      updateMutation.mutate({ id: editingLoad.id, ...formData });
+      updateMutation.mutate({ id: editingLoad.id, ...payload });
     } else {
-      createMutation.mutate(formData as FleetLoadInsert);
+      createMutation.mutate(payload);
     }
   };
 
   const getDriverName = (driverId: string | null) => {
     if (!driverId) return '-';
-    const driver = drivers.find(d => d.id === driverId);
+    const driver = drivers.find((d: any) => d.id === driverId);
     return driver ? `${driver.first_name} ${driver.last_name}` : '-';
   };
 
   const getTruckUnit = (truckId: string | null) => {
     if (!truckId) return '-';
-    const truck = trucks.find(t => t.id === truckId);
+    const truck = trucks.find((t: any) => t.id === truckId);
     return truck?.unit_number || '-';
   };
 
-  const columns = [
-    { key: 'landstar_load_id', header: 'Landstar ID', render: (l: FleetLoad) => l.landstar_load_id || '-' },
-    { key: 'origin', header: 'Origin' },
-    { key: 'destination', header: 'Destination' },
-    { key: 'pickup_date', header: 'Pickup', render: (l: FleetLoad) => l.pickup_date || '-' },
-    { key: 'delivery_date', header: 'Delivery', render: (l: FleetLoad) => l.delivery_date || '-' },
-    { key: 'driver_id', header: 'Driver', render: (l: FleetLoad) => getDriverName(l.driver_id) },
-    { key: 'truck_id', header: 'Truck', render: (l: FleetLoad) => getTruckUnit(l.truck_id) },
-    { key: 'rate', header: 'Rate', render: (l: FleetLoad) => `$${l.rate?.toFixed(2) || '0.00'}` },
-    { key: 'status', header: 'Status', render: (l: FleetLoad) => <StatusBadge status={l.status} /> },
-    {
-      key: 'actions',
-      header: 'Actions',
-      render: (load: FleetLoad) => (
-        <div className="flex gap-2">
-          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(load); }}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(load.id); }}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
+  const formatCurrency = (value: number | null) => {
+    if (value === null || value === undefined) return '$0.00';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+  };
+
+  const formatDate = (date: string | null) => {
+    if (!date) return '-';
+    return format(parseISO(date), 'MM/dd/yyyy');
+  };
+
+  // Filter loads by month
+  const filteredLoads = selectedMonth === 'all' 
+    ? loads 
+    : loads.filter((l: any) => l.pickup_date && l.pickup_date.startsWith(selectedMonth));
+
+  // Calculate totals
+  const totals = filteredLoads.reduce((acc: any, load: any) => ({
+    loads: acc.loads + 1,
+    rate: acc.rate + (load.rate || 0),
+    fuelSurcharge: acc.fuelSurcharge + (load.fuel_surcharge || 0),
+    grossRevenue: acc.grossRevenue + (load.gross_revenue || 0),
+    netRevenue: acc.netRevenue + (load.net_revenue || 0),
+    settlement: acc.settlement + (load.settlement || 0),
+    bookedMiles: acc.bookedMiles + (load.booked_miles || 0),
+    actualMiles: acc.actualMiles + (load.actual_miles || 0),
+  }), { loads: 0, rate: 0, fuelSurcharge: 0, grossRevenue: 0, netRevenue: 0, settlement: 0, bookedMiles: 0, actualMiles: 0 });
 
   return (
     <DashboardLayout>
-      <PageHeader title="Fleet Loads" description="Manage your fleet loads with Landstar integration" action={{ label: 'Add Load', onClick: () => openDialog() }} />
-      <DataTable columns={columns} data={loads} loading={isLoading} emptyMessage="No loads yet" />
+      <PageHeader 
+        title="Fleet Loads" 
+        description="Track loads, revenue, and settlements" 
+        action={{ label: 'Add Load', onClick: () => openDialog() }} 
+      />
 
+      {/* Summary Cards */}
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
+        <Card className="card-elevated">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Loads</CardTitle>
+            <Truck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totals.loads}</div>
+            <p className="text-xs text-muted-foreground">{totals.actualMiles.toLocaleString()} actual miles</p>
+          </CardContent>
+        </Card>
+        <Card className="card-elevated">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Gross Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(totals.grossRevenue)}</div>
+            <p className="text-xs text-muted-foreground">Rate + FSC + Accessorials</p>
+          </CardContent>
+        </Card>
+        <Card className="card-elevated">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
+            <TrendingUp className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">{formatCurrency(totals.netRevenue)}</div>
+            <p className="text-xs text-muted-foreground">Truck + Trailer share</p>
+          </CardContent>
+        </Card>
+        <Card className="card-elevated">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Avg Per Mile</CardTitle>
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {totals.actualMiles > 0 ? formatCurrency(totals.netRevenue / totals.actualMiles) : '$0.00'}
+            </div>
+            <p className="text-xs text-muted-foreground">Net revenue per mile</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Month Filter */}
+      <div className="flex gap-4 mb-4">
+        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Filter by month" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Loads</SelectItem>
+            <SelectItem value="2026-01">January 2026</SelectItem>
+            <SelectItem value="2026-02">February 2026</SelectItem>
+            <SelectItem value="2026-03">March 2026</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Loads Table */}
+      <Card className="card-elevated">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Landstar ID</TableHead>
+                  <TableHead>Origin</TableHead>
+                  <TableHead>Destination</TableHead>
+                  <TableHead className="text-right">Rate</TableHead>
+                  <TableHead className="text-right">FSC</TableHead>
+                  <TableHead className="text-right">Accessorials</TableHead>
+                  <TableHead className="text-right">Net Revenue</TableHead>
+                  <TableHead className="text-right">Miles</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Loading...</TableCell>
+                  </TableRow>
+                ) : filteredLoads.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">No loads yet</TableCell>
+                  </TableRow>
+                ) : (
+                  filteredLoads.map((load: any) => (
+                    <TableRow key={load.id}>
+                      <TableCell>{formatDate(load.pickup_date)}</TableCell>
+                      <TableCell className="font-mono">{load.landstar_load_id || '-'}</TableCell>
+                      <TableCell>{load.origin}</TableCell>
+                      <TableCell>{load.destination}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(load.rate)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(load.fuel_surcharge)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(load.accessorials)}</TableCell>
+                      <TableCell className="text-right font-medium text-success">{formatCurrency(load.net_revenue)}</TableCell>
+                      <TableCell className="text-right">{load.actual_miles?.toLocaleString() || '-'}</TableCell>
+                      <TableCell><StatusBadge status={load.status} /></TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => openDialog(load)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+                {filteredLoads.length > 0 && (
+                  <TableRow className="bg-muted/50 font-medium">
+                    <TableCell colSpan={4}>Totals ({totals.loads} loads)</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totals.rate)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totals.fuelSurcharge)}</TableCell>
+                    <TableCell className="text-right">-</TableCell>
+                    <TableCell className="text-right text-success">{formatCurrency(totals.netRevenue)}</TableCell>
+                    <TableCell className="text-right">{totals.actualMiles.toLocaleString()}</TableCell>
+                    <TableCell colSpan={2}></TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Load Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingLoad ? 'Edit Load' : 'Add New Load'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="landstar_load_id">Landstar Load ID</Label>
-                <Input id="landstar_load_id" value={formData.landstar_load_id || ''} onChange={(e) => setFormData({ ...formData, landstar_load_id: e.target.value })} placeholder="LS-12345" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select value={formData.status || 'pending'} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="assigned">Assigned</SelectItem>
-                    <SelectItem value="in_transit">In Transit</SelectItem>
-                    <SelectItem value="delivered">Delivered</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="origin">Origin *</Label>
-                <Input id="origin" value={formData.origin || ''} onChange={(e) => setFormData({ ...formData, origin: e.target.value })} placeholder="City, State" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="destination">Destination *</Label>
-                <Input id="destination" value={formData.destination || ''} onChange={(e) => setFormData({ ...formData, destination: e.target.value })} placeholder="City, State" required />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="pickup_date">Pickup Date</Label>
-                <Input id="pickup_date" type="date" value={formData.pickup_date || ''} onChange={(e) => setFormData({ ...formData, pickup_date: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="delivery_date">Delivery Date</Label>
-                <Input id="delivery_date" type="date" value={formData.delivery_date || ''} onChange={(e) => setFormData({ ...formData, delivery_date: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="driver_id">Driver</Label>
-                <Select value={formData.driver_id || 'none'} onValueChange={(v) => setFormData({ ...formData, driver_id: v === 'none' ? null : v })}>
-                  <SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Unassigned</SelectItem>
-                    {drivers.map(d => <SelectItem key={d.id} value={d.id}>{d.first_name} {d.last_name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="truck_id">Truck</Label>
-                <Select value={formData.truck_id || 'none'} onValueChange={(v) => setFormData({ ...formData, truck_id: v === 'none' ? null : v })}>
-                  <SelectTrigger><SelectValue placeholder="Select truck" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Unassigned</SelectItem>
-                    {trucks.map(t => <SelectItem key={t.id} value={t.id}>{t.unit_number}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="rate">Rate ($)</Label>
-                <Input id="rate" type="number" step="0.01" value={formData.rate || ''} onChange={(e) => setFormData({ ...formData, rate: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fuel_advance">Fuel Advance ($)</Label>
-                <Input id="fuel_advance" type="number" step="0.01" value={formData.fuel_advance || ''} onChange={(e) => setFormData({ ...formData, fuel_advance: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="detention_pay">Accessorials ($)</Label>
-                <Input id="detention_pay" type="number" step="0.01" value={formData.detention_pay || ''} onChange={(e) => setFormData({ ...formData, detention_pay: parseFloat(e.target.value) || 0 })} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea id="notes" value={formData.notes || ''} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} placeholder="Additional notes..." />
-            </div>
-            <DialogFooter>
+          <form onSubmit={handleSubmit}>
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="details">Load Details</TabsTrigger>
+                <TabsTrigger value="revenue">Revenue & Advance</TabsTrigger>
+                <TabsTrigger value="miles">Miles & Notes</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="details" className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="landstar_load_id">Landstar Load ID</Label>
+                    <Input 
+                      id="landstar_load_id" 
+                      value={formData.landstar_load_id || ''} 
+                      onChange={(e) => setFormData({ ...formData, landstar_load_id: e.target.value })} 
+                      placeholder="8941232" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select value={formData.status || 'pending'} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="booked">Booked</SelectItem>
+                        <SelectItem value="assigned">Assigned</SelectItem>
+                        <SelectItem value="in_transit">In Transit</SelectItem>
+                        <SelectItem value="delivered">Delivered</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="origin">Origin *</Label>
+                    <Input 
+                      id="origin" 
+                      value={formData.origin || ''} 
+                      onChange={(e) => setFormData({ ...formData, origin: e.target.value })} 
+                      placeholder="Lewisville, TX" 
+                      required 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="destination">Destination *</Label>
+                    <Input 
+                      id="destination" 
+                      value={formData.destination || ''} 
+                      onChange={(e) => setFormData({ ...formData, destination: e.target.value })} 
+                      placeholder="Evans, CO" 
+                      required 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="pickup_date">Pickup Date</Label>
+                    <Input 
+                      id="pickup_date" 
+                      type="date" 
+                      value={formData.pickup_date || ''} 
+                      onChange={(e) => setFormData({ ...formData, pickup_date: e.target.value })} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="delivery_date">Delivery Date</Label>
+                    <Input 
+                      id="delivery_date" 
+                      type="date" 
+                      value={formData.delivery_date || ''} 
+                      onChange={(e) => setFormData({ ...formData, delivery_date: e.target.value })} 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="driver_id">Driver</Label>
+                    <Select value={formData.driver_id || 'none'} onValueChange={(v) => setFormData({ ...formData, driver_id: v === 'none' ? null : v })}>
+                      <SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Unassigned</SelectItem>
+                        {drivers.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.first_name} {d.last_name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="truck_id">Truck</Label>
+                    <Select value={formData.truck_id || 'none'} onValueChange={(v) => setFormData({ ...formData, truck_id: v === 'none' ? null : v })}>
+                      <SelectTrigger><SelectValue placeholder="Select truck" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Unassigned</SelectItem>
+                        {trucks.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.unit_number}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="is_power_only" 
+                    checked={formData.is_power_only || false}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_power_only: checked })}
+                  />
+                  <Label htmlFor="is_power_only" className="font-normal cursor-pointer">Power Only (No trailer revenue)</Label>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="revenue" className="space-y-4 mt-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="rate">Booked Linehaul ($)</Label>
+                    <Input 
+                      id="rate" 
+                      type="number" 
+                      step="0.01" 
+                      value={formData.rate || ''} 
+                      onChange={(e) => setFormData({ ...formData, rate: parseFloat(e.target.value) || 0 })} 
+                      placeholder="2430.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="booked_miles">Booked Miles</Label>
+                    <Input 
+                      id="booked_miles" 
+                      type="number" 
+                      value={formData.booked_miles || ''} 
+                      onChange={(e) => setFormData({ ...formData, booked_miles: parseInt(e.target.value) || 0 })} 
+                      placeholder="810"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fuel_surcharge">Fuel Surcharge ($)</Label>
+                    <Input 
+                      id="fuel_surcharge" 
+                      type="number" 
+                      step="0.01" 
+                      value={formData.fuel_surcharge || ''} 
+                      onChange={(e) => setFormData({ ...formData, fuel_surcharge: parseFloat(e.target.value) || 0 })} 
+                      placeholder="315.90"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="lumper">Lumper ($)</Label>
+                    <Input 
+                      id="lumper" 
+                      type="number" 
+                      step="0.01" 
+                      value={formData.lumper || ''} 
+                      onChange={(e) => setFormData({ ...formData, lumper: parseFloat(e.target.value) || 0 })} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="accessorials">Accessorials ($)</Label>
+                    <Input 
+                      id="accessorials" 
+                      type="number" 
+                      step="0.01" 
+                      value={formData.accessorials || ''} 
+                      onChange={(e) => setFormData({ ...formData, accessorials: parseFloat(e.target.value) || 0 })} 
+                      placeholder="300.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fuel_advance">Fuel Advance ($)</Label>
+                    <Input 
+                      id="fuel_advance" 
+                      type="number" 
+                      step="0.01" 
+                      value={formData.fuel_advance || ''} 
+                      onChange={(e) => setFormData({ ...formData, fuel_advance: parseFloat(e.target.value) || 0 })} 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="advance_taken">Advance Taken ($)</Label>
+                    <Input 
+                      id="advance_taken" 
+                      type="number" 
+                      step="0.01" 
+                      value={formData.advance_taken || ''} 
+                      onChange={(e) => setFormData({ ...formData, advance_taken: parseFloat(e.target.value) || 0 })} 
+                      placeholder="456.50"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Advance Available (calculated)</Label>
+                    <div className="h-10 px-3 py-2 rounded-md border bg-muted text-muted-foreground">
+                      {formatCurrency((parseFloat(formData.rate) || 0) * (parseFloat(getSetting('advance_percentage', '30')) / 100))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preview calculations */}
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="font-medium mb-3">Revenue Preview</h4>
+                  <div className="grid grid-cols-4 gap-4 text-sm">
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-muted-foreground">Gross Revenue</p>
+                      <p className="font-bold">{formatCurrency(calculateRevenue(formData).gross_revenue)}</p>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-muted-foreground">Truck ({getSetting('truck_percentage', '65')}%)</p>
+                      <p className="font-bold">{formatCurrency(calculateRevenue(formData).truck_revenue)}</p>
+                    </div>
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-muted-foreground">Trailer ({getSetting('trailer_percentage', '7')}%)</p>
+                      <p className="font-bold">{formatCurrency(calculateRevenue(formData).trailer_revenue)}</p>
+                    </div>
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                      <p className="text-muted-foreground">Net Revenue</p>
+                      <p className="font-bold text-primary">{formatCurrency(calculateRevenue(formData).net_revenue)}</p>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="miles" className="space-y-4 mt-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="start_miles">Starting Odometer</Label>
+                    <Input 
+                      id="start_miles" 
+                      type="number" 
+                      value={formData.start_miles || ''} 
+                      onChange={(e) => setFormData({ ...formData, start_miles: parseInt(e.target.value) || 0 })} 
+                      placeholder="647744"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="end_miles">Ending Odometer</Label>
+                    <Input 
+                      id="end_miles" 
+                      type="number" 
+                      value={formData.end_miles || ''} 
+                      onChange={(e) => setFormData({ ...formData, end_miles: parseInt(e.target.value) || 0 })} 
+                      placeholder="648611"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Actual Miles (calculated)</Label>
+                    <div className="h-10 px-3 py-2 rounded-md border bg-muted text-muted-foreground">
+                      {((parseInt(formData.end_miles) || 0) - (parseInt(formData.start_miles) || 0)).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes / Comments</Label>
+                  <Textarea 
+                    id="notes" 
+                    value={formData.notes || ''} 
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })} 
+                    placeholder="Stop over in Denver, etc." 
+                    rows={4}
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            <DialogFooter className="mt-6">
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
               <Button type="submit" className="gradient-gold text-primary-foreground">
                 {editingLoad ? 'Save Changes' : 'Add Load'}
