@@ -26,39 +26,41 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/trucks" element={<Trucks />} />
-              <Route path="/drivers" element={<Drivers />} />
-              <Route path="/fleet-loads" element={<FleetLoads />} />
-              <Route path="/agency-loads" element={<AgencyLoads />} />
-              <Route path="/payroll" element={<Payroll />} />
-              <Route path="/commissions" element={<Commissions />} />
-              <Route path="/finance" element={<Finance />} />
-              <Route path="/ledger" element={<Finance />} />
-              <Route path="/insights" element={<CompanyInsights />} />
-              <Route path="/resources" element={<Resources />} />
-              <Route path="/maintenance" element={<Maintenance />} />
-              <Route path="/documents" element={<Documents />} />
-              <Route path="/safety" element={<Safety />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthProvider>
+              <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/trucks" element={<Trucks />} />
+                <Route path="/drivers" element={<Drivers />} />
+                <Route path="/fleet-loads" element={<FleetLoads />} />
+                <Route path="/agency-loads" element={<AgencyLoads />} />
+                <Route path="/payroll" element={<Payroll />} />
+                <Route path="/commissions" element={<Commissions />} />
+                <Route path="/finance" element={<Finance />} />
+                <Route path="/ledger" element={<Finance />} />
+                <Route path="/insights" element={<CompanyInsights />} />
+                <Route path="/resources" element={<Resources />} />
+                <Route path="/maintenance" element={<Maintenance />} />
+                <Route path="/documents" element={<Documents />} />
+                <Route path="/safety" element={<Safety />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
