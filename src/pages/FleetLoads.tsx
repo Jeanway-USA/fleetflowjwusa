@@ -127,15 +127,16 @@ export default function FleetLoads() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, accessorials: accs, ...updates }: any) => {
+    mutationFn: async ({ id, updates, accessorialItems }: { id: string; updates: any; accessorialItems: Accessorial[] }) => {
       const { error } = await supabase.from('fleet_loads').update(updates).eq('id', id);
       if (error) throw error;
-      
+
       // Delete existing accessorials and insert new ones
-      await supabase.from('load_accessorials').delete().eq('load_id', id);
-      
-      if (accs && accs.length > 0) {
-        const accessorialRecords = accs.map((acc: Accessorial) => ({
+      const { error: deleteError } = await supabase.from('load_accessorials').delete().eq('load_id', id);
+      if (deleteError) throw deleteError;
+
+      if (accessorialItems.length > 0) {
+        const accessorialRecords = accessorialItems.map((acc: Accessorial) => ({
           load_id: id,
           accessorial_type: acc.accessorial_type,
           amount: acc.amount,
@@ -286,7 +287,7 @@ export default function FleetLoads() {
     };
 
     if (editingLoad) {
-      updateMutation.mutate({ id: editingLoad.id, accessorials, ...payload });
+      updateMutation.mutate({ id: editingLoad.id, updates: payload, accessorialItems: accessorials });
     } else {
       createMutation.mutate({ load: payload, accessorials });
     }
