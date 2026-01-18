@@ -414,14 +414,16 @@ export default function Finance() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-success" />
+            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+            {netProfit >= 0 ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">{formatCurrency(revenueTotals.netRevenue)}</div>
+            <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {formatCurrency(netProfit)}
+            </div>
             <p className="text-xs text-muted-foreground">{revenueTotals.loadCount} loads</p>
           </CardContent>
         </Card>
@@ -433,18 +435,6 @@ export default function Finance() {
           <CardContent>
             <div className="text-2xl font-bold text-destructive">{formatCurrency(totalExpenses)}</div>
             <p className="text-xs text-muted-foreground">All operating costs</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-            {netProfit >= 0 ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {formatCurrency(netProfit)}
-            </div>
-            <p className="text-xs text-muted-foreground">Revenue - Expenses</p>
           </CardContent>
         </Card>
         <Card className="card-elevated">
