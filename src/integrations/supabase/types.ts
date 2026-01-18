@@ -229,6 +229,66 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_inspections: {
+        Row: {
+          created_at: string
+          defect_notes: string | null
+          defects_found: boolean
+          driver_id: string
+          id: string
+          inspection_date: string
+          inspection_type: string
+          odometer_reading: number | null
+          signature: string | null
+          status: string
+          truck_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          defect_notes?: string | null
+          defects_found?: boolean
+          driver_id: string
+          id?: string
+          inspection_date?: string
+          inspection_type: string
+          odometer_reading?: number | null
+          signature?: string | null
+          status?: string
+          truck_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          defect_notes?: string | null
+          defects_found?: boolean
+          driver_id?: string
+          id?: string
+          inspection_date?: string
+          inspection_type?: string
+          odometer_reading?: number | null
+          signature?: string | null
+          status?: string
+          truck_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_inspections_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_inspections_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_payroll: {
         Row: {
           created_at: string
@@ -779,6 +839,60 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "maintenance_logs_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_requests: {
+        Row: {
+          admin_notes: string | null
+          created_at: string
+          description: string
+          driver_id: string
+          id: string
+          issue_type: string
+          priority: string
+          status: string
+          truck_id: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          created_at?: string
+          description: string
+          driver_id: string
+          id?: string
+          issue_type: string
+          priority?: string
+          status?: string
+          truck_id: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          created_at?: string
+          description?: string
+          driver_id?: string
+          id?: string
+          issue_type?: string
+          priority?: string
+          status?: string
+          truck_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_requests_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_requests_truck_id_fkey"
             columns: ["truck_id"]
             isOneToOne: false
             referencedRelation: "trucks"
