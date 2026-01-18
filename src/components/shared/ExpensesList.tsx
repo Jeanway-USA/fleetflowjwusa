@@ -12,6 +12,7 @@ import { format, parseISO } from 'date-fns';
 
 const EXPENSE_TYPES = [
   'Fuel',
+  'DEF',
   'Truck Payment',
   'Trailer Payment',
   'Licensing/Permits',
@@ -27,6 +28,8 @@ const EXPENSE_TYPES = [
   'Parking',
   'Misc',
 ];
+
+const GALLONS_EXPENSE_TYPES = ['Fuel', 'DEF'];
 
 interface ExpensesListProps {
   relatedType: 'load' | 'truck';
@@ -120,7 +123,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
       expense_date: formData.expense_date,
       vendor: formData.vendor || null,
       description: formData.description || null,
-      gallons: formData.expense_type === 'Fuel' && formData.gallons ? parseFloat(formData.gallons) : null,
+      gallons: GALLONS_EXPENSE_TYPES.includes(formData.expense_type) && formData.gallons ? parseFloat(formData.gallons) : null,
     };
 
     if (relatedType === 'load') {
@@ -195,7 +198,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
                 required
               />
             </div>
-            {formData.expense_type === 'Fuel' && (
+            {GALLONS_EXPENSE_TYPES.includes(formData.expense_type) && (
               <div className="space-y-2">
                 <Label>Gallons</Label>
                 <Input 
@@ -207,7 +210,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
                 />
               </div>
             )}
-            {formData.expense_type !== 'Fuel' && (
+            {!GALLONS_EXPENSE_TYPES.includes(formData.expense_type) && (
               <div className="space-y-2">
                 <Label>Vendor</Label>
                 <Input 
@@ -219,7 +222,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
             )}
           </div>
 
-          {formData.expense_type === 'Fuel' && (
+          {GALLONS_EXPENSE_TYPES.includes(formData.expense_type) && (
             <div className="space-y-2">
               <Label>Vendor</Label>
               <Input 
@@ -276,7 +279,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
                   <TableCell>{formatDate(expense.expense_date)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      {expense.expense_type === 'Fuel' && <Fuel className="h-4 w-4 text-muted-foreground" />}
+                      {GALLONS_EXPENSE_TYPES.includes(expense.expense_type) && <Fuel className="h-4 w-4 text-muted-foreground" />}
                       {expense.expense_type}
                     </div>
                   </TableCell>
