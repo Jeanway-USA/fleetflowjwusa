@@ -32,19 +32,7 @@ const CompanyInsights = () => {
     },
   });
 
-  // Fetch agency loads
-  const { data: agencyLoads = [] } = useQuery({
-    queryKey: ['agency-loads-insights', selectedYear],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('agency_loads')
-        .select('*')
-        .gte('pickup_date', format(yearStart, 'yyyy-MM-dd'))
-        .lte('pickup_date', format(yearEnd, 'yyyy-MM-dd'));
-      if (error) throw error;
-      return data || [];
-    },
-  });
+  // Note: Agency data is derived from fleet_loads using agency_code field
 
   // Fetch expenses
   const { data: expenses = [] } = useQuery({
@@ -132,22 +120,26 @@ const CompanyInsights = () => {
 
   // ==================== AGENCY REPORTS ====================
   
-  // Aggregate by broker/agency
-  const agencyStats = agencyLoads.reduce((acc: Record<string, { name: string; totalPaid: number; loads: number; loadRefs: string[] }>, load: any) => {
-    const agencyName = load.broker_name || 'Unknown Agency';
-    if (!acc[agencyName]) {
-      acc[agencyName] = { name: agencyName, totalPaid: 0, loads: 0, loadRefs: [] };
+  // Aggregate by agency_code from fleet_loads
+  const agencyStats = fleetLoads.reduce((acc: Record<string, { name: string; totalRevenue: number; loads: number; loadRefs: string[] }>, load: any) => {
+    const agencyCode = load.agency_code || 'No Agency';
+    if (!acc[agencyCode]) {
+      acc[agencyCode] = { name: agencyCode, totalRevenue: 0, loads: 0, loadRefs: [] };
     }
-    acc[agencyName].totalPaid += (load.broker_rate || 0);
-    acc[agencyName].loads += 1;
-    if (load.load_reference) {
-      acc[agencyName].loadRefs.push(load.load_reference);
+    acc[agencyCode].totalRevenue += (load.net_revenue || 0);
+    acc[agencyCode].loads += 1;
+    if (load.landstar_load_id) {
+      acc[agencyCode].loadRefs.push(load.landstar_load_id);
     }
     return acc;
   }, {});
 
   const agencyLeaderboard = Object.values(agencyStats)
-    .sort((a: any, b: any) => b.totalPaid - a.totalPaid);
+    .filter((a: any) => a.name !== 'No Agency')
+    .sort((a: any, b: any) => b.totalRevenue - a.totalRevenue);
+  
+  const totalAgencyRevenue = agencyLeaderboard.reduce((sum: number, a: any) => sum + a.totalRevenue, 0);
+  const totalAgencyLoads = agencyLeaderboard.reduce((sum: number, a: any) => sum + a.loads, 0);
 
   // ==================== TAX SUMMARY ====================
   
@@ -387,20 +379,20 @@ const CompanyInsights = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Rank</TableHead>
-                        <TableHead>Agency/Broker</TableHead>
+                        <TableHead>Agency Code</TableHead>
                         <TableHead className="text-right">Total Loads</TableHead>
-                        <TableHead className="text-right">Total Paid</TableHead>
+                        <TableHead className="text-right">Total Revenue</TableHead>
                         <TableHead>Load References</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {agencyLeaderboard.map((agency: any, index: number) => (
-                        <TableRow key={agency.name} className={index === 0 ? 'bg-amber-50 dark:bg-amber-950/20' : ''}>
+                        <TableRow key={agency.name} className={index === 0 ? 'bg-primary/10' : ''}>
                           <TableCell>{getRankBadge(index)}</TableCell>
                           <TableCell className="font-medium">{agency.name}</TableCell>
                           <TableCell className="text-right">{agency.loads}</TableCell>
                           <TableCell className="text-right font-mono font-medium text-primary">
-                            {formatCurrency(agency.totalPaid)}
+                            {formatCurrency(agency.totalRevenue)}
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1 max-w-xs">
@@ -427,7 +419,7 @@ const CompanyInsights = () => {
                   <div className="text-center">
                     <p className="text-sm text-muted-foreground">Total Agency Revenue</p>
                     <p className="text-2xl font-bold text-primary">
-                      {formatCurrency(agencyLeaderboard.reduce((sum: number, a: any) => sum + a.totalPaid, 0))}
+                      {formatCurrency(totalAgencyRevenue)}
                     </p>
                   </div>
                 </CardContent>
@@ -436,7 +428,7 @@ const CompanyInsights = () => {
                 <CardContent className="pt-6">
                   <div className="text-center">
                     <p className="text-sm text-muted-foreground">Total Agency Loads</p>
-                    <p className="text-2xl font-bold">{agencyLoads.length}</p>
+                    <p className="text-2xl font-bold">{totalAgencyLoads}</p>
                   </div>
                 </CardContent>
               </Card>
