@@ -11,12 +11,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, TrendingDown, Users } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type GeneralLedger = Database['public']['Tables']['general_ledger']['Row'];
 type GeneralLedgerInsert = Database['public']['Tables']['general_ledger']['Insert'];
+type DriverPayroll = Database['public']['Tables']['driver_payroll']['Row'];
+type Driver = Database['public']['Tables']['drivers']['Row'];
 
 const categories = ['Revenue', 'Fuel', 'Repairs', 'Insurance', 'Tolls', 'Equipment', 'Payroll', 'Office', 'Other'];
 
@@ -30,6 +33,24 @@ export default function Ledger() {
     queryKey: ['general_ledger'],
     queryFn: async () => {
       const { data, error } = await supabase.from('general_ledger').select('*').order('transaction_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: payrolls = [] } = useQuery({
+    queryKey: ['driver_payroll'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('driver_payroll').select('*').order('period_end', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: drivers = [] } = useQuery({
+    queryKey: ['drivers'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('drivers').select('*');
       if (error) throw error;
       return data;
     },
@@ -101,7 +122,23 @@ export default function Ledger() {
   // Calculate totals
   const totalIncome = entries.filter(e => e.transaction_type === 'income').reduce((sum, e) => sum + Number(e.amount), 0);
   const totalExpenses = entries.filter(e => e.transaction_type === 'expense').reduce((sum, e) => sum + Number(e.amount), 0);
-  const netProfit = totalIncome - totalExpenses;
+  const totalPayroll = payrolls.reduce((sum, p) => sum + Number(p.net_pay || 0), 0);
+  const netProfit = totalIncome - totalExpenses - totalPayroll;
+
+  const getDriverName = (driverId: string) => {
+    const driver = drivers.find(d => d.id === driverId);
+    return driver ? `${driver.first_name} ${driver.last_name}` : '-';
+  };
+
+  const payrollColumns = [
+    { key: 'driver_id', header: 'Driver', render: (p: DriverPayroll) => getDriverName(p.driver_id) },
+    { key: 'period_start', header: 'Period Start' },
+    { key: 'period_end', header: 'Period End' },
+    { key: 'gross_pay', header: 'Gross Pay', render: (p: DriverPayroll) => `$${Number(p.gross_pay).toFixed(2)}` },
+    { key: 'fuel_deductions', header: 'Fuel Ded.', render: (p: DriverPayroll) => `$${(p.fuel_deductions || 0).toFixed(2)}` },
+    { key: 'net_pay', header: 'Net Pay', render: (p: DriverPayroll) => <span className="font-semibold text-primary">${(p.net_pay || 0).toFixed(2)}</span> },
+    { key: 'status', header: 'Status', render: (p: DriverPayroll) => <span className={`capitalize ${p.status === 'paid' ? 'text-success' : 'text-muted-foreground'}`}>{p.status}</span> },
+  ];
 
   const columns = [
     { key: 'transaction_date', header: 'Date' },
@@ -167,6 +204,15 @@ export default function Ledger() {
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Payroll</CardTitle>
+            <Users className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">${totalPayroll.toFixed(2)}</div>
+          </CardContent>
+        </Card>
+        <Card className="card-elevated">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Net Profit</CardTitle>
           </CardHeader>
           <CardContent>
@@ -177,7 +223,18 @@ export default function Ledger() {
         </Card>
       </div>
 
-      <DataTable columns={columns} data={entries} loading={isLoading} emptyMessage="No ledger entries yet" />
+      <Tabs defaultValue="ledger" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="ledger">General Ledger</TabsTrigger>
+          <TabsTrigger value="payroll">Driver Payroll</TabsTrigger>
+        </TabsList>
+        <TabsContent value="ledger">
+          <DataTable columns={columns} data={entries} loading={isLoading} emptyMessage="No ledger entries yet" />
+        </TabsContent>
+        <TabsContent value="payroll">
+          <DataTable columns={payrollColumns} data={payrolls} loading={isLoading} emptyMessage="No payroll records yet" />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
