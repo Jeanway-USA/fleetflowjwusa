@@ -249,6 +249,32 @@ export default function Finance() {
   const filteredLoads = getFilteredLoads();
   const filteredExpenses = getFilteredExpenses();
 
+  // Calculate deadhead miles (empty miles between loads)
+  // Sort loads by pickup_date to find consecutive loads
+  const sortedLoads = [...filteredLoads]
+    .filter((l: any) => l.pickup_date && l.start_miles != null && l.end_miles != null)
+    .sort((a: any, b: any) => {
+      const dateA = parseISO(a.pickup_date);
+      const dateB = parseISO(b.pickup_date);
+      return dateA.getTime() - dateB.getTime();
+    });
+
+  // Calculate deadhead miles between consecutive loads
+  let deadheadMiles = 0;
+  for (let i = 1; i < sortedLoads.length; i++) {
+    const prevLoad = sortedLoads[i - 1];
+    const currLoad = sortedLoads[i];
+    
+    // Deadhead = current load's start_miles - previous load's end_miles
+    if (prevLoad.end_miles != null && currLoad.start_miles != null) {
+      const gap = currLoad.start_miles - prevLoad.end_miles;
+      // Only count positive gaps (negative would mean overlapping or data error)
+      if (gap > 0) {
+        deadheadMiles += gap;
+      }
+    }
+  }
+
   // Calculate P&L totals
   const revenueTotals = filteredLoads.reduce((acc: any, load: any) => ({
     loadCount: acc.loadCount + 1,
@@ -271,6 +297,12 @@ export default function Finance() {
     grossRevenue: 0, truckRevenue: 0, trailerRevenue: 0, netRevenue: 0,
     settlement: 0, actualMiles: 0,
   });
+
+  // Total empty miles = deadhead between loads + (actual - booked per load)
+  const perLoadEmptyMiles = revenueTotals.actualMiles - revenueTotals.bookedMiles;
+  const totalEmptyMiles = deadheadMiles + Math.max(0, perLoadEmptyMiles);
+  // Total actual miles for percentage = actual miles from loads + deadhead
+  const totalActualMilesWithDeadhead = revenueTotals.actualMiles + deadheadMiles;
 
   // Get load expenses for filtered loads
   const loadIds = filteredLoads.map((l: any) => l.id);
@@ -554,16 +586,20 @@ export default function Finance() {
                       <TableCell className="text-right font-mono">{revenueTotals.actualMiles.toLocaleString()}</TableCell>
                     </TableRow>
                     <TableRow>
+                      <TableCell>Deadhead Miles (Between Loads)</TableCell>
+                      <TableCell className="text-right font-mono">{deadheadMiles.toLocaleString()}</TableCell>
+                    </TableRow>
+                    <TableRow>
                       <TableCell>Empty Miles</TableCell>
                       <TableCell className="text-right font-mono">
-                        {(revenueTotals.actualMiles - revenueTotals.bookedMiles).toLocaleString()}
+                        {totalEmptyMiles.toLocaleString()}
                       </TableCell>
                     </TableRow>
                     <TableRow className="border-t">
                       <TableCell className="font-medium">% of Empty Miles</TableCell>
                       <TableCell className="text-right font-medium">
-                        {revenueTotals.actualMiles > 0 
-                          ? (((revenueTotals.actualMiles - revenueTotals.bookedMiles) / revenueTotals.actualMiles) * 100).toFixed(2)
+                        {totalActualMilesWithDeadhead > 0 
+                          ? ((totalEmptyMiles / totalActualMilesWithDeadhead) * 100).toFixed(2)
                           : 0}%
                       </TableCell>
                     </TableRow>
@@ -576,7 +612,7 @@ export default function Finance() {
                     <TableRow>
                       <TableCell className="font-medium">Revenue Per Actual Mile</TableCell>
                       <TableCell className="text-right font-medium">
-                        {revenueTotals.actualMiles > 0 ? formatCurrency(revenueTotals.netRevenue / revenueTotals.actualMiles) : '$0.00'}
+                        {totalActualMilesWithDeadhead > 0 ? formatCurrency(revenueTotals.netRevenue / totalActualMilesWithDeadhead) : '$0.00'}
                       </TableCell>
                     </TableRow>
                   </TableBody>
