@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, AlertTriangle } from 'lucide-react';
+import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, AlertTriangle, Link, Link2Off } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 const endorsementOptions = ['H - Hazmat', 'N - Tank', 'P - Passenger', 'S - School Bus', 'T - Double/Triple', 'X - Hazmat + Tank'];
@@ -37,6 +37,25 @@ export default function Drivers() {
       return data;
     },
   });
+
+  // Fetch all users/profiles for linking
+  const { data: users = [] } = useQuery({
+    queryKey: ['profiles-for-linking'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, user_id, email, first_name, last_name')
+        .order('email');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Get linked user info for display
+  const getLinkedUser = (userId: string | null) => {
+    if (!userId) return null;
+    return users.find((u: any) => u.user_id === userId);
+  };
 
   const createMutation = useMutation({
     mutationFn: async (driver: any) => {
@@ -227,6 +246,23 @@ export default function Drivers() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
+                {/* Linked User Account */}
+                <div className="flex items-center gap-2 text-sm">
+                  {driver.user_id ? (
+                    <>
+                      <Link className="h-4 w-4 text-primary" />
+                      <span className="text-primary font-medium">
+                        Linked to: {getLinkedUser(driver.user_id)?.email || 'Unknown User'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Link2Off className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">No linked user account</span>
+                    </>
+                  )}
+                </div>
+
                 {driver.phone && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Phone className="h-4 w-4" />
@@ -332,6 +368,32 @@ export default function Drivers() {
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone</Label>
                 <Input id="phone" value={formData.phone || ''} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">Link to User Account</h4>
+              <div className="space-y-2">
+                <Label htmlFor="user_id">User Account</Label>
+                <Select 
+                  value={formData.user_id || 'none'} 
+                  onValueChange={(v) => setFormData({ ...formData, user_id: v === 'none' ? null : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a user account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No linked user</SelectItem>
+                    {users.map((user: any) => (
+                      <SelectItem key={user.user_id} value={user.user_id}>
+                        {user.email} {user.first_name && user.last_name ? `(${user.first_name} ${user.last_name})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Linking a driver to a user account allows them to log in and view their own data.
+                </p>
               </div>
             </div>
 
