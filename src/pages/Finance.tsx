@@ -1312,6 +1312,7 @@ export default function Finance() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="settings" className="mt-6">
           <Card className="card-elevated">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
