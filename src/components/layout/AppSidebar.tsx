@@ -19,7 +19,7 @@ import jwBannerLight from '@/assets/JW_Banner.png';
 import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/hooks/useTheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import {
   Sidebar,
   SidebarContent,

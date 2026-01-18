@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/hooks/useTheme';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Users, Shield, Trash2, UserPlus, Sun, Moon, Settings2, Mail, Building2 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
