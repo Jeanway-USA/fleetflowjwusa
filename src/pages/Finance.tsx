@@ -312,21 +312,21 @@ export default function Finance() {
   const standaloneExpenseTotals = standaloneExpenses.reduce((acc: any, exp: Expense) => {
     acc.total += Number(exp.amount) || 0;
     acc.byType[exp.expense_type] = (acc.byType[exp.expense_type] || 0) + (Number(exp.amount) || 0);
-    if (GALLONS_EXPENSE_TYPES.includes(exp.expense_type) && exp.gallons) {
-      acc.fuelGallons += Number(exp.gallons) || 0;
+    if (exp.gallons) {
+      acc.gallonsByType[exp.expense_type] = (acc.gallonsByType[exp.expense_type] || 0) + (Number(exp.gallons) || 0);
     }
     return acc;
-  }, { total: 0, byType: {}, fuelGallons: 0 });
+  }, { total: 0, byType: {}, gallonsByType: {} });
 
   // Calculate load-linked expense totals from expenses table
   const loadLinkedExpenseTotals = loadLinkedExpenses.reduce((acc: any, exp: Expense) => {
     acc.total += Number(exp.amount) || 0;
     acc.byType[exp.expense_type] = (acc.byType[exp.expense_type] || 0) + (Number(exp.amount) || 0);
-    if (GALLONS_EXPENSE_TYPES.includes(exp.expense_type) && exp.gallons) {
-      acc.fuelGallons += Number(exp.gallons) || 0;
+    if (exp.gallons) {
+      acc.gallonsByType[exp.expense_type] = (acc.gallonsByType[exp.expense_type] || 0) + (Number(exp.gallons) || 0);
     }
     return acc;
-  }, { total: 0, byType: {}, fuelGallons: 0 });
+  }, { total: 0, byType: {}, gallonsByType: {} });
 
   const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total;
   const netProfit = revenueTotals.netRevenue - totalExpenses;
@@ -753,15 +753,16 @@ export default function Finance() {
                     <TableBody>
                       {expenseTypes.map(type => {
                         const amount = standaloneExpenseTotals.byType[type] || 0;
+                        const gallons = standaloneExpenseTotals.gallonsByType[type] || 0;
                         if (amount === 0) return null;
                         return (
                           <TableRow key={type}>
                             <TableCell className="flex items-center gap-2">
-                              {type === 'Fuel' && <Fuel className="h-4 w-4" />}
+                              {(type === 'Fuel' || type === 'DEF') && <Fuel className="h-4 w-4" />}
                               {(type === 'Truck Payment' || type === 'Maintenance') && <TruckIcon className="h-4 w-4" />}
                               {type}
-                              {type === 'Fuel' && standaloneExpenseTotals.fuelGallons > 0 && (
-                                <span className="text-xs text-muted-foreground">({standaloneExpenseTotals.fuelGallons.toFixed(1)} gal)</span>
+                              {gallons > 0 && (
+                                <span className="text-xs text-muted-foreground">({gallons.toFixed(1)} gal)</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right">{formatCurrency(amount)}</TableCell>
@@ -789,6 +790,7 @@ export default function Finance() {
                       {/* Expenses from expenses table linked to loads */}
                       {expenseTypes.map(type => {
                         const amount = loadLinkedExpenseTotals.byType[type] || 0;
+                        const gallons = loadLinkedExpenseTotals.gallonsByType[type] || 0;
                         if (amount === 0) return null;
                         return (
                           <TableRow key={type}>
@@ -796,8 +798,8 @@ export default function Finance() {
                               {(type === 'Fuel' || type === 'DEF') && <Fuel className="h-4 w-4" />}
                               {(type === 'Truck Payment' || type === 'Maintenance') && <TruckIcon className="h-4 w-4" />}
                               {type}
-                              {(type === 'Fuel' || type === 'DEF') && loadLinkedExpenseTotals.fuelGallons > 0 && (
-                                <span className="text-xs text-muted-foreground">({loadLinkedExpenseTotals.fuelGallons.toFixed(1)} gal)</span>
+                              {gallons > 0 && (
+                                <span className="text-xs text-muted-foreground">({gallons.toFixed(1)} gal)</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right">{formatCurrency(amount)}</TableCell>
