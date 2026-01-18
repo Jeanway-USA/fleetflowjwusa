@@ -4,7 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { AlertTriangle, CheckCircle, Clock, Truck } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Truck, Shield } from 'lucide-react';
 import { format, addDays, isBefore, isAfter } from 'date-fns';
 
 export default function Safety() {
@@ -49,6 +49,16 @@ export default function Safety() {
     isExpired: d.license_expiry ? isBefore(new Date(d.license_expiry), today) : false
   }));
 
+  // Drivers with medical card issues
+  const medicalAlerts = drivers.filter(d => {
+    if (!d.medical_card_expiry) return false;
+    const expDate = new Date(d.medical_card_expiry);
+    return isBefore(expDate, in30Days);
+  }).map(d => ({
+    ...d,
+    isExpired: d.medical_card_expiry ? isBefore(new Date(d.medical_card_expiry), today) : false
+  }));
+
   // Trucks that are down
   const downTrucks = trucks.filter(t => t.status === 'down' || t.status === 'out_of_service');
 
@@ -56,7 +66,7 @@ export default function Safety() {
     <DashboardLayout>
       <PageHeader title="Safety Dashboard" description="Monitor inspections, compliance, and alerts" />
 
-      <div className="grid gap-6 md:grid-cols-3 mb-6">
+      <div className="grid gap-6 md:grid-cols-4 mb-6">
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Inspection Alerts</CardTitle>
@@ -79,6 +89,16 @@ export default function Safety() {
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Medical Card Alerts</CardTitle>
+            <Shield className={`h-4 w-4 ${medicalAlerts.length > 0 ? 'text-warning' : 'text-muted-foreground'}`} />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{medicalAlerts.length}</div>
+            <p className="text-xs text-muted-foreground">Expiring within 30 days</p>
+          </CardContent>
+        </Card>
+        <Card className="card-elevated">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Down Trucks</CardTitle>
             <Truck className={`h-4 w-4 ${downTrucks.length > 0 ? 'text-destructive' : 'text-success'}`} />
           </CardHeader>
@@ -89,7 +109,7 @@ export default function Safety() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Inspection Alerts */}
         <Card className="card-elevated">
           <CardHeader>
@@ -160,8 +180,42 @@ export default function Safety() {
           </CardContent>
         </Card>
 
+        {/* Medical Card Alerts */}
+        <Card className="card-elevated">
+          <CardHeader>
+            <CardTitle>DOT Medical Card Expirations</CardTitle>
+            <CardDescription>Drivers with expiring medical cards</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {medicalAlerts.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle className="h-10 w-10 mx-auto mb-3 text-success" />
+                <p>All medical cards are current</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {medicalAlerts.map(driver => (
+                  <div key={driver.id} className={`flex items-center justify-between p-3 rounded-lg ${driver.isExpired ? 'bg-destructive/10' : 'bg-warning/10'}`}>
+                    <div>
+                      <p className="font-medium">{driver.first_name} {driver.last_name}</p>
+                      <p className="text-sm text-muted-foreground">DOT Medical Card</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-sm font-medium ${driver.isExpired ? 'text-destructive' : 'text-warning'}`}>
+                        {driver.isExpired ? 'EXPIRED' : 'Expiring'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {driver.medical_card_expiry && format(new Date(driver.medical_card_expiry), 'MMM d, yyyy')}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
         {/* Down Trucks */}
-        <Card className="card-elevated md:col-span-2">
+        <Card className="card-elevated lg:col-span-3">
           <CardHeader>
             <CardTitle>Out of Service Trucks</CardTitle>
             <CardDescription>Trucks currently down or out of service</CardDescription>
