@@ -1,0 +1,296 @@
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  CalendarIcon, 
+  ClipboardCheck, 
+  AlertTriangle, 
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  Image as ImageIcon,
+  FileSignature
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface DVIRHistoryProps {
+  driverId: string;
+}
+
+export function DVIRHistory({ driverId }: DVIRHistoryProps) {
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: subDays(new Date(), 7),
+    to: new Date(),
+  });
+  const [selectedInspection, setSelectedInspection] = useState<any>(null);
+
+  const { data: inspections = [], isLoading } = useQuery({
+    queryKey: ['driver-inspections-history', driverId, dateRange.from, dateRange.to],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from('driver_inspections' as any) as any)
+        .select('*, trucks(*)')
+        .eq('driver_id', driverId)
+        .gte('inspection_date', startOfDay(dateRange.from).toISOString())
+        .lte('inspection_date', endOfDay(dateRange.to).toISOString())
+        .order('inspection_date', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!driverId,
+  });
+
+  // Fetch photos for selected inspection
+  const { data: inspectionPhotos = [] } = useQuery({
+    queryKey: ['inspection-photos', selectedInspection?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from('inspection_photos' as any) as any)
+        .select('*')
+        .eq('inspection_id', selectedInspection?.id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedInspection?.id,
+  });
+
+  const goBack = () => {
+    setDateRange(prev => ({
+      from: subDays(prev.from, 7),
+      to: subDays(prev.to, 7),
+    }));
+  };
+
+  const goForward = () => {
+    const newTo = new Date(Math.min(
+      subDays(dateRange.to, -7).getTime(),
+      new Date().getTime()
+    ));
+    setDateRange(prev => ({
+      from: subDays(prev.from, -7),
+      to: newTo,
+    }));
+  };
+
+  const canGoForward = dateRange.to < new Date();
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ClipboardCheck className="h-5 w-5" />
+            Inspection History
+          </CardTitle>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={goBack}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="text-xs">
+                  <CalendarIcon className="h-3 w-3 mr-1" />
+                  {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="range"
+                  selected={{ from: dateRange.from, to: dateRange.to }}
+                  onSelect={(range) => {
+                    if (range?.from && range?.to) {
+                      setDateRange({ from: range.from, to: range.to });
+                    }
+                  }}
+                  disabled={(date) => date > new Date()}
+                />
+              </PopoverContent>
+            </Popover>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={goForward}
+              disabled={!canGoForward}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </div>
+        ) : inspections.length === 0 ? (
+          <div className="text-center py-6 text-muted-foreground">
+            <ClipboardCheck className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No inspections in this date range</p>
+          </div>
+        ) : (
+          <ScrollArea className="h-[300px] pr-4">
+            <div className="space-y-2">
+              {inspections.map((inspection: any) => (
+                <Dialog key={inspection.id}>
+                  <DialogTrigger asChild>
+                    <button
+                      className="w-full text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                      onClick={() => setSelectedInspection(inspection)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={inspection.inspection_type === 'pre_trip' ? 'default' : 'secondary'}>
+                              {inspection.inspection_type === 'pre_trip' ? 'Pre-Trip' : 'Post-Trip'}
+                            </Badge>
+                            {inspection.defects_found ? (
+                              <Badge variant="destructive" className="gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                Defects
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="gap-1 text-success border-success">
+                                <CheckCircle className="h-3 w-3" />
+                                Clear
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(inspection.inspection_date), 'EEEE, MMM d, yyyy • h:mm a')}
+                          </p>
+                          {inspection.trucks && (
+                            <p className="text-xs text-muted-foreground">
+                              Truck: {inspection.trucks.unit_number}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {inspection.signature_url && (
+                            <FileSignature className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Inspection Details</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      {/* Basic Info */}
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Type:</span>
+                          <p className="font-medium capitalize">
+                            {inspection.inspection_type?.replace('_', '-')}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Date:</span>
+                          <p className="font-medium">
+                            {format(new Date(inspection.inspection_date), 'MMM d, yyyy')}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Time:</span>
+                          <p className="font-medium">
+                            {format(new Date(inspection.inspection_date), 'h:mm a')}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Odometer:</span>
+                          <p className="font-medium">
+                            {inspection.odometer_reading?.toLocaleString() || 'N/A'} mi
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Status */}
+                      <div className="flex items-center gap-2">
+                        {inspection.defects_found ? (
+                          <Badge variant="destructive" className="gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            Defects Found
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="gap-1 text-success border-success">
+                            <CheckCircle className="h-3 w-3" />
+                            No Defects
+                          </Badge>
+                        )}
+                        <Badge variant="outline">
+                          {inspection.status}
+                        </Badge>
+                      </div>
+
+                      {/* Defect Notes */}
+                      {inspection.defect_notes && (
+                        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
+                          <h4 className="text-sm font-medium text-destructive mb-1">Defect Notes</h4>
+                          <p className="text-sm">{inspection.defect_notes}</p>
+                        </div>
+                      )}
+
+                      {/* Photos */}
+                      {inspectionPhotos.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
+                            <ImageIcon className="h-4 w-4" />
+                            Defect Photos ({inspectionPhotos.length})
+                          </h4>
+                          <div className="grid grid-cols-3 gap-2">
+                            {inspectionPhotos.map((photo: any) => (
+                              <a
+                                key={photo.id}
+                                href={photo.photo_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="aspect-square rounded-lg overflow-hidden border hover:opacity-80 transition-opacity"
+                              >
+                                <img
+                                  src={photo.photo_url}
+                                  alt="Defect photo"
+                                  className="w-full h-full object-cover"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Signature */}
+                      {inspection.signature_url && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
+                            <FileSignature className="h-4 w-4" />
+                            Driver Signature
+                          </h4>
+                          <div className="border rounded-lg p-2 bg-white">
+                            <img
+                              src={inspection.signature_url}
+                              alt="Driver signature"
+                              className="max-h-24 mx-auto"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

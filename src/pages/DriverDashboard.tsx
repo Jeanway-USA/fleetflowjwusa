@@ -9,6 +9,7 @@ import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
 import { DVIRButtons } from '@/components/driver/DVIRButtons';
 import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
 import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
+import { DVIRHistory } from '@/components/driver/DVIRHistory';
 import { Loader2, Sun, Moon, AlertTriangle } from 'lucide-react';
 
 export default function DriverDashboard() {
@@ -195,6 +196,9 @@ export default function DriverDashboard() {
           driverId={driver.id}
           truckId={assignedTruck?.id}
         />
+
+        {/* DVIR History */}
+        <DVIRHistory driverId={driver.id} />
       </div>
     </DashboardLayout>
   );
