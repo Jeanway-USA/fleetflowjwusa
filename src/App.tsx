@@ -14,7 +14,6 @@ import FleetLoads from "./pages/FleetLoads";
 import AgencyLoads from "./pages/AgencyLoads";
 import Payroll from "./pages/Payroll";
 import Commissions from "./pages/Commissions";
-import Ledger from "./pages/Ledger";
 import Finance from "./pages/Finance";
 import Resources from "./pages/Resources";
 import Maintenance from "./pages/Maintenance";
@@ -42,8 +41,8 @@ const App = () => (
             <Route path="/agency-loads" element={<AgencyLoads />} />
             <Route path="/payroll" element={<Payroll />} />
             <Route path="/commissions" element={<Commissions />} />
-            <Route path="/ledger" element={<Ledger />} />
             <Route path="/finance" element={<Finance />} />
+            <Route path="/ledger" element={<Finance />} />
             <Route path="/resources" element={<Resources />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/documents" element={<Documents />} />

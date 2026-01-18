@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { DataTable } from '@/components/shared/DataTable';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,16 +11,42 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { DollarSign, TrendingUp, TrendingDown, Percent, Truck, Receipt, PiggyBank, Calculator, Fuel, Route } from 'lucide-react';
-import { format, parseISO, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, isWithinInterval } from 'date-fns';
-import { useState } from 'react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon } from 'lucide-react';
+import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval } from 'date-fns';
+import type { Database } from '@/integrations/supabase/types';
+
+type Expense = Database['public']['Tables']['expenses']['Row'];
+type ExpenseInsert = Database['public']['Tables']['expenses']['Insert'];
+
+const expenseTypes = [
+  'Fuel',
+  'Truck Payment',
+  'Trailer Payment',
+  'Licensing/Permits',
+  'Insurance',
+  'LCN/Satellite',
+  'Maintenance',
+  'Cell Phone',
+  'Trip Scanning',
+  'Card Load',
+  'IFTA',
+  'PrePass/Scale',
+  'Tolls',
+  'Parking',
+  'Misc'
+];
 
 export default function Finance() {
   const queryClient = useQueryClient();
   const [selectedPeriod, setSelectedPeriod] = useState<string>('2026-Q1');
   const [editingSettings, setEditingSettings] = useState(false);
   const [settingsForm, setSettingsForm] = useState<any>({});
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [expenseFormData, setExpenseFormData] = useState<Partial<ExpenseInsert>>({});
 
   const { data: settings = [] } = useQuery({
     queryKey: ['company_settings'],
@@ -38,10 +66,28 @@ export default function Finance() {
     },
   });
 
-  const { data: expenses = [] } = useQuery({
+  const { data: loadExpenses = [] } = useQuery({
     queryKey: ['load_expenses'],
     queryFn: async () => {
       const { data, error } = await supabase.from('load_expenses').select('*');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: expenses = [], isLoading: expensesLoading } = useQuery({
+    queryKey: ['expenses'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('expenses').select('*').order('expense_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: trucks = [] } = useQuery({
+    queryKey: ['trucks'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('trucks').select('*');
       if (error) throw error;
       return data;
     },
@@ -61,6 +107,69 @@ export default function Finance() {
     },
     onError: (error: any) => toast.error(error.message),
   });
+
+  const createExpenseMutation = useMutation({
+    mutationFn: async (expense: ExpenseInsert) => {
+      const { error } = await supabase.from('expenses').insert(expense);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast.success('Expense added');
+      closeExpenseDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updateExpenseMutation = useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Expense> & { id: string }) => {
+      const { error } = await supabase.from('expenses').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast.success('Expense updated');
+      closeExpenseDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const deleteExpenseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('expenses').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast.success('Expense deleted');
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const openExpenseDialog = (expense?: Expense) => {
+    setEditingExpense(expense || null);
+    setExpenseFormData(expense || { expense_type: 'Fuel' });
+    setExpenseDialogOpen(true);
+  };
+
+  const closeExpenseDialog = () => {
+    setExpenseDialogOpen(false);
+    setEditingExpense(null);
+    setExpenseFormData({});
+  };
+
+  const handleExpenseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!expenseFormData.expense_type || !expenseFormData.amount) {
+      toast.error('Please fill in required fields');
+      return;
+    }
+    if (editingExpense) {
+      updateExpenseMutation.mutate({ id: editingExpense.id, ...expenseFormData });
+    } else {
+      createExpenseMutation.mutate(expenseFormData as ExpenseInsert);
+    }
+  };
 
   const getSetting = (key: string, defaultValue: string = '0') => {
     const setting = settings.find((s: any) => s.setting_key === key);
@@ -103,7 +212,39 @@ export default function Finance() {
     }
   };
 
+  // Filter standalone expenses by period
+  const getFilteredExpenses = () => {
+    if (selectedPeriod === 'all') return expenses;
+    
+    const [year, period] = selectedPeriod.split('-');
+    const yearNum = parseInt(year);
+    
+    if (period.startsWith('Q')) {
+      const quarter = parseInt(period.substring(1));
+      const startMonth = (quarter - 1) * 3;
+      const start = new Date(yearNum, startMonth, 1);
+      const end = endOfQuarter(start);
+      
+      return expenses.filter((e: Expense) => {
+        if (!e.expense_date) return false;
+        const date = parseISO(e.expense_date);
+        return isWithinInterval(date, { start, end });
+      });
+    } else {
+      const month = parseInt(period) - 1;
+      const start = new Date(yearNum, month, 1);
+      const end = endOfMonth(start);
+      
+      return expenses.filter((e: Expense) => {
+        if (!e.expense_date) return false;
+        const date = parseISO(e.expense_date);
+        return isWithinInterval(date, { start, end });
+      });
+    }
+  };
+
   const filteredLoads = getFilteredLoads();
+  const filteredExpenses = getFilteredExpenses();
 
   // Calculate P&L totals
   const revenueTotals = filteredLoads.reduce((acc: any, load: any) => ({
@@ -128,11 +269,11 @@ export default function Finance() {
     settlement: 0, actualMiles: 0,
   });
 
-  // Get expenses for filtered loads
+  // Get load expenses for filtered loads
   const loadIds = filteredLoads.map((l: any) => l.id);
-  const filteredExpenses = expenses.filter((e: any) => loadIds.includes(e.load_id));
+  const filteredLoadExpenses = loadExpenses.filter((e: any) => loadIds.includes(e.load_id));
   
-  const expenseTotals = filteredExpenses.reduce((acc: any, exp: any) => ({
+  const loadExpenseTotals = filteredLoadExpenses.reduce((acc: any, exp: any) => ({
     fuelGallons: acc.fuelGallons + (exp.fuel_gallons || 0),
     fuelCost: acc.fuelCost + (exp.fuel_cost || 0),
     truckPayment: acc.truckPayment + (exp.truck_payment || 0),
@@ -160,8 +301,31 @@ export default function Finance() {
     operatingTotal: 0, personalTotal: 0,
   });
 
-  const netProfit = revenueTotals.netRevenue - expenseTotals.operatingTotal;
+  // Calculate standalone expense totals by type
+  const standaloneExpenseTotals = filteredExpenses.reduce((acc: any, exp: Expense) => {
+    acc.total += Number(exp.amount) || 0;
+    acc.byType[exp.expense_type] = (acc.byType[exp.expense_type] || 0) + (Number(exp.amount) || 0);
+    if (exp.expense_type === 'Fuel' && exp.gallons) {
+      acc.fuelGallons += Number(exp.gallons) || 0;
+    }
+    return acc;
+  }, { total: 0, byType: {}, fuelGallons: 0 });
+
+  const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total;
+  const netProfit = revenueTotals.netRevenue - totalExpenses;
   const profitMargin = revenueTotals.netRevenue > 0 ? (netProfit / revenueTotals.netRevenue) * 100 : 0;
+
+  const getTruckName = (truckId: string | null) => {
+    if (!truckId) return '-';
+    const truck = trucks.find((t: any) => t.id === truckId);
+    return truck ? truck.unit_number : '-';
+  };
+
+  const getLoadName = (loadId: string | null) => {
+    if (!loadId) return '-';
+    const load = loads.find((l: any) => l.id === loadId);
+    return load?.landstar_load_id || 'Linked';
+  };
 
   const handleSaveSettings = () => {
     Object.entries(settingsForm).forEach(([key, value]) => {
@@ -183,6 +347,34 @@ export default function Finance() {
     });
     setEditingSettings(true);
   };
+
+  const expenseColumns = [
+    { key: 'expense_date', header: 'Date', render: (e: Expense) => e.expense_date ? format(parseISO(e.expense_date), 'MM/dd/yyyy') : '-' },
+    { key: 'expense_type', header: 'Type' },
+    { key: 'description', header: 'Description', render: (e: Expense) => e.description || '-' },
+    { 
+      key: 'amount', 
+      header: 'Amount', 
+      render: (e: Expense) => <span className="text-destructive font-medium">{formatCurrency(Number(e.amount))}</span>
+    },
+    { key: 'gallons', header: 'Gallons', render: (e: Expense) => e.gallons ? `${e.gallons} gal` : '-' },
+    { key: 'truck_id', header: 'Truck', render: (e: Expense) => getTruckName(e.truck_id) },
+    { key: 'load_id', header: 'Load', render: (e: Expense) => getLoadName(e.load_id) },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (expense: Expense) => (
+        <div className="flex gap-2">
+          <Button size="icon" variant="ghost" onClick={(ev) => { ev.stopPropagation(); openExpenseDialog(expense); }}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" className="text-destructive" onClick={(ev) => { ev.stopPropagation(); deleteExpenseMutation.mutate(expense.id); }}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <DashboardLayout>
@@ -218,11 +410,11 @@ export default function Finance() {
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Operating Expenses</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
             <Receipt className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{formatCurrency(expenseTotals.operatingTotal)}</div>
+            <div className="text-2xl font-bold text-destructive">{formatCurrency(totalExpenses)}</div>
             <p className="text-xs text-muted-foreground">All operating costs</p>
           </CardContent>
         </Card>
@@ -253,10 +445,11 @@ export default function Finance() {
       </div>
 
       <Tabs defaultValue="summary" className="w-full">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="summary">P&L Summary</TabsTrigger>
           <TabsTrigger value="revenue">Revenue Details</TabsTrigger>
-          <TabsTrigger value="expenses">Expense Details</TabsTrigger>
+          <TabsTrigger value="expenses">Manage Expenses</TabsTrigger>
+          <TabsTrigger value="expense-summary">Expense Summary</TabsTrigger>
           <TabsTrigger value="settings">Compensation Package</TabsTrigger>
         </TabsList>
 
@@ -385,156 +578,50 @@ export default function Finance() {
             </Card>
           </div>
 
-          {/* Expense Summary */}
+          {/* Net Profit Calculation */}
           <Card className="card-elevated mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-destructive" />
-                Expense Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <div className="grid md:grid-cols-2 gap-6">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead colSpan={2}>Operating Expenses</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell>Truck Payment</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.truckPayment)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Trailer Payment</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.trailerPayment)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Insurance</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.insurance)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Licensing & Permits</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.licensingPermits)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>LCN/Satellite</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.lcnSatellite)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Cell Phone</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.cellPhone)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Fuel Cost</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.fuelCost)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Tires</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.tires)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Oil</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.oil)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Repairs & Parts</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.repairsParts)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Tolls</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.tolls)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Prepass/Scale</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.prepassScale)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Maintenance Fund</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.maintenanceFund)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Savings</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.savings)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Retirement</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.retirement)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Misc Operating</TableCell>
-                      <TableCell className="text-right">{formatCurrency(expenseTotals.miscOperating)}</TableCell>
-                    </TableRow>
-                    <TableRow className="bg-destructive/10">
-                      <TableCell className="font-bold">OPERATING EXPENSES</TableCell>
-                      <TableCell className="text-right font-bold text-destructive">{formatCurrency(expenseTotals.operatingTotal)}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-bold">PERSONAL EXPENSES</TableCell>
-                      <TableCell className="text-right font-bold">{formatCurrency(expenseTotals.personalTotal)}</TableCell>
-                    </TableRow>
-                    <TableRow className="bg-muted">
-                      <TableCell className="font-bold text-lg">TOTAL EXPENSES</TableCell>
-                      <TableCell className="text-right font-bold text-lg text-destructive">
-                        {formatCurrency(expenseTotals.operatingTotal + expenseTotals.personalTotal)}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-
-                {/* P&L Final Calculation */}
-                <div className="space-y-4">
-                  <Card className="bg-muted">
-                    <CardContent className="pt-6">
-                      <div className="space-y-3">
-                        <div className="flex justify-between">
-                          <span>Revenue</span>
-                          <span className="font-mono">{formatCurrency(revenueTotals.netRevenue)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>FSC</span>
-                          <span className="font-mono">{formatCurrency(revenueTotals.fuelSurcharge)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Expenses</span>
-                          <span className="font-mono text-destructive">-{formatCurrency(expenseTotals.operatingTotal)}</span>
-                        </div>
-                        <div className="border-t pt-3">
-                          <div className="flex justify-between items-center">
-                            <span className="font-bold text-lg">{netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS'}</span>
-                            <span className={`font-bold text-2xl ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                              {formatCurrency(netProfit)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div className="p-4 bg-muted rounded-lg text-center">
-                      <p className="text-sm text-muted-foreground">Loads</p>
-                      <p className="text-2xl font-bold">{revenueTotals.loadCount}</p>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span>Net Revenue</span>
+                    <span className="font-mono text-success">{formatCurrency(revenueTotals.netRevenue)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Total Expenses</span>
+                    <span className="font-mono text-destructive">-{formatCurrency(totalExpenses)}</span>
+                  </div>
+                  <div className="border-t pt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-lg">{netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS'}</span>
+                      <span className={`font-bold text-2xl ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                        {formatCurrency(netProfit)}
+                      </span>
                     </div>
-                    <div className="p-4 bg-muted rounded-lg text-center">
-                      <p className="text-sm text-muted-foreground">Profit Margin</p>
-                      <p className={`text-2xl font-bold ${profitMargin >= 0 ? 'text-success' : 'text-destructive'}`}>
-                        {profitMargin.toFixed(1)}%
-                      </p>
-                    </div>
-                    <div className="p-4 bg-muted rounded-lg text-center">
-                      <p className="text-sm text-muted-foreground">Avg Per Load</p>
-                      <p className="text-xl font-bold">
-                        {revenueTotals.loadCount > 0 ? formatCurrency(netProfit / revenueTotals.loadCount) : '$0.00'}
-                      </p>
-                    </div>
-                    <div className="p-4 bg-muted rounded-lg text-center">
-                      <p className="text-sm text-muted-foreground">Profit Per Mile</p>
-                      <p className="text-xl font-bold">
-                        {revenueTotals.actualMiles > 0 ? formatCurrency(netProfit / revenueTotals.actualMiles) : '$0.00'}
-                      </p>
-                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-muted rounded-lg text-center">
+                    <p className="text-sm text-muted-foreground">Loads</p>
+                    <p className="text-2xl font-bold">{revenueTotals.loadCount}</p>
+                  </div>
+                  <div className="p-4 bg-muted rounded-lg text-center">
+                    <p className="text-sm text-muted-foreground">Profit Margin</p>
+                    <p className={`text-2xl font-bold ${profitMargin >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {profitMargin.toFixed(1)}%
+                    </p>
+                  </div>
+                  <div className="p-4 bg-muted rounded-lg text-center">
+                    <p className="text-sm text-muted-foreground">Avg Per Load</p>
+                    <p className="text-xl font-bold">
+                      {revenueTotals.loadCount > 0 ? formatCurrency(netProfit / revenueTotals.loadCount) : '$0.00'}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-muted rounded-lg text-center">
+                    <p className="text-sm text-muted-foreground">Profit Per Mile</p>
+                    <p className="text-xl font-bold">
+                      {revenueTotals.actualMiles > 0 ? formatCurrency(netProfit / revenueTotals.actualMiles) : '$0.00'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -602,54 +689,145 @@ export default function Finance() {
 
         <TabsContent value="expenses" className="mt-6">
           <Card className="card-elevated">
-            <CardHeader>
-              <CardTitle>Operating Expenses</CardTitle>
-              <CardDescription>
-                Track expenses per load or add fixed monthly expenses
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5" />
+                  Manage Expenses
+                </CardTitle>
+                <CardDescription>
+                  Track expenses by type, optionally link to a load or truck
+                </CardDescription>
+              </div>
+              <Button onClick={() => openExpenseDialog()} className="gradient-gold text-primary-foreground">
+                <Plus className="h-4 w-4 mr-2" /> Add Expense
+              </Button>
             </CardHeader>
             <CardContent>
-              {filteredExpenses.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <PiggyBank className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No expense records for this period</p>
-                  <p className="text-sm mt-2">Expenses can be added to individual loads for detailed P&L tracking</p>
+              <DataTable 
+                columns={expenseColumns} 
+                data={filteredExpenses} 
+                loading={expensesLoading} 
+                emptyMessage="No expenses recorded yet" 
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="expense-summary" className="mt-6">
+          <Card className="card-elevated">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-destructive" />
+                Expense Summary by Type
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-medium mb-4">Standalone Expenses</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Category</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {expenseTypes.map(type => {
+                        const amount = standaloneExpenseTotals.byType[type] || 0;
+                        if (amount === 0) return null;
+                        return (
+                          <TableRow key={type}>
+                            <TableCell className="flex items-center gap-2">
+                              {type === 'Fuel' && <Fuel className="h-4 w-4" />}
+                              {(type === 'Truck Payment' || type === 'Maintenance') && <TruckIcon className="h-4 w-4" />}
+                              {type}
+                              {type === 'Fuel' && standaloneExpenseTotals.fuelGallons > 0 && (
+                                <span className="text-xs text-muted-foreground">({standaloneExpenseTotals.fuelGallons.toFixed(1)} gal)</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">{formatCurrency(amount)}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      <TableRow className="bg-destructive/10">
+                        <TableCell className="font-bold">Total Standalone Expenses</TableCell>
+                        <TableCell className="text-right font-bold text-destructive">{formatCurrency(standaloneExpenseTotals.total)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
                 </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Load ID</TableHead>
-                      <TableHead className="text-right">Fuel</TableHead>
-                      <TableHead className="text-right">Truck Pmt</TableHead>
-                      <TableHead className="text-right">Insurance</TableHead>
-                      <TableHead className="text-right">Licensing</TableHead>
-                      <TableHead className="text-right">Cell</TableHead>
-                      <TableHead className="text-right">Maint Fund</TableHead>
-                      <TableHead className="text-right">Savings</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredExpenses.map((exp: any) => {
-                      const load = loads.find((l: any) => l.id === exp.load_id);
-                      return (
-                        <TableRow key={exp.id}>
-                          <TableCell className="font-mono">{load?.landstar_load_id || '-'}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(exp.fuel_cost)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(exp.truck_payment)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(exp.insurance)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(exp.licensing_permits)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(exp.cell_phone)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(exp.maintenance_fund)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(exp.savings)}</TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(exp.operating_total)}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
+
+                <div>
+                  <h3 className="font-medium mb-4">Load-Linked Expenses</h3>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Category</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell>Fuel Cost</TableCell>
+                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.fuelCost)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Truck Payment</TableCell>
+                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.truckPayment)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Trailer Payment</TableCell>
+                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.trailerPayment)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Insurance</TableCell>
+                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.insurance)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Licensing & Permits</TableCell>
+                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.licensingPermits)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>LCN/Satellite</TableCell>
+                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.lcnSatellite)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Cell Phone</TableCell>
+                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.cellPhone)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Repairs & Parts</TableCell>
+                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.repairsParts)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Tolls</TableCell>
+                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.tolls)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>PrePass/Scale</TableCell>
+                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.prepassScale)}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>Misc Operating</TableCell>
+                        <TableCell className="text-right">{formatCurrency(loadExpenseTotals.miscOperating)}</TableCell>
+                      </TableRow>
+                      <TableRow className="bg-destructive/10">
+                        <TableCell className="font-bold">Total Load Expenses</TableCell>
+                        <TableCell className="text-right font-bold text-destructive">{formatCurrency(loadExpenseTotals.operatingTotal)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-muted rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-lg">GRAND TOTAL EXPENSES</span>
+                  <span className="font-bold text-2xl text-destructive">{formatCurrency(totalExpenses)}</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -724,31 +902,31 @@ export default function Finance() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={handleSaveSettings} className="gradient-gold text-primary-foreground">Save Settings</Button>
+                    <Button onClick={handleSaveSettings} className="gradient-gold text-primary-foreground">Save Changes</Button>
                     <Button variant="outline" onClick={() => setEditingSettings(false)}>Cancel</Button>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div className="p-4 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground">Gross %</p>
+                      <p className="text-sm text-muted-foreground">Gross Percentage</p>
                       <p className="text-2xl font-bold">{getSetting('gross_percentage', '100')}%</p>
                     </div>
                     <div className="p-4 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground">Truck %</p>
+                      <p className="text-sm text-muted-foreground">Truck Percentage</p>
                       <p className="text-2xl font-bold">{getSetting('truck_percentage', '65')}%</p>
                     </div>
                     <div className="p-4 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground">Trailer %</p>
+                      <p className="text-sm text-muted-foreground">Trailer Percentage</p>
                       <p className="text-2xl font-bold">{getSetting('trailer_percentage', '7')}%</p>
                     </div>
                     <div className="p-4 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground">Power Only %</p>
+                      <p className="text-sm text-muted-foreground">Power Only</p>
                       <p className="text-2xl font-bold">{getSetting('power_only_percentage', '5')}%</p>
                     </div>
                     <div className="p-4 bg-muted rounded-lg">
-                      <p className="text-sm text-muted-foreground">Advance %</p>
+                      <p className="text-sm text-muted-foreground">Advance Rate</p>
                       <p className="text-2xl font-bold">{getSetting('advance_percentage', '30')}%</p>
                     </div>
                     <div className="p-4 bg-muted rounded-lg">
@@ -763,6 +941,135 @@ export default function Finance() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Expense Dialog */}
+      <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingExpense ? 'Edit Expense' : 'Add Expense'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleExpenseSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="expense_date">Date</Label>
+                <Input 
+                  id="expense_date" 
+                  type="date" 
+                  value={expenseFormData.expense_date || ''} 
+                  onChange={(e) => setExpenseFormData({ ...expenseFormData, expense_date: e.target.value })} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="expense_type">Type *</Label>
+                <Select 
+                  value={expenseFormData.expense_type || 'Fuel'} 
+                  onValueChange={(v) => setExpenseFormData({ ...expenseFormData, expense_type: v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {expenseTypes.map(type => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="amount">Amount ($) *</Label>
+                <Input 
+                  id="amount" 
+                  type="number" 
+                  step="0.01" 
+                  value={expenseFormData.amount || ''} 
+                  onChange={(e) => setExpenseFormData({ ...expenseFormData, amount: parseFloat(e.target.value) || 0 })} 
+                  required 
+                />
+              </div>
+              {expenseFormData.expense_type === 'Fuel' && (
+                <div className="space-y-2">
+                  <Label htmlFor="gallons">Gallons</Label>
+                  <Input 
+                    id="gallons" 
+                    type="number" 
+                    step="0.01" 
+                    value={expenseFormData.gallons || ''} 
+                    onChange={(e) => setExpenseFormData({ ...expenseFormData, gallons: parseFloat(e.target.value) || undefined })} 
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Input 
+                id="description" 
+                value={expenseFormData.description || ''} 
+                onChange={(e) => setExpenseFormData({ ...expenseFormData, description: e.target.value })} 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="vendor">Vendor</Label>
+              <Input 
+                id="vendor" 
+                value={expenseFormData.vendor || ''} 
+                onChange={(e) => setExpenseFormData({ ...expenseFormData, vendor: e.target.value })} 
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="truck_id">Link to Truck</Label>
+                <Select 
+                  value={expenseFormData.truck_id || 'none'} 
+                  onValueChange={(v) => setExpenseFormData({ ...expenseFormData, truck_id: v === 'none' ? null : v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {trucks.map((truck: any) => (
+                      <SelectItem key={truck.id} value={truck.id}>{truck.unit_number}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="load_id">Link to Load</Label>
+                <Select 
+                  value={expenseFormData.load_id || 'none'} 
+                  onValueChange={(v) => setExpenseFormData({ ...expenseFormData, load_id: v === 'none' ? null : v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {loads.slice(0, 20).map((load: any) => (
+                      <SelectItem key={load.id} value={load.id}>{load.landstar_load_id || `${load.origin} → ${load.destination}`}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea 
+                id="notes" 
+                value={expenseFormData.notes || ''} 
+                onChange={(e) => setExpenseFormData({ ...expenseFormData, notes: e.target.value })} 
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeExpenseDialog}>Cancel</Button>
+              <Button type="submit" className="gradient-gold text-primary-foreground">
+                {editingExpense ? 'Save Changes' : 'Add Expense'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

@@ -66,10 +66,9 @@ export function AppSidebar() {
   ];
 
   const financeNavItems: NavItem[] = [
-    { title: 'P&L / Finance', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'] },
+    { title: 'Finance & P/L', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'] },
     { title: 'Driver Payroll', icon: DollarSign, path: '/payroll', roles: ['owner', 'payroll_admin', 'driver'] },
     { title: 'Commissions', icon: DollarSign, path: '/commissions', roles: ['owner', 'payroll_admin'] },
-    { title: 'General Ledger', icon: FileText, path: '/ledger', roles: ['owner', 'payroll_admin'] },
   ];
 
   const operationsNavItems: NavItem[] = [
