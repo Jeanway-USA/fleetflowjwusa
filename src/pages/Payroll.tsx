@@ -57,7 +57,8 @@ export default function Payroll() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<DriverPayroll> & { id: string }) => {
+    mutationFn: async ({ id, net_pay, ...updates }: Partial<DriverPayroll> & { id: string }) => {
+      // net_pay is a generated column, exclude it from updates
       const { error } = await supabase.from('driver_payroll').update(updates).eq('id', id);
       if (error) throw error;
     },
