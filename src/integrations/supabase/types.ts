@@ -479,6 +479,7 @@ export type Database = {
           current_driver_id: string | null
           id: string
           license_plate: string | null
+          license_plate_state: string | null
           make: string | null
           model: string | null
           next_inspection_date: string | null
@@ -493,6 +494,7 @@ export type Database = {
           current_driver_id?: string | null
           id?: string
           license_plate?: string | null
+          license_plate_state?: string | null
           make?: string | null
           model?: string | null
           next_inspection_date?: string | null
@@ -507,6 +509,7 @@ export type Database = {
           current_driver_id?: string | null
           id?: string
           license_plate?: string | null
+          license_plate_state?: string | null
           make?: string | null
           model?: string | null
           next_inspection_date?: string | null

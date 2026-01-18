@@ -172,14 +172,25 @@ export default function Trucks() {
                 <Input id="year" type="number" value={formData.year || ''} onChange={(e) => setFormData({ ...formData, year: parseInt(e.target.value) || undefined })} placeholder="2023" />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="vin">VIN</Label>
+              <Input id="vin" value={formData.vin || ''} onChange={(e) => setFormData({ ...formData, vin: e.target.value })} placeholder="1FUJGBDV7CLBP8834" />
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="vin">VIN</Label>
-                <Input id="vin" value={formData.vin || ''} onChange={(e) => setFormData({ ...formData, vin: e.target.value })} placeholder="1FUJGBDV7CLBP8834" />
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="license_plate">License Plate</Label>
                 <Input id="license_plate" value={formData.license_plate || ''} onChange={(e) => setFormData({ ...formData, license_plate: e.target.value })} placeholder="ABC-1234" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="license_plate_state">License Plate State</Label>
+                <Select value={(formData as any).license_plate_state || ''} onValueChange={(v) => setFormData({ ...formData, license_plate_state: v } as any)}>
+                  <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                  <SelectContent>
+                    {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'].map(state => (
+                      <SelectItem key={state} value={state}>{state}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">

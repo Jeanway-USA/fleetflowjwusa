@@ -132,10 +132,17 @@ export default function Drivers() {
 
   const toggleEndorsement = (endorsement: string) => {
     const current = formData.endorsements || [];
-    const updated = current.includes(endorsement)
+    const isRemoving = current.includes(endorsement);
+    const updated = isRemoving
       ? current.filter((e: string) => e !== endorsement)
       : [...current, endorsement];
-    setFormData({ ...formData, endorsements: updated });
+    
+    // Clear hazmat_expiry if removing HAZMAT endorsement
+    if (isRemoving && endorsement.includes('Hazmat')) {
+      setFormData({ ...formData, endorsements: updated, hazmat_expiry: null });
+    } else {
+      setFormData({ ...formData, endorsements: updated });
+    }
   };
 
   const getInitials = (firstName: string, lastName: string) => {
