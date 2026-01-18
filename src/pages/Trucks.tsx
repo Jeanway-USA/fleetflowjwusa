@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
+import { ExpensesList } from '@/components/shared/ExpensesList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText } from 'lucide-react';
+import { Pencil, Trash2, FileText, DollarSign } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
@@ -114,7 +115,7 @@ export default function Trucks() {
       header: 'Actions',
       render: (truck: Truck) => (
         <div className="flex gap-2">
-          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setSelectedTruck(truck); }}>
+          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setViewingTruck(truck); }} title="View details">
             <FileText className="h-4 w-4" />
           </Button>
           <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(truck); }}>
@@ -128,7 +129,7 @@ export default function Trucks() {
     },
   ];
 
-  const [selectedTruck, setSelectedTruck] = useState<Truck | null>(null);
+  const [viewingTruck, setViewingTruck] = useState<Truck | null>(null);
 
   return (
     <DashboardLayout>
@@ -207,18 +208,38 @@ export default function Trucks() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!selectedTruck} onOpenChange={(open) => !open && setSelectedTruck(null)}>
-        <DialogContent className="max-w-lg">
+      {/* Truck Details Dialog with Documents & Expenses */}
+      <Dialog open={!!viewingTruck} onOpenChange={(open) => !open && setViewingTruck(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Documents for Truck {selectedTruck?.unit_number}</DialogTitle>
+            <DialogTitle>Truck {viewingTruck?.unit_number} - {viewingTruck?.make} {viewingTruck?.model}</DialogTitle>
           </DialogHeader>
-          {selectedTruck && (
-            <DocumentUpload
-              relatedType="truck"
-              relatedId={selectedTruck.id}
-              documentTypes={['Registration', 'Insurance', 'Inspection', 'Title', 'Other']}
-              title="Truck Documents"
-            />
+          {viewingTruck && (
+            <Tabs defaultValue="expenses" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="expenses" className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" /> Expenses
+                </TabsTrigger>
+                <TabsTrigger value="documents" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> Documents
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="expenses" className="mt-4">
+                <ExpensesList
+                  relatedType="truck"
+                  relatedId={viewingTruck.id}
+                  title="Truck Expenses"
+                />
+              </TabsContent>
+              <TabsContent value="documents" className="mt-4">
+                <DocumentUpload
+                  relatedType="truck"
+                  relatedId={viewingTruck.id}
+                  documentTypes={['Registration', 'Insurance', 'Inspection', 'Title', 'Other']}
+                  title="Truck Documents"
+                />
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>

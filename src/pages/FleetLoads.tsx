@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { ExpensesList } from '@/components/shared/ExpensesList';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt } from 'lucide-react';
 
 // Accessorial types commonly used in trucking
 const ACCESSORIAL_TYPES = [
@@ -481,10 +482,13 @@ export default function FleetLoads() {
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="details">Load Details</TabsTrigger>
                 <TabsTrigger value="revenue">Revenue & Advance</TabsTrigger>
                 <TabsTrigger value="miles">Miles & Notes</TabsTrigger>
+                <TabsTrigger value="expenses" className="flex items-center gap-1">
+                  <Receipt className="h-4 w-4" /> Expenses
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="details" className="space-y-4 mt-4">
@@ -817,6 +821,20 @@ export default function FleetLoads() {
                     rows={4}
                   />
                 </div>
+              </TabsContent>
+
+              <TabsContent value="expenses" className="mt-4">
+                {editingLoad?.id ? (
+                  <ExpensesList
+                    relatedType="load"
+                    relatedId={editingLoad.id}
+                    title="Load Expenses"
+                  />
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Save the load first to add expenses.</p>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
 
