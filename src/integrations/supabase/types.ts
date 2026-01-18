@@ -354,6 +354,66 @@ export type Database = {
         }
         Relationships: []
       }
+      expenses: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          expense_date: string
+          expense_type: string
+          gallons: number | null
+          id: string
+          load_id: string | null
+          notes: string | null
+          truck_id: string | null
+          updated_at: string
+          vendor: string | null
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          expense_date?: string
+          expense_type: string
+          gallons?: number | null
+          id?: string
+          load_id?: string | null
+          notes?: string | null
+          truck_id?: string | null
+          updated_at?: string
+          vendor?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          expense_date?: string
+          expense_type?: string
+          gallons?: number | null
+          id?: string
+          load_id?: string | null
+          notes?: string | null
+          truck_id?: string | null
+          updated_at?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_loads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fleet_loads: {
         Row: {
           accessorials: number | null
