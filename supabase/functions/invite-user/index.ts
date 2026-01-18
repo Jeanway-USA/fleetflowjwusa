@@ -200,6 +200,8 @@ Deno.serve(async (req) => {
 </html>
     `;
 
+    let resendMessageId: string | null = null;
+
     try {
       const emailResponse = await resend.emails.send({
         from: 'JeanWay USA <no-reply@jeanwayusa.com>',
@@ -208,16 +210,28 @@ Deno.serve(async (req) => {
         html: emailHtml,
       });
 
+      // Resend v4 returns { data, error }
+      // When error is null, the request was accepted and queued for delivery.
+      // Delivery status (delivered/bounced/complained) can be checked in Resend events using the id.
+      // @ts-ignore - keep runtime safe even if typings differ
+      resendMessageId = emailResponse?.data?.id ?? null;
       console.log('Email sent via Resend:', emailResponse);
+
+      // @ts-ignore
+      if (emailResponse?.error) {
+        // @ts-ignore
+        console.error('Resend returned an error payload:', emailResponse.error);
+      }
     } catch (emailError) {
-      console.error('Resend email error:', emailError);
-      // Don't fail the whole request if email fails - user was still invited via Supabase
+      console.error('Resend email error (thrown):', emailError);
+      // Don't fail the whole request if email fails - user was still invited
     }
 
-    return new Response(JSON.stringify({ 
-      success: true, 
+    return new Response(JSON.stringify({
+      success: true,
       message: `Invitation sent to ${email}`,
-      user_id: inviteData.user?.id 
+      user_id: inviteData.user?.id,
+      resend_message_id: resendMessageId,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
