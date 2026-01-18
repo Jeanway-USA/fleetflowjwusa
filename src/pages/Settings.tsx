@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Users, Shield, Trash2, UserPlus, Sun, Moon, Settings2, Mail, Building2, Pencil } from 'lucide-react';
+import { Users, Shield, Trash2, UserPlus, Sun, Moon, Settings2, Mail, Building2, Pencil, KeyRound } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type AppRole = Database['public']['Enums']['app_role'];
@@ -62,6 +62,11 @@ export default function Settings() {
   const [inviteRole, setInviteRole] = useState<AppRole>('driver');
   const [isInviting, setIsInviting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Password reset state
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [userToResetPassword, setUserToResetPassword] = useState<UserWithRole | null>(null);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   // Get all profiles with their roles
   const { data: usersWithRoles = [], isLoading } = useQuery({
@@ -260,6 +265,35 @@ export default function Settings() {
     setDeleteDialogOpen(true);
   };
 
+  const openResetPasswordDialog = (usr: UserWithRole) => {
+    setUserToResetPassword(usr);
+    setResetPasswordDialogOpen(true);
+  };
+
+  const handleForcePasswordReset = async () => {
+    if (!userToResetPassword) return;
+    
+    setIsResettingPassword(true);
+    
+    try {
+      const redirectUrl = `${window.location.origin}/reset-password`;
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(userToResetPassword.email, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) throw error;
+
+      toast.success(`Password reset email sent to ${userToResetPassword.email}`);
+      setResetPasswordDialogOpen(false);
+      setUserToResetPassword(null);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to send password reset email');
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
   const usersWithoutRoles = usersWithRoles.filter(u => !u.role);
 
   // Access denied for non-owners (but still show personal settings)
@@ -402,6 +436,19 @@ export default function Settings() {
                           onClick={() => openEditDialog(usr)}
                         >
                           <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      
+                      {/* Reset Password button - available for all users except current user */}
+                      {usr.user_id !== user?.id && (
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="text-muted-foreground hover:text-foreground shrink-0"
+                          onClick={() => openResetPasswordDialog(usr)}
+                          title="Force Password Reset"
+                        >
+                          <KeyRound className="h-4 w-4" />
                         </Button>
                       )}
                       
@@ -695,6 +742,30 @@ export default function Settings() {
               disabled={isDeleting}
             >
               {isDeleting ? 'Deleting...' : 'Delete User'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset Password Confirmation Dialog */}
+      <AlertDialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Force Password Reset</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will send a password reset email to{' '}
+              <span className="font-semibold">{userToResetPassword?.email}</span>.
+              The user will need to click the link in the email to set a new password.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResettingPassword}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleForcePasswordReset}
+              className="gradient-gold text-primary-foreground"
+              disabled={isResettingPassword}
+            >
+              {isResettingPassword ? 'Sending...' : 'Send Reset Email'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 
 // Pages
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Trucks from "./pages/Trucks";
 import Drivers from "./pages/Drivers";
@@ -38,6 +39,7 @@ const App = () => {
               <Routes>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/trucks" element={<Trucks />} />
                 <Route path="/drivers" element={<Drivers />} />
