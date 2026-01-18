@@ -218,6 +218,7 @@ export type Database = {
           endorsements: string[] | null
           first_name: string
           has_twic: boolean | null
+          hazmat_expiry: string | null
           hire_date: string | null
           id: string
           last_name: string
@@ -239,6 +240,7 @@ export type Database = {
           endorsements?: string[] | null
           first_name: string
           has_twic?: boolean | null
+          hazmat_expiry?: string | null
           hire_date?: string | null
           id?: string
           last_name: string
@@ -260,6 +262,7 @@ export type Database = {
           endorsements?: string[] | null
           first_name?: string
           has_twic?: boolean | null
+          hazmat_expiry?: string | null
           hire_date?: string | null
           id?: string
           last_name?: string
