@@ -20,10 +20,50 @@ import type { Database } from '@/integrations/supabase/types';
 type Truck = Database['public']['Tables']['trucks']['Row'];
 type TruckInsert = Database['public']['Tables']['trucks']['Insert'];
 
+type DriverSummary = {
+  id: string;
+  first_name: string;
+  last_name: string;
+};
+
+type TruckWithDriver = Truck & { drivers?: DriverSummary | null };
+
+const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> => {
+  if (!truck) return { status: 'active' };
+
+  // IMPORTANT: strip out any joined/derived fields (e.g. `drivers`) so updates don't
+  // attempt to write non-existent columns.
+  const {
+    unit_number,
+    status,
+    make,
+    model,
+    year,
+    vin,
+    license_plate,
+    license_plate_state,
+    next_inspection_date,
+    current_driver_id,
+  } = truck;
+
+  return {
+    unit_number: unit_number ?? undefined,
+    status: status ?? 'active',
+    make: make ?? null,
+    model: model ?? null,
+    year: year ?? null,
+    vin: vin ?? null,
+    license_plate: license_plate ?? null,
+    license_plate_state: license_plate_state ?? null,
+    next_inspection_date: next_inspection_date ?? null,
+    current_driver_id: current_driver_id ?? null,
+  };
+};
+
 export default function Trucks() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingTruck, setEditingTruck] = useState<Truck | null>(null);
+  const [editingTruck, setEditingTruck] = useState<TruckWithDriver | null>(null);
   const [formData, setFormData] = useState<Partial<TruckInsert>>({});
 
   const { data: trucks = [], isLoading } = useQuery({
@@ -34,7 +74,7 @@ export default function Trucks() {
         .select('*, drivers!trucks_current_driver_id_fkey(id, first_name, last_name)')
         .order('unit_number');
       if (error) throw error;
-      return data;
+      return (data ?? []) as TruckWithDriver[];
     },
   });
 
@@ -90,9 +130,9 @@ export default function Trucks() {
     onError: (error) => toast.error(error.message),
   });
 
-  const openDialog = (truck?: Truck) => {
+  const openDialog = (truck?: TruckWithDriver) => {
     setEditingTruck(truck || null);
-    setFormData(truck || { status: 'active' });
+    setFormData(toEditableTruck(truck));
     setDialogOpen(true);
   };
 
@@ -128,16 +168,16 @@ export default function Trucks() {
         return driver ? `${driver.first_name} ${driver.last_name}` : <span className="text-muted-foreground">Unassigned</span>;
       }
     },
-    { key: 'status', header: 'Status', render: (truck: Truck) => <StatusBadge status={truck.status} /> },
+    { key: 'status', header: 'Status', render: (truck: TruckWithDriver) => <StatusBadge status={truck.status} /> },
     { 
       key: 'next_inspection_date', 
       header: 'Next Inspection',
-      render: (truck: Truck) => truck.next_inspection_date || '-'
+      render: (truck: TruckWithDriver) => truck.next_inspection_date || '-'
     },
     {
       key: 'actions',
       header: 'Actions',
-      render: (truck: Truck) => (
+      render: (truck: TruckWithDriver) => (
         <div className="flex gap-2">
           <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setViewingTruck(truck); }} title="View details">
             <FileText className="h-4 w-4" />
@@ -153,7 +193,7 @@ export default function Trucks() {
     },
   ];
 
-  const [viewingTruck, setViewingTruck] = useState<Truck | null>(null);
+  const [viewingTruck, setViewingTruck] = useState<TruckWithDriver | null>(null);
 
   return (
     <DashboardLayout>
