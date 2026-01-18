@@ -2,50 +2,113 @@ import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Truck, Package, Users, DollarSign, TrendingUp, TrendingDown, AlertTriangle, CheckCircle } from 'lucide-react';
-
-// Placeholder stats - will be dynamic later
-const stats = [
-  { 
-    title: 'Active Trucks', 
-    value: '0', 
-    change: '+0%',
-    trend: 'up',
-    icon: Truck,
-    description: 'Fleet vehicles'
-  },
-  { 
-    title: 'Active Loads', 
-    value: '0', 
-    change: '+0%',
-    trend: 'up',
-    icon: Package,
-    description: 'In transit'
-  },
-  { 
-    title: 'Drivers', 
-    value: '0', 
-    change: '+0%',
-    trend: 'up',
-    icon: Users,
-    description: 'Active drivers'
-  },
-  { 
-    title: 'Revenue MTD', 
-    value: '$0', 
-    change: '+0%',
-    trend: 'up',
-    icon: DollarSign,
-    description: 'Month to date'
-  },
-];
-
-const alerts = [
-  { type: 'warning', message: 'No trucks registered yet', icon: AlertTriangle },
-  { type: 'info', message: 'Welcome to JeanWay USA Fleet Management', icon: CheckCircle },
-];
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
   const { roles, hasRole, isOwner, user } = useAuth();
+  const navigate = useNavigate();
+
+  // Fetch actual data from database
+  const { data: trucks } = useQuery({
+    queryKey: ['trucks-count'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('trucks')
+        .select('id, status');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: drivers } = useQuery({
+    queryKey: ['drivers-count'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('id, status');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const { data: loads } = useQuery({
+    queryKey: ['loads-count'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fleet_loads')
+        .select('id, status, net_revenue, pickup_date');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Calculate stats
+  const activeTrucks = trucks?.filter(t => t.status === 'active').length || 0;
+  const totalTrucks = trucks?.length || 0;
+  const activeDrivers = drivers?.filter(d => d.status === 'active').length || 0;
+  const totalDrivers = drivers?.length || 0;
+  const activeLoads = loads?.filter(l => ['booked', 'in_transit', 'loading', 'unloading'].includes(l.status)).length || 0;
+  
+  // Calculate MTD revenue
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const mtdRevenue = loads?.filter(l => {
+    if (!l.pickup_date) return false;
+    const pickupDate = new Date(l.pickup_date);
+    return pickupDate >= startOfMonth && pickupDate <= now;
+  }).reduce((sum, l) => sum + (l.net_revenue || 0), 0) || 0;
+
+  const stats = [
+    { 
+      title: 'Active Trucks', 
+      value: `${activeTrucks}/${totalTrucks}`, 
+      change: totalTrucks > 0 ? '+' + Math.round((activeTrucks / totalTrucks) * 100) + '%' : '0%',
+      trend: 'up' as const,
+      icon: Truck,
+      description: 'Fleet vehicles'
+    },
+    { 
+      title: 'Active Loads', 
+      value: String(activeLoads), 
+      change: '+0%',
+      trend: 'up' as const,
+      icon: Package,
+      description: 'In transit'
+    },
+    { 
+      title: 'Drivers', 
+      value: `${activeDrivers}/${totalDrivers}`, 
+      change: totalDrivers > 0 ? '+' + Math.round((activeDrivers / totalDrivers) * 100) + '%' : '0%',
+      trend: 'up' as const,
+      icon: Users,
+      description: 'Active drivers'
+    },
+    { 
+      title: 'Revenue MTD', 
+      value: '$' + mtdRevenue.toLocaleString(), 
+      change: '+0%',
+      trend: 'up' as const,
+      icon: DollarSign,
+      description: 'Month to date'
+    },
+  ];
+
+  // Generate dynamic alerts
+  const alerts = [];
+  if (totalTrucks === 0) {
+    alerts.push({ type: 'warning', message: 'No trucks registered yet', icon: AlertTriangle });
+  }
+  if (totalDrivers === 0) {
+    alerts.push({ type: 'warning', message: 'No drivers registered yet', icon: AlertTriangle });
+  }
+  if (activeLoads === 0) {
+    alerts.push({ type: 'info', message: 'No active loads at the moment', icon: CheckCircle });
+  }
+  if (alerts.length === 0) {
+    alerts.push({ type: 'info', message: 'All systems operational', icon: CheckCircle });
+  }
 
   const getRoleDisplay = () => {
     if (roles.length === 0) return 'No role assigned';
@@ -138,11 +201,17 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-3">
                 {(isOwner || hasRole('dispatcher')) && (
                   <>
-                    <button className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left">
+                    <button 
+                      onClick={() => navigate('/fleet-loads')}
+                      className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left"
+                    >
                       <Package className="h-5 w-5 text-primary mb-2" />
                       <p className="font-medium text-sm">New Load</p>
                     </button>
-                    <button className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left">
+                    <button 
+                      onClick={() => navigate('/trucks')}
+                      className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left"
+                    >
                       <Truck className="h-5 w-5 text-primary mb-2" />
                       <p className="font-medium text-sm">Add Truck</p>
                     </button>
@@ -150,11 +219,17 @@ export default function Dashboard() {
                 )}
                 {(isOwner || hasRole('payroll_admin')) && (
                   <>
-                    <button className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left">
+                    <button 
+                      onClick={() => navigate('/drivers')}
+                      className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left"
+                    >
                       <Users className="h-5 w-5 text-primary mb-2" />
                       <p className="font-medium text-sm">Add Driver</p>
                     </button>
-                    <button className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left">
+                    <button 
+                      onClick={() => navigate('/payroll')}
+                      className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left"
+                    >
                       <DollarSign className="h-5 w-5 text-primary mb-2" />
                       <p className="font-medium text-sm">Payroll</p>
                     </button>
@@ -162,11 +237,17 @@ export default function Dashboard() {
                 )}
                 {hasRole('driver') && !isOwner && (
                   <>
-                    <button className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left">
+                    <button 
+                      onClick={() => navigate('/fleet-loads')}
+                      className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left"
+                    >
                       <Package className="h-5 w-5 text-primary mb-2" />
                       <p className="font-medium text-sm">My Loads</p>
                     </button>
-                    <button className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left">
+                    <button 
+                      onClick={() => navigate('/payroll')}
+                      className="p-4 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-left"
+                    >
                       <DollarSign className="h-5 w-5 text-primary mb-2" />
                       <p className="font-medium text-sm">Pay Statements</p>
                     </button>
