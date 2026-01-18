@@ -15,9 +15,11 @@ import {
   BarChart3,
   LucideIcon
 } from 'lucide-react';
-import jwBanner from '@/assets/JW_Banner.png';
+import jwBannerLight from '@/assets/JW_Banner.png';
+import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/hooks/useTheme';
 import {
   Sidebar,
   SidebarContent,
@@ -47,6 +49,10 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, roles, user, hasRole, isOwner } = useAuth();
+  const { theme } = useTheme();
+  
+  // Use dark banner on light backgrounds, light banner on dark backgrounds
+  const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
 
   const handleSignOut = async () => {
     await signOut();
@@ -115,7 +121,7 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center justify-center">
           <img 
-            src={jwBanner} 
+            src={bannerSrc} 
             alt="JeanWay USA - Gets You There" 
             className="h-12 w-auto object-contain"
           />
