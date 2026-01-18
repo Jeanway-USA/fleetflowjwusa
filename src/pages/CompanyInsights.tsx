@@ -273,7 +273,7 @@ const CompanyInsights = () => {
                       </TableHeader>
                       <TableBody>
                         {truckLeaderboard.map((item: any, index: number) => (
-                          <TableRow key={item.truck.id} className={index === 0 ? 'bg-amber-50 dark:bg-amber-950/20' : ''}>
+                          <TableRow key={item.truck.id} className={index === 0 ? 'bg-primary/10' : ''}>
                             <TableCell>{getRankBadge(index)}</TableCell>
                             <TableCell className="font-medium">{item.truck.unit_number}</TableCell>
                             <TableCell className="text-right">{item.loads}</TableCell>
@@ -313,7 +313,7 @@ const CompanyInsights = () => {
                       </TableHeader>
                       <TableBody>
                         {driverLeaderboard.map((item: any, index: number) => (
-                          <TableRow key={item.driver.id} className={index === 0 ? 'bg-amber-50 dark:bg-amber-950/20' : ''}>
+                          <TableRow key={item.driver.id} className={index === 0 ? 'bg-primary/10' : ''}>
                             <TableCell>{getRankBadge(index)}</TableCell>
                             <TableCell className="font-medium">
                               {item.driver.first_name} {item.driver.last_name}
