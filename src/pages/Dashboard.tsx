@@ -156,7 +156,7 @@ export default function Dashboard() {
                   <span className={`text-xs ${stat.trend === 'up' ? 'text-success' : 'text-destructive'}`}>
                     {stat.change}
                   </span>
-                  <span className="text-xs text-muted-foreground">from last month</span>
+                  <span className="text-xs text-muted-foreground">from last year</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
               </CardContent>
