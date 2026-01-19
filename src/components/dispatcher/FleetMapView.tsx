@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { MapPin, Truck, Navigation, Radio } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { geocodeLocation, interpolatePosition, getProgressFromStatus } from '@/lib/geocoding';
+import { geocodeLocationAsync, interpolatePosition, getProgressFromStatus } from '@/lib/geocoding';
 
 // Fix Leaflet default icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -99,6 +99,7 @@ export function FleetMapView() {
   const queryClient = useQueryClient();
   const [driverLocations, setDriverLocations] = useState<Map<string, DriverLocation>>(new Map());
   const [liveCount, setLiveCount] = useState(0);
+  const [geocodedCoords, setGeocodedCoords] = useState<Map<string, { lat: number; lng: number } | null>>(new Map());
 
   // Fetch initial driver locations
   const { data: initialLocations } = useQuery({
@@ -192,13 +193,51 @@ export function FleetMapView() {
     refetchInterval: 30000,
   });
 
+  // Geocode addresses when loads change
+  useEffect(() => {
+    if (!rawLoads) return;
+
+    const geocodeAddresses = async () => {
+      const addressesToGeocode: string[] = [];
+      
+      // Collect all unique addresses that aren't cached
+      rawLoads.forEach(load => {
+        if (!geocodedCoords.has(load.origin)) {
+          addressesToGeocode.push(load.origin);
+        }
+        if (!geocodedCoords.has(load.destination)) {
+          addressesToGeocode.push(load.destination);
+        }
+      });
+
+      if (addressesToGeocode.length === 0) return;
+
+      // Geocode addresses one at a time (rate limited internally)
+      const newCoords = new Map(geocodedCoords);
+      
+      for (const address of addressesToGeocode) {
+        try {
+          const coords = await geocodeLocationAsync(address);
+          newCoords.set(address, coords);
+        } catch (error) {
+          console.error(`Failed to geocode: ${address}`, error);
+          newCoords.set(address, null);
+        }
+      }
+
+      setGeocodedCoords(newCoords);
+    };
+
+    geocodeAddresses();
+  }, [rawLoads]);
+
   // Process loads with geocoded coordinates and live GPS
   const loads = useMemo(() => {
     if (!rawLoads) return [];
 
     return rawLoads.map(load => {
-      const originCoords = geocodeLocation(load.origin);
-      const destCoords = geocodeLocation(load.destination);
+      const originCoords = geocodedCoords.get(load.origin) || null;
+      const destCoords = geocodedCoords.get(load.destination) || null;
       
       // Check for live GPS location
       const liveLocation = load.driver_id ? driverLocations.get(load.driver_id) : null;
@@ -224,7 +263,7 @@ export function FleetMapView() {
         isLiveLocation,
       } as LoadWithLocation;
     });
-  }, [rawLoads, driverLocations]);
+  }, [rawLoads, driverLocations, geocodedCoords]);
 
   if (isLoading) {
     return (
