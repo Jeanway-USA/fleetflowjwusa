@@ -25,6 +25,7 @@ import Documents from "./pages/Documents";
 import Safety from "./pages/Safety";
 import Settings from "./pages/Settings";
 import DriverDashboard from "./pages/DriverDashboard";
+import DriverSettings from "./pages/DriverSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const App = () => {
                   <Route path="/safety" element={<Safety />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/driver-dashboard" element={<DriverDashboard />} />
+                  <Route path="/driver-settings" element={<DriverSettings />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ErrorBoundary>

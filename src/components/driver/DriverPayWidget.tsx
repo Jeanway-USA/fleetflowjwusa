@@ -19,6 +19,20 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
   const weekEnd = endOfWeek(new Date(), { weekStartsOn: 0 });
 
+  // Get driver settings for goals
+  const { data: driverSettings } = useQuery({
+    queryKey: ['driver-settings', driverId],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from('driver_settings' as any) as any)
+        .select('*')
+        .eq('driver_id', driverId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!driverId,
+  });
+
   // Get this week's loads
   const { data: weeklyLoads = [] } = useQuery({
     queryKey: ['driver-weekly-loads', driverId, weekStart.toISOString()],
@@ -54,8 +68,11 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
     weeklyEarnings = totalMiles * payRate;
   }
 
-  // Weekly goal (configurable - for now use 2500 miles or $3000)
-  const weeklyGoal = payType === 'per_mile' ? 2500 : 3000;
+  // Weekly goals from driver settings
+  const weeklyMilesGoal = driverSettings?.weekly_miles_goal || 2500;
+  const weeklyRevenueGoal = driverSettings?.weekly_revenue_goal || 3000;
+  
+  const weeklyGoal = payType === 'per_mile' ? weeklyMilesGoal : weeklyRevenueGoal;
   const progress = payType === 'per_mile' 
     ? (totalMiles / weeklyGoal) * 100 
     : (weeklyEarnings / weeklyGoal) * 100;
