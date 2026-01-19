@@ -111,7 +111,7 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
     
     if (notification.notification_type === 'load_assigned' && notification.related_id) {
       setOpen(false);
-      navigate('/driver-loads');
+      navigate('/driver-dashboard');
     }
   };
 
