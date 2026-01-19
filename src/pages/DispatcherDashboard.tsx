@@ -13,6 +13,7 @@ import { DriverStatusGrid } from '@/components/dispatcher/DriverStatusGrid';
 import { TruckStatusGrid } from '@/components/dispatcher/TruckStatusGrid';
 import { DispatcherAlerts } from '@/components/dispatcher/DispatcherAlerts';
 import { FleetMapView } from '@/components/dispatcher/FleetMapView';
+import { DriverAssignmentPanel } from '@/components/dispatcher/DriverAssignmentPanel';
 
 export default function DispatcherDashboard() {
   const { user, roles, hasRole } = useAuth();
@@ -22,6 +23,23 @@ export default function DispatcherDashboard() {
   if (!hasRole('dispatcher') && roles.length > 0) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  // Fetch user's first name from profile
+  const { data: profile } = useQuery({
+    queryKey: ['user-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (error) return null;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
 
   // Fetch stats data
   const { data: stats } = useQuery({
@@ -80,6 +98,9 @@ export default function DispatcherDashboard() {
     return 'Good evening';
   };
 
+  // Get display name - prefer first name from profile, fallback to email
+  const displayName = profile?.first_name || user?.email?.split('@')[0] || 'Dispatcher';
+
   const statCards = [
     { label: 'Active Loads', value: stats?.activeLoads || 0, icon: Package, color: 'text-blue-500' },
     { label: 'Available Drivers', value: stats?.availableDrivers || 0, icon: Users, color: 'text-green-500' },
@@ -94,7 +115,7 @@ export default function DispatcherDashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              {getGreeting()}, <span className="text-gradient-gold">{user?.email?.split('@')[0]}</span>
+              {getGreeting()}, <span className="text-gradient-gold">{displayName}</span>
             </h1>
             <p className="text-muted-foreground mt-1">Dispatcher Operations Center</p>
           </div>
@@ -123,21 +144,26 @@ export default function DispatcherDashboard() {
           ))}
         </div>
 
-        {/* Fleet Map View - Full Width */}
-        <FleetMapView />
-
-        {/* Main Content Grid */}
+        {/* Map + Assignment Panel Row */}
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column - Active Loads */}
-          <div className="lg:col-span-2">
-            <ActiveLoadsBoard />
+          {/* Map - Square, takes 1 column */}
+          <div>
+            <FleetMapView />
           </div>
 
-          {/* Right Column - Alerts */}
+          {/* Driver Assignment Panel */}
+          <div>
+            <DriverAssignmentPanel />
+          </div>
+
+          {/* Alerts */}
           <div>
             <DispatcherAlerts />
           </div>
         </div>
+
+        {/* Active Loads - Full Width */}
+        <ActiveLoadsBoard />
 
         {/* Upcoming Pickups - Full Width */}
         <UpcomingPickups />

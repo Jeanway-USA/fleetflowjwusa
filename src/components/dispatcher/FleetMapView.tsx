@@ -1,10 +1,10 @@
-import { useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Truck, Package, Navigation } from 'lucide-react';
+import { MapPin, Truck, Navigation } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -57,7 +57,11 @@ function FitBounds({ loads }: { loads: LoadWithLocation[] }) {
   const map = useMap();
 
   useEffect(() => {
-    if (loads.length === 0) return;
+    if (loads.length === 0) {
+      // Default to US center if no loads
+      map.setView([39.8283, -98.5795], 4);
+      return;
+    }
 
     const allCoords: [number, number][] = [];
     loads.forEach(load => {
@@ -68,23 +72,16 @@ function FitBounds({ loads }: { loads: LoadWithLocation[] }) {
 
     if (allCoords.length > 0) {
       const bounds = L.latLngBounds(allCoords);
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [30, 30] });
     }
   }, [loads, map]);
 
   return null;
 }
 
-const statusColors: Record<string, string> = {
-  assigned: '#3b82f6',
-  loading: '#f59e0b',
-  in_transit: '#22c55e',
-  unloading: '#a855f7',
-};
-
 export function FleetMapView() {
   const { data: rawLoads, isLoading } = useQuery({
-    queryKey: ['active-loads-map'],
+    queryKey: ['in-transit-loads-map'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fleet_loads')
@@ -97,12 +94,12 @@ export function FleetMapView() {
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
           truck:trucks!fleet_loads_truck_id_fkey(unit_number)
         `)
-        .in('status', ['assigned', 'loading', 'in_transit', 'unloading']);
+        .eq('status', 'in_transit'); // Only in_transit loads
       
       if (error) throw error;
       return data;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
   });
 
   // Process loads with geocoded coordinates
@@ -130,51 +127,51 @@ export function FleetMapView() {
 
   if (isLoading) {
     return (
-      <Card className="card-elevated">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Navigation className="h-5 w-5 text-primary" />
-            Fleet Map
+      <Card className="card-elevated h-full">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Navigation className="h-4 w-4 text-primary" />
+            In Transit
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <Skeleton className="h-[400px] w-full rounded-lg" />
+        <CardContent className="p-3 pt-0">
+          <Skeleton className="aspect-square w-full rounded-lg" />
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="card-elevated">
-      <CardHeader className="pb-3">
+    <Card className="card-elevated h-full">
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <Navigation className="h-5 w-5 text-primary" />
-              Fleet Map
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Navigation className="h-4 w-4 text-primary" />
+              In Transit
             </CardTitle>
-            <CardDescription>
-              {loads.length} active loads • Live positions simulated
+            <CardDescription className="text-xs">
+              {loads.length} loads on the road
             </CardDescription>
           </div>
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-2 text-xs">
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-green-500" />
-              <span className="text-muted-foreground">Origin</span>
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-muted-foreground hidden sm:inline">Origin</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded-full bg-red-500" />
-              <span className="text-muted-foreground">Destination</span>
+              <div className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="text-muted-foreground hidden sm:inline">Dest</span>
             </div>
             <div className="flex items-center gap-1">
               <Truck className="h-3 w-3 text-blue-500" />
-              <span className="text-muted-foreground">Truck</span>
+              <span className="text-muted-foreground hidden sm:inline">Truck</span>
             </div>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="h-[400px] rounded-lg overflow-hidden border border-border">
+      <CardContent className="p-3 pt-0">
+        <div className="aspect-square rounded-lg overflow-hidden border border-border relative">
           <MapContainer
             center={[39.8283, -98.5795]}
             zoom={4}
@@ -188,101 +185,97 @@ export function FleetMapView() {
             
             <FitBounds loads={loads} />
 
-            {loads.map(load => {
-              const routeColor = statusColors[load.status] || '#6b7280';
-              
-              return (
-                <div key={load.id}>
-                  {/* Route line */}
-                  {load.originCoords && load.destCoords && (
-                    <Polyline
-                      positions={[
-                        [load.originCoords.lat, load.originCoords.lng],
-                        [load.destCoords.lat, load.destCoords.lng],
-                      ]}
-                      pathOptions={{
-                        color: routeColor,
-                        weight: 3,
-                        opacity: 0.6,
-                        dashArray: '10, 10',
-                      }}
-                    />
-                  )}
+            {loads.map(load => (
+              <div key={load.id}>
+                {/* Route line */}
+                {load.originCoords && load.destCoords && (
+                  <Polyline
+                    positions={[
+                      [load.originCoords.lat, load.originCoords.lng],
+                      [load.destCoords.lat, load.destCoords.lng],
+                    ]}
+                    pathOptions={{
+                      color: '#22c55e',
+                      weight: 3,
+                      opacity: 0.6,
+                      dashArray: '10, 10',
+                    }}
+                  />
+                )}
 
-                  {/* Origin marker */}
-                  {load.originCoords && (
-                    <Marker
-                      position={[load.originCoords.lat, load.originCoords.lng]}
-                      icon={originIcon}
-                    >
-                      <Popup>
-                        <div className="text-sm">
-                          <p className="font-medium">Origin</p>
-                          <p className="text-muted-foreground">{load.origin}</p>
-                          <p className="text-xs mt-1">Load: {load.landstar_load_id || load.id.slice(0, 8)}</p>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  )}
+                {/* Origin marker */}
+                {load.originCoords && (
+                  <Marker
+                    position={[load.originCoords.lat, load.originCoords.lng]}
+                    icon={originIcon}
+                  >
+                    <Popup>
+                      <div className="text-sm">
+                        <p className="font-medium">Origin</p>
+                        <p className="text-muted-foreground">{load.origin}</p>
+                        <p className="text-xs mt-1">Load: {load.landstar_load_id || load.id.slice(0, 8)}</p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )}
 
-                  {/* Destination marker */}
-                  {load.destCoords && (
-                    <Marker
-                      position={[load.destCoords.lat, load.destCoords.lng]}
-                      icon={destinationIcon}
-                    >
-                      <Popup>
-                        <div className="text-sm">
-                          <p className="font-medium">Destination</p>
-                          <p className="text-muted-foreground">{load.destination}</p>
-                          <p className="text-xs mt-1">Load: {load.landstar_load_id || load.id.slice(0, 8)}</p>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  )}
+                {/* Destination marker */}
+                {load.destCoords && (
+                  <Marker
+                    position={[load.destCoords.lat, load.destCoords.lng]}
+                    icon={destinationIcon}
+                  >
+                    <Popup>
+                      <div className="text-sm">
+                        <p className="font-medium">Destination</p>
+                        <p className="text-muted-foreground">{load.destination}</p>
+                        <p className="text-xs mt-1">Load: {load.landstar_load_id || load.id.slice(0, 8)}</p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )}
 
-                  {/* Truck marker */}
-                  {load.truckCoords && load.truck && (
-                    <Marker
-                      position={[load.truckCoords.lat, load.truckCoords.lng]}
-                      icon={truckIcon}
-                    >
-                      <Popup>
-                        <div className="text-sm min-w-[150px]">
-                          <div className="flex items-center justify-between mb-1">
-                            <p className="font-medium">Unit {load.truck.unit_number}</p>
-                            <Badge variant="outline" className="text-xs">
-                              {load.status.replace('_', ' ')}
-                            </Badge>
-                          </div>
-                          {load.driver && (
-                            <p className="text-muted-foreground text-xs">
-                              {load.driver.first_name} {load.driver.last_name}
-                            </p>
-                          )}
-                          <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
-                            <p>{load.origin}</p>
-                            <p className="text-center">↓</p>
-                            <p>{load.destination}</p>
-                          </div>
+                {/* Truck marker */}
+                {load.truckCoords && load.truck && (
+                  <Marker
+                    position={[load.truckCoords.lat, load.truckCoords.lng]}
+                    icon={truckIcon}
+                  >
+                    <Popup>
+                      <div className="text-sm min-w-[140px]">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-medium">Unit {load.truck.unit_number}</p>
+                          <Badge variant="outline" className="text-xs bg-green-500/10 text-green-500 border-green-500/20">
+                            In Transit
+                          </Badge>
                         </div>
-                      </Popup>
-                    </Marker>
-                  )}
-                </div>
-              );
-            })}
+                        {load.driver && (
+                          <p className="text-muted-foreground text-xs">
+                            {load.driver.first_name} {load.driver.last_name}
+                          </p>
+                        )}
+                        <div className="mt-2 pt-2 border-t text-xs text-muted-foreground">
+                          <p>{load.origin}</p>
+                          <p className="text-center">↓</p>
+                          <p>{load.destination}</p>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )}
+              </div>
+            ))}
           </MapContainer>
-        </div>
 
-        {loads.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-            <div className="text-center text-muted-foreground">
-              <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No active loads to display</p>
+          {loads.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+              <div className="text-center text-muted-foreground">
+                <MapPin className="h-6 w-6 mx-auto mb-1 opacity-50" />
+                <p className="text-sm">No loads in transit</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </CardContent>
     </Card>
   );
