@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Truck, Navigation, Package, CheckCircle, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { MapPin, Clock, Truck, Navigation, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route } from 'lucide-react';
 import { format, differenceInHours, differenceInMinutes, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -127,6 +128,7 @@ function getCondensedAddress(address: string): { full: string; short: string } {
 
 export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: ActiveLoadCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   if (!load) {
     return (
@@ -278,6 +280,16 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
           </div>
         </div>
 
+        {/* Load Details Button */}
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => setDetailsOpen(true)}
+        >
+          <FileText className="h-4 w-4 mr-2" />
+          Load Details
+        </Button>
+
         {/* Miles & Estimated Pay */}
         <div className="flex items-center justify-between bg-primary/10 rounded-lg p-3">
           <div>
@@ -331,6 +343,91 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
           </div>
         )}
       </CardContent>
+
+      {/* Load Details Dialog (Read-Only) */}
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Load Details
+              <Badge variant="outline" className="font-mono ml-2">
+                {load.landstar_load_id || 'No ID'}
+              </Badge>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Status */}
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <span className="text-sm text-muted-foreground">Status</span>
+              <Badge className={getStatusColor(load.status)}>
+                {getStatusLabel(load.status)}
+              </Badge>
+            </div>
+
+            {/* Origin */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MapPin className="h-4 w-4 text-success" />
+                Origin
+              </div>
+              <p className="font-medium pl-6">{load.origin}</p>
+              {load.pickup_date && (
+                <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  Pickup: {format(parseISO(load.pickup_date), 'EEE, MMM d, yyyy h:mm a')}
+                </p>
+              )}
+            </div>
+
+            {/* Destination */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MapPin className="h-4 w-4 text-destructive" />
+                Destination
+              </div>
+              <p className="font-medium pl-6">{load.destination}</p>
+              {load.delivery_date && (
+                <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  Delivery: {format(parseISO(load.delivery_date), 'EEE, MMM d, yyyy h:mm a')}
+                </p>
+              )}
+            </div>
+
+            {/* Miles */}
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Route className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Booked Miles</span>
+              </div>
+              <span className="font-semibold">{load.booked_miles?.toLocaleString() || 'TBD'}</span>
+            </div>
+
+            {/* Estimated Pay */}
+            <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-primary" />
+                <span className="text-sm text-muted-foreground">Estimated Pay</span>
+              </div>
+              <span className="font-bold text-primary text-lg">
+                ${estimatedPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+
+            {/* Special Instructions */}
+            {load.notes && (
+              <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
+                <p className="text-xs text-warning font-medium uppercase tracking-wide mb-1">
+                  Special Instructions
+                </p>
+                <p className="text-sm whitespace-pre-wrap">{load.notes}</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
