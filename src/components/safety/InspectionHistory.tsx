@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from 'sonner';
 import { 
   CalendarIcon, 
   ClipboardCheck, 
@@ -20,7 +21,8 @@ import {
   Image as ImageIcon,
   FileSignature,
   User,
-  Truck
+  Truck,
+  Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -30,11 +32,45 @@ interface InspectionHistoryProps {
 }
 
 export function InspectionHistory({ truckId, showAllTrucks = true }: InspectionHistoryProps) {
+  const queryClient = useQueryClient();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: subDays(new Date(), 7),
     to: new Date(),
   });
   const [selectedInspection, setSelectedInspection] = useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [inspectionToDelete, setInspectionToDelete] = useState<any>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // First delete related photos
+      await supabase.from('inspection_photos').delete().eq('inspection_id', id);
+      // Then delete the inspection
+      const { error } = await supabase.from('driver_inspections').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-inspections-history'] });
+      queryClient.invalidateQueries({ queryKey: ['driver_inspections'] });
+      toast.success('Inspection deleted');
+      setDeleteDialogOpen(false);
+      setInspectionToDelete(null);
+    },
+    onError: (error: any) => toast.error(error.message),
+  });
+
+  const handleDeleteClick = (e: React.MouseEvent, inspection: any) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setInspectionToDelete(inspection);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (inspectionToDelete) {
+      deleteMutation.mutate(inspectionToDelete.id);
+    }
+  };
 
   const { data: inspections = [], isLoading } = useQuery({
     queryKey: ['all-inspections-history', dateRange.from, dateRange.to, truckId],
@@ -195,6 +231,14 @@ export function InspectionHistory({ truckId, showAllTrucks = true }: InspectionH
                           {inspection.signature_url && (
                             <FileSignature className="h-4 w-4 text-muted-foreground" />
                           )}
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => handleDeleteClick(e, inspection)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </button>
@@ -323,6 +367,32 @@ export function InspectionHistory({ truckId, showAllTrucks = true }: InspectionH
           </ScrollArea>
         )}
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Inspection</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete this {inspectionToDelete?.inspection_type?.replace('_', '-')} inspection from{' '}
+            {inspectionToDelete && format(new Date(inspectionToDelete.inspection_date), 'MMM d, yyyy')}? 
+            This will also delete any associated photos and cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
