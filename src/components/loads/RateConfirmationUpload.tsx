@@ -2,7 +2,8 @@ import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, RefreshCw, Plus } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -37,17 +38,28 @@ interface ExtractedLoadData {
   confidence: Record<string, number>;
 }
 
+interface ExistingLoad {
+  id: string;
+  landstar_load_id: string | null;
+  origin: string;
+  destination: string;
+  rate: number | null;
+  pickup_date: string | null;
+}
+
 interface RateConfirmationUploadProps {
-  onDataExtracted: (data: ExtractedLoadData) => void;
+  onDataExtracted: (data: ExtractedLoadData, existingLoadId?: string) => void;
+  existingLoads: ExistingLoad[];
   drivers: Array<{ id: string; first_name: string; last_name: string }>;
   trucks: Array<{ id: string; unit_number: string }>;
 }
 
-export function RateConfirmationUpload({ onDataExtracted, drivers, trucks }: RateConfirmationUploadProps) {
+export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers, trucks }: RateConfirmationUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedLoadData | null>(null);
+  const [matchingLoad, setMatchingLoad] = useState<ExistingLoad | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -112,10 +124,22 @@ export function RateConfirmationUpload({ onDataExtracted, drivers, trucks }: Rat
       console.log('Extracted load data:', data);
       setExtractedData(data);
       
-      // Try to match driver and truck
-      const matchedData = matchDriversAndTrucks(data);
-      
-      toast.success('Rate confirmation parsed successfully!');
+      // Check if this load already exists by Freight Bill #
+      if (data.landstar_load_id) {
+        const existingLoad = existingLoads.find(
+          load => load.landstar_load_id === data.landstar_load_id
+        );
+        if (existingLoad) {
+          setMatchingLoad(existingLoad);
+          toast.info(`Found existing load with Freight Bill #${data.landstar_load_id}`);
+        } else {
+          setMatchingLoad(null);
+          toast.success('Rate confirmation parsed successfully!');
+        }
+      } else {
+        setMatchingLoad(null);
+        toast.success('Rate confirmation parsed successfully!');
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to process file';
       setError(message);
@@ -176,19 +200,30 @@ export function RateConfirmationUpload({ onDataExtracted, drivers, trucks }: Rat
     }
   };
 
-  const handleUseData = () => {
+  const handleUseData = (updateExisting: boolean = false) => {
     if (extractedData) {
       const matchedData = matchDriversAndTrucks(extractedData);
-      onDataExtracted(matchedData as any);
+      if (updateExisting && matchingLoad) {
+        onDataExtracted(matchedData as any, matchingLoad.id);
+      } else {
+        onDataExtracted(matchedData as any);
+      }
       setExtractedData(null);
       setFileName(null);
+      setMatchingLoad(null);
     }
   };
 
   const handleCancel = () => {
     setExtractedData(null);
     setFileName(null);
+    setMatchingLoad(null);
     setError(null);
+  };
+
+  const formatCurrencyValue = (value: number | null) => {
+    if (value === null || value === undefined) return '-';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
   };
 
   const formatCurrency = (value: number | null) => {
@@ -262,13 +297,29 @@ export function RateConfirmationUpload({ onDataExtracted, drivers, trucks }: Rat
 
       {/* Extracted Data Preview */}
       {extractedData && (
-        <Card className="border-success bg-success/5">
+        <Card className={cn(
+          "border-2",
+          matchingLoad ? "border-warning bg-warning/5" : "border-success bg-success/5"
+        )}>
           <CardContent className="py-4">
+            {/* Matching Load Alert */}
+            {matchingLoad && (
+              <Alert className="mb-4 border-warning bg-warning/10">
+                <RefreshCw className="h-4 w-4" />
+                <AlertDescription className="ml-2">
+                  <span className="font-semibold">Existing load found!</span> Freight Bill #{matchingLoad.landstar_load_id} already exists.
+                  You can update it with this data or create a new load.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex items-start gap-3 mb-4">
-              <CheckCircle className="h-5 w-5 text-success shrink-0 mt-0.5" />
+              <CheckCircle className={cn("h-5 w-5 shrink-0 mt-0.5", matchingLoad ? "text-warning" : "text-success")} />
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-success">Data extracted from {fileName}</p>
+                  <p className={cn("text-sm font-medium", matchingLoad ? "text-warning" : "text-success")}>
+                    Data extracted from {fileName}
+                  </p>
                   <Button variant="ghost" size="icon" className="shrink-0" onClick={handleCancel}>
                     <X className="h-4 w-4" />
                   </Button>
@@ -276,6 +327,31 @@ export function RateConfirmationUpload({ onDataExtracted, drivers, trucks }: Rat
                 <p className="text-xs text-muted-foreground mt-1">Review the extracted data below</p>
               </div>
             </div>
+
+            {/* Show comparison if matching load found */}
+            {matchingLoad && (
+              <div className="mb-4 p-3 rounded-md bg-muted/50 border">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Current Load Data:</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">Origin:</span>
+                    <p className="font-medium truncate">{matchingLoad.origin}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Destination:</span>
+                    <p className="font-medium truncate">{matchingLoad.destination}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Rate:</span>
+                    <p className="font-medium">{formatCurrencyValue(matchingLoad.rate)}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Pickup:</span>
+                    <p className="font-medium">{matchingLoad.pickup_date || '-'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
@@ -309,7 +385,7 @@ export function RateConfirmationUpload({ onDataExtracted, drivers, trucks }: Rat
               <div>
                 <p className="text-xs text-muted-foreground">Rate + FSC</p>
                 <p className="font-medium text-success">
-                  {formatCurrency((extractedData.rate || 0) + (extractedData.fuel_surcharge || 0))}
+                  {formatCurrencyValue((extractedData.rate || 0) + (extractedData.fuel_surcharge || 0))}
                 </p>
               </div>
               {extractedData.driver_name && (
@@ -330,7 +406,7 @@ export function RateConfirmationUpload({ onDataExtracted, drivers, trucks }: Rat
                   <div className="flex flex-wrap gap-2 mt-1">
                     {extractedData.accessorials.map((acc, i) => (
                       <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary">
-                        {acc.type}: {formatCurrency(acc.amount)}
+                        {acc.type}: {formatCurrencyValue(acc.amount)}
                       </span>
                     ))}
                   </div>
@@ -352,10 +428,23 @@ export function RateConfirmationUpload({ onDataExtracted, drivers, trucks }: Rat
 
             <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
               <Button variant="outline" onClick={handleCancel}>Cancel</Button>
-              <Button onClick={handleUseData} className="gradient-gold text-primary-foreground">
-                <FileText className="h-4 w-4 mr-2" />
-                Use This Data
-              </Button>
+              {matchingLoad ? (
+                <>
+                  <Button variant="outline" onClick={() => handleUseData(false)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New Load
+                  </Button>
+                  <Button onClick={() => handleUseData(true)} className="gradient-gold text-primary-foreground">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Update Existing Load
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={() => handleUseData(false)} className="gradient-gold text-primary-foreground">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Use This Data
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
