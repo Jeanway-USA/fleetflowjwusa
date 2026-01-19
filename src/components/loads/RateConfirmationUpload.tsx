@@ -52,71 +52,18 @@ export function RateConfirmationUpload({ onDataExtracted, drivers, trucks }: Rat
     setIsDragging(false);
   }, []);
 
-  const extractTextFromPDF = async (file: File): Promise<string> => {
-    // Read the file as array buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-    
-    // Convert to base64
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    const base64 = btoa(binary);
-    
-    // For PDF parsing, we'll send the raw text content
-    // The AI will extract from the structured content
-    // For now, we'll use a simpler approach - extract what we can from the PDF
-    
-    // Simple text extraction from PDF (works for text-based PDFs)
-    const text = await extractTextFromPDFSimple(arrayBuffer);
-    return text;
-  };
-
-  const extractTextFromPDFSimple = async (arrayBuffer: ArrayBuffer): Promise<string> => {
-    // Simple PDF text extraction
-    // This works for text-based PDFs by finding text streams
-    const bytes = new Uint8Array(arrayBuffer);
-    const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
-    
-    // Extract readable text portions
-    const textParts: string[] = [];
-    
-    // Look for text between BT and ET markers (PDF text objects)
-    const btPattern = /BT[\s\S]*?ET/g;
-    const matches = text.match(btPattern);
-    
-    if (matches) {
-      for (const match of matches) {
-        // Extract text from Tj and TJ operators
-        const tjPattern = /\(([^)]*)\)\s*Tj|\[([^\]]*)\]\s*TJ/g;
-        let tjMatch;
-        while ((tjMatch = tjPattern.exec(match)) !== null) {
-          const extractedText = tjMatch[1] || tjMatch[2] || '';
-          if (extractedText) {
-            textParts.push(extractedText.replace(/\\/g, ''));
-          }
-        }
-      }
-    }
-
-    // If we couldn't extract structured text, try to find readable strings
-    if (textParts.length === 0) {
-      // Find sequences of printable ASCII characters
-      const printablePattern = /[\x20-\x7E]{4,}/g;
-      const printableMatches = text.match(printablePattern);
-      if (printableMatches) {
-        textParts.push(...printableMatches.filter(s => 
-          !s.includes('obj') && 
-          !s.includes('endobj') && 
-          !s.includes('stream') &&
-          !s.includes('/Type') &&
-          !s.includes('/Font')
-        ));
-      }
-    }
-
-    return textParts.join('\n');
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data URL prefix (e.g., "data:application/pdf;base64,")
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   const processFile = async (file: File) => {
@@ -131,18 +78,18 @@ export function RateConfirmationUpload({ onDataExtracted, drivers, trucks }: Rat
     setExtractedData(null);
 
     try {
-      // Extract text from PDF
-      const pdfText = await extractTextFromPDF(file);
+      // Convert PDF to base64 for multimodal AI processing
+      const pdfBase64 = await convertFileToBase64(file);
       
-      if (!pdfText || pdfText.length < 100) {
-        throw new Error('Could not extract text from PDF. Please ensure the PDF contains text, not just images.');
+      if (!pdfBase64 || pdfBase64.length < 100) {
+        throw new Error('Could not read PDF file.');
       }
 
-      console.log('Extracted PDF text length:', pdfText.length);
+      console.log('PDF base64 length:', pdfBase64.length);
 
-      // Send to edge function for AI parsing
+      // Send to edge function for AI parsing with multimodal capabilities
       const { data, error: fnError } = await supabase.functions.invoke('parse-rate-confirmation', {
-        body: { pdfText },
+        body: { pdfBase64 },
       });
 
       if (fnError) {

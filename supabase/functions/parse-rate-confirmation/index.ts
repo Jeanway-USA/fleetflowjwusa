@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { decode as base64Decode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,46 +40,46 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const { pdfText } = await req.json();
+    const { pdfBase64 } = await req.json();
 
-    if (!pdfText || typeof pdfText !== "string") {
+    if (!pdfBase64 || typeof pdfBase64 !== "string") {
       return new Response(
-        JSON.stringify({ error: "PDF text content is required" }),
+        JSON.stringify({ error: "PDF base64 content is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Parsing rate confirmation, text length:", pdfText.length);
+    console.log("Parsing rate confirmation PDF, base64 length:", pdfBase64.length);
 
+    // Use Gemini's multimodal capabilities to read the PDF directly
     const systemPrompt = `You are an expert at extracting structured data from Landstar BCO Load Detail documents (Rate Confirmations). 
-Extract the load information accurately and return it in a structured format.
+You will be given a PDF document image. Extract the load information accurately and return it in a structured JSON format.
 Be careful with dates - they should be in YYYY-MM-DD format.
-For locations, combine the city and state (e.g., "Baldwyn, MS").
-For accessorials, extract any charges that aren't the base Linehaul or Fuel Surcharge.`;
+For locations, combine the city and state (e.g., "Lewisville, TX" or "Denver, CO").
+For accessorials, extract any charges that aren't the base Line Haul or Fuel Surcharge (like Stop Of, Detention, etc.).
+Look for the "Load #" field (e.g., EL8557325), "Agency Name" for the agency code (last 3 letters like LTL or BLR), 
+pickup/delivery locations and dates from Stop Information, and charges from the Actual Customer Charges table.`;
 
-    const userPrompt = `Extract the following information from this Landstar BCO Load Detail document and return ONLY a JSON object (no markdown, no code blocks):
+    const userPrompt = `Analyze this Landstar BCO Load Detail PDF document and extract the load information.
 
-Document text:
-${pdfText}
-
-Required JSON structure:
+Return ONLY a valid JSON object with this exact structure (no markdown, no code blocks):
 {
-  "landstar_load_id": "Load # (e.g., EL8984471)",
-  "agency_code": "3-letter agency code from Agency Name (e.g., BLR from 'Veazey Logistics LLC - BLR')",
-  "origin": "First pickup city, state (e.g., 'Baldwyn, MS')",
-  "destination": "Final delivery city, state (e.g., 'The Colony, TX')",
+  "landstar_load_id": "Load # value (e.g., EL8557325)",
+  "agency_code": "3-letter agency code from Agency Name (e.g., LTL from 'B-Line Logistics LLC - LTL')",
+  "origin": "First pickup city, state (e.g., 'Lewisville, TX')",
+  "destination": "Final delivery city, state (e.g., 'Evans, CO')",
   "pickup_date": "First pickup date in YYYY-MM-DD format",
   "delivery_date": "Final delivery date in YYYY-MM-DD format", 
-  "booked_miles": "Total Distance in miles as a number",
-  "rate": "Linehaul amount as a number (no $ or commas)",
-  "fuel_surcharge": "Fuel Surcharge amount as a number",
-  "driver_name": "Driver name if available",
-  "truck_unit": "Tractor # if available",
-  "trailer_number": "Trailer # if available",
+  "booked_miles": Total Distance in miles as a number,
+  "rate": Line Haul amount as a number (no $ or commas),
+  "fuel_surcharge": Fuel Surcharge total amount as a number,
+  "driver_name": "Driver name from Driver(s) field",
+  "truck_unit": "Tractor # value",
+  "trailer_number": "Trailer # value if present",
   "accessorials": [
-    {"type": "accessorial type", "amount": number, "notes": "optional notes"}
+    {"type": "accessorial type like Stop Of", "amount": number value, "notes": "optional"}
   ],
-  "notes": "Any important notes from the document",
+  "notes": "Any important notes",
   "confidence": {
     "landstar_load_id": 0-100,
     "origin": 0-100,
@@ -88,8 +89,9 @@ Required JSON structure:
   }
 }
 
-Return ONLY valid JSON, no additional text.`;
+IMPORTANT: Extract the ACTUAL data from this specific PDF document. Do not use example data.`;
 
+    // Call Gemini with the PDF as a document
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -97,10 +99,21 @@ Return ONLY valid JSON, no additional text.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { 
+            role: "user", 
+            content: [
+              { type: "text", text: userPrompt },
+              { 
+                type: "image_url", 
+                image_url: { 
+                  url: `data:application/pdf;base64,${pdfBase64}` 
+                } 
+              }
+            ]
+          },
         ],
         temperature: 0.1, // Low temperature for more consistent extraction
       }),
@@ -123,7 +136,7 @@ Return ONLY valid JSON, no additional text.`;
         );
       }
       
-      throw new Error(`AI Gateway error: ${response.status}`);
+      throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
     }
 
     const aiResponse = await response.json();
@@ -152,6 +165,7 @@ Return ONLY valid JSON, no additional text.`;
       extractedData = JSON.parse(cleanContent.trim());
     } catch (parseError) {
       console.error("Failed to parse AI response as JSON:", parseError);
+      console.error("Raw content:", content);
       throw new Error("Failed to parse extracted data");
     }
 
