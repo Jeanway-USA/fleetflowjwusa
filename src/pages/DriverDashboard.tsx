@@ -167,8 +167,8 @@ export default function DriverDashboard() {
         {/* Next Load Preview */}
         {nextLoad && <NextLoadPreview load={nextLoad} />}
 
-        {/* Quick Actions - Compact 2x2 Grid */}
-        <div className="grid grid-cols-4 gap-2">
+        {/* Quick Actions - Full Width Row */}
+        <div className="grid grid-cols-3 gap-2">
           <DVIRButtons 
             driverId={driver.id} 
             truckId={assignedTruck?.id} 
