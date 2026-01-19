@@ -333,6 +333,19 @@ export default function FleetLoads() {
     actualMiles: acc.actualMiles + (load.actual_miles || 0),
   }), { loads: 0, rate: 0, fuelSurcharge: 0, accessorials: 0, grossRevenue: 0, netRevenue: 0, settlement: 0, bookedMiles: 0, actualMiles: 0 });
 
+  // Format intermediate stops for notes
+  const formatIntermediateStops = (stops: any[]): string => {
+    if (!stops || stops.length === 0) return '';
+    
+    const formattedStops = stops.map(stop => {
+      const facility = stop.facility_name ? `${stop.facility_name}, ` : '';
+      const date = stop.date ? ` - ${stop.date}` : '';
+      return `Stop ${stop.stop_number} (${stop.stop_type}): ${facility}${stop.address}${date}`;
+    }).join('\n');
+    
+    return `\n\n=== INTERMEDIATE STOPS ===\n${formattedStops}`;
+  };
+
   // Handle extracted data from rate confirmation
   const handleRateConfirmationData = (data: any) => {
     // Map accessorials from the extracted data
@@ -342,6 +355,10 @@ export default function FleetLoads() {
       percentage: 100,
       notes: acc.notes,
     }));
+
+    // Format intermediate stops to append to notes
+    const intermediateStopsText = formatIntermediateStops(data.intermediate_stops);
+    const combinedNotes = (data.notes || '') + intermediateStopsText;
 
     // Set form data with extracted values
     setFormData({
@@ -356,7 +373,7 @@ export default function FleetLoads() {
       fuel_surcharge: data.fuel_surcharge || 0,
       driver_id: data.driver_id || null,
       truck_id: data.truck_id || null,
-      notes: data.notes || '',
+      notes: combinedNotes,
       status: 'booked',
       is_power_only: false,
     });
@@ -577,22 +594,22 @@ export default function FleetLoads() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="origin">Origin *</Label>
+                    <Label htmlFor="origin">Origin (Full Address) *</Label>
                     <Input 
                       id="origin" 
                       value={formData.origin || ''} 
                       onChange={(e) => setFormData({ ...formData, origin: e.target.value })} 
-                      placeholder="Lewisville, TX" 
+                      placeholder="1234 Industrial Blvd, Lewisville, TX 75057" 
                       required 
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="destination">Destination *</Label>
+                    <Label htmlFor="destination">Destination (Full Address) *</Label>
                     <Input 
                       id="destination" 
                       value={formData.destination || ''} 
                       onChange={(e) => setFormData({ ...formData, destination: e.target.value })} 
-                      placeholder="Evans, CO" 
+                      placeholder="5678 Commerce Dr, Evans, CO 80620" 
                       required 
                     />
                   </div>
