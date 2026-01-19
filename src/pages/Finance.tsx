@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase } from 'lucide-react';
+import { StatementUpload } from '@/components/finance/StatementUpload';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import type { Database } from '@/integrations/supabase/types';
@@ -29,15 +30,23 @@ type AgentCommissionInsert = Database['public']['Tables']['agent_commissions']['
 const expenseTypes = [
   'Fuel',
   'DEF',
+  'Fuel Discount',
   'Truck Payment',
   'Trailer Payment',
   'Licensing/Permits',
+  'Registration/Plates',
   'Insurance',
   'LCN/Satellite',
   'Maintenance',
   'Cell Phone',
   'Trip Scanning',
   'Card Load',
+  'Card Fee',
+  'Cash Advance',
+  'Direct Deposit Fee',
+  'Escrow Payment',
+  'Truck Warranty',
+  'CPP/Benefits',
   'IFTA',
   'PrePass/Scale',
   'Tolls',
@@ -1029,6 +1038,21 @@ export default function Finance() {
         </TabsContent>
 
         <TabsContent value="expenses" className="mt-6">
+          {/* Statement Upload */}
+          <StatementUpload 
+            existingLoads={loads.map((l: any) => ({
+              id: l.id,
+              landstar_load_id: l.landstar_load_id,
+              origin: l.origin,
+              destination: l.destination,
+            }))}
+            trucks={trucks.map((t: any) => ({
+              id: t.id,
+              unit_number: t.unit_number,
+            }))}
+            onExpensesImported={() => queryClient.invalidateQueries({ queryKey: ['expenses'] })}
+          />
+
           <Card className="card-elevated">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
