@@ -5,10 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, Link, Unlink } from 'lucide-react';
+import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, Link, Unlink, Edit2, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 interface ExtractedExpense {
   date: string;
   expense_type: string;
@@ -60,6 +66,7 @@ export function StatementUpload({ existingLoads, trucks, onExpensesImported }: S
   const [statementData, setStatementData] = useState<ParsedStatement | null>(null);
   const [expenses, setExpenses] = useState<ExpenseWithMatch[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const findMatchingLoad = (tripNumber: string | null): FleetLoad | null => {
@@ -192,6 +199,15 @@ export function StatementUpload({ existingLoads, trucks, onExpensesImported }: S
 
   const toggleAll = (selected: boolean) => {
     setExpenses(prev => prev.map(exp => ({ ...exp, selected })));
+  };
+
+  const updateLoadMatch = (index: number, loadId: string | null) => {
+    const matchedLoad = loadId ? existingLoads.find(l => l.id === loadId) || null : null;
+    setExpenses(prev => prev.map((exp, i) => 
+      i === index ? { ...exp, matchedLoad } : exp
+    ));
+    setEditingIndex(null);
+    toast.success(matchedLoad ? `Linked to load ${matchedLoad.landstar_load_id}` : 'Load unlinked');
   };
 
   const handleImport = async (importAll: boolean = false) => {
@@ -390,19 +406,67 @@ export function StatementUpload({ existingLoads, trucks, onExpensesImported }: S
                       )}>
                         {expense.is_discount ? '-' : ''}{formatCurrency(Math.abs(expense.amount))}
                       </TableCell>
-                      <TableCell>
-                        {expense.matchedLoad ? (
-                          <div className="flex items-center gap-1 text-xs">
-                            <Link className="h-3 w-3 text-success" />
-                            <span className="text-success font-mono">{expense.matchedLoad.landstar_load_id}</span>
-                          </div>
-                        ) : expense.trip_number ? (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Unlink className="h-3 w-3" />
-                            <span className="font-mono">{expense.trip_number}</span>
+                      <TableCell className="min-w-[200px]">
+                        {editingIndex === index ? (
+                          <div className="flex items-center gap-1">
+                            <Select
+                              value={expense.matchedLoad?.id || 'none'}
+                              onValueChange={(value) => updateLoadMatch(index, value === 'none' ? null : value)}
+                            >
+                              <SelectTrigger className="h-7 text-xs w-[140px]">
+                                <SelectValue placeholder="Select load" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  <span className="flex items-center gap-1">
+                                    <Unlink className="h-3 w-3" />
+                                    No link
+                                  </span>
+                                </SelectItem>
+                                {existingLoads.map(load => (
+                                  <SelectItem key={load.id} value={load.id}>
+                                    <span className="font-mono text-xs">{load.landstar_load_id}</span>
+                                    <span className="text-muted-foreground ml-1 text-xs truncate">
+                                      {load.origin?.split(',')[0]} → {load.destination?.split(',')[0]}
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-6 w-6"
+                              onClick={() => setEditingIndex(null)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
                           </div>
                         ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
+                          <div className="flex items-center gap-1">
+                            {expense.matchedLoad ? (
+                              <div className="flex items-center gap-1 text-xs">
+                                <Link className="h-3 w-3 text-success" />
+                                <span className="text-success font-mono">{expense.matchedLoad.landstar_load_id}</span>
+                              </div>
+                            ) : expense.trip_number ? (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Unlink className="h-3 w-3" />
+                                <span className="font-mono">{expense.trip_number}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 ml-1 opacity-50 hover:opacity-100"
+                              onClick={() => setEditingIndex(index)}
+                              title="Edit load match"
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>
