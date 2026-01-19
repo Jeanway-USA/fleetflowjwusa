@@ -132,23 +132,29 @@ export default function DriverDashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-4 pb-8 max-w-4xl mx-auto">
-        {/* Header - My Day */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              {currentHour >= 6 && currentHour < 18 ? (
-                <Sun className="h-6 w-6 text-primary" />
-              ) : (
-                <Moon className="h-6 w-6 text-primary" />
-              )}
-              {greeting}, {driver.first_name}
-            </h1>
-            <p className="text-muted-foreground">
-              {format(new Date(), 'EEEE, MMMM d, yyyy')}
-            </p>
-          </div>
+      <div className="space-y-3 pb-6 max-w-4xl mx-auto">
+        {/* Compact Header */}
+        <div className="flex items-center justify-between py-1">
+          <h1 className="text-lg font-semibold flex items-center gap-2">
+            {currentHour >= 6 && currentHour < 18 ? (
+              <Sun className="h-5 w-5 text-primary" />
+            ) : (
+              <Moon className="h-5 w-5 text-primary" />
+            )}
+            {greeting}, {driver.first_name}
+          </h1>
+          <span className="text-sm text-muted-foreground">
+            {format(new Date(), 'EEE, MMM d')}
+          </span>
         </div>
+
+        {/* No Truck Warning - Compact */}
+        {!assignedTruck && (
+          <div className="bg-warning/10 border border-warning/30 rounded-md p-3 flex items-center gap-2 text-sm">
+            <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+            <span className="text-warning font-medium">No truck assigned - contact dispatch</span>
+          </div>
+        )}
 
         {/* Active Load Card */}
         <ActiveLoadCard 
@@ -161,35 +167,8 @@ export default function DriverDashboard() {
         {/* Next Load Preview */}
         {nextLoad && <NextLoadPreview load={nextLoad} />}
 
-        {/* Pay Widget */}
-        <DriverPayWidget 
-          driverId={driver.id} 
-          payRate={driver.pay_rate} 
-          payType={driver.pay_type} 
-        />
-
-        {/* No Truck Assigned Warning */}
-        {!assignedTruck && (
-          <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
-            <div>
-              <p className="font-medium text-warning">No Truck Assigned</p>
-              <p className="text-sm text-muted-foreground">
-                You don't have a truck assigned yet. Contact dispatch to get assigned a truck before you can complete inspections or report maintenance issues.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* GPS Location Sharing */}
-        <LocationSharing 
-          driverId={driver.id}
-          truckId={assignedTruck?.id}
-          loadId={activeLoad?.id}
-        />
-
-        {/* Quick Actions Row */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* Quick Actions - Compact 2x2 Grid */}
+        <div className="grid grid-cols-4 gap-2">
           <DVIRButtons 
             driverId={driver.id} 
             truckId={assignedTruck?.id} 
@@ -197,6 +176,20 @@ export default function DriverDashboard() {
             hasPostTrip={hasPostTrip}
           />
           <DocumentScanButton driverId={driver.id} />
+        </div>
+
+        {/* GPS + Pay in one row on larger screens */}
+        <div className="grid gap-3 md:grid-cols-2">
+          <LocationSharing 
+            driverId={driver.id}
+            truckId={assignedTruck?.id}
+            loadId={activeLoad?.id}
+          />
+          <DriverPayWidget 
+            driverId={driver.id} 
+            payRate={driver.pay_rate} 
+            payType={driver.pay_type} 
+          />
         </div>
 
         {/* Maintenance Request Status */}
