@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ExpensesList } from '@/components/shared/ExpensesList';
 import { RateConfirmationUpload } from '@/components/loads/RateConfirmationUpload';
+import DriverLoadsView from '@/components/driver/DriverLoadsView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -43,6 +45,8 @@ interface Accessorial {
 import { format, parseISO } from 'date-fns';
 
 export default function FleetLoads() {
+  const { hasRole, isAdmin } = useAuth();
+  const isDriverOnly = hasRole('driver') && !isAdmin;
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLoad, setEditingLoad] = useState<any>(null);
@@ -445,6 +449,19 @@ export default function FleetLoads() {
     
     toast.info('Form pre-filled with extracted data. Review and save when ready.');
   };
+
+  // Driver-only view - mobile-friendly, read-only except status updates
+  if (isDriverOnly) {
+    return (
+      <DashboardLayout>
+        <PageHeader 
+          title="My Loads" 
+          description="View your assigned loads and update status" 
+        />
+        <DriverLoadsView />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
