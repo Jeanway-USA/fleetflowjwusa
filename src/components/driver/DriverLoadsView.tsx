@@ -178,21 +178,23 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
             <span className="font-medium">{getCondensedAddress(load.destination)}</span>
           </div>
 
-          {/* Date & Time - Show delivery for in_transit, pickup for others */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4 shrink-0" />
-            {load.status === 'in_transit' ? (
-              <span>
-                Delivery: {formatDate(load.delivery_date)}
-                {load.delivery_time && <span className="ml-1 text-foreground font-medium">@ {load.delivery_time}</span>}
-              </span>
-            ) : (
-              <span>
-                Pickup: {formatDate(load.pickup_date)}
-                {load.pickup_time && <span className="ml-1 text-foreground font-medium">@ {load.pickup_time}</span>}
-              </span>
-            )}
-          </div>
+          {/* Date & Time - Hide for delivered/cancelled loads */}
+          {!['delivered', 'cancelled'].includes(load.status) && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4 shrink-0" />
+              {load.status === 'in_transit' ? (
+                <span>
+                  Delivery: {formatDate(load.delivery_date)}
+                  {load.delivery_time && <span className="ml-1 text-foreground font-medium">@ {load.delivery_time}</span>}
+                </span>
+              ) : (
+                <span>
+                  Pickup: {formatDate(load.pickup_date)}
+                  {load.pickup_time && <span className="ml-1 text-foreground font-medium">@ {load.pickup_time}</span>}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Miles and Estimated Pay */}
           <div className="flex items-center justify-between pt-2 border-t">
