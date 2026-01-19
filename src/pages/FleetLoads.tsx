@@ -5,6 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ExpensesList } from '@/components/shared/ExpensesList';
+import { RateConfirmationUpload } from '@/components/loads/RateConfirmationUpload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -332,6 +333,41 @@ export default function FleetLoads() {
     actualMiles: acc.actualMiles + (load.actual_miles || 0),
   }), { loads: 0, rate: 0, fuelSurcharge: 0, accessorials: 0, grossRevenue: 0, netRevenue: 0, settlement: 0, bookedMiles: 0, actualMiles: 0 });
 
+  // Handle extracted data from rate confirmation
+  const handleRateConfirmationData = (data: any) => {
+    // Map accessorials from the extracted data
+    const extractedAccessorials: Accessorial[] = (data.accessorials || []).map((acc: any) => ({
+      accessorial_type: acc.type === 'Stop Of' ? 'Stop-off' : acc.type,
+      amount: acc.amount || 0,
+      percentage: 100,
+      notes: acc.notes,
+    }));
+
+    // Set form data with extracted values
+    setFormData({
+      landstar_load_id: data.landstar_load_id || '',
+      agency_code: data.agency_code || '',
+      origin: data.origin || '',
+      destination: data.destination || '',
+      pickup_date: data.pickup_date || '',
+      delivery_date: data.delivery_date || '',
+      booked_miles: data.booked_miles || 0,
+      rate: data.rate || 0,
+      fuel_surcharge: data.fuel_surcharge || 0,
+      driver_id: data.driver_id || null,
+      truck_id: data.truck_id || null,
+      notes: data.notes || '',
+      status: 'booked',
+      is_power_only: false,
+    });
+
+    setAccessorials(extractedAccessorials);
+    setEditingLoad(null);
+    setDialogOpen(true);
+    
+    toast.info('Form pre-filled with extracted data. Review and save when ready.');
+  };
+
   return (
     <DashboardLayout>
       <PageHeader 
@@ -339,6 +375,15 @@ export default function FleetLoads() {
         description="Track loads, revenue, and settlements" 
         action={{ label: 'Add Load', onClick: () => openDialog() }} 
       />
+
+      {/* Rate Confirmation Upload */}
+      <div className="mb-6">
+        <RateConfirmationUpload
+          onDataExtracted={handleRateConfirmationData}
+          drivers={drivers}
+          trucks={trucks}
+        />
+      </div>
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4 mb-6">
