@@ -11,6 +11,7 @@ import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCa
 import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
 import { DVIRHistory } from '@/components/driver/DVIRHistory';
 import { LocationSharing } from '@/components/driver/LocationSharing';
+import { DriverNotifications } from '@/components/driver/DriverNotifications';
 import { Loader2, Sun, Moon, AlertTriangle } from 'lucide-react';
 
 export default function DriverDashboard() {
@@ -143,9 +144,12 @@ export default function DriverDashboard() {
             )}
             {greeting}, {driver.first_name}
           </h1>
-          <span className="text-sm text-muted-foreground">
-            {format(new Date(), 'EEE, MMM d')}
-          </span>
+          <div className="flex items-center gap-2">
+            <DriverNotifications driverId={driver.id} />
+            <span className="text-sm text-muted-foreground">
+              {format(new Date(), 'EEE, MMM d')}
+            </span>
+          </div>
         </div>
 
         {/* No Truck Warning - Compact */}
