@@ -356,6 +356,47 @@ export type Database = {
           },
         ]
       }
+      driver_notifications: {
+        Row: {
+          created_at: string
+          driver_id: string
+          id: string
+          is_read: boolean
+          message: string
+          notification_type: string
+          related_id: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          driver_id: string
+          id?: string
+          is_read?: boolean
+          message: string
+          notification_type?: string
+          related_id?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          notification_type?: string
+          related_id?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_notifications_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_payroll: {
         Row: {
           created_at: string
