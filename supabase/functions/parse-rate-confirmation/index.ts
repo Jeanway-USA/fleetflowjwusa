@@ -6,6 +6,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface IntermediateStop {
+  stop_number: number;
+  stop_type: string; // "Pickup" or "Drop"
+  address: string;
+  date: string | null;
+  facility_name: string | null;
+}
+
 interface ExtractedLoadData {
   landstar_load_id: string | null;
   agency_code: string | null;
@@ -24,6 +32,7 @@ interface ExtractedLoadData {
     amount: number;
     notes?: string;
   }>;
+  intermediate_stops: IntermediateStop[];
   notes: string | null;
   confidence: Record<string, number>;
 }
@@ -54,15 +63,24 @@ serve(async (req) => {
     // Use Gemini's multimodal capabilities to read the PDF directly
     const systemPrompt = `You are an expert at extracting structured data from Landstar BCO Load Detail documents (Rate Confirmations). 
 You will be given a PDF document image. Extract the load information accurately and return it in a structured JSON format.
-Be careful with dates - they should be in YYYY-MM-DD format.
-For locations, combine the city and state (e.g., "Lewisville, TX" or "Denver, CO").
-For accessorials, extract any charges that aren't the base Line Haul or Fuel Surcharge (like Stop Of, Detention, etc.).
 
-CRITICAL: For the landstar_load_id, you MUST use the "Freight Bill #" value (a numeric value like 6725288), 
-NOT the "Load #" (which starts with letters like EL8964000). The Freight Bill # is typically a 7-digit number.
+CRITICAL INSTRUCTIONS:
+1. For the landstar_load_id, you MUST use the "Freight Bill #" value (a numeric value like 6725288), NOT the "Load #" (which starts with letters like EL8964000). The Freight Bill # is typically a 7-digit number.
 
-Look for "Agency Name" for the agency code (last 3 letters like LTL or BLR), 
-pickup/delivery locations and dates from Stop Information, and charges from the Actual Customer Charges table.`;
+2. For ADDRESSES: Extract the FULL address including street address, city, state, and ZIP code when available.
+   - Look in the "Stop Information" section for complete addresses
+   - Include facility/company name if shown
+   - Format: "123 Main St, City, ST 12345" or "Company Name, 123 Main St, City, ST 12345"
+
+3. For MULTI-STOP LOADS:
+   - The "origin" should be the FIRST stop (Stop 1) with its full address
+   - The "destination" should be the LAST stop with its full address
+   - ALL stops between the first and last should be captured in the "intermediate_stops" array
+   - Each intermediate stop should include: stop number, type (Pickup/Drop), full address, date, and facility name if available
+
+4. Dates should be in YYYY-MM-DD format.
+5. Look for "Agency Name" for the agency code (last 3 letters like LTL or BLR).
+6. For accessorials, extract any charges that aren't the base Line Haul or Fuel Surcharge (like Stop Of, Detention, etc.).`;
 
     const userPrompt = `Analyze this Landstar BCO Load Detail PDF document and extract the load information.
 
@@ -70,8 +88,8 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
 {
   "landstar_load_id": "Freight Bill # value - a NUMERIC value like 6725288, NOT the Load # which starts with EL",
   "agency_code": "3-letter agency code from Agency Name (e.g., LTL from 'B-Line Logistics LLC - LTL')",
-  "origin": "First pickup city, state (e.g., 'Lewisville, TX')",
-  "destination": "Final delivery city, state (e.g., 'Evans, CO')",
+  "origin": "FULL address of first pickup stop including street, city, state, ZIP (e.g., '1234 Industrial Blvd, Lewisville, TX 75057')",
+  "destination": "FULL address of final delivery stop including street, city, state, ZIP (e.g., '5678 Commerce Dr, Evans, CO 80620')",
   "pickup_date": "First pickup date in YYYY-MM-DD format",
   "delivery_date": "Final delivery date in YYYY-MM-DD format", 
   "booked_miles": Total Distance in miles as a number,
@@ -83,7 +101,16 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
   "accessorials": [
     {"type": "accessorial type like Stop Of", "amount": number value, "notes": "optional"}
   ],
-  "notes": "Any important notes",
+  "intermediate_stops": [
+    {
+      "stop_number": 2,
+      "stop_type": "Pickup or Drop",
+      "address": "Full address of the stop",
+      "date": "YYYY-MM-DD",
+      "facility_name": "Name of facility if shown"
+    }
+  ],
+  "notes": "Any important notes from the document",
   "confidence": {
     "landstar_load_id": 0-100,
     "origin": 0-100,
@@ -93,7 +120,11 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
   }
 }
 
-IMPORTANT: Extract the ACTUAL data from this specific PDF document. Do not use example data.`;
+IMPORTANT: 
+- Extract the ACTUAL data from this specific PDF document. Do not use example data.
+- For origin and destination, always try to extract the FULL address with street, city, state, and ZIP.
+- If there are stops between the first and last stop, include them in intermediate_stops array.
+- If this is a simple 2-stop load (origin to destination), leave intermediate_stops as an empty array [].`;
 
     // Call Gemini with the PDF as a document
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

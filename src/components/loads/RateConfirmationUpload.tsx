@@ -6,6 +6,14 @@ import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X } from 'lucide-r
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+interface IntermediateStop {
+  stop_number: number;
+  stop_type: string;
+  address: string;
+  date: string | null;
+  facility_name: string | null;
+}
+
 interface ExtractedLoadData {
   landstar_load_id: string | null;
   agency_code: string | null;
@@ -24,6 +32,7 @@ interface ExtractedLoadData {
     amount: number;
     notes?: string;
   }>;
+  intermediate_stops?: IntermediateStop[];
   notes: string | null;
   confidence: Record<string, number>;
 }
@@ -322,6 +331,18 @@ export function RateConfirmationUpload({ onDataExtracted, drivers, trucks }: Rat
                     {extractedData.accessorials.map((acc, i) => (
                       <span key={i} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary">
                         {acc.type}: {formatCurrency(acc.amount)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {extractedData.intermediate_stops && extractedData.intermediate_stops.length > 0 && (
+                <div className="col-span-full">
+                  <p className="text-xs text-muted-foreground">Intermediate Stops ({extractedData.intermediate_stops.length})</p>
+                  <div className="flex flex-col gap-1 mt-1 text-xs">
+                    {extractedData.intermediate_stops.map((stop, i) => (
+                      <span key={i} className="text-muted-foreground">
+                        Stop {stop.stop_number} ({stop.stop_type}): {stop.facility_name ? `${stop.facility_name}, ` : ''}{stop.address}{stop.date ? ` - ${stop.date}` : ''}
                       </span>
                     ))}
                   </div>
