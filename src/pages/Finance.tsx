@@ -1082,6 +1082,7 @@ export default function Finance() {
               unit_number: t.unit_number,
             }))}
             existingExpenses={expenses.map((e: any) => ({
+              id: e.id,
               expense_date: e.expense_date,
               expense_type: e.expense_type,
               amount: e.amount,
