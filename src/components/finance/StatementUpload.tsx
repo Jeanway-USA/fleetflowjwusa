@@ -36,6 +36,7 @@ interface ParsedStatement {
 }
 
 interface ExistingExpense {
+  id: string;
   expense_date: string;
   expense_type: string;
   amount: number;
@@ -66,6 +67,7 @@ interface ExpenseWithMatch extends ExtractedExpense {
   matchedLoad: FleetLoad | null;
   matchedTruck: Truck | null;
   isDuplicate: boolean;
+  duplicateId: string | null; // ID of the existing expense if this is a duplicate
 }
 
 export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported }: StatementUploadProps) {
@@ -97,9 +99,9 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     return trucks.find(t => t.unit_number.includes(cleanUnit) || cleanUnit.includes(t.unit_number)) || null;
   };
 
-  // Check if an expense already exists in the database
-  const checkIsDuplicate = (expense: ExtractedExpense, matchedLoad: FleetLoad | null): boolean => {
-    return existingExpenses.some(existing => {
+  // Check if an expense already exists in the database and return its ID
+  const findDuplicateId = (expense: ExtractedExpense, matchedLoad: FleetLoad | null): string | null => {
+    const duplicate = existingExpenses.find(existing => {
       const sameDate = existing.expense_date === expense.date;
       const sameType = existing.expense_type === expense.expense_type;
       const sameAmount = Math.abs(existing.amount - Math.abs(expense.amount)) < 0.01;
@@ -113,6 +115,11 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       
       return false;
     });
+    return duplicate?.id || null;
+  };
+
+  const checkIsDuplicate = (expense: ExtractedExpense, matchedLoad: FleetLoad | null): boolean => {
+    return findDuplicateId(expense, matchedLoad) !== null;
   };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -180,15 +187,16 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       // Process expenses and match with loads
       const processedExpenses: ExpenseWithMatch[] = (data.expenses || []).map((exp: ExtractedExpense) => {
         const matchedLoad = findMatchingLoad(exp.trip_number);
-        const isDuplicate = checkIsDuplicate(exp, matchedLoad);
+        const duplicateId = findDuplicateId(exp, matchedLoad);
         return {
           ...exp,
           // Ensure is_reimbursement has a default value
           is_reimbursement: exp.is_reimbursement || false,
-          selected: !isDuplicate, // Don't auto-select duplicates
+          selected: !duplicateId, // Don't auto-select duplicates
           matchedLoad,
           matchedTruck: exp.trip_number ? null : statementTruck, // Only assign truck if no trip number
-          isDuplicate,
+          isDuplicate: duplicateId !== null,
+          duplicateId,
         };
       });
 
@@ -286,24 +294,62 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     setIsImporting(true);
 
     try {
-      const expenseInserts = validExpenses.map(exp => ({
-        expense_date: exp.date,
-        expense_type: exp.is_reimbursement ? 'Reimbursement' : exp.expense_type,
-        // Store reimbursements as negative to decrease total expenses
-        amount: exp.is_reimbursement ? -Math.abs(exp.amount) : Math.abs(exp.amount),
-        description: exp.description,
-        vendor: exp.vendor,
-        gallons: exp.gallons,
-        load_id: exp.matchedLoad?.id || null,
-        truck_id: exp.matchedTruck?.id || null,
-        notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
-      }));
+      // Separate new expenses from duplicates that need to be updated
+      const newExpenses = validExpenses.filter(exp => !exp.duplicateId);
+      const duplicateExpenses = validExpenses.filter(exp => exp.duplicateId);
 
-      const { error } = await supabase.from('expenses').insert(expenseInserts);
+      let insertedCount = 0;
+      let updatedCount = 0;
 
-      if (error) throw error;
+      // Insert new expenses
+      if (newExpenses.length > 0) {
+        const expenseInserts = newExpenses.map(exp => ({
+          expense_date: exp.date,
+          expense_type: exp.is_reimbursement ? 'Reimbursement' : exp.expense_type,
+          amount: exp.is_reimbursement ? -Math.abs(exp.amount) : Math.abs(exp.amount),
+          description: exp.description,
+          vendor: exp.vendor,
+          gallons: exp.gallons,
+          load_id: exp.matchedLoad?.id || null,
+          truck_id: exp.matchedTruck?.id || null,
+          notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
+        }));
 
-      toast.success(`Successfully imported ${validExpenses.length} expenses`);
+        const { error } = await supabase.from('expenses').insert(expenseInserts);
+        if (error) throw error;
+        insertedCount = newExpenses.length;
+      }
+
+      // Update duplicate expenses (overwrite existing)
+      for (const exp of duplicateExpenses) {
+        const updateData = {
+          expense_date: exp.date,
+          expense_type: exp.is_reimbursement ? 'Reimbursement' : exp.expense_type,
+          amount: exp.is_reimbursement ? -Math.abs(exp.amount) : Math.abs(exp.amount),
+          description: exp.description,
+          vendor: exp.vendor,
+          gallons: exp.gallons,
+          load_id: exp.matchedLoad?.id || null,
+          truck_id: exp.matchedTruck?.id || null,
+          notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error } = await supabase
+          .from('expenses')
+          .update(updateData)
+          .eq('id', exp.duplicateId!);
+        
+        if (error) throw error;
+        updatedCount++;
+      }
+
+      // Build success message
+      const messages: string[] = [];
+      if (insertedCount > 0) messages.push(`${insertedCount} new`);
+      if (updatedCount > 0) messages.push(`${updatedCount} updated`);
+      
+      toast.success(`Successfully imported: ${messages.join(', ')} expenses`);
       handleCancel();
       onExpensesImported();
     } catch (err) {
