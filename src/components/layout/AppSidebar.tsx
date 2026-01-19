@@ -130,15 +130,24 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2">
-        {renderNavGroup('Main', mainNavItems)}
-        <SidebarSeparator />
-        {renderNavGroup('Fleet', fleetNavItems)}
-        <SidebarSeparator />
-        {renderNavGroup('Loads', loadsNavItems)}
-        <SidebarSeparator />
-        {renderNavGroup('Finance', financeNavItems)}
-        <SidebarSeparator />
-        {renderNavGroup('Operations', operationsNavItems)}
+        {(() => {
+          const groups = [
+            { label: 'Main', items: mainNavItems },
+            { label: 'Fleet', items: fleetNavItems },
+            { label: 'Loads', items: loadsNavItems },
+            { label: 'Finance', items: financeNavItems },
+            { label: 'Operations', items: operationsNavItems },
+          ];
+          
+          const visibleGroups = groups.filter(g => filterByRole(g.items).length > 0);
+          
+          return visibleGroups.map((group, index) => (
+            <div key={group.label}>
+              {index > 0 && <SidebarSeparator />}
+              {renderNavGroup(group.label, group.items)}
+            </div>
+          ));
+        })()}
         
         {isOwner && (
           <>
