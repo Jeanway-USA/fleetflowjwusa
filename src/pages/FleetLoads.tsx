@@ -374,7 +374,7 @@ export default function FleetLoads() {
       driver_id: data.driver_id || null,
       truck_id: data.truck_id || null,
       notes: combinedNotes,
-      status: 'booked',
+      status: 'assigned',
       is_power_only: false,
     });
 
@@ -582,8 +582,8 @@ export default function FleetLoads() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="booked">Booked</SelectItem>
                         <SelectItem value="assigned">Assigned</SelectItem>
+                        <SelectItem value="loading">Loading</SelectItem>
                         <SelectItem value="in_transit">In Transit</SelectItem>
                         <SelectItem value="delivered">Delivered</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
