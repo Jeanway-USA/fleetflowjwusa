@@ -10,6 +10,7 @@ import { DVIRButtons } from '@/components/driver/DVIRButtons';
 import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
 import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
 import { DVIRHistory } from '@/components/driver/DVIRHistory';
+import { LocationSharing } from '@/components/driver/LocationSharing';
 import { Loader2, Sun, Moon, AlertTriangle } from 'lucide-react';
 
 export default function DriverDashboard() {
@@ -179,6 +180,13 @@ export default function DriverDashboard() {
             </div>
           </div>
         )}
+
+        {/* GPS Location Sharing */}
+        <LocationSharing 
+          driverId={driver.id}
+          truckId={assignedTruck?.id}
+          loadId={activeLoad?.id}
+        />
 
         {/* Quick Actions Row */}
         <div className="grid grid-cols-3 gap-3">
