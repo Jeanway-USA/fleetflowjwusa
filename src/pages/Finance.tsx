@@ -665,14 +665,44 @@ export default function Finance() {
     setEditingSettings(true);
   };
 
+  // Helper to check if expense is a refund/reimbursement (negative amount)
+  const isRefundExpense = (expense: Expense) => {
+    return expense.amount < 0 || 
+           expense.expense_type === 'Reimbursement' || 
+           expense.expense_type === 'Fuel Discount';
+  };
+
   const expenseColumns = [
     { key: 'expense_date', header: 'Date', render: (e: Expense) => e.expense_date ? format(parseISO(e.expense_date), 'MM/dd/yyyy') : '-' },
-    { key: 'expense_type', header: 'Type' },
+    { 
+      key: 'expense_type', 
+      header: 'Type',
+      render: (e: Expense) => {
+        const isRefund = isRefundExpense(e);
+        return (
+          <div className="flex items-center gap-2">
+            {isRefund && <TrendingUp className="h-4 w-4 text-success" />}
+            <span className={isRefund ? 'text-success font-medium' : ''}>
+              {e.expense_type}
+              {isRefund && e.expense_type !== 'Reimbursement' && e.expense_type !== 'Fuel Discount' && ' (Refund)'}
+            </span>
+          </div>
+        );
+      }
+    },
     { key: 'description', header: 'Description', render: (e: Expense) => e.description || '-' },
     { 
       key: 'amount', 
       header: 'Amount', 
-      render: (e: Expense) => <span className="text-destructive font-medium">{formatCurrency(Number(e.amount))}</span>
+      render: (e: Expense) => {
+        const isRefund = isRefundExpense(e);
+        const absAmount = Math.abs(Number(e.amount));
+        return (
+          <span className={`font-medium ${isRefund ? 'text-success' : 'text-destructive'}`}>
+            {isRefund ? '+' : '-'}{formatCurrency(absAmount)}
+          </span>
+        );
+      }
     },
     { key: 'gallons', header: 'Gallons', render: (e: Expense) => e.gallons ? `${e.gallons} gal` : '-' },
     { key: 'truck_id', header: 'Truck', render: (e: Expense) => getTruckName(e.truck_id) },
