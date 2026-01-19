@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, Link, Unlink, Edit2, Check } from 'lucide-react';
+import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, Link, Unlink, Edit2, Check, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import {
@@ -24,6 +24,7 @@ interface ExtractedExpense {
   vendor: string | null;
   gallons: number | null;
   is_discount: boolean;
+  is_reimbursement: boolean;
 }
 
 interface ParsedStatement {
@@ -32,6 +33,13 @@ interface ParsedStatement {
   period_end: string | null;
   unit_number: string | null;
   expenses: ExtractedExpense[];
+}
+
+interface ExistingExpense {
+  expense_date: string;
+  expense_type: string;
+  amount: number;
+  load_id: string | null;
 }
 
 interface FleetLoad {
@@ -49,6 +57,7 @@ interface Truck {
 interface StatementUploadProps {
   existingLoads: FleetLoad[];
   trucks: Truck[];
+  existingExpenses: ExistingExpense[];
   onExpensesImported: () => void;
 }
 
@@ -56,9 +65,10 @@ interface ExpenseWithMatch extends ExtractedExpense {
   selected: boolean;
   matchedLoad: FleetLoad | null;
   matchedTruck: Truck | null;
+  isDuplicate: boolean;
 }
 
-export function StatementUpload({ existingLoads, trucks, onExpensesImported }: StatementUploadProps) {
+export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported }: StatementUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -85,6 +95,24 @@ export function StatementUpload({ existingLoads, trucks, onExpensesImported }: S
     if (!unitNumber) return null;
     const cleanUnit = unitNumber.replace(/\D/g, '');
     return trucks.find(t => t.unit_number.includes(cleanUnit) || cleanUnit.includes(t.unit_number)) || null;
+  };
+
+  // Check if an expense already exists in the database
+  const checkIsDuplicate = (expense: ExtractedExpense, matchedLoad: FleetLoad | null): boolean => {
+    return existingExpenses.some(existing => {
+      const sameDate = existing.expense_date === expense.date;
+      const sameType = existing.expense_type === expense.expense_type;
+      const sameAmount = Math.abs(existing.amount - Math.abs(expense.amount)) < 0.01;
+      const sameLoad = matchedLoad?.id === existing.load_id;
+      
+      // If same date, type, amount, and load - likely a duplicate
+      if (sameDate && sameType && sameAmount && sameLoad) return true;
+      
+      // If same date, type, and amount (within small tolerance) - also likely a duplicate
+      if (sameDate && sameType && sameAmount) return true;
+      
+      return false;
+    });
   };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -150,17 +178,30 @@ export function StatementUpload({ existingLoads, trucks, onExpensesImported }: S
       const statementTruck = findMatchingTruck(data.unit_number);
 
       // Process expenses and match with loads
-      const processedExpenses: ExpenseWithMatch[] = (data.expenses || []).map((exp: ExtractedExpense) => ({
-        ...exp,
-        selected: true,
-        matchedLoad: findMatchingLoad(exp.trip_number),
-        matchedTruck: exp.trip_number ? null : statementTruck, // Only assign truck if no trip number
-      }));
+      const processedExpenses: ExpenseWithMatch[] = (data.expenses || []).map((exp: ExtractedExpense) => {
+        const matchedLoad = findMatchingLoad(exp.trip_number);
+        const isDuplicate = checkIsDuplicate(exp, matchedLoad);
+        return {
+          ...exp,
+          // Ensure is_reimbursement has a default value
+          is_reimbursement: exp.is_reimbursement || false,
+          selected: !isDuplicate, // Don't auto-select duplicates
+          matchedLoad,
+          matchedTruck: exp.trip_number ? null : statementTruck, // Only assign truck if no trip number
+          isDuplicate,
+        };
+      });
 
       setExpenses(processedExpenses);
       
       const matchedCount = processedExpenses.filter((e: ExpenseWithMatch) => e.matchedLoad).length;
-      toast.success(`Extracted ${processedExpenses.length} expenses (${matchedCount} matched to existing loads)`);
+      const duplicateCount = processedExpenses.filter((e: ExpenseWithMatch) => e.isDuplicate).length;
+      
+      let message = `Extracted ${processedExpenses.length} expenses (${matchedCount} matched to loads)`;
+      if (duplicateCount > 0) {
+        message += ` - ${duplicateCount} potential duplicates detected`;
+      }
+      toast.success(message);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to process file';
       setError(message);
@@ -223,14 +264,15 @@ export function StatementUpload({ existingLoads, trucks, onExpensesImported }: S
     try {
       const expenseInserts = toImport.map(exp => ({
         expense_date: exp.date,
-        expense_type: exp.expense_type,
-        amount: Math.abs(exp.amount), // Store as positive, the type indicates if it's a discount
+        expense_type: exp.is_reimbursement ? 'Reimbursement' : exp.expense_type,
+        // Store as positive, reimbursements will be handled as negative in display/calculations
+        amount: exp.is_reimbursement ? -Math.abs(exp.amount) : Math.abs(exp.amount),
         description: exp.description,
         vendor: exp.vendor,
         gallons: exp.gallons,
         load_id: exp.matchedLoad?.id || null,
         truck_id: exp.matchedTruck?.id || null,
-        notes: exp.is_discount ? 'Discount/Credit' : null,
+        notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
       }));
 
       const { error } = await supabase.from('expenses').insert(expenseInserts);
@@ -262,8 +304,19 @@ export function StatementUpload({ existingLoads, trucks, onExpensesImported }: S
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
   };
 
-  const selectedCount = expenses.filter(e => e.selected).length;
-  const selectedTotal = expenses.filter(e => e.selected).reduce((sum, e) => sum + e.amount, 0);
+  const selectedExpenses = expenses.filter(e => e.selected);
+  const selectedCount = selectedExpenses.length;
+  const duplicateCount = expenses.filter(e => e.isDuplicate).length;
+  const reimbursementCount = expenses.filter(e => e.is_reimbursement || e.is_discount).length;
+  
+  // Calculate totals: expenses are positive (cost), reimbursements/discounts subtract from total
+  const selectedExpensesTotal = selectedExpenses
+    .filter(e => !e.is_reimbursement && !e.is_discount)
+    .reduce((sum, e) => sum + Math.abs(e.amount), 0);
+  const selectedReimbursementsTotal = selectedExpenses
+    .filter(e => e.is_reimbursement || e.is_discount)
+    .reduce((sum, e) => sum + Math.abs(e.amount), 0);
+  const netTotal = selectedExpensesTotal - selectedReimbursementsTotal;
 
   return (
     <Card className="mb-6">
@@ -376,7 +429,8 @@ export function StatementUpload({ existingLoads, trucks, onExpensesImported }: S
                     <TableRow 
                       key={index}
                       className={cn(
-                        expense.is_discount && "bg-success/5",
+                        (expense.is_discount || expense.is_reimbursement) && "bg-success/5",
+                        expense.isDuplicate && "bg-warning/10",
                         !expense.selected && "opacity-50"
                       )}
                     >
@@ -386,11 +440,31 @@ export function StatementUpload({ existingLoads, trucks, onExpensesImported }: S
                           onCheckedChange={() => toggleExpense(index)}
                         />
                       </TableCell>
-                      <TableCell className="text-sm">{expense.date}</TableCell>
+                      <TableCell className="text-sm">
+                        <div className="flex items-center gap-1">
+                          {expense.date}
+                          {expense.isDuplicate && (
+                            <span title="Potential duplicate">
+                              <AlertTriangle className="h-3 w-3 text-warning" />
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
-                        <Badge variant={expense.is_discount ? "secondary" : "outline"} className="text-xs">
-                          {expense.expense_type}
-                        </Badge>
+                        <div className="flex items-center gap-1">
+                          {(expense.is_reimbursement || expense.is_discount) && (
+                            <TrendingUp className="h-3 w-3 text-success" />
+                          )}
+                          <Badge 
+                            variant={(expense.is_discount || expense.is_reimbursement) ? "secondary" : "outline"} 
+                            className={cn(
+                              "text-xs",
+                              (expense.is_reimbursement || expense.is_discount) && "bg-success/20 text-success border-success/30"
+                            )}
+                          >
+                            {expense.is_reimbursement ? 'Reimbursement' : expense.expense_type}
+                          </Badge>
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm max-w-48 truncate" title={expense.description}>
                         {expense.vendor || expense.description}
@@ -401,10 +475,10 @@ export function StatementUpload({ existingLoads, trucks, onExpensesImported }: S
                         )}
                       </TableCell>
                       <TableCell className={cn(
-                        "text-right font-mono text-sm",
-                        expense.is_discount ? "text-success" : "text-destructive"
+                        "text-right font-mono text-sm font-medium",
+                        (expense.is_discount || expense.is_reimbursement) ? "text-success" : "text-destructive"
                       )}>
-                        {expense.is_discount ? '-' : ''}{formatCurrency(Math.abs(expense.amount))}
+                        {(expense.is_discount || expense.is_reimbursement) ? '+' : '-'}{formatCurrency(Math.abs(expense.amount))}
                       </TableCell>
                       <TableCell className="min-w-[200px]">
                         {editingIndex === index ? (
@@ -477,15 +551,27 @@ export function StatementUpload({ existingLoads, trucks, onExpensesImported }: S
 
             {/* Summary & Actions */}
             <div className="flex items-center justify-between pt-2 border-t">
-              <div className="text-sm">
+              <div className="text-sm space-x-2">
                 <span className="text-muted-foreground">Selected: </span>
-                <span className="font-medium">{selectedCount} expenses</span>
-                <span className="text-muted-foreground ml-2">• Total: </span>
+                <span className="font-medium">{selectedCount}</span>
+                {duplicateCount > 0 && (
+                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    {duplicateCount} duplicates
+                  </Badge>
+                )}
+                {reimbursementCount > 0 && (
+                  <Badge variant="outline" className="text-xs text-success border-success/30">
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    {reimbursementCount} refunds
+                  </Badge>
+                )}
+                <span className="text-muted-foreground ml-2">• Net: </span>
                 <span className={cn(
                   "font-mono font-medium",
-                  selectedTotal >= 0 ? "text-destructive" : "text-success"
+                  netTotal >= 0 ? "text-destructive" : "text-success"
                 )}>
-                  {formatCurrency(selectedTotal)}
+                  {formatCurrency(netTotal)}
                 </span>
               </div>
               <div className="flex gap-2">

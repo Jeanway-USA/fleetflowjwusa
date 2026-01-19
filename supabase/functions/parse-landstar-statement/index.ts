@@ -14,6 +14,7 @@ interface ExtractedExpense {
   vendor: string | null;
   gallons: number | null;
   is_discount: boolean;
+  is_reimbursement: boolean;
 }
 
 interface ParsedStatement {
@@ -79,6 +80,12 @@ EXPENSE TYPE MAPPING - Use these exact expense_type values:
 - Cell Phone → "Cell Phone"
 - Any other expenses → "Misc"
 
+REIMBURSEMENTS & CREDITS - These are REVENUE (money coming back):
+- Look for keywords: "REIMB", "REIMBURSEMENT", "REFUND", "CREDIT", "ADJUSTMENT CR", "REBATE"
+- Mark these with is_reimbursement: true
+- Use expense_type: "Reimbursement" for these items
+- The amount should be POSITIVE (it's money returned to the driver/company)
+
 TRIP NUMBER EXTRACTION:
 - Look for Trip Numbers in formats like "DLE 6065079", "EL8 1234567", etc.
 - Extract ONLY the numeric portion (e.g., "6065079" from "DLE 6065079")
@@ -88,6 +95,7 @@ TRIP NUMBER EXTRACTION:
 AMOUNT HANDLING:
 - Extract amounts as positive numbers EXCEPT for discounts/credits
 - For NATS Discounts and similar credits, make the amount NEGATIVE
+- For reimbursements, keep amount POSITIVE (they reduce total expenses)
 - Parse amounts correctly even if they have parentheses (negative) or CR suffix
 
 GALLONS:
@@ -106,12 +114,13 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
     {
       "date": "YYYY-MM-DD",
       "expense_type": "Use exact type from mapping above",
-      "amount": number (positive for expenses, negative for discounts/credits),
+      "amount": number (positive for expenses, negative for discounts/credits, positive for reimbursements),
       "trip_number": "7-digit number only (no letters) or null",
       "description": "Original description from statement",
       "vendor": "Vendor/location name if available, or null",
       "gallons": number or null (for fuel/DEF only),
-      "is_discount": true/false (true if this is a discount or credit)
+      "is_discount": true/false (true if this is a fuel discount or similar credit),
+      "is_reimbursement": true/false (true if this is a reimbursement, refund, or money returned)
     }
   ]
 }
@@ -121,6 +130,7 @@ IMPORTANT:
 - Use the exact expense_type values from the mapping
 - For Trip Numbers, extract only the numeric portion (remove 3-letter prefix)
 - Fuel discounts (like NATS) should have negative amounts and is_discount: true
+- Reimbursements (REIMB, REFUND, CREDIT, REBATE) should have positive amounts and is_reimbursement: true
 - Include the original description for reference
 - If the document has multiple pages, process all of them
 - Group related items (like fuel purchase + NATS discount) as separate line items`;
