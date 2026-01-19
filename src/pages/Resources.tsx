@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,10 @@ const AGENT_STATUSES = [
 ];
 
 export default function Resources() {
+  const { hasRole, isAdmin } = useAuth();
+  const isDriver = hasRole('driver') && !isAdmin;
+  const canEdit = !isDriver; // Drivers can only view, not edit
+  
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<any>(null);
@@ -158,13 +163,13 @@ export default function Resources() {
           <TableHead>Code</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Information</TableHead>
-          <TableHead>Actions</TableHead>
+          {canEdit && <TableHead>Actions</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
         {filteredResources.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={canEdit ? 4 : 3} className="text-center py-8 text-muted-foreground">
               No load agents found
             </TableCell>
           </TableRow>
@@ -174,16 +179,18 @@ export default function Resources() {
               <TableCell className="font-mono font-bold text-lg">{resource.agent_code}</TableCell>
               <TableCell>{renderAgentStatus(resource.agent_status)}</TableCell>
               <TableCell className="max-w-md">{resource.notes || '-'}</TableCell>
-              <TableCell>
-                <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => openDialog(resource)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(resource.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
+              {canEdit && (
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => openDialog(resource)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(resource.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              )}
             </TableRow>
           ))
         )}
@@ -199,13 +206,13 @@ export default function Resources() {
           <TableHead>Contact</TableHead>
           <TableHead>{activeTab === 'roadside' ? 'Service Area' : 'Address'}</TableHead>
           <TableHead>Notes</TableHead>
-          <TableHead>Actions</TableHead>
+          {canEdit && <TableHead>Actions</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
         {filteredResources.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={canEdit ? 5 : 4} className="text-center py-8 text-muted-foreground">
               No resources found
             </TableCell>
           </TableRow>
@@ -253,16 +260,18 @@ export default function Resources() {
                 )}
               </TableCell>
               <TableCell className="max-w-xs truncate">{resource.notes || '-'}</TableCell>
-              <TableCell>
-                <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => openDialog(resource)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(resource.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
+              {canEdit && (
+                <TableCell>
+                  <div className="flex gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => openDialog(resource)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(resource.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              )}
             </TableRow>
           ))
         )}
@@ -275,7 +284,7 @@ export default function Resources() {
       <PageHeader 
         title="Company Resources" 
         description="Searchable database of vendors, services, and load agents" 
-        action={{ label: 'Add Resource', onClick: () => openDialog() }} 
+        action={canEdit ? { label: 'Add Resource', onClick: () => openDialog() } : undefined} 
       />
 
       {/* Load Agent Scorecard Summary */}
