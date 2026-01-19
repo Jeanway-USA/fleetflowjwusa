@@ -212,19 +212,25 @@ export default function ExecutiveDashboard() {
         return acc;
       }, {});
 
-      const colors: Record<string, string> = {
-        fuel: 'hsl(45 80% 50%)',
-        truck_payment: 'hsl(200 70% 50%)',
-        insurance: 'hsl(280 70% 50%)',
-        maintenance: 'hsl(142 70% 45%)',
-        payroll: 'hsl(0 70% 50%)',
-        other: 'hsl(0 0% 50%)',
-      };
+      // Dynamic color palette for all expense types
+      const colorPalette = [
+        'hsl(45 80% 50%)',   // Gold
+        'hsl(200 70% 50%)',  // Blue
+        'hsl(280 70% 50%)',  // Purple
+        'hsl(142 70% 45%)',  // Green
+        'hsl(0 70% 50%)',    // Red
+        'hsl(30 80% 50%)',   // Orange
+        'hsl(180 60% 45%)',  // Teal
+        'hsl(320 70% 50%)',  // Pink
+        'hsl(60 70% 45%)',   // Yellow-green
+        'hsl(240 60% 55%)',  // Indigo
+      ];
 
-      return Object.entries(grouped).map(([name, value]) => ({
+      const entries = Object.entries(grouped);
+      return entries.map(([name, value], index) => ({
         name: name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
         value,
-        color: colors[name] || colors.other,
+        color: colorPalette[index % colorPalette.length],
       }));
     },
   });
