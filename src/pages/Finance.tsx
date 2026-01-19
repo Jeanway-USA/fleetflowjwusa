@@ -31,6 +31,7 @@ const expenseTypes = [
   'Fuel',
   'DEF',
   'Fuel Discount',
+  'Reimbursement',
   'Truck Payment',
   'Trailer Payment',
   'Licensing/Permits',
@@ -1049,6 +1050,12 @@ export default function Finance() {
             trucks={trucks.map((t: any) => ({
               id: t.id,
               unit_number: t.unit_number,
+            }))}
+            existingExpenses={expenses.map((e: any) => ({
+              expense_date: e.expense_date,
+              expense_type: e.expense_type,
+              amount: e.amount,
+              load_id: e.load_id,
             }))}
             onExpensesImported={() => queryClient.invalidateQueries({ queryKey: ['expenses'] })}
           />
