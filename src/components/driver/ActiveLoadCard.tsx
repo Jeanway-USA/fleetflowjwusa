@@ -105,6 +105,26 @@ function getStatusLabel(status: string): string {
   }
 }
 
+function getCondensedAddress(address: string): { full: string; short: string } {
+  const full = address;
+  const parts = address.split(',').map(p => p.trim()).filter(Boolean);
+
+  // Find a "ST 12345"-like part for state/zip
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const m = parts[i].match(/\b([A-Z]{2})\b/);
+    if (m) {
+      const state = m[1];
+      // city is usually the part right before the state/zip chunk
+      const city = i > 0 ? parts[i - 1] : '';
+      const short = city ? `${city}, ${state}` : state;
+      return { full, short };
+    }
+  }
+
+  // Fallback: use first part (often street or facility)
+  return { full, short: parts[0] || address };
+}
+
 export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: ActiveLoadCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -186,11 +206,19 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
         {/* Target Location */}
         <div className="bg-muted/50 rounded-lg p-4">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
                 {isEnRouteToDelivery ? 'Delivering To' : 'Picking Up At'}
               </p>
-              <p className="font-semibold text-lg leading-tight">{targetLocation}</p>
+              {(() => {
+                const addr = getCondensedAddress(targetLocation);
+                return (
+                  <p className="font-semibold text-lg leading-tight min-w-0">
+                    <span className="hidden md:block" title={addr.full}>{addr.full}</span>
+                    <span className="md:hidden block truncate" title={addr.full}>{addr.short}</span>
+                  </p>
+                );
+              })()}
             </div>
             <Button 
               size="sm" 
@@ -218,18 +246,34 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
 
         {/* Route Info */}
         <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-success" />
-            <div>
+          <div className="flex items-center gap-2 min-w-0">
+            <MapPin className="h-4 w-4 text-success shrink-0" />
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Origin</p>
-              <p className="font-medium truncate">{load.origin}</p>
+              {(() => {
+                const addr = getCondensedAddress(load.origin);
+                return (
+                  <p className="font-medium min-w-0">
+                    <span className="hidden md:block truncate" title={addr.full}>{addr.full}</span>
+                    <span className="md:hidden block truncate" title={addr.full}>{addr.short}</span>
+                  </p>
+                );
+              })()}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-destructive" />
-            <div>
+          <div className="flex items-center gap-2 min-w-0">
+            <MapPin className="h-4 w-4 text-destructive shrink-0" />
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Destination</p>
-              <p className="font-medium truncate">{load.destination}</p>
+              {(() => {
+                const addr = getCondensedAddress(load.destination);
+                return (
+                  <p className="font-medium min-w-0">
+                    <span className="hidden md:block truncate" title={addr.full}>{addr.full}</span>
+                    <span className="md:hidden block truncate" title={addr.full}>{addr.short}</span>
+                  </p>
+                );
+              })()}
             </div>
           </div>
         </div>
