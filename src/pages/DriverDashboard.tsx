@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { ActiveLoadCard } from '@/components/driver/ActiveLoadCard';
 import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
 import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
+import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
 import { DVIRButtons } from '@/components/driver/DVIRButtons';
 import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
 import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
@@ -195,6 +196,9 @@ export default function DriverDashboard() {
             payType={driver.pay_type} 
           />
         </div>
+
+        {/* Monthly Bonus Goal */}
+        <MonthlyBonusWidget driverId={driver.id} />
 
         {/* Maintenance Request Status */}
         <MaintenanceRequestCard 
