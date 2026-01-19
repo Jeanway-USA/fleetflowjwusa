@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.parse-rate-confirmation]
 verify_jwt = false
+
+[functions.parse-landstar-statement]
+verify_jwt = false
