@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { format, parseISO, isAfter, isBefore, isToday } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { 
   MapPin, 
   Calendar, 
@@ -300,7 +300,9 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
             {load.notes && (
               <div className="space-y-1">
                 <span className="text-sm text-muted-foreground">Special Instructions</span>
-                <p className="text-sm bg-muted p-2 rounded-md whitespace-pre-wrap">{load.notes}</p>
+                <div className="text-sm bg-muted p-2 rounded-md whitespace-pre-wrap max-h-32 overflow-y-auto">
+                  {load.notes}
+                </div>
               </div>
             )}
           </div>
@@ -353,17 +355,15 @@ export default function DriverLoadsView() {
   };
 
   // Categorize loads
-  const now = new Date();
-  
+  // Current: only in_transit and loading (actively on the road)
   const currentLoads = loads.filter((load: Load) => 
-    ['pending', 'assigned', 'loading', 'in_transit'].includes(load.status)
+    ['loading', 'in_transit'].includes(load.status)
   );
 
-  const upcomingLoads = loads.filter((load: Load) => {
-    if (!['pending', 'assigned'].includes(load.status)) return false;
-    if (!load.pickup_date) return false;
-    return isAfter(parseISO(load.pickup_date), now) && !isToday(parseISO(load.pickup_date));
-  });
+  // Upcoming: pending and assigned loads
+  const upcomingLoads = loads.filter((load: Load) => 
+    ['pending', 'assigned'].includes(load.status)
+  );
 
   const completedLoads = loads.filter((load: Load) => 
     ['delivered', 'cancelled'].includes(load.status)
