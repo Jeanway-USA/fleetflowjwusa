@@ -5,12 +5,15 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
+import { InspectionHistory } from '@/components/safety/InspectionHistory';
+import { DefectAlerts } from '@/components/safety/DefectAlerts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { Pencil, Trash2, FileText } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
@@ -143,7 +146,18 @@ export default function Maintenance() {
   return (
     <DashboardLayout>
       <PageHeader title="Maintenance" description="Track truck maintenance and repairs" action={{ label: 'Add Record', onClick: () => openDialog() }} />
+      
+      {/* Defect Alerts from Inspections */}
+      <DefectAlerts />
+      
+      {/* Maintenance Records Table */}
       <DataTable columns={columns} data={logs} loading={isLoading} emptyMessage="No maintenance records yet" />
+      
+      {/* Inspection History Section */}
+      <Separator className="my-8" />
+      <div className="mt-6">
+        <InspectionHistory showAllTrucks />
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
