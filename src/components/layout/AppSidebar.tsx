@@ -62,6 +62,7 @@ export function AppSidebar() {
   const mainNavItems: NavItem[] = [
     { title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety'] },
     { title: 'My Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['driver'] },
+    { title: 'My Settings', icon: Settings, path: '/driver-settings', roles: ['driver'] },
   ];
 
   const fleetNavItems: NavItem[] = [

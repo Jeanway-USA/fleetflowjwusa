@@ -348,6 +348,44 @@ export type Database = {
           },
         ]
       }
+      driver_settings: {
+        Row: {
+          created_at: string
+          driver_id: string
+          id: string
+          theme_preference: string | null
+          updated_at: string
+          weekly_miles_goal: number | null
+          weekly_revenue_goal: number | null
+        }
+        Insert: {
+          created_at?: string
+          driver_id: string
+          id?: string
+          theme_preference?: string | null
+          updated_at?: string
+          weekly_miles_goal?: number | null
+          weekly_revenue_goal?: number | null
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string
+          id?: string
+          theme_preference?: string | null
+          updated_at?: string
+          weekly_miles_goal?: number | null
+          weekly_revenue_goal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_settings_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drivers: {
         Row: {
           avatar_url: string | null
