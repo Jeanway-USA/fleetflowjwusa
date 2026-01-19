@@ -17,6 +17,24 @@ interface NextLoadPreviewProps {
   load: Load;
 }
 
+function getCondensedAddress(address: string): string {
+  const parts = address.split(',').map(p => p.trim()).filter(Boolean);
+
+  // Find state abbreviation pattern
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const m = parts[i].match(/\b([A-Z]{2})\b/);
+    if (m) {
+      const state = m[1];
+      // city is usually the part right before the state/zip chunk
+      const city = i > 0 ? parts[i - 1] : '';
+      return city ? `${city}, ${state}` : state;
+    }
+  }
+
+  // Fallback: use first part
+  return parts[0] || address;
+}
+
 export function NextLoadPreview({ load }: NextLoadPreviewProps) {
   return (
     <Card className="bg-muted/30 border-dashed">
@@ -30,11 +48,11 @@ export function NextLoadPreview({ load }: NextLoadPreviewProps) {
           </Badge>
         </div>
 
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm min-w-0">
           <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="truncate">{load.origin}</span>
+          <span className="truncate" title={load.origin}>{getCondensedAddress(load.origin)}</span>
           <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="truncate">{load.destination}</span>
+          <span className="truncate" title={load.destination}>{getCondensedAddress(load.destination)}</span>
         </div>
 
         <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
