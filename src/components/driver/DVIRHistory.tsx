@@ -70,17 +70,16 @@ export function DVIRHistory({ driverId }: DVIRHistoryProps) {
   };
 
   const goForward = () => {
-    const newTo = new Date(Math.min(
-      subDays(dateRange.to, -7).getTime(),
-      new Date().getTime()
-    ));
+    const today = new Date();
+    const newTo = subDays(dateRange.to, -7);
+    const clampedTo = newTo > today ? today : newTo;
     setDateRange(prev => ({
       from: subDays(prev.from, -7),
-      to: newTo,
+      to: clampedTo,
     }));
   };
 
-  const canGoForward = dateRange.to < new Date();
+  const canGoForward = endOfDay(dateRange.to) < endOfDay(new Date());
 
   return (
     <Card>
@@ -101,16 +100,19 @@ export function DVIRHistory({ driverId }: DVIRHistoryProps) {
                   {format(dateRange.from, 'MMM d')} - {format(dateRange.to, 'MMM d')}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
+              <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
                 <Calendar
                   mode="range"
                   selected={{ from: dateRange.from, to: dateRange.to }}
                   onSelect={(range) => {
                     if (range?.from && range?.to) {
                       setDateRange({ from: range.from, to: range.to });
+                    } else if (range?.from) {
+                      setDateRange({ from: range.from, to: range.from });
                     }
                   }}
                   disabled={(date) => date > new Date()}
+                  className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
