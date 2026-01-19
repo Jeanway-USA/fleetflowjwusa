@@ -56,6 +56,52 @@ function normalizeAddress(address: string): string {
   return address.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
+// Clean address by removing building/company names and keeping just street address
+// Example: "Roku Olive Branch, 8955 Hacks Cross Rd, Olive Branch, MS 38654" 
+//       -> "8955 Hacks Cross Rd, Olive Branch, MS 38654"
+function cleanAddressForGeocoding(address: string): string {
+  // Split by comma
+  const parts = address.split(',').map(p => p.trim());
+  
+  if (parts.length < 2) {
+    return address; // Not enough parts to clean
+  }
+  
+  // Check if the first part looks like a street address (starts with a number)
+  const firstPart = parts[0].trim();
+  const startsWithNumber = /^\d+/.test(firstPart);
+  
+  if (startsWithNumber) {
+    // First part is already a street address, return as-is
+    return address;
+  }
+  
+  // Check if the second part looks like a street address
+  const secondPart = parts[1]?.trim() || '';
+  const secondStartsWithNumber = /^\d+/.test(secondPart);
+  
+  if (secondStartsWithNumber) {
+    // Skip the first part (building name) and use the rest
+    return parts.slice(1).join(', ');
+  }
+  
+  // Try to find the part that starts with a street number
+  for (let i = 0; i < parts.length; i++) {
+    if (/^\d+/.test(parts[i].trim())) {
+      // Found a street address, return from here onwards
+      return parts.slice(i).join(', ');
+    }
+  }
+  
+  // Couldn't find a street number, return original but try removing first part
+  // if it doesn't look like a city/state (no state abbreviation)
+  if (parts.length > 2 && !/\b[A-Z]{2}\b/.test(firstPart)) {
+    return parts.slice(1).join(', ');
+  }
+  
+  return address;
+}
+
 // Extract city name from address for fallback lookup
 function extractCityFromAddress(address: string): string | null {
   const normalized = normalizeAddress(address);
@@ -72,7 +118,7 @@ function extractCityFromAddress(address: string): string | null {
 
 // Geocode using Nominatim API
 async function geocodeWithNominatim(address: string): Promise<Coordinates | null> {
-  // Rate limiting
+// Rate limiting
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
   if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
@@ -80,8 +126,12 @@ async function geocodeWithNominatim(address: string): Promise<Coordinates | null
   }
   lastRequestTime = Date.now();
 
+  // Clean the address to remove building names
+  const cleanedAddress = cleanAddressForGeocoding(address);
+  console.log(`Geocoding: "${address}" -> cleaned: "${cleanedAddress}"`);
+
   try {
-    const encodedAddress = encodeURIComponent(address);
+    const encodedAddress = encodeURIComponent(cleanedAddress);
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&countrycodes=us`,
       {
