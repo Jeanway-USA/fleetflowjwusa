@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,9 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { MapPin, Navigation, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Update interval in milliseconds (10 minutes)
+const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
 
 interface LocationSharingProps {
   driverId: string;
@@ -20,6 +23,9 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
   const [watchId, setWatchId] = useState<number | null>(null);
   const [currentPosition, setCurrentPosition] = useState<GeolocationPosition | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [nextUpdateIn, setNextUpdateIn] = useState<number | null>(null);
+  const lastUpdateTimeRef = useRef<number>(0);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const queryClient = useQueryClient();
 
   // Get current location status from database
@@ -62,6 +68,7 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
       return data;
     },
     onSuccess: () => {
+      lastUpdateTimeRef.current = Date.now();
       queryClient.invalidateQueries({ queryKey: ['driver-location', driverId] });
     },
     onError: (error) => {
@@ -86,11 +93,18 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
     },
   });
 
-  // Handle position updates
+  // Handle position updates with throttling (10 min interval)
   const handlePositionUpdate = useCallback((position: GeolocationPosition) => {
     setCurrentPosition(position);
     setError(null);
-    updateLocation.mutate(position);
+    
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
+    
+    // Send update if it's the first update or 10 minutes have passed
+    if (lastUpdateTimeRef.current === 0 || timeSinceLastUpdate >= UPDATE_INTERVAL_MS) {
+      updateLocation.mutate(position);
+    }
   }, [updateLocation]);
 
   // Handle position errors
@@ -143,8 +157,14 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
       navigator.geolocation.clearWatch(watchId);
       setWatchId(null);
     }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
     setIsSharing(false);
     setCurrentPosition(null);
+    setNextUpdateIn(null);
+    lastUpdateTimeRef.current = 0;
     deleteLocation.mutate();
   }, [watchId, deleteLocation]);
 
@@ -163,8 +183,28 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
       if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
       }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
     };
   }, [watchId]);
+
+  // Update countdown timer
+  useEffect(() => {
+    if (isSharing && lastUpdateTimeRef.current > 0) {
+      countdownIntervalRef.current = setInterval(() => {
+        const elapsed = Date.now() - lastUpdateTimeRef.current;
+        const remaining = Math.max(0, UPDATE_INTERVAL_MS - elapsed);
+        setNextUpdateIn(Math.ceil(remaining / 1000));
+      }, 1000);
+
+      return () => {
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+        }
+      };
+    }
+  }, [isSharing, locationData]);
 
   // Check if we had a previous session
   useEffect(() => {
@@ -251,6 +291,11 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
                     Accuracy: ±{currentPosition.coords.accuracy?.toFixed(0) || '?'}m
                   </span>
                 </div>
+                {nextUpdateIn !== null && nextUpdateIn > 0 && (
+                  <div className="text-muted-foreground/70">
+                    Next update in {Math.floor(nextUpdateIn / 60)}:{String(nextUpdateIn % 60).padStart(2, '0')}
+                  </div>
+                )}
               </div>
             )}
           </div>
