@@ -62,7 +62,6 @@ export function AppSidebar() {
   const mainNavItems: NavItem[] = [
     { title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety'] },
     { title: 'My Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['driver'] },
-    { title: 'My Settings', icon: Settings, path: '/driver-settings', roles: ['driver'] },
   ];
 
   const fleetNavItems: NavItem[] = [
@@ -152,6 +151,25 @@ export function AppSidebar() {
                     <SidebarMenuButton isActive={location.pathname === '/settings'} onClick={() => navigate('/settings')} className="hover:bg-sidebar-accent">
                       <Settings className="h-4 w-4" />
                       <span>Settings</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
+        
+        {hasRole('driver') && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-muted-foreground uppercase text-xs tracking-wider">Settings</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton isActive={location.pathname === '/driver-settings'} onClick={() => navigate('/driver-settings')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary">
+                      <Settings className="h-4 w-4" />
+                      <span>My Settings</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
