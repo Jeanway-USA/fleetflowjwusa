@@ -12,6 +12,7 @@ import { UpcomingPickups } from '@/components/dispatcher/UpcomingPickups';
 import { DriverStatusGrid } from '@/components/dispatcher/DriverStatusGrid';
 import { TruckStatusGrid } from '@/components/dispatcher/TruckStatusGrid';
 import { DispatcherAlerts } from '@/components/dispatcher/DispatcherAlerts';
+import { FleetMapView } from '@/components/dispatcher/FleetMapView';
 
 export default function DispatcherDashboard() {
   const { user, roles, hasRole } = useAuth();
@@ -121,6 +122,9 @@ export default function DispatcherDashboard() {
             </Card>
           ))}
         </div>
+
+        {/* Fleet Map View - Full Width */}
+        <FleetMapView />
 
         {/* Main Content Grid */}
         <div className="grid gap-6 lg:grid-cols-3">
