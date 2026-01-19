@@ -156,127 +156,223 @@ export default function Resources() {
     );
   };
 
-  const renderLoadAgentTable = () => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Code</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Information</TableHead>
-          {canEdit && <TableHead>Actions</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filteredResources.length === 0 ? (
-          <TableRow>
-            <TableCell colSpan={canEdit ? 4 : 3} className="text-center py-8 text-muted-foreground">
-              No load agents found
-            </TableCell>
-          </TableRow>
-        ) : (
-          filteredResources.map((resource: any) => (
-            <TableRow key={resource.id}>
-              <TableCell className="font-mono font-bold text-lg">{resource.agent_code}</TableCell>
-              <TableCell>{renderAgentStatus(resource.agent_status)}</TableCell>
-              <TableCell className="max-w-md">{resource.notes || '-'}</TableCell>
+  const renderLoadAgentCards = () => (
+    <div className="grid gap-3 p-4 sm:hidden">
+      {filteredResources.length === 0 ? (
+        <p className="text-center py-8 text-muted-foreground">No load agents found</p>
+      ) : (
+        filteredResources.map((resource: any) => (
+          <Card key={resource.id} className="p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <span className="font-mono font-bold text-xl">{resource.agent_code}</span>
+                {renderAgentStatus(resource.agent_status)}
+              </div>
               {canEdit && (
-                <TableCell>
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => openDialog(resource)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(resource.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
+                <div className="flex gap-1">
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openDialog(resource)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(resource.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               )}
+            </div>
+            {resource.notes && <p className="text-sm text-muted-foreground mt-2">{resource.notes}</p>}
+          </Card>
+        ))
+      )}
+    </div>
+  );
+
+  const renderLoadAgentTable = () => (
+    <div className="hidden sm:block">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Code</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Information</TableHead>
+            {canEdit && <TableHead>Actions</TableHead>}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredResources.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={canEdit ? 4 : 3} className="text-center py-8 text-muted-foreground">
+                No load agents found
+              </TableCell>
             </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+          ) : (
+            filteredResources.map((resource: any) => (
+              <TableRow key={resource.id}>
+                <TableCell className="font-mono font-bold text-lg">{resource.agent_code}</TableCell>
+                <TableCell>{renderAgentStatus(resource.agent_status)}</TableCell>
+                <TableCell className="max-w-md">{resource.notes || '-'}</TableCell>
+                {canEdit && (
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => openDialog(resource)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(resource.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
+  const renderResourceCards = () => (
+    <div className="grid gap-3 p-4 sm:hidden">
+      {filteredResources.length === 0 ? (
+        <p className="text-center py-8 text-muted-foreground">No resources found</p>
+      ) : (
+        filteredResources.map((resource: any) => (
+          <Card key={resource.id} className="p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-1 min-w-0 flex-1">
+                <p className="font-medium truncate">{resource.name}</p>
+                {resource.website && resource.website !== 'N/A' && (
+                  <a href={resource.website.startsWith('http') ? resource.website : `https://${resource.website}`} 
+                     target="_blank" 
+                     rel="noopener noreferrer"
+                     className="text-xs text-primary hover:underline flex items-center gap-1">
+                    <ExternalLink className="h-3 w-3" />
+                    Website
+                  </a>
+                )}
+              </div>
+              {canEdit && (
+                <div className="flex gap-1 shrink-0">
+                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openDialog(resource)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => deleteMutation.mutate(resource.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="mt-3 space-y-2 text-sm">
+              {resource.phone && (
+                <a href={`tel:${resource.phone}`} className="flex items-center gap-2 text-muted-foreground">
+                  <Phone className="h-4 w-4" />
+                  {resource.phone}
+                </a>
+              )}
+              {resource.email && resource.email !== 'N/A' && (
+                <a href={`mailto:${resource.email}`} className="flex items-center gap-2 text-muted-foreground truncate">
+                  <Mail className="h-4 w-4 shrink-0" />
+                  {resource.email}
+                </a>
+              )}
+              {activeTab === 'roadside' ? (
+                resource.service_area && <Badge variant="outline">{resource.service_area}</Badge>
+              ) : (
+                resource.address && (
+                  <p className="text-muted-foreground flex items-start gap-2">
+                    <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
+                    <span>{resource.address}</span>
+                  </p>
+                )
+              )}
+              {resource.notes && <p className="text-muted-foreground text-xs pt-1 border-t">{resource.notes}</p>}
+            </div>
+          </Card>
+        ))
+      )}
+    </div>
   );
 
   const renderResourceTable = () => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Contact</TableHead>
-          <TableHead>{activeTab === 'roadside' ? 'Service Area' : 'Address'}</TableHead>
-          <TableHead>Notes</TableHead>
-          {canEdit && <TableHead>Actions</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filteredResources.length === 0 ? (
+    <div className="hidden sm:block">
+      <Table>
+        <TableHeader>
           <TableRow>
-            <TableCell colSpan={canEdit ? 5 : 4} className="text-center py-8 text-muted-foreground">
-              No resources found
-            </TableCell>
+            <TableHead>Name</TableHead>
+            <TableHead>Contact</TableHead>
+            <TableHead>{activeTab === 'roadside' ? 'Service Area' : 'Address'}</TableHead>
+            <TableHead>Notes</TableHead>
+            {canEdit && <TableHead>Actions</TableHead>}
           </TableRow>
-        ) : (
-          filteredResources.map((resource: any) => (
-            <TableRow key={resource.id}>
-              <TableCell>
-                <div className="space-y-1">
-                  <p className="font-medium">{resource.name}</p>
-                  {resource.website && resource.website !== 'N/A' && (
-                    <a href={resource.website.startsWith('http') ? resource.website : `https://${resource.website}`} 
-                       target="_blank" 
-                       rel="noopener noreferrer"
-                       className="text-xs text-primary hover:underline flex items-center gap-1">
-                      <ExternalLink className="h-3 w-3" />
-                      Website
-                    </a>
-                  )}
-                </div>
+        </TableHeader>
+        <TableBody>
+          {filteredResources.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={canEdit ? 5 : 4} className="text-center py-8 text-muted-foreground">
+                No resources found
               </TableCell>
-              <TableCell>
-                <div className="space-y-1 text-sm">
-                  {resource.phone && (
-                    <a href={`tel:${resource.phone}`} className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
-                      <Phone className="h-3 w-3" />
-                      {resource.phone}
-                    </a>
-                  )}
-                  {resource.email && resource.email !== 'N/A' && (
-                    <a href={`mailto:${resource.email}`} className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
-                      <Mail className="h-3 w-3" />
-                      {resource.email}
-                    </a>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell>
-                {activeTab === 'roadside' ? (
-                  <Badge variant="outline">{resource.service_area}</Badge>
-                ) : (
-                  <span className="text-sm text-muted-foreground flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {resource.address || '-'}
-                  </span>
-                )}
-              </TableCell>
-              <TableCell className="max-w-xs truncate">{resource.notes || '-'}</TableCell>
-              {canEdit && (
+            </TableRow>
+          ) : (
+            filteredResources.map((resource: any) => (
+              <TableRow key={resource.id}>
                 <TableCell>
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" onClick={() => openDialog(resource)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(resource.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <div className="space-y-1">
+                    <p className="font-medium">{resource.name}</p>
+                    {resource.website && resource.website !== 'N/A' && (
+                      <a href={resource.website.startsWith('http') ? resource.website : `https://${resource.website}`} 
+                         target="_blank" 
+                         rel="noopener noreferrer"
+                         className="text-xs text-primary hover:underline flex items-center gap-1">
+                        <ExternalLink className="h-3 w-3" />
+                        Website
+                      </a>
+                    )}
                   </div>
                 </TableCell>
-              )}
-            </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+                <TableCell>
+                  <div className="space-y-1 text-sm">
+                    {resource.phone && (
+                      <a href={`tel:${resource.phone}`} className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                        <Phone className="h-3 w-3" />
+                        {resource.phone}
+                      </a>
+                    )}
+                    {resource.email && resource.email !== 'N/A' && (
+                      <a href={`mailto:${resource.email}`} className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
+                        <Mail className="h-3 w-3" />
+                        {resource.email}
+                      </a>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {activeTab === 'roadside' ? (
+                    <Badge variant="outline">{resource.service_area}</Badge>
+                  ) : (
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {resource.address || '-'}
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell className="max-w-xs truncate">{resource.notes || '-'}</TableCell>
+                {canEdit && (
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => openDialog(resource)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(resource.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 
   return (
@@ -287,45 +383,45 @@ export default function Resources() {
         action={canEdit ? { label: 'Add Resource', onClick: () => openDialog() } : undefined} 
       />
 
-      {/* Load Agent Scorecard Summary */}
+      {/* Load Agent Scorecard Summary - Compact on mobile */}
       {activeTab === 'load_agent' && (
-        <div className="grid gap-4 md:grid-cols-3 mb-6">
-          <Card className="card-elevated">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+          <Card className="card-elevated p-3 sm:p-0">
+            <CardHeader className="hidden sm:flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Total Agents</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loadAgents.length}</div>
-              <p className="text-xs text-muted-foreground">In database</p>
+            <CardContent className="p-0 sm:p-6 sm:pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-center sm:text-left">{loadAgents.length}</div>
+              <p className="text-xs text-muted-foreground text-center sm:text-left">Total</p>
             </CardContent>
           </Card>
-          <Card className="card-elevated border-success/30">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <Card className="card-elevated border-success/30 p-3 sm:p-0">
+            <CardHeader className="hidden sm:flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Safe Agents</CardTitle>
               <CheckCircle className="h-4 w-4 text-success" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-success">{safeAgents.length}</div>
-              <p className="text-xs text-muted-foreground">The good ones</p>
+            <CardContent className="p-0 sm:p-6 sm:pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-success text-center sm:text-left">{safeAgents.length}</div>
+              <p className="text-xs text-muted-foreground text-center sm:text-left">Safe</p>
             </CardContent>
           </Card>
-          <Card className="card-elevated border-destructive/30">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <Card className="card-elevated border-destructive/30 p-3 sm:p-0">
+            <CardHeader className="hidden sm:flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Unsafe Agents</CardTitle>
               <AlertTriangle className="h-4 w-4 text-destructive" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">{unsafeAgents.length}</div>
-              <p className="text-xs text-muted-foreground">The ugly ones</p>
+            <CardContent className="p-0 sm:p-6 sm:pt-0">
+              <div className="text-xl sm:text-2xl font-bold text-destructive text-center sm:text-left">{unsafeAgents.length}</div>
+              <p className="text-xs text-muted-foreground text-center sm:text-left">Unsafe</p>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Search and Tabs */}
-      <div className="flex gap-4 mb-4">
-        <div className="relative flex-1 max-w-md">
+      {/* Search */}
+      <div className="mb-4">
+        <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search resources..."
@@ -337,15 +433,15 @@ export default function Resources() {
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSearchQuery(''); }}>
-        <TabsList>
+        <TabsList className="w-full grid grid-cols-4 h-auto">
           {RESOURCE_TYPES.map(type => {
             const Icon = type.icon;
             const count = resources.filter((r: any) => r.resource_type === type.value).length;
             return (
-              <TabsTrigger key={type.value} value={type.value} className="flex items-center gap-2">
+              <TabsTrigger key={type.value} value={type.value} className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm">
                 <Icon className="h-4 w-4" />
-                {type.label}
-                <Badge variant="secondary" className="ml-1">{count}</Badge>
+                <span className="hidden sm:inline">{type.label}</span>
+                <Badge variant="secondary" className="text-[10px] sm:text-xs">{count}</Badge>
               </TabsTrigger>
             );
           })}
@@ -357,7 +453,10 @@ export default function Resources() {
               {isLoading ? (
                 <div className="p-8 text-center text-muted-foreground">Loading...</div>
               ) : (
-                renderLoadAgentTable()
+                <>
+                  {renderLoadAgentCards()}
+                  {renderLoadAgentTable()}
+                </>
               )}
             </CardContent>
           </Card>
@@ -370,7 +469,10 @@ export default function Resources() {
                 {isLoading ? (
                   <div className="p-8 text-center text-muted-foreground">Loading...</div>
                 ) : (
-                  renderResourceTable()
+                  <>
+                    {renderResourceCards()}
+                    {renderResourceTable()}
+                  </>
                 )}
               </CardContent>
             </Card>
