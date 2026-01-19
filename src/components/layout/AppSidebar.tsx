@@ -13,6 +13,7 @@ import {
   TrendingUp,
   BookOpen,
   BarChart3,
+  Crown,
   LucideIcon
 } from 'lucide-react';
 import jwBannerLight from '@/assets/JW_Banner.png';
@@ -60,6 +61,7 @@ export function AppSidebar() {
   };
 
   const mainNavItems: NavItem[] = [
+    { title: 'Executive View', icon: Crown, path: '/executive-dashboard', roles: ['owner'] },
     { title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['owner', 'payroll_admin', 'safety'] },
     { title: 'My Dashboard', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['dispatcher'] },
     { title: 'My Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['driver'] },

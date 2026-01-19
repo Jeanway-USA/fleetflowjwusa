@@ -26,6 +26,7 @@ import Safety from "./pages/Safety";
 import Settings from "./pages/Settings";
 import DriverDashboard from "./pages/DriverDashboard";
 import DispatcherDashboard from "./pages/DispatcherDashboard";
+import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import DriverSettings from "./pages/DriverSettings";
 import NotFound from "./pages/NotFound";
 
@@ -62,6 +63,7 @@ const App = () => {
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/driver-dashboard" element={<DriverDashboard />} />
                   <Route path="/dispatcher-dashboard" element={<DispatcherDashboard />} />
+                  <Route path="/executive-dashboard" element={<ExecutiveDashboard />} />
                   <Route path="/driver-settings" element={<DriverSettings />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
