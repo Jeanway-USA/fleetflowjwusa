@@ -56,50 +56,56 @@ function normalizeAddress(address: string): string {
   return address.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
-// Clean address by removing building/company names and keeping just street address
+// Extract just City, State from a full address for simpler geocoding
 // Example: "Roku Olive Branch, 8955 Hacks Cross Rd, Olive Branch, MS 38654" 
-//       -> "8955 Hacks Cross Rd, Olive Branch, MS 38654"
-function cleanAddressForGeocoding(address: string): string {
-  // Split by comma
+//       -> "Olive Branch, MS"
+function extractCityState(address: string): string {
   const parts = address.split(',').map(p => p.trim());
   
   if (parts.length < 2) {
-    return address; // Not enough parts to clean
-  }
-  
-  // Check if the first part looks like a street address (starts with a number)
-  const firstPart = parts[0].trim();
-  const startsWithNumber = /^\d+/.test(firstPart);
-  
-  if (startsWithNumber) {
-    // First part is already a street address, return as-is
     return address;
   }
   
-  // Check if the second part looks like a street address
-  const secondPart = parts[1]?.trim() || '';
-  const secondStartsWithNumber = /^\d+/.test(secondPart);
-  
-  if (secondStartsWithNumber) {
-    // Skip the first part (building name) and use the rest
-    return parts.slice(1).join(', ');
-  }
-  
-  // Try to find the part that starts with a street number
-  for (let i = 0; i < parts.length; i++) {
-    if (/^\d+/.test(parts[i].trim())) {
-      // Found a street address, return from here onwards
-      return parts.slice(i).join(', ');
+  // Look for the state abbreviation pattern (2 uppercase letters)
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const part = parts[i].trim();
+    // Match state abbreviation, possibly followed by zip code
+    const stateMatch = part.match(/^([A-Z]{2})(\s+\d{5}(-\d{4})?)?$/);
+    if (stateMatch) {
+      // State found - get the city (should be the previous part)
+      const state = stateMatch[1];
+      const city = i > 0 ? parts[i - 1].trim() : '';
+      if (city) {
+        return `${city}, ${state}`;
+      }
+      return state;
+    }
+    
+    // Also check for "City, ST 12345" format where state and zip are together
+    const cityStateMatch = part.match(/^(.+?)\s+([A-Z]{2})(\s+\d{5}(-\d{4})?)?$/);
+    if (cityStateMatch) {
+      return `${cityStateMatch[1]}, ${cityStateMatch[2]}`;
     }
   }
   
-  // Couldn't find a street number, return original but try removing first part
-  // if it doesn't look like a city/state (no state abbreviation)
-  if (parts.length > 2 && !/\b[A-Z]{2}\b/.test(firstPart)) {
-    return parts.slice(1).join(', ');
+  // Fallback: look for any 2-letter state code in the address
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const part = parts[i].trim();
+    const stateMatch = part.match(/\b([A-Z]{2})\b/);
+    if (stateMatch) {
+      const state = stateMatch[1];
+      // City is likely the part before or the beginning of this part
+      const beforeState = part.replace(stateMatch[0], '').replace(/\d+/g, '').trim();
+      const city = beforeState || (i > 0 ? parts[i - 1].trim() : '');
+      if (city && !/^\d/.test(city)) {
+        return `${city}, ${state}`;
+      }
+      return `${city || parts[0]}, ${state}`;
+    }
   }
   
-  return address;
+  // Couldn't parse - return first two parts
+  return parts.slice(0, 2).join(', ');
 }
 
 // Extract city name from address for fallback lookup
@@ -126,12 +132,12 @@ async function geocodeWithNominatim(address: string): Promise<Coordinates | null
   }
   lastRequestTime = Date.now();
 
-  // Clean the address to remove building names
-  const cleanedAddress = cleanAddressForGeocoding(address);
-  console.log(`Geocoding: "${address}" -> cleaned: "${cleanedAddress}"`);
+  // Extract just City, State for simpler geocoding
+  const cityState = extractCityState(address);
+  console.log(`Geocoding: "${address}" -> simplified: "${cityState}"`);
 
   try {
-    const encodedAddress = encodeURIComponent(cleanedAddress);
+    const encodedAddress = encodeURIComponent(cityState);
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&countrycodes=us`,
       {
