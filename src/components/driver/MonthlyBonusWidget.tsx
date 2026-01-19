@@ -12,7 +12,7 @@ interface MonthlyBonusWidgetProps {
   driverId: string;
 }
 
-const TARGET = 24000;
+const TARGET_MILES = 12000;
 
 export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
   const hasTriggeredConfetti = useRef(false);
@@ -21,12 +21,12 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
   const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd');
   const currentMonth = format(now, 'MMMM yyyy');
 
-  const { data: monthlyRevenue = 0, isLoading } = useQuery({
-    queryKey: ['driver-monthly-revenue', driverId, monthStart],
+  const { data: monthlyMiles = 0, isLoading } = useQuery({
+    queryKey: ['driver-monthly-miles', driverId, monthStart],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fleet_loads')
-        .select('gross_revenue')
+        .select('actual_miles, booked_miles')
         .eq('driver_id', driverId)
         .eq('status', 'delivered')
         .gte('delivery_date', monthStart)
@@ -34,13 +34,14 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
 
       if (error) throw error;
 
-      return data?.reduce((sum, load) => sum + (load.gross_revenue || 0), 0) || 0;
+      // Use actual_miles if available, otherwise fall back to booked_miles
+      return data?.reduce((sum, load) => sum + (load.actual_miles || load.booked_miles || 0), 0) || 0;
     },
     enabled: !!driverId,
   });
 
-  const percentage = Math.min((monthlyRevenue / TARGET) * 100, 100);
-  const actualPercentage = (monthlyRevenue / TARGET) * 100;
+  const percentage = Math.min((monthlyMiles / TARGET_MILES) * 100, 100);
+  const actualPercentage = (monthlyMiles / TARGET_MILES) * 100;
   const bonusUnlocked = actualPercentage >= 100;
 
   // Trigger confetti when bonus is unlocked
@@ -89,13 +90,8 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
     badgeVariant = 'secondary';
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const formatMiles = (miles: number) => {
+    return new Intl.NumberFormat('en-US').format(Math.round(miles));
   };
 
   return (
@@ -112,13 +108,13 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Hit {formatCurrency(TARGET)} in deliveries this month to unlock a{' '}
-          <span className="font-semibold text-primary">$0.05/mile bonus</span> on every load!
+          Drive {formatMiles(TARGET_MILES)} miles this month to unlock a{' '}
+          <span className="font-semibold text-primary">$0.05/mile bonus</span> — every mile counts!
         </p>
 
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium">
-            {isLoading ? '...' : formatCurrency(monthlyRevenue)} / {formatCurrency(TARGET)}
+            {isLoading ? '...' : formatMiles(monthlyMiles)} / {formatMiles(TARGET_MILES)} mi
           </span>
           <Badge variant={badgeVariant} className={bonusUnlocked ? 'bg-green-500 text-white animate-pulse' : ''}>
             {label}
