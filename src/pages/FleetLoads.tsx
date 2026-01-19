@@ -315,6 +315,30 @@ export default function FleetLoads() {
     return format(parseISO(date), 'MM/dd/yyyy');
   };
 
+  // Format address for display - condense for mobile
+  const formatAddressDisplay = (address: string | null) => {
+    if (!address) return '-';
+    
+    const parts = address.split(',').map(p => p.trim());
+    
+    // Extract city and state from address
+    // Look for state abbreviation pattern (2 uppercase letters followed by space and zip or end)
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const part = parts[i].trim();
+      const stateMatch = part.match(/\b([A-Z]{2})\s*(\d{5})?/);
+      if (stateMatch) {
+        // Found state, get the city (usually the part before or the previous part)
+        const stateWithZip = stateMatch[0];
+        const beforeState = part.replace(stateWithZip, '').trim();
+        const city = beforeState || (i > 0 ? parts[i - 1].trim() : '');
+        return { city, state: stateMatch[1], full: address };
+      }
+    }
+    
+    // Fallback: just return first meaningful part
+    return { city: parts[0], state: '', full: address };
+  };
+
   // Filter loads by month
   const filteredLoads = selectedMonth === 'all' 
     ? loads 
@@ -544,8 +568,28 @@ export default function FleetLoads() {
                       <TableCell>{formatDate(load.pickup_date)}</TableCell>
                       <TableCell className="font-mono">{load.landstar_load_id || '-'}</TableCell>
                       <TableCell className="font-mono text-xs">{load.agency_code || '-'}</TableCell>
-                      <TableCell>{load.origin}</TableCell>
-                      <TableCell>{load.destination}</TableCell>
+                      <TableCell className="max-w-[120px] md:max-w-[200px]">
+                        {(() => {
+                          const addr = formatAddressDisplay(load.origin);
+                          return typeof addr === 'string' ? addr : (
+                            <div className="truncate" title={addr.full}>
+                              <span className="hidden md:inline">{addr.full}</span>
+                              <span className="md:hidden">{addr.city}{addr.state ? `, ${addr.state}` : ''}</span>
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell className="max-w-[120px] md:max-w-[200px]">
+                        {(() => {
+                          const addr = formatAddressDisplay(load.destination);
+                          return typeof addr === 'string' ? addr : (
+                            <div className="truncate" title={addr.full}>
+                              <span className="hidden md:inline">{addr.full}</span>
+                              <span className="md:hidden">{addr.city}{addr.state ? `, ${addr.state}` : ''}</span>
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell className="text-right">{formatCurrency(load.rate)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(load.fuel_surcharge)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(getLoadAccessorialsTotal(load.id))}</TableCell>
