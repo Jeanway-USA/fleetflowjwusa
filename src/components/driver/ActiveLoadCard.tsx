@@ -28,8 +28,8 @@ interface ActiveLoadCardProps {
   onStatusUpdate?: () => void;
 }
 
-// Status progression order
-const STATUS_PROGRESSION = ['pending', 'assigned', 'loading', 'in_transit', 'delivered'] as const;
+// Status progression order (matching database constraint: assigned, in_transit, delivered)
+const STATUS_PROGRESSION = ['assigned', 'in_transit', 'delivered'] as const;
 
 function getNextStatus(currentStatus: string): string | null {
   const currentIndex = STATUS_PROGRESSION.indexOf(currentStatus as typeof STATUS_PROGRESSION[number]);
@@ -41,11 +41,7 @@ function getNextStatus(currentStatus: string): string | null {
 
 function getProgressButtonLabel(currentStatus: string): string {
   switch (currentStatus) {
-    case 'pending':
-      return 'Mark Assigned';
     case 'assigned':
-      return 'Arrived at Pickup';
-    case 'loading':
       return 'Depart for Delivery';
     case 'in_transit':
       return 'Mark Delivered';
