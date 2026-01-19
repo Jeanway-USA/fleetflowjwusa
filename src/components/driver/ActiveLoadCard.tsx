@@ -13,7 +13,9 @@ interface Load {
   origin: string;
   destination: string;
   pickup_date: string | null;
+  pickup_time: string | null;
   delivery_date: string | null;
+  delivery_time: string | null;
   status: string;
   rate: number | null;
   booked_miles: number | null;
@@ -376,7 +378,8 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
               {load.pickup_date && (
                 <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  Pickup: {format(parseISO(load.pickup_date), 'EEE, MMM d, yyyy h:mm a')}
+                  Pickup: {format(parseISO(load.pickup_date), 'EEE, MMM d, yyyy')}
+                  {load.pickup_time && <span className="font-medium text-foreground ml-1">@ {load.pickup_time}</span>}
                 </p>
               )}
             </div>
@@ -391,7 +394,8 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
               {load.delivery_date && (
                 <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  Delivery: {format(parseISO(load.delivery_date), 'EEE, MMM d, yyyy h:mm a')}
+                  Delivery: {format(parseISO(load.delivery_date), 'EEE, MMM d, yyyy')}
+                  {load.delivery_time && <span className="font-medium text-foreground ml-1">@ {load.delivery_time}</span>}
                 </p>
               )}
             </div>

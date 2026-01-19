@@ -399,7 +399,9 @@ export default function FleetLoads() {
           origin: data.origin || existingLoad.origin || '',
           destination: data.destination || existingLoad.destination || '',
           pickup_date: data.pickup_date || existingLoad.pickup_date || '',
+          pickup_time: data.pickup_time || existingLoad.pickup_time || '',
           delivery_date: data.delivery_date || existingLoad.delivery_date || '',
+          delivery_time: data.delivery_time || existingLoad.delivery_time || '',
           booked_miles: data.booked_miles || existingLoad.booked_miles || 0,
           rate: data.rate || existingLoad.rate || 0,
           fuel_surcharge: data.fuel_surcharge || existingLoad.fuel_surcharge || 0,
@@ -432,7 +434,9 @@ export default function FleetLoads() {
       origin: data.origin || '',
       destination: data.destination || '',
       pickup_date: data.pickup_date || '',
+      pickup_time: data.pickup_time || '',
       delivery_date: data.delivery_date || '',
+      delivery_time: data.delivery_time || '',
       booked_miles: data.booked_miles || 0,
       rate: data.rate || 0,
       fuel_surcharge: data.fuel_surcharge || 0,
@@ -721,7 +725,7 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="pickup_date">Pickup Date</Label>
                     <Input 
@@ -732,12 +736,32 @@ export default function FleetLoads() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="pickup_time">Pickup Time</Label>
+                    <Input 
+                      id="pickup_time" 
+                      type="text" 
+                      value={formData.pickup_time || ''} 
+                      onChange={(e) => setFormData({ ...formData, pickup_time: e.target.value })} 
+                      placeholder="8:00 AM"
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="delivery_date">Delivery Date</Label>
                     <Input 
                       id="delivery_date" 
                       type="date" 
                       value={formData.delivery_date || ''} 
                       onChange={(e) => setFormData({ ...formData, delivery_date: e.target.value })} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="delivery_time">Delivery Time</Label>
+                    <Input 
+                      id="delivery_time" 
+                      type="text" 
+                      value={formData.delivery_time || ''} 
+                      onChange={(e) => setFormData({ ...formData, delivery_time: e.target.value })} 
+                      placeholder="2:00 PM"
                     />
                   </div>
                 </div>

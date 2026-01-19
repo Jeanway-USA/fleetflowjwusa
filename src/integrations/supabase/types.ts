@@ -589,6 +589,7 @@ export type Database = {
           booked_miles: number | null
           created_at: string
           delivery_date: string | null
+          delivery_time: string | null
           destination: string
           detention_pay: number | null
           driver_id: string | null
@@ -604,6 +605,7 @@ export type Database = {
           notes: string | null
           origin: string
           pickup_date: string | null
+          pickup_time: string | null
           rate: number | null
           settlement: number | null
           start_miles: number | null
@@ -622,6 +624,7 @@ export type Database = {
           booked_miles?: number | null
           created_at?: string
           delivery_date?: string | null
+          delivery_time?: string | null
           destination: string
           detention_pay?: number | null
           driver_id?: string | null
@@ -637,6 +640,7 @@ export type Database = {
           notes?: string | null
           origin: string
           pickup_date?: string | null
+          pickup_time?: string | null
           rate?: number | null
           settlement?: number | null
           start_miles?: number | null
@@ -655,6 +659,7 @@ export type Database = {
           booked_miles?: number | null
           created_at?: string
           delivery_date?: string | null
+          delivery_time?: string | null
           destination?: string
           detention_pay?: number | null
           driver_id?: string | null
@@ -670,6 +675,7 @@ export type Database = {
           notes?: string | null
           origin?: string
           pickup_date?: string | null
+          pickup_time?: string | null
           rate?: number | null
           settlement?: number | null
           start_miles?: number | null

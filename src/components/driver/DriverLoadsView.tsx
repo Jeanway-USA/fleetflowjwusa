@@ -101,7 +101,9 @@ interface Load {
   origin: string;
   destination: string;
   pickup_date: string | null;
+  pickup_time: string | null;
   delivery_date: string | null;
+  delivery_time: string | null;
   status: string;
   booked_miles: number | null;
   rate: number | null;
@@ -176,10 +178,13 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
             <span className="font-medium">{getCondensedAddress(load.destination)}</span>
           </div>
 
-          {/* Pickup Date */}
+          {/* Pickup Date & Time */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4 shrink-0" />
-            <span>Pickup: {formatDate(load.pickup_date)}</span>
+            <span>
+              Pickup: {formatDate(load.pickup_date)}
+              {load.pickup_time && <span className="ml-1 text-foreground font-medium">@ {load.pickup_time}</span>}
+            </span>
           </div>
 
           {/* Miles and Estimated Pay */}
@@ -264,19 +269,25 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
               <p className="text-sm font-medium">{load.destination}</p>
             </div>
 
-            {/* Dates */}
+            {/* Dates & Times */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3" /> Pickup Date
+                  <Calendar className="h-3 w-3" /> Pickup
                 </span>
                 <p className="text-sm font-medium">{formatDate(load.pickup_date)}</p>
+                {load.pickup_time && (
+                  <p className="text-xs text-primary font-medium">{load.pickup_time}</p>
+                )}
               </div>
               <div className="space-y-1">
                 <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Calendar className="h-3 w-3" /> Delivery Date
+                  <Calendar className="h-3 w-3" /> Delivery
                 </span>
                 <p className="text-sm font-medium">{formatDate(load.delivery_date)}</p>
+                {load.delivery_time && (
+                  <p className="text-xs text-primary font-medium">{load.delivery_time}</p>
+                )}
               </div>
             </div>
 
