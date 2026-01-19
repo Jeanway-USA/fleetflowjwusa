@@ -62,6 +62,56 @@ const cityCoordinates: Record<string, Coordinates> = {
   'san francisco': { lat: 37.7749, lng: -122.4194 },
   'laredo': { lat: 27.5036, lng: -99.5075 },
   'mcallen': { lat: 26.2034, lng: -98.2300 },
+  // Texas cities
+  'lancaster': { lat: 32.5921, lng: -96.7561 },
+  'arlington': { lat: 32.7357, lng: -97.1081 },
+  'plano': { lat: 33.0198, lng: -96.6989 },
+  'irving': { lat: 32.8140, lng: -96.9489 },
+  'garland': { lat: 32.9126, lng: -96.6389 },
+  'grand prairie': { lat: 32.7459, lng: -96.9978 },
+  'mesquite': { lat: 32.7668, lng: -96.5992 },
+  'frisco': { lat: 33.1507, lng: -96.8236 },
+  'mckinney': { lat: 33.1972, lng: -96.6397 },
+  'denton': { lat: 33.2148, lng: -97.1331 },
+  'waco': { lat: 31.5493, lng: -97.1467 },
+  'corpus christi': { lat: 27.8006, lng: -97.3964 },
+  'brownsville': { lat: 25.9017, lng: -97.4975 },
+  'lubbock': { lat: 33.5779, lng: -101.8552 },
+  'amarillo': { lat: 35.2220, lng: -101.8313 },
+  'midland': { lat: 31.9973, lng: -102.0779 },
+  'odessa': { lat: 31.8457, lng: -102.3676 },
+  // Mississippi cities
+  'olive branch': { lat: 34.9618, lng: -89.8295 },
+  'jackson': { lat: 32.2988, lng: -90.1848 },
+  'gulfport': { lat: 30.3674, lng: -89.0928 },
+  'southaven': { lat: 34.9889, lng: -90.0126 },
+  'hattiesburg': { lat: 31.3271, lng: -89.2903 },
+  'biloxi': { lat: 30.3960, lng: -88.8853 },
+  'tupelo': { lat: 34.2576, lng: -88.7034 },
+  'greenville': { lat: 33.4101, lng: -91.0618 },
+  'horn lake': { lat: 34.9554, lng: -90.0348 },
+  // Tennessee cities
+  'chattanooga': { lat: 35.0456, lng: -85.3097 },
+  'knoxville': { lat: 35.9606, lng: -83.9207 },
+  'clarksville': { lat: 36.5298, lng: -87.3595 },
+  'murfreesboro': { lat: 35.8456, lng: -86.3903 },
+  // Arkansas cities
+  'little rock': { lat: 34.7465, lng: -92.2896 },
+  'fayetteville': { lat: 36.0822, lng: -94.1719 },
+  'fort smith': { lat: 35.3859, lng: -94.3985 },
+  // Louisiana cities
+  'baton rouge': { lat: 30.4515, lng: -91.1871 },
+  'shreveport': { lat: 32.5252, lng: -93.7502 },
+  'lafayette': { lat: 30.2241, lng: -92.0198 },
+  'lake charles': { lat: 30.2266, lng: -93.2174 },
+  // Alabama cities
+  'montgomery': { lat: 32.3792, lng: -86.3077 },
+  'mobile': { lat: 30.6954, lng: -88.0399 },
+  'huntsville': { lat: 34.7304, lng: -86.5861 },
+  // Georgia cities
+  'savannah': { lat: 32.0809, lng: -81.0912 },
+  'augusta': { lat: 33.4735, lng: -81.9748 },
+  'macon': { lat: 32.8407, lng: -83.6324 },
   // States for partial matches
   'tx': { lat: 31.9686, lng: -99.9018 },
   'ca': { lat: 36.7783, lng: -119.4179 },
@@ -73,6 +123,30 @@ const cityCoordinates: Record<string, Coordinates> = {
   'ga': { lat: 32.1656, lng: -82.9001 },
   'nc': { lat: 35.7596, lng: -79.0193 },
   'mi': { lat: 44.3148, lng: -85.6024 },
+  'ms': { lat: 32.3547, lng: -89.3985 },
+  'tn': { lat: 35.5175, lng: -86.5804 },
+  'ar': { lat: 35.2010, lng: -91.8318 },
+  'la': { lat: 30.9843, lng: -91.9623 },
+  'al': { lat: 32.3182, lng: -86.9023 },
+  'az': { lat: 34.0489, lng: -111.0937 },
+  'nv': { lat: 38.8026, lng: -116.4194 },
+  'co': { lat: 39.5501, lng: -105.7821 },
+  'or': { lat: 43.8041, lng: -120.5542 },
+  'wa': { lat: 47.7511, lng: -120.7401 },
+  'mo': { lat: 37.9643, lng: -91.8318 },
+  'md': { lat: 39.0458, lng: -76.6413 },
+  'wi': { lat: 43.7844, lng: -88.7879 },
+  'mn': { lat: 46.7296, lng: -94.6859 },
+  'ky': { lat: 37.8393, lng: -84.2700 },
+  'ok': { lat: 35.0078, lng: -97.0929 },
+  'ut': { lat: 39.3210, lng: -111.0937 },
+  'nm': { lat: 34.5199, lng: -105.8701 },
+  'sc': { lat: 33.8361, lng: -81.1637 },
+  'va': { lat: 37.4316, lng: -78.6569 },
+  'in': { lat: 40.2672, lng: -86.1349 },
+  'ma': { lat: 42.4072, lng: -71.3824 },
+  'ct': { lat: 41.6032, lng: -73.0877 },
+  'nj': { lat: 40.0583, lng: -74.4057 },
 };
 
 // Extract city name from location string (e.g., "Houston, TX" -> "houston")
@@ -102,24 +176,18 @@ export function geocodeLocation(location: string): Coordinates | null {
     }
   }
   
-  // Try to match state abbreviation
-  const stateMatch = location.match(/,?\s*(tx|ca|ny|fl|il|pa|oh|ga|nc|mi|wa|az|nv|co|or|tn|mo|md|wi|mn|la|ky|ok|ut|nm|al|sc|va|in|ma|ct|nj)$/i);
+  // Try to match state abbreviation - return state center (no random offset for consistency)
+  const stateMatch = location.match(/,?\s*(tx|ca|ny|fl|il|pa|oh|ga|nc|mi|wa|az|nv|co|or|tn|mo|md|wi|mn|la|ky|ok|ut|nm|al|sc|va|in|ma|ct|nj|ms|ar)$/i);
   if (stateMatch) {
     const state = stateMatch[1].toLowerCase();
     if (cityCoordinates[state]) {
-      // Add some random offset to prevent overlapping
-      return {
-        lat: cityCoordinates[state].lat + (Math.random() - 0.5) * 2,
-        lng: cityCoordinates[state].lng + (Math.random() - 0.5) * 2,
-      };
+      return cityCoordinates[state];
     }
   }
   
-  // Default to center of continental US with random offset
-  return {
-    lat: 39.8283 + (Math.random() - 0.5) * 10,
-    lng: -98.5795 + (Math.random() - 0.5) * 20,
-  };
+  // Return null if we can't find the location - better than showing wrong position
+  console.warn(`Could not geocode location: ${location}`);
+  return null;
 }
 
 // Calculate position along route based on progress (0-1)
