@@ -33,7 +33,7 @@ export default function DriverDashboard() {
   });
 
   // Get active loads for this driver
-  const { data: activeLoads = [], isLoading: loadsLoading } = useQuery({
+  const { data: activeLoads = [], isLoading: loadsLoading, refetch: refetchLoads } = useQuery({
     queryKey: ['driver-active-loads', driver?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -153,7 +153,8 @@ export default function DriverDashboard() {
         <ActiveLoadCard 
           load={activeLoad} 
           payRate={driver.pay_rate} 
-          payType={driver.pay_type} 
+          payType={driver.pay_type}
+          onStatusUpdate={refetchLoads}
         />
 
         {/* Next Load Preview */}

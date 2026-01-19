@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Clock, Truck, DollarSign, Navigation, Package } from 'lucide-react';
+import { MapPin, Clock, Truck, Navigation, Package, CheckCircle, Loader2 } from 'lucide-react';
 import { format, differenceInHours, differenceInMinutes, parseISO } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Load {
   id: string;
@@ -22,6 +25,33 @@ interface ActiveLoadCardProps {
   load: Load | undefined;
   payRate: number | null;
   payType: string | null;
+  onStatusUpdate?: () => void;
+}
+
+// Status progression order
+const STATUS_PROGRESSION = ['pending', 'assigned', 'loading', 'in_transit', 'delivered'] as const;
+
+function getNextStatus(currentStatus: string): string | null {
+  const currentIndex = STATUS_PROGRESSION.indexOf(currentStatus as typeof STATUS_PROGRESSION[number]);
+  if (currentIndex === -1 || currentIndex >= STATUS_PROGRESSION.length - 1) {
+    return null; // Already delivered or unknown status
+  }
+  return STATUS_PROGRESSION[currentIndex + 1];
+}
+
+function getProgressButtonLabel(currentStatus: string): string {
+  switch (currentStatus) {
+    case 'pending':
+      return 'Mark Assigned';
+    case 'assigned':
+      return 'Arrived at Pickup';
+    case 'loading':
+      return 'Depart for Delivery';
+    case 'in_transit':
+      return 'Mark Delivered';
+    default:
+      return 'Update Status';
+  }
 }
 
 function getStatusColor(status: string): string {
@@ -75,7 +105,9 @@ function getStatusLabel(status: string): string {
   }
 }
 
-export function ActiveLoadCard({ load, payRate, payType }: ActiveLoadCardProps) {
+export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: ActiveLoadCardProps) {
+  const [isUpdating, setIsUpdating] = useState(false);
+
   if (!load) {
     return (
       <Card className="border-2 border-dashed border-muted">
@@ -94,6 +126,8 @@ export function ActiveLoadCard({ load, payRate, payType }: ActiveLoadCardProps) 
   const targetDate = isEnRouteToDelivery ? load.delivery_date : load.pickup_date;
   const targetLocation = isEnRouteToDelivery ? load.destination : load.origin;
   const timeStatus = getTimeStatus(targetDate);
+  const nextStatus = getNextStatus(load.status);
+  const isDelivered = load.status === 'delivered';
 
   // Calculate estimated pay
   const accessorialsTotal = load.load_accessorials?.reduce((sum, a) => sum + (a.amount || 0), 0) || 0;
@@ -107,6 +141,28 @@ export function ActiveLoadCard({ load, payRate, payType }: ActiveLoadCardProps) 
   const handleNavigate = () => {
     const encodedAddress = encodeURIComponent(targetLocation);
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, '_blank');
+  };
+
+  const handleProgressStatus = async () => {
+    if (!nextStatus) return;
+    
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase
+        .from('fleet_loads')
+        .update({ status: nextStatus })
+        .eq('id', load.id);
+
+      if (error) throw error;
+
+      toast.success(`Load status updated to ${nextStatus.replace('_', ' ')}`);
+      onStatusUpdate?.();
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error('Failed to update load status');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   return (
@@ -199,6 +255,35 @@ export function ActiveLoadCard({ load, payRate, payType }: ActiveLoadCardProps) 
               Special Instructions
             </p>
             <p className="text-sm">{load.notes}</p>
+          </div>
+        )}
+
+        {/* Status Progression Button */}
+        {!isDelivered && nextStatus && (
+          <Button
+            onClick={handleProgressStatus}
+            disabled={isUpdating}
+            className="w-full bg-primary hover:bg-primary/90"
+            size="lg"
+          >
+            {isUpdating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Updating...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                {getProgressButtonLabel(load.status)}
+              </>
+            )}
+          </Button>
+        )}
+
+        {isDelivered && (
+          <div className="bg-success/10 border border-success/30 rounded-lg p-3 text-center">
+            <CheckCircle className="h-5 w-5 text-success mx-auto mb-1" />
+            <p className="text-sm font-medium text-success">Load Delivered</p>
           </div>
         )}
       </CardContent>
