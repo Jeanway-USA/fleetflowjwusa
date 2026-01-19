@@ -23,7 +23,7 @@ export function DVIRButtons({ driverId, truckId, hasPreTrip, hasPostTrip }: DVIR
         <DialogTrigger asChild>
           <Button 
             variant={hasPreTrip ? 'secondary' : 'default'}
-            className="h-16 flex-col gap-1"
+            className="h-16 flex-col gap-1 flex-1 w-full"
             disabled={!truckId}
           >
             {hasPreTrip ? (
@@ -51,7 +51,7 @@ export function DVIRButtons({ driverId, truckId, hasPreTrip, hasPostTrip }: DVIR
         <DialogTrigger asChild>
           <Button 
             variant={hasPostTrip ? 'secondary' : 'outline'}
-            className="h-16 flex-col gap-1"
+            className="h-16 flex-col gap-1 flex-1 w-full"
             disabled={!truckId}
           >
             {hasPostTrip ? (

@@ -73,10 +73,26 @@ function getStatusColor(status: string): string {
   }
 }
 
-function getTimeStatus(dateStr: string | null): { color: string; label: string } {
+function getTimeStatus(dateStr: string | null, timeStr: string | null): { color: string; label: string } {
   if (!dateStr) return { color: 'text-muted-foreground', label: 'TBD' };
   
-  const date = parseISO(dateStr);
+  // Combine date and time if available
+  let date = parseISO(dateStr);
+  if (timeStr) {
+    // Parse time string (e.g., "08:00 AM", "14:00", "8:00")
+    const timeParts = timeStr.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)?/i);
+    if (timeParts) {
+      let hours = parseInt(timeParts[1]);
+      const minutes = timeParts[2] ? parseInt(timeParts[2]) : 0;
+      const meridiem = timeParts[3]?.toUpperCase();
+      
+      if (meridiem === 'PM' && hours !== 12) hours += 12;
+      if (meridiem === 'AM' && hours === 12) hours = 0;
+      
+      date.setHours(hours, minutes, 0, 0);
+    }
+  }
+  
   const now = new Date();
   const hoursUntil = differenceInHours(date, now);
   const minutesUntil = differenceInMinutes(date, now);
@@ -148,8 +164,9 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
 
   const isEnRouteToDelivery = load.status === 'in_transit';
   const targetDate = isEnRouteToDelivery ? load.delivery_date : load.pickup_date;
+  const targetTime = isEnRouteToDelivery ? load.delivery_time : load.pickup_time;
   const targetLocation = isEnRouteToDelivery ? load.destination : load.origin;
-  const timeStatus = getTimeStatus(targetDate);
+  const timeStatus = getTimeStatus(targetDate, targetTime);
   const nextStatus = getNextStatus(load.status);
   const isDelivered = load.status === 'delivered';
 
@@ -239,7 +256,8 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">
-                Appointment: {format(parseISO(targetDate), 'MMM d, h:mm a')}
+                Appointment: {format(parseISO(targetDate), 'EEE, MMM d')}
+                {targetTime && <span className="font-medium"> @ {targetTime}</span>}
               </span>
               <Badge variant="secondary" className={`ml-auto ${timeStatus.color}`}>
                 {timeStatus.label}
