@@ -259,13 +259,37 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       return;
     }
 
+    // Filter out expenses without valid dates
+    const validExpenses = toImport.filter(exp => {
+      if (!exp.date || exp.date.trim() === '') {
+        console.warn('Skipping expense without date:', exp);
+        return false;
+      }
+      // Validate date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(exp.date)) {
+        console.warn('Skipping expense with invalid date format:', exp);
+        return false;
+      }
+      return true;
+    });
+
+    if (validExpenses.length === 0) {
+      toast.error('No expenses with valid dates to import');
+      return;
+    }
+
+    if (validExpenses.length < toImport.length) {
+      toast.warning(`Skipping ${toImport.length - validExpenses.length} expenses without valid dates`);
+    }
+
     setIsImporting(true);
 
     try {
-      const expenseInserts = toImport.map(exp => ({
+      const expenseInserts = validExpenses.map(exp => ({
         expense_date: exp.date,
         expense_type: exp.is_reimbursement ? 'Reimbursement' : exp.expense_type,
-        // Store as positive, reimbursements will be handled as negative in display/calculations
+        // Store reimbursements as negative to decrease total expenses
         amount: exp.is_reimbursement ? -Math.abs(exp.amount) : Math.abs(exp.amount),
         description: exp.description,
         vendor: exp.vendor,
@@ -279,7 +303,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
 
       if (error) throw error;
 
-      toast.success(`Successfully imported ${toImport.length} expenses`);
+      toast.success(`Successfully imported ${validExpenses.length} expenses`);
       handleCancel();
       onExpensesImported();
     } catch (err) {
