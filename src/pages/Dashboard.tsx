@@ -50,6 +50,12 @@ export default function Dashboard() {
     return <Navigate to="/driver-dashboard" replace />;
   }
 
+  // Auto-redirect dispatchers who only have the dispatcher role to dispatcher dashboard
+  const isDispatcherOnly = roles.length === 1 && roles[0] === 'dispatcher';
+  if (isDispatcherOnly) {
+    return <Navigate to="/dispatcher-dashboard" replace />;
+  }
+
   // Calculate stats
   const activeTrucks = trucks?.filter(t => t.status === 'active').length || 0;
   const totalTrucks = trucks?.length || 0;
