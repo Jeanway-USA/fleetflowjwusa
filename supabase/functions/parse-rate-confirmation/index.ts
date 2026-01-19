@@ -20,7 +20,9 @@ interface ExtractedLoadData {
   origin: string | null;
   destination: string | null;
   pickup_date: string | null;
+  pickup_time: string | null;
   delivery_date: string | null;
+  delivery_time: string | null;
   booked_miles: number | null;
   rate: number | null;
   fuel_surcharge: number | null;
@@ -80,7 +82,8 @@ CRITICAL INSTRUCTIONS:
 
 4. Dates should be in YYYY-MM-DD format.
 5. Look for "Agency Name" for the agency code (last 3 letters like LTL or BLR).
-6. For accessorials, extract any charges that aren't the base Line Haul or Fuel Surcharge (like Stop Of, Detention, etc.).`;
+6. For accessorials, extract any charges that aren't the base Line Haul or Fuel Surcharge (like Stop Of, Detention, etc.).
+7. For TIMES: Extract pickup and delivery appointment times in 12-hour format (e.g., "8:00 AM", "2:30 PM"). Look for times next to or below dates in the stop information section.`;
 
     const userPrompt = `Analyze this Landstar BCO Load Detail PDF document and extract the load information.
 
@@ -91,7 +94,9 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
   "origin": "FULL address of first pickup stop including street, city, state, ZIP (e.g., '1234 Industrial Blvd, Lewisville, TX 75057')",
   "destination": "FULL address of final delivery stop including street, city, state, ZIP (e.g., '5678 Commerce Dr, Evans, CO 80620')",
   "pickup_date": "First pickup date in YYYY-MM-DD format",
-  "delivery_date": "Final delivery date in YYYY-MM-DD format", 
+  "pickup_time": "Pickup appointment time in 12-hour format (e.g., '8:00 AM', '2:30 PM') or null if not specified",
+  "delivery_date": "Final delivery date in YYYY-MM-DD format",
+  "delivery_time": "Delivery appointment time in 12-hour format (e.g., '10:00 AM', '4:00 PM') or null if not specified",
   "booked_miles": Total Distance in miles as a number,
   "rate": Line Haul amount as a number (no $ or commas),
   "fuel_surcharge": Fuel Surcharge total amount as a number,
@@ -124,7 +129,8 @@ IMPORTANT:
 - Extract the ACTUAL data from this specific PDF document. Do not use example data.
 - For origin and destination, always try to extract the FULL address with street, city, state, and ZIP.
 - If there are stops between the first and last stop, include them in intermediate_stops array.
-- If this is a simple 2-stop load (origin to destination), leave intermediate_stops as an empty array [].`;
+- If this is a simple 2-stop load (origin to destination), leave intermediate_stops as an empty array [].
+- Extract pickup_time and delivery_time from the stop information - they may appear next to or below the dates.`;
 
     // Call Gemini with the PDF as a document
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

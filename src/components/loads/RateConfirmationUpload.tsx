@@ -21,7 +21,9 @@ interface ExtractedLoadData {
   origin: string | null;
   destination: string | null;
   pickup_date: string | null;
+  pickup_time: string | null;
   delivery_date: string | null;
+  delivery_time: string | null;
   booked_miles: number | null;
   rate: number | null;
   fuel_surcharge: number | null;
@@ -373,10 +375,16 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
               <div>
                 <p className="text-xs text-muted-foreground">Pickup Date</p>
                 <p className="font-medium">{extractedData.pickup_date || '-'}</p>
+                {extractedData.pickup_time && (
+                  <p className="text-xs text-muted-foreground">{extractedData.pickup_time}</p>
+                )}
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Delivery Date</p>
                 <p className="font-medium">{extractedData.delivery_date || '-'}</p>
+                {extractedData.delivery_time && (
+                  <p className="text-xs text-muted-foreground">{extractedData.delivery_time}</p>
+                )}
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Miles</p>
