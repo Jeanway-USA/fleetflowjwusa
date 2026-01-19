@@ -347,7 +347,7 @@ export default function FleetLoads() {
   };
 
   // Handle extracted data from rate confirmation
-  const handleRateConfirmationData = (data: any) => {
+  const handleRateConfirmationData = (data: any, existingLoadId?: string) => {
     // Map accessorials from the extracted data
     const extractedAccessorials: Accessorial[] = (data.accessorials || []).map((acc: any) => ({
       accessorial_type: acc.type === 'Stop Of' ? 'Stop-off' : acc.type,
@@ -360,7 +360,44 @@ export default function FleetLoads() {
     const intermediateStopsText = formatIntermediateStops(data.intermediate_stops);
     const combinedNotes = (data.notes || '') + intermediateStopsText;
 
-    // Set form data with extracted values
+    // If updating an existing load, find it and merge the data
+    if (existingLoadId) {
+      const existingLoad = loads.find((l: any) => l.id === existingLoadId);
+      if (existingLoad) {
+        // Merge: use extracted data where available, preserve existing data otherwise
+        setFormData({
+          landstar_load_id: data.landstar_load_id || existingLoad.landstar_load_id || '',
+          agency_code: data.agency_code || existingLoad.agency_code || '',
+          origin: data.origin || existingLoad.origin || '',
+          destination: data.destination || existingLoad.destination || '',
+          pickup_date: data.pickup_date || existingLoad.pickup_date || '',
+          delivery_date: data.delivery_date || existingLoad.delivery_date || '',
+          booked_miles: data.booked_miles || existingLoad.booked_miles || 0,
+          rate: data.rate || existingLoad.rate || 0,
+          fuel_surcharge: data.fuel_surcharge || existingLoad.fuel_surcharge || 0,
+          driver_id: data.driver_id || existingLoad.driver_id || null,
+          truck_id: data.truck_id || existingLoad.truck_id || null,
+          // Append new notes to existing notes
+          notes: existingLoad.notes 
+            ? existingLoad.notes + (combinedNotes ? '\n\n--- Updated from Rate Confirmation ---' + combinedNotes : '')
+            : combinedNotes,
+          status: existingLoad.status || 'assigned',
+          is_power_only: existingLoad.is_power_only || false,
+          advance_taken: existingLoad.advance_taken || 0,
+          lumper: existingLoad.lumper || 0,
+          start_miles: existingLoad.start_miles || 0,
+          end_miles: existingLoad.end_miles || 0,
+        });
+        
+        setEditingLoad(existingLoad);
+        setAccessorials(extractedAccessorials);
+        setDialogOpen(true);
+        toast.info('Updating existing load. Review changes and save when ready.');
+        return;
+      }
+    }
+
+    // Creating a new load
     setFormData({
       landstar_load_id: data.landstar_load_id || '',
       agency_code: data.agency_code || '',
@@ -397,6 +434,14 @@ export default function FleetLoads() {
       <div className="mb-6">
         <RateConfirmationUpload
           onDataExtracted={handleRateConfirmationData}
+          existingLoads={loads.map((l: any) => ({
+            id: l.id,
+            landstar_load_id: l.landstar_load_id,
+            origin: l.origin,
+            destination: l.destination,
+            rate: l.rate,
+            pickup_date: l.pickup_date,
+          }))}
           drivers={drivers}
           trucks={trucks}
         />
