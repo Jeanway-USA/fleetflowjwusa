@@ -178,13 +178,20 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
             <span className="font-medium">{getCondensedAddress(load.destination)}</span>
           </div>
 
-          {/* Pickup Date & Time */}
+          {/* Date & Time - Show delivery for in_transit, pickup for others */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Calendar className="h-4 w-4 shrink-0" />
-            <span>
-              Pickup: {formatDate(load.pickup_date)}
-              {load.pickup_time && <span className="ml-1 text-foreground font-medium">@ {load.pickup_time}</span>}
-            </span>
+            {load.status === 'in_transit' ? (
+              <span>
+                Delivery: {formatDate(load.delivery_date)}
+                {load.delivery_time && <span className="ml-1 text-foreground font-medium">@ {load.delivery_time}</span>}
+              </span>
+            ) : (
+              <span>
+                Pickup: {formatDate(load.pickup_date)}
+                {load.pickup_time && <span className="ml-1 text-foreground font-medium">@ {load.pickup_time}</span>}
+              </span>
+            )}
           </div>
 
           {/* Miles and Estimated Pay */}
@@ -352,33 +359,58 @@ export default function DriverLoadsView() {
       const { data, error } = await supabase
         .from('fleet_loads')
         .select('*')
-        .eq('driver_id', driverRecord.id)
-        .order('pickup_date', { ascending: false });
+        .eq('driver_id', driverRecord.id);
       if (error) throw error;
       return data;
     },
     enabled: !!driverRecord?.id,
   });
 
+  // Sort loads chronologically based on status
+  // For in_transit: sort by delivery_date
+  // For others: sort by pickup_date
+  // Earliest dates first
+  const sortLoadsChronologically = (loadsToSort: Load[]): Load[] => {
+    return [...loadsToSort].sort((a, b) => {
+      const dateA = a.status === 'in_transit' 
+        ? (a.delivery_date || a.pickup_date || '') 
+        : (a.pickup_date || '');
+      const dateB = b.status === 'in_transit' 
+        ? (b.delivery_date || b.pickup_date || '') 
+        : (b.pickup_date || '');
+      
+      // Parse dates for comparison
+      const timeA = dateA ? new Date(dateA).getTime() : Infinity;
+      const timeB = dateB ? new Date(dateB).getTime() : Infinity;
+      
+      return timeA - timeB; // Ascending order (earliest first)
+    });
+  };
+
   const handleStatusUpdate = () => {
     queryClient.invalidateQueries({ queryKey: ['driver_loads'] });
     queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
   };
 
-  // Categorize loads
+  // Categorize and sort loads
   // Current: only in_transit and loading (actively on the road)
-  const currentLoads = loads.filter((load: Load) => 
-    ['loading', 'in_transit'].includes(load.status)
+  const currentLoads = sortLoadsChronologically(
+    loads.filter((load: Load) => ['loading', 'in_transit'].includes(load.status))
   );
 
   // Upcoming: pending and assigned loads
-  const upcomingLoads = loads.filter((load: Load) => 
-    ['pending', 'assigned'].includes(load.status)
+  const upcomingLoads = sortLoadsChronologically(
+    loads.filter((load: Load) => ['pending', 'assigned'].includes(load.status))
   );
 
-  const completedLoads = loads.filter((load: Load) => 
+  // Completed: sorted most recent first (reverse chronological)
+  const completedLoads = [...loads.filter((load: Load) => 
     ['delivered', 'cancelled'].includes(load.status)
-  );
+  )].sort((a, b) => {
+    const dateA = a.delivery_date || a.pickup_date || '';
+    const dateB = b.delivery_date || b.pickup_date || '';
+    return new Date(dateB).getTime() - new Date(dateA).getTime(); // Most recent first
+  });
 
   // Get driver pay info
   const payRate = driverRecord?.pay_rate || 0;
