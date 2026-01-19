@@ -57,14 +57,14 @@ You will be given a PDF document image. Extract the load information accurately 
 Be careful with dates - they should be in YYYY-MM-DD format.
 For locations, combine the city and state (e.g., "Lewisville, TX" or "Denver, CO").
 For accessorials, extract any charges that aren't the base Line Haul or Fuel Surcharge (like Stop Of, Detention, etc.).
-Look for the "Load #" field (e.g., EL8557325), "Agency Name" for the agency code (last 3 letters like LTL or BLR), 
+Look for the "Freight Bill #" field (e.g., EL8964000) - NOT the "Load #", "Agency Name" for the agency code (last 3 letters like LTL or BLR), 
 pickup/delivery locations and dates from Stop Information, and charges from the Actual Customer Charges table.`;
 
     const userPrompt = `Analyze this Landstar BCO Load Detail PDF document and extract the load information.
 
 Return ONLY a valid JSON object with this exact structure (no markdown, no code blocks):
 {
-  "landstar_load_id": "Load # value (e.g., EL8557325)",
+  "landstar_load_id": "Freight Bill # value (e.g., EL8964000) - NOT the Load #",
   "agency_code": "3-letter agency code from Agency Name (e.g., LTL from 'B-Line Logistics LLC - LTL')",
   "origin": "First pickup city, state (e.g., 'Lewisville, TX')",
   "destination": "Final delivery city, state (e.g., 'Evans, CO')",
