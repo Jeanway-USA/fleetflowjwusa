@@ -15,6 +15,7 @@ interface HealthBarProps {
   intervalValue: number;
   unit: 'miles' | 'days';
   baseline?: PMBaseline;
+  description?: string | null;
   className?: string;
 }
 
@@ -25,6 +26,7 @@ export function HealthBar({
   intervalValue,
   unit,
   baseline,
+  description,
   className,
 }: HealthBarProps) {
   const used = currentValue - lastPerformedValue;
@@ -95,9 +97,12 @@ export function HealthBar({
             </p>
           </div>
         </TooltipTrigger>
-        <TooltipContent>
+        <TooltipContent className="max-w-xs">
           <div className="text-sm space-y-1">
             <p className="font-medium">{serviceName}</p>
+            {description && (
+              <p className="text-xs text-muted-foreground">{description}</p>
+            )}
             <p>Interval: {intervalValue.toLocaleString()} {unit}</p>
             <p>Miles since service: {used.toLocaleString()} {unit}</p>
             <p className={getTextColor()}>{formatRemainingLine()}</p>

@@ -1122,6 +1122,45 @@ export type Database = {
           },
         ]
       }
+      manufacturer_pm_profiles: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          interval_days: number | null
+          interval_miles: number | null
+          manufacturer: string
+          service_code: string
+          service_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          interval_days?: number | null
+          interval_miles?: number | null
+          manufacturer: string
+          service_code: string
+          service_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          interval_days?: number | null
+          interval_miles?: number | null
+          manufacturer?: string
+          service_code?: string
+          service_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           address: string | null
@@ -1166,6 +1205,7 @@ export type Database = {
           interval_miles: number | null
           last_performed_date: string | null
           last_performed_miles: number | null
+          profile_service_id: string | null
           service_name: string
           truck_id: string
           updated_at: string
@@ -1177,6 +1217,7 @@ export type Database = {
           interval_miles?: number | null
           last_performed_date?: string | null
           last_performed_miles?: number | null
+          profile_service_id?: string | null
           service_name: string
           truck_id: string
           updated_at?: string
@@ -1188,11 +1229,19 @@ export type Database = {
           interval_miles?: number | null
           last_performed_date?: string | null
           last_performed_miles?: number | null
+          profile_service_id?: string | null
           service_name?: string
           truck_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_schedules_profile_service_id_fkey"
+            columns: ["profile_service_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturer_pm_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "service_schedules_truck_id_fkey"
             columns: ["truck_id"]
