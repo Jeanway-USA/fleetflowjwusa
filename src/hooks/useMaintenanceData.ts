@@ -418,6 +418,16 @@ export function useCompleteWorkOrder() {
       invoice_url?: string;
       notes?: string;
     }) => {
+      // First, get the work order to check its type and truck_id
+      const { data: workOrder, error: fetchError } = await supabase
+        .from('work_orders')
+        .select('truck_id, service_type, entry_date, odometer_reading')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Complete the work order
       const { data, error } = await supabase
         .from('work_orders')
         .update({
@@ -432,6 +442,35 @@ export function useCompleteWorkOrder() {
         .single();
 
       if (error) throw error;
+
+      // If this is an inspection work order, update the service schedule
+      if (workOrder.service_type === 'inspection') {
+        const completionDate = new Date().toISOString().split('T')[0];
+        
+        // Update the 120-Day Inspection service schedule for this truck
+        const { error: scheduleError } = await supabase
+          .from('service_schedules')
+          .update({
+            last_performed_date: completionDate,
+            last_performed_miles: workOrder.odometer_reading || null,
+          })
+          .eq('truck_id', workOrder.truck_id)
+          .eq('service_name', '120-Day Inspection');
+
+        if (scheduleError) {
+          console.error('Failed to update service schedule:', scheduleError);
+        }
+
+        // Also update the truck's last_120_inspection_date
+        await supabase
+          .from('trucks')
+          .update({
+            last_120_inspection_date: completionDate,
+            last_120_inspection_miles: workOrder.odometer_reading || null,
+          })
+          .eq('id', workOrder.truck_id);
+      }
+
       return data;
     },
     onSuccess: () => {
@@ -439,6 +478,9 @@ export function useCompleteWorkOrder() {
       queryClient.invalidateQueries({ queryKey: ['service-history'] });
       queryClient.invalidateQueries({ queryKey: ['fleet-availability'] });
       queryClient.invalidateQueries({ queryKey: ['maintenance-cost-mtd'] });
+      queryClient.invalidateQueries({ queryKey: ['compliance-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['service-schedules-120day'] });
+      queryClient.invalidateQueries({ queryKey: ['pm-schedule'] });
     },
   });
 }
