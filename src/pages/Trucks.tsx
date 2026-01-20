@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { addDays, differenceInDays, format } from 'date-fns';
@@ -229,10 +230,17 @@ export default function Trucks() {
         
         if (inspection.status === 'never') {
           return (
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span className="text-xs">Never Inspected</span>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 text-muted-foreground cursor-help">
+                  <Clock className="h-4 w-4" />
+                  <span className="text-xs">Never Inspected</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>No 120-Day Inspection on record</p>
+              </TooltipContent>
+            </Tooltip>
           );
         }
         
@@ -246,14 +254,21 @@ export default function Trucks() {
         const Icon = config.icon;
         
         return (
-          <div className={`flex items-center gap-1 ${config.color}`}>
-            <Icon className="h-4 w-4" />
-            <span className="text-xs">
-              {inspection.daysRemaining !== null && inspection.daysRemaining < 0 
-                ? `Overdue ${Math.abs(inspection.daysRemaining)}d`
-                : `${inspection.daysRemaining}d left`}
-            </span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className={`flex items-center gap-1 ${config.color} cursor-help`}>
+                <Icon className="h-4 w-4" />
+                <span className="text-xs">
+                  {inspection.daysRemaining !== null && inspection.daysRemaining < 0 
+                    ? `Overdue ${Math.abs(inspection.daysRemaining)}d`
+                    : `${inspection.daysRemaining}d left`}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Due: {inspection.nextInspectionDate}</p>
+            </TooltipContent>
+          </Tooltip>
         );
       }
     },
