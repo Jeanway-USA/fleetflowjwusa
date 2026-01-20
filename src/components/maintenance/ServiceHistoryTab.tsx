@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useServiceHistory, useUpdateCompletedWorkOrder, useDeleteCompletedWorkOrder } from '@/hooks/useMaintenanceData';
+import { useState, useMemo } from 'react';
+import { useServiceHistory, useUpdateCompletedWorkOrder, useDeleteCompletedWorkOrder, useTrucks } from '@/hooks/useMaintenanceData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -8,13 +8,45 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
-import { Search, History, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Search, History, Pencil, Trash2, Loader2, ChevronDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { toast } from 'sonner';
+
+interface ServiceType {
+  value: string;
+  label: string;
+  description?: string;
+}
+
+// Freightliner Cascadia Schedule II service types
+const FREIGHTLINER_SERVICE_TYPES: ServiceType[] = [
+  { value: 'M1', label: 'M1 Service (Safety & Grease)', description: '25,000 mi interval' },
+  { value: 'PM_A', label: 'PM A (Oil & Fuel)', description: '50,000 mi interval' },
+  { value: 'M2', label: 'M2 Service (Annual)', description: '100,000 mi interval' },
+  { value: 'M3', label: 'M3 Service (Major Fluids)', description: '300,000 mi interval' },
+];
+
+// Generic service types for non-Freightliner trucks
+const GENERIC_SERVICE_TYPES: ServiceType[] = [
+  { value: 'pm', label: 'Preventive Maintenance (PM)' },
+  { value: 'repair', label: 'Repair' },
+  { value: 'tire', label: 'Tire Service' },
+  { value: 'inspection', label: 'Inspection' },
+  { value: 'other', label: 'Other' },
+];
+
+// Additional types for Freightliner (in addition to M-services)
+const FREIGHTLINER_ADDITIONAL_TYPES: ServiceType[] = [
+  { value: 'repair', label: 'Repair' },
+  { value: 'tire', label: 'Tire Service' },
+  { value: 'inspection', label: '120-Day Inspection' },
+  { value: 'other', label: 'Other' },
+];
 
 interface ServiceHistoryItem {
   id: string;
@@ -22,6 +54,7 @@ interface ServiceHistoryItem {
   date: string;
   unitNumber: string;
   serviceType: string;
+  serviceTypes?: string[] | null;
   vendor: string | null;
   cost: number | null;
   description: string | null;
@@ -37,17 +70,47 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [editingItem, setEditingItem] = useState<ServiceHistoryItem | null>(null);
   const [deleteItem, setDeleteItem] = useState<ServiceHistoryItem | null>(null);
+  const [serviceTypesOpen, setServiceTypesOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     entry_date: '',
     vendor: '',
     final_cost: '',
     description: '',
-    service_type: '',
+    service_types: [] as string[],
   });
   
   const { data: history, isLoading } = useServiceHistory(debouncedQuery || undefined);
+  const { data: trucks } = useTrucks();
   const updateWorkOrder = useUpdateCompletedWorkOrder();
   const deleteWorkOrder = useDeleteCompletedWorkOrder();
+
+  // Get truck make for the item being edited
+  const editingTruck = useMemo(() => {
+    if (!editingItem || !trucks) return null;
+    return trucks.find(t => t.id === editingItem.truckId);
+  }, [editingItem, trucks]);
+
+  const isFreightliner = useMemo(() => {
+    return editingTruck?.make?.toLowerCase() === 'freightliner';
+  }, [editingTruck]);
+
+  // Get service types based on manufacturer
+  const serviceTypes = useMemo(() => {
+    if (isFreightliner) {
+      return {
+        pmTypes: FREIGHTLINER_SERVICE_TYPES,
+        otherTypes: FREIGHTLINER_ADDITIONAL_TYPES,
+      };
+    }
+    return {
+      pmTypes: [],
+      otherTypes: GENERIC_SERVICE_TYPES,
+    };
+  }, [isFreightliner]);
+
+  const allServiceTypes = useMemo(() => {
+    return [...serviceTypes.pmTypes, ...serviceTypes.otherTypes];
+  }, [serviceTypes]);
 
   const debouncedSearch = useDebouncedCallback((value: string) => {
     setDebouncedQuery(value);
@@ -61,17 +124,54 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
 
   const handleEdit = (item: ServiceHistoryItem) => {
     setEditingItem(item);
+    // Parse the service types from the comma-separated string or use the array
+    const types = item.serviceTypes || item.serviceType.split(',').map(t => t.trim()).filter(Boolean);
     setEditForm({
       entry_date: item.date,
       vendor: item.vendor || '',
       final_cost: item.cost?.toString() || '',
       description: item.description || '',
-      service_type: item.serviceType,
+      service_types: types,
     });
+  };
+
+  const toggleServiceType = (value: string) => {
+    setEditForm(prev => {
+      const newTypes = prev.service_types.includes(value)
+        ? prev.service_types.filter(t => t !== value)
+        : [...prev.service_types, value];
+      return { ...prev, service_types: newTypes };
+    });
+  };
+
+  const removeServiceType = (value: string) => {
+    setEditForm(prev => ({
+      ...prev,
+      service_types: prev.service_types.filter(t => t !== value),
+    }));
+  };
+
+  const getServiceLabel = (value: string) => {
+    const type = allServiceTypes.find(t => t.value === value);
+    return type?.label || value;
+  };
+
+  const getShortLabel = (value: string) => {
+    const type = allServiceTypes.find(t => t.value === value);
+    if (!type) return value;
+    if (['M1', 'PM_A', 'M2', 'M3'].includes(value)) {
+      return value === 'PM_A' ? 'PM A' : value;
+    }
+    return type.label.split(' ')[0];
   };
 
   const handleSaveEdit = async () => {
     if (!editingItem) return;
+
+    if (editForm.service_types.length === 0) {
+      toast.error('Please select at least one service type');
+      return;
+    }
 
     try {
       await updateWorkOrder.mutateAsync({
@@ -80,7 +180,8 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
         vendor: editForm.vendor || undefined,
         final_cost: editForm.final_cost ? parseFloat(editForm.final_cost) : undefined,
         description: editForm.description || undefined,
-        service_type: editForm.service_type,
+        service_type: editForm.service_types.join(', '),
+        service_types: editForm.service_types,
       });
       toast.success('Service record updated');
       setEditingItem(null);
@@ -228,22 +329,122 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-service-type">Service Type</Label>
-              <Select
-                value={editForm.service_type}
-                onValueChange={(value) => setEditForm({ ...editForm, service_type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select service type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pm">Preventive Maintenance (PM)</SelectItem>
-                  <SelectItem value="repair">Repair</SelectItem>
-                  <SelectItem value="tire">Tire Service</SelectItem>
-                  <SelectItem value="inspection">Inspection</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>
+                Service Types *
+                {isFreightliner && (
+                  <span className="ml-2 text-xs text-muted-foreground font-normal">
+                    (Cascadia Schedule II)
+                  </span>
+                )}
+              </Label>
+              
+              <Popover open={serviceTypesOpen} onOpenChange={setServiceTypesOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={serviceTypesOpen}
+                    className={cn(
+                      "w-full justify-between h-auto min-h-10",
+                      editForm.service_types.length === 0 && "text-muted-foreground"
+                    )}
+                  >
+                    {editForm.service_types.length === 0 ? (
+                      <span>Select service types...</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {editForm.service_types.map(type => (
+                          <Badge
+                            key={type}
+                            variant="secondary"
+                            className="mr-1 mb-1"
+                          >
+                            {getShortLabel(type)}
+                            <button
+                              type="button"
+                              className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeServiceType(type);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[350px] p-0" align="start">
+                  <div className="max-h-[300px] overflow-y-auto p-2">
+                    {isFreightliner && serviceTypes.pmTypes.length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                          Freightliner PM Schedule
+                        </div>
+                        {serviceTypes.pmTypes.map(type => (
+                          <div
+                            key={type.value}
+                            className="flex items-start space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                            onClick={() => toggleServiceType(type.value)}
+                          >
+                            <Checkbox
+                              id={`edit-${type.value}`}
+                              checked={editForm.service_types.includes(type.value)}
+                              onCheckedChange={() => toggleServiceType(type.value)}
+                            />
+                            <div className="grid gap-0.5 leading-none">
+                              <label
+                                htmlFor={`edit-${type.value}`}
+                                className="text-sm font-medium leading-none cursor-pointer"
+                              >
+                                {type.label}
+                              </label>
+                              {type.description && (
+                                <span className="text-xs text-muted-foreground">
+                                  {type.description}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        <div className="my-2 border-t" />
+                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                          Other Services
+                        </div>
+                      </>
+                    )}
+                    {serviceTypes.otherTypes.map(type => (
+                      <div
+                        key={type.value}
+                        className="flex items-start space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                        onClick={() => toggleServiceType(type.value)}
+                      >
+                        <Checkbox
+                          id={`edit-${type.value}`}
+                          checked={editForm.service_types.includes(type.value)}
+                          onCheckedChange={() => toggleServiceType(type.value)}
+                        />
+                        <div className="grid gap-0.5 leading-none">
+                          <label
+                            htmlFor={`edit-${type.value}`}
+                            className="text-sm font-medium leading-none cursor-pointer"
+                          >
+                            {type.label}
+                          </label>
+                          {type.description && (
+                            <span className="text-xs text-muted-foreground">
+                              {type.description}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-vendor">Vendor</Label>
