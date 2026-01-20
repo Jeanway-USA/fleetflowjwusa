@@ -37,7 +37,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
               data?.truck && (
                 <>
                   {data.truck.year} {data.truck.make} {data.truck.model}
-                  {data.truck.current_odometer && (
+                  {data.truck.current_odometer != null && data.truck.current_odometer > 0 && (
                     <> • {data.truck.current_odometer.toLocaleString()} miles</>
                   )}
                 </>
