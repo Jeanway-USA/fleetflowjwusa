@@ -12,6 +12,8 @@ interface KPIData {
   prevNetRevenue: number;
   prevOperatingProfit: number;
   prevProfitMargin: number;
+  deliveredLoadCount: number;
+  prevDeliveredLoadCount: number;
 }
 
 interface RevenueKPICardsProps {
@@ -47,6 +49,7 @@ function KPICard({
   icon: Icon,
   format = 'currency',
   isLoading,
+  subtitle,
 }: {
   title: string;
   value: number;
@@ -54,6 +57,7 @@ function KPICard({
   icon: React.ElementType;
   format?: 'currency' | 'percent';
   isLoading: boolean;
+  subtitle?: string;
 }) {
   const change = calculateChange(value, previousValue);
   const displayValue = format === 'percent' ? `${value.toFixed(1)}%` : formatCurrency(value);
@@ -79,7 +83,10 @@ function KPICard({
             <Icon className="h-4 w-4 text-primary" />
           </div>
         </div>
-        <div className="text-2xl font-bold mb-2">{displayValue}</div>
+        <div className="text-2xl font-bold mb-1">{displayValue}</div>
+        {subtitle && (
+          <div className="text-xs text-muted-foreground mb-1">{subtitle}</div>
+        )}
         <div className="flex items-center gap-1 text-sm">
           {change.isPositive ? (
             <TrendingUp className="h-4 w-4 text-green-500" />
@@ -105,6 +112,7 @@ export function RevenueKPICards({ data, isLoading }: RevenueKPICardsProps) {
         previousValue={data?.prevGrossRevenue ?? 0}
         icon={DollarSign}
         isLoading={isLoading}
+        subtitle={`${data?.deliveredLoadCount ?? 0} loads delivered`}
       />
       <KPICard
         title="Net Revenue"
@@ -112,6 +120,7 @@ export function RevenueKPICards({ data, isLoading }: RevenueKPICardsProps) {
         previousValue={data?.prevNetRevenue ?? 0}
         icon={Banknote}
         isLoading={isLoading}
+        subtitle={`${data?.deliveredLoadCount ?? 0} loads delivered`}
       />
       <KPICard
         title="Operating Profit"
@@ -119,6 +128,7 @@ export function RevenueKPICards({ data, isLoading }: RevenueKPICardsProps) {
         previousValue={data?.prevOperatingProfit ?? 0}
         icon={PiggyBank}
         isLoading={isLoading}
+        subtitle={`${data?.deliveredLoadCount ?? 0} loads delivered`}
       />
       <KPICard
         title="Profit Margin"
@@ -127,6 +137,7 @@ export function RevenueKPICards({ data, isLoading }: RevenueKPICardsProps) {
         icon={Percent}
         format="percent"
         isLoading={isLoading}
+        subtitle={`${data?.deliveredLoadCount ?? 0} loads delivered`}
       />
     </div>
   );
