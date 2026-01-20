@@ -1,12 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { ClipboardList, FileText, Wrench, AlertCircle, Calendar, ChevronRight } from 'lucide-react';
+import { ClipboardList, FileText, Wrench, AlertCircle, Calendar, ChevronRight, Receipt } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export interface PendingAction {
   id: string;
-  type: 'document' | 'maintenance' | 'defect' | 'credential';
+  type: 'document' | 'maintenance' | 'defect' | 'credential' | 'settlement';
   title: string;
   count: number;
   priority: 'high' | 'medium' | 'low';
@@ -23,6 +23,7 @@ const typeConfig: Record<PendingAction['type'], { icon: typeof FileText; label: 
   maintenance: { icon: Wrench, label: 'Maintenance' },
   defect: { icon: AlertCircle, label: 'Defects' },
   credential: { icon: Calendar, label: 'Credentials' },
+  settlement: { icon: Receipt, label: 'Finance' },
 };
 
 const priorityColors: Record<PendingAction['priority'], string> = {

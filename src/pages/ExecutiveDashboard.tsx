@@ -333,6 +333,23 @@ export default function ExecutiveDashboard() {
       const now = new Date();
       const thirtyDaysFromNow = addDays(now, 30);
 
+      // Pending settlements (draft or pending status)
+      const { data: pendingSettlements } = await supabase
+        .from('settlements')
+        .select('id, status')
+        .in('status', ['draft', 'pending']);
+
+      if (pendingSettlements && pendingSettlements.length > 0) {
+        actions.push({
+          id: 'pending-settlements',
+          type: 'settlement',
+          title: 'Settlements Pending Approval',
+          count: pendingSettlements.length,
+          priority: 'medium',
+          link: '/finance?tab=settlements',
+        });
+      }
+
       // Pending maintenance requests
       const { data: maintenanceRequests } = await supabase
         .from('maintenance_requests')
