@@ -554,6 +554,19 @@ export default function Finance() {
   const filteredLoads = getFilteredLoads();
   const filteredExpenses = getFilteredExpenses();
   
+  // Helper functions for getting names - defined before use in sorting
+  const getTruckName = (truckId: string | null) => {
+    if (!truckId) return '-';
+    const truck = trucks.find((t: any) => t.id === truckId);
+    return truck ? truck.unit_number : '-';
+  };
+
+  const getLoadName = (loadId: string | null) => {
+    if (!loadId) return '-';
+    const load = loads.find((l: any) => l.id === loadId);
+    return load?.landstar_load_id || 'Linked';
+  };
+  
   // Sort expenses based on selected sort field and direction
   const sortedFilteredExpenses = [...filteredExpenses].sort((a, b) => {
     const direction = sortDirection === 'asc' ? 1 : -1;
@@ -783,17 +796,7 @@ export default function Finance() {
   const netProfit = totalRevenueWithCommissions - grandTotalExpenses;
   const profitMargin = totalRevenueWithCommissions > 0 ? (netProfit / totalRevenueWithCommissions) * 100 : 0;
 
-  const getTruckName = (truckId: string | null) => {
-    if (!truckId) return '-';
-    const truck = trucks.find((t: any) => t.id === truckId);
-    return truck ? truck.unit_number : '-';
-  };
-
-  const getLoadName = (loadId: string | null) => {
-    if (!loadId) return '-';
-    const load = loads.find((l: any) => l.id === loadId);
-    return load?.landstar_load_id || 'Linked';
-  };
+  // getTruckName and getLoadName are now defined earlier in the component
 
   const handleSaveSettings = () => {
     Object.entries(settingsForm).forEach(([key, value]) => {
