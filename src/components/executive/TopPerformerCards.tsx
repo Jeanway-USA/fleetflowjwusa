@@ -29,11 +29,21 @@ interface TopPerformerCardsProps {
 }
 
 function formatCurrency(amount: number) {
+  if (amount >= 10000) {
+    return `$${(amount / 1000).toFixed(1)}K`;
+  }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
   }).format(amount);
+}
+
+function formatMiles(num: number) {
+  if (num >= 1000) {
+    return `${(num / 1000).toFixed(1)}K`;
+  }
+  return new Intl.NumberFormat('en-US').format(Math.round(num));
 }
 
 function formatNumber(num: number) {
@@ -102,7 +112,7 @@ export function TopPerformerCards({ topDriver, topTruck, isLoading }: TopPerform
                 </div>
                 <div className="flex flex-col items-center p-2 rounded-lg bg-muted/50">
                   <MapPin className="h-4 w-4 text-primary mb-1" />
-                  <span className="text-sm font-medium">{formatNumber(topDriver.miles)}</span>
+                  <span className="text-sm font-medium">{formatMiles(topDriver.miles)}</span>
                   <span className="text-xs text-muted-foreground">Miles</span>
                 </div>
                 <div className="flex flex-col items-center p-2 rounded-lg bg-muted/50">
@@ -156,7 +166,7 @@ export function TopPerformerCards({ topDriver, topTruck, isLoading }: TopPerform
                 </div>
                 <div className="flex flex-col items-center p-2 rounded-lg bg-muted/50">
                   <MapPin className="h-4 w-4 text-primary mb-1" />
-                  <span className="text-sm font-medium">{formatNumber(topTruck.miles)}</span>
+                  <span className="text-sm font-medium">{formatMiles(topTruck.miles)}</span>
                   <span className="text-xs text-muted-foreground">Miles</span>
                 </div>
                 <div className="flex flex-col items-center p-2 rounded-lg bg-muted/50">
