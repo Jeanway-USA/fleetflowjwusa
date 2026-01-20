@@ -16,8 +16,9 @@ interface CompanyHealthScoreProps {
 
 function calculateHealthScore(data: HealthData): number {
   // Weighted scoring: each metric contributes 25%
-  // Profit Margin: Target 25%+, score 0-100 based on 0-30% range
-  const profitScore = Math.min(100, Math.max(0, (data.profitMargin / 30) * 100));
+  // Retention Rate (profitMargin): Target 65%+ (Landstar BCO typically keeps 65%)
+  // Score 100 at 70%+, score 0 at 50% or below
+  const retentionScore = Math.min(100, Math.max(0, ((data.profitMargin - 50) / 20) * 100));
   
   // Fleet Utilization: Target 80%+, score based on 0-100% range
   const utilizationScore = data.fleetUtilization;
@@ -28,7 +29,7 @@ function calculateHealthScore(data: HealthData): number {
   // Revenue Growth: Positive is good, scale -20% to +20% to 0-100
   const growthScore = Math.min(100, Math.max(0, ((data.revenueGrowth + 20) / 40) * 100));
   
-  return Math.round((profitScore * 0.25) + (utilizationScore * 0.25) + (onTimeScore * 0.25) + (growthScore * 0.25));
+  return Math.round((retentionScore * 0.25) + (utilizationScore * 0.25) + (onTimeScore * 0.25) + (growthScore * 0.25));
 }
 
 function getHealthStatus(score: number): { label: string; color: string; bgColor: string } {
@@ -117,7 +118,7 @@ export function CompanyHealthScore({ data, isLoading }: CompanyHealthScoreProps)
         {/* Metric Breakdown */}
         <div className="grid grid-cols-2 gap-2 mt-4 w-full text-xs">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Profit</span>
+            <span className="text-muted-foreground">Retention</span>
             <span className="font-medium">{data.profitMargin.toFixed(0)}%</span>
           </div>
           <div className="flex justify-between">

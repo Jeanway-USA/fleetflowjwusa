@@ -115,29 +115,29 @@ export function RevenueKPICards({ data, isLoading }: RevenueKPICardsProps) {
         subtitle={`${data?.deliveredLoadCount ?? 0} loads delivered`}
       />
       <KPICard
-        title="Net Revenue"
+        title="Company Revenue"
         value={data?.netRevenue ?? 0}
         previousValue={data?.prevNetRevenue ?? 0}
         icon={Banknote}
         isLoading={isLoading}
-        subtitle={`${data?.deliveredLoadCount ?? 0} loads delivered`}
+        subtitle="After Landstar split"
       />
       <KPICard
-        title="Operating Profit"
+        title="Total Profit"
         value={data?.operatingProfit ?? 0}
         previousValue={data?.prevOperatingProfit ?? 0}
         icon={PiggyBank}
         isLoading={isLoading}
-        subtitle={`${data?.deliveredLoadCount ?? 0} loads delivered`}
+        subtitle="Company earnings"
       />
       <KPICard
-        title="Profit Margin"
+        title="Retention Rate"
         value={data?.profitMargin ?? 0}
         previousValue={data?.prevProfitMargin ?? 0}
         icon={Percent}
         format="percent"
         isLoading={isLoading}
-        subtitle={`${data?.deliveredLoadCount ?? 0} loads delivered`}
+        subtitle="% of gross kept"
       />
     </div>
   );
