@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, subWeeks, subMonths, subQuarters, subYears } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, subWeeks, subMonths, subQuarters, subYears, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -11,8 +11,11 @@ import { OperationalMetrics } from '@/components/executive/OperationalMetrics';
 import { CostBreakdownChart } from '@/components/executive/CostBreakdownChart';
 import { TopPerformerCards } from '@/components/executive/TopPerformerCards';
 import { QuickInsights, Insight } from '@/components/executive/QuickInsights';
-import { Bell } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { CompanyHealthScore } from '@/components/executive/CompanyHealthScore';
+import { FleetStatusCard } from '@/components/executive/FleetStatusCard';
+import { DriverAvailabilityCard } from '@/components/executive/DriverAvailabilityCard';
+import { CriticalAlertsBar, CriticalAlert } from '@/components/executive/CriticalAlertsBar';
+import { PendingActionsCard, PendingAction } from '@/components/executive/PendingActionsCard';
 
 function getDateRange(period: TimePeriod) {
   const now = new Date();
@@ -198,6 +201,206 @@ export default function ExecutiveDashboard() {
     },
   });
 
+  // Fetch fleet status
+  const { data: fleetStatus, isLoading: fleetLoading } = useQuery({
+    queryKey: ['executive-fleet-status'],
+    queryFn: async () => {
+      const { data: trucks } = await supabase.from('trucks').select('id, status');
+      const { data: activeLoads } = await supabase
+        .from('fleet_loads')
+        .select('truck_id')
+        .in('status', ['in_transit', 'at_pickup', 'at_delivery']);
+
+      const trucksOnLoads = new Set(activeLoads?.map((l) => l.truck_id));
+      const truckList = trucks || [];
+
+      const active = truckList.filter(t => t.status === 'active' && trucksOnLoads.has(t.id)).length;
+      const available = truckList.filter(t => t.status === 'active' && !trucksOnLoads.has(t.id)).length;
+      const maintenance = truckList.filter(t => t.status === 'maintenance').length;
+      const outOfService = truckList.filter(t => t.status === 'out_of_service').length;
+
+      return {
+        active,
+        available,
+        maintenance,
+        outOfService,
+        total: truckList.length,
+      };
+    },
+  });
+
+  // Fetch driver availability
+  const { data: driverAvailability, isLoading: driverLoading } = useQuery({
+    queryKey: ['executive-driver-availability'],
+    queryFn: async () => {
+      const { data: drivers } = await supabase.from('drivers').select('id, status, license_expiry, medical_card_expiry');
+      const { data: activeLoads } = await supabase
+        .from('fleet_loads')
+        .select('driver_id')
+        .in('status', ['in_transit', 'at_pickup', 'at_delivery']);
+
+      const driversOnLoads = new Set(activeLoads?.map((l) => l.driver_id));
+      const driverList = drivers || [];
+      const now = new Date();
+      const thirtyDaysFromNow = addDays(now, 30);
+
+      // Check for credential issues (expired or expiring soon)
+      const hasCredentialIssues = (d: typeof driverList[0]) => {
+        const licenseExpiry = d.license_expiry ? new Date(d.license_expiry) : null;
+        const medicalExpiry = d.medical_card_expiry ? new Date(d.medical_card_expiry) : null;
+        return (licenseExpiry && licenseExpiry < now) || (medicalExpiry && medicalExpiry < now);
+      };
+
+      const onLoad = driverList.filter(d => d.status === 'active' && driversOnLoads.has(d.id)).length;
+      const credentialIssues = driverList.filter(d => hasCredentialIssues(d)).length;
+      const available = driverList.filter(d => d.status === 'active' && !driversOnLoads.has(d.id) && !hasCredentialIssues(d)).length;
+      const offDuty = driverList.filter(d => d.status !== 'active').length;
+
+      return {
+        onLoad,
+        available,
+        offDuty,
+        credentialIssues,
+        total: driverList.length,
+      };
+    },
+  });
+
+  // Fetch critical alerts
+  const { data: criticalAlerts = [], isLoading: alertsLoading } = useQuery({
+    queryKey: ['executive-critical-alerts'],
+    queryFn: async () => {
+      const alerts: CriticalAlert[] = [];
+      const now = new Date();
+
+      // Check for trucks in maintenance/out of service
+      const { data: trucks } = await supabase.from('trucks').select('status');
+      const maintenanceTrucks = trucks?.filter(t => t.status === 'maintenance').length || 0;
+      const outOfServiceTrucks = trucks?.filter(t => t.status === 'out_of_service').length || 0;
+
+      if (outOfServiceTrucks > 0) {
+        alerts.push({
+          id: 'trucks-oos',
+          type: 'truck',
+          message: `${outOfServiceTrucks} truck${outOfServiceTrucks > 1 ? 's' : ''} out of service`,
+          count: outOfServiceTrucks,
+        });
+      }
+
+      if (maintenanceTrucks > 0) {
+        alerts.push({
+          id: 'trucks-maintenance',
+          type: 'maintenance',
+          message: `${maintenanceTrucks} truck${maintenanceTrucks > 1 ? 's' : ''} in maintenance`,
+          count: maintenanceTrucks,
+        });
+      }
+
+      // Check for drivers with expired credentials
+      const { data: drivers } = await supabase.from('drivers').select('license_expiry, medical_card_expiry');
+      const expiredCredentials = drivers?.filter(d => {
+        const licenseExpiry = d.license_expiry ? new Date(d.license_expiry) : null;
+        const medicalExpiry = d.medical_card_expiry ? new Date(d.medical_card_expiry) : null;
+        return (licenseExpiry && licenseExpiry < now) || (medicalExpiry && medicalExpiry < now);
+      }).length || 0;
+
+      if (expiredCredentials > 0) {
+        alerts.push({
+          id: 'expired-credentials',
+          type: 'driver',
+          message: `${expiredCredentials} driver${expiredCredentials > 1 ? 's' : ''} with expired credentials`,
+          count: expiredCredentials,
+        });
+      }
+
+      // Check for unresolved defects
+      const { data: defects } = await supabase
+        .from('driver_inspections')
+        .select('id')
+        .eq('defects_found', true)
+        .neq('status', 'resolved');
+
+      if (defects && defects.length > 0) {
+        alerts.push({
+          id: 'unresolved-defects',
+          type: 'maintenance',
+          message: `${defects.length} unresolved defect${defects.length > 1 ? 's' : ''} from inspections`,
+          count: defects.length,
+        });
+      }
+
+      return alerts;
+    },
+  });
+
+  // Fetch pending actions
+  const { data: pendingActions = [], isLoading: actionsLoading } = useQuery({
+    queryKey: ['executive-pending-actions'],
+    queryFn: async () => {
+      const actions: PendingAction[] = [];
+      const now = new Date();
+      const thirtyDaysFromNow = addDays(now, 30);
+
+      // Pending maintenance requests
+      const { data: maintenanceRequests } = await supabase
+        .from('maintenance_requests')
+        .select('id, priority')
+        .eq('status', 'submitted');
+
+      if (maintenanceRequests && maintenanceRequests.length > 0) {
+        const highPriority = maintenanceRequests.filter(m => m.priority === 'high').length;
+        actions.push({
+          id: 'maintenance-requests',
+          type: 'maintenance',
+          title: 'Maintenance Requests',
+          count: maintenanceRequests.length,
+          priority: highPriority > 0 ? 'high' : 'medium',
+          link: '/maintenance',
+        });
+      }
+
+      // Unresolved inspection defects
+      const { data: defects } = await supabase
+        .from('driver_inspections')
+        .select('id')
+        .eq('defects_found', true)
+        .neq('status', 'resolved');
+
+      if (defects && defects.length > 0) {
+        actions.push({
+          id: 'defects',
+          type: 'defect',
+          title: 'Unresolved Defects',
+          count: defects.length,
+          priority: 'high',
+          link: '/safety',
+        });
+      }
+
+      // Expiring credentials (within 30 days)
+      const { data: drivers } = await supabase.from('drivers').select('license_expiry, medical_card_expiry');
+      const expiringCredentials = drivers?.filter(d => {
+        const licenseExpiry = d.license_expiry ? new Date(d.license_expiry) : null;
+        const medicalExpiry = d.medical_card_expiry ? new Date(d.medical_card_expiry) : null;
+        return (licenseExpiry && licenseExpiry >= now && licenseExpiry <= thirtyDaysFromNow) ||
+               (medicalExpiry && medicalExpiry >= now && medicalExpiry <= thirtyDaysFromNow);
+      }).length || 0;
+
+      if (expiringCredentials > 0) {
+        actions.push({
+          id: 'expiring-credentials',
+          type: 'credential',
+          title: 'Credentials Expiring Soon',
+          count: expiringCredentials,
+          priority: 'medium',
+          link: '/drivers',
+        });
+      }
+
+      return actions;
+    },
+  });
+
   // Fetch cost breakdown - grouped into broader categories
   const { data: costBreakdown = [], isLoading: costLoading } = useQuery({
     queryKey: ['executive-costs', period],
@@ -346,6 +549,22 @@ export default function ExecutiveDashboard() {
     },
   });
 
+  // Calculate health score data
+  const healthData = useMemo(() => {
+    if (!kpiData || !operationalData) return undefined;
+
+    const revenueGrowth = kpiData.prevGrossRevenue > 0
+      ? ((kpiData.grossRevenue - kpiData.prevGrossRevenue) / kpiData.prevGrossRevenue) * 100
+      : 0;
+
+    return {
+      profitMargin: kpiData.profitMargin,
+      fleetUtilization: operationalData.fleetUtilization,
+      onTimeRate: operationalData.onTimeRate,
+      revenueGrowth,
+    };
+  }, [kpiData, operationalData]);
+
   // Generate insights
   const insights: Insight[] = useMemo(() => {
     const result: Insight[] = [];
@@ -421,38 +640,49 @@ export default function ExecutiveDashboard() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <PageHeader
             title="Executive Dashboard"
-            description="High-level overview of business performance and key metrics"
+            description="Financial and operational health at a glance"
           />
-          <div className="flex items-center gap-3">
-            <PeriodSelector value={period} onChange={setPeriod} />
-            <Badge variant="outline" className="gap-1">
-              <Bell className="h-3 w-3" />
-              {insights.filter((i) => i.type === 'warning' || i.type === 'alert').length}
-            </Badge>
+          <PeriodSelector value={period} onChange={setPeriod} />
+        </div>
+
+        {/* Row 1: Critical Alerts Banner */}
+        <CriticalAlertsBar alerts={criticalAlerts} isLoading={alertsLoading} />
+
+        {/* Row 2: Health Score + KPI Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-1">
+            <CompanyHealthScore data={healthData} isLoading={kpiLoading || operationalLoading} />
+          </div>
+          <div className="lg:col-span-4">
+            <RevenueKPICards data={kpiData} isLoading={kpiLoading} />
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <RevenueKPICards data={kpiData} isLoading={kpiLoading} />
+        {/* Row 3: Fleet & Driver Status */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <FleetStatusCard data={fleetStatus} isLoading={fleetLoading} />
+          <DriverAvailabilityCard data={driverAvailability} isLoading={driverLoading} />
+        </div>
 
-        {/* Revenue Trends Chart */}
+        {/* Row 4: Revenue Trends Chart */}
         <RevenueTrendsChart data={trendsData} isLoading={trendsLoading} />
 
-        {/* Two Column Layout */}
+        {/* Row 5: Operations + Costs */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <OperationalMetrics data={operationalData} isLoading={operationalLoading} />
           <CostBreakdownChart data={costBreakdown} isLoading={costLoading} />
         </div>
 
-        {/* Top Performers */}
-        <TopPerformerCards
-          topDriver={topPerformers?.topDriver}
-          topTruck={topPerformers?.topTruck}
-          isLoading={performersLoading}
-        />
-
-        {/* Quick Insights */}
-        <QuickInsights insights={insights} isLoading={isLoading} />
+        {/* Row 6: Actions + Performers + Insights */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <PendingActionsCard actions={pendingActions} isLoading={actionsLoading} />
+          <TopPerformerCards
+            topDriver={topPerformers?.topDriver}
+            topTruck={topPerformers?.topTruck}
+            isLoading={performersLoading}
+          />
+          <QuickInsights insights={insights} isLoading={isLoading} />
+        </div>
       </div>
     </DashboardLayout>
   );
