@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,29 @@ interface NewWorkOrderSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface ServiceType {
+  value: string;
+  label: string;
+  description?: string;
+}
+
+// Freightliner Cascadia Schedule II service types
+const FREIGHTLINER_SERVICE_TYPES: ServiceType[] = [
+  { value: 'M1', label: 'M1 Service (Safety & Grease)', description: '25,000 mi interval' },
+  { value: 'PM_A', label: 'PM A (Oil & Fuel)', description: '50,000 mi interval' },
+  { value: 'M2', label: 'M2 Service (Annual)', description: '100,000 mi interval' },
+  { value: 'M3', label: 'M3 Service (Major Fluids)', description: '300,000 mi interval' },
+];
+
+// Generic service types for non-Freightliner trucks
+const GENERIC_SERVICE_TYPES: ServiceType[] = [
+  { value: 'pm', label: 'Preventive Maintenance (PM)' },
+  { value: 'repair', label: 'Repair' },
+  { value: 'tire', label: 'Tire Service' },
+  { value: 'inspection', label: 'Inspection' },
+  { value: 'other', label: 'Other' },
+];
+
 export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps) {
   const { data: trucks } = useTrucks();
   const createWorkOrder = useCreateWorkOrder();
@@ -30,6 +53,30 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
     description: '',
     is_reimbursable: false,
   });
+
+  // Determine if selected truck is a Freightliner
+  const selectedTruck = useMemo(() => {
+    return trucks?.find(t => t.id === formData.truck_id);
+  }, [trucks, formData.truck_id]);
+
+  const isFreightliner = useMemo(() => {
+    return selectedTruck?.make?.toLowerCase() === 'freightliner';
+  }, [selectedTruck]);
+
+  // Get service types based on manufacturer
+  const serviceTypes = useMemo(() => {
+    if (isFreightliner) {
+      // Include both Freightliner-specific and generic types
+      return [
+        ...FREIGHTLINER_SERVICE_TYPES,
+        { value: 'repair', label: 'Repair' },
+        { value: 'tire', label: 'Tire Service' },
+        { value: 'inspection', label: '120-Day Inspection' },
+        { value: 'other', label: 'Other' },
+      ];
+    }
+    return GENERIC_SERVICE_TYPES;
+  }, [isFreightliner]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +124,14 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
   };
 
   const handleChange = (field: string, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      // Reset service_type when truck changes (manufacturer may differ)
+      if (field === 'truck_id') {
+        updated.service_type = '';
+      }
+      return updated;
+    });
   };
 
   return (
@@ -115,7 +169,14 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="serviceType">Service Type *</Label>
+              <Label htmlFor="serviceType">
+                Service Type *
+                {isFreightliner && (
+                  <span className="ml-2 text-xs text-muted-foreground font-normal">
+                    (Cascadia Schedule II)
+                  </span>
+                )}
+              </Label>
               <Select
                 value={formData.service_type}
                 onValueChange={(value) => handleChange('service_type', value)}
@@ -124,11 +185,21 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
                   <SelectValue placeholder="Select service type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pm">Preventive Maintenance (PM)</SelectItem>
-                  <SelectItem value="repair">Repair</SelectItem>
-                  <SelectItem value="tire">Tire Service</SelectItem>
-                  <SelectItem value="inspection">Inspection</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  {isFreightliner && (
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                      Freightliner PM Schedule
+                    </div>
+                  )}
+                  {serviceTypes.map((type: ServiceType) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      <div className="flex flex-col">
+                        <span>{type.label}</span>
+                        {type.description && (
+                          <span className="text-xs text-muted-foreground">{type.description}</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
