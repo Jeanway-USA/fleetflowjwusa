@@ -165,7 +165,7 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
                   key={`${item.source}-${item.id}`}
                 >
                   <TableCell>
-                    {format(new Date(item.date), 'MMM d, yyyy')}
+                    {format(new Date(item.date + 'T00:00:00'), 'MMM d, yyyy')}
                   </TableCell>
                   <TableCell className="font-medium">{item.unitNumber}</TableCell>
                   <TableCell>{getServiceTypeBadge(item.serviceType)}</TableCell>
