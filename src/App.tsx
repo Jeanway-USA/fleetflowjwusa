@@ -27,6 +27,9 @@ import DriverDashboard from "./pages/DriverDashboard";
 import DispatcherDashboard from "./pages/DispatcherDashboard";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import DriverSettings from "./pages/DriverSettings";
+import Incidents from "./pages/Incidents";
+import DriverPerformance from "./pages/DriverPerformance";
+import IFTA from "./pages/IFTA";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -62,6 +65,9 @@ const App = () => {
                   <Route path="/dispatcher-dashboard" element={<DispatcherDashboard />} />
                   <Route path="/executive-dashboard" element={<ExecutiveDashboard />} />
                   <Route path="/driver-settings" element={<DriverSettings />} />
+                  <Route path="/incidents" element={<Incidents />} />
+                  <Route path="/driver-performance" element={<DriverPerformance />} />
+                  <Route path="/ifta" element={<IFTA />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ErrorBoundary>
