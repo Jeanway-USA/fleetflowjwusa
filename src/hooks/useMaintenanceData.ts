@@ -502,13 +502,14 @@ export function useCompleteWorkOrder() {
 
       // If this is an inspection work order, update the service schedule
       if (workOrder.service_type === 'inspection') {
-        const completionDate = new Date().toISOString().split('T')[0];
+        // Use the work order's entry_date (the actual inspection date), not today's date
+        const inspectionDate = workOrder.entry_date;
         
         // Update the 120-Day Inspection service schedule for this truck
         const { error: scheduleError } = await supabase
           .from('service_schedules')
           .update({
-            last_performed_date: completionDate,
+            last_performed_date: inspectionDate,
             last_performed_miles: workOrder.odometer_reading || null,
           })
           .eq('truck_id', workOrder.truck_id)
@@ -522,7 +523,7 @@ export function useCompleteWorkOrder() {
         await supabase
           .from('trucks')
           .update({
-            last_120_inspection_date: completionDate,
+            last_120_inspection_date: inspectionDate,
             last_120_inspection_miles: workOrder.odometer_reading || null,
           })
           .eq('id', workOrder.truck_id);
