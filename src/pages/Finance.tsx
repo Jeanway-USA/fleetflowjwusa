@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StatementUpload } from '@/components/finance/StatementUpload';
+import { SettlementsTab } from '@/components/finance/SettlementsTab';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import type { Database } from '@/integrations/supabase/types';
@@ -984,6 +985,7 @@ export default function Finance() {
           <TabsTrigger value="expenses">Manage Expenses</TabsTrigger>
           <TabsTrigger value="payroll">Driver Payroll</TabsTrigger>
           <TabsTrigger value="commissions">Commissions</TabsTrigger>
+          <TabsTrigger value="settlements">Settlements</TabsTrigger>
           <TabsTrigger value="settings">Compensation Package</TabsTrigger>
         </TabsList>
 
@@ -1721,6 +1723,10 @@ export default function Finance() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="settlements" className="mt-6">
+          <SettlementsTab />
         </TabsContent>
 
         <TabsContent value="settings" className="mt-6">
