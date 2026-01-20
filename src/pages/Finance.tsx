@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { StatementUpload } from '@/components/finance/StatementUpload';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -76,6 +77,11 @@ export default function Finance() {
   const [commissionDialogOpen, setCommissionDialogOpen] = useState(false);
   const [editingCommission, setEditingCommission] = useState<AgentCommission | null>(null);
   const [commissionFormData, setCommissionFormData] = useState<Partial<AgentCommissionInsert>>({});
+  
+  // Mass edit state
+  const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
+  const [massEditDialogOpen, setMassEditDialogOpen] = useState(false);
+  const [massEditFormData, setMassEditFormData] = useState<Partial<ExpenseInsert>>({});
 
   const { data: settings = [] } = useQuery({
     queryKey: ['company_settings'],
@@ -316,6 +322,73 @@ export default function Finance() {
     setCommissionFormData({});
   };
 
+  // Mass edit functions
+  const toggleExpenseSelection = (id: string) => {
+    setSelectedExpenseIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllExpenses = () => {
+    if (selectedExpenseIds.size === sortedFilteredExpenses.length) {
+      setSelectedExpenseIds(new Set());
+    } else {
+      setSelectedExpenseIds(new Set(sortedFilteredExpenses.map(e => e.id)));
+    }
+  };
+
+  const openMassEditDialog = () => {
+    setMassEditFormData({});
+    setMassEditDialogOpen(true);
+  };
+
+  const closeMassEditDialog = () => {
+    setMassEditDialogOpen(false);
+    setMassEditFormData({});
+  };
+
+  const massUpdateExpensesMutation = useMutation({
+    mutationFn: async (updates: Partial<ExpenseInsert>) => {
+      const ids = Array.from(selectedExpenseIds);
+      const { error } = await supabase
+        .from('expenses')
+        .update(updates)
+        .in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast.success(`${selectedExpenseIds.size} expenses updated`);
+      setSelectedExpenseIds(new Set());
+      closeMassEditDialog();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const handleMassEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // Only include fields that were actually set
+    const updates: Partial<ExpenseInsert> = {};
+    if (massEditFormData.expense_type) updates.expense_type = massEditFormData.expense_type;
+    if (massEditFormData.expense_date) updates.expense_date = massEditFormData.expense_date;
+    if (massEditFormData.truck_id !== undefined) updates.truck_id = massEditFormData.truck_id || null;
+    if (massEditFormData.load_id !== undefined) updates.load_id = massEditFormData.load_id || null;
+    if (massEditFormData.description !== undefined) updates.description = massEditFormData.description;
+    
+    if (Object.keys(updates).length === 0) {
+      toast.error('Please select at least one field to update');
+      return;
+    }
+    
+    massUpdateExpensesMutation.mutate(updates);
+  };
+
   const handleExpenseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!expenseFormData.expense_type || !expenseFormData.amount) {
@@ -448,6 +521,14 @@ export default function Finance() {
 
   const filteredLoads = getFilteredLoads();
   const filteredExpenses = getFilteredExpenses();
+  
+  // Sort expenses chronologically (oldest first for consistent ordering)
+  const sortedFilteredExpenses = [...filteredExpenses].sort((a, b) => {
+    if (!a.expense_date && !b.expense_date) return 0;
+    if (!a.expense_date) return 1;
+    if (!b.expense_date) return -1;
+    return parseISO(a.expense_date).getTime() - parseISO(b.expense_date).getTime();
+  });
 
   // Filter payroll by period
   const getFilteredPayrolls = () => {
@@ -1132,17 +1213,102 @@ export default function Finance() {
                   Track expenses by type, optionally link to a load or truck
                 </CardDescription>
               </div>
-              <Button onClick={() => openExpenseDialog()} className="gradient-gold text-primary-foreground">
-                <Plus className="h-4 w-4 mr-2" /> Add Expense
-              </Button>
+              <div className="flex gap-2">
+                {selectedExpenseIds.size > 0 && (
+                  <Button variant="outline" onClick={openMassEditDialog}>
+                    <CheckSquare className="h-4 w-4 mr-2" />
+                    Edit {selectedExpenseIds.size} Selected
+                  </Button>
+                )}
+                <Button onClick={() => openExpenseDialog()} className="gradient-gold text-primary-foreground">
+                  <Plus className="h-4 w-4 mr-2" /> Add Expense
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              <DataTable 
-                columns={expenseColumns} 
-                data={filteredExpenses} 
-                loading={expensesLoading} 
-                emptyMessage="No expenses recorded yet" 
-              />
+              <div className="rounded-lg border border-border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={sortedFilteredExpenses.length > 0 && selectedExpenseIds.size === sortedFilteredExpenses.length}
+                          onCheckedChange={toggleSelectAllExpenses}
+                        />
+                      </TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Gallons</TableHead>
+                      <TableHead>Truck</TableHead>
+                      <TableHead>Load</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {expensesLoading ? (
+                      [1, 2, 3].map((i) => (
+                        <TableRow key={i}>
+                          {[...Array(9)].map((_, j) => (
+                            <TableCell key={j}><div className="h-4 bg-muted animate-pulse rounded" /></TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    ) : sortedFilteredExpenses.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                          No expenses recorded yet
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      sortedFilteredExpenses.map((expense) => {
+                        const isRefund = isRefundExpense(expense);
+                        const absAmount = Math.abs(Number(expense.amount));
+                        return (
+                          <TableRow key={expense.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={selectedExpenseIds.has(expense.id)}
+                                onCheckedChange={() => toggleExpenseSelection(expense.id)}
+                              />
+                            </TableCell>
+                            <TableCell>{expense.expense_date ? format(parseISO(expense.expense_date), 'MM/dd/yyyy') : '-'}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {isRefund && <TrendingUp className="h-4 w-4 text-success" />}
+                                <span className={isRefund ? 'text-success font-medium' : ''}>
+                                  {expense.expense_type}
+                                  {isRefund && expense.expense_type !== 'Reimbursement' && expense.expense_type !== 'Fuel Discount' && ' (Refund)'}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{expense.description || '-'}</TableCell>
+                            <TableCell>
+                              <span className={`font-medium ${isRefund ? 'text-success' : 'text-destructive'}`}>
+                                {isRefund ? '+' : '-'}{formatCurrency(absAmount)}
+                              </span>
+                            </TableCell>
+                            <TableCell>{expense.gallons ? `${expense.gallons} gal` : '-'}</TableCell>
+                            <TableCell>{getTruckName(expense.truck_id)}</TableCell>
+                            <TableCell>{getLoadName(expense.load_id)}</TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button size="icon" variant="ghost" onClick={() => openExpenseDialog(expense)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteExpenseMutation.mutate(expense.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1782,6 +1948,91 @@ export default function Finance() {
               <Button type="button" variant="outline" onClick={closeCommissionDialog}>Cancel</Button>
               <Button type="submit" className="gradient-gold text-primary-foreground">
                 {editingCommission ? 'Save Changes' : 'Add Commission'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mass Edit Expenses Dialog */}
+      <Dialog open={massEditDialogOpen} onOpenChange={setMassEditDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckSquare className="h-5 w-5" />
+              Edit {selectedExpenseIds.size} Expenses
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleMassEditSubmit} className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Only fill in the fields you want to update. Empty fields will not be changed.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Expense Type</Label>
+                <Select value={massEditFormData.expense_type || ''} onValueChange={(v) => setMassEditFormData({ ...massEditFormData, expense_type: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Keep current" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {expenseTypes.map(type => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={massEditFormData.expense_date || ''}
+                  onChange={(e) => setMassEditFormData({ ...massEditFormData, expense_date: e.target.value })}
+                  placeholder="Keep current"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Truck</Label>
+                <Select value={massEditFormData.truck_id || 'keep'} onValueChange={(v) => setMassEditFormData({ ...massEditFormData, truck_id: v === 'keep' ? undefined : (v === 'none' ? null : v) })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Keep current" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="keep">Keep current</SelectItem>
+                    <SelectItem value="none">No truck</SelectItem>
+                    {trucks.map((truck: any) => (
+                      <SelectItem key={truck.id} value={truck.id}>Unit #{truck.unit_number}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Load</Label>
+                <Select value={massEditFormData.load_id || 'keep'} onValueChange={(v) => setMassEditFormData({ ...massEditFormData, load_id: v === 'keep' ? undefined : (v === 'none' ? null : v) })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Keep current" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="keep">Keep current</SelectItem>
+                    <SelectItem value="none">No load</SelectItem>
+                    {loads.slice(0, 50).map((load: any) => (
+                      <SelectItem key={load.id} value={load.id}>{load.landstar_load_id || `${load.origin} → ${load.destination}`}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input
+                value={massEditFormData.description ?? ''}
+                onChange={(e) => setMassEditFormData({ ...massEditFormData, description: e.target.value })}
+                placeholder="Keep current (leave empty)"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={closeMassEditDialog}>Cancel</Button>
+              <Button type="submit" className="gradient-gold text-primary-foreground">
+                Update {selectedExpenseIds.size} Expenses
               </Button>
             </DialogFooter>
           </form>
