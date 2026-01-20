@@ -14,6 +14,7 @@ import {
   BookOpen,
   BarChart3,
   Crown,
+  Container,
   LucideIcon
 } from 'lucide-react';
 import jwBannerLight from '@/assets/JW_Banner.png';
@@ -68,6 +69,7 @@ export function AppSidebar() {
 
   const fleetNavItems: NavItem[] = [
     { title: 'Trucks', icon: Truck, path: '/trucks', roles: ['owner', 'dispatcher', 'safety'] },
+    { title: 'Trailers', icon: Container, path: '/trailers', roles: ['owner', 'dispatcher', 'safety'] },
     { title: 'Drivers', icon: Users, path: '/drivers', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety'] },
   ];
 

@@ -651,6 +651,7 @@ export type Database = {
           settlement: number | null
           start_miles: number | null
           status: string
+          trailer_id: string | null
           trailer_revenue: number | null
           truck_id: string | null
           truck_revenue: number | null
@@ -686,6 +687,7 @@ export type Database = {
           settlement?: number | null
           start_miles?: number | null
           status?: string
+          trailer_id?: string | null
           trailer_revenue?: number | null
           truck_id?: string | null
           truck_revenue?: number | null
@@ -721,6 +723,7 @@ export type Database = {
           settlement?: number | null
           start_miles?: number | null
           status?: string
+          trailer_id?: string | null
           trailer_revenue?: number | null
           truck_id?: string | null
           truck_revenue?: number | null
@@ -1300,6 +1303,202 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      settlement_line_items: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string
+          id: string
+          load_id: string | null
+          settlement_id: string
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description: string
+          id?: string
+          load_id?: string | null
+          settlement_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          load_id?: string | null
+          settlement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlement_line_items_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settlements: {
+        Row: {
+          cash_advances: number | null
+          created_at: string
+          driver_id: string
+          driver_pay: number
+          escrow_deduction: number | null
+          fuel_advances: number | null
+          gross_revenue: number
+          id: string
+          net_pay: number | null
+          notes: string | null
+          other_deductions: number | null
+          pdf_url: string | null
+          period_end: string
+          period_start: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          cash_advances?: number | null
+          created_at?: string
+          driver_id: string
+          driver_pay?: number
+          escrow_deduction?: number | null
+          fuel_advances?: number | null
+          gross_revenue?: number
+          id?: string
+          net_pay?: number | null
+          notes?: string | null
+          other_deductions?: number | null
+          pdf_url?: string | null
+          period_end: string
+          period_start: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          cash_advances?: number | null
+          created_at?: string
+          driver_id?: string
+          driver_pay?: number
+          escrow_deduction?: number | null
+          fuel_advances?: number | null
+          gross_revenue?: number
+          id?: string
+          net_pay?: number | null
+          notes?: string | null
+          other_deductions?: number | null
+          pdf_url?: string | null
+          period_end?: string
+          period_start?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      trailer_assignments: {
+        Row: {
+          assigned_at: string
+          created_at: string
+          driver_id: string | null
+          id: string
+          released_at: string | null
+          trailer_id: string
+          truck_id: string | null
+        }
+        Insert: {
+          assigned_at?: string
+          created_at?: string
+          driver_id?: string | null
+          id?: string
+          released_at?: string | null
+          trailer_id: string
+          truck_id?: string | null
+        }
+        Update: {
+          assigned_at?: string
+          created_at?: string
+          driver_id?: string | null
+          id?: string
+          released_at?: string | null
+          trailer_id?: string
+          truck_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trailer_assignments_trailer_id_fkey"
+            columns: ["trailer_id"]
+            isOneToOne: false
+            referencedRelation: "trailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trailers: {
+        Row: {
+          created_at: string
+          current_driver_id: string | null
+          id: string
+          last_inspection_date: string | null
+          license_plate: string | null
+          license_plate_state: string | null
+          make: string | null
+          model: string | null
+          monthly_payment: number | null
+          next_inspection_date: string | null
+          notes: string | null
+          owned_or_leased: string | null
+          status: string
+          trailer_type: string
+          unit_number: string
+          updated_at: string
+          vin: string | null
+          year: number | null
+        }
+        Insert: {
+          created_at?: string
+          current_driver_id?: string | null
+          id?: string
+          last_inspection_date?: string | null
+          license_plate?: string | null
+          license_plate_state?: string | null
+          make?: string | null
+          model?: string | null
+          monthly_payment?: number | null
+          next_inspection_date?: string | null
+          notes?: string | null
+          owned_or_leased?: string | null
+          status?: string
+          trailer_type?: string
+          unit_number: string
+          updated_at?: string
+          vin?: string | null
+          year?: number | null
+        }
+        Update: {
+          created_at?: string
+          current_driver_id?: string | null
+          id?: string
+          last_inspection_date?: string | null
+          license_plate?: string | null
+          license_plate_state?: string | null
+          make?: string | null
+          model?: string | null
+          monthly_payment?: number | null
+          next_inspection_date?: string | null
+          notes?: string | null
+          owned_or_leased?: string | null
+          status?: string
+          trailer_type?: string
+          unit_number?: string
+          updated_at?: string
+          vin?: string | null
+          year?: number | null
+        }
+        Relationships: []
       }
       trucks: {
         Row: {

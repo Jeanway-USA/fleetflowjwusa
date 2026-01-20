@@ -12,6 +12,7 @@ import { RoleBasedRedirect } from "@/components/shared/RoleBasedRedirect";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Trucks from "./pages/Trucks";
+import Trailers from "./pages/Trailers";
 import Drivers from "./pages/Drivers";
 import FleetLoads from "./pages/FleetLoads";
 import AgencyLoads from "./pages/AgencyLoads";
@@ -45,6 +46,7 @@ const App = () => {
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/trucks" element={<Trucks />} />
+                  <Route path="/trailers" element={<Trailers />} />
                   <Route path="/drivers" element={<Drivers />} />
                   <Route path="/fleet-loads" element={<FleetLoads />} />
                   <Route path="/agency-loads" element={<AgencyLoads />} />
