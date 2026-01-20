@@ -128,6 +128,22 @@ const getServiceTypeMatcher = (serviceType: string): ((st: string) => boolean) =
   }
 };
 
+// Hook to fetch all manufacturer PM profiles (for work order service type selection)
+export function useManufacturerPMProfiles() {
+  return useQuery({
+    queryKey: ['manufacturer-pm-profiles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('manufacturer_pm_profiles')
+        .select('*')
+        .order('manufacturer')
+        .order('display_order');
+      if (error) throw error;
+      return data as ManufacturerPMProfile[];
+    },
+  });
+}
+
 // Hook for Fleet Availability KPI
 export function useFleetAvailability() {
   return useQuery({

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,11 +8,12 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
-import { useCreateWorkOrder, useTrucks } from '@/hooks/useMaintenanceData';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { useCreateWorkOrder, useTrucks, useManufacturerPMProfiles, ManufacturerPMProfile } from '@/hooks/useMaintenanceData';
 import { toast } from 'sonner';
-import { Loader2, Plus, DollarSign, ChevronDown, X } from 'lucide-react';
+import { Loader2, Plus, DollarSign, ChevronDown, X, Check, Search, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 interface NewWorkOrderSheetProps {
   open: boolean;
@@ -23,27 +24,22 @@ interface ServiceType {
   value: string;
   label: string;
   description?: string;
+  interval?: string;
 }
 
-// Freightliner Cascadia Schedule II service types
-const FREIGHTLINER_SERVICE_TYPES: ServiceType[] = [
-  { value: 'M1', label: 'M1 Service (Safety & Grease)', description: '25,000 mi interval' },
-  { value: 'PM_A', label: 'PM A (Oil & Fuel)', description: '50,000 mi interval' },
-  { value: 'M2', label: 'M2 Service (Annual)', description: '100,000 mi interval' },
-  { value: 'M3', label: 'M3 Service (Major Fluids)', description: '300,000 mi interval' },
-];
+// Manufacturer schedule display names
+const MANUFACTURER_SCHEDULE_NAMES: Record<string, string> = {
+  'freightliner': 'Cascadia Schedule II',
+  'western star': 'Daimler M-System',
+  'peterbilt': 'PACCAR Normal Duty',
+  'kenworth': 'PACCAR Normal Duty',
+  'international': 'Class A/B/C/D System',
+  'volvo': 'VDS-4.5 Normal Duty',
+  'mack': 'EOS-4.5 Normal Duty',
+};
 
-// Generic service types for non-Freightliner trucks
+// Generic service types available for all trucks
 const GENERIC_SERVICE_TYPES: ServiceType[] = [
-  { value: 'pm', label: 'Preventive Maintenance (PM)' },
-  { value: 'repair', label: 'Repair' },
-  { value: 'tire', label: 'Tire Service' },
-  { value: 'inspection', label: 'Inspection' },
-  { value: 'other', label: 'Other' },
-];
-
-// Additional types for Freightliner (in addition to M-services)
-const FREIGHTLINER_ADDITIONAL_TYPES: ServiceType[] = [
   { value: 'repair', label: 'Repair' },
   { value: 'tire', label: 'Tire Service' },
   { value: 'inspection', label: '120-Day Inspection' },
@@ -52,8 +48,12 @@ const FREIGHTLINER_ADDITIONAL_TYPES: ServiceType[] = [
 
 export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps) {
   const { data: trucks } = useTrucks();
+  const { data: pmProfiles } = useManufacturerPMProfiles();
   const createWorkOrder = useCreateWorkOrder();
   const [serviceTypesOpen, setServiceTypesOpen] = useState(false);
+  const [vehicleOpen, setVehicleOpen] = useState(false);
+  const [vehicleSearch, setVehicleSearch] = useState('');
+  const vehicleListRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     truck_id: '',
@@ -66,32 +66,95 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
     is_reimbursable: false,
   });
 
-  // Determine if selected truck is a Freightliner
+  // Find selected truck
   const selectedTruck = useMemo(() => {
     return trucks?.find(t => t.id === formData.truck_id);
   }, [trucks, formData.truck_id]);
 
-  const isFreightliner = useMemo(() => {
-    return selectedTruck?.make?.toLowerCase() === 'freightliner';
+  // Get manufacturer key (normalized)
+  const manufacturerKey = useMemo(() => {
+    return (selectedTruck?.make || '').trim().toLowerCase();
   }, [selectedTruck]);
 
-  // Get service types based on manufacturer
-  const serviceTypes = useMemo(() => {
-    if (isFreightliner) {
-      return {
-        pmTypes: FREIGHTLINER_SERVICE_TYPES,
-        otherTypes: FREIGHTLINER_ADDITIONAL_TYPES,
-      };
-    }
-    return {
-      pmTypes: [],
-      otherTypes: GENERIC_SERVICE_TYPES,
-    };
-  }, [isFreightliner]);
+  // Get schedule name for selected manufacturer
+  const scheduleName = useMemo(() => {
+    return MANUFACTURER_SCHEDULE_NAMES[manufacturerKey] || null;
+  }, [manufacturerKey]);
 
+  // Group and filter trucks for the searchable list
+  const groupedTrucks = useMemo(() => {
+    if (!trucks) return { groups: {}, all: [] };
+
+    const filtered = vehicleSearch.trim()
+      ? trucks.filter(t => {
+          const search = vehicleSearch.toLowerCase();
+          return (
+            t.unit_number.toLowerCase().includes(search) ||
+            (t.make || '').toLowerCase().includes(search) ||
+            (t.model || '').toLowerCase().includes(search)
+          );
+        })
+      : trucks;
+
+    // Group by manufacturer
+    const groups: Record<string, typeof trucks> = {};
+    filtered.forEach(truck => {
+      const make = (truck.make || 'Other').trim();
+      if (!groups[make]) groups[make] = [];
+      groups[make].push(truck);
+    });
+
+    // Sort groups alphabetically
+    const sortedGroups: Record<string, typeof trucks> = {};
+    Object.keys(groups)
+      .sort()
+      .forEach(key => {
+        sortedGroups[key] = groups[key].sort((a, b) => 
+          a.unit_number.localeCompare(b.unit_number, undefined, { numeric: true })
+        );
+      });
+
+    return { groups: sortedGroups, all: filtered };
+  }, [trucks, vehicleSearch]);
+
+  // Flatten for virtualizer
+  const flattenedTruckItems = useMemo(() => {
+    const items: Array<{ type: 'header' | 'truck'; label?: string; truck?: typeof trucks extends (infer T)[] ? T : never }> = [];
+    Object.entries(groupedTrucks.groups).forEach(([make, truckList]) => {
+      items.push({ type: 'header', label: make });
+      truckList.forEach(truck => {
+        items.push({ type: 'truck', truck });
+      });
+    });
+    return items;
+  }, [groupedTrucks]);
+
+  // Virtual scrolling for large truck lists
+  const rowVirtualizer = useVirtualizer({
+    count: flattenedTruckItems.length,
+    getScrollElement: () => vehicleListRef.current,
+    estimateSize: (index) => flattenedTruckItems[index].type === 'header' ? 32 : 40,
+    overscan: 5,
+  });
+
+  // Get manufacturer-specific PM service types from database
+  const manufacturerServiceTypes = useMemo((): ServiceType[] => {
+    if (!pmProfiles || !manufacturerKey) return [];
+    
+    return pmProfiles
+      .filter(p => p.manufacturer.toLowerCase() === manufacturerKey)
+      .map(p => ({
+        value: p.service_code,
+        label: `${p.service_code.replace('_', ' ')} (${p.service_name.replace(p.service_code.replace('_', ' ') + ' ', '').replace('(', '').replace(')', '')})`,
+        description: p.description || undefined,
+        interval: p.interval_miles ? `${p.interval_miles.toLocaleString()} mi` : undefined,
+      }));
+  }, [pmProfiles, manufacturerKey]);
+
+  // All available service types for the selected truck
   const allServiceTypes = useMemo(() => {
-    return [...serviceTypes.pmTypes, ...serviceTypes.otherTypes];
-  }, [serviceTypes]);
+    return [...manufacturerServiceTypes, ...GENERIC_SERVICE_TYPES];
+  }, [manufacturerServiceTypes]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +173,7 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
       await createWorkOrder.mutateAsync({
         truck_id: formData.truck_id,
         service_types: formData.service_types,
-        service_type: formData.service_types.join(', '), // Keep for backwards compatibility
+        service_type: formData.service_types.join(', '),
         vendor: formData.vendor || undefined,
         odometer_reading: formData.odometer_reading ? parseInt(formData.odometer_reading) : undefined,
         cost_estimate: formData.cost_estimate ? parseFloat(formData.cost_estimate) : undefined,
@@ -133,6 +196,7 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
         description: '',
         is_reimbursable: false,
       });
+      setVehicleSearch('');
     } catch (error) {
       console.error('Error creating work order:', error);
       toast.error('Failed to create work order');
@@ -142,7 +206,6 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
   const handleChange = (field: string, value: string | boolean) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
-      // Reset service_types when truck changes (manufacturer may differ)
       if (field === 'truck_id') {
         updated.service_types = [];
       }
@@ -166,20 +229,14 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
     }));
   };
 
-  const getServiceLabel = (value: string) => {
-    const type = allServiceTypes.find(t => t.value === value);
-    return type?.label || value;
-  };
-
   const getShortLabel = (value: string) => {
-    // Return a shorter version for badges
     const type = allServiceTypes.find(t => t.value === value);
     if (!type) return value;
-    // For M-services, just return the code
-    if (['M1', 'PM_A', 'M2', 'M3'].includes(value)) {
-      return value === 'PM_A' ? 'PM A' : value;
+    // For service codes, format nicely
+    if (value.includes('_')) {
+      return value.replace('_', ' ');
     }
-    return type.label.split(' ')[0]; // First word only
+    return type.label.split(' ')[0];
   };
 
   return (
@@ -197,31 +254,151 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
 
         <form onSubmit={handleSubmit} className="space-y-6 py-6">
           <div className="space-y-4">
+            {/* Searchable Vehicle Selector */}
             <div className="grid gap-2">
               <Label htmlFor="truck">Vehicle *</Label>
-              <Select
-                value={formData.truck_id}
-                onValueChange={(value) => handleChange('truck_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a vehicle" />
-                </SelectTrigger>
-                <SelectContent>
-                  {trucks?.map(truck => (
-                    <SelectItem key={truck.id} value={truck.id}>
-                      {truck.unit_number} {truck.make && truck.model && `- ${truck.make} ${truck.model}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={vehicleOpen} onOpenChange={setVehicleOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={vehicleOpen}
+                    className={cn(
+                      "w-full justify-between",
+                      !formData.truck_id && "text-muted-foreground"
+                    )}
+                  >
+                    {selectedTruck ? (
+                      <span className="flex items-center gap-2">
+                        <Truck className="h-4 w-4" />
+                        <span className="font-medium">{selectedTruck.unit_number}</span>
+                        {selectedTruck.make && (
+                          <Badge variant="secondary" className="text-xs">
+                            {selectedTruck.make.trim()}
+                          </Badge>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Search className="h-4 w-4" />
+                        Select a vehicle...
+                      </span>
+                    )}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[350px] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput 
+                      placeholder="Search by unit, make, or model..." 
+                      value={vehicleSearch}
+                      onValueChange={setVehicleSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No vehicles found.</CommandEmpty>
+                      {groupedTrucks.all.length <= 50 ? (
+                        // Non-virtualized for small lists
+                        Object.entries(groupedTrucks.groups).map(([make, truckList]) => (
+                          <CommandGroup key={make} heading={make}>
+                            {truckList.map(truck => (
+                              <CommandItem
+                                key={truck.id}
+                                value={truck.id}
+                                onSelect={() => {
+                                  handleChange('truck_id', truck.id);
+                                  setVehicleOpen(false);
+                                  setVehicleSearch('');
+                                }}
+                                className="flex items-center justify-between"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Truck className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium">{truck.unit_number}</span>
+                                  {truck.model && (
+                                    <span className="text-muted-foreground text-sm">{truck.model}</span>
+                                  )}
+                                </span>
+                                {formData.truck_id === truck.id && (
+                                  <Check className="h-4 w-4" />
+                                )}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        ))
+                      ) : (
+                        // Virtualized for large lists
+                        <div
+                          ref={vehicleListRef}
+                          className="max-h-[300px] overflow-auto"
+                        >
+                          <div
+                            style={{
+                              height: `${rowVirtualizer.getTotalSize()}px`,
+                              width: '100%',
+                              position: 'relative',
+                            }}
+                          >
+                            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                              const item = flattenedTruckItems[virtualRow.index];
+                              return (
+                                <div
+                                  key={virtualRow.index}
+                                  style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: `${virtualRow.size}px`,
+                                    transform: `translateY(${virtualRow.start}px)`,
+                                  }}
+                                >
+                                  {item.type === 'header' ? (
+                                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground bg-muted/50">
+                                      {item.label}
+                                    </div>
+                                  ) : item.truck ? (
+                                    <div
+                                      className={cn(
+                                        "flex items-center justify-between px-2 py-2 cursor-pointer hover:bg-accent",
+                                        formData.truck_id === item.truck.id && "bg-accent"
+                                      )}
+                                      onClick={() => {
+                                        handleChange('truck_id', item.truck!.id);
+                                        setVehicleOpen(false);
+                                        setVehicleSearch('');
+                                      }}
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <Truck className="h-4 w-4 text-muted-foreground" />
+                                        <span className="font-medium">{item.truck.unit_number}</span>
+                                        {item.truck.model && (
+                                          <span className="text-muted-foreground text-sm">{item.truck.model}</span>
+                                        )}
+                                      </span>
+                                      {formData.truck_id === item.truck.id && (
+                                        <Check className="h-4 w-4" />
+                                      )}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
+            {/* Service Types with Manufacturer-Specific Options */}
             <div className="grid gap-2">
               <Label>
                 Service Types *
-                {isFreightliner && (
+                {scheduleName && (
                   <span className="ml-2 text-xs text-muted-foreground font-normal">
-                    (Cascadia Schedule II)
+                    ({scheduleName})
                   </span>
                 )}
               </Label>
@@ -268,12 +445,13 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
                 </PopoverTrigger>
                 <PopoverContent className="w-[350px] p-0" align="start">
                   <div className="max-h-[300px] overflow-y-auto p-2">
-                    {isFreightliner && serviceTypes.pmTypes.length > 0 && (
+                    {/* Manufacturer PM Services */}
+                    {manufacturerServiceTypes.length > 0 && (
                       <>
                         <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                          Freightliner PM Schedule
+                          {scheduleName || 'Manufacturer PM Schedule'}
                         </div>
-                        {serviceTypes.pmTypes.map(type => (
+                        {manufacturerServiceTypes.map(type => (
                           <div
                             key={type.value}
                             className="flex items-start space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
@@ -284,12 +462,17 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
                               checked={formData.service_types.includes(type.value)}
                               onCheckedChange={() => toggleServiceType(type.value)}
                             />
-                            <div className="grid gap-0.5 leading-none">
+                            <div className="grid gap-0.5 leading-none flex-1">
                               <label
                                 htmlFor={type.value}
-                                className="text-sm font-medium leading-none cursor-pointer"
+                                className="text-sm font-medium leading-none cursor-pointer flex items-center justify-between"
                               >
-                                {type.label}
+                                <span>{type.label}</span>
+                                {type.interval && (
+                                  <span className="text-xs text-muted-foreground font-normal">
+                                    {type.interval}
+                                  </span>
+                                )}
                               </label>
                               {type.description && (
                                 <span className="text-xs text-muted-foreground">
@@ -300,12 +483,14 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
                           </div>
                         ))}
                         <div className="my-2 border-t" />
-                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                          Other Services
-                        </div>
                       </>
                     )}
-                    {serviceTypes.otherTypes.map(type => (
+                    
+                    {/* Generic Services */}
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                      Other Services
+                    </div>
+                    {GENERIC_SERVICE_TYPES.map(type => (
                       <div
                         key={type.value}
                         className="flex items-start space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
@@ -323,11 +508,6 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
                           >
                             {type.label}
                           </label>
-                          {type.description && (
-                            <span className="text-xs text-muted-foreground">
-                              {type.description}
-                            </span>
-                          )}
                         </div>
                       </div>
                     ))}
