@@ -46,6 +46,7 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     license_plate_state,
     next_inspection_date,
     current_driver_id,
+    purchase_mileage,
   } = truck;
 
   return {
@@ -59,6 +60,7 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     license_plate_state: license_plate_state ?? null,
     next_inspection_date: next_inspection_date ?? null,
     current_driver_id: current_driver_id ?? null,
+    purchase_mileage: purchase_mileage ?? null,
   };
 };
 
@@ -356,9 +358,21 @@ export default function Trucks() {
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="next_inspection_date">Next Inspection Date</Label>
-              <Input id="next_inspection_date" type="date" value={formData.next_inspection_date || ''} onChange={(e) => setFormData({ ...formData, next_inspection_date: e.target.value })} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="next_inspection_date">Next Inspection Date</Label>
+                <Input id="next_inspection_date" type="date" value={formData.next_inspection_date || ''} onChange={(e) => setFormData({ ...formData, next_inspection_date: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="purchase_mileage">Purchase Mileage</Label>
+                <Input 
+                  id="purchase_mileage" 
+                  type="number" 
+                  value={(formData as any).purchase_mileage || ''} 
+                  onChange={(e) => setFormData({ ...formData, purchase_mileage: e.target.value ? parseInt(e.target.value) : null } as any)} 
+                  placeholder="e.g. 50000"
+                />
+              </div>
             </div>
 
             <div className="border-t pt-4">
