@@ -88,7 +88,7 @@ export default function DispatcherDashboard() {
 
   // Redirect if user doesn't have dispatcher role (after all hooks)
   if (!hasRole('dispatcher') && roles.length > 0) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const getGreeting = () => {
