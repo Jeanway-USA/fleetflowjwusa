@@ -46,13 +46,17 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
           </TableRow>
         </TableHeader>
         <TableBody>
-          {trucks.map(truck => {
+          {trucks.map((truck: any) => {
             const oilChangeSchedule = truck.schedules.find(s => s.service_name === 'Oil Change');
             const tiresSchedule = truck.schedules.find(s => s.service_name === 'Tire Replacement');
             const inspectionSchedule = truck.schedules.find(s => s.service_name === '120-Day Inspection');
-            
-            // Use calculated odometer from delivered loads
-            const currentOdometer = truck.calculated_odometer || 0;
+
+            // Display odometer comes from last delivered load (end_miles)
+            const currentOdometer = (truck as any).calculated_odometer || 0;
+
+            // PM usage is based on delivered load actual_miles since the last performed date
+            const oilCurrentValue = (oilChangeSchedule?.last_performed_miles || 0) + ((truck as any).miles_since_oil_change || 0);
+            const tireCurrentValue = (tiresSchedule?.last_performed_miles || 0) + ((truck as any).miles_since_tire_replacement || 0);
 
             return (
               <TableRow 
@@ -66,7 +70,7 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
                   {oilChangeSchedule ? (
                     <HealthBar
                       serviceName="Oil"
-                      currentValue={currentOdometer}
+                      currentValue={oilCurrentValue}
                       lastPerformedValue={oilChangeSchedule.last_performed_miles || 0}
                       intervalValue={oilChangeSchedule.interval_miles || 15000}
                       unit="miles"
@@ -79,7 +83,7 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
                   {tiresSchedule ? (
                     <HealthBar
                       serviceName="Tires"
-                      currentValue={currentOdometer}
+                      currentValue={tireCurrentValue}
                       lastPerformedValue={tiresSchedule.last_performed_miles || 0}
                       intervalValue={tiresSchedule.interval_miles || 80000}
                       unit="miles"
