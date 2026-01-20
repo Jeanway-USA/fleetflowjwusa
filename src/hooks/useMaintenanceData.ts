@@ -47,7 +47,15 @@ export interface TruckWithSchedules {
   id: string;
   unit_number: string;
   current_odometer: number | null;
-  calculated_odometer: number; // Miles from delivered loads
+  /**
+   * Truck odometer as of the most recently delivered load (fleet_loads.end_miles).
+   * Falls back to trucks.current_odometer when no delivered loads exist.
+   */
+  calculated_odometer: number;
+  /** Miles driven since last Oil Change based on delivered loads' actual_miles. */
+  miles_since_oil_change: number;
+  /** Miles driven since last Tire Replacement based on delivered loads' actual_miles. */
+  miles_since_tire_replacement: number;
   last_120_inspection_date: string | null;
   status: string;
   schedules: ServiceSchedule[];
@@ -406,32 +414,64 @@ export function usePMSchedule() {
 
       if (schedulesError) throw schedulesError;
 
-      // Get the most recent delivered load per truck to get end_miles (actual odometer)
+      // Delivered loads drive two different concepts:
+      // 1) Current Odometer display: last delivered load's end_miles
+      // 2) PM progress: miles since last service = sum of delivered loads' actual_miles since last_performed_date
       const { data: deliveredLoads, error: loadsError } = await supabase
         .from('fleet_loads')
-        .select('truck_id, end_miles, delivery_date')
+        .select('truck_id, end_miles, delivery_date, actual_miles')
         .eq('status', 'delivered')
-        .not('end_miles', 'is', null)
         .order('delivery_date', { ascending: false });
 
       if (loadsError) throw loadsError;
 
-      // Get the latest end_miles per truck (actual odometer reading)
+      // Latest end_miles per truck (actual odometer reading)
       const truckOdometerMap = new Map<string, number>();
       deliveredLoads?.forEach(load => {
         if (load.truck_id && load.end_miles && !truckOdometerMap.has(load.truck_id)) {
-          // Only take the first (most recent) load for each truck
           truckOdometerMap.set(load.truck_id, load.end_miles);
         }
       });
 
-      // Map schedules to trucks with odometer from last delivered load
-      const trucksWithSchedules: TruckWithSchedules[] = trucks?.map(truck => ({
-        ...truck,
-        // Use end_miles from the most recent delivered load as the odometer
-        calculated_odometer: truckOdometerMap.get(truck.id) || truck.current_odometer || 0,
-        schedules: schedules?.filter(s => s.truck_id === truck.id) || [],
-      })) || [];
+      // Index delivered loads by truck for mileage calculations
+      const loadsByTruck = new Map<string, { delivery_date: string | null; actual_miles: number | null }[]>();
+      deliveredLoads?.forEach(load => {
+        if (!load.truck_id) return;
+        const arr = loadsByTruck.get(load.truck_id) || [];
+        arr.push({
+          delivery_date: load.delivery_date ?? null,
+          actual_miles: load.actual_miles ?? null,
+        });
+        loadsByTruck.set(load.truck_id, arr);
+      });
+
+      const sumActualMilesSince = (truckId: string, sinceDate: string | null) => {
+        const loads = loadsByTruck.get(truckId) || [];
+        return loads.reduce((sum, l) => {
+          if (!l.actual_miles) return sum;
+          if (!l.delivery_date) return sum;
+          if (!sinceDate) return sum + l.actual_miles;
+          return new Date(l.delivery_date).getTime() > new Date(sinceDate).getTime() ? sum + l.actual_miles : sum;
+        }, 0);
+      };
+
+      // Map schedules to trucks with:
+      // - calculated_odometer = last delivered end_miles
+      // - miles since oil/tires = sum(actual_miles) since that service was last performed
+      const trucksWithSchedules: TruckWithSchedules[] =
+        trucks?.map(truck => {
+          const truckSchedules = schedules?.filter(s => s.truck_id === truck.id) || [];
+          const oilSchedule = truckSchedules.find(s => s.service_name === 'Oil Change') || null;
+          const tireSchedule = truckSchedules.find(s => s.service_name === 'Tire Replacement') || null;
+
+          return {
+            ...truck,
+            calculated_odometer: truckOdometerMap.get(truck.id) || truck.current_odometer || 0,
+            miles_since_oil_change: sumActualMilesSince(truck.id, oilSchedule?.last_performed_date || null),
+            miles_since_tire_replacement: sumActualMilesSince(truck.id, tireSchedule?.last_performed_date || null),
+            schedules: truckSchedules,
+          };
+        }) || [];
 
       return trucksWithSchedules;
     },
