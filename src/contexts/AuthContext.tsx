@@ -10,12 +10,15 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   roles: AppRole[];
+  simulatedRole: AppRole | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
+  setSimulatedRole: (role: AppRole | null) => void;
   isOwner: boolean;
   isAdmin: boolean;
+  isSimulating: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<AppRole[]>([]);
+  const [simulatedRole, setSimulatedRole] = useState<AppRole | null>(null);
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase
@@ -54,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }, 0);
         } else {
           setRoles([]);
+          setSimulatedRole(null); // Clear simulation on logout
         }
         
         setLoading(false);
@@ -107,13 +112,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    setSimulatedRole(null);
     await supabase.auth.signOut();
     setRoles([]);
   };
 
-  const hasRole = (role: AppRole) => roles.includes(role);
-  const isOwner = hasRole('owner');
-  const isAdmin = roles.some(r => ['owner', 'payroll_admin', 'dispatcher', 'safety'].includes(r));
+  // Check if user has a role - respects simulation mode
+  const hasRole = (role: AppRole) => {
+    // If simulating, only return true for the simulated role
+    if (simulatedRole) {
+      return role === simulatedRole;
+    }
+    return roles.includes(role);
+  };
+
+  // Real owner status (ignores simulation)
+  const actuallyIsOwner = roles.includes('owner');
+  
+  // Simulated owner status
+  const isOwner = simulatedRole ? simulatedRole === 'owner' : actuallyIsOwner;
+  
+  const isAdmin = simulatedRole 
+    ? ['owner', 'payroll_admin', 'dispatcher', 'safety'].includes(simulatedRole)
+    : roles.some(r => ['owner', 'payroll_admin', 'dispatcher', 'safety'].includes(r));
+
+  const isSimulating = simulatedRole !== null;
 
   return (
     <AuthContext.Provider value={{
@@ -121,12 +144,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       loading,
       roles,
+      simulatedRole,
       signIn,
       signUp,
       signOut,
       hasRole,
+      setSimulatedRole,
       isOwner,
       isAdmin,
+      isSimulating,
     }}>
       {children}
     </AuthContext.Provider>

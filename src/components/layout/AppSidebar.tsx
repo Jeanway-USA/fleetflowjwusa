@@ -53,8 +53,11 @@ interface NavItem {
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut, roles, user, hasRole, isOwner } = useAuth();
+  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole } = useAuth();
   const { theme } = useTheme();
+  
+  // Check if user is actually an owner (not simulated)
+  const actuallyIsOwner = roles.includes('owner');
   
   // Use dark banner on light backgrounds, light banner on dark backgrounds
   const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
@@ -64,8 +67,20 @@ export function AppSidebar() {
     navigate('/auth');
   };
 
+  const handleDashboardSwitch = (path: string, role: 'owner' | 'dispatcher' | 'driver') => {
+    if (actuallyIsOwner) {
+      // For owners, set simulation mode when switching to non-owner dashboards
+      if (role === 'owner') {
+        setSimulatedRole(null); // Exit simulation
+      } else {
+        setSimulatedRole(role);
+      }
+    }
+    navigate(path);
+  };
+
   // Dashboard items - owners can see all, others only see their own
-  const dashboardNavItems: NavItem[] = isOwner ? [
+  const dashboardNavItems: NavItem[] = actuallyIsOwner ? [
     { title: 'Executive View', icon: Crown, path: '/executive-dashboard', roles: ['owner'] },
     { title: 'Dispatcher View', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['owner'] },
     { title: 'Driver View', icon: Truck, path: '/driver-dashboard', roles: ['owner'] },
@@ -73,6 +88,13 @@ export function AppSidebar() {
     { title: 'My Dashboard', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['dispatcher'] },
     { title: 'My Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['driver'] },
   ];
+
+  // Map paths to roles for simulation
+  const pathToRole: Record<string, 'owner' | 'dispatcher' | 'driver'> = {
+    '/executive-dashboard': 'owner',
+    '/dispatcher-dashboard': 'dispatcher',
+    '/driver-dashboard': 'driver',
+  };
 
   const fleetNavItems: NavItem[] = [
     { title: 'Trucks', icon: Truck, path: '/trucks', roles: ['owner', 'dispatcher', 'safety'] },
@@ -102,8 +124,10 @@ export function AppSidebar() {
 
   const filterByRole = (items: NavItem[]) => items.filter(item => item.roles.some(role => hasRole(role)));
 
-  const renderNavGroup = (label: string, items: NavItem[]) => {
-    const filteredItems = filterByRole(items);
+  const renderNavGroup = (label: string, items: NavItem[], isDashboardGroup: boolean = false) => {
+    const filteredItems = isDashboardGroup && actuallyIsOwner 
+      ? items // Show all dashboard items for actual owners
+      : filterByRole(items);
     if (filteredItems.length === 0) return null;
 
     return (
@@ -115,7 +139,13 @@ export function AppSidebar() {
               <SidebarMenuItem key={item.path}>
                 <SidebarMenuButton
                   isActive={location.pathname === item.path}
-                  onClick={() => navigate(item.path)}
+                  onClick={() => {
+                    if (isDashboardGroup && actuallyIsOwner && pathToRole[item.path]) {
+                      handleDashboardSwitch(item.path, pathToRole[item.path]);
+                    } else {
+                      navigate(item.path);
+                    }
+                  }}
                   className="hover:bg-sidebar-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
                 >
                   <item.icon className="h-4 w-4" />
@@ -142,26 +172,52 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2">
+        {/* Simulation Mode Banner */}
+        {isSimulating && actuallyIsOwner && (
+          <div className="mx-2 mt-2 mb-1 p-2 rounded-md bg-warning/10 border border-warning/30">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-warning capitalize">
+                Viewing as: {simulatedRole?.replace('_', ' ')}
+              </span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 text-xs text-warning hover:bg-warning/20"
+                onClick={() => {
+                  setSimulatedRole(null);
+                  navigate('/executive-dashboard');
+                }}
+              >
+                Exit
+              </Button>
+            </div>
+          </div>
+        )}
+
         {(() => {
           const groups = [
-            { label: isOwner ? 'Dashboards' : 'Main', items: dashboardNavItems },
-            { label: 'Fleet', items: fleetNavItems },
-            { label: 'Loads', items: loadsNavItems },
-            { label: 'Finance', items: financeNavItems },
-            { label: 'Operations', items: operationsNavItems },
+            { label: actuallyIsOwner ? 'Dashboards' : 'Main', items: dashboardNavItems, isDashboard: true },
+            { label: 'Fleet', items: fleetNavItems, isDashboard: false },
+            { label: 'Loads', items: loadsNavItems, isDashboard: false },
+            { label: 'Finance', items: financeNavItems, isDashboard: false },
+            { label: 'Operations', items: operationsNavItems, isDashboard: false },
           ];
           
-          const visibleGroups = groups.filter(g => filterByRole(g.items).length > 0);
+          const visibleGroups = groups.filter(g => 
+            g.isDashboard && actuallyIsOwner 
+              ? g.items.length > 0 
+              : filterByRole(g.items).length > 0
+          );
           
           return visibleGroups.map((group, index) => (
             <div key={group.label}>
               {index > 0 && <SidebarSeparator />}
-              {renderNavGroup(group.label, group.items)}
+              {renderNavGroup(group.label, group.items, group.isDashboard)}
             </div>
           ));
         })()}
         
-        {isOwner && (
+        {actuallyIsOwner && (
           <>
             <SidebarSeparator />
             <SidebarGroup>
