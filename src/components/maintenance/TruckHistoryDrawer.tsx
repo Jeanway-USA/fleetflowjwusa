@@ -1,0 +1,195 @@
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useTruckHistory } from '@/hooks/useMaintenanceData';
+import { format, formatDistanceToNow } from 'date-fns';
+import { Truck, DollarSign, Wrench, Calendar, Clock, FileText } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface TruckHistoryDrawerProps {
+  truckId: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistoryDrawerProps) {
+  const { data, isLoading } = useTruckHistory(truckId);
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <Truck className="h-5 w-5" />
+            {isLoading ? (
+              <Skeleton className="h-6 w-24" />
+            ) : (
+              <>Unit {data?.truck?.unit_number || 'Unknown'}</>
+            )}
+          </SheetTitle>
+          <SheetDescription>
+            {isLoading ? (
+              <Skeleton className="h-4 w-48" />
+            ) : (
+              data?.truck && (
+                <>
+                  {data.truck.year} {data.truck.make} {data.truck.model}
+                  {data.truck.current_odometer && (
+                    <> • {data.truck.current_odometer.toLocaleString()} miles</>
+                  )}
+                </>
+              )
+            )}
+          </SheetDescription>
+        </SheetHeader>
+
+        {isLoading ? (
+          <div className="space-y-4 py-6">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
+        ) : data ? (
+          <ScrollArea className="h-[calc(100vh-140px)] pr-4">
+            <div className="space-y-6 py-6">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <DollarSign className="h-4 w-4" />
+                      <span className="text-xs">Total Spend</span>
+                    </div>
+                    <p className="text-xl font-bold">
+                      ${data.stats.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <Wrench className="h-4 w-4" />
+                      <span className="text-xs">Total Jobs</span>
+                    </div>
+                    <p className="text-xl font-bold">
+                      {data.stats.totalWorkOrders + data.stats.totalMaintenanceLogs}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {data.stats.lastServiceDate && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  Last service: {formatDistanceToNow(new Date(data.stats.lastServiceDate), { addSuffix: true })}
+                </div>
+              )}
+
+              <Separator />
+
+              {/* Work Orders */}
+              {data.workOrders.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Work Orders ({data.workOrders.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {data.workOrders.map(wo => (
+                      <Card key={wo.id} className={cn(
+                        wo.is_reimbursable && 'border-amber-200 bg-amber-50/30 dark:bg-amber-950/20'
+                      )}>
+                        <CardContent className="p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="capitalize text-xs">
+                                  {wo.service_type}
+                                </Badge>
+                                <Badge 
+                                  variant={wo.status === 'completed' ? 'default' : 'secondary'}
+                                  className={cn(
+                                    'text-xs',
+                                    wo.status === 'completed' && 'bg-emerald-500'
+                                  )}
+                                >
+                                  {wo.status}
+                                </Badge>
+                                {wo.is_reimbursable && (
+                                  <Badge className="bg-amber-100 text-amber-800 text-xs">
+                                    Reimbursable
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm">{wo.description || wo.vendor || 'No description'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(wo.entry_date), 'MMM d, yyyy')}
+                                {wo.vendor && <> • {wo.vendor}</>}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              {wo.final_cost ? (
+                                <p className="font-medium">${wo.final_cost.toLocaleString()}</p>
+                              ) : wo.cost_estimate ? (
+                                <p className="text-sm text-muted-foreground">
+                                  Est. ${wo.cost_estimate.toLocaleString()}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Maintenance Logs */}
+              {data.maintenanceLogs.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <Wrench className="h-4 w-4" />
+                    Maintenance Logs ({data.maintenanceLogs.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {data.maintenanceLogs.map(log => (
+                      <Card key={log.id}>
+                        <CardContent className="p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1">
+                              <Badge variant="outline" className="capitalize text-xs">
+                                {log.service_type}
+                              </Badge>
+                              <p className="text-sm">{log.description || 'No description'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(log.service_date), 'MMM d, yyyy')}
+                                {log.vendor && <> • {log.vendor}</>}
+                              </p>
+                            </div>
+                            {log.cost && (
+                              <p className="font-medium">${log.cost.toLocaleString()}</p>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {data.workOrders.length === 0 && data.maintenanceLogs.length === 0 && (
+                <div className="text-center py-8">
+                  <Wrench className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No maintenance history for this truck.</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  );
+}

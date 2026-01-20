@@ -1158,11 +1158,58 @@ export type Database = {
         }
         Relationships: []
       }
+      service_schedules: {
+        Row: {
+          created_at: string
+          id: string
+          interval_days: number | null
+          interval_miles: number | null
+          last_performed_date: string | null
+          last_performed_miles: number | null
+          service_name: string
+          truck_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          interval_days?: number | null
+          interval_miles?: number | null
+          last_performed_date?: string | null
+          last_performed_miles?: number | null
+          service_name: string
+          truck_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          interval_days?: number | null
+          interval_miles?: number | null
+          last_performed_date?: string | null
+          last_performed_miles?: number | null
+          service_name?: string
+          truck_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_schedules_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trucks: {
         Row: {
           created_at: string
           current_driver_id: string | null
+          current_odometer: number | null
           id: string
+          last_120_inspection_date: string | null
+          last_120_inspection_miles: number | null
           license_plate: string | null
           license_plate_state: string | null
           make: string | null
@@ -1177,7 +1224,10 @@ export type Database = {
         Insert: {
           created_at?: string
           current_driver_id?: string | null
+          current_odometer?: number | null
           id?: string
+          last_120_inspection_date?: string | null
+          last_120_inspection_miles?: number | null
           license_plate?: string | null
           license_plate_state?: string | null
           make?: string | null
@@ -1192,7 +1242,10 @@ export type Database = {
         Update: {
           created_at?: string
           current_driver_id?: string | null
+          current_odometer?: number | null
           id?: string
+          last_120_inspection_date?: string | null
+          last_120_inspection_miles?: number | null
           license_plate?: string | null
           license_plate_state?: string | null
           make?: string | null
@@ -1234,6 +1287,74 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      work_orders: {
+        Row: {
+          completed_at: string | null
+          cost_estimate: number | null
+          created_at: string
+          description: string | null
+          entry_date: string
+          estimated_completion: string | null
+          final_cost: number | null
+          id: string
+          invoice_url: string | null
+          is_reimbursable: boolean | null
+          notes: string | null
+          odometer_reading: number | null
+          service_type: string
+          status: string
+          truck_id: string
+          updated_at: string
+          vendor: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          cost_estimate?: number | null
+          created_at?: string
+          description?: string | null
+          entry_date?: string
+          estimated_completion?: string | null
+          final_cost?: number | null
+          id?: string
+          invoice_url?: string | null
+          is_reimbursable?: boolean | null
+          notes?: string | null
+          odometer_reading?: number | null
+          service_type: string
+          status?: string
+          truck_id: string
+          updated_at?: string
+          vendor?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          cost_estimate?: number | null
+          created_at?: string
+          description?: string | null
+          entry_date?: string
+          estimated_completion?: string | null
+          final_cost?: number | null
+          id?: string
+          invoice_url?: string | null
+          is_reimbursable?: boolean | null
+          notes?: string | null
+          odometer_reading?: number | null
+          service_type?: string
+          status?: string
+          truck_id?: string
+          updated_at?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_orders_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
