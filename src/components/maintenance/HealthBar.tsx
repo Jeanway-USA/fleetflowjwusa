@@ -53,7 +53,7 @@ export function HealthBar({
 
   const formatPrimaryLine = () => {
     if (unit === 'miles') {
-      return `${used.toLocaleString()} mi since service`;
+      return `${used.toLocaleString()} / ${intervalValue.toLocaleString()} mi`;
     }
 
     if (isOverdue) {
