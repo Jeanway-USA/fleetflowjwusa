@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, DollarSign, User } from 'lucide-react';
+import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { addDays, differenceInDays, format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
@@ -77,6 +78,54 @@ export default function Trucks() {
       return (data ?? []) as TruckWithDriver[];
     },
   });
+
+  // Fetch service schedules for 120-Day Inspections
+  const { data: serviceSchedules = [] } = useQuery({
+    queryKey: ['service-schedules-120day'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('service_schedules')
+        .select('*')
+        .eq('service_name', '120-Day Inspection');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Create a map of truck ID to inspection status
+  const inspectionStatusMap = useMemo(() => {
+    const today = new Date();
+    const map = new Map<string, { nextInspectionDate: string | null; daysRemaining: number | null; status: 'ok' | 'warning' | 'overdue' | 'never' }>();
+    
+    serviceSchedules.forEach(schedule => {
+      if (!schedule.last_performed_date) {
+        map.set(schedule.truck_id, {
+          nextInspectionDate: null,
+          daysRemaining: null,
+          status: 'never',
+        });
+      } else {
+        const lastDate = new Date(schedule.last_performed_date);
+        const dueDate = addDays(lastDate, schedule.interval_days || 120);
+        const daysRemaining = differenceInDays(dueDate, today);
+        
+        let status: 'ok' | 'warning' | 'overdue' = 'ok';
+        if (daysRemaining < 0) {
+          status = 'overdue';
+        } else if (daysRemaining <= 30) {
+          status = 'warning';
+        }
+        
+        map.set(schedule.truck_id, {
+          nextInspectionDate: format(dueDate, 'yyyy-MM-dd'),
+          daysRemaining,
+          status,
+        });
+      }
+    });
+    
+    return map;
+  }, [serviceSchedules]);
 
   // Fetch drivers for assignment
   const { data: drivers = [] } = useQuery({
@@ -170,9 +219,54 @@ export default function Trucks() {
     },
     { key: 'status', header: 'Status', render: (truck: TruckWithDriver) => <StatusBadge status={truck.status} /> },
     { 
+      key: 'next_120_inspection', 
+      header: '120-Day Inspection',
+      render: (truck: TruckWithDriver) => {
+        const inspection = inspectionStatusMap.get(truck.id);
+        if (!inspection) {
+          return <span className="text-muted-foreground">-</span>;
+        }
+        
+        if (inspection.status === 'never') {
+          return (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span className="text-xs">Never Inspected</span>
+            </div>
+          );
+        }
+        
+        const statusConfig = {
+          ok: { color: 'text-green-600', icon: CheckCircle },
+          warning: { color: 'text-yellow-600', icon: AlertTriangle },
+          overdue: { color: 'text-red-600', icon: AlertTriangle },
+        };
+        
+        const config = statusConfig[inspection.status];
+        const Icon = config.icon;
+        
+        return (
+          <div className={`flex items-center gap-1 ${config.color}`}>
+            <Icon className="h-4 w-4" />
+            <span className="text-xs">
+              {inspection.daysRemaining !== null && inspection.daysRemaining < 0 
+                ? `Overdue ${Math.abs(inspection.daysRemaining)}d`
+                : `${inspection.daysRemaining}d left`}
+            </span>
+          </div>
+        );
+      }
+    },
+    { 
       key: 'next_inspection_date', 
-      header: 'Next Inspection',
-      render: (truck: TruckWithDriver) => truck.next_inspection_date || '-'
+      header: 'Next Inspection Date',
+      render: (truck: TruckWithDriver) => {
+        const inspection = inspectionStatusMap.get(truck.id);
+        if (inspection?.nextInspectionDate) {
+          return inspection.nextInspectionDate;
+        }
+        return truck.next_inspection_date || '-';
+      }
     },
     {
       key: 'actions',
