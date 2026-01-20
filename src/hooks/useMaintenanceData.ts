@@ -47,6 +47,7 @@ export interface TruckWithSchedules {
   id: string;
   unit_number: string;
   current_odometer: number | null;
+  calculated_odometer: number; // Miles from delivered loads
   last_120_inspection_date: string | null;
   status: string;
   schedules: ServiceSchedule[];
@@ -405,9 +406,29 @@ export function usePMSchedule() {
 
       if (schedulesError) throw schedulesError;
 
-      // Map schedules to trucks
+      // Get total actual miles per truck from delivered loads
+      const { data: loadMiles, error: loadsError } = await supabase
+        .from('fleet_loads')
+        .select('truck_id, actual_miles')
+        .eq('status', 'delivered')
+        .not('actual_miles', 'is', null);
+
+      if (loadsError) throw loadsError;
+
+      // Sum actual miles per truck
+      const truckMilesMap = new Map<string, number>();
+      loadMiles?.forEach(load => {
+        if (load.truck_id && load.actual_miles) {
+          const current = truckMilesMap.get(load.truck_id) || 0;
+          truckMilesMap.set(load.truck_id, current + load.actual_miles);
+        }
+      });
+
+      // Map schedules to trucks with calculated odometer
       const trucksWithSchedules: TruckWithSchedules[] = trucks?.map(truck => ({
         ...truck,
+        // Use calculated miles from delivered loads as the odometer
+        calculated_odometer: truckMilesMap.get(truck.id) || 0,
         schedules: schedules?.filter(s => s.truck_id === truck.id) || [],
       })) || [];
 
@@ -500,6 +521,16 @@ export function useCompleteWorkOrder() {
 
       if (error) throw error;
 
+      // Get the current calculated odometer (sum of actual miles from delivered loads)
+      const { data: loadMiles } = await supabase
+        .from('fleet_loads')
+        .select('actual_miles')
+        .eq('truck_id', workOrder.truck_id)
+        .eq('status', 'delivered')
+        .not('actual_miles', 'is', null);
+
+      const calculatedOdometer = loadMiles?.reduce((sum, load) => sum + (load.actual_miles || 0), 0) || 0;
+
       // If this is an inspection work order, update the service schedule
       if (workOrder.service_type === 'inspection') {
         // Use the work order's entry_date (the actual inspection date), not today's date
@@ -510,7 +541,7 @@ export function useCompleteWorkOrder() {
           .from('service_schedules')
           .update({
             last_performed_date: inspectionDate,
-            last_performed_miles: workOrder.odometer_reading || null,
+            last_performed_miles: workOrder.odometer_reading || calculatedOdometer,
           })
           .eq('truck_id', workOrder.truck_id)
           .eq('service_name', '120-Day Inspection');
@@ -524,9 +555,33 @@ export function useCompleteWorkOrder() {
           .from('trucks')
           .update({
             last_120_inspection_date: inspectionDate,
-            last_120_inspection_miles: workOrder.odometer_reading || null,
+            last_120_inspection_miles: workOrder.odometer_reading || calculatedOdometer,
           })
           .eq('id', workOrder.truck_id);
+      }
+
+      // If this is an oil change work order, reset the oil change PM schedule
+      if (workOrder.service_type === 'pm' || workOrder.service_type.toLowerCase().includes('oil')) {
+        await supabase
+          .from('service_schedules')
+          .update({
+            last_performed_date: workOrder.entry_date,
+            last_performed_miles: calculatedOdometer,
+          })
+          .eq('truck_id', workOrder.truck_id)
+          .eq('service_name', 'Oil Change');
+      }
+
+      // If this is a tire work order, reset the tire PM schedule
+      if (workOrder.service_type === 'tire' || workOrder.service_type.toLowerCase().includes('tire')) {
+        await supabase
+          .from('service_schedules')
+          .update({
+            last_performed_date: workOrder.entry_date,
+            last_performed_miles: calculatedOdometer,
+          })
+          .eq('truck_id', workOrder.truck_id)
+          .eq('service_name', 'Tire Replacement');
       }
 
       return data;

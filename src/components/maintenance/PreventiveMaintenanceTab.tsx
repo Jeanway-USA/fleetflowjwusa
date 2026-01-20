@@ -51,7 +51,8 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
             const tiresSchedule = truck.schedules.find(s => s.service_name === 'Tire Replacement');
             const inspectionSchedule = truck.schedules.find(s => s.service_name === '120-Day Inspection');
             
-            const currentOdometer = truck.current_odometer || 0;
+            // Use calculated odometer from delivered loads
+            const currentOdometer = truck.calculated_odometer || 0;
 
             return (
               <TableRow 
