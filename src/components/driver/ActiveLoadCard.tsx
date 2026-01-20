@@ -8,6 +8,39 @@ import { MapPin, Clock, Truck, Navigation, Package, CheckCircle, Loader2, FileTe
 import { format, differenceInHours, differenceInMinutes, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+// Helper to format and clean special instructions for better readability
+function formatSpecialInstructions(notes: string | null): React.ReactNode {
+  if (!notes) return null;
+  
+  // Split by common section dividers
+  const updatedFromRCMatch = notes.split(/---\s*Updated from Rate Confirmation\s*---/i);
+  const mainContent = updatedFromRCMatch[0]?.trim() || '';
+  
+  // Extract intermediate stops if present
+  const stopsMatch = mainContent.match(/===\s*INTERMEDIATE STOPS\s*===\n?([\s\S]*?)$/i);
+  const intermediateStops = stopsMatch?.[1]?.trim();
+  
+  // Get main instructions (before intermediate stops)
+  const mainInstructions = stopsMatch 
+    ? mainContent.replace(/===\s*INTERMEDIATE STOPS\s*===[\s\S]*$/i, '').trim()
+    : mainContent;
+  
+  return (
+    <div className="space-y-2">
+      {mainInstructions && (
+        <p className="text-sm whitespace-pre-wrap leading-relaxed">{mainInstructions}</p>
+      )}
+      {intermediateStops && (
+        <div className="border-t border-warning/30 pt-2 mt-2">
+          <p className="text-xs font-semibold text-warning mb-1">📍 Intermediate Stops</p>
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">{intermediateStops}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface Load {
   id: string;
   origin: string;
@@ -327,11 +360,13 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
         {/* Special Instructions */}
         {load.notes && (
           <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-            <p className="text-xs text-warning font-medium uppercase tracking-wide mb-1">
+            <p className="text-xs text-warning font-medium uppercase tracking-wide mb-2">
               Special Instructions
             </p>
-            <ScrollArea className="max-h-24">
-              <p className="text-sm whitespace-pre-wrap pr-2">{load.notes}</p>
+            <ScrollArea className="max-h-40">
+              <div className="pr-2">
+                {formatSpecialInstructions(load.notes)}
+              </div>
             </ScrollArea>
           </div>
         )}
@@ -443,11 +478,13 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
             {/* Special Instructions */}
             {load.notes && (
               <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-                <p className="text-xs text-warning font-medium uppercase tracking-wide mb-1">
+                <p className="text-xs text-warning font-medium uppercase tracking-wide mb-2">
                   Special Instructions
                 </p>
-                <ScrollArea className="max-h-32">
-                  <p className="text-sm whitespace-pre-wrap pr-2">{load.notes}</p>
+                <ScrollArea className="max-h-64">
+                  <div className="pr-2">
+                    {formatSpecialInstructions(load.notes)}
+                  </div>
                 </ScrollArea>
               </div>
             )}
