@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { usePMSchedule, TruckWithSchedules, ManufacturerService } from '@/hooks/useMaintenanceData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,16 +17,38 @@ interface PreventiveMaintenanceTabProps {
   onViewTruck: (truckId: string) => void;
 }
 
-// Group trucks by manufacturer for proper column headers
+// Manufacturer display names and schedule types
+const MANUFACTURER_SCHEDULE_NAMES: Record<string, string> = {
+  'freightliner': 'Freightliner Cascadia Schedule II',
+  'western star': 'Western Star M-System',
+  'peterbilt': 'Peterbilt PACCAR Normal Duty',
+  'kenworth': 'Kenworth PACCAR Normal Duty',
+  'international': 'International Class System',
+  'volvo': 'Volvo VDS-4.5 Normal Duty',
+  'mack': 'Mack EOS-4.5 Normal Duty',
+};
+
+// List of supported manufacturers with PM profiles
+const SUPPORTED_MANUFACTURERS = ['freightliner', 'western star', 'peterbilt', 'kenworth', 'international', 'volvo', 'mack'];
+
+// Group trucks by manufacturer
 function groupTrucksByManufacturer(trucks: TruckWithSchedules[]) {
-  const freightlinerTrucks = trucks.filter(t => 
-    t.make?.toLowerCase() === 'freightliner' && t.manufacturer_services.length > 0
-  );
-  const otherTrucks = trucks.filter(t => 
-    t.make?.toLowerCase() !== 'freightliner' || t.manufacturer_services.length === 0
-  );
-  
-  return { freightlinerTrucks, otherTrucks };
+  const groups: Record<string, TruckWithSchedules[]> = {};
+  const otherTrucks: TruckWithSchedules[] = [];
+
+  trucks.forEach(truck => {
+    const make = (truck.make || '').toLowerCase();
+    if (truck.manufacturer_services.length > 0 && SUPPORTED_MANUFACTURERS.includes(make)) {
+      if (!groups[make]) {
+        groups[make] = [];
+      }
+      groups[make].push(truck);
+    } else {
+      otherTrucks.push(truck);
+    }
+  });
+
+  return { manufacturerGroups: groups, otherTrucks };
 }
 
 interface CollapsibleTableSectionProps {
@@ -64,12 +86,12 @@ function CollapsibleTableSection({
             </div>
             <div className="flex items-center gap-2">
               {overdueCount > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
                   {overdueCount} overdue
                 </span>
               )}
               {dueSoonCount > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning-foreground dark:text-warning">
                   {dueSoonCount} due soon
                 </span>
               )}
@@ -89,13 +111,13 @@ function CollapsibleTableSection({
   );
 }
 
-interface FreightlinerPMTableProps {
+interface ManufacturerPMTableProps {
   trucks: TruckWithSchedules[];
   onViewTruck: (truckId: string) => void;
   compactMode: boolean;
 }
 
-function FreightlinerPMTable({ trucks, onViewTruck, compactMode }: FreightlinerPMTableProps) {
+function ManufacturerPMTable({ trucks, onViewTruck, compactMode }: ManufacturerPMTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const shouldVirtualize = trucks.length > 20;
 
@@ -109,6 +131,7 @@ function FreightlinerPMTable({ trucks, onViewTruck, compactMode }: FreightlinerP
 
   if (trucks.length === 0) return null;
 
+  // Get service columns from first truck's manufacturer services
   const serviceColumns = trucks[0].manufacturer_services.map(s => ({
     code: s.profile.service_code,
     name: s.profile.service_name,
@@ -439,9 +462,9 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
 
       // Manufacturer filter
       if (manufacturerFilter !== 'all') {
-        const isFreightliner = truck.make?.toLowerCase() === 'freightliner';
-        if (manufacturerFilter === 'freightliner' && !isFreightliner) return false;
-        if (manufacturerFilter === 'other' && isFreightliner) return false;
+        const make = (truck.make || '').toLowerCase();
+        if (manufacturerFilter === 'freightliner' && make !== 'freightliner') return false;
+        if (manufacturerFilter === 'other' && SUPPORTED_MANUFACTURERS.includes(make)) return false;
       }
 
       // Hide healthy filter
@@ -454,31 +477,39 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
   }, [truckHealthList, searchQuery, statusFilter, manufacturerFilter, hideHealthy]);
 
   // Group filtered trucks by manufacturer
-  const { freightlinerTrucks, otherTrucks } = useMemo(() => {
+  const { manufacturerGroups, otherTrucks } = useMemo(() => {
     const trucksOnly = filteredTrucks.map(t => t.truck);
     return groupTrucksByManufacturer(trucksOnly);
   }, [filteredTrucks]);
 
   // Calculate health counts for each group
-  const freightlinerHealth = useMemo(() => {
-    const health = filteredTrucks.filter(t => 
-      t.truck.make?.toLowerCase() === 'freightliner' && t.truck.manufacturer_services.length > 0
-    );
-    return {
-      overdueCount: health.filter(h => h.status === 'overdue').length,
-      dueSoonCount: health.filter(h => h.status === 'due-soon').length,
-    };
-  }, [filteredTrucks]);
+  const groupHealthCounts = useMemo(() => {
+    const counts: Record<string, { overdueCount: number; dueSoonCount: number }> = {};
+    
+    // For each manufacturer group
+    Object.keys(manufacturerGroups).forEach(make => {
+      const groupTrucks = manufacturerGroups[make];
+      const health = filteredTrucks.filter(t => 
+        (t.truck.make || '').toLowerCase() === make
+      );
+      counts[make] = {
+        overdueCount: health.filter(h => h.status === 'overdue').length,
+        dueSoonCount: health.filter(h => h.status === 'due-soon').length,
+      };
+    });
 
-  const otherHealth = useMemo(() => {
-    const health = filteredTrucks.filter(t => 
-      t.truck.make?.toLowerCase() !== 'freightliner' || t.truck.manufacturer_services.length === 0
-    );
-    return {
-      overdueCount: health.filter(h => h.status === 'overdue').length,
-      dueSoonCount: health.filter(h => h.status === 'due-soon').length,
+    // For other trucks
+    const otherHealth = filteredTrucks.filter(t => {
+      const make = (t.truck.make || '').toLowerCase();
+      return !SUPPORTED_MANUFACTURERS.includes(make) || t.truck.manufacturer_services.length === 0;
+    });
+    counts['other'] = {
+      overdueCount: otherHealth.filter(h => h.status === 'overdue').length,
+      dueSoonCount: otherHealth.filter(h => h.status === 'due-soon').length,
     };
-  }, [filteredTrucks]);
+
+    return counts;
+  }, [filteredTrucks, manufacturerGroups]);
 
   if (isLoading) {
     return (
@@ -503,6 +534,13 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
       </div>
     );
   }
+
+  // Sort manufacturers by number of issues (most urgent first)
+  const sortedManufacturers = Object.keys(manufacturerGroups).sort((a, b) => {
+    const aIssues = (groupHealthCounts[a]?.overdueCount || 0) * 10 + (groupHealthCounts[a]?.dueSoonCount || 0);
+    const bIssues = (groupHealthCounts[b]?.overdueCount || 0) * 10 + (groupHealthCounts[b]?.dueSoonCount || 0);
+    return bIssues - aIssues;
+  });
 
   return (
     <div className="space-y-4">
@@ -540,29 +578,38 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
         </div>
       ) : (
         <div className="space-y-4">
-          {freightlinerTrucks.length > 0 && (
-            <CollapsibleTableSection
-              title="Freightliner Cascadia Schedule II"
-              overdueCount={freightlinerHealth.overdueCount}
-              dueSoonCount={freightlinerHealth.dueSoonCount}
-              totalCount={freightlinerTrucks.length}
-              defaultOpen={freightlinerHealth.overdueCount > 0 || freightlinerHealth.dueSoonCount > 0 || freightlinerTrucks.length <= 10}
-            >
-              <FreightlinerPMTable 
-                trucks={freightlinerTrucks} 
-                onViewTruck={onViewTruck}
-                compactMode={compactMode}
-              />
-            </CollapsibleTableSection>
-          )}
+          {/* Render manufacturer-specific tables */}
+          {sortedManufacturers.map(make => {
+            const groupTrucks = manufacturerGroups[make];
+            const health = groupHealthCounts[make] || { overdueCount: 0, dueSoonCount: 0 };
+            const title = MANUFACTURER_SCHEDULE_NAMES[make] || `${make.charAt(0).toUpperCase() + make.slice(1)} PM Schedule`;
 
+            return (
+              <CollapsibleTableSection
+                key={make}
+                title={title}
+                overdueCount={health.overdueCount}
+                dueSoonCount={health.dueSoonCount}
+                totalCount={groupTrucks.length}
+                defaultOpen={health.overdueCount > 0 || health.dueSoonCount > 0 || groupTrucks.length <= 10}
+              >
+                <ManufacturerPMTable 
+                  trucks={groupTrucks} 
+                  onViewTruck={onViewTruck}
+                  compactMode={compactMode}
+                />
+              </CollapsibleTableSection>
+            );
+          })}
+
+          {/* Render generic table for other trucks */}
           {otherTrucks.length > 0 && (
             <CollapsibleTableSection
               title="Other Trucks"
-              overdueCount={otherHealth.overdueCount}
-              dueSoonCount={otherHealth.dueSoonCount}
+              overdueCount={groupHealthCounts['other']?.overdueCount || 0}
+              dueSoonCount={groupHealthCounts['other']?.dueSoonCount || 0}
               totalCount={otherTrucks.length}
-              defaultOpen={otherHealth.overdueCount > 0 || otherHealth.dueSoonCount > 0 || otherTrucks.length <= 10}
+              defaultOpen={(groupHealthCounts['other']?.overdueCount || 0) > 0 || (groupHealthCounts['other']?.dueSoonCount || 0) > 0 || otherTrucks.length <= 10}
             >
               <GenericPMTable 
                 trucks={otherTrucks} 

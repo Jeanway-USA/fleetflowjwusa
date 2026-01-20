@@ -1161,6 +1161,56 @@ export type Database = {
         }
         Relationships: []
       }
+      pm_notifications: {
+        Row: {
+          created_at: string
+          days_or_miles_remaining: number | null
+          dismissed_at: string | null
+          id: string
+          is_read: boolean
+          notification_type: string
+          service_code: string | null
+          service_name: string
+          truck_id: string
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          days_or_miles_remaining?: number | null
+          dismissed_at?: string | null
+          id?: string
+          is_read?: boolean
+          notification_type: string
+          service_code?: string | null
+          service_name: string
+          truck_id: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          days_or_miles_remaining?: number | null
+          dismissed_at?: string | null
+          id?: string
+          is_read?: boolean
+          notification_type?: string
+          service_code?: string | null
+          service_name?: string
+          truck_id?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pm_notifications_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           address: string | null

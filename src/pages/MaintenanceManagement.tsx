@@ -10,6 +10,8 @@ import { PreventiveMaintenanceTab } from '@/components/maintenance/PreventiveMai
 import { ServiceHistoryTab } from '@/components/maintenance/ServiceHistoryTab';
 import { NewWorkOrderSheet } from '@/components/maintenance/NewWorkOrderSheet';
 import { TruckHistoryDrawer } from '@/components/maintenance/TruckHistoryDrawer';
+import { PMNotificationsPanel, PMNotificationsBell } from '@/components/maintenance/PMNotificationsPanel';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Plus, Wrench, Calendar, History } from 'lucide-react';
 
 export default function MaintenanceManagement() {
@@ -28,10 +30,23 @@ export default function MaintenanceManagement() {
         title="Maintenance Management" 
         description="Fleet maintenance tracking, work orders, and preventive maintenance schedules"
       >
-        <Button onClick={() => setNewWorkOrderOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          New Work Order
-        </Button>
+        <div className="flex items-center gap-2">
+          <Sheet>
+            <SheetTrigger asChild>
+              <PMNotificationsBell />
+            </SheetTrigger>
+            <SheetContent className="w-[400px] sm:w-[450px] p-0">
+              <SheetHeader className="sr-only">
+                <SheetTitle>PM Notifications</SheetTitle>
+              </SheetHeader>
+              <PMNotificationsPanel onViewTruck={handleViewTruck} />
+            </SheetContent>
+          </Sheet>
+          <Button onClick={() => setNewWorkOrderOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            New Work Order
+          </Button>
+        </div>
       </PageHeader>
 
       <div className="space-y-6">
