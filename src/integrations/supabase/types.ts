@@ -453,6 +453,74 @@ export type Database = {
           },
         ]
       }
+      driver_performance_metrics: {
+        Row: {
+          created_at: string
+          driver_id: string
+          dvir_compliance_rate: number | null
+          fuel_efficiency_mpg: number | null
+          id: string
+          incidents_count: number | null
+          late_deliveries: number | null
+          on_time_deliveries: number | null
+          overall_score: number | null
+          period_end: string
+          period_start: string
+          period_type: string
+          safety_score: number | null
+          total_loads: number | null
+          total_miles: number | null
+          total_revenue: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          driver_id: string
+          dvir_compliance_rate?: number | null
+          fuel_efficiency_mpg?: number | null
+          id?: string
+          incidents_count?: number | null
+          late_deliveries?: number | null
+          on_time_deliveries?: number | null
+          overall_score?: number | null
+          period_end: string
+          period_start: string
+          period_type?: string
+          safety_score?: number | null
+          total_loads?: number | null
+          total_miles?: number | null
+          total_revenue?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string
+          dvir_compliance_rate?: number | null
+          fuel_efficiency_mpg?: number | null
+          id?: string
+          incidents_count?: number | null
+          late_deliveries?: number | null
+          on_time_deliveries?: number | null
+          overall_score?: number | null
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          safety_score?: number | null
+          total_loads?: number | null
+          total_miles?: number | null
+          total_revenue?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_performance_metrics_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_settings: {
         Row: {
           created_at: string
@@ -746,6 +814,66 @@ export type Database = {
           },
         ]
       }
+      fuel_purchases: {
+        Row: {
+          created_at: string
+          driver_id: string | null
+          gallons: number
+          id: string
+          jurisdiction: string
+          price_per_gallon: number
+          purchase_date: string
+          receipt_url: string | null
+          total_cost: number
+          truck_id: string | null
+          updated_at: string
+          vendor: string | null
+        }
+        Insert: {
+          created_at?: string
+          driver_id?: string | null
+          gallons?: number
+          id?: string
+          jurisdiction: string
+          price_per_gallon?: number
+          purchase_date?: string
+          receipt_url?: string | null
+          total_cost?: number
+          truck_id?: string | null
+          updated_at?: string
+          vendor?: string | null
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string | null
+          gallons?: number
+          id?: string
+          jurisdiction?: string
+          price_per_gallon?: number
+          purchase_date?: string
+          receipt_url?: string | null
+          total_cost?: number
+          truck_id?: string | null
+          updated_at?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fuel_purchases_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_purchases_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       general_ledger: {
         Row: {
           amount: number
@@ -787,6 +915,226 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      ifta_records: {
+        Row: {
+          created_at: string
+          fuel_cost: number | null
+          fuel_gallons: number | null
+          id: string
+          jurisdiction: string
+          quarter: string
+          tax_owed: number | null
+          tax_rate: number | null
+          taxable_miles: number | null
+          total_miles: number | null
+          truck_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          fuel_cost?: number | null
+          fuel_gallons?: number | null
+          id?: string
+          jurisdiction: string
+          quarter: string
+          tax_owed?: number | null
+          tax_rate?: number | null
+          taxable_miles?: number | null
+          total_miles?: number | null
+          truck_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          fuel_cost?: number | null
+          fuel_gallons?: number | null
+          id?: string
+          jurisdiction?: string
+          quarter?: string
+          tax_owed?: number | null
+          tax_rate?: number | null
+          taxable_miles?: number | null
+          total_miles?: number | null
+          truck_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ifta_records_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_photos: {
+        Row: {
+          description: string | null
+          id: string
+          incident_id: string
+          photo_url: string
+          uploaded_at: string
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          incident_id: string
+          photo_url: string
+          uploaded_at?: string
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          incident_id?: string
+          photo_url?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_photos_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_witnesses: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          incident_id: string
+          name: string
+          phone: string | null
+          statement: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          incident_id: string
+          name: string
+          phone?: string | null
+          statement?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          incident_id?: string
+          name?: string
+          phone?: string | null
+          statement?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_witnesses_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incidents: {
+        Row: {
+          citation_issued: boolean | null
+          created_at: string
+          description: string
+          driver_id: string | null
+          estimated_damage: number | null
+          id: string
+          incident_date: string
+          incident_type: string
+          injuries_reported: boolean | null
+          injury_details: string | null
+          insurance_claim_number: string | null
+          latitude: number | null
+          location_description: string | null
+          longitude: number | null
+          police_report_number: string | null
+          reported_by: string | null
+          resolution_notes: string | null
+          severity: string
+          status: string
+          trailer_id: string | null
+          truck_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          citation_issued?: boolean | null
+          created_at?: string
+          description: string
+          driver_id?: string | null
+          estimated_damage?: number | null
+          id?: string
+          incident_date?: string
+          incident_type?: string
+          injuries_reported?: boolean | null
+          injury_details?: string | null
+          insurance_claim_number?: string | null
+          latitude?: number | null
+          location_description?: string | null
+          longitude?: number | null
+          police_report_number?: string | null
+          reported_by?: string | null
+          resolution_notes?: string | null
+          severity?: string
+          status?: string
+          trailer_id?: string | null
+          truck_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          citation_issued?: boolean | null
+          created_at?: string
+          description?: string
+          driver_id?: string | null
+          estimated_damage?: number | null
+          id?: string
+          incident_date?: string
+          incident_type?: string
+          injuries_reported?: boolean | null
+          injury_details?: string | null
+          insurance_claim_number?: string | null
+          latitude?: number | null
+          location_description?: string | null
+          longitude?: number | null
+          police_report_number?: string | null
+          reported_by?: string | null
+          resolution_notes?: string | null
+          severity?: string
+          status?: string
+          trailer_id?: string | null
+          truck_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incidents_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_trailer_id_fkey"
+            columns: ["trailer_id"]
+            isOneToOne: false
+            referencedRelation: "trailers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inspection_photos: {
         Row: {
