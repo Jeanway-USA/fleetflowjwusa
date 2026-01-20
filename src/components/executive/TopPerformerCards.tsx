@@ -79,33 +79,36 @@ export function TopPerformerCards({ topDriver, topTruck, isLoading }: TopPerform
             </Badge>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-2">
           {topDriver ? (
-            <div className="flex items-start gap-4">
-              <Avatar className="h-14 w-14 border-2 border-primary/20">
-                <AvatarImage src={topDriver.avatarUrl} />
-                <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                  {topDriver.name
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 space-y-2">
-                <h4 className="font-semibold">{topDriver.name}</h4>
-                <div className="grid grid-cols-3 gap-2 text-sm">
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <DollarSign className="h-3 w-3" />
-                    <span>{formatCurrency(topDriver.revenue)}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
-                    <span>{formatNumber(topDriver.miles)} mi</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <Package className="h-3 w-3" />
-                    <span>{topDriver.loads} loads</span>
-                  </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12 border-2 border-primary/20">
+                  <AvatarImage src={topDriver.avatarUrl} />
+                  <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                    {topDriver.name
+                      .split(' ')
+                      .map((n) => n[0])
+                      .join('')}
+                  </AvatarFallback>
+                </Avatar>
+                <h4 className="font-semibold text-lg">{topDriver.name}</h4>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col items-center p-2 rounded-lg bg-muted/50">
+                  <DollarSign className="h-4 w-4 text-primary mb-1" />
+                  <span className="text-sm font-medium">{formatCurrency(topDriver.revenue)}</span>
+                  <span className="text-xs text-muted-foreground">Revenue</span>
+                </div>
+                <div className="flex flex-col items-center p-2 rounded-lg bg-muted/50">
+                  <MapPin className="h-4 w-4 text-primary mb-1" />
+                  <span className="text-sm font-medium">{formatNumber(topDriver.miles)}</span>
+                  <span className="text-xs text-muted-foreground">Miles</span>
+                </div>
+                <div className="flex flex-col items-center p-2 rounded-lg bg-muted/50">
+                  <Package className="h-4 w-4 text-primary mb-1" />
+                  <span className="text-sm font-medium">{topDriver.loads}</span>
+                  <span className="text-xs text-muted-foreground">Loads</span>
                 </div>
               </div>
             </div>
@@ -128,15 +131,15 @@ export function TopPerformerCards({ topDriver, topTruck, isLoading }: TopPerform
             </Badge>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-2">
           {topTruck ? (
-            <div className="flex items-start gap-4">
-              <div className="h-14 w-14 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Truck className="h-7 w-7 text-primary" />
-              </div>
-              <div className="flex-1 space-y-2">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Truck className="h-6 w-6 text-primary" />
+                </div>
                 <div className="flex items-center gap-2">
-                  <h4 className="font-semibold">Unit #{topTruck.unitNumber}</h4>
+                  <h4 className="font-semibold text-lg">Unit #{topTruck.unitNumber}</h4>
                   <Badge
                     variant={topTruck.status === 'active' ? 'default' : 'secondary'}
                     className={topTruck.status === 'active' ? 'bg-green-500/10 text-green-500 border-green-500/20' : ''}
@@ -144,19 +147,22 @@ export function TopPerformerCards({ topDriver, topTruck, isLoading }: TopPerform
                     {topTruck.status}
                   </Badge>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-sm">
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <DollarSign className="h-3 w-3" />
-                    <span>{formatCurrency(topTruck.revenue)}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
-                    <span>{formatNumber(topTruck.miles)} mi</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <Package className="h-3 w-3" />
-                    <span>{topTruck.loads} loads</span>
-                  </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col items-center p-2 rounded-lg bg-muted/50">
+                  <DollarSign className="h-4 w-4 text-primary mb-1" />
+                  <span className="text-sm font-medium">{formatCurrency(topTruck.revenue)}</span>
+                  <span className="text-xs text-muted-foreground">Revenue</span>
+                </div>
+                <div className="flex flex-col items-center p-2 rounded-lg bg-muted/50">
+                  <MapPin className="h-4 w-4 text-primary mb-1" />
+                  <span className="text-sm font-medium">{formatNumber(topTruck.miles)}</span>
+                  <span className="text-xs text-muted-foreground">Miles</span>
+                </div>
+                <div className="flex flex-col items-center p-2 rounded-lg bg-muted/50">
+                  <Package className="h-4 w-4 text-primary mb-1" />
+                  <span className="text-sm font-medium">{topTruck.loads}</span>
+                  <span className="text-xs text-muted-foreground">Loads</span>
                 </div>
               </div>
             </div>
