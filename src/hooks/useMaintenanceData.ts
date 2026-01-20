@@ -382,15 +382,138 @@ export function useDeleteCompletedWorkOrder() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      // Fetch the work order first so we know what schedules it affected
+      const { data: workOrder, error: fetchError } = await supabase
+        .from('work_orders')
+        .select('id, truck_id, service_type, entry_date, odometer_reading, status')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const truckId = workOrder.truck_id;
+      const serviceType = (workOrder.service_type || '').toLowerCase();
+
+      const isInspection = serviceType === 'inspection' || serviceType.includes('inspection');
+      const isOil = serviceType === 'pm' || serviceType.includes('oil');
+      const isTire = serviceType === 'tire' || serviceType.includes('tire');
+
+      // Delete the work order
+      const { error: deleteError } = await supabase
         .from('work_orders')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
+
+      const getOdometerAtDate = async (date: string) => {
+        const { data } = await supabase
+          .from('fleet_loads')
+          .select('end_miles, delivery_date')
+          .eq('truck_id', truckId)
+          .eq('status', 'delivered')
+          .not('end_miles', 'is', null)
+          .lte('delivery_date', date)
+          .order('delivery_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        return data?.end_miles ?? null;
+      };
+
+      const fetchMostRecentMatchingWO = async (matcher: (serviceType: string) => boolean) => {
+        const { data } = await supabase
+          .from('work_orders')
+          .select('entry_date, odometer_reading, service_type')
+          .eq('truck_id', truckId)
+          .eq('status', 'completed')
+          .order('entry_date', { ascending: false })
+          .limit(50);
+
+        const rows = (data || []) as Array<{
+          entry_date: string;
+          odometer_reading: number | null;
+          service_type: string;
+        }>;
+
+        return rows.find(r => matcher((r.service_type || '').toLowerCase())) || null;
+      };
+
+      const revertScheduleToPrevious = async (serviceName: string, matcher: (serviceType: string) => boolean) => {
+        const prev = await fetchMostRecentMatchingWO(matcher);
+
+        if (!prev) {
+          await supabase
+            .from('service_schedules')
+            .update({ last_performed_date: null, last_performed_miles: null })
+            .eq('truck_id', truckId)
+            .eq('service_name', serviceName);
+          return;
+        }
+
+        const odometerAtService =
+          prev.odometer_reading ?? (await getOdometerAtDate(prev.entry_date)) ?? null;
+
+        await supabase
+          .from('service_schedules')
+          .update({
+            last_performed_date: prev.entry_date,
+            last_performed_miles: odometerAtService,
+          })
+          .eq('truck_id', truckId)
+          .eq('service_name', serviceName);
+      };
+
+      if (isOil) {
+        await revertScheduleToPrevious('Oil Change', st => st === 'pm' || st.includes('oil'));
+      }
+
+      if (isTire) {
+        await revertScheduleToPrevious('Tire Replacement', st => st === 'tire' || st.includes('tire'));
+      }
+
+      if (isInspection) {
+        const prevInspection = await fetchMostRecentMatchingWO(st => st === 'inspection' || st.includes('inspection'));
+
+        if (!prevInspection) {
+          await supabase
+            .from('service_schedules')
+            .update({ last_performed_date: null, last_performed_miles: null })
+            .eq('truck_id', truckId)
+            .eq('service_name', '120-Day Inspection');
+
+          await supabase
+            .from('trucks')
+            .update({ last_120_inspection_date: null, last_120_inspection_miles: null })
+            .eq('id', truckId);
+        } else {
+          const odometerAtService =
+            prevInspection.odometer_reading ?? (await getOdometerAtDate(prevInspection.entry_date)) ?? null;
+
+          await supabase
+            .from('service_schedules')
+            .update({
+              last_performed_date: prevInspection.entry_date,
+              last_performed_miles: odometerAtService,
+            })
+            .eq('truck_id', truckId)
+            .eq('service_name', '120-Day Inspection');
+
+          await supabase
+            .from('trucks')
+            .update({
+              last_120_inspection_date: prevInspection.entry_date,
+              last_120_inspection_miles: odometerAtService,
+            })
+            .eq('id', truckId);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['service-history'] });
+      queryClient.invalidateQueries({ queryKey: ['pm-schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['compliance-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['service-schedules-120day'] });
     },
   });
 }
