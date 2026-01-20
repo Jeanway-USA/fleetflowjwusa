@@ -10,7 +10,6 @@ import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 // Pages
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
-import Dashboard from "./pages/Dashboard";
 import Trucks from "./pages/Trucks";
 import Drivers from "./pages/Drivers";
 import FleetLoads from "./pages/FleetLoads";
@@ -43,10 +42,9 @@ const App = () => {
             <AuthProvider>
               <ErrorBoundary>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/" element={<Navigate to="/fleet-loads" replace />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/trucks" element={<Trucks />} />
                   <Route path="/drivers" element={<Drivers />} />
                   <Route path="/fleet-loads" element={<FleetLoads />} />
