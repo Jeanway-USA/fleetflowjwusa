@@ -257,17 +257,6 @@ export default function Trucks() {
         );
       }
     },
-    { 
-      key: 'next_inspection_date', 
-      header: 'Next Inspection Date',
-      render: (truck: TruckWithDriver) => {
-        const inspection = inspectionStatusMap.get(truck.id);
-        if (inspection?.nextInspectionDate) {
-          return inspection.nextInspectionDate;
-        }
-        return truck.next_inspection_date || '-';
-      }
-    },
     {
       key: 'actions',
       header: 'Actions',
