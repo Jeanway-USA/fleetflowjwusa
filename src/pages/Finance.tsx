@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StatementUpload } from '@/components/finance/StatementUpload';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval } from 'date-fns';
@@ -82,6 +82,12 @@ export default function Finance() {
   const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
   const [massEditDialogOpen, setMassEditDialogOpen] = useState(false);
   const [massEditFormData, setMassEditFormData] = useState<Partial<ExpenseInsert>>({});
+  
+  // Sort state for expenses
+  type SortField = 'expense_date' | 'expense_type' | 'description' | 'amount' | 'gallons' | 'truck_id' | 'load_id';
+  type SortDirection = 'asc' | 'desc';
+  const [sortField, setSortField] = useState<SortField>('expense_date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const { data: settings = [] } = useQuery({
     queryKey: ['company_settings'],
@@ -389,6 +395,32 @@ export default function Finance() {
     massUpdateExpensesMutation.mutate(updates);
   };
 
+  // Select by type function
+  const selectExpensesByType = (type: string) => {
+    const idsOfType = sortedFilteredExpenses
+      .filter(e => e.expense_type === type)
+      .map(e => e.id);
+    setSelectedExpenseIds(new Set(idsOfType));
+  };
+
+  // Toggle sort
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sort icon component
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-50" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-3 w-3 ml-1" /> 
+      : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
+
   const handleExpenseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!expenseFormData.expense_type || !expenseFormData.amount) {
@@ -522,12 +554,35 @@ export default function Finance() {
   const filteredLoads = getFilteredLoads();
   const filteredExpenses = getFilteredExpenses();
   
-  // Sort expenses chronologically (oldest first for consistent ordering)
+  // Sort expenses based on selected sort field and direction
   const sortedFilteredExpenses = [...filteredExpenses].sort((a, b) => {
-    if (!a.expense_date && !b.expense_date) return 0;
-    if (!a.expense_date) return 1;
-    if (!b.expense_date) return -1;
-    return parseISO(a.expense_date).getTime() - parseISO(b.expense_date).getTime();
+    const direction = sortDirection === 'asc' ? 1 : -1;
+    
+    switch (sortField) {
+      case 'expense_date':
+        if (!a.expense_date && !b.expense_date) return 0;
+        if (!a.expense_date) return 1;
+        if (!b.expense_date) return -1;
+        return direction * (parseISO(a.expense_date).getTime() - parseISO(b.expense_date).getTime());
+      case 'expense_type':
+        return direction * (a.expense_type || '').localeCompare(b.expense_type || '');
+      case 'description':
+        return direction * (a.description || '').localeCompare(b.description || '');
+      case 'amount':
+        return direction * ((a.amount || 0) - (b.amount || 0));
+      case 'gallons':
+        return direction * ((a.gallons || 0) - (b.gallons || 0));
+      case 'truck_id':
+        const truckA = getTruckName(a.truck_id);
+        const truckB = getTruckName(b.truck_id);
+        return direction * truckA.localeCompare(truckB);
+      case 'load_id':
+        const loadA = getLoadName(a.load_id);
+        const loadB = getLoadName(b.load_id);
+        return direction * loadA.localeCompare(loadB);
+      default:
+        return 0;
+    }
   });
 
   // Filter payroll by period
@@ -1213,7 +1268,24 @@ export default function Finance() {
                   Track expenses by type, optionally link to a load or truck
                 </CardDescription>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Select onValueChange={selectExpensesByType}>
+                  <SelectTrigger className="w-44">
+                    <SelectValue placeholder="Select by type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {expenseTypes.filter(type => 
+                      sortedFilteredExpenses.some(e => e.expense_type === type)
+                    ).map(type => {
+                      const count = sortedFilteredExpenses.filter(e => e.expense_type === type).length;
+                      return (
+                        <SelectItem key={type} value={type}>
+                          {type} ({count})
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
                 {selectedExpenseIds.size > 0 && (
                   <Button variant="outline" onClick={openMassEditDialog}>
                     <CheckSquare className="h-4 w-4 mr-2" />
@@ -1236,13 +1308,69 @@ export default function Finance() {
                           onCheckedChange={toggleSelectAllExpenses}
                         />
                       </TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Gallons</TableHead>
-                      <TableHead>Truck</TableHead>
-                      <TableHead>Load</TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 select-none"
+                        onClick={() => handleSort('expense_date')}
+                      >
+                        <div className="flex items-center">
+                          Date
+                          <SortIcon field="expense_date" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 select-none"
+                        onClick={() => handleSort('expense_type')}
+                      >
+                        <div className="flex items-center">
+                          Type
+                          <SortIcon field="expense_type" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 select-none"
+                        onClick={() => handleSort('description')}
+                      >
+                        <div className="flex items-center">
+                          Description
+                          <SortIcon field="description" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 select-none"
+                        onClick={() => handleSort('amount')}
+                      >
+                        <div className="flex items-center">
+                          Amount
+                          <SortIcon field="amount" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 select-none"
+                        onClick={() => handleSort('gallons')}
+                      >
+                        <div className="flex items-center">
+                          Gallons
+                          <SortIcon field="gallons" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 select-none"
+                        onClick={() => handleSort('truck_id')}
+                      >
+                        <div className="flex items-center">
+                          Truck
+                          <SortIcon field="truck_id" />
+                        </div>
+                      </TableHead>
+                      <TableHead 
+                        className="cursor-pointer hover:bg-muted/80 select-none"
+                        onClick={() => handleSort('load_id')}
+                      >
+                        <div className="flex items-center">
+                          Load
+                          <SortIcon field="load_id" />
+                        </div>
+                      </TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
