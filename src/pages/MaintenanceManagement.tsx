@@ -45,21 +45,18 @@ export default function MaintenanceManagement() {
           </CardHeader>
           <CardContent className="pt-0">
             <Tabs defaultValue="active" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-                <TabsTrigger value="active" className="gap-2">
+              <TabsList className="w-full sm:w-auto">
+                <TabsTrigger value="active" className="gap-2 px-4">
                   <Wrench className="h-4 w-4" />
-                  <span className="hidden sm:inline">Active Work Orders</span>
-                  <span className="sm:hidden">Active</span>
+                  Active Work Orders
                 </TabsTrigger>
-                <TabsTrigger value="pm" className="gap-2">
+                <TabsTrigger value="pm" className="gap-2 px-4">
                   <Calendar className="h-4 w-4" />
-                  <span className="hidden sm:inline">PM Schedule</span>
-                  <span className="sm:hidden">PM</span>
+                  PM Schedule
                 </TabsTrigger>
-                <TabsTrigger value="history" className="gap-2">
+                <TabsTrigger value="history" className="gap-2 px-4">
                   <History className="h-4 w-4" />
-                  <span className="hidden sm:inline">Service History</span>
-                  <span className="sm:hidden">History</span>
+                  Service History
                 </TabsTrigger>
               </TabsList>
 

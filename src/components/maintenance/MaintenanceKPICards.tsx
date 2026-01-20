@@ -171,9 +171,11 @@ function ComplianceAlertCard() {
               <div className="mt-2 space-y-1">
                 {data.trucks.slice(0, 3).map(truck => (
                   <p key={truck.truckId} className="text-xs text-red-600">
-                    {truck.unitNumber}: {truck.daysRemaining < 0 
-                      ? `Overdue ${Math.abs(truck.daysRemaining)}d` 
-                      : `${truck.daysRemaining}d left`}
+                    {truck.unitNumber}: {truck.neverInspected 
+                      ? 'Never Inspected'
+                      : truck.daysRemaining !== null && truck.daysRemaining < 0 
+                        ? `Overdue ${Math.abs(truck.daysRemaining)}d` 
+                        : `${truck.daysRemaining}d left`}
                   </p>
                 ))}
                 {data.trucks.length > 3 && (

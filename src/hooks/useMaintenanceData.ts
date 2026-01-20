@@ -183,10 +183,12 @@ export function useComplianceAlerts() {
       const dueInspections = schedules?.filter(schedule => {
         if (!schedule.interval_days) return false;
         
-        const lastDate = schedule.last_performed_date 
-          ? new Date(schedule.last_performed_date) 
-          : new Date(0); // If never performed, it's overdue
+        // If never performed, mark as needing inspection (but not with crazy overdue days)
+        if (!schedule.last_performed_date) {
+          return true; // Flag as needing attention
+        }
         
+        const lastDate = new Date(schedule.last_performed_date);
         const dueDate = addDays(lastDate, schedule.interval_days);
         const daysRemaining = differenceInDays(dueDate, today);
         
@@ -195,14 +197,29 @@ export function useComplianceAlerts() {
 
       return {
         count: dueInspections.length,
-        trucks: dueInspections.map(s => ({
-          truckId: s.truck_id,
-          unitNumber: (s.trucks as any)?.unit_number || 'Unknown',
-          daysRemaining: differenceInDays(
-            addDays(new Date(s.last_performed_date || 0), s.interval_days || 120),
+        trucks: dueInspections.map(s => {
+          // Handle never inspected case
+          if (!s.last_performed_date) {
+            return {
+              truckId: s.truck_id,
+              unitNumber: (s.trucks as any)?.unit_number || 'Unknown',
+              daysRemaining: null, // null means never inspected
+              neverInspected: true,
+            };
+          }
+          
+          const daysRemaining = differenceInDays(
+            addDays(new Date(s.last_performed_date), s.interval_days || 120),
             today
-          ),
-        })),
+          );
+          
+          return {
+            truckId: s.truck_id,
+            unitNumber: (s.trucks as any)?.unit_number || 'Unknown',
+            daysRemaining,
+            neverInspected: false,
+          };
+        }),
       };
     },
   });
