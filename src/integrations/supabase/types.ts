@@ -1264,6 +1264,7 @@ export type Database = {
           make: string | null
           model: string | null
           next_inspection_date: string | null
+          purchase_mileage: number | null
           status: string
           unit_number: string
           updated_at: string
@@ -1282,6 +1283,7 @@ export type Database = {
           make?: string | null
           model?: string | null
           next_inspection_date?: string | null
+          purchase_mileage?: number | null
           status?: string
           unit_number: string
           updated_at?: string
@@ -1300,6 +1302,7 @@ export type Database = {
           make?: string | null
           model?: string | null
           next_inspection_date?: string | null
+          purchase_mileage?: number | null
           status?: string
           unit_number?: string
           updated_at?: string

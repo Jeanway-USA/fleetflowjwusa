@@ -72,6 +72,8 @@ export interface TruckWithSchedules {
   unit_number: string;
   make: string | null;
   current_odometer: number | null;
+  /** Mileage when the truck was purchased (for fallback PM calculations). */
+  purchase_mileage: number | null;
   /**
    * Truck odometer as of the most recently delivered load (fleet_loads.end_miles).
    * Falls back to trucks.current_odometer when no delivered loads exist.
@@ -604,7 +606,7 @@ export function usePMSchedule() {
     queryFn: async () => {
       const { data: trucks, error: trucksError } = await supabase
         .from('trucks')
-        .select('id, unit_number, make, current_odometer, last_120_inspection_date, status')
+        .select('id, unit_number, make, current_odometer, last_120_inspection_date, status, purchase_mileage')
         .eq('status', 'active')
         .order('unit_number');
 
@@ -687,8 +689,17 @@ export function usePMSchedule() {
         woByTruck.set(wo.truck_id, arr);
       });
 
-      const sumActualMilesSince = (truckId: string, sinceDate: string | null) => {
+      // Sum actual miles since a given date, or since purchase if no date provided
+      const sumActualMilesSince = (truckId: string, sinceDate: string | null, purchaseMileage: number | null, currentOdometer: number) => {
         const loads = loadsByTruck.get(truckId) || [];
+        
+        // If no baseline date (no previous service), calculate using purchase mileage
+        if (!sinceDate && purchaseMileage !== null) {
+          // Miles since purchase = current odometer - purchase mileage
+          return Math.max(0, currentOdometer - purchaseMileage);
+        }
+        
+        // Otherwise sum actual_miles from loads since the baseline date
         return loads.reduce((sum, l) => {
           if (!l.actual_miles) return sum;
           if (!l.delivery_date) return sum;
@@ -751,7 +762,13 @@ export function usePMSchedule() {
 
             const matcher = getServiceCodeMatcher(profile.service_code);
             const baseline = findBaselineWorkOrder(truck.id, matcher);
-            const miles_since_service = sumActualMilesSince(truck.id, baseline.date);
+            const calculatedOdometer = truckOdometerMap.get(truck.id) || truck.current_odometer || 0;
+            const miles_since_service = sumActualMilesSince(
+              truck.id, 
+              baseline.date, 
+              (truck as any).purchase_mileage ?? null,
+              calculatedOdometer
+            );
 
             return {
               profile,
@@ -761,13 +778,29 @@ export function usePMSchedule() {
             };
           });
 
+          const calculatedOdometer = truckOdometerMap.get(truck.id) || truck.current_odometer || 0;
+          const purchaseMileage = (truck as any).purchase_mileage ?? null;
+          const oilBaseline = findBaselineWorkOrder(truck.id, st => st === 'pm' || st.includes('oil'));
+          const tireBaseline = findBaselineWorkOrder(truck.id, st => st === 'tire' || st.includes('tire'));
+
           return {
             ...truck,
-            calculated_odometer: truckOdometerMap.get(truck.id) || truck.current_odometer || 0,
-            miles_since_oil_change: sumActualMilesSince(truck.id, oilSchedule?.last_performed_date || null),
-            miles_since_tire_replacement: sumActualMilesSince(truck.id, tireSchedule?.last_performed_date || null),
-            oil_change_baseline: findBaselineWorkOrder(truck.id, st => st === 'pm' || st.includes('oil')),
-            tire_replacement_baseline: findBaselineWorkOrder(truck.id, st => st === 'tire' || st.includes('tire')),
+            purchase_mileage: purchaseMileage,
+            calculated_odometer: calculatedOdometer,
+            miles_since_oil_change: sumActualMilesSince(
+              truck.id, 
+              oilSchedule?.last_performed_date || oilBaseline.date, 
+              purchaseMileage,
+              calculatedOdometer
+            ),
+            miles_since_tire_replacement: sumActualMilesSince(
+              truck.id, 
+              tireSchedule?.last_performed_date || tireBaseline.date, 
+              purchaseMileage,
+              calculatedOdometer
+            ),
+            oil_change_baseline: oilBaseline,
+            tire_replacement_baseline: tireBaseline,
             schedules: truckSchedules,
             manufacturer_services,
           };
