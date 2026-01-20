@@ -266,10 +266,11 @@ export function useServiceHistory(searchQuery?: string) {
           description,
           final_cost,
           completed_at,
+          estimated_completion,
           trucks (unit_number)
         `)
         .eq('status', 'completed')
-        .order('completed_at', { ascending: false });
+        .order('entry_date', { ascending: false });
 
       if (searchQuery) {
         woQuery = woQuery.or(`description.ilike.%${searchQuery}%,service_type.ilike.%${searchQuery}%,vendor.ilike.%${searchQuery}%`);
@@ -300,11 +301,12 @@ export function useServiceHistory(searchQuery?: string) {
       const { data: logs, error: logsError } = await logsQuery;
       if (logsError) throw logsError;
 
-      // Combine and normalize
+      // Combine and normalize - use entry_date for work orders (the date the work was done)
       const combined = [
         ...(workOrders?.map(wo => ({
           id: wo.id,
-          date: wo.completed_at || wo.entry_date,
+          truckId: wo.truck_id,
+          date: wo.entry_date, // Use entry_date as the service date
           unitNumber: (wo.trucks as any)?.unit_number || 'Unknown',
           serviceType: wo.service_type,
           vendor: wo.vendor,
@@ -314,6 +316,7 @@ export function useServiceHistory(searchQuery?: string) {
         })) || []),
         ...(logs?.map(log => ({
           id: log.id,
+          truckId: log.truck_id,
           date: log.service_date,
           unitNumber: (log.trucks as any)?.unit_number || 'Unknown',
           serviceType: log.service_type,
@@ -325,6 +328,60 @@ export function useServiceHistory(searchQuery?: string) {
       ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       return combined;
+    },
+  });
+}
+
+// Mutation to update a completed work order
+export function useUpdateCompletedWorkOrder() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, entry_date, vendor, final_cost, description, service_type }: {
+      id: string;
+      entry_date?: string;
+      vendor?: string;
+      final_cost?: number;
+      description?: string;
+      service_type?: string;
+    }) => {
+      const { data, error } = await supabase
+        .from('work_orders')
+        .update({
+          entry_date,
+          vendor,
+          final_cost,
+          description,
+          service_type,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-history'] });
+    },
+  });
+}
+
+// Mutation to delete a completed work order
+export function useDeleteCompletedWorkOrder() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('work_orders')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-history'] });
     },
   });
 }
