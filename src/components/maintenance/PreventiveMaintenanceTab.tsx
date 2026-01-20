@@ -1,8 +1,17 @@
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { usePMSchedule, TruckWithSchedules, ManufacturerService } from '@/hooks/useMaintenanceData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { HealthBar, InspectionCountdown } from './HealthBar';
-import { Wrench } from 'lucide-react';
+import { CompactHealthDot, CompactInspectionDot } from './CompactHealthDot';
+import { PMScheduleFilters, HealthStatus, ManufacturerFilter } from './PMScheduleFilters';
+import { PMFleetHealthSummary } from './PMFleetHealthSummary';
+import { usePMHealthCalculations, TruckHealthStatus } from './usePMHealthCalculations';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, Wrench } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 
 interface PreventiveMaintenanceTabProps {
   onViewTruck: (truckId: string) => void;
@@ -20,26 +29,152 @@ function groupTrucksByManufacturer(trucks: TruckWithSchedules[]) {
   return { freightlinerTrucks, otherTrucks };
 }
 
-function FreightlinerPMTable({ 
-  trucks, 
-  onViewTruck 
-}: { 
-  trucks: TruckWithSchedules[]; 
+interface CollapsibleTableSectionProps {
+  title: string;
+  overdueCount: number;
+  dueSoonCount: number;
+  totalCount: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}
+
+function CollapsibleTableSection({
+  title,
+  overdueCount,
+  dueSoonCount,
+  totalCount,
+  defaultOpen = true,
+  children,
+}: CollapsibleTableSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const hasIssues = overdueCount > 0 || dueSoonCount > 0;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <div className="rounded-md border overflow-hidden">
+        <CollapsibleTrigger asChild>
+          <button className="w-full flex items-center justify-between bg-muted/50 px-4 py-2.5 border-b hover:bg-muted/70 transition-colors">
+            <div className="flex items-center gap-3">
+              <ChevronDown className={cn(
+                'h-4 w-4 transition-transform',
+                !isOpen && '-rotate-90'
+              )} />
+              <h3 className="font-medium text-sm">{title}</h3>
+              <span className="text-xs text-muted-foreground">({totalCount} trucks)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {overdueCount > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                  {overdueCount} overdue
+                </span>
+              )}
+              {dueSoonCount > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                  {dueSoonCount} due soon
+                </span>
+              )}
+              {!hasIssues && totalCount > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                  All on track
+                </span>
+              )}
+            </div>
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          {children}
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
+
+interface FreightlinerPMTableProps {
+  trucks: TruckWithSchedules[];
   onViewTruck: (truckId: string) => void;
-}) {
+  compactMode: boolean;
+}
+
+function FreightlinerPMTable({ trucks, onViewTruck, compactMode }: FreightlinerPMTableProps) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const shouldVirtualize = trucks.length > 20;
+
+  const rowVirtualizer = useVirtualizer({
+    count: trucks.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 60,
+    overscan: 5,
+    enabled: shouldVirtualize,
+  });
+
   if (trucks.length === 0) return null;
 
-  // Get service columns from first truck's manufacturer services
   const serviceColumns = trucks[0].manufacturer_services.map(s => ({
     code: s.profile.service_code,
     name: s.profile.service_name,
   }));
 
+  const renderRow = (truck: TruckWithSchedules, style?: React.CSSProperties) => {
+    const inspectionSchedule = truck.schedules.find(s => s.service_name === '120-Day Inspection');
+    const currentOdometer = truck.calculated_odometer || 0;
+
+    return (
+      <TableRow 
+        key={truck.id}
+        className="cursor-pointer hover:bg-muted/50"
+        onClick={() => onViewTruck(truck.id)}
+        style={style}
+      >
+        <TableCell className="font-medium">{truck.unit_number}</TableCell>
+        <TableCell>{currentOdometer.toLocaleString()} mi</TableCell>
+        {truck.manufacturer_services.map((service: ManufacturerService) => (
+          <TableCell key={service.profile.id}>
+            {compactMode ? (
+              <CompactHealthDot
+                serviceName={service.profile.service_name}
+                currentValue={service.miles_since_service}
+                lastPerformedValue={0}
+                intervalValue={service.profile.interval_miles || 25000}
+                unit="miles"
+                baseline={service.baseline}
+                description={service.profile.description}
+              />
+            ) : (
+              <HealthBar
+                serviceName={service.profile.service_name}
+                currentValue={service.miles_since_service}
+                lastPerformedValue={0}
+                intervalValue={service.profile.interval_miles || 25000}
+                unit="miles"
+                baseline={service.baseline}
+                description={service.profile.description}
+              />
+            )}
+          </TableCell>
+        ))}
+        <TableCell>
+          {inspectionSchedule ? (
+            compactMode ? (
+              <CompactInspectionDot
+                lastInspectionDate={inspectionSchedule.last_performed_date}
+                intervalDays={inspectionSchedule.interval_days || 120}
+              />
+            ) : (
+              <InspectionCountdown
+                lastInspectionDate={inspectionSchedule.last_performed_date}
+                intervalDays={inspectionSchedule.interval_days || 120}
+              />
+            )
+          ) : (
+            <span className="text-muted-foreground text-sm">Not scheduled</span>
+          )}
+        </TableCell>
+      </TableRow>
+    );
+  };
+
   return (
-    <div className="rounded-md border">
-      <div className="bg-muted/50 px-4 py-2 border-b">
-        <h3 className="font-medium text-sm">Freightliner Cascadia Schedule II</h3>
-      </div>
+    <div ref={parentRef} className={shouldVirtualize ? 'max-h-[500px] overflow-auto' : ''}>
       <Table>
         <TableHeader>
           <TableRow>
@@ -52,66 +187,145 @@ function FreightlinerPMTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {trucks.map((truck) => {
-            const inspectionSchedule = truck.schedules.find(s => s.service_name === '120-Day Inspection');
-            const currentOdometer = truck.calculated_odometer || 0;
-
-            return (
-              <TableRow 
-                key={truck.id}
-                className="cursor-pointer"
-                onClick={() => onViewTruck(truck.id)}
-              >
-                <TableCell className="font-medium">{truck.unit_number}</TableCell>
-                <TableCell>{currentOdometer.toLocaleString()} mi</TableCell>
-                {truck.manufacturer_services.map((service: ManufacturerService) => (
-                  <TableCell key={service.profile.id}>
-                    <HealthBar
-                      serviceName={service.profile.service_name}
-                      currentValue={service.miles_since_service}
-                      lastPerformedValue={0}
-                      intervalValue={service.profile.interval_miles || 25000}
-                      unit="miles"
-                      baseline={service.baseline}
-                      description={service.profile.description}
-                    />
-                  </TableCell>
-                ))}
-                <TableCell>
-                  {inspectionSchedule ? (
-                    <InspectionCountdown
-                      lastInspectionDate={inspectionSchedule.last_performed_date}
-                      intervalDays={inspectionSchedule.interval_days || 120}
-                    />
-                  ) : (
-                    <span className="text-muted-foreground text-sm">Not scheduled</span>
-                  )}
-                </TableCell>
-              </TableRow>
-            );
-          })}
+          {shouldVirtualize ? (
+            <tr style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+              <td colSpan={serviceColumns.length + 3} style={{ padding: 0 }}>
+                <table className="w-full">
+                  <tbody>
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const truck = trucks[virtualRow.index];
+                      return renderRow(truck, {
+                        position: 'absolute',
+                        top: virtualRow.start,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualRow.size}px`,
+                      });
+                    })}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          ) : (
+            trucks.map(truck => renderRow(truck))
+          )}
         </TableBody>
       </Table>
     </div>
   );
 }
 
-function GenericPMTable({ 
-  trucks, 
-  onViewTruck 
-}: { 
-  trucks: TruckWithSchedules[]; 
+interface GenericPMTableProps {
+  trucks: TruckWithSchedules[];
   onViewTruck: (truckId: string) => void;
-}) {
+  compactMode: boolean;
+}
+
+function GenericPMTable({ trucks, onViewTruck, compactMode }: GenericPMTableProps) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const shouldVirtualize = trucks.length > 20;
+
+  const rowVirtualizer = useVirtualizer({
+    count: trucks.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 60,
+    overscan: 5,
+    enabled: shouldVirtualize,
+  });
+
   if (trucks.length === 0) return null;
 
+  const renderRow = (truck: TruckWithSchedules, style?: React.CSSProperties) => {
+    const oilChangeSchedule = truck.schedules.find(s => s.service_name === 'Oil Change');
+    const tiresSchedule = truck.schedules.find(s => s.service_name === 'Tire Replacement');
+    const inspectionSchedule = truck.schedules.find(s => s.service_name === '120-Day Inspection');
+
+    const currentOdometer = truck.calculated_odometer || 0;
+    const oilCurrentValue = (oilChangeSchedule?.last_performed_miles || 0) + (truck.miles_since_oil_change || 0);
+    const tireCurrentValue = (tiresSchedule?.last_performed_miles || 0) + (truck.miles_since_tire_replacement || 0);
+
+    return (
+      <TableRow 
+        key={truck.id}
+        className="cursor-pointer hover:bg-muted/50"
+        onClick={() => onViewTruck(truck.id)}
+        style={style}
+      >
+        <TableCell className="font-medium">{truck.unit_number}</TableCell>
+        <TableCell>{currentOdometer.toLocaleString()} mi</TableCell>
+        <TableCell>
+          {oilChangeSchedule ? (
+            compactMode ? (
+              <CompactHealthDot
+                serviceName="Oil"
+                currentValue={oilCurrentValue}
+                lastPerformedValue={oilChangeSchedule.last_performed_miles || 0}
+                intervalValue={oilChangeSchedule.interval_miles || 15000}
+                unit="miles"
+                baseline={truck.oil_change_baseline}
+              />
+            ) : (
+              <HealthBar
+                serviceName="Oil"
+                currentValue={oilCurrentValue}
+                lastPerformedValue={oilChangeSchedule.last_performed_miles || 0}
+                intervalValue={oilChangeSchedule.interval_miles || 15000}
+                unit="miles"
+                baseline={truck.oil_change_baseline}
+              />
+            )
+          ) : (
+            <span className="text-muted-foreground text-sm">Not scheduled</span>
+          )}
+        </TableCell>
+        <TableCell>
+          {tiresSchedule ? (
+            compactMode ? (
+              <CompactHealthDot
+                serviceName="Tires"
+                currentValue={tireCurrentValue}
+                lastPerformedValue={tiresSchedule.last_performed_miles || 0}
+                intervalValue={tiresSchedule.interval_miles || 80000}
+                unit="miles"
+                baseline={truck.tire_replacement_baseline}
+              />
+            ) : (
+              <HealthBar
+                serviceName="Tires"
+                currentValue={tireCurrentValue}
+                lastPerformedValue={tiresSchedule.last_performed_miles || 0}
+                intervalValue={tiresSchedule.interval_miles || 80000}
+                unit="miles"
+                baseline={truck.tire_replacement_baseline}
+              />
+            )
+          ) : (
+            <span className="text-muted-foreground text-sm">Not scheduled</span>
+          )}
+        </TableCell>
+        <TableCell>
+          {inspectionSchedule ? (
+            compactMode ? (
+              <CompactInspectionDot
+                lastInspectionDate={inspectionSchedule.last_performed_date}
+                intervalDays={inspectionSchedule.interval_days || 120}
+              />
+            ) : (
+              <InspectionCountdown
+                lastInspectionDate={inspectionSchedule.last_performed_date}
+                intervalDays={inspectionSchedule.interval_days || 120}
+              />
+            )
+          ) : (
+            <span className="text-muted-foreground text-sm">Not scheduled</span>
+          )}
+        </TableCell>
+      </TableRow>
+    );
+  };
+
   return (
-    <div className="rounded-md border">
-      {trucks.some(t => t.make) && (
-        <div className="bg-muted/50 px-4 py-2 border-b">
-          <h3 className="font-medium text-sm">Other Trucks</h3>
-        </div>
-      )}
+    <div ref={parentRef} className={shouldVirtualize ? 'max-h-[500px] overflow-auto' : ''}>
       <Table>
         <TableHeader>
           <TableRow>
@@ -123,66 +337,28 @@ function GenericPMTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {trucks.map((truck) => {
-            const oilChangeSchedule = truck.schedules.find(s => s.service_name === 'Oil Change');
-            const tiresSchedule = truck.schedules.find(s => s.service_name === 'Tire Replacement');
-            const inspectionSchedule = truck.schedules.find(s => s.service_name === '120-Day Inspection');
-
-            const currentOdometer = truck.calculated_odometer || 0;
-
-            // PM usage is based on delivered load actual_miles since the last performed date
-            const oilCurrentValue = (oilChangeSchedule?.last_performed_miles || 0) + (truck.miles_since_oil_change || 0);
-            const tireCurrentValue = (tiresSchedule?.last_performed_miles || 0) + (truck.miles_since_tire_replacement || 0);
-
-            return (
-              <TableRow 
-                key={truck.id}
-                className="cursor-pointer"
-                onClick={() => onViewTruck(truck.id)}
-              >
-                <TableCell className="font-medium">{truck.unit_number}</TableCell>
-                <TableCell>{currentOdometer.toLocaleString()} mi</TableCell>
-                <TableCell>
-                  {oilChangeSchedule ? (
-                    <HealthBar
-                      serviceName="Oil"
-                      currentValue={oilCurrentValue}
-                      lastPerformedValue={oilChangeSchedule.last_performed_miles || 0}
-                      intervalValue={oilChangeSchedule.interval_miles || 15000}
-                      unit="miles"
-                      baseline={truck.oil_change_baseline}
-                    />
-                  ) : (
-                    <span className="text-muted-foreground text-sm">Not scheduled</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {tiresSchedule ? (
-                    <HealthBar
-                      serviceName="Tires"
-                      currentValue={tireCurrentValue}
-                      lastPerformedValue={tiresSchedule.last_performed_miles || 0}
-                      intervalValue={tiresSchedule.interval_miles || 80000}
-                      unit="miles"
-                      baseline={truck.tire_replacement_baseline}
-                    />
-                  ) : (
-                    <span className="text-muted-foreground text-sm">Not scheduled</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {inspectionSchedule ? (
-                    <InspectionCountdown
-                      lastInspectionDate={inspectionSchedule.last_performed_date}
-                      intervalDays={inspectionSchedule.interval_days || 120}
-                    />
-                  ) : (
-                    <span className="text-muted-foreground text-sm">Not scheduled</span>
-                  )}
-                </TableCell>
-              </TableRow>
-            );
-          })}
+          {shouldVirtualize ? (
+            <tr style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+              <td colSpan={5} style={{ padding: 0 }}>
+                <table className="w-full">
+                  <tbody>
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const truck = trucks[virtualRow.index];
+                      return renderRow(truck, {
+                        position: 'absolute',
+                        top: virtualRow.start,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualRow.size}px`,
+                      });
+                    })}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+          ) : (
+            trucks.map(truck => renderRow(truck))
+          )}
         </TableBody>
       </Table>
     </div>
@@ -191,12 +367,126 @@ function GenericPMTable({
 
 export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceTabProps) {
   const { data: trucks, isLoading } = usePMSchedule();
+  
+  // Filter state with localStorage persistence
+  const [searchQuery, setSearchQuery] = useState(() => 
+    localStorage.getItem('pm-search') || ''
+  );
+  const [statusFilter, setStatusFilter] = useState<HealthStatus>(() => 
+    (localStorage.getItem('pm-status-filter') as HealthStatus) || 'all'
+  );
+  const [manufacturerFilter, setManufacturerFilter] = useState<ManufacturerFilter>(() => 
+    (localStorage.getItem('pm-manufacturer-filter') as ManufacturerFilter) || 'all'
+  );
+  const [compactMode, setCompactMode] = useState(() => 
+    localStorage.getItem('pm-compact-mode') === 'true'
+  );
+  const [hideHealthy, setHideHealthy] = useState(() => 
+    localStorage.getItem('pm-hide-healthy') === 'true'
+  );
+
+  // Persist filters to localStorage
+  useEffect(() => {
+    localStorage.setItem('pm-search', searchQuery);
+  }, [searchQuery]);
+  
+  useEffect(() => {
+    localStorage.setItem('pm-status-filter', statusFilter);
+  }, [statusFilter]);
+  
+  useEffect(() => {
+    localStorage.setItem('pm-manufacturer-filter', manufacturerFilter);
+  }, [manufacturerFilter]);
+  
+  useEffect(() => {
+    localStorage.setItem('pm-compact-mode', String(compactMode));
+  }, [compactMode]);
+  
+  useEffect(() => {
+    localStorage.setItem('pm-hide-healthy', String(hideHealthy));
+  }, [hideHealthy]);
+
+  // Debounced search for performance
+  const debouncedSearch = useDebouncedCallback((value: string) => {
+    setSearchQuery(value);
+  }, 200);
+
+  // Calculate health for all trucks
+  const { truckHealthList, overdueCount, dueSoonCount, onTrackCount } = usePMHealthCalculations(trucks);
+
+  // Apply filters
+  const filteredTrucks = useMemo(() => {
+    if (!truckHealthList.length) return [];
+
+    return truckHealthList.filter(({ truck, status }) => {
+      // Search filter
+      if (searchQuery && !truck.unit_number.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+
+      // Status filter
+      if (statusFilter !== 'all') {
+        const statusMap: Record<HealthStatus, TruckHealthStatus | null> = {
+          'all': null,
+          'overdue': 'overdue',
+          'due-soon': 'due-soon',
+          'on-track': 'on-track',
+        };
+        if (statusMap[statusFilter] && status !== statusMap[statusFilter]) {
+          return false;
+        }
+      }
+
+      // Manufacturer filter
+      if (manufacturerFilter !== 'all') {
+        const isFreightliner = truck.make?.toLowerCase() === 'freightliner';
+        if (manufacturerFilter === 'freightliner' && !isFreightliner) return false;
+        if (manufacturerFilter === 'other' && isFreightliner) return false;
+      }
+
+      // Hide healthy filter
+      if (hideHealthy && status === 'on-track') {
+        return false;
+      }
+
+      return true;
+    });
+  }, [truckHealthList, searchQuery, statusFilter, manufacturerFilter, hideHealthy]);
+
+  // Group filtered trucks by manufacturer
+  const { freightlinerTrucks, otherTrucks } = useMemo(() => {
+    const trucksOnly = filteredTrucks.map(t => t.truck);
+    return groupTrucksByManufacturer(trucksOnly);
+  }, [filteredTrucks]);
+
+  // Calculate health counts for each group
+  const freightlinerHealth = useMemo(() => {
+    const health = filteredTrucks.filter(t => 
+      t.truck.make?.toLowerCase() === 'freightliner' && t.truck.manufacturer_services.length > 0
+    );
+    return {
+      overdueCount: health.filter(h => h.status === 'overdue').length,
+      dueSoonCount: health.filter(h => h.status === 'due-soon').length,
+    };
+  }, [filteredTrucks]);
+
+  const otherHealth = useMemo(() => {
+    const health = filteredTrucks.filter(t => 
+      t.truck.make?.toLowerCase() !== 'freightliner' || t.truck.manufacturer_services.length === 0
+    );
+    return {
+      overdueCount: health.filter(h => h.status === 'overdue').length,
+      dueSoonCount: health.filter(h => h.status === 'due-soon').length,
+    };
+  }, [filteredTrucks]);
 
   if (isLoading) {
     return (
       <div className="space-y-4">
-        {[1, 2, 3, 4].map(i => (
-          <Skeleton key={i} className="h-20 w-full" />
+        <Skeleton className="h-10 w-full max-w-sm" />
+        <Skeleton className="h-12 w-full" />
+        {[1, 2, 3].map(i => (
+          <Skeleton key={i} className="h-16 w-full" />
         ))}
       </div>
     );
@@ -214,12 +504,75 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
     );
   }
 
-  const { freightlinerTrucks, otherTrucks } = groupTrucksByManufacturer(trucks);
-
   return (
-    <div className="space-y-6">
-      <FreightlinerPMTable trucks={freightlinerTrucks} onViewTruck={onViewTruck} />
-      <GenericPMTable trucks={otherTrucks} onViewTruck={onViewTruck} />
+    <div className="space-y-4">
+      {/* Fleet Health Summary */}
+      <PMFleetHealthSummary
+        overdueCount={overdueCount}
+        dueSoonCount={dueSoonCount}
+        onTrackCount={onTrackCount}
+        onFilterClick={setStatusFilter}
+        activeFilter={statusFilter}
+      />
+
+      {/* Filters */}
+      <PMScheduleFilters
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        manufacturerFilter={manufacturerFilter}
+        onManufacturerFilterChange={setManufacturerFilter}
+        compactMode={compactMode}
+        onCompactModeChange={setCompactMode}
+        hideHealthy={hideHealthy}
+        onHideHealthyChange={setHideHealthy}
+      />
+
+      {/* Results */}
+      {filteredTrucks.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
+          <Wrench className="h-10 w-10 text-muted-foreground mb-3" />
+          <h3 className="text-base font-medium">No matching trucks</h3>
+          <p className="text-sm text-muted-foreground">
+            Try adjusting your filters or search query.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {freightlinerTrucks.length > 0 && (
+            <CollapsibleTableSection
+              title="Freightliner Cascadia Schedule II"
+              overdueCount={freightlinerHealth.overdueCount}
+              dueSoonCount={freightlinerHealth.dueSoonCount}
+              totalCount={freightlinerTrucks.length}
+              defaultOpen={freightlinerHealth.overdueCount > 0 || freightlinerHealth.dueSoonCount > 0 || freightlinerTrucks.length <= 10}
+            >
+              <FreightlinerPMTable 
+                trucks={freightlinerTrucks} 
+                onViewTruck={onViewTruck}
+                compactMode={compactMode}
+              />
+            </CollapsibleTableSection>
+          )}
+
+          {otherTrucks.length > 0 && (
+            <CollapsibleTableSection
+              title="Other Trucks"
+              overdueCount={otherHealth.overdueCount}
+              dueSoonCount={otherHealth.dueSoonCount}
+              totalCount={otherTrucks.length}
+              defaultOpen={otherHealth.overdueCount > 0 || otherHealth.dueSoonCount > 0 || otherTrucks.length <= 10}
+            >
+              <GenericPMTable 
+                trucks={otherTrucks} 
+                onViewTruck={onViewTruck}
+                compactMode={compactMode}
+              />
+            </CollapsibleTableSection>
+          )}
+        </div>
+      )}
     </div>
   );
 }
