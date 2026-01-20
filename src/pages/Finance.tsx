@@ -60,6 +60,7 @@ const GALLONS_EXPENSE_TYPES = ['Fuel', 'DEF'];
 export default function Finance() {
   const queryClient = useQueryClient();
   const [selectedPeriod, setSelectedPeriod] = useState<string>('2026-Q1');
+  const [selectedTruck, setSelectedTruck] = useState<string>('all');
   const [editingSettings, setEditingSettings] = useState(false);
   const [settingsForm, setSettingsForm] = useState<any>({});
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
@@ -369,9 +370,16 @@ export default function Finance() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
   };
 
-  // Filter loads by selected period
+  // Filter loads by selected period and truck
   const getFilteredLoads = () => {
-    if (selectedPeriod === 'all') return loads;
+    let filtered = loads;
+    
+    // Filter by truck first
+    if (selectedTruck !== 'all') {
+      filtered = filtered.filter((l: any) => l.truck_id === selectedTruck);
+    }
+    
+    if (selectedPeriod === 'all') return filtered;
     
     const [year, period] = selectedPeriod.split('-');
     const yearNum = parseInt(year);
@@ -382,7 +390,7 @@ export default function Finance() {
       const start = new Date(yearNum, startMonth, 1);
       const end = endOfQuarter(start);
       
-      return loads.filter((l: any) => {
+      return filtered.filter((l: any) => {
         if (!l.pickup_date) return false;
         const date = parseISO(l.pickup_date);
         return isWithinInterval(date, { start, end });
@@ -392,7 +400,7 @@ export default function Finance() {
       const start = new Date(yearNum, month, 1);
       const end = endOfMonth(start);
       
-      return loads.filter((l: any) => {
+      return filtered.filter((l: any) => {
         if (!l.pickup_date) return false;
         const date = parseISO(l.pickup_date);
         return isWithinInterval(date, { start, end });
@@ -400,9 +408,16 @@ export default function Finance() {
     }
   };
 
-  // Filter standalone expenses by period
+  // Filter standalone expenses by period and truck
   const getFilteredExpenses = () => {
-    if (selectedPeriod === 'all') return expenses;
+    let filtered = expenses;
+    
+    // Filter by truck first
+    if (selectedTruck !== 'all') {
+      filtered = filtered.filter((e: Expense) => e.truck_id === selectedTruck);
+    }
+    
+    if (selectedPeriod === 'all') return filtered;
     
     const [year, period] = selectedPeriod.split('-');
     const yearNum = parseInt(year);
@@ -413,7 +428,7 @@ export default function Finance() {
       const start = new Date(yearNum, startMonth, 1);
       const end = endOfQuarter(start);
       
-      return expenses.filter((e: Expense) => {
+      return filtered.filter((e: Expense) => {
         if (!e.expense_date) return false;
         const date = parseISO(e.expense_date);
         return isWithinInterval(date, { start, end });
@@ -423,7 +438,7 @@ export default function Finance() {
       const start = new Date(yearNum, month, 1);
       const end = endOfMonth(start);
       
-      return expenses.filter((e: Expense) => {
+      return filtered.filter((e: Expense) => {
         if (!e.expense_date) return false;
         const date = parseISO(e.expense_date);
         return isWithinInterval(date, { start, end });
@@ -727,8 +742,8 @@ export default function Finance() {
     <DashboardLayout>
       <PageHeader title="Finance & P/L" description="Track revenue, expenses, and profitability" />
 
-      {/* Period Selector */}
-      <div className="flex gap-4 mb-6">
+      {/* Period and Truck Selector */}
+      <div className="flex flex-wrap gap-4 mb-6">
         <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Select period" />
@@ -739,6 +754,21 @@ export default function Finance() {
             <SelectItem value="2026-1">January 2026</SelectItem>
             <SelectItem value="2026-2">February 2026</SelectItem>
             <SelectItem value="2026-3">March 2026</SelectItem>
+          </SelectContent>
+        </Select>
+        
+        <Select value={selectedTruck} onValueChange={setSelectedTruck}>
+          <SelectTrigger className="w-56">
+            <TruckIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Select truck" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Units (Company)</SelectItem>
+            {trucks.map((truck: any) => (
+              <SelectItem key={truck.id} value={truck.id}>
+                Unit #{truck.unit_number}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
