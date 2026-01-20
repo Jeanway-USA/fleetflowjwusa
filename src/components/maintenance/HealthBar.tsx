@@ -49,7 +49,18 @@ export function HealthBar({
     return 'text-emerald-600';
   };
 
-  const formatRemaining = () => {
+  const formatPrimaryLine = () => {
+    if (unit === 'miles') {
+      return `${used.toLocaleString()} mi since service`;
+    }
+
+    if (isOverdue) {
+      return `Overdue by ${Math.abs(remaining).toLocaleString()} ${unit}`;
+    }
+    return `${remaining.toLocaleString()} ${unit} remaining`;
+  };
+
+  const formatRemainingLine = () => {
     if (isOverdue) {
       return `Overdue by ${Math.abs(remaining).toLocaleString()} ${unit}`;
     }
@@ -80,7 +91,7 @@ export function HealthBar({
               />
             </div>
             <p className={cn('text-xs mt-0.5', getTextColor())}>
-              {formatRemaining()}
+              {formatPrimaryLine()}
             </p>
           </div>
         </TooltipTrigger>
@@ -89,7 +100,7 @@ export function HealthBar({
             <p className="font-medium">{serviceName}</p>
             <p>Interval: {intervalValue.toLocaleString()} {unit}</p>
             <p>Miles since service: {used.toLocaleString()} {unit}</p>
-            <p className={getTextColor()}>{formatRemaining()}</p>
+            <p className={getTextColor()}>{formatRemainingLine()}</p>
             {baseline && (
               <div className="pt-1 border-t border-border mt-1">
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
