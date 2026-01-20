@@ -86,8 +86,8 @@ export default function DispatcherDashboard() {
     },
   });
 
-  // Redirect if user doesn't have dispatcher role (after all hooks)
-  if (!hasRole('dispatcher') && roles.length > 0) {
+  // Redirect if user doesn't have dispatcher or owner role (after all hooks)
+  if (!hasRole('dispatcher') && !hasRole('owner') && roles.length > 0) {
     return <Navigate to="/" replace />;
   }
 
