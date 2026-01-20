@@ -19,11 +19,6 @@ export default function DispatcherDashboard() {
   const { user, roles, hasRole } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if user doesn't have dispatcher role
-  if (!hasRole('dispatcher') && roles.length > 0) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   // Fetch user's first name from profile
   const { data: profile } = useQuery({
     queryKey: ['user-profile', user?.id],
@@ -90,6 +85,11 @@ export default function DispatcherDashboard() {
       };
     },
   });
+
+  // Redirect if user doesn't have dispatcher role (after all hooks)
+  if (!hasRole('dispatcher') && roles.length > 0) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const getGreeting = () => {
     const hour = new Date().getHours();
