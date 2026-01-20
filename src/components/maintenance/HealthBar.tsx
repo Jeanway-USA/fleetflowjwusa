@@ -1,6 +1,12 @@
 import { cn } from '@/lib/utils';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, FileText } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { format } from 'date-fns';
+
+interface PMBaseline {
+  workOrderId: string | null;
+  date: string | null;
+}
 
 interface HealthBarProps {
   serviceName: string;
@@ -8,6 +14,7 @@ interface HealthBarProps {
   lastPerformedValue: number;
   intervalValue: number;
   unit: 'miles' | 'days';
+  baseline?: PMBaseline;
   className?: string;
 }
 
@@ -17,6 +24,7 @@ export function HealthBar({
   lastPerformedValue,
   intervalValue,
   unit,
+  baseline,
   className,
 }: HealthBarProps) {
   const used = currentValue - lastPerformedValue;
@@ -77,11 +85,28 @@ export function HealthBar({
           </div>
         </TooltipTrigger>
         <TooltipContent>
-          <div className="text-sm">
+          <div className="text-sm space-y-1">
             <p className="font-medium">{serviceName}</p>
             <p>Interval: {intervalValue.toLocaleString()} {unit}</p>
-            <p>Used: {used.toLocaleString()} {unit}</p>
+            <p>Miles since service: {used.toLocaleString()} {unit}</p>
             <p className={getTextColor()}>{formatRemaining()}</p>
+            {baseline && (
+              <div className="pt-1 border-t border-border mt-1">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <FileText className="h-3 w-3" />
+                  <span>
+                    {baseline.date 
+                      ? `Baseline: ${format(new Date(baseline.date), 'MMM d, yyyy')}`
+                      : 'No service recorded'}
+                  </span>
+                </div>
+                {baseline.workOrderId && (
+                  <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                    WO: {baseline.workOrderId.slice(0, 8)}...
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </TooltipContent>
       </Tooltip>

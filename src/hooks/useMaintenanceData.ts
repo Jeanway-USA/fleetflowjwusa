@@ -43,6 +43,11 @@ export interface ServiceSchedule {
   };
 }
 
+export interface PMBaseline {
+  workOrderId: string | null;
+  date: string | null;
+}
+
 export interface TruckWithSchedules {
   id: string;
   unit_number: string;
@@ -56,6 +61,10 @@ export interface TruckWithSchedules {
   miles_since_oil_change: number;
   /** Miles driven since last Tire Replacement based on delivered loads' actual_miles. */
   miles_since_tire_replacement: number;
+  /** Baseline work order info for Oil Change. */
+  oil_change_baseline: PMBaseline;
+  /** Baseline work order info for Tire Replacement. */
+  tire_replacement_baseline: PMBaseline;
   last_120_inspection_date: string | null;
   status: string;
   schedules: ServiceSchedule[];
@@ -548,6 +557,15 @@ export function usePMSchedule() {
 
       if (loadsError) throw loadsError;
 
+      // Fetch completed work orders to find baseline work orders for each PM type
+      const { data: completedWorkOrders, error: woError } = await supabase
+        .from('work_orders')
+        .select('id, truck_id, service_type, entry_date')
+        .eq('status', 'completed')
+        .order('entry_date', { ascending: false });
+
+      if (woError) throw woError;
+
       // Latest end_miles per truck (actual odometer reading)
       const truckOdometerMap = new Map<string, number>();
       deliveredLoads?.forEach(load => {
@@ -568,6 +586,19 @@ export function usePMSchedule() {
         loadsByTruck.set(load.truck_id, arr);
       });
 
+      // Index completed work orders by truck
+      const woByTruck = new Map<string, { id: string; service_type: string; entry_date: string }[]>();
+      completedWorkOrders?.forEach(wo => {
+        if (!wo.truck_id) return;
+        const arr = woByTruck.get(wo.truck_id) || [];
+        arr.push({
+          id: wo.id,
+          service_type: wo.service_type || '',
+          entry_date: wo.entry_date,
+        });
+        woByTruck.set(wo.truck_id, arr);
+      });
+
       const sumActualMilesSince = (truckId: string, sinceDate: string | null) => {
         const loads = loadsByTruck.get(truckId) || [];
         return loads.reduce((sum, l) => {
@@ -578,9 +609,18 @@ export function usePMSchedule() {
         }, 0);
       };
 
+      const findBaselineWorkOrder = (truckId: string, matcher: (serviceType: string) => boolean): PMBaseline => {
+        const wos = woByTruck.get(truckId) || [];
+        const match = wos.find(wo => matcher(wo.service_type.toLowerCase()));
+        return match
+          ? { workOrderId: match.id, date: match.entry_date }
+          : { workOrderId: null, date: null };
+      };
+
       // Map schedules to trucks with:
       // - calculated_odometer = last delivered end_miles
       // - miles since oil/tires = sum(actual_miles) since that service was last performed
+      // - baseline work order info for tooltips
       const trucksWithSchedules: TruckWithSchedules[] =
         trucks?.map(truck => {
           const truckSchedules = schedules?.filter(s => s.truck_id === truck.id) || [];
@@ -592,6 +632,8 @@ export function usePMSchedule() {
             calculated_odometer: truckOdometerMap.get(truck.id) || truck.current_odometer || 0,
             miles_since_oil_change: sumActualMilesSince(truck.id, oilSchedule?.last_performed_date || null),
             miles_since_tire_replacement: sumActualMilesSince(truck.id, tireSchedule?.last_performed_date || null),
+            oil_change_baseline: findBaselineWorkOrder(truck.id, st => st === 'pm' || st.includes('oil')),
+            tire_replacement_baseline: findBaselineWorkOrder(truck.id, st => st === 'tire' || st.includes('tire')),
             schedules: truckSchedules,
           };
         }) || [];
