@@ -554,12 +554,12 @@ export default function IFTA() {
               <div className="space-y-2">
                 <Label>Truck</Label>
                 <Select 
-                  value={fuelFormData.truck_id || ''} 
-                  onValueChange={(v) => setFuelFormData({ ...fuelFormData, truck_id: v || null })}
+                  value={fuelFormData.truck_id || 'none'} 
+                  onValueChange={(v) => setFuelFormData({ ...fuelFormData, truck_id: v === 'none' ? null : v })}
                 >
                   <SelectTrigger><SelectValue placeholder="Select truck" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {trucks.map(t => (
                       <SelectItem key={t.id} value={t.id}>#{t.unit_number}</SelectItem>
                     ))}
@@ -569,12 +569,12 @@ export default function IFTA() {
               <div className="space-y-2">
                 <Label>Driver</Label>
                 <Select 
-                  value={fuelFormData.driver_id || ''} 
-                  onValueChange={(v) => setFuelFormData({ ...fuelFormData, driver_id: v || null })}
+                  value={fuelFormData.driver_id || 'none'} 
+                  onValueChange={(v) => setFuelFormData({ ...fuelFormData, driver_id: v === 'none' ? null : v })}
                 >
                   <SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {drivers.map(d => (
                       <SelectItem key={d.id} value={d.id}>{d.first_name} {d.last_name}</SelectItem>
                     ))}
