@@ -7,6 +7,8 @@ import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { ExpensesList } from '@/components/shared/ExpensesList';
+import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
+import { LoadingButton } from '@/components/shared/LoadingButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock, Truck as TruckIcon } from 'lucide-react';
 import { addDays, differenceInDays, format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -69,6 +71,8 @@ export default function Trucks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTruck, setEditingTruck] = useState<TruckWithDriver | null>(null);
   const [formData, setFormData] = useState<Partial<TruckInsert>>({});
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [truckToDelete, setTruckToDelete] = useState<TruckWithDriver | null>(null);
 
   const { data: trucks = [], isLoading } = useQuery({
     queryKey: ['trucks'],
@@ -178,9 +182,22 @@ export default function Trucks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trucks'] });
       toast.success('Truck deleted');
+      setDeleteConfirmOpen(false);
+      setTruckToDelete(null);
     },
     onError: (error) => toast.error(error.message),
   });
+
+  const handleDeleteClick = (truck: TruckWithDriver) => {
+    setTruckToDelete(truck);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (truckToDelete) {
+      deleteMutation.mutate(truckToDelete.id);
+    }
+  };
 
   const openDialog = (truck?: TruckWithDriver) => {
     setEditingTruck(truck || null);
@@ -282,10 +299,10 @@ export default function Trucks() {
           <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setViewingTruck(truck); }} title="View details">
             <FileText className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(truck); }}>
+          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(truck); }} title="Edit truck">
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(truck.id); }}>
+          <Button size="icon" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(truck); }} title="Delete truck">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -403,14 +420,31 @@ export default function Trucks() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">
-                {editingTruck ? 'Save Changes' : 'Add Truck'}
+              <Button type="button" variant="outline" onClick={closeDialog} disabled={createMutation.isPending || updateMutation.isPending}>
+                Cancel
               </Button>
+              <LoadingButton 
+                type="submit" 
+                className="gradient-gold text-primary-foreground"
+                loading={createMutation.isPending || updateMutation.isPending}
+                loadingText={editingTruck ? 'Saving...' : 'Adding...'}
+              >
+                {editingTruck ? 'Save Changes' : 'Add Truck'}
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDeleteDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={confirmDelete}
+        title="Delete Truck"
+        itemName={truckToDelete?.unit_number}
+        isDeleting={deleteMutation.isPending}
+      />
 
       {/* Truck Details Dialog with Documents & Expenses */}
       <Dialog open={!!viewingTruck} onOpenChange={(open) => !open && setViewingTruck(null)}>

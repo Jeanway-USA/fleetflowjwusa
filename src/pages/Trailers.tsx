@@ -6,6 +6,8 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
+import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
+import { LoadingButton } from '@/components/shared/LoadingButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, User, AlertTriangle, CheckCircle, Clock, History } from 'lucide-react';
+import { Pencil, Trash2, FileText, User, AlertTriangle, CheckCircle, Clock, History, Container } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
 import { TrailerAssignmentHistory } from '@/components/trailers/TrailerAssignmentHistory';
 
@@ -94,6 +96,8 @@ export default function Trailers() {
   const [editingTrailer, setEditingTrailer] = useState<TrailerWithDriver | null>(null);
   const [formData, setFormData] = useState<Partial<TrailerInsert>>({});
   const [viewingTrailer, setViewingTrailer] = useState<TrailerWithDriver | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [trailerToDelete, setTrailerToDelete] = useState<TrailerWithDriver | null>(null);
 
   const { data: trailers = [], isLoading } = useQuery({
     queryKey: ['trailers'],
@@ -181,9 +185,22 @@ export default function Trailers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trailers'] });
       toast.success('Trailer deleted');
+      setDeleteConfirmOpen(false);
+      setTrailerToDelete(null);
     },
     onError: (error) => toast.error(error.message),
   });
+
+  const handleDeleteClick = (trailer: TrailerWithDriver) => {
+    setTrailerToDelete(trailer);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (trailerToDelete) {
+      deleteMutation.mutate(trailerToDelete.id);
+    }
+  };
 
   const openDialog = (trailer?: TrailerWithDriver) => {
     setEditingTrailer(trailer || null);
@@ -277,10 +294,10 @@ export default function Trailers() {
           <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setViewingTrailer(trailer); }} title="View details">
             <FileText className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(trailer); }}>
+          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(trailer); }} title="Edit trailer">
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(trailer.id); }}>
+          <Button size="icon" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(trailer); }} title="Delete trailer">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -423,14 +440,31 @@ export default function Trailers() {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">
-                {editingTrailer ? 'Save Changes' : 'Add Trailer'}
+              <Button type="button" variant="outline" onClick={closeDialog} disabled={createMutation.isPending || updateMutation.isPending}>
+                Cancel
               </Button>
+              <LoadingButton 
+                type="submit" 
+                className="gradient-gold text-primary-foreground"
+                loading={createMutation.isPending || updateMutation.isPending}
+                loadingText={editingTrailer ? 'Saving...' : 'Adding...'}
+              >
+                {editingTrailer ? 'Save Changes' : 'Add Trailer'}
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDeleteDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={confirmDelete}
+        title="Delete Trailer"
+        itemName={trailerToDelete?.unit_number}
+        isDeleting={deleteMutation.isPending}
+      />
 
       {/* Trailer Details Dialog */}
       <Dialog open={!!viewingTrailer} onOpenChange={(open) => !open && setViewingTrailer(null)}>

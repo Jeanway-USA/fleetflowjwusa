@@ -5,6 +5,9 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
+import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
+import { LoadingButton } from '@/components/shared/LoadingButton';
+import { EmptyState } from '@/components/shared/EmptyState';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, AlertTriangle, Link, Link2Off } from 'lucide-react';
+import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 const endorsementOptions = ['H - Hazmat', 'N - Tank', 'P - Passenger', 'S - School Bus', 'T - Double/Triple', 'X - Hazmat + Tank'];
@@ -28,6 +31,8 @@ export default function Drivers() {
   const [formData, setFormData] = useState<any>({});
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [driverToDelete, setDriverToDelete] = useState<any>(null);
 
   const { data: drivers = [], isLoading } = useQuery({
     queryKey: ['drivers'],
@@ -91,9 +96,22 @@ export default function Drivers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['drivers'] });
       toast.success('Driver deleted');
+      setDeleteConfirmOpen(false);
+      setDriverToDelete(null);
     },
     onError: (error: any) => toast.error(error.message),
   });
+
+  const handleDeleteClick = (driver: any) => {
+    setDriverToDelete(driver);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (driverToDelete) {
+      deleteMutation.mutate(driverToDelete.id);
+    }
+  };
 
   const openDialog = (driver?: any) => {
     setEditingDriver(driver || null);
@@ -195,10 +213,12 @@ export default function Drivers() {
       <PageHeader title="Drivers" description="Manage your drivers" action={{ label: 'Add Driver', onClick: () => openDialog() }} />
 
       {drivers.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">
-          <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>No drivers registered yet</p>
-        </div>
+        <EmptyState
+          icon={Users}
+          title="No drivers registered yet"
+          description="Add your first driver to start managing your team."
+          action={{ label: 'Add Driver', onClick: () => openDialog() }}
+        />
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {drivers.map((driver: any) => (
@@ -236,10 +256,10 @@ export default function Drivers() {
                     <Button size="icon" variant="ghost" onClick={() => setSelectedDriver(driver)}>
                       <FileText className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => openDialog(driver)}>
+                    <Button size="icon" variant="ghost" onClick={() => openDialog(driver)} title="Edit driver">
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(driver.id)}>
+                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDeleteClick(driver)} title="Delete driver">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -494,14 +514,31 @@ export default function Drivers() {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">
-                {editingDriver ? 'Save Changes' : 'Add Driver'}
+              <Button type="button" variant="outline" onClick={closeDialog} disabled={createMutation.isPending || updateMutation.isPending}>
+                Cancel
               </Button>
+              <LoadingButton 
+                type="submit" 
+                className="gradient-gold text-primary-foreground"
+                loading={createMutation.isPending || updateMutation.isPending}
+                loadingText={editingDriver ? 'Saving...' : 'Adding...'}
+              >
+                {editingDriver ? 'Save Changes' : 'Add Driver'}
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDeleteDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={confirmDelete}
+        title="Delete Driver"
+        itemName={driverToDelete ? `${driverToDelete.first_name} ${driverToDelete.last_name}` : undefined}
+        isDeleting={deleteMutation.isPending}
+      />
 
       <Dialog open={!!selectedDriver} onOpenChange={(open) => !open && setSelectedDriver(null)}>
         <DialogContent className="max-w-lg">
