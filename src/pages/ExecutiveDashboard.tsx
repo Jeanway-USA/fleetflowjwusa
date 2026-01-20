@@ -198,7 +198,7 @@ export default function ExecutiveDashboard() {
     },
   });
 
-  // Fetch cost breakdown
+  // Fetch cost breakdown - grouped into broader categories
   const { data: costBreakdown = [], isLoading: costLoading } = useQuery({
     queryKey: ['executive-costs', period],
     queryFn: async () => {
@@ -210,31 +210,54 @@ export default function ExecutiveDashboard() {
         .gte('expense_date', formatDate(dateRange.start))
         .lte('expense_date', formatDate(dateRange.end));
 
+      // Category mappings for grouping expense types
+      const categoryMap: Record<string, string> = {
+        // Fuel & DEF
+        'Fuel': 'Fuel & DEF',
+        'DEF': 'Fuel & DEF',
+        'Fuel Discount': 'Fuel & DEF',
+        
+        // Operations & Road Expenses
+        'Tolls': 'Operations',
+        'PrePass/Scale': 'Operations',
+        'Trip Scanning': 'Operations',
+        'LCN/Satellite': 'Operations',
+        
+        // Insurance & Benefits
+        'Insurance': 'Insurance & Benefits',
+        'CPP/Benefits': 'Insurance & Benefits',
+        
+        // Payments & Advances
+        'Cash Advance': 'Payments & Advances',
+        'Card Pre-Trip': 'Payments & Advances',
+        'Card Load': 'Payments & Advances',
+        'Card Fee': 'Payments & Advances',
+        'Direct Deposit Fee': 'Payments & Advances',
+        'Escrow Payment': 'Payments & Advances',
+      };
+
+      // Group expenses by category
       const grouped = (expenses || []).reduce<Record<string, number>>((acc, e) => {
-        const type = e.expense_type || 'other';
-        acc[type] = (acc[type] || 0) + (e.amount || 0);
+        const type = e.expense_type || 'Other';
+        const category = categoryMap[type] || 'Other';
+        acc[category] = (acc[category] || 0) + (e.amount || 0);
         return acc;
       }, {});
 
-      // Dynamic color palette for all expense types
-      const colorPalette = [
-        'hsl(45 80% 50%)',   // Gold
-        'hsl(200 70% 50%)',  // Blue
-        'hsl(280 70% 50%)',  // Purple
-        'hsl(142 70% 45%)',  // Green
-        'hsl(0 70% 50%)',    // Red
-        'hsl(30 80% 50%)',   // Orange
-        'hsl(180 60% 45%)',  // Teal
-        'hsl(320 70% 50%)',  // Pink
-        'hsl(60 70% 45%)',   // Yellow-green
-        'hsl(240 60% 55%)',  // Indigo
-      ];
+      // Muted, professional color palette
+      const categoryColors: Record<string, string> = {
+        'Fuel & DEF': 'hsl(35 50% 55%)',       // Warm tan
+        'Operations': 'hsl(210 40% 55%)',      // Soft blue
+        'Insurance & Benefits': 'hsl(160 35% 50%)',  // Sage green
+        'Payments & Advances': 'hsl(280 30% 55%)',   // Muted purple
+        'Other': 'hsl(220 20% 50%)',           // Slate gray
+      };
 
-      const entries = Object.entries(grouped);
-      return entries.map(([name, value], index) => ({
-        name: name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+      const entries = Object.entries(grouped).filter(([_, value]) => value !== 0);
+      return entries.map(([name, value]) => ({
+        name,
         value,
-        color: colorPalette[index % colorPalette.length],
+        color: categoryColors[name] || 'hsl(220 20% 50%)',
       }));
     },
   });
