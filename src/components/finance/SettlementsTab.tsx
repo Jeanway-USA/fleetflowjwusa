@@ -305,10 +305,20 @@ export function SettlementsTab() {
       net_pay: netPay,
     };
 
+    if (!formData.driver_id || !formData.period_start || !formData.period_end) {
+      toast.error('Please select a driver and date range');
+      return;
+    }
+
     if (editingSettlement) {
       updateMutation.mutate({ id: editingSettlement.id, ...settlementData });
     } else {
-      const result = await createMutation.mutateAsync(settlementData);
+      const result = await createMutation.mutateAsync({
+        ...settlementData,
+        driver_id: formData.driver_id,
+        period_start: formData.period_start,
+        period_end: formData.period_end,
+      });
       
       // Create line items for each load
       if (result && formData.driver_id && formData.period_start && formData.period_end) {
