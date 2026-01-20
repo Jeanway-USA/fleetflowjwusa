@@ -64,8 +64,12 @@ export function AppSidebar() {
     navigate('/auth');
   };
 
-  const mainNavItems: NavItem[] = [
+  // Dashboard items - owners can see all, others only see their own
+  const dashboardNavItems: NavItem[] = isOwner ? [
     { title: 'Executive View', icon: Crown, path: '/executive-dashboard', roles: ['owner'] },
+    { title: 'Dispatcher View', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['owner'] },
+    { title: 'Driver View', icon: Truck, path: '/driver-dashboard', roles: ['owner'] },
+  ] : [
     { title: 'My Dashboard', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['dispatcher'] },
     { title: 'My Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['driver'] },
   ];
@@ -140,7 +144,7 @@ export function AppSidebar() {
       <SidebarContent className="px-2">
         {(() => {
           const groups = [
-            { label: 'Main', items: mainNavItems },
+            { label: isOwner ? 'Dashboards' : 'Main', items: dashboardNavItems },
             { label: 'Fleet', items: fleetNavItems },
             { label: 'Loads', items: loadsNavItems },
             { label: 'Finance', items: financeNavItems },
