@@ -330,7 +330,7 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
             <p className="text-xs text-warning font-medium uppercase tracking-wide mb-1">
               Special Instructions
             </p>
-            <p className="text-sm">{load.notes}</p>
+            <p className="text-sm whitespace-pre-wrap">{load.notes}</p>
           </div>
         )}
 
