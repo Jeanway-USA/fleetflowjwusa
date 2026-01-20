@@ -7,8 +7,8 @@ import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { ExpensesList } from '@/components/shared/ExpensesList';
-import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { LoadingButton } from '@/components/shared/LoadingButton';
+import { useUndoableDelete } from '@/hooks/useUndoableDelete';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,8 +71,6 @@ export default function Trucks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTruck, setEditingTruck] = useState<TruckWithDriver | null>(null);
   const [formData, setFormData] = useState<Partial<TruckInsert>>({});
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [truckToDelete, setTruckToDelete] = useState<TruckWithDriver | null>(null);
 
   const { data: trucks = [], isLoading } = useQuery({
     queryKey: ['trucks'],
@@ -174,30 +172,22 @@ export default function Trucks() {
     onError: (error) => toast.error(error.message),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+  // Undoable delete hook
+  const { deleteWithUndo } = useUndoableDelete<TruckWithDriver>({
+    onDelete: async (id) => {
       const { error } = await supabase.from('trucks').delete().eq('id', id);
       if (error) throw error;
-    },
-    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trucks'] });
-      toast.success('Truck deleted');
-      setDeleteConfirmOpen(false);
-      setTruckToDelete(null);
     },
-    onError: (error) => toast.error(error.message),
+    onRestore: async (truck) => {
+      const { drivers: _, ...truckData } = truck;
+      const { error } = await supabase.from('trucks').insert(truckData);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['trucks'] });
+    },
+    getItemName: (truck) => truck.unit_number,
+    entityName: 'Truck',
   });
-
-  const handleDeleteClick = (truck: TruckWithDriver) => {
-    setTruckToDelete(truck);
-    setDeleteConfirmOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (truckToDelete) {
-      deleteMutation.mutate(truckToDelete.id);
-    }
-  };
 
   const openDialog = (truck?: TruckWithDriver) => {
     setEditingTruck(truck || null);
@@ -302,7 +292,7 @@ export default function Trucks() {
           <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(truck); }} title="Edit truck">
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(truck); }} title="Delete truck">
+          <Button size="icon" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); deleteWithUndo(truck); }} title="Delete truck">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -436,15 +426,6 @@ export default function Trucks() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDeleteDialog
-        open={deleteConfirmOpen}
-        onOpenChange={setDeleteConfirmOpen}
-        onConfirm={confirmDelete}
-        title="Delete Truck"
-        itemName={truckToDelete?.unit_number}
-        isDeleting={deleteMutation.isPending}
-      />
 
       {/* Truck Details Dialog with Documents & Expenses */}
       <Dialog open={!!viewingTruck} onOpenChange={(open) => !open && setViewingTruck(null)}>

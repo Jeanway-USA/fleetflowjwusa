@@ -5,9 +5,9 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
-import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { useUndoableDelete } from '@/hooks/useUndoableDelete';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,8 +31,6 @@ export default function Drivers() {
   const [formData, setFormData] = useState<any>({});
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [driverToDelete, setDriverToDelete] = useState<any>(null);
 
   const { data: drivers = [], isLoading } = useQuery({
     queryKey: ['drivers'],
@@ -88,30 +86,21 @@ export default function Drivers() {
     onError: (error: any) => toast.error(error.message),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+  // Undoable delete hook
+  const { deleteWithUndo } = useUndoableDelete<any>({
+    onDelete: async (id) => {
       const { error } = await supabase.from('drivers').delete().eq('id', id);
       if (error) throw error;
-    },
-    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['drivers'] });
-      toast.success('Driver deleted');
-      setDeleteConfirmOpen(false);
-      setDriverToDelete(null);
     },
-    onError: (error: any) => toast.error(error.message),
+    onRestore: async (driver) => {
+      const { error } = await supabase.from('drivers').insert(driver);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+    },
+    getItemName: (driver) => `${driver.first_name} ${driver.last_name}`,
+    entityName: 'Driver',
   });
-
-  const handleDeleteClick = (driver: any) => {
-    setDriverToDelete(driver);
-    setDeleteConfirmOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (driverToDelete) {
-      deleteMutation.mutate(driverToDelete.id);
-    }
-  };
 
   const openDialog = (driver?: any) => {
     setEditingDriver(driver || null);
@@ -259,7 +248,7 @@ export default function Drivers() {
                     <Button size="icon" variant="ghost" onClick={() => openDialog(driver)} title="Edit driver">
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDeleteClick(driver)} title="Delete driver">
+                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteWithUndo(driver)} title="Delete driver">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -530,15 +519,6 @@ export default function Drivers() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDeleteDialog
-        open={deleteConfirmOpen}
-        onOpenChange={setDeleteConfirmOpen}
-        onConfirm={confirmDelete}
-        title="Delete Driver"
-        itemName={driverToDelete ? `${driverToDelete.first_name} ${driverToDelete.last_name}` : undefined}
-        isDeleting={deleteMutation.isPending}
-      />
 
       <Dialog open={!!selectedDriver} onOpenChange={(open) => !open && setSelectedDriver(null)}>
         <DialogContent className="max-w-lg">
