@@ -48,9 +48,28 @@ export interface PMBaseline {
   date: string | null;
 }
 
+export interface ManufacturerPMProfile {
+  id: string;
+  manufacturer: string;
+  service_name: string;
+  service_code: string;
+  interval_miles: number | null;
+  interval_days: number | null;
+  description: string | null;
+  display_order: number;
+}
+
+export interface ManufacturerService {
+  profile: ManufacturerPMProfile;
+  schedule: ServiceSchedule | null;
+  miles_since_service: number;
+  baseline: PMBaseline;
+}
+
 export interface TruckWithSchedules {
   id: string;
   unit_number: string;
+  make: string | null;
   current_odometer: number | null;
   /**
    * Truck odometer as of the most recently delivered load (fleet_loads.end_miles).
@@ -68,6 +87,8 @@ export interface TruckWithSchedules {
   last_120_inspection_date: string | null;
   status: string;
   schedules: ServiceSchedule[];
+  /** Manufacturer-specific PM services (for Freightliner, etc.) */
+  manufacturer_services: ManufacturerService[];
 }
 
 // Hook for Fleet Availability KPI
@@ -534,7 +555,7 @@ export function usePMSchedule() {
     queryFn: async () => {
       const { data: trucks, error: trucksError } = await supabase
         .from('trucks')
-        .select('id, unit_number, current_odometer, last_120_inspection_date, status')
+        .select('id, unit_number, make, current_odometer, last_120_inspection_date, status')
         .eq('status', 'active')
         .order('unit_number');
 
@@ -545,6 +566,23 @@ export function usePMSchedule() {
         .select('*');
 
       if (schedulesError) throw schedulesError;
+
+      // Fetch manufacturer PM profiles
+      const { data: manufacturerProfiles, error: profilesError } = await supabase
+        .from('manufacturer_pm_profiles')
+        .select('*')
+        .order('display_order');
+
+      if (profilesError) throw profilesError;
+
+      // Index profiles by manufacturer
+      const profilesByManufacturer = new Map<string, ManufacturerPMProfile[]>();
+      manufacturerProfiles?.forEach(profile => {
+        const key = profile.manufacturer.toLowerCase();
+        const arr = profilesByManufacturer.get(key) || [];
+        arr.push(profile as ManufacturerPMProfile);
+        profilesByManufacturer.set(key, arr);
+      });
 
       // Delivered loads drive two different concepts:
       // 1) Current Odometer display: last delivered load's end_miles
@@ -617,15 +655,55 @@ export function usePMSchedule() {
           : { workOrderId: null, date: null };
       };
 
+      // Helper to match service codes to work order service types
+      const getServiceCodeMatcher = (serviceCode: string): ((serviceType: string) => boolean) => {
+        switch (serviceCode) {
+          case 'M1':
+            return st => st.includes('m1') || st.includes('grease') || st.includes('lube');
+          case 'PM_A':
+            return st => st === 'pm' || st.includes('oil') || st.includes('pm a') || st.includes('pm-a');
+          case 'M2':
+            return st => st.includes('m2') || st.includes('annual');
+          case 'M3':
+            return st => st.includes('m3') || st.includes('major');
+          default:
+            return st => st.includes(serviceCode.toLowerCase());
+        }
+      };
+
       // Map schedules to trucks with:
       // - calculated_odometer = last delivered end_miles
       // - miles since oil/tires = sum(actual_miles) since that service was last performed
       // - baseline work order info for tooltips
+      // - manufacturer-specific services
       const trucksWithSchedules: TruckWithSchedules[] =
         trucks?.map(truck => {
           const truckSchedules = schedules?.filter(s => s.truck_id === truck.id) || [];
           const oilSchedule = truckSchedules.find(s => s.service_name === 'Oil Change') || null;
           const tireSchedule = truckSchedules.find(s => s.service_name === 'Tire Replacement') || null;
+
+          // Build manufacturer-specific services if this truck has a known manufacturer
+          const manufacturerKey = (truck.make || '').toLowerCase();
+          const profiles = profilesByManufacturer.get(manufacturerKey) || [];
+          
+          const manufacturer_services: ManufacturerService[] = profiles.map(profile => {
+            // Find matching schedule by profile_service_id or by service_name
+            const matchingSchedule = truckSchedules.find(s => 
+              s.profile_service_id === profile.id || 
+              s.service_name === profile.service_name
+            ) || null;
+
+            const matcher = getServiceCodeMatcher(profile.service_code);
+            const baseline = findBaselineWorkOrder(truck.id, matcher);
+            const miles_since_service = sumActualMilesSince(truck.id, baseline.date);
+
+            return {
+              profile,
+              schedule: matchingSchedule,
+              miles_since_service,
+              baseline,
+            };
+          });
 
           return {
             ...truck,
@@ -635,6 +713,7 @@ export function usePMSchedule() {
             oil_change_baseline: findBaselineWorkOrder(truck.id, st => st === 'pm' || st.includes('oil')),
             tire_replacement_baseline: findBaselineWorkOrder(truck.id, st => st === 'tire' || st.includes('tire')),
             schedules: truckSchedules,
+            manufacturer_services,
           };
         }) || [];
 
