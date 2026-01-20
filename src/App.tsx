@@ -17,7 +17,7 @@ import AgencyLoads from "./pages/AgencyLoads";
 import Finance from "./pages/Finance";
 import CompanyInsights from "./pages/CompanyInsights";
 import Resources from "./pages/Resources";
-import Maintenance from "./pages/Maintenance";
+import MaintenanceManagement from "./pages/MaintenanceManagement";
 import Documents from "./pages/Documents";
 import Safety from "./pages/Safety";
 import Settings from "./pages/Settings";
@@ -51,7 +51,7 @@ const App = () => {
                   <Route path="/ledger" element={<Finance />} />
                   <Route path="/insights" element={<CompanyInsights />} />
                   <Route path="/resources" element={<Resources />} />
-                  <Route path="/maintenance" element={<Maintenance />} />
+                  <Route path="/maintenance" element={<MaintenanceManagement />} />
                   <Route path="/documents" element={<Documents />} />
                   <Route path="/safety" element={<Safety />} />
                   <Route path="/settings" element={<Settings />} />
