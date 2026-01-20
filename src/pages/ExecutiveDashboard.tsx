@@ -56,6 +56,12 @@ export default function ExecutiveDashboard() {
   const dateRange = useMemo(() => getDateRange(period), [period]);
 
   // Fetch KPI data
+  // NOTE: In this business model:
+  // - Gross Revenue = Total load value from Landstar
+  // - Net Revenue = Company's portion after Landstar percentage (this IS the company profit from hauling)
+  // - The "expenses" table contains driver-specific deductions (fuel, advances) - NOT company operating costs
+  // - Operating Profit = Net Revenue (the company's take)
+  // - Profit Margin = Net Revenue / Gross Revenue (company retention rate)
   const { data: kpiData, isLoading: kpiLoading } = useQuery({
     queryKey: ['executive-kpi', period],
     queryFn: async () => {
@@ -77,33 +83,19 @@ export default function ExecutiveDashboard() {
         .gte('delivery_date', formatDate(dateRange.prevStart))
         .lte('delivery_date', formatDate(dateRange.prevEnd));
 
-      // Current period expenses
-      const { data: currentExpenses } = await supabase
-        .from('expenses')
-        .select('amount')
-        .gte('expense_date', formatDate(dateRange.start))
-        .lte('expense_date', formatDate(dateRange.end));
-
-      // Previous period expenses
-      const { data: prevExpenses } = await supabase
-        .from('expenses')
-        .select('amount')
-        .gte('expense_date', formatDate(dateRange.prevStart))
-        .lte('expense_date', formatDate(dateRange.prevEnd));
-
       const deliveredLoadCount = currentLoads?.length || 0;
       const grossRevenue = currentLoads?.reduce((sum, l) => sum + (l.gross_revenue || 0), 0) || 0;
       const netRevenue = currentLoads?.reduce((sum, l) => sum + (l.net_revenue || 0), 0) || 0;
-      const totalExpenses = currentExpenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
-      const operatingProfit = netRevenue - totalExpenses;
-      const profitMargin = grossRevenue > 0 ? (operatingProfit / grossRevenue) * 100 : 0;
+      // Operating profit IS net revenue - it's what the company keeps after Landstar's cut
+      const operatingProfit = netRevenue;
+      // Profit margin = what percentage of gross the company retains
+      const profitMargin = grossRevenue > 0 ? (netRevenue / grossRevenue) * 100 : 0;
 
       const prevDeliveredLoadCount = prevLoads?.length || 0;
       const prevGrossRevenue = prevLoads?.reduce((sum, l) => sum + (l.gross_revenue || 0), 0) || 0;
       const prevNetRevenue = prevLoads?.reduce((sum, l) => sum + (l.net_revenue || 0), 0) || 0;
-      const prevTotalExpenses = prevExpenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
-      const prevOperatingProfit = prevNetRevenue - prevTotalExpenses;
-      const prevProfitMargin = prevGrossRevenue > 0 ? (prevOperatingProfit / prevGrossRevenue) * 100 : 0;
+      const prevOperatingProfit = prevNetRevenue;
+      const prevProfitMargin = prevGrossRevenue > 0 ? (prevNetRevenue / prevGrossRevenue) * 100 : 0;
 
       return {
         grossRevenue,
