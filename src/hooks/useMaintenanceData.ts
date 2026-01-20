@@ -414,13 +414,14 @@ export function useUpdateCompletedWorkOrder() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, entry_date, vendor, final_cost, description, service_type }: {
+    mutationFn: async ({ id, entry_date, vendor, final_cost, description, service_type, service_types }: {
       id: string;
       entry_date?: string;
       vendor?: string;
       final_cost?: number;
       description?: string;
       service_type?: string;
+      service_types?: string[];
     }) => {
       const { data, error } = await supabase
         .from('work_orders')
@@ -430,6 +431,7 @@ export function useUpdateCompletedWorkOrder() {
           final_cost,
           description,
           service_type,
+          service_types: service_types || [],
         })
         .eq('id', id)
         .select()
