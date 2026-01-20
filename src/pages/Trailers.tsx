@@ -6,8 +6,8 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
-import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { LoadingButton } from '@/components/shared/LoadingButton';
+import { useUndoableDelete } from '@/hooks/useUndoableDelete';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -96,8 +96,6 @@ export default function Trailers() {
   const [editingTrailer, setEditingTrailer] = useState<TrailerWithDriver | null>(null);
   const [formData, setFormData] = useState<Partial<TrailerInsert>>({});
   const [viewingTrailer, setViewingTrailer] = useState<TrailerWithDriver | null>(null);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [trailerToDelete, setTrailerToDelete] = useState<TrailerWithDriver | null>(null);
 
   const { data: trailers = [], isLoading } = useQuery({
     queryKey: ['trailers'],
@@ -177,30 +175,22 @@ export default function Trailers() {
     onError: (error) => toast.error(error.message),
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
+  // Undoable delete hook
+  const { deleteWithUndo } = useUndoableDelete<TrailerWithDriver>({
+    onDelete: async (id) => {
       const { error } = await supabase.from('trailers').delete().eq('id', id);
       if (error) throw error;
-    },
-    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trailers'] });
-      toast.success('Trailer deleted');
-      setDeleteConfirmOpen(false);
-      setTrailerToDelete(null);
     },
-    onError: (error) => toast.error(error.message),
+    onRestore: async (trailer) => {
+      const { drivers: _, ...trailerData } = trailer;
+      const { error } = await supabase.from('trailers').insert(trailerData);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['trailers'] });
+    },
+    getItemName: (trailer) => trailer.unit_number,
+    entityName: 'Trailer',
   });
-
-  const handleDeleteClick = (trailer: TrailerWithDriver) => {
-    setTrailerToDelete(trailer);
-    setDeleteConfirmOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (trailerToDelete) {
-      deleteMutation.mutate(trailerToDelete.id);
-    }
-  };
 
   const openDialog = (trailer?: TrailerWithDriver) => {
     setEditingTrailer(trailer || null);
@@ -297,7 +287,7 @@ export default function Trailers() {
           <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(trailer); }} title="Edit trailer">
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button size="icon" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteClick(trailer); }} title="Delete trailer">
+          <Button size="icon" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); deleteWithUndo(trailer); }} title="Delete trailer">
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
@@ -456,15 +446,6 @@ export default function Trailers() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <ConfirmDeleteDialog
-        open={deleteConfirmOpen}
-        onOpenChange={setDeleteConfirmOpen}
-        onConfirm={confirmDelete}
-        title="Delete Trailer"
-        itemName={trailerToDelete?.unit_number}
-        isDeleting={deleteMutation.isPending}
-      />
 
       {/* Trailer Details Dialog */}
       <Dialog open={!!viewingTrailer} onOpenChange={(open) => !open && setViewingTrailer(null)}>
