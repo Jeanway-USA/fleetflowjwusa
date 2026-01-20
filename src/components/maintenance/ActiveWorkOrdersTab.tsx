@@ -14,6 +14,34 @@ interface ActiveWorkOrdersTabProps {
   onViewTruck: (truckId: string) => void;
 }
 
+// Service type display colors
+const SERVICE_TYPE_COLORS: Record<string, string> = {
+  M1: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
+  PM_A: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
+  M2: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700',
+  M3: 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700',
+  pm: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
+  repair: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700',
+  tire: 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-900/30 dark:text-slate-300 dark:border-slate-700',
+  inspection: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
+  other: 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/30 dark:text-gray-300 dark:border-gray-700',
+};
+
+const getServiceTypeLabel = (type: string): string => {
+  const labels: Record<string, string> = {
+    M1: 'M1',
+    PM_A: 'PM A',
+    M2: 'M2',
+    M3: 'M3',
+    pm: 'PM',
+    repair: 'Repair',
+    tire: 'Tire',
+    inspection: '120-Day',
+    other: 'Other',
+  };
+  return labels[type] || type;
+};
+
 export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
   const { data: workOrders, isLoading } = useActiveWorkOrders();
   const updateStatus = useUpdateWorkOrderStatus();
@@ -33,17 +61,28 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
     }
   };
 
-  const getServiceTypeBadge = (type: string) => {
-    const colors: Record<string, string> = {
-      pm: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-      repair: 'bg-red-100 text-red-800 border-red-300',
-      tire: 'bg-slate-100 text-slate-800 border-slate-300',
-      inspection: 'bg-blue-100 text-blue-800 border-blue-300',
-    };
+  const renderServiceTypes = (wo: WorkOrder) => {
+    // Use service_types array if available, otherwise fall back to service_type
+    const types = wo.service_types && wo.service_types.length > 0 
+      ? wo.service_types 
+      : wo.service_type ? [wo.service_type] : [];
+
+    if (types.length === 0) {
+      return <span className="text-muted-foreground">-</span>;
+    }
+
     return (
-      <Badge variant="outline" className={cn('capitalize', colors[type] || '')}>
-        {type}
-      </Badge>
+      <div className="flex flex-wrap gap-1">
+        {types.map((type, index) => (
+          <Badge 
+            key={`${type}-${index}`}
+            variant="outline" 
+            className={cn('text-xs', SERVICE_TYPE_COLORS[type] || SERVICE_TYPE_COLORS.other)}
+          >
+            {getServiceTypeLabel(type)}
+          </Badge>
+        ))}
+      </div>
     );
   };
 
@@ -85,7 +124,7 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Unit #</TableHead>
-              <TableHead>Service Type</TableHead>
+              <TableHead>Service Types</TableHead>
               <TableHead>Vendor</TableHead>
               <TableHead>Entry Date</TableHead>
               <TableHead>Est. Completion</TableHead>
@@ -115,7 +154,7 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
                     )}
                   </div>
                 </TableCell>
-                <TableCell>{getServiceTypeBadge(wo.service_type)}</TableCell>
+                <TableCell>{renderServiceTypes(wo)}</TableCell>
                 <TableCell>{wo.vendor || '-'}</TableCell>
                 <TableCell>{format(new Date(wo.entry_date), 'MMM d, yyyy')}</TableCell>
                 <TableCell>

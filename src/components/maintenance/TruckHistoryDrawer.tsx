@@ -1,12 +1,12 @@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTruckHistory } from '@/hooks/useMaintenanceData';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Truck, DollarSign, Wrench, Calendar, Clock, FileText } from 'lucide-react';
+import { Truck, DollarSign, Wrench, Calendar, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface TruckHistoryDrawerProps {
@@ -75,7 +75,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                       <span className="text-xs">Total Jobs</span>
                     </div>
                     <p className="text-xl font-bold">
-                      {data.stats.totalWorkOrders + data.stats.totalMaintenanceLogs}
+                      {data.workOrders.length + data.logs.length}
                     </p>
                   </CardContent>
                 </Card>
@@ -148,14 +148,14 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
               )}
 
               {/* Maintenance Logs */}
-              {data.maintenanceLogs.length > 0 && (
+              {data.logs.length > 0 && (
                 <div>
                   <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
                     <Wrench className="h-4 w-4" />
-                    Maintenance Logs ({data.maintenanceLogs.length})
+                    Maintenance Logs ({data.logs.length})
                   </h3>
                   <div className="space-y-3">
-                    {data.maintenanceLogs.map(log => (
+                    {data.logs.map(log => (
                       <Card key={log.id}>
                         <CardContent className="p-3">
                           <div className="flex items-start justify-between gap-2">
@@ -180,7 +180,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                 </div>
               )}
 
-              {data.workOrders.length === 0 && data.maintenanceLogs.length === 0 && (
+              {data.workOrders.length === 0 && data.logs.length === 0 && (
                 <div className="text-center py-8">
                   <Wrench className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">No maintenance history for this truck.</p>

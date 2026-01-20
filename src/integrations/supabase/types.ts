@@ -1352,6 +1352,7 @@ export type Database = {
           notes: string | null
           odometer_reading: number | null
           service_type: string
+          service_types: string[] | null
           status: string
           truck_id: string
           updated_at: string
@@ -1371,6 +1372,7 @@ export type Database = {
           notes?: string | null
           odometer_reading?: number | null
           service_type: string
+          service_types?: string[] | null
           status?: string
           truck_id: string
           updated_at?: string
@@ -1390,6 +1392,7 @@ export type Database = {
           notes?: string | null
           odometer_reading?: number | null
           service_type?: string
+          service_types?: string[] | null
           status?: string
           truck_id?: string
           updated_at?: string
