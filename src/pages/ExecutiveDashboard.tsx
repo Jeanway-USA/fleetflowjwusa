@@ -58,7 +58,7 @@ export default function ExecutiveDashboard() {
     queryFn: async () => {
       const formatDate = (d: Date) => format(d, 'yyyy-MM-dd');
 
-      // Current period loads
+      // Current period loads - only delivered
       const { data: currentLoads } = await supabase
         .from('fleet_loads')
         .select('gross_revenue, net_revenue')
@@ -66,7 +66,7 @@ export default function ExecutiveDashboard() {
         .gte('delivery_date', formatDate(dateRange.start))
         .lte('delivery_date', formatDate(dateRange.end));
 
-      // Previous period loads
+      // Previous period loads - only delivered
       const { data: prevLoads } = await supabase
         .from('fleet_loads')
         .select('gross_revenue, net_revenue')
@@ -88,12 +88,14 @@ export default function ExecutiveDashboard() {
         .gte('expense_date', formatDate(dateRange.prevStart))
         .lte('expense_date', formatDate(dateRange.prevEnd));
 
+      const deliveredLoadCount = currentLoads?.length || 0;
       const grossRevenue = currentLoads?.reduce((sum, l) => sum + (l.gross_revenue || 0), 0) || 0;
       const netRevenue = currentLoads?.reduce((sum, l) => sum + (l.net_revenue || 0), 0) || 0;
       const totalExpenses = currentExpenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
       const operatingProfit = netRevenue - totalExpenses;
       const profitMargin = grossRevenue > 0 ? (operatingProfit / grossRevenue) * 100 : 0;
 
+      const prevDeliveredLoadCount = prevLoads?.length || 0;
       const prevGrossRevenue = prevLoads?.reduce((sum, l) => sum + (l.gross_revenue || 0), 0) || 0;
       const prevNetRevenue = prevLoads?.reduce((sum, l) => sum + (l.net_revenue || 0), 0) || 0;
       const prevTotalExpenses = prevExpenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
@@ -109,6 +111,8 @@ export default function ExecutiveDashboard() {
         prevNetRevenue,
         prevOperatingProfit,
         prevProfitMargin,
+        deliveredLoadCount,
+        prevDeliveredLoadCount,
       };
     },
   });
