@@ -4,12 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Badge } from '@/components/ui/badge';
 import { useCreateWorkOrder, useTrucks } from '@/hooks/useMaintenanceData';
 import { toast } from 'sonner';
-import { Loader2, Plus, DollarSign } from 'lucide-react';
-import { format } from 'date-fns';
+import { Loader2, Plus, DollarSign, ChevronDown, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface NewWorkOrderSheetProps {
   open: boolean;
@@ -39,13 +42,22 @@ const GENERIC_SERVICE_TYPES: ServiceType[] = [
   { value: 'other', label: 'Other' },
 ];
 
+// Additional types for Freightliner (in addition to M-services)
+const FREIGHTLINER_ADDITIONAL_TYPES: ServiceType[] = [
+  { value: 'repair', label: 'Repair' },
+  { value: 'tire', label: 'Tire Service' },
+  { value: 'inspection', label: '120-Day Inspection' },
+  { value: 'other', label: 'Other' },
+];
+
 export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps) {
   const { data: trucks } = useTrucks();
   const createWorkOrder = useCreateWorkOrder();
+  const [serviceTypesOpen, setServiceTypesOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     truck_id: '',
-    service_type: '',
+    service_types: [] as string[],
     vendor: '',
     odometer_reading: '',
     cost_estimate: '',
@@ -66,17 +78,20 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
   // Get service types based on manufacturer
   const serviceTypes = useMemo(() => {
     if (isFreightliner) {
-      // Include both Freightliner-specific and generic types
-      return [
-        ...FREIGHTLINER_SERVICE_TYPES,
-        { value: 'repair', label: 'Repair' },
-        { value: 'tire', label: 'Tire Service' },
-        { value: 'inspection', label: '120-Day Inspection' },
-        { value: 'other', label: 'Other' },
-      ];
+      return {
+        pmTypes: FREIGHTLINER_SERVICE_TYPES,
+        otherTypes: FREIGHTLINER_ADDITIONAL_TYPES,
+      };
     }
-    return GENERIC_SERVICE_TYPES;
+    return {
+      pmTypes: [],
+      otherTypes: GENERIC_SERVICE_TYPES,
+    };
   }, [isFreightliner]);
+
+  const allServiceTypes = useMemo(() => {
+    return [...serviceTypes.pmTypes, ...serviceTypes.otherTypes];
+  }, [serviceTypes]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,15 +101,16 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
       return;
     }
 
-    if (!formData.service_type) {
-      toast.error('Please select a service type');
+    if (formData.service_types.length === 0) {
+      toast.error('Please select at least one service type');
       return;
     }
 
     try {
       await createWorkOrder.mutateAsync({
         truck_id: formData.truck_id,
-        service_type: formData.service_type,
+        service_types: formData.service_types,
+        service_type: formData.service_types.join(', '), // Keep for backwards compatibility
         vendor: formData.vendor || undefined,
         odometer_reading: formData.odometer_reading ? parseInt(formData.odometer_reading) : undefined,
         cost_estimate: formData.cost_estimate ? parseFloat(formData.cost_estimate) : undefined,
@@ -109,7 +125,7 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
       // Reset form
       setFormData({
         truck_id: '',
-        service_type: '',
+        service_types: [],
         vendor: '',
         odometer_reading: '',
         cost_estimate: '',
@@ -126,12 +142,44 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
   const handleChange = (field: string, value: string | boolean) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
-      // Reset service_type when truck changes (manufacturer may differ)
+      // Reset service_types when truck changes (manufacturer may differ)
       if (field === 'truck_id') {
-        updated.service_type = '';
+        updated.service_types = [];
       }
       return updated;
     });
+  };
+
+  const toggleServiceType = (value: string) => {
+    setFormData(prev => {
+      const newTypes = prev.service_types.includes(value)
+        ? prev.service_types.filter(t => t !== value)
+        : [...prev.service_types, value];
+      return { ...prev, service_types: newTypes };
+    });
+  };
+
+  const removeServiceType = (value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      service_types: prev.service_types.filter(t => t !== value),
+    }));
+  };
+
+  const getServiceLabel = (value: string) => {
+    const type = allServiceTypes.find(t => t.value === value);
+    return type?.label || value;
+  };
+
+  const getShortLabel = (value: string) => {
+    // Return a shorter version for badges
+    const type = allServiceTypes.find(t => t.value === value);
+    if (!type) return value;
+    // For M-services, just return the code
+    if (['M1', 'PM_A', 'M2', 'M3'].includes(value)) {
+      return value === 'PM_A' ? 'PM A' : value;
+    }
+    return type.label.split(' ')[0]; // First word only
   };
 
   return (
@@ -169,39 +217,123 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="serviceType">
-                Service Type *
+              <Label>
+                Service Types *
                 {isFreightliner && (
                   <span className="ml-2 text-xs text-muted-foreground font-normal">
                     (Cascadia Schedule II)
                   </span>
                 )}
               </Label>
-              <Select
-                value={formData.service_type}
-                onValueChange={(value) => handleChange('service_type', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select service type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {isFreightliner && (
-                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                      Freightliner PM Schedule
-                    </div>
-                  )}
-                  {serviceTypes.map((type: ServiceType) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      <div className="flex flex-col">
-                        <span>{type.label}</span>
-                        {type.description && (
-                          <span className="text-xs text-muted-foreground">{type.description}</span>
-                        )}
+              
+              <Popover open={serviceTypesOpen} onOpenChange={setServiceTypesOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={serviceTypesOpen}
+                    className={cn(
+                      "w-full justify-between h-auto min-h-10",
+                      formData.service_types.length === 0 && "text-muted-foreground"
+                    )}
+                    disabled={!formData.truck_id}
+                  >
+                    {formData.service_types.length === 0 ? (
+                      <span>Select service types...</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {formData.service_types.map(type => (
+                          <Badge
+                            key={type}
+                            variant="secondary"
+                            className="mr-1 mb-1"
+                          >
+                            {getShortLabel(type)}
+                            <button
+                              type="button"
+                              className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeServiceType(type);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    )}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[350px] p-0" align="start">
+                  <div className="max-h-[300px] overflow-y-auto p-2">
+                    {isFreightliner && serviceTypes.pmTypes.length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                          Freightliner PM Schedule
+                        </div>
+                        {serviceTypes.pmTypes.map(type => (
+                          <div
+                            key={type.value}
+                            className="flex items-start space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                            onClick={() => toggleServiceType(type.value)}
+                          >
+                            <Checkbox
+                              id={type.value}
+                              checked={formData.service_types.includes(type.value)}
+                              onCheckedChange={() => toggleServiceType(type.value)}
+                            />
+                            <div className="grid gap-0.5 leading-none">
+                              <label
+                                htmlFor={type.value}
+                                className="text-sm font-medium leading-none cursor-pointer"
+                              >
+                                {type.label}
+                              </label>
+                              {type.description && (
+                                <span className="text-xs text-muted-foreground">
+                                  {type.description}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        <div className="my-2 border-t" />
+                        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                          Other Services
+                        </div>
+                      </>
+                    )}
+                    {serviceTypes.otherTypes.map(type => (
+                      <div
+                        key={type.value}
+                        className="flex items-start space-x-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                        onClick={() => toggleServiceType(type.value)}
+                      >
+                        <Checkbox
+                          id={type.value}
+                          checked={formData.service_types.includes(type.value)}
+                          onCheckedChange={() => toggleServiceType(type.value)}
+                        />
+                        <div className="grid gap-0.5 leading-none">
+                          <label
+                            htmlFor={type.value}
+                            className="text-sm font-medium leading-none cursor-pointer"
+                          >
+                            {type.label}
+                          </label>
+                          {type.description && (
+                            <span className="text-xs text-muted-foreground">
+                              {type.description}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="grid gap-2">

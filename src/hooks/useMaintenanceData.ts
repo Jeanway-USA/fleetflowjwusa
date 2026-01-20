@@ -11,6 +11,7 @@ export interface WorkOrder {
   estimated_completion: string | null;
   status: string;
   service_type: string;
+  service_types: string[] | null;
   description: string | null;
   cost_estimate: number | null;
   final_cost: number | null;
@@ -90,6 +91,40 @@ export interface TruckWithSchedules {
   /** Manufacturer-specific PM services (for Freightliner, etc.) */
   manufacturer_services: ManufacturerService[];
 }
+
+// Service type to schedule name mapping
+const SERVICE_TYPE_TO_SCHEDULE: Record<string, string> = {
+  'M1': 'M1 Service (Safety & Grease)',
+  'PM_A': 'PM A (Oil & Fuel)',
+  'M2': 'M2 Service (Annual)',
+  'M3': 'M3 Service (Major Fluids)',
+  'pm': 'Oil Change',
+  'tire': 'Tire Replacement',
+  'inspection': '120-Day Inspection',
+};
+
+// Matchers for each service type
+const getServiceTypeMatcher = (serviceType: string): ((st: string) => boolean) => {
+  const type = serviceType.toLowerCase();
+  switch (type) {
+    case 'm1':
+      return st => st.includes('m1') || st.includes('grease') || st.includes('lube');
+    case 'pm_a':
+      return st => st === 'pm' || st.includes('oil') || st.includes('pm a') || st.includes('pm_a');
+    case 'm2':
+      return st => st.includes('m2') || st.includes('annual');
+    case 'm3':
+      return st => st.includes('m3') || st.includes('major');
+    case 'pm':
+      return st => st === 'pm' || st.includes('oil');
+    case 'tire':
+      return st => st === 'tire' || st.includes('tire');
+    case 'inspection':
+      return st => st === 'inspection' || st.includes('inspection');
+    default:
+      return st => st.includes(type);
+  }
+};
 
 // Hook for Fleet Availability KPI
 export function useFleetAvailability() {
@@ -302,6 +337,7 @@ export function useServiceHistory(searchQuery?: string) {
           vendor,
           entry_date,
           service_type,
+          service_types,
           description,
           final_cost,
           completed_at,
@@ -348,6 +384,7 @@ export function useServiceHistory(searchQuery?: string) {
           date: wo.entry_date, // Use entry_date as the service date
           unitNumber: (wo.trucks as any)?.unit_number || 'Unknown',
           serviceType: wo.service_type,
+          serviceTypes: wo.service_types as string[] | null,
           vendor: wo.vendor,
           cost: wo.final_cost,
           description: wo.description,
@@ -359,6 +396,7 @@ export function useServiceHistory(searchQuery?: string) {
           date: log.service_date,
           unitNumber: (log.trucks as any)?.unit_number || 'Unknown',
           serviceType: log.service_type,
+          serviceTypes: null as string[] | null,
           vendor: log.vendor,
           cost: log.cost,
           description: log.description,
@@ -415,18 +453,18 @@ export function useDeleteCompletedWorkOrder() {
       // Fetch the work order first so we know what schedules it affected
       const { data: workOrder, error: fetchError } = await supabase
         .from('work_orders')
-        .select('id, truck_id, service_type, entry_date, odometer_reading, status')
+        .select('id, truck_id, service_type, service_types, entry_date, odometer_reading, status')
         .eq('id', id)
         .single();
 
       if (fetchError) throw fetchError;
 
       const truckId = workOrder.truck_id;
-      const serviceType = (workOrder.service_type || '').toLowerCase();
-
-      const isInspection = serviceType === 'inspection' || serviceType.includes('inspection');
-      const isOil = serviceType === 'pm' || serviceType.includes('oil');
-      const isTire = serviceType === 'tire' || serviceType.includes('tire');
+      
+      // Get all service types to revert (from array or single value)
+      const serviceTypesToRevert: string[] = workOrder.service_types && workOrder.service_types.length > 0
+        ? workOrder.service_types
+        : workOrder.service_type ? [workOrder.service_type] : [];
 
       // Delete the work order
       const { error: deleteError } = await supabase
@@ -454,7 +492,7 @@ export function useDeleteCompletedWorkOrder() {
       const fetchMostRecentMatchingWO = async (matcher: (serviceType: string) => boolean) => {
         const { data } = await supabase
           .from('work_orders')
-          .select('entry_date, odometer_reading, service_type')
+          .select('entry_date, odometer_reading, service_type, service_types')
           .eq('truck_id', truckId)
           .eq('status', 'completed')
           .order('entry_date', { ascending: false })
@@ -464,9 +502,16 @@ export function useDeleteCompletedWorkOrder() {
           entry_date: string;
           odometer_reading: number | null;
           service_type: string;
+          service_types: string[] | null;
         }>;
 
-        return rows.find(r => matcher((r.service_type || '').toLowerCase())) || null;
+        // Check both service_types array and service_type string
+        return rows.find(r => {
+          const types = r.service_types && r.service_types.length > 0 
+            ? r.service_types 
+            : r.service_type ? [r.service_type] : [];
+          return types.some(t => matcher(t.toLowerCase()));
+        }) || null;
       };
 
       const revertScheduleToPrevious = async (serviceName: string, matcher: (serviceType: string) => boolean) => {
@@ -494,48 +539,50 @@ export function useDeleteCompletedWorkOrder() {
           .eq('service_name', serviceName);
       };
 
-      if (isOil) {
-        await revertScheduleToPrevious('Oil Change', st => st === 'pm' || st.includes('oil'));
-      }
+      // Revert each service type
+      for (const serviceType of serviceTypesToRevert) {
+        const type = serviceType.toLowerCase();
+        const scheduleName = SERVICE_TYPE_TO_SCHEDULE[serviceType] || SERVICE_TYPE_TO_SCHEDULE[type];
+        const matcher = getServiceTypeMatcher(serviceType);
 
-      if (isTire) {
-        await revertScheduleToPrevious('Tire Replacement', st => st === 'tire' || st.includes('tire'));
-      }
+        if (type === 'inspection' || type.includes('inspection')) {
+          // Handle inspection specially - also update trucks table
+          const prevInspection = await fetchMostRecentMatchingWO(matcher);
 
-      if (isInspection) {
-        const prevInspection = await fetchMostRecentMatchingWO(st => st === 'inspection' || st.includes('inspection'));
+          if (!prevInspection) {
+            await supabase
+              .from('service_schedules')
+              .update({ last_performed_date: null, last_performed_miles: null })
+              .eq('truck_id', truckId)
+              .eq('service_name', '120-Day Inspection');
 
-        if (!prevInspection) {
-          await supabase
-            .from('service_schedules')
-            .update({ last_performed_date: null, last_performed_miles: null })
-            .eq('truck_id', truckId)
-            .eq('service_name', '120-Day Inspection');
+            await supabase
+              .from('trucks')
+              .update({ last_120_inspection_date: null, last_120_inspection_miles: null })
+              .eq('id', truckId);
+          } else {
+            const odometerAtService =
+              prevInspection.odometer_reading ?? (await getOdometerAtDate(prevInspection.entry_date)) ?? null;
 
-          await supabase
-            .from('trucks')
-            .update({ last_120_inspection_date: null, last_120_inspection_miles: null })
-            .eq('id', truckId);
-        } else {
-          const odometerAtService =
-            prevInspection.odometer_reading ?? (await getOdometerAtDate(prevInspection.entry_date)) ?? null;
+            await supabase
+              .from('service_schedules')
+              .update({
+                last_performed_date: prevInspection.entry_date,
+                last_performed_miles: odometerAtService,
+              })
+              .eq('truck_id', truckId)
+              .eq('service_name', '120-Day Inspection');
 
-          await supabase
-            .from('service_schedules')
-            .update({
-              last_performed_date: prevInspection.entry_date,
-              last_performed_miles: odometerAtService,
-            })
-            .eq('truck_id', truckId)
-            .eq('service_name', '120-Day Inspection');
-
-          await supabase
-            .from('trucks')
-            .update({
-              last_120_inspection_date: prevInspection.entry_date,
-              last_120_inspection_miles: odometerAtService,
-            })
-            .eq('id', truckId);
+            await supabase
+              .from('trucks')
+              .update({
+                last_120_inspection_date: prevInspection.entry_date,
+                last_120_inspection_miles: odometerAtService,
+              })
+              .eq('id', truckId);
+          }
+        } else if (scheduleName) {
+          await revertScheduleToPrevious(scheduleName, matcher);
         }
       }
     },
@@ -598,7 +645,7 @@ export function usePMSchedule() {
       // Fetch completed work orders to find baseline work orders for each PM type
       const { data: completedWorkOrders, error: woError } = await supabase
         .from('work_orders')
-        .select('id, truck_id, service_type, entry_date')
+        .select('id, truck_id, service_type, service_types, entry_date')
         .eq('status', 'completed')
         .order('entry_date', { ascending: false });
 
@@ -625,13 +672,14 @@ export function usePMSchedule() {
       });
 
       // Index completed work orders by truck
-      const woByTruck = new Map<string, { id: string; service_type: string; entry_date: string }[]>();
+      const woByTruck = new Map<string, { id: string; service_type: string; service_types: string[] | null; entry_date: string }[]>();
       completedWorkOrders?.forEach(wo => {
         if (!wo.truck_id) return;
         const arr = woByTruck.get(wo.truck_id) || [];
         arr.push({
           id: wo.id,
           service_type: wo.service_type || '',
+          service_types: wo.service_types as string[] | null,
           entry_date: wo.entry_date,
         });
         woByTruck.set(wo.truck_id, arr);
@@ -649,7 +697,13 @@ export function usePMSchedule() {
 
       const findBaselineWorkOrder = (truckId: string, matcher: (serviceType: string) => boolean): PMBaseline => {
         const wos = woByTruck.get(truckId) || [];
-        const match = wos.find(wo => matcher(wo.service_type.toLowerCase()));
+        const match = wos.find(wo => {
+          // Check both service_types array and service_type string
+          const types = wo.service_types && wo.service_types.length > 0 
+            ? wo.service_types 
+            : wo.service_type ? [wo.service_type] : [];
+          return types.some(t => matcher(t.toLowerCase()));
+        });
         return match
           ? { workOrderId: match.id, date: match.entry_date }
           : { workOrderId: null, date: null };
@@ -661,7 +715,7 @@ export function usePMSchedule() {
           case 'M1':
             return st => st.includes('m1') || st.includes('grease') || st.includes('lube');
           case 'PM_A':
-            return st => st === 'pm' || st.includes('oil') || st.includes('pm a') || st.includes('pm-a');
+            return st => st === 'pm' || st.includes('oil') || st.includes('pm a') || st.includes('pm_a');
           case 'M2':
             return st => st.includes('m2') || st.includes('annual');
           case 'M3':
@@ -749,6 +803,7 @@ export function useCreateWorkOrder() {
       entry_date?: string;
       estimated_completion?: string;
       service_type: string;
+      service_types?: string[];
       description?: string;
       cost_estimate?: number;
       is_reimbursable?: boolean;
@@ -756,7 +811,18 @@ export function useCreateWorkOrder() {
     }) => {
       const { data, error } = await supabase
         .from('work_orders')
-        .insert(workOrder)
+        .insert({
+          truck_id: workOrder.truck_id,
+          vendor: workOrder.vendor,
+          entry_date: workOrder.entry_date,
+          estimated_completion: workOrder.estimated_completion,
+          service_type: workOrder.service_type,
+          service_types: workOrder.service_types || [],
+          description: workOrder.description,
+          cost_estimate: workOrder.cost_estimate,
+          is_reimbursable: workOrder.is_reimbursable,
+          odometer_reading: workOrder.odometer_reading,
+        })
         .select()
         .single();
 
@@ -784,7 +850,7 @@ export function useCompleteWorkOrder() {
       // First, get the work order to check its type and truck_id
       const { data: workOrder, error: fetchError } = await supabase
         .from('work_orders')
-        .select('truck_id, service_type, entry_date, odometer_reading')
+        .select('truck_id, service_type, service_types, entry_date, odometer_reading')
         .eq('id', id)
         .single();
 
@@ -819,57 +885,52 @@ export function useCompleteWorkOrder() {
 
       const currentOdometer = lastLoad?.end_miles || 0;
 
-      // If this is an inspection work order, update the service schedule
-      if (workOrder.service_type === 'inspection') {
-        // Use the work order's entry_date (the actual inspection date), not today's date
-        const inspectionDate = workOrder.entry_date;
-        
-        // Update the 120-Day Inspection service schedule for this truck
-        const { error: scheduleError } = await supabase
-          .from('service_schedules')
-          .update({
-            last_performed_date: inspectionDate,
-            last_performed_miles: workOrder.odometer_reading || currentOdometer,
-          })
-          .eq('truck_id', workOrder.truck_id)
-          .eq('service_name', '120-Day Inspection');
+      // Get all service types (from array or single value)
+      const serviceTypes: string[] = workOrder.service_types && workOrder.service_types.length > 0
+        ? workOrder.service_types
+        : workOrder.service_type ? [workOrder.service_type] : [];
 
-        if (scheduleError) {
-          console.error('Failed to update service schedule:', scheduleError);
+      // Process each service type
+      for (const serviceType of serviceTypes) {
+        const type = serviceType.toLowerCase();
+        const scheduleName = SERVICE_TYPE_TO_SCHEDULE[serviceType] || SERVICE_TYPE_TO_SCHEDULE[type];
+
+        if (type === 'inspection' || type.includes('inspection')) {
+          // Update the 120-Day Inspection service schedule for this truck
+          const inspectionDate = workOrder.entry_date;
+          
+          const { error: scheduleError } = await supabase
+            .from('service_schedules')
+            .update({
+              last_performed_date: inspectionDate,
+              last_performed_miles: workOrder.odometer_reading || currentOdometer,
+            })
+            .eq('truck_id', workOrder.truck_id)
+            .eq('service_name', '120-Day Inspection');
+
+          if (scheduleError) {
+            console.error('Failed to update service schedule:', scheduleError);
+          }
+
+          // Also update the truck's last_120_inspection_date
+          await supabase
+            .from('trucks')
+            .update({
+              last_120_inspection_date: inspectionDate,
+              last_120_inspection_miles: workOrder.odometer_reading || currentOdometer,
+            })
+            .eq('id', workOrder.truck_id);
+        } else if (scheduleName) {
+          // Update the corresponding service schedule
+          await supabase
+            .from('service_schedules')
+            .update({
+              last_performed_date: workOrder.entry_date,
+              last_performed_miles: currentOdometer,
+            })
+            .eq('truck_id', workOrder.truck_id)
+            .eq('service_name', scheduleName);
         }
-
-        // Also update the truck's last_120_inspection_date
-        await supabase
-          .from('trucks')
-          .update({
-            last_120_inspection_date: inspectionDate,
-            last_120_inspection_miles: workOrder.odometer_reading || currentOdometer,
-          })
-          .eq('id', workOrder.truck_id);
-      }
-
-      // If this is an oil change work order, reset the oil change PM schedule
-      if (workOrder.service_type === 'pm' || workOrder.service_type.toLowerCase().includes('oil')) {
-        await supabase
-          .from('service_schedules')
-          .update({
-            last_performed_date: workOrder.entry_date,
-            last_performed_miles: currentOdometer,
-          })
-          .eq('truck_id', workOrder.truck_id)
-          .eq('service_name', 'Oil Change');
-      }
-
-      // If this is a tire work order, reset the tire PM schedule
-      if (workOrder.service_type === 'tire' || workOrder.service_type.toLowerCase().includes('tire')) {
-        await supabase
-          .from('service_schedules')
-          .update({
-            last_performed_date: workOrder.entry_date,
-            last_performed_miles: currentOdometer,
-          })
-          .eq('truck_id', workOrder.truck_id)
-          .eq('service_name', 'Tire Replacement');
       }
 
       return data;
@@ -979,17 +1040,16 @@ export function useTruckHistory(truckId: string | null) {
         .map(item => 'completed_at' in item ? item.completed_at : item.service_date)
         .filter(Boolean)
         .sort()
-        .reverse()[0];
+        .pop();
 
       return {
         truck,
         workOrders: workOrders || [],
-        maintenanceLogs: logs || [],
+        logs: logs || [],
         stats: {
           totalSpend,
-          totalWorkOrders: workOrders?.length || 0,
-          totalMaintenanceLogs: logs?.length || 0,
           lastServiceDate,
+          openWorkOrders: workOrders?.filter(wo => wo.status !== 'completed').length || 0,
         },
       };
     },
