@@ -177,7 +177,6 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
               <Input
                 id="estimatedCompletion"
                 type="date"
-                min={format(new Date(), 'yyyy-MM-dd')}
                 value={formData.estimated_completion}
                 onChange={(e) => handleChange('estimated_completion', e.target.value)}
               />
