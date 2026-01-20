@@ -750,7 +750,8 @@ export function usePMSchedule() {
           const tireSchedule = truckSchedules.find(s => s.service_name === 'Tire Replacement') || null;
 
           // Build manufacturer-specific services if this truck has a known manufacturer
-          const manufacturerKey = (truck.make || '').toLowerCase();
+          // Trim whitespace to handle data inconsistencies
+          const manufacturerKey = (truck.make || '').trim().toLowerCase();
           const profiles = profilesByManufacturer.get(manufacturerKey) || [];
           
           const manufacturer_services: ManufacturerService[] = profiles.map(profile => {

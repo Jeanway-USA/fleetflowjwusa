@@ -37,7 +37,7 @@ function groupTrucksByManufacturer(trucks: TruckWithSchedules[]) {
   const otherTrucks: TruckWithSchedules[] = [];
 
   trucks.forEach(truck => {
-    const make = (truck.make || '').toLowerCase();
+    const make = (truck.make || '').trim().toLowerCase();
     if (truck.manufacturer_services.length > 0 && SUPPORTED_MANUFACTURERS.includes(make)) {
       if (!groups[make]) {
         groups[make] = [];
@@ -462,7 +462,7 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
 
       // Manufacturer filter
       if (manufacturerFilter !== 'all') {
-        const make = (truck.make || '').toLowerCase();
+        const make = (truck.make || '').trim().toLowerCase();
         if (manufacturerFilter === 'freightliner' && make !== 'freightliner') return false;
         if (manufacturerFilter === 'other' && SUPPORTED_MANUFACTURERS.includes(make)) return false;
       }
@@ -490,7 +490,7 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
     Object.keys(manufacturerGroups).forEach(make => {
       const groupTrucks = manufacturerGroups[make];
       const health = filteredTrucks.filter(t => 
-        (t.truck.make || '').toLowerCase() === make
+        (t.truck.make || '').trim().toLowerCase() === make
       );
       counts[make] = {
         overdueCount: health.filter(h => h.status === 'overdue').length,
@@ -500,7 +500,7 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
 
     // For other trucks
     const otherHealth = filteredTrucks.filter(t => {
-      const make = (t.truck.make || '').toLowerCase();
+      const make = (t.truck.make || '').trim().toLowerCase();
       return !SUPPORTED_MANUFACTURERS.includes(make) || t.truck.manufacturer_services.length === 0;
     });
     counts['other'] = {
