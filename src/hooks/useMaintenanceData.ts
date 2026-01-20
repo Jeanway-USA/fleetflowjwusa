@@ -406,29 +406,30 @@ export function usePMSchedule() {
 
       if (schedulesError) throw schedulesError;
 
-      // Get total actual miles per truck from delivered loads
-      const { data: loadMiles, error: loadsError } = await supabase
+      // Get the most recent delivered load per truck to get end_miles (actual odometer)
+      const { data: deliveredLoads, error: loadsError } = await supabase
         .from('fleet_loads')
-        .select('truck_id, actual_miles')
+        .select('truck_id, end_miles, delivery_date')
         .eq('status', 'delivered')
-        .not('actual_miles', 'is', null);
+        .not('end_miles', 'is', null)
+        .order('delivery_date', { ascending: false });
 
       if (loadsError) throw loadsError;
 
-      // Sum actual miles per truck
-      const truckMilesMap = new Map<string, number>();
-      loadMiles?.forEach(load => {
-        if (load.truck_id && load.actual_miles) {
-          const current = truckMilesMap.get(load.truck_id) || 0;
-          truckMilesMap.set(load.truck_id, current + load.actual_miles);
+      // Get the latest end_miles per truck (actual odometer reading)
+      const truckOdometerMap = new Map<string, number>();
+      deliveredLoads?.forEach(load => {
+        if (load.truck_id && load.end_miles && !truckOdometerMap.has(load.truck_id)) {
+          // Only take the first (most recent) load for each truck
+          truckOdometerMap.set(load.truck_id, load.end_miles);
         }
       });
 
-      // Map schedules to trucks with calculated odometer
+      // Map schedules to trucks with odometer from last delivered load
       const trucksWithSchedules: TruckWithSchedules[] = trucks?.map(truck => ({
         ...truck,
-        // Use calculated miles from delivered loads as the odometer
-        calculated_odometer: truckMilesMap.get(truck.id) || 0,
+        // Use end_miles from the most recent delivered load as the odometer
+        calculated_odometer: truckOdometerMap.get(truck.id) || truck.current_odometer || 0,
         schedules: schedules?.filter(s => s.truck_id === truck.id) || [],
       })) || [];
 
@@ -521,15 +522,18 @@ export function useCompleteWorkOrder() {
 
       if (error) throw error;
 
-      // Get the current calculated odometer (sum of actual miles from delivered loads)
-      const { data: loadMiles } = await supabase
+      // Get the current odometer from the most recent delivered load's end_miles
+      const { data: lastLoad } = await supabase
         .from('fleet_loads')
-        .select('actual_miles')
+        .select('end_miles')
         .eq('truck_id', workOrder.truck_id)
         .eq('status', 'delivered')
-        .not('actual_miles', 'is', null);
+        .not('end_miles', 'is', null)
+        .order('delivery_date', { ascending: false })
+        .limit(1)
+        .single();
 
-      const calculatedOdometer = loadMiles?.reduce((sum, load) => sum + (load.actual_miles || 0), 0) || 0;
+      const currentOdometer = lastLoad?.end_miles || 0;
 
       // If this is an inspection work order, update the service schedule
       if (workOrder.service_type === 'inspection') {
@@ -541,7 +545,7 @@ export function useCompleteWorkOrder() {
           .from('service_schedules')
           .update({
             last_performed_date: inspectionDate,
-            last_performed_miles: workOrder.odometer_reading || calculatedOdometer,
+            last_performed_miles: workOrder.odometer_reading || currentOdometer,
           })
           .eq('truck_id', workOrder.truck_id)
           .eq('service_name', '120-Day Inspection');
@@ -555,7 +559,7 @@ export function useCompleteWorkOrder() {
           .from('trucks')
           .update({
             last_120_inspection_date: inspectionDate,
-            last_120_inspection_miles: workOrder.odometer_reading || calculatedOdometer,
+            last_120_inspection_miles: workOrder.odometer_reading || currentOdometer,
           })
           .eq('id', workOrder.truck_id);
       }
@@ -566,7 +570,7 @@ export function useCompleteWorkOrder() {
           .from('service_schedules')
           .update({
             last_performed_date: workOrder.entry_date,
-            last_performed_miles: calculatedOdometer,
+            last_performed_miles: currentOdometer,
           })
           .eq('truck_id', workOrder.truck_id)
           .eq('service_name', 'Oil Change');
@@ -578,7 +582,7 @@ export function useCompleteWorkOrder() {
           .from('service_schedules')
           .update({
             last_performed_date: workOrder.entry_date,
-            last_performed_miles: calculatedOdometer,
+            last_performed_miles: currentOdometer,
           })
           .eq('truck_id', workOrder.truck_id)
           .eq('service_name', 'Tire Replacement');
