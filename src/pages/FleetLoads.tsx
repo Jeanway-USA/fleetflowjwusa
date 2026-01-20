@@ -19,7 +19,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History } from 'lucide-react';
+import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 
 // Accessorial types commonly used in trucking
 const ACCESSORIAL_TYPES = [
@@ -655,12 +656,15 @@ export default function FleetLoads() {
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="details">Load Details</TabsTrigger>
-                <TabsTrigger value="revenue">Revenue & Advance</TabsTrigger>
-                <TabsTrigger value="miles">Miles & Notes</TabsTrigger>
+                <TabsTrigger value="revenue">Revenue</TabsTrigger>
+                <TabsTrigger value="miles">Miles</TabsTrigger>
                 <TabsTrigger value="expenses" className="flex items-center gap-1">
                   <Receipt className="h-4 w-4" /> Expenses
+                </TabsTrigger>
+                <TabsTrigger value="history" className="flex items-center gap-1">
+                  <History className="h-4 w-4" /> History
                 </TabsTrigger>
               </TabsList>
 
@@ -1026,6 +1030,22 @@ export default function FleetLoads() {
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <p>Save the load first to add expenses.</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="history" className="mt-4">
+                {editingLoad?.id ? (
+                  <StatusHistoryLog
+                    loadId={editingLoad.id}
+                    pickupDate={editingLoad.pickup_date}
+                    pickupTime={editingLoad.pickup_time}
+                    deliveryDate={editingLoad.delivery_date}
+                    deliveryTime={editingLoad.delivery_time}
+                  />
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Save the load first to view status history.</p>
                   </div>
                 )}
               </TabsContent>
