@@ -42,7 +42,7 @@ const App = () => {
             <AuthProvider>
               <ErrorBoundary>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/fleet-loads" replace />} />
+                  <Route path="/" element={<Navigate to="/executive-dashboard" replace />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/trucks" element={<Trucks />} />
