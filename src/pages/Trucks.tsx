@@ -106,7 +106,7 @@ export default function Trucks() {
           status: 'never',
         });
       } else {
-        const lastDate = new Date(schedule.last_performed_date);
+        const lastDate = new Date(schedule.last_performed_date + 'T00:00:00');
         const dueDate = addDays(lastDate, schedule.interval_days || 120);
         const daysRemaining = differenceInDays(dueDate, today);
         
