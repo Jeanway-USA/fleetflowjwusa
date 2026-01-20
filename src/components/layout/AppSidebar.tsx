@@ -15,6 +15,9 @@ import {
   BarChart3,
   Crown,
   Container,
+  AlertTriangle,
+  Award,
+  Fuel,
   LucideIcon
 } from 'lucide-react';
 import jwBannerLight from '@/assets/JW_Banner.png';
@@ -81,6 +84,7 @@ export function AppSidebar() {
   const financeNavItems: NavItem[] = [
     { title: 'Finance & P/L', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'] },
     { title: 'Company Insights', icon: BarChart3, path: '/insights', roles: ['owner', 'payroll_admin'] },
+    { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'] },
   ];
 
   const operationsNavItems: NavItem[] = [
@@ -88,6 +92,8 @@ export function AppSidebar() {
     { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'] },
     { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'] },
     { title: 'Safety', icon: Shield, path: '/safety', roles: ['owner', 'safety'] },
+    { title: 'Incidents', icon: AlertTriangle, path: '/incidents', roles: ['owner', 'safety', 'dispatcher'] },
+    { title: 'Driver Performance', icon: Award, path: '/driver-performance', roles: ['owner', 'safety', 'dispatcher'] },
   ];
 
   const filterByRole = (items: NavItem[]) => items.filter(item => item.roles.some(role => hasRole(role)));
