@@ -3,11 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { MapPin, Clock, Truck, Navigation, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route } from 'lucide-react';
 import { format, differenceInHours, differenceInMinutes, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
 interface Load {
   id: string;
   origin: string;
@@ -330,7 +330,9 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
             <p className="text-xs text-warning font-medium uppercase tracking-wide mb-1">
               Special Instructions
             </p>
-            <p className="text-sm whitespace-pre-wrap">{load.notes}</p>
+            <ScrollArea className="max-h-24">
+              <p className="text-sm whitespace-pre-wrap pr-2">{load.notes}</p>
+            </ScrollArea>
           </div>
         )}
 
@@ -444,7 +446,9 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
                 <p className="text-xs text-warning font-medium uppercase tracking-wide mb-1">
                   Special Instructions
                 </p>
-                <p className="text-sm whitespace-pre-wrap">{load.notes}</p>
+                <ScrollArea className="max-h-32">
+                  <p className="text-sm whitespace-pre-wrap pr-2">{load.notes}</p>
+                </ScrollArea>
               </div>
             )}
           </div>
