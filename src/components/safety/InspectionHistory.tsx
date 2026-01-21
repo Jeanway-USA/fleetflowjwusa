@@ -10,6 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { SignedImage } from '@/components/shared/SignedImage';
 import { toast } from 'sonner';
 import { 
   CalendarIcon, 
@@ -325,19 +326,17 @@ export function InspectionHistory({ truckId, showAllTrucks = true }: InspectionH
                           </h4>
                           <div className="grid grid-cols-3 gap-2">
                             {inspectionPhotos.map((photo: any) => (
-                              <a
+                              <div
                                 key={photo.id}
-                                href={photo.photo_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="aspect-square rounded-lg overflow-hidden border hover:opacity-80 transition-opacity"
+                                className="aspect-square rounded-lg overflow-hidden border"
                               >
-                                <img
-                                  src={photo.photo_url}
+                                <SignedImage
+                                  bucket="dvir-photos"
+                                  storedPath={photo.photo_url}
                                   alt="Defect photo"
                                   className="w-full h-full object-cover"
                                 />
-                              </a>
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -351,8 +350,9 @@ export function InspectionHistory({ truckId, showAllTrucks = true }: InspectionH
                             Driver Signature
                           </h4>
                           <div className="border rounded-lg p-2 bg-white">
-                            <img
-                              src={inspection.signature_url}
+                            <SignedImage
+                              bucket="dvir-signatures"
+                              storedPath={inspection.signature_url}
                               alt="Driver signature"
                               className="max-h-24 mx-auto"
                             />

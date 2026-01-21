@@ -36,24 +36,19 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
       if (!selectedFile || !docType) throw new Error('Missing file or document type');
 
       const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${driverId}/${Date.now()}.${fileExt}`;
+      const filePath = `${driverId}/${Date.now()}.${fileExt}`;
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(fileName, selectedFile);
+        .upload(filePath, selectedFile);
       
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
-
-      // Save document record
+      // Save document record with the path (not public URL) for private bucket
       const { error: dbError } = await supabase.from('documents').insert({
         file_name: selectedFile.name,
-        file_path: urlData.publicUrl,
+        file_path: filePath,
         file_size: selectedFile.size,
         document_type: docType,
         uploaded_by: user?.id,
