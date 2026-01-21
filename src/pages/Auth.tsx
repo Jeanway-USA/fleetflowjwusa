@@ -33,7 +33,7 @@ export default function Auth() {
 
   // Redirect if already logged in
   if (user) {
-    navigate('/dashboard');
+    navigate('/');
     return null;
   }
 
@@ -78,7 +78,7 @@ export default function Auth() {
       }
     } else {
       toast.success('Welcome back!');
-      navigate('/dashboard');
+      navigate('/');
     }
   };
 
@@ -98,7 +98,7 @@ export default function Auth() {
       }
     } else {
       toast.success('Account created! Please contact an administrator to assign your role.');
-      navigate('/dashboard');
+      navigate('/');
     }
   };
 
