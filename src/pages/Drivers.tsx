@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -8,6 +8,7 @@ import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useUndoableDelete } from '@/hooks/useUndoableDelete';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +23,26 @@ import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Up
 import { format, parseISO } from 'date-fns';
 
 const endorsementOptions = ['H - Hazmat', 'N - Tank', 'P - Passenger', 'S - School Bus', 'T - Double/Triple', 'X - Hazmat + Tank'];
+
+// Component for avatar with signed URL support
+function DriverAvatar({ avatarPath, initials }: { avatarPath: string | null; initials: string }) {
+  const { url, loading } = useSignedUrl(
+    avatarPath && !avatarPath.startsWith('http') ? 'documents' : null,
+    avatarPath && !avatarPath.startsWith('http') ? avatarPath : null
+  );
+  
+  // Use signed URL for storage paths, direct URL for legacy public URLs
+  const imageSrc = avatarPath?.startsWith('http') ? avatarPath : url;
+  
+  return (
+    <Avatar className="h-16 w-16 border-2 border-primary/20">
+      <AvatarImage src={imageSrc || undefined} />
+      <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
+        {initials}
+      </AvatarFallback>
+    </Avatar>
+  );
+}
 
 export default function Drivers() {
   const queryClient = useQueryClient();
@@ -142,11 +163,8 @@ export default function Drivers() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
-
-      await supabase.from('drivers').update({ avatar_url: publicUrl }).eq('id', driverId);
+      // Store the path instead of public URL - signed URLs will be used for display
+      await supabase.from('drivers').update({ avatar_url: fileName }).eq('id', driverId);
       queryClient.invalidateQueries({ queryKey: ['drivers'] });
       toast.success('Photo uploaded');
     } catch (error: any) {
@@ -216,12 +234,10 @@ export default function Drivers() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
                     <div className="relative group">
-                      <Avatar className="h-16 w-16 border-2 border-primary/20">
-                        <AvatarImage src={driver.avatar_url} />
-                        <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
-                          {getInitials(driver.first_name, driver.last_name)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <DriverAvatar 
+                        avatarPath={driver.avatar_url} 
+                        initials={getInitials(driver.first_name, driver.last_name)} 
+                      />
                       <input
                         type="file"
                         className="hidden"

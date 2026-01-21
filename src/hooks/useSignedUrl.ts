@@ -88,7 +88,7 @@ export async function getSignedUrl(
  * Hook to get a signed URL for a single file
  */
 export function useSignedUrl(
-  bucket: string,
+  bucket: string | null | undefined,
   storedPath: string | null | undefined,
   expiresIn: number = 3600
 ): { url: string | null; loading: boolean } {
@@ -96,7 +96,7 @@ export function useSignedUrl(
   const [loading, setLoading] = useState(false);
   
   useEffect(() => {
-    if (!storedPath) {
+    if (!bucket || !storedPath) {
       setUrl(null);
       return;
     }
