@@ -39,8 +39,12 @@ const roleLabels: Record<AppRole, string> = {
 
 export default function Settings() {
   const queryClient = useQueryClient();
-  const { isOwner, user } = useAuth();
+  const { isOwner, user, canSimulateRoles } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  
+  // Use canSimulateRoles (actuallyIsOwner) for admin access - owners should always have access
+  // even when simulating other roles
+  const hasAdminAccess = canSimulateRoles;
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -90,7 +94,7 @@ export default function Settings() {
         };
       }) as UserWithRole[];
     },
-    enabled: isOwner,
+    enabled: hasAdminAccess,
   });
 
   const assignRoleMutation = useMutation({
@@ -297,7 +301,7 @@ export default function Settings() {
   const usersWithoutRoles = usersWithRoles.filter(u => !u.role);
 
   // Access denied for non-owners (but still show personal settings)
-  if (!isOwner) {
+  if (!hasAdminAccess) {
     return (
       <DashboardLayout>
         <PageHeader title="Settings" description="Manage your preferences" />
