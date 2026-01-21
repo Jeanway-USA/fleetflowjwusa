@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -22,18 +22,33 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, loading: authLoading } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
   
   const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
 
-  // Redirect if already logged in
+  // Redirect if already logged in (only after auth state is resolved)
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/');
+    }
+  }, [user, authLoading, navigate]);
+
+  // Show loading state while auth is being resolved
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // If user is logged in, don't render the form (redirect is happening)
   if (user) {
-    navigate('/');
     return null;
   }
 
@@ -66,9 +81,9 @@ export default function Auth() {
     e.preventDefault();
     if (!validateForm()) return;
     
-    setLoading(true);
+    setFormLoading(true);
     const { error } = await signIn(email, password);
-    setLoading(false);
+    setFormLoading(false);
 
     if (error) {
       if (error.message.includes('Invalid login')) {
@@ -86,9 +101,9 @@ export default function Auth() {
     e.preventDefault();
     if (!validateForm()) return;
     
-    setLoading(true);
+    setFormLoading(true);
     const { error } = await signUp(email, password, firstName, lastName);
-    setLoading(false);
+    setFormLoading(false);
 
     if (error) {
       if (error.message.includes('already registered')) {
@@ -106,13 +121,13 @@ export default function Auth() {
     e.preventDefault();
     if (!validateEmail()) return;
 
-    setLoading(true);
+    setFormLoading(true);
     const redirectUrl = `${window.location.origin}/reset-password`;
     
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: redirectUrl,
     });
-    setLoading(false);
+    setFormLoading(false);
 
     if (error) {
       toast.error(error.message);
@@ -182,9 +197,9 @@ export default function Auth() {
                   <Button 
                     type="submit" 
                     className="w-full gradient-gold text-primary-foreground hover:opacity-90"
-                    disabled={loading}
+                    disabled={formLoading}
                   >
-                    {loading ? (
+                    {formLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Sending...
@@ -277,9 +292,9 @@ export default function Auth() {
                   <Button 
                     type="submit" 
                     className="w-full gradient-gold text-primary-foreground hover:opacity-90"
-                    disabled={loading}
+                    disabled={formLoading}
                   >
-                    {loading ? (
+                    {formLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Signing in...
@@ -344,9 +359,9 @@ export default function Auth() {
                   <Button 
                     type="submit" 
                     className="w-full gradient-gold text-primary-foreground hover:opacity-90"
-                    disabled={loading}
+                    disabled={formLoading}
                   >
-                    {loading ? (
+                    {formLoading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Creating account...
