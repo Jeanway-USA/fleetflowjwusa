@@ -15,7 +15,13 @@ interface AuthContextType {
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
+  /** 
+   * SECURITY NOTE: Role simulation is UI-only for testing purposes.
+   * All actual data access is controlled by server-side RLS policies.
+   * Only real owners can use this feature.
+   */
   setSimulatedRole: (role: AppRole | null) => void;
+  canSimulateRoles: boolean;
   isOwner: boolean;
   isAdmin: boolean;
   isSimulating: boolean;
@@ -129,8 +135,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return roles.includes(role);
   };
 
-  // Real owner status (ignores simulation)
+  // Real owner status (ignores simulation) - this is the ONLY check for role simulation permission
   const actuallyIsOwner = roles.includes('owner');
+  
+  // Only actual owners can simulate other roles (security requirement)
+  const canSimulateRoles = actuallyIsOwner;
+  
+  // Secure setSimulatedRole that only works for actual owners
+  const handleSetSimulatedRole = (role: AppRole | null) => {
+    if (!actuallyIsOwner && role !== null) {
+      console.warn('Security: Only owners can simulate roles. Ignoring request.');
+      return;
+    }
+    setSimulatedRole(role);
+  };
   
   // Simulated owner status
   const isOwner = simulatedRole ? simulatedRole === 'owner' : actuallyIsOwner;
@@ -165,7 +183,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUp,
       signOut,
       hasRole,
-      setSimulatedRole,
+      setSimulatedRole: handleSetSimulatedRole,
+      canSimulateRoles,
       isOwner,
       isAdmin,
       isSimulating,

@@ -1,15 +1,29 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { decode as base64Decode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Allowed origins for CORS - restrict to known domains
+const ALLOWED_ORIGINS = [
+  'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app',
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+
+function getCorsHeaders(request: Request): Record<string, string> {
+  const origin = request.headers.get('Origin') || '';
+  const isAllowed = ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || origin.endsWith('.lovable.app')
+  );
+  
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : ALLOWED_ORIGINS[0],
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  };
+}
 
 interface IntermediateStop {
   stop_number: number;
-  stop_type: string; // "Pickup" or "Drop"
+  stop_type: string;
   address: string;
   date: string | null;
   facility_name: string | null;
@@ -41,6 +55,8 @@ interface ExtractedLoadData {
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -92,7 +108,6 @@ serve(async (req) => {
 
     console.log("Parsing rate confirmation PDF, base64 length:", pdfBase64.length);
 
-    // Use Gemini's multimodal capabilities to read the PDF directly
     const systemPrompt = `You are an expert at extracting structured data from Landstar BCO Load Detail documents (Rate Confirmations). 
 You will be given a PDF document image. Extract the load information accurately and return it in a structured JSON format.
 
@@ -186,7 +201,7 @@ IMPORTANT:
             ]
           },
         ],
-        temperature: 0.1, // Low temperature for more consistent extraction
+        temperature: 0.1,
       }),
     });
 
@@ -222,7 +237,6 @@ IMPORTANT:
     // Parse the JSON response
     let extractedData: ExtractedLoadData;
     try {
-      // Clean the response in case there's markdown formatting
       let cleanContent = content.trim();
       if (cleanContent.startsWith("```json")) {
         cleanContent = cleanContent.slice(7);
@@ -249,7 +263,7 @@ IMPORTANT:
     console.error("Parse rate confirmation error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   }
 });
