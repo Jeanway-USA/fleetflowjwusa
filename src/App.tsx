@@ -31,6 +31,7 @@ import Incidents from "./pages/Incidents";
 import DriverPerformance from "./pages/DriverPerformance";
 import IFTA from "./pages/IFTA";
 import NotFound from "./pages/NotFound";
+import PendingAccess from "./pages/PendingAccess";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ const App = () => {
                   <Route path="/incidents" element={<Incidents />} />
                   <Route path="/driver-performance" element={<DriverPerformance />} />
                   <Route path="/ifta" element={<IFTA />} />
+                  <Route path="/pending-access" element={<PendingAccess />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ErrorBoundary>

@@ -61,5 +61,5 @@ export function RoleBasedRedirect() {
   }
 
   // Fallback for users with no recognized role (after roles were checked)
-  return <Navigate to="/auth" replace />;
+  return <Navigate to="/pending-access" replace />;
 }
