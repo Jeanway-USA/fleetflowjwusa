@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, Trash2, Download, Eye } from 'lucide-react';
+import { Upload, FileText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDocumentUpload, useDocuments } from '@/hooks/useDocumentUpload';
+import { DocumentViewer } from '@/components/shared/DocumentViewer';
 import type { Database } from '@/integrations/supabase/types';
 
 type Document = Database['public']['Tables']['documents']['Row'];
@@ -109,27 +110,10 @@ export function DocumentUpload({
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => window.open(doc.file_path, '_blank')}
-                    title="View"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => {
-                      const link = document.createElement('a');
-                      link.href = doc.file_path;
-                      link.download = doc.file_name;
-                      link.click();
-                    }}
-                    title="Download"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
+                  <DocumentViewer 
+                    storedPath={doc.file_path} 
+                    fileName={doc.file_name} 
+                  />
                   <Button
                     size="icon"
                     variant="ghost"

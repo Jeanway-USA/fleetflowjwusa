@@ -46,18 +46,16 @@ export function CompleteJobModal({ workOrder, open, onOpenChange }: CompleteJobM
       if (invoiceFile) {
         const fileExt = invoiceFile.name.split('.').pop();
         const fileName = `${workOrder.id}-invoice-${Date.now()}.${fileExt}`;
+        const filePath = `invoices/${fileName}`;
         
-        const { error: uploadError, data } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('documents')
-          .upload(`invoices/${fileName}`, invoiceFile);
+          .upload(filePath, invoiceFile);
 
         if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('documents')
-          .getPublicUrl(`invoices/${fileName}`);
-        
-        invoiceUrl = publicUrl;
+        // Store the path (not public URL) for private bucket
+        invoiceUrl = filePath;
       }
 
       await completeWorkOrder.mutateAsync({

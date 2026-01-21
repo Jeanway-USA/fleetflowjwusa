@@ -4,12 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
+import { DocumentViewer } from '@/components/shared/DocumentViewer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Upload, Trash2, Download, Eye, FolderOpen } from 'lucide-react';
+import { FileText, Upload, Trash2, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
+import { extractStoragePath } from '@/hooks/useSignedUrl';
 import type { Database } from '@/integrations/supabase/types';
 
 type Document = Database['public']['Tables']['documents']['Row'];
@@ -47,10 +49,10 @@ export default function Documents() {
 
   const deleteMutation = useMutation({
     mutationFn: async (doc: Document) => {
-      const url = new URL(doc.file_path);
-      const pathParts = url.pathname.split('/storage/v1/object/public/documents/');
-      if (pathParts[1]) {
-        await supabase.storage.from('documents').remove([pathParts[1]]);
+      // Handle both old URL format and new path format
+      const storagePath = extractStoragePath(doc.file_path, 'documents') || doc.file_path;
+      if (storagePath) {
+        await supabase.storage.from('documents').remove([storagePath]);
       }
       const { error } = await supabase.from('documents').delete().eq('id', doc.id);
       if (error) throw error;
@@ -72,21 +74,18 @@ export default function Documents() {
       if (!user) throw new Error('Not authenticated');
 
       const fileExt = file.name.split('.').pop();
-      const fileName = `general/${Date.now()}.${fileExt}`;
+      const filePath = `general/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(fileName, file);
+        .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileName);
-
+      // Store the path (not public URL) for private bucket
       const { error: dbError } = await supabase.from('documents').insert({
         file_name: file.name,
-        file_path: publicUrl,
+        file_path: filePath,
         file_size: file.size,
         document_type: selectedType,
         related_type: 'general',
@@ -127,17 +126,7 @@ export default function Documents() {
       header: 'Actions',
       render: (doc: Document) => (
         <div className="flex gap-1">
-          <Button size="icon" variant="ghost" onClick={() => window.open(doc.file_path, '_blank')}>
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" onClick={() => {
-            const link = document.createElement('a');
-            link.href = doc.file_path;
-            link.download = doc.file_name;
-            link.click();
-          }}>
-            <Download className="h-4 w-4" />
-          </Button>
+          <DocumentViewer storedPath={doc.file_path} fileName={doc.file_name} />
           <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(doc)}>
             <Trash2 className="h-4 w-4" />
           </Button>

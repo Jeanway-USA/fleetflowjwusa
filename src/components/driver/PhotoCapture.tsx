@@ -51,34 +51,31 @@ export function PhotoCapture({ onPhotosCaptured, disabled, maxPhotos = 5 }: Phot
     if (photos.length === 0) return [];
 
     setUploading(true);
-    const urls: string[] = [];
+    const paths: string[] = [];
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       for (const photo of photos) {
-        const fileName = `${user.id}/${Date.now()}-${photo.file.name}`;
+        const filePath = `${user.id}/${Date.now()}-${photo.file.name}`;
         const { error: uploadError } = await supabase.storage
           .from('dvir-photos')
-          .upload(fileName, photo.file);
+          .upload(filePath, photo.file);
 
         if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('dvir-photos')
-          .getPublicUrl(fileName);
-
-        urls.push(publicUrl);
+        // Store the path (not public URL) for private bucket
+        paths.push(filePath);
       }
 
-      onPhotosCaptured(urls);
+      onPhotosCaptured(paths);
       
       // Clean up previews
       photos.forEach(p => URL.revokeObjectURL(p.preview));
       setPhotos([]);
       
-      return urls;
+      return paths;
     } catch (error: any) {
       toast.error('Failed to upload photos: ' + error.message);
       return [];
@@ -201,32 +198,29 @@ export function usePhotoUpload() {
     if (photos.length === 0) return [];
     
     setUploading(true);
-    const urls: string[] = [];
+    const paths: string[] = [];
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       for (const photo of photos) {
-        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+        const filePath = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
         const { error: uploadError } = await supabase.storage
           .from('dvir-photos')
-          .upload(fileName, photo.file);
+          .upload(filePath, photo.file);
 
         if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('dvir-photos')
-          .getPublicUrl(fileName);
-
-        urls.push(publicUrl);
+        // Store the path (not public URL) for private bucket
+        paths.push(filePath);
       }
 
       // Clean up
       photos.forEach(p => URL.revokeObjectURL(p.preview));
       setPhotos([]);
       
-      return urls;
+      return paths;
     } catch (error: any) {
       throw error;
     } finally {

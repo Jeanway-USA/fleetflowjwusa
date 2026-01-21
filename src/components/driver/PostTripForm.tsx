@@ -175,19 +175,16 @@ export function PostTripForm({ driverId, truckId, onComplete }: PostTripFormProp
 
       const response = await fetch(dataUrl);
       const blob = await response.blob();
-      const fileName = `${user.id}/${Date.now()}-signature.png`;
+      const filePath = `${user.id}/${Date.now()}-signature.png`;
 
       const { error } = await supabase.storage
         .from('dvir-signatures')
-        .upload(fileName, blob, { contentType: 'image/png' });
+        .upload(filePath, blob, { contentType: 'image/png' });
 
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('dvir-signatures')
-        .getPublicUrl(fileName);
-
-      return publicUrl;
+      // Return the storage path (not public URL) for private bucket
+      return filePath;
     } catch (error) {
       console.error('Failed to upload signature:', error);
       return null;
@@ -197,30 +194,27 @@ export function PostTripForm({ driverId, truckId, onComplete }: PostTripFormProp
   const uploadPhotos = async (): Promise<string[]> => {
     if (photos.length === 0) return [];
     
-    const urls: string[] = [];
+    const paths: string[] = [];
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
 
     for (const photo of photos) {
       try {
-        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+        const filePath = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
         const { error } = await supabase.storage
           .from('dvir-photos')
-          .upload(fileName, photo.file);
+          .upload(filePath, photo.file);
 
         if (error) throw error;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('dvir-photos')
-          .getPublicUrl(fileName);
-
-        urls.push(publicUrl);
+        // Store the path (not public URL) for private bucket
+        paths.push(filePath);
       } catch (error) {
         console.error('Failed to upload photo:', error);
       }
     }
 
-    return urls;
+    return paths;
   };
 
   const submitMutation = useMutation({
