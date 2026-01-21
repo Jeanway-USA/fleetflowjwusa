@@ -1,18 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogOut, Clock } from 'lucide-react';
-import bannerLight from '@/assets/JW_Banner.png';
-import bannerDark from '@/assets/JW_Banner_Dark.png';
+import bannerLogo from '@/assets/JW_Banner.png';
 
 export default function PendingAccess() {
   const { user, signOut, loading } = useAuth();
-  const { theme } = useTheme();
   const navigate = useNavigate();
-
-  const bannerLogo = theme === 'dark' ? bannerDark : bannerLight;
 
   const handleSignOut = async () => {
     await signOut();
