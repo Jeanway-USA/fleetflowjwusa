@@ -2015,6 +2015,8 @@ export type Database = {
     Functions: {
       get_driver_id_for_user: { Args: { _user_id: string }; Returns: string }
       has_admin_access: { Args: { _user_id: string }; Returns: boolean }
+      has_operations_access: { Args: { _user_id: string }; Returns: boolean }
+      has_payroll_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2022,6 +2024,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_safety_access: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
