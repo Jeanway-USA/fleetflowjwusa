@@ -2124,14 +2124,12 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string | null
-          email: string | null
           endorsements: string[] | null
           first_name: string | null
           has_twic: boolean | null
           hire_date: string | null
           id: string | null
           last_name: string | null
-          phone: string | null
           status: string | null
           updated_at: string | null
           user_id: string | null
@@ -2139,14 +2137,12 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
-          email?: string | null
           endorsements?: string[] | null
           first_name?: string | null
           has_twic?: boolean | null
           hire_date?: string | null
           id?: string | null
           last_name?: string | null
-          phone?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -2154,14 +2150,12 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string | null
-          email?: string | null
           endorsements?: string[] | null
           first_name?: string | null
           has_twic?: boolean | null
           hire_date?: string | null
           id?: string | null
           last_name?: string | null
-          phone?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -2170,6 +2164,17 @@ export type Database = {
       }
     }
     Functions: {
+      create_audit_log: {
+        Args: {
+          p_action: string
+          p_details?: Json
+          p_ip_address?: string
+          p_record_id?: string
+          p_table_name: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       get_driver_id_for_user: { Args: { _user_id: string }; Returns: string }
       has_admin_access: { Args: { _user_id: string }; Returns: boolean }
       has_operations_access: { Args: { _user_id: string }; Returns: boolean }
