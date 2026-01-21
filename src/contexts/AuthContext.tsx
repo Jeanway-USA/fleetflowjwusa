@@ -121,9 +121,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // Ensure the UI never gets stuck in a loading state if signOut is slow/fails.
+    setLoading(true);
     setSimulatedRole(null);
-    await supabase.auth.signOut();
+    // Optimistically clear local auth state so protected routes redirect immediately.
+    setSession(null);
+    setUser(null);
     setRoles([]);
+
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Check if user has a role - respects simulation mode

@@ -63,8 +63,9 @@ export function AppSidebar() {
   const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
 
   const handleSignOut = async () => {
-    await signOut();
+    // Navigate immediately so the user sees the auth screen even if sign-out takes a moment.
     navigate('/auth');
+    await signOut();
   };
 
   const handleDashboardSwitch = (path: string, role: 'owner' | 'dispatcher' | 'driver') => {
