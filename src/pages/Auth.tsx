@@ -317,6 +317,7 @@ export default function Auth() {
                         placeholder="John"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
+                        required
                         className="bg-background"
                       />
                     </div>
@@ -328,6 +329,7 @@ export default function Auth() {
                         placeholder="Doe"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
+                        required
                         className="bg-background"
                       />
                     </div>
