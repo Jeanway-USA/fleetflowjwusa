@@ -115,6 +115,39 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_address: string | null
+          record_id: string | null
+          table_name: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          record_id?: string | null
+          table_name: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: string | null
+          record_id?: string | null
+          table_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       company_resources: {
         Row: {
           address: string | null
@@ -284,6 +317,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "driver_inspections_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "driver_inspections_truck_id_fkey"
             columns: ["truck_id"]
             isOneToOne: false
@@ -341,6 +381,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "driver_locations_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "driver_locations_load_id_fkey"
             columns: ["load_id"]
             isOneToOne: false
@@ -393,6 +440,13 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_notifications_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
             referencedColumns: ["id"]
           },
         ]
@@ -449,6 +503,13 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_payroll_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
             referencedColumns: ["id"]
           },
         ]
@@ -519,6 +580,13 @@ export type Database = {
             referencedRelation: "drivers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "driver_performance_metrics_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       driver_settings: {
@@ -555,6 +623,13 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: true
             referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_settings_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "drivers_public_view"
             referencedColumns: ["id"]
           },
         ]
@@ -806,6 +881,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fleet_loads_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fleet_loads_truck_id_fkey"
             columns: ["truck_id"]
             isOneToOne: false
@@ -863,6 +945,13 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_purchases_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
             referencedColumns: ["id"]
           },
           {
@@ -1118,6 +1207,13 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
             referencedColumns: ["id"]
           },
           {
@@ -1462,6 +1558,13 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_requests_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
             referencedColumns: ["id"]
           },
           {
@@ -1914,6 +2017,13 @@ export type Database = {
             referencedRelation: "drivers"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "trucks_current_driver_id_fkey"
+            columns: ["current_driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_roles: {
@@ -2010,7 +2120,54 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      drivers_public_view: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string | null
+          endorsements: string[] | null
+          first_name: string | null
+          has_twic: boolean | null
+          hire_date: string | null
+          id: string | null
+          last_name: string | null
+          phone: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          endorsements?: string[] | null
+          first_name?: string | null
+          has_twic?: boolean | null
+          hire_date?: string | null
+          id?: string | null
+          last_name?: string | null
+          phone?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          endorsements?: string[] | null
+          first_name?: string | null
+          has_twic?: boolean | null
+          hire_date?: string | null
+          id?: string | null
+          last_name?: string | null
+          phone?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_driver_id_for_user: { Args: { _user_id: string }; Returns: string }
