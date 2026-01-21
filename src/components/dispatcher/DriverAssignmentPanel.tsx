@@ -56,7 +56,7 @@ export function DriverAssignmentPanel() {
       const { data, error } = await supabase
         .from('fleet_loads')
         .select('id, landstar_load_id, origin, destination, status, pickup_date')
-        .in('status', ['booked', 'assigned'])
+        .in('status', ['pending', 'booked', 'assigned'])
         .is('driver_id', null)
         .order('pickup_date', { ascending: true });
       

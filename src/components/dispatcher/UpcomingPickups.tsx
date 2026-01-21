@@ -44,7 +44,7 @@ export function UpcomingPickups() {
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
           truck:trucks!fleet_loads_truck_id_fkey(unit_number)
         `)
-        .in('status', ['booked', 'assigned'])
+        .in('status', ['pending', 'booked', 'assigned'])
         .gte('pickup_date', now.toISOString())
         .lte('pickup_date', in48Hours.toISOString())
         .order('pickup_date', { ascending: true });
