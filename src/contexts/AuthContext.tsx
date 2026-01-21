@@ -19,6 +19,9 @@ interface AuthContextType {
   isOwner: boolean;
   isAdmin: boolean;
   isSimulating: boolean;
+  hasPayrollAccess: boolean;
+  hasOperationsAccess: boolean;
+  hasSafetyAccess: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -138,6 +141,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const isSimulating = simulatedRole !== null;
 
+  // Granular access control - matches database functions
+  const hasPayrollAccess = simulatedRole 
+    ? ['owner', 'payroll_admin'].includes(simulatedRole)
+    : roles.some(r => ['owner', 'payroll_admin'].includes(r));
+
+  const hasOperationsAccess = simulatedRole 
+    ? ['owner', 'dispatcher'].includes(simulatedRole)
+    : roles.some(r => ['owner', 'dispatcher'].includes(r));
+
+  const hasSafetyAccess = simulatedRole 
+    ? ['owner', 'dispatcher'].includes(simulatedRole)
+    : roles.some(r => ['owner', 'dispatcher'].includes(r));
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -153,6 +169,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isOwner,
       isAdmin,
       isSimulating,
+      hasPayrollAccess,
+      hasOperationsAccess,
+      hasSafetyAccess,
     }}>
       {children}
     </AuthContext.Provider>
