@@ -20,6 +20,7 @@ import {
   Clock,
   Package
 } from 'lucide-react';
+import { getRelativeTimestamp } from './RelativeTimestamp';
 
 // Status progression for drivers
 const STATUS_PROGRESSION: Record<string, string> = {
@@ -178,11 +179,15 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
             <span className="font-medium">{getCondensedAddress(load.destination)}</span>
           </div>
 
-          {/* Date & Time - Hide for delivered/cancelled loads */}
-          {!['delivered', 'cancelled'].includes(load.status) && (
+          {/* Date & Time - Show relative for delivered, hide time for cancelled */}
+          {!['cancelled'].includes(load.status) && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4 shrink-0" />
-              {load.status === 'in_transit' ? (
+              {load.status === 'delivered' ? (
+                <span className="text-success font-medium">
+                  {getRelativeTimestamp(load.delivery_date, null)}
+                </span>
+              ) : load.status === 'in_transit' ? (
                 <span>
                   Delivery: {formatDate(load.delivery_date)}
                   {load.delivery_time && <span className="ml-1 text-foreground font-medium">@ {load.delivery_time}</span>}

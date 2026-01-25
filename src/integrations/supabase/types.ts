@@ -777,6 +777,7 @@ export type Database = {
           destination: string
           detention_pay: number | null
           driver_id: string | null
+          empty_miles: number | null
           end_miles: number | null
           fuel_advance: number | null
           fuel_surcharge: number | null
@@ -813,6 +814,7 @@ export type Database = {
           destination: string
           detention_pay?: number | null
           driver_id?: string | null
+          empty_miles?: number | null
           end_miles?: number | null
           fuel_advance?: number | null
           fuel_surcharge?: number | null
@@ -849,6 +851,7 @@ export type Database = {
           destination?: string
           detention_pay?: number | null
           driver_id?: string | null
+          empty_miles?: number | null
           end_miles?: number | null
           fuel_advance?: number | null
           fuel_surcharge?: number | null

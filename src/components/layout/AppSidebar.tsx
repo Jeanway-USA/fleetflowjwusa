@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   Award,
   Fuel,
+  BarChart,
   LucideIcon
 } from 'lucide-react';
 import jwBannerLight from '@/assets/JW_Banner.png';
@@ -241,9 +242,15 @@ export function AppSidebar() {
           <>
             <SidebarSeparator />
             <SidebarGroup>
-              <SidebarGroupLabel className="text-muted-foreground uppercase text-xs tracking-wider">Settings</SidebarGroupLabel>
+              <SidebarGroupLabel className="text-muted-foreground uppercase text-xs tracking-wider">My Account</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton isActive={location.pathname === '/driver-stats'} onClick={() => navigate('/driver-stats')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary">
+                      <BarChart className="h-4 w-4" />
+                      <span>My Stats</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton isActive={location.pathname === '/driver-settings'} onClick={() => navigate('/driver-settings')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary">
                       <Settings className="h-4 w-4" />

@@ -8,6 +8,7 @@ import { MapPin, Clock, Truck, Navigation, Package, CheckCircle, Loader2, FileTe
 import { format, differenceInHours, differenceInMinutes, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { RequestDetentionButton } from './RequestDetentionButton';
 
 // Helper to format and clean special instructions for better readability
 function formatSpecialInstructions(notes: string | null): React.ReactNode {
@@ -52,6 +53,7 @@ interface Load {
   status: string;
   rate: number | null;
   booked_miles: number | null;
+  empty_miles?: number | null;
   notes: string | null;
   landstar_load_id: string | null;
   load_accessorials?: { amount: number }[];
@@ -61,6 +63,7 @@ interface ActiveLoadCardProps {
   load: Load | undefined;
   payRate: number | null;
   payType: string | null;
+  driverId?: string;
   onStatusUpdate?: () => void;
 }
 
@@ -177,7 +180,7 @@ function getCondensedAddress(address: string): { full: string; short: string } {
   return { full, short: parts[0] || address };
 }
 
-export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: ActiveLoadCardProps) {
+export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdate }: ActiveLoadCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -333,21 +336,35 @@ export function ActiveLoadCard({ load, payRate, payType, onStatusUpdate }: Activ
           </div>
         </div>
 
-        {/* Load Details Button */}
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => setDetailsOpen(true)}
-        >
-          <FileText className="h-4 w-4 mr-2" />
-          Load Details
-        </Button>
+        {/* Action Buttons Row */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => setDetailsOpen(true)}
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Load Details
+          </Button>
+          {driverId && !['delivered', 'pending'].includes(load.status) && (
+            <RequestDetentionButton
+              loadId={load.id}
+              driverId={driverId}
+              loadNumber={load.landstar_load_id}
+            />
+          )}
+        </div>
 
         {/* Miles & Estimated Pay */}
         <div className="flex items-center justify-between bg-primary/10 rounded-lg p-3">
           <div>
-            <p className="text-xs text-muted-foreground">Miles</p>
+            <p className="text-xs text-muted-foreground">Loaded Miles</p>
             <p className="font-semibold">{load.booked_miles?.toLocaleString() || 'TBD'}</p>
+            {load.empty_miles && load.empty_miles > 0 && (
+              <p className="text-xs text-muted-foreground">
+                +{load.empty_miles.toLocaleString()} empty
+              </p>
+            )}
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Est. Pay</p>
