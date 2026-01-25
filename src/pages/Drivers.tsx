@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
@@ -19,8 +20,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off } from 'lucide-react';
+import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off, Eye } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 const endorsementOptions = ['H - Hazmat', 'N - Tank', 'P - Passenger', 'S - School Bus', 'T - Double/Triple', 'X - Hazmat + Tank'];
 
@@ -45,6 +47,8 @@ function DriverAvatar({ avatarPath, initials }: { avatarPath: string | null; ini
 }
 
 export default function Drivers() {
+  const { isOwner } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -258,6 +262,17 @@ export default function Drivers() {
                     </div>
                   </div>
                   <div className="flex gap-1">
+                    {isOwner && (
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        onClick={() => navigate(`/driver-view/${driver.id}`)} 
+                        title="View driver dashboard"
+                        className="text-primary"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button size="icon" variant="ghost" onClick={() => setSelectedDriver(driver)}>
                       <FileText className="h-4 w-4" />
                     </Button>

@@ -273,7 +273,9 @@ export default function FleetLoads() {
       trailer_revenue: trailerRevenue,
       net_revenue: netRevenue,
       settlement: settlement,
-      actual_miles: (parseInt(data.end_miles) || 0) - (parseInt(data.start_miles) || 0),
+      actual_miles: ((parseInt(data.end_miles) || 0) - (parseInt(data.start_miles) || 0)) > 0 
+        ? (parseInt(data.end_miles) || 0) - (parseInt(data.start_miles) || 0) 
+        : null,
       accessorials: accessorialsTotal,
     };
   };
@@ -349,6 +351,11 @@ export default function FleetLoads() {
     ? loads 
     : loads.filter((l: any) => l.pickup_date && l.pickup_date.startsWith(selectedMonth));
 
+  // Helper to get display miles (actual if valid, otherwise booked)
+  const getDisplayMiles = (load: any) => {
+    return (load.actual_miles && load.actual_miles > 0) ? load.actual_miles : (load.booked_miles || 0);
+  };
+
   // Calculate totals
   const totals = filteredLoads.reduce((acc: any, load: any) => ({
     loads: acc.loads + 1,
@@ -359,7 +366,7 @@ export default function FleetLoads() {
     netRevenue: acc.netRevenue + (load.net_revenue || 0),
     settlement: acc.settlement + (load.settlement || 0),
     bookedMiles: acc.bookedMiles + (load.booked_miles || 0),
-    actualMiles: acc.actualMiles + (load.actual_miles || 0),
+    actualMiles: acc.actualMiles + getDisplayMiles(load),
   }), { loads: 0, rate: 0, fuelSurcharge: 0, accessorials: 0, grossRevenue: 0, netRevenue: 0, settlement: 0, bookedMiles: 0, actualMiles: 0 });
 
   // Format intermediate stops for notes
@@ -616,7 +623,11 @@ export default function FleetLoads() {
                       <TableCell className="text-right">{formatCurrency(load.fuel_surcharge)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(getLoadAccessorialsTotal(load.id))}</TableCell>
                       <TableCell className="text-right font-medium text-success">{formatCurrency(load.net_revenue)}</TableCell>
-                      <TableCell className="text-right">{load.actual_miles?.toLocaleString() || '-'}</TableCell>
+                      <TableCell className="text-right">
+                        {(load.actual_miles && load.actual_miles > 0) 
+                          ? load.actual_miles.toLocaleString() 
+                          : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : '-')}
+                      </TableCell>
                       <TableCell><StatusBadge status={load.status} /></TableCell>
                       <TableCell>
                         <div className="flex gap-1">

@@ -33,7 +33,7 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
     enabled: !!driverId,
   });
 
-  // Get this week's loads
+  // Get this week's delivered loads (only count pay after delivery)
   const { data: weeklyLoads = [] } = useQuery({
     queryKey: ['driver-weekly-loads', driverId, weekStart.toISOString()],
     queryFn: async () => {
@@ -41,9 +41,9 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
         .from('fleet_loads')
         .select('*, load_accessorials(*)')
         .eq('driver_id', driverId)
-        .gte('pickup_date', weekStart.toISOString().split('T')[0])
-        .lte('pickup_date', weekEnd.toISOString().split('T')[0])
-        .in('status', ['delivered', 'in_transit', 'loading', 'assigned']);
+        .gte('delivery_date', weekStart.toISOString().split('T')[0])
+        .lte('delivery_date', weekEnd.toISOString().split('T')[0])
+        .eq('status', 'delivered');
       if (error) throw error;
       return data;
     },
@@ -77,8 +77,7 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
     ? (totalMiles / weeklyGoal) * 100 
     : (weeklyEarnings / weeklyGoal) * 100;
 
-  const deliveredCount = weeklyLoads.filter(l => l.status === 'delivered').length;
-  const activeCount = weeklyLoads.filter(l => l.status !== 'delivered').length;
+  const deliveredCount = weeklyLoads.length;
 
   return (
     <Card>
@@ -106,7 +105,7 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
               {totalMiles.toLocaleString()} miles
             </div>
             <p className="text-muted-foreground">
-              {deliveredCount} delivered, {activeCount} active
+              {deliveredCount} delivered this week
             </p>
           </div>
         </div>
