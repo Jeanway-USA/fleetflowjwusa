@@ -1,27 +1,12 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
 
 export function RoleBasedRedirect() {
-  const { user, loading, roles, hasRole } = useAuth();
-  const [rolesChecked, setRolesChecked] = useState(false);
+  const { user, loading, rolesLoading, hasRole } = useAuth();
 
-  // Give roles a moment to load after user is authenticated
-  useEffect(() => {
-    if (user && !loading) {
-      // Wait a short time for roles to load, then mark as checked
-      const timeout = setTimeout(() => {
-        setRolesChecked(true);
-      }, 500);
-      return () => clearTimeout(timeout);
-    } else {
-      setRolesChecked(false);
-    }
-  }, [user, loading]);
-
-  // Still loading auth state
-  if (loading) {
+  // Still loading auth state or roles
+  if (loading || rolesLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -32,15 +17,6 @@ export function RoleBasedRedirect() {
   // Not authenticated - go to login
   if (!user) {
     return <Navigate to="/auth" replace />;
-  }
-
-  // Roles haven't loaded yet and we haven't timed out - wait briefly
-  if (roles.length === 0 && !rolesChecked) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
   }
 
   // Route based on role priority
@@ -60,6 +36,6 @@ export function RoleBasedRedirect() {
     return <Navigate to="/executive-dashboard" replace />;
   }
 
-  // Fallback for users with no recognized role (after roles were checked)
+  // Fallback for users with no recognized role
   return <Navigate to="/pending-access" replace />;
 }

@@ -9,6 +9,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  rolesLoading: boolean;
   roles: AppRole[];
   simulatedRole: AppRole | null;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -36,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [rolesLoading, setRolesLoading] = useState(true);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [simulatedRole, setSimulatedRole] = useState<AppRole | null>(null);
 
@@ -60,13 +62,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer role fetching
         if (session?.user) {
+          setRolesLoading(true);
           setTimeout(() => {
-            fetchUserRoles(session.user.id).then(setRoles);
+            fetchUserRoles(session.user.id).then((fetchedRoles) => {
+              setRoles(fetchedRoles);
+              setRolesLoading(false);
+            });
           }, 0);
         } else {
           setRoles([]);
+          setRolesLoading(false);
           setSimulatedRole(null); // Clear simulation on logout
         }
         
@@ -80,7 +86,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchUserRoles(session.user.id).then(setRoles);
+        setRolesLoading(true);
+        fetchUserRoles(session.user.id).then((fetchedRoles) => {
+          setRoles(fetchedRoles);
+          setRolesLoading(false);
+        });
+      } else {
+        setRolesLoading(false);
       }
       
       setLoading(false);
@@ -187,6 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       session,
       loading,
+      rolesLoading,
       roles,
       simulatedRole,
       signIn,
