@@ -166,6 +166,7 @@ export default function DriverDashboard() {
           load={activeLoad} 
           payRate={driver.pay_rate} 
           payType={driver.pay_type}
+          driverId={driver.id}
           onStatusUpdate={refetchLoads}
         />
 
