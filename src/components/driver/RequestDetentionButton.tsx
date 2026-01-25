@@ -34,20 +34,19 @@ export function RequestDetentionButton({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // Create a notification for dispatch
+      // Insert into detention_requests table for dispatcher review
       const { error } = await supabase
-        .from('driver_notifications')
+        .from('detention_requests')
         .insert({
           driver_id: driverId,
-          title: 'Detention Request',
-          message: `Driver is requesting detention for Load #${loadNumber || 'N/A'}. ${notes ? `Notes: ${notes}` : ''}`,
-          notification_type: 'detention_request',
-          related_id: loadId,
+          load_id: loadId,
+          notes: notes.trim() || `Detention request for Load #${loadNumber || 'N/A'}`,
+          status: 'pending',
         });
 
       if (error) throw error;
 
-      toast.success('Detention request sent to dispatch');
+      toast.success('Detention request sent to dispatch for review');
       setIsOpen(false);
       setNotes('');
     } catch (error) {
