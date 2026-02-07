@@ -51,6 +51,7 @@ interface DriverLocation {
   speed: number | null;
   heading: number | null;
   updated_at: string;
+  is_sharing: boolean;
 }
 
 interface LoadWithLocation {
@@ -68,13 +69,21 @@ interface LoadWithLocation {
   isLiveLocation: boolean;
 }
 
+// Determine if a location record represents a live GPS signal
+function isLocationLive(loc: DriverLocation): boolean {
+  if (!loc.is_sharing) return false;
+  const updatedAt = new Date(loc.updated_at);
+  const now = new Date();
+  const minutesAgo = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
+  return minutesAgo < 10;
+}
+
 // Component to fit map bounds
 function FitBounds({ loads }: { loads: LoadWithLocation[] }) {
   const map = useMap();
 
   useEffect(() => {
     if (loads.length === 0) {
-      // Default to US center if no loads
       map.setView([39.8283, -98.5795], 4);
       return;
     }
@@ -101,34 +110,30 @@ export function FleetMapView() {
   const [liveCount, setLiveCount] = useState(0);
   const [geocodedCoords, setGeocodedCoords] = useState<Map<string, { lat: number; lng: number } | null>>(new Map());
 
-  // Fetch initial driver locations
+  // Fetch ALL driver locations (not just recent ones)
   const { data: initialLocations } = useQuery({
     queryKey: ['driver-locations'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('driver_locations')
-        .select('driver_id, latitude, longitude, speed, heading, updated_at');
+        .select('driver_id, latitude, longitude, speed, heading, updated_at, is_sharing');
       
       if (error) throw error;
       return data as DriverLocation[];
     },
   });
 
-  // Initialize driver locations from query
+  // Initialize driver locations from query — include all records
   useEffect(() => {
     if (initialLocations) {
       const locMap = new Map<string, DriverLocation>();
+      let live = 0;
       initialLocations.forEach(loc => {
-        // Only include locations updated within the last 10 minutes
-        const updatedAt = new Date(loc.updated_at);
-        const now = new Date();
-        const minutesAgo = (now.getTime() - updatedAt.getTime()) / (1000 * 60);
-        if (minutesAgo < 10) {
-          locMap.set(loc.driver_id, loc);
-        }
+        locMap.set(loc.driver_id, loc);
+        if (isLocationLive(loc)) live++;
       });
       setDriverLocations(locMap);
-      setLiveCount(locMap.size);
+      setLiveCount(live);
     }
   }, [initialLocations]);
 
@@ -149,7 +154,9 @@ export function FleetMapView() {
             setDriverLocations(prev => {
               const next = new Map(prev);
               next.delete((payload.old as any).driver_id);
-              setLiveCount(next.size);
+              let live = 0;
+              next.forEach(l => { if (isLocationLive(l)) live++; });
+              setLiveCount(live);
               return next;
             });
           } else {
@@ -157,7 +164,9 @@ export function FleetMapView() {
             setDriverLocations(prev => {
               const next = new Map(prev);
               next.set(newLoc.driver_id, newLoc);
-              setLiveCount(next.size);
+              let live = 0;
+              next.forEach(l => { if (isLocationLive(l)) live++; });
+              setLiveCount(live);
               return next;
             });
           }
@@ -200,7 +209,6 @@ export function FleetMapView() {
     const geocodeAddresses = async () => {
       const addressesToGeocode: string[] = [];
       
-      // Collect all unique addresses that aren't cached
       rawLoads.forEach(load => {
         if (!geocodedCoords.has(load.origin)) {
           addressesToGeocode.push(load.origin);
@@ -212,7 +220,6 @@ export function FleetMapView() {
 
       if (addressesToGeocode.length === 0) return;
 
-      // Geocode addresses one at a time (rate limited internally)
       const newCoords = new Map(geocodedCoords);
       
       for (const address of addressesToGeocode) {
@@ -231,7 +238,7 @@ export function FleetMapView() {
     geocodeAddresses();
   }, [rawLoads]);
 
-  // Process loads with geocoded coordinates and live GPS
+  // Process loads with geocoded coordinates and GPS data
   const loads = useMemo(() => {
     if (!rawLoads) return [];
 
@@ -239,18 +246,18 @@ export function FleetMapView() {
       const originCoords = geocodedCoords.get(load.origin) || null;
       const destCoords = geocodedCoords.get(load.destination) || null;
       
-      // Check for live GPS location
-      const liveLocation = load.driver_id ? driverLocations.get(load.driver_id) : null;
+      // Check for GPS location record (live or last known)
+      const locationRecord = load.driver_id ? driverLocations.get(load.driver_id) : null;
       
       let truckCoords = null;
       let isLiveLocation = false;
       
-      if (liveLocation) {
-        // Use real GPS coordinates
-        truckCoords = { lat: Number(liveLocation.latitude), lng: Number(liveLocation.longitude) };
-        isLiveLocation = true;
+      if (locationRecord) {
+        // Use stored GPS coordinates (live or last known)
+        truckCoords = { lat: Number(locationRecord.latitude), lng: Number(locationRecord.longitude) };
+        isLiveLocation = isLocationLive(locationRecord);
       } else if (originCoords && destCoords) {
-        // Fallback to interpolated position
+        // Fallback to interpolated position only if no location record exists at all
         const progress = getProgressFromStatus(load.status);
         truckCoords = interpolatePosition(originCoords, destCoords, progress);
       }

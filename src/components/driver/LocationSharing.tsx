@@ -43,7 +43,7 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
     },
   });
 
-  // Mutation to update location
+  // Mutation to update location (also sets is_sharing = true)
   const updateLocation = useMutation({
     mutationFn: async (position: GeolocationPosition) => {
       const locationPayload = {
@@ -55,6 +55,7 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
         heading: position.coords.heading,
         speed: position.coords.speed,
         accuracy: position.coords.accuracy,
+        is_sharing: true,
         updated_at: new Date().toISOString(),
       };
 
@@ -77,12 +78,12 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
     },
   });
 
-  // Mutation to delete location (stop sharing)
-  const deleteLocation = useMutation({
+  // Mutation to deactivate location (set is_sharing = false, keep coordinates)
+  const deactivateLocation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
         .from('driver_locations')
-        .delete()
+        .update({ is_sharing: false })
         .eq('driver_id', driverId);
 
       if (error) throw error;
@@ -151,7 +152,7 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
     toast.success('Location sharing started');
   }, [handlePositionUpdate, handlePositionError]);
 
-  // Stop sharing location
+  // Stop sharing location (preserve last known position)
   const stopSharing = useCallback(() => {
     if (watchId !== null) {
       navigator.geolocation.clearWatch(watchId);
@@ -165,8 +166,8 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
     setCurrentPosition(null);
     setNextUpdateIn(null);
     lastUpdateTimeRef.current = 0;
-    deleteLocation.mutate();
-  }, [watchId, deleteLocation]);
+    deactivateLocation.mutate();
+  }, [watchId, deactivateLocation]);
 
   // Toggle sharing
   const handleToggle = (checked: boolean) => {
@@ -209,12 +210,10 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
   // Check if we had a previous session
   useEffect(() => {
     if (locationData && !isSharing) {
-      // Location exists in DB, check if we should resume sharing
       const lastUpdate = new Date(locationData.updated_at);
       const now = new Date();
       const minutesSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
       
-      // If last update was within 5 minutes, offer to resume
       if (minutesSinceUpdate < 5) {
         // Auto-resume could be added here if desired
       }

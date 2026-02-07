@@ -255,7 +255,7 @@ export function getProgressFromStatus(status: string): number {
     case 'loading':
       return 0.1;
     case 'in_transit':
-      return 0.5 + (Math.random() * 0.3); // Random position between 50-80%
+      return 0.5; // Fixed midpoint estimate
     case 'unloading':
       return 0.95;
     case 'delivered':

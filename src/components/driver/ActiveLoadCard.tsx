@@ -1,29 +1,25 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, Clock, Truck, Navigation, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route } from 'lucide-react';
-import { format, differenceInHours, differenceInMinutes, parseISO } from 'date-fns';
+import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-import { LoadRouteMap } from './LoadRouteMap';
+import { getRelativeTimestamp } from './RelativeTimestamp';
 
 // Helper to format and clean special instructions for better readability
 function formatSpecialInstructions(notes: string | null): React.ReactNode {
   if (!notes) return null;
   
-  // Split by common section dividers
   const updatedFromRCMatch = notes.split(/---\s*Updated from Rate Confirmation\s*---/i);
   const mainContent = updatedFromRCMatch[0]?.trim() || '';
   
-  // Extract intermediate stops if present
   const stopsMatch = mainContent.match(/===\s*INTERMEDIATE STOPS\s*===\n?([\s\S]*?)$/i);
   const intermediateStops = stopsMatch?.[1]?.trim();
   
-  // Get main instructions (before intermediate stops)
   const mainInstructions = stopsMatch 
     ? mainContent.replace(/===\s*INTERMEDIATE STOPS\s*===[\s\S]*$/i, '').trim()
     : mainContent;
@@ -68,118 +64,71 @@ interface ActiveLoadCardProps {
   onStatusUpdate?: () => void;
 }
 
-// Status progression order (full workflow)
-const STATUS_PROGRESSION = ['pending', 'assigned', 'loading', 'in_transit', 'delivered'] as const;
-
-function getNextStatus(currentStatus: string): string | null {
-  const currentIndex = STATUS_PROGRESSION.indexOf(currentStatus as typeof STATUS_PROGRESSION[number]);
-  if (currentIndex === -1 || currentIndex >= STATUS_PROGRESSION.length - 1) {
-    return null; // Already delivered or unknown status
-  }
-  return STATUS_PROGRESSION[currentIndex + 1];
-}
+// Status progression order
+const STATUS_PROGRESSION: Record<string, string> = {
+  'pending': 'assigned',
+  'assigned': 'loading',
+  'loading': 'in_transit',
+  'in_transit': 'delivered',
+};
 
 function getProgressButtonLabel(currentStatus: string): string {
   switch (currentStatus) {
-    case 'pending':
-      return 'Accept Load';
-    case 'assigned':
-      return 'Arrived at Pickup';
-    case 'loading':
-      return 'Loaded & Departing';
-    case 'in_transit':
-      return 'Mark Delivered';
-    default:
-      return 'Update Status';
+    case 'pending': return 'Accept Load';
+    case 'assigned': return 'Arrived at Pickup';
+    case 'loading': return 'Loaded & Departing';
+    case 'in_transit': return 'Mark Delivered';
+    default: return 'Update Status';
   }
 }
 
 function getStatusColor(status: string): string {
   switch (status) {
-    case 'delivered':
-      return 'bg-success text-success-foreground';
-    case 'in_transit':
-      return 'bg-primary text-primary-foreground';
-    case 'loading':
-      return 'bg-warning text-warning-foreground';
-    case 'assigned':
-    case 'pending':
-      return 'bg-secondary text-secondary-foreground';
-    default:
-      return 'bg-muted text-muted-foreground';
+    case 'pending': return 'bg-amber-500';
+    case 'assigned': return 'bg-blue-500';
+    case 'loading': return 'bg-purple-500';
+    case 'in_transit': return 'bg-emerald-500';
+    case 'delivered': return 'bg-success';
+    case 'cancelled': return 'bg-destructive';
+    default: return 'bg-muted';
   }
-}
-
-function getTimeStatus(dateStr: string | null, timeStr: string | null): { color: string; label: string } {
-  if (!dateStr) return { color: 'text-muted-foreground', label: 'TBD' };
-  
-  // Combine date and time if available
-  let date = parseISO(dateStr);
-  if (timeStr) {
-    // Parse time string (e.g., "08:00 AM", "14:00", "8:00")
-    const timeParts = timeStr.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)?/i);
-    if (timeParts) {
-      let hours = parseInt(timeParts[1]);
-      const minutes = timeParts[2] ? parseInt(timeParts[2]) : 0;
-      const meridiem = timeParts[3]?.toUpperCase();
-      
-      if (meridiem === 'PM' && hours !== 12) hours += 12;
-      if (meridiem === 'AM' && hours === 12) hours = 0;
-      
-      date.setHours(hours, minutes, 0, 0);
-    }
-  }
-  
-  const now = new Date();
-  const hoursUntil = differenceInHours(date, now);
-  const minutesUntil = differenceInMinutes(date, now);
-
-  if (minutesUntil < 0) {
-    return { color: 'text-destructive', label: 'OVERDUE' };
-  } else if (hoursUntil < 2) {
-    return { color: 'text-warning', label: `${minutesUntil}m` };
-  } else if (hoursUntil < 6) {
-    return { color: 'text-warning', label: `${hoursUntil}h` };
-  }
-  return { color: 'text-success', label: `${hoursUntil}h` };
 }
 
 function getStatusLabel(status: string): string {
   switch (status) {
-    case 'in_transit':
-      return 'En Route to Delivery';
-    case 'loading':
-      return 'At Pickup / Loading';
-    case 'assigned':
-      return 'En Route to Pickup';
-    case 'pending':
-      return 'Awaiting Assignment';
-    case 'delivered':
-      return 'Delivered';
-    default:
-      return status.replace('_', ' ').toUpperCase();
+    case 'pending': return 'Pending';
+    case 'assigned': return 'Assigned';
+    case 'loading': return 'Loading';
+    case 'in_transit': return 'In Transit';
+    case 'delivered': return 'Delivered';
+    default: return status.replace('_', ' ');
   }
 }
 
-function getCondensedAddress(address: string): { full: string; short: string } {
-  const full = address;
+function getCondensedAddress(address: string): string {
+  if (!address) return '-';
   const parts = address.split(',').map(p => p.trim()).filter(Boolean);
-
-  // Find a "ST 12345"-like part for state/zip
+  
   for (let i = parts.length - 1; i >= 0; i--) {
-    const m = parts[i].match(/\b([A-Z]{2})\b/);
-    if (m) {
-      const state = m[1];
-      // city is usually the part right before the state/zip chunk
+    const match = parts[i].match(/\b([A-Z]{2})\b/);
+    if (match) {
+      const state = match[1];
       const city = i > 0 ? parts[i - 1] : '';
-      const short = city ? `${city}, ${state}` : state;
-      return { full, short };
+      return city ? `${city}, ${state}` : state;
     }
   }
-
-  // Fallback: use first part (often street or facility)
-  return { full, short: parts[0] || address };
+  
+  return parts[0] || address;
 }
+
+const formatDate = (date: string | null) => {
+  if (!date) return '-';
+  return format(parseISO(date), 'MMM d, yyyy');
+};
+
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+};
 
 export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdate }: ActiveLoadCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -199,13 +148,8 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
     );
   }
 
-  const isEnRouteToDelivery = load.status === 'in_transit';
-  const targetDate = isEnRouteToDelivery ? load.delivery_date : load.pickup_date;
-  const targetTime = isEnRouteToDelivery ? load.delivery_time : load.pickup_time;
-  const targetLocation = isEnRouteToDelivery ? load.destination : load.origin;
-  const timeStatus = getTimeStatus(targetDate, targetTime);
-  const nextStatus = getNextStatus(load.status);
-  const isDelivered = load.status === 'delivered';
+  const canProgress = STATUS_PROGRESSION[load.status] !== undefined;
+  const nextStatus = STATUS_PROGRESSION[load.status];
 
   // Calculate estimated pay
   const accessorialsTotal = load.load_accessorials?.reduce((sum, a) => sum + (a.amount || 0), 0) || 0;
@@ -215,11 +159,6 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   } else if (payType === 'per_mile' && load.booked_miles && payRate) {
     estimatedPay = load.booked_miles * payRate;
   }
-
-  const handleNavigate = () => {
-    const encodedAddress = encodeURIComponent(targetLocation);
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, '_blank');
-  };
 
   const handleProgressStatus = async () => {
     if (!nextStatus) return;
@@ -233,7 +172,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
 
       if (error) throw error;
 
-      toast.success(`Load status updated to ${nextStatus.replace('_', ' ')}`);
+      toast.success(`Load status updated to ${getStatusLabel(nextStatus)}`);
       onStatusUpdate?.();
     } catch (error) {
       console.error('Error updating status:', error);
@@ -244,189 +183,112 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   };
 
   return (
-    <Card className="border-2 border-primary/50 shadow-lg">
-      {/* Status Bar */}
-      <div className={`h-2 rounded-t-lg ${getStatusColor(load.status).split(' ')[0]}`} />
-      
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Truck className="h-5 w-5" />
-            {getStatusLabel(load.status)}
-          </CardTitle>
-          <Badge variant="outline" className="font-mono">
-            {load.landstar_load_id || 'No ID'}
-          </Badge>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Target Location */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                {isEnRouteToDelivery ? 'Delivering To' : 'Picking Up At'}
-              </p>
-              {(() => {
-                const addr = getCondensedAddress(targetLocation);
-                return (
-                  <p className="font-semibold text-lg leading-tight min-w-0">
-                    <span className="hidden md:block" title={addr.full}>{addr.full}</span>
-                    <span className="md:hidden block truncate" title={addr.full}>{addr.short}</span>
-                  </p>
-                );
-              })()}
-            </div>
-            <Button 
-              size="sm" 
-              onClick={handleNavigate}
-              className="shrink-0"
-            >
-              <Navigation className="h-4 w-4 mr-1" />
-              Navigate
-            </Button>
+    <>
+      <Card className="overflow-hidden border-2 border-primary/50 shadow-lg">
+        {/* Status bar */}
+        <div className={`h-2 ${getStatusColor(load.status)}`} />
+        
+        <CardContent className="p-4 space-y-3">
+          {/* Load ID and Status */}
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-sm font-medium">
+              Load #{load.landstar_load_id || 'N/A'}
+            </span>
+            <Badge variant="outline" className="text-xs">
+              {getStatusLabel(load.status)}
+            </Badge>
           </div>
-          
-          {/* Appointment Time */}
-          {targetDate && (
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">
-                Appointment: {format(parseISO(targetDate), 'EEE, MMM d')}
-                {targetTime && <span className="font-medium"> @ {targetTime}</span>}
+
+          {/* Route */}
+          <div className="flex items-center gap-2 text-sm">
+            <MapPin className="h-4 w-4 text-primary shrink-0" />
+            <span className="font-medium">{getCondensedAddress(load.origin)}</span>
+            <span className="text-muted-foreground">→</span>
+            <span className="font-medium">{getCondensedAddress(load.destination)}</span>
+          </div>
+
+          {/* Date & Time */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Calendar className="h-4 w-4 shrink-0" />
+            {load.status === 'delivered' ? (
+              <span className="text-success font-medium">
+                {getRelativeTimestamp(load.delivery_date, null)}
               </span>
-              <Badge variant="secondary" className={`ml-auto ${timeStatus.color}`}>
-                {timeStatus.label}
-              </Badge>
+            ) : load.status === 'in_transit' ? (
+              <span>
+                Delivery: {formatDate(load.delivery_date)}
+                {load.delivery_time && <span className="ml-1 text-foreground font-medium">@ {load.delivery_time}</span>}
+              </span>
+            ) : (
+              <span>
+                Pickup: {formatDate(load.pickup_date)}
+                {load.pickup_time && <span className="ml-1 text-foreground font-medium">@ {load.pickup_time}</span>}
+              </span>
+            )}
+          </div>
+
+          {/* Miles and Estimated Pay */}
+          <div className="flex items-center justify-between pt-2 border-t">
+            <div className="flex items-center gap-2 text-sm">
+              <Route className="h-4 w-4 text-muted-foreground" />
+              <span>{load.booked_miles?.toLocaleString() || 0} mi</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-medium text-success">
+              <DollarSign className="h-4 w-4" />
+              <span>Est. {formatCurrency(estimatedPay)}</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1"
+              onClick={() => setDetailsOpen(true)}
+            >
+              <FileText className="h-4 w-4 mr-1" />
+              Load Details
+            </Button>
+            {canProgress && (
+              <Button 
+                size="sm" 
+                className="flex-1"
+                onClick={handleProgressStatus}
+                disabled={isUpdating}
+              >
+                {isUpdating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    {getProgressButtonLabel(load.status)}
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* Delivered indicator */}
+          {load.status === 'delivered' && (
+            <div className="bg-success/10 border border-success/30 rounded-lg p-3 text-center">
+              <CheckCircle className="h-5 w-5 text-success mx-auto mb-1" />
+              <p className="text-sm font-medium text-success">Load Delivered</p>
             </div>
           )}
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Route Info */}
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center gap-2 min-w-0">
-            <MapPin className="h-4 w-4 text-success shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Origin</p>
-              {(() => {
-                const addr = getCondensedAddress(load.origin);
-                return (
-                  <p className="font-medium min-w-0">
-                    <span className="hidden md:block truncate" title={addr.full}>{addr.full}</span>
-                    <span className="md:hidden block truncate" title={addr.full}>{addr.short}</span>
-                  </p>
-                );
-              })()}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 min-w-0">
-            <MapPin className="h-4 w-4 text-destructive shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Destination</p>
-              {(() => {
-                const addr = getCondensedAddress(load.destination);
-                return (
-                  <p className="font-medium min-w-0">
-                    <span className="hidden md:block truncate" title={addr.full}>{addr.full}</span>
-                    <span className="md:hidden block truncate" title={addr.full}>{addr.short}</span>
-                  </p>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-
-        {/* Route Map Preview */}
-        {load.origin && load.destination && (
-          <LoadRouteMap origin={load.origin} destination={load.destination} />
-        )}
-
-        {/* Action Buttons Row */}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={() => setDetailsOpen(true)}
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            Load Details
-          </Button>
-        </div>
-
-        {/* Miles & Estimated Pay */}
-        <div className="flex items-center justify-between bg-primary/10 rounded-lg p-3">
-          <div>
-            <p className="text-xs text-muted-foreground">Loaded Miles</p>
-            <p className="font-semibold">{load.booked_miles?.toLocaleString() || 'TBD'}</p>
-            {load.empty_miles && load.empty_miles > 0 && (
-              <p className="text-xs text-muted-foreground">
-                +{load.empty_miles.toLocaleString()} empty
-              </p>
-            )}
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Est. Pay</p>
-            <p className="font-semibold text-primary text-lg">
-              ${estimatedPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-          </div>
-        </div>
-
-        {/* Special Instructions */}
-        {load.notes && (
-          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-            <p className="text-xs text-warning font-medium uppercase tracking-wide mb-2">
-              Special Instructions
-            </p>
-            <ScrollArea className="max-h-40">
-              <div className="pr-2">
-                {formatSpecialInstructions(load.notes)}
-              </div>
-            </ScrollArea>
-          </div>
-        )}
-
-        {/* Status Progression Button */}
-        {!isDelivered && nextStatus && (
-          <Button
-            onClick={handleProgressStatus}
-            disabled={isUpdating}
-            className="w-full bg-primary hover:bg-primary/90"
-            size="lg"
-          >
-            {isUpdating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Updating...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                {getProgressButtonLabel(load.status)}
-              </>
-            )}
-          </Button>
-        )}
-
-        {isDelivered && (
-          <div className="bg-success/10 border border-success/30 rounded-lg p-3 text-center">
-            <CheckCircle className="h-5 w-5 text-success mx-auto mb-1" />
-            <p className="text-sm font-medium text-success">Load Delivered</p>
-          </div>
-        )}
-      </CardContent>
-
-      {/* Load Details Dialog (Read-Only) */}
+      {/* Load Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Load Details
-              <Badge variant="outline" className="font-mono ml-2">
-                {load.landstar_load_id || 'No ID'}
-              </Badge>
+              <Truck className="h-5 w-5" />
+              Load #{load.landstar_load_id || 'N/A'}
             </DialogTitle>
           </DialogHeader>
           
@@ -434,7 +296,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
             {/* Status */}
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
               <span className="text-sm text-muted-foreground">Status</span>
-              <Badge className={getStatusColor(load.status)}>
+              <Badge className={`${getStatusColor(load.status)} text-white`}>
                 {getStatusLabel(load.status)}
               </Badge>
             </div>
@@ -487,7 +349,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
                 <span className="text-sm text-muted-foreground">Estimated Pay</span>
               </div>
               <span className="font-bold text-primary text-lg">
-                ${estimatedPay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatCurrency(estimatedPay)}
               </span>
             </div>
 
@@ -507,6 +369,6 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </>
   );
 }
