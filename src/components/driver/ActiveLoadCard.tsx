@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { LoadRouteMap } from './LoadRouteMap';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getRelativeTimestamp } from './RelativeTimestamp';
@@ -226,6 +227,9 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
               </span>
             )}
           </div>
+
+          {/* Route Map Preview */}
+          <LoadRouteMap origin={load.origin} destination={load.destination} />
 
           {/* Miles and Estimated Pay */}
           <div className="flex items-center justify-between pt-2 border-t">
