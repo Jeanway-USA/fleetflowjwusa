@@ -1,37 +1,64 @@
 
+## Plan: Fix Home Time Submissions, Add Date Selection, Enable Notification Clearing
 
-## Plan: Live Dispatcher Alerts + Route Map on ActiveLoadCard
-
-### Part 1: Live Alerts on Dispatcher Dashboard
-
-**Problem:** The Alerts & Actions panel uses a standard `useQuery` fetch, so the dispatcher must refresh the page to see new driver requests (detention, home time, PTO, maintenance). This delays response times.
-
-**Solution:** Add a Supabase Realtime subscription on the `driver_requests` table so the alerts query automatically re-fetches whenever a new request comes in or an existing one is updated.
-
-**Database Migration:**
-- Add `driver_requests` to the `supabase_realtime` publication so Postgres changes are broadcast.
-
-**File: `src/components/dispatcher/DispatcherAlerts.tsx`**
-- Add a `useEffect` that subscribes to the `driver_requests` Realtime channel, listening for INSERT, UPDATE, and DELETE events.
-- On any change, call `queryClient.invalidateQueries({ queryKey: ['dispatcher-alerts'] })` to re-fetch the full alerts list.
-- Clean up the subscription on unmount.
-- This approach is efficient: the Realtime channel acts as a lightweight "something changed" signal, and the existing query handles the actual data fetching and sorting logic. No need to manually merge payloads.
-
-The pattern follows the same approach used in `FleetMapView.tsx` and `DriverNotifications.tsx` for their respective Realtime subscriptions.
+### Overview
+Three targeted fixes for the driver experience:
+1. Fix home time request submissions by improving error handling and removing the type cast
+2. Add start/end date selection to Home Time and PTO request forms
+3. Allow drivers to clear their notifications (currently blocked by a missing database policy)
 
 ---
 
-### Part 2: Route Map Preview on ActiveLoadCard
+### Part 1: Fix Home Time Request Submission
 
-**Problem:** The redesigned ActiveLoadCard is compact but lacks a visual route preview showing where the load is going.
+**Root Cause:** The form uses `insertData as any` to bypass TypeScript type checking, and the error toast shows a generic "Failed to submit request" message that hides the actual database error. This makes debugging impossible for both developers and users.
 
-**Solution:** Add the existing `LoadRouteMap` component to the ActiveLoadCard, placed between the date/time row and the miles/pay row. This component already handles geocoding, Leaflet rendering, loading skeletons, and silent failure -- no new logic is needed.
+**File: `src/components/driver/DriverRequestForm.tsx`**
+- Remove the `Record<string, unknown>` and `as any` type cast -- use the proper Supabase Insert type instead so TypeScript catches issues at compile time
+- Show the actual error message in the toast (e.g., `toast.error('Failed to submit: ' + error.message)`) so drivers and support can see what went wrong
+- Add a pre-submission check that validates `driverId` is present before attempting the insert
 
-**File: `src/components/driver/ActiveLoadCard.tsx`**
-- Import the `LoadRouteMap` component from `./LoadRouteMap`.
-- Render `<LoadRouteMap origin={load.origin} destination={load.destination} />` between the date row and the miles/pay separator.
-- The map will show a dashed line from origin to destination with green (origin) and red (destination) markers, matching the existing map style used elsewhere in the app.
-- If geocoding fails, the map silently hides itself (built-in behavior), so the card remains clean.
+---
+
+### Part 2: Add Date Selection for Home Time and PTO
+
+Drivers currently type dates into the subject line ("Home time Feb 14-16") which is unstructured and hard to process. Adding proper date fields gives dispatchers accurate, machine-readable dates.
+
+**Database Migration:**
+- Add `start_date` (date, nullable) column to `driver_requests`
+- Add `end_date` (date, nullable) column to `driver_requests`
+- Both are nullable since detention and maintenance requests don't need dates
+
+**File: `src/components/driver/DriverRequestForm.tsx`**
+- Add `startDate` and `endDate` state variables (type `Date | undefined`)
+- When request type is `home_time` or `pto`, show two date pickers below the subject line:
+  - "Start Date" picker
+  - "End Date" picker  
+- Use the existing Shadcn Calendar + Popover pattern (with `pointer-events-auto` class for proper interaction inside the bottom sheet)
+- Disable past dates on the calendar
+- Include `start_date` and `end_date` in the insert payload (formatted as ISO date strings)
+- Add validation: if type is `home_time` or `pto`, require at least a start date
+
+**File: `src/components/driver/DriverRequestsCard.tsx`**
+- When displaying pending/recent requests of type `home_time` or `pto`, show the date range below the subject if dates are present (e.g., "Feb 14 - Feb 16")
+
+**File: `src/components/dispatcher/DispatcherAlerts.tsx`**
+- Display the requested date range in the alert detail view so the dispatcher sees when the driver wants off
+
+---
+
+### Part 3: Enable Notification Clearing
+
+**Root Cause:** The `driver_notifications` table only has SELECT and UPDATE policies for drivers -- there is no DELETE policy. When a driver tries to delete a notification, the database silently blocks it.
+
+**Database Migration:**
+- Add a DELETE policy: `Drivers can delete their own notifications` with condition `driver_id = get_driver_id_for_user(auth.uid())`
+
+**File: `src/components/driver/DriverNotifications.tsx`**
+- Add a "Clear all" button in the notification header (next to "Mark all read") that deletes all notifications for the driver
+- Add a swipe-to-dismiss or small X button on individual notifications for single deletion
+- Add confirmation before clearing all notifications
+- Both use `supabase.from('driver_notifications').delete().eq('driver_id', driverId)` which will now work with the new RLS policy
 
 ---
 
@@ -39,8 +66,8 @@ The pattern follows the same approach used in `FleetMapView.tsx` and `DriverNoti
 
 | Action | File | Details |
 |--------|------|---------|
-| Migration | New SQL migration | `ALTER PUBLICATION supabase_realtime ADD TABLE public.driver_requests` |
-| Modify | `src/components/dispatcher/DispatcherAlerts.tsx` | Add Realtime subscription on `driver_requests` to auto-invalidate alerts query |
-| Modify | `src/components/driver/ActiveLoadCard.tsx` | Add `LoadRouteMap` component between date row and miles/pay row |
-
-No new components or dependencies are needed. Both changes reuse existing patterns and components already in the codebase.
+| Migration | New SQL migration | Add `start_date` and `end_date` to `driver_requests`; add DELETE policy on `driver_notifications` |
+| Modify | `src/components/driver/DriverRequestForm.tsx` | Fix type cast, improve error messages, add date pickers for home_time/pto |
+| Modify | `src/components/driver/DriverRequestsCard.tsx` | Display date range on home_time/pto requests |
+| Modify | `src/components/dispatcher/DispatcherAlerts.tsx` | Show requested dates in alert details |
+| Modify | `src/components/driver/DriverNotifications.tsx` | Add clear all and individual delete buttons |
