@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, Link, Unlink, Edit2, Check, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { extractJurisdictionFromVendor } from '@/lib/us-states';
 import {
   Select,
   SelectContent,
@@ -67,7 +68,8 @@ interface ExpenseWithMatch extends ExtractedExpense {
   matchedLoad: FleetLoad | null;
   matchedTruck: Truck | null;
   isDuplicate: boolean;
-  duplicateId: string | null; // ID of the existing expense if this is a duplicate
+  duplicateId: string | null;
+  jurisdiction: string | null;
 }
 
 export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported }: StatementUploadProps) {
@@ -188,15 +190,18 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       const processedExpenses: ExpenseWithMatch[] = (data.expenses || []).map((exp: ExtractedExpense) => {
         const matchedLoad = findMatchingLoad(exp.trip_number);
         const duplicateId = findDuplicateId(exp, matchedLoad);
+        // Extract jurisdiction from vendor for fuel/DEF expenses
+        const isFuelType = ['Fuel', 'DEF'].includes(exp.expense_type);
+        const jurisdiction = isFuelType ? extractJurisdictionFromVendor(exp.vendor || exp.description) : null;
         return {
           ...exp,
-          // Ensure is_reimbursement has a default value
           is_reimbursement: exp.is_reimbursement || false,
-          selected: !duplicateId, // Don't auto-select duplicates
+          selected: !duplicateId,
           matchedLoad,
-          matchedTruck: exp.trip_number ? null : statementTruck, // Only assign truck if no trip number
+          matchedTruck: exp.trip_number ? null : statementTruck,
           isDuplicate: duplicateId !== null,
           duplicateId,
+          jurisdiction,
         };
       });
 
@@ -313,6 +318,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
           load_id: exp.matchedLoad?.id || null,
           truck_id: exp.matchedTruck?.id || null,
           notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
+          jurisdiction: exp.jurisdiction,
         }));
 
         const { error } = await supabase.from('expenses').insert(expenseInserts);
@@ -332,6 +338,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
           load_id: exp.matchedLoad?.id || null,
           truck_id: exp.matchedTruck?.id || null,
           notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
+          jurisdiction: exp.jurisdiction,
           updated_at: new Date().toISOString(),
         };
 

@@ -14,13 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, MapPin } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { StatementUpload } from '@/components/finance/StatementUpload';
 import { SettlementsTab } from '@/components/finance/SettlementsTab';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import type { Database } from '@/integrations/supabase/types';
+import { US_STATES } from '@/lib/us-states';
 
 type Expense = Database['public']['Tables']['expenses']['Row'];
 type ExpenseInsert = Database['public']['Tables']['expenses']['Insert'];
@@ -1894,6 +1895,25 @@ export default function Finance() {
                     value={expenseFormData.gallons || ''} 
                     onChange={(e) => setExpenseFormData({ ...expenseFormData, gallons: parseFloat(e.target.value) || undefined })} 
                   />
+                </div>
+              )}
+              {GALLONS_EXPENSE_TYPES.includes(expenseFormData.expense_type || '') && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> State (IFTA)
+                  </Label>
+                  <Select 
+                    value={(expenseFormData as any).jurisdiction || 'none'} 
+                    onValueChange={(v) => setExpenseFormData({ ...expenseFormData, jurisdiction: v === 'none' ? null : v } as any)}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {US_STATES.map(s => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
             </div>

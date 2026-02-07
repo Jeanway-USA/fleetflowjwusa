@@ -850,6 +850,7 @@ export type Database = {
           expense_type: string
           gallons: number | null
           id: string
+          jurisdiction: string | null
           load_id: string | null
           notes: string | null
           truck_id: string | null
@@ -864,6 +865,7 @@ export type Database = {
           expense_type: string
           gallons?: number | null
           id?: string
+          jurisdiction?: string | null
           load_id?: string | null
           notes?: string | null
           truck_id?: string | null
@@ -878,6 +880,7 @@ export type Database = {
           expense_type?: string
           gallons?: number | null
           id?: string
+          jurisdiction?: string | null
           load_id?: string | null
           notes?: string | null
           truck_id?: string | null
@@ -1047,6 +1050,7 @@ export type Database = {
           price_per_gallon: number
           purchase_date: string
           receipt_url: string | null
+          source_expense_id: string | null
           total_cost: number
           truck_id: string | null
           updated_at: string
@@ -1061,6 +1065,7 @@ export type Database = {
           price_per_gallon?: number
           purchase_date?: string
           receipt_url?: string | null
+          source_expense_id?: string | null
           total_cost?: number
           truck_id?: string | null
           updated_at?: string
@@ -1075,6 +1080,7 @@ export type Database = {
           price_per_gallon?: number
           purchase_date?: string
           receipt_url?: string | null
+          source_expense_id?: string | null
           total_cost?: number
           truck_id?: string | null
           updated_at?: string
@@ -1093,6 +1099,13 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_purchases_source_expense_id_fkey"
+            columns: ["source_expense_id"]
+            isOneToOne: true
+            referencedRelation: "expenses"
             referencedColumns: ["id"]
           },
           {

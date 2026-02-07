@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Plus, Trash2, DollarSign, Fuel } from 'lucide-react';
+import { Plus, Trash2, DollarSign, Fuel, MapPin } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { US_STATES } from '@/lib/us-states';
 
 const EXPENSE_TYPES = [
   'Fuel',
@@ -46,6 +47,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
     gallons: '',
     vendor: '',
     description: '',
+    jurisdiction: '',
     expense_date: new Date().toISOString().split('T')[0],
   });
 
@@ -106,6 +108,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
       gallons: '',
       vendor: '',
       description: '',
+      jurisdiction: '',
       expense_date: new Date().toISOString().split('T')[0],
     });
     setShowAddForm(false);
@@ -124,6 +127,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
       vendor: formData.vendor || null,
       description: formData.description || null,
       gallons: GALLONS_EXPENSE_TYPES.includes(formData.expense_type) && formData.gallons ? parseFloat(formData.gallons) : null,
+      jurisdiction: GALLONS_EXPENSE_TYPES.includes(formData.expense_type) && formData.jurisdiction ? formData.jurisdiction : null,
     };
 
     if (relatedType === 'load') {
@@ -223,13 +227,32 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
           </div>
 
           {GALLONS_EXPENSE_TYPES.includes(formData.expense_type) && (
-            <div className="space-y-2">
-              <Label>Vendor</Label>
-              <Input 
-                placeholder="Fuel stop / vendor" 
-                value={formData.vendor} 
-                onChange={(e) => setFormData({ ...formData, vendor: e.target.value })} 
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Vendor</Label>
+                <Input 
+                  placeholder="Fuel stop / vendor" 
+                  value={formData.vendor} 
+                  onChange={(e) => setFormData({ ...formData, vendor: e.target.value })} 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" /> State (IFTA)
+                </Label>
+                <Select 
+                  value={formData.jurisdiction || 'none'} 
+                  onValueChange={(v) => setFormData({ ...formData, jurisdiction: v === 'none' ? '' : v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {US_STATES.map(s => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
 
