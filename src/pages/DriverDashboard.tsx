@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ActiveLoadCard } from '@/components/driver/ActiveLoadCard';
+import { TripFuelPlanner } from '@/components/driver/TripFuelPlanner';
 import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
 import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
 import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
@@ -131,6 +132,16 @@ export default function DriverDashboard() {
           driverId={driver.id}
           onStatusUpdate={refetchLoads}
         />
+
+        {/* Fuel Trip Planner - shows when there's an active/upcoming load */}
+        {activeLoad && (
+          <TripFuelPlanner
+            driverId={driver.id}
+            origin={activeLoad.origin}
+            destination={activeLoad.destination}
+            bookedMiles={activeLoad.booked_miles}
+          />
+        )}
 
         {/* Next Load Preview */}
         {nextLoad && <NextLoadPreview load={nextLoad} />}
