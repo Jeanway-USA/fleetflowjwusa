@@ -119,7 +119,12 @@ export default function Incidents() {
 
   const createMutation = useMutation({
     mutationFn: async (incident: Partial<Incident>) => {
-      const { error } = await supabase.from('incidents').insert(incident as any);
+      const payload: Record<string, unknown> = { ...incident };
+      // Convert empty/undefined nullable fields to null for Supabase
+      if (!payload.driver_id) payload.driver_id = null;
+      if (!payload.truck_id) payload.truck_id = null;
+      if (!payload.trailer_id) payload.trailer_id = null;
+      const { error } = await supabase.from('incidents').insert(payload as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -397,10 +402,10 @@ export default function Incidents() {
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Driver</Label>
-                <Select value={formData.driver_id || ''} onValueChange={(v) => setFormData({ ...formData, driver_id: v || null })}>
+                <Select value={formData.driver_id || 'none'} onValueChange={(v) => setFormData({ ...formData, driver_id: v === 'none' ? null : v })}>
                   <SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {drivers.map(d => (
                       <SelectItem key={d.id} value={d.id}>{d.first_name} {d.last_name}</SelectItem>
                     ))}
@@ -409,10 +414,10 @@ export default function Incidents() {
               </div>
               <div className="space-y-2">
                 <Label>Truck</Label>
-                <Select value={formData.truck_id || ''} onValueChange={(v) => setFormData({ ...formData, truck_id: v || null })}>
+                <Select value={formData.truck_id || 'none'} onValueChange={(v) => setFormData({ ...formData, truck_id: v === 'none' ? null : v })}>
                   <SelectTrigger><SelectValue placeholder="Select truck" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {trucks.map(t => (
                       <SelectItem key={t.id} value={t.id}>#{t.unit_number}</SelectItem>
                     ))}
@@ -421,10 +426,10 @@ export default function Incidents() {
               </div>
               <div className="space-y-2">
                 <Label>Trailer</Label>
-                <Select value={formData.trailer_id || ''} onValueChange={(v) => setFormData({ ...formData, trailer_id: v || null })}>
+                <Select value={formData.trailer_id || 'none'} onValueChange={(v) => setFormData({ ...formData, trailer_id: v === 'none' ? null : v })}>
                   <SelectTrigger><SelectValue placeholder="Select trailer" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {trailers.map(t => (
                       <SelectItem key={t.id} value={t.id}>#{t.unit_number}</SelectItem>
                     ))}
