@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Clock, Home, CalendarDays, Wrench, Plus, MessageSquare } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { DriverRequestForm } from './DriverRequestForm';
 
 type RequestType = 'detention' | 'home_time' | 'pto' | 'maintenance';
@@ -109,7 +109,15 @@ export function DriverRequestsCard({ driverId, truckId, activeLoadId, activeLoad
                 return (
                   <div key={req.id} className="flex items-center gap-2 p-2 rounded-md bg-warning/5 border border-warning/20 text-sm">
                     <span className="text-warning">{meta.icon}</span>
-                    <span className="flex-1 truncate font-medium">{req.subject}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className="truncate block font-medium">{req.subject}</span>
+                      {req.start_date && (
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(req.start_date), 'MMM d')}
+                          {req.end_date ? ` – ${format(new Date(req.end_date), 'MMM d')}` : ''}
+                        </span>
+                      )}
+                    </div>
                     <Badge variant="outline" className="text-xs shrink-0">Pending</Badge>
                   </div>
                 );
@@ -128,6 +136,12 @@ export function DriverRequestsCard({ driverId, truckId, activeLoadId, activeLoad
                     <span className="text-muted-foreground">{meta.icon}</span>
                     <div className="flex-1 min-w-0">
                       <span className="truncate block">{req.subject}</span>
+                      {req.start_date && (
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(req.start_date), 'MMM d')}
+                          {req.end_date ? ` – ${format(new Date(req.end_date), 'MMM d')}` : ''}
+                        </p>
+                      )}
                       {req.response_notes && (
                         <p className="text-xs text-muted-foreground truncate">Reply: {req.response_notes}</p>
                       )}

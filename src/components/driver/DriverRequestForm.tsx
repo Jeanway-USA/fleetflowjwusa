@@ -4,9 +4,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Clock, Home, CalendarDays, Wrench } from 'lucide-react';
+import { Loader2, Clock, Home, CalendarDays, Wrench, CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 type RequestType = 'detention' | 'home_time' | 'pto' | 'maintenance';
 
@@ -32,6 +36,8 @@ const ISSUE_TYPES = [
   'cooling_system', 'exhaust', 'body_damage', 'interior', 'other',
 ];
 
+const needsDates = (type: RequestType) => type === 'home_time' || type === 'pto';
+
 export function DriverRequestForm({
   driverId,
   truckId,
@@ -46,11 +52,18 @@ export function DriverRequestForm({
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [issueType, setIssueType] = useState('');
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
     if (!subject.trim()) {
       toast.error('Please enter a subject');
+      return;
+    }
+
+    if (needsDates(requestType) && !startDate) {
+      toast.error('Please select a start date');
       return;
     }
 
@@ -66,31 +79,31 @@ export function DriverRequestForm({
 
     setIsSubmitting(true);
     try {
-      const insertData: Record<string, unknown> = {
+      let finalSubject = subject.trim();
+      
+      if (requestType === 'maintenance' && truckId) {
+        finalSubject = `${issueType.replace(/_/g, ' ')} — ${subject.trim()}`;
+      }
+
+      const { error } = await supabase.from('driver_requests').insert({
         driver_id: driverId,
         request_type: requestType,
-        subject: subject.trim(),
+        subject: finalSubject,
         description: description.trim() || null,
         priority: requestType === 'maintenance' ? priority : 'medium',
-      };
+        load_id: requestType === 'detention' && activeLoadId ? activeLoadId : null,
+        truck_id: requestType === 'maintenance' && truckId ? truckId : null,
+        start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
+        end_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
+      });
 
-      if (requestType === 'detention' && activeLoadId) {
-        insertData.load_id = activeLoadId;
-      }
-
-      if (requestType === 'maintenance' && truckId) {
-        insertData.truck_id = truckId;
-        insertData.subject = `${issueType.replace(/_/g, ' ')} — ${subject.trim()}`;
-      }
-
-      const { error } = await supabase.from('driver_requests').insert(insertData as any);
       if (error) throw error;
 
       toast.success('Request submitted');
       onSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting request:', err);
-      toast.error('Failed to submit request');
+      toast.error(`Failed to submit: ${err?.message || 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -169,14 +182,33 @@ export function DriverRequestForm({
         <Input
           placeholder={
             requestType === 'detention' ? 'e.g. Waiting at shipper over 2 hrs'
-            : requestType === 'home_time' ? 'e.g. Home time Feb 14-16'
-            : requestType === 'pto' ? 'e.g. PTO Mar 1-3'
+            : requestType === 'home_time' ? 'e.g. Home time request'
+            : requestType === 'pto' ? 'e.g. PTO request'
             : 'Brief description of issue'
           }
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
         />
       </div>
+
+      {/* Date Pickers (home_time & pto only) */}
+      {needsDates(requestType) && (
+        <div className="grid grid-cols-2 gap-3">
+          <DatePickerField
+            label="Start Date"
+            date={startDate}
+            onSelect={setStartDate}
+            placeholder="Select start"
+          />
+          <DatePickerField
+            label="End Date"
+            date={endDate}
+            onSelect={setEndDate}
+            placeholder="Select end"
+            minDate={startDate}
+          />
+        </div>
+      )}
 
       {/* Description */}
       <div className="space-y-1.5">
@@ -199,6 +231,53 @@ export function DriverRequestForm({
           Submit Request
         </Button>
       </div>
+    </div>
+  );
+}
+
+function DatePickerField({
+  label,
+  date,
+  onSelect,
+  placeholder,
+  minDate,
+}: {
+  label: string;
+  date: Date | undefined;
+  onSelect: (d: Date | undefined) => void;
+  placeholder: string;
+  minDate?: Date;
+}) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn(
+              'w-full justify-start text-left font-normal',
+              !date && 'text-muted-foreground'
+            )}
+          >
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            {date ? format(date, 'MMM d, yyyy') : <span>{placeholder}</span>}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={date}
+            onSelect={onSelect}
+            disabled={(d) => d < today || (minDate ? d < minDate : false)}
+            initialFocus
+            className={cn('p-3 pointer-events-auto')}
+          />
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
