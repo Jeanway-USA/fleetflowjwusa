@@ -9,6 +9,7 @@ import { format, differenceInHours, differenceInMinutes, parseISO } from 'date-f
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RequestDetentionButton } from './RequestDetentionButton';
+import { LoadRouteMap } from './LoadRouteMap';
 
 // Helper to format and clean special instructions for better readability
 function formatSpecialInstructions(notes: string | null): React.ReactNode {
@@ -335,6 +336,11 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
             </div>
           </div>
         </div>
+
+        {/* Route Map Preview */}
+        {load.origin && load.destination && (
+          <LoadRouteMap origin={load.origin} destination={load.destination} />
+        )}
 
         {/* Action Buttons Row */}
         <div className="flex gap-2">
