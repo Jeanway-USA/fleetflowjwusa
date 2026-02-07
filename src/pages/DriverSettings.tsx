@@ -13,7 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Target, Sun, Moon, DollarSign, Route, Loader2 } from 'lucide-react';
+import { Target, Sun, Moon, DollarSign, Route, Loader2, Fuel, Eye, EyeOff } from 'lucide-react';
 
 export default function DriverSettings() {
   const { user } = useAuth();
@@ -22,6 +22,9 @@ export default function DriverSettings() {
   
   const [weeklyMilesGoal, setWeeklyMilesGoal] = useState(2500);
   const [weeklyRevenueGoal, setWeeklyRevenueGoal] = useState(2000);
+  const [landstarUsername, setLandstarUsername] = useState('');
+  const [landstarPassword, setLandstarPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Fetch driver profile
   const { data: driver, isLoading: driverLoading } = useQuery({
@@ -57,31 +60,35 @@ export default function DriverSettings() {
     if (settings) {
       setWeeklyMilesGoal(settings.weekly_miles_goal || 2500);
       setWeeklyRevenueGoal(settings.weekly_revenue_goal || 2000);
+      setLandstarUsername(settings.landstar_username || '');
+      setLandstarPassword(settings.landstar_password || '');
     }
   }, [settings]);
 
   // Save settings mutation
   const saveMutation = useMutation({
-    mutationFn: async (data: { weekly_miles_goal: number; weekly_revenue_goal: number }) => {
+    mutationFn: async (data: { weekly_miles_goal: number; weekly_revenue_goal: number; landstar_username: string; landstar_password: string }) => {
       if (!driver?.id) throw new Error('Driver not found');
 
       const settingsData = {
         driver_id: driver.id,
         weekly_miles_goal: data.weekly_miles_goal,
         weekly_revenue_goal: data.weekly_revenue_goal,
+        landstar_username: data.landstar_username || null,
+        landstar_password: data.landstar_password || null,
       };
 
       if (settings) {
-        // Update existing settings
         const { error } = await (supabase.from('driver_settings' as any) as any)
           .update({
             weekly_miles_goal: data.weekly_miles_goal,
             weekly_revenue_goal: data.weekly_revenue_goal,
+            landstar_username: data.landstar_username || null,
+            landstar_password: data.landstar_password || null,
           })
           .eq('driver_id', driver.id);
         if (error) throw error;
       } else {
-        // Insert new settings
         const { error } = await (supabase.from('driver_settings' as any) as any)
           .insert(settingsData);
         if (error) throw error;
@@ -89,10 +96,10 @@ export default function DriverSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['driver-settings'] });
-      toast.success('Goals saved successfully');
+      toast.success('Settings saved successfully');
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to save goals');
+      toast.error(error.message || 'Failed to save settings');
     },
   });
 
@@ -100,6 +107,8 @@ export default function DriverSettings() {
     saveMutation.mutate({
       weekly_miles_goal: weeklyMilesGoal,
       weekly_revenue_goal: weeklyRevenueGoal,
+      landstar_username: landstarUsername,
+      landstar_password: landstarPassword,
     });
   };
 
@@ -248,6 +257,79 @@ export default function DriverSettings() {
                   </>
                 ) : (
                   'Save Goals'
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Landstar Portal Credentials */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Fuel className="h-5 w-5" />
+              Landstar Portal
+            </CardTitle>
+            <CardDescription>
+              Enter your LandstarOne credentials to access LCAPP fuel discounts in the trip planner
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="landstarUsername">Landstar Username</Label>
+                <Input
+                  id="landstarUsername"
+                  type="text"
+                  value={landstarUsername}
+                  onChange={(e) => setLandstarUsername(e.target.value)}
+                  placeholder="Your LandstarOne username"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="landstarPassword">Landstar Password</Label>
+                <div className="relative">
+                  <Input
+                    id="landstarPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    value={landstarPassword}
+                    onChange={(e) => setLandstarPassword(e.target.value)}
+                    placeholder="Your LandstarOne password"
+                    autoComplete="off"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Your credentials are stored securely and only used to fetch your personalized LCAPP fuel discounts. They are never shared.
+            </p>
+
+            <Separator />
+
+            <div className="flex justify-end">
+              <Button 
+                onClick={handleSaveGoals} 
+                disabled={saveMutation.isPending}
+                className="gradient-gold text-primary-foreground"
+              >
+                {saveMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Credentials'
                 )}
               </Button>
             </div>
