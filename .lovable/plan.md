@@ -1,52 +1,115 @@
 
 
-## Plan: Expandable Notification Messages
+## Plan: Auto-Sync Fuel Expenses to IFTA Fuel Purchases
 
 ### Problem
-Currently, notification messages are truncated to a single line. Clicking a notification either navigates away (for `load_assigned` type) or does nothing visible (for other types like `request_response`). Drivers cannot read the full message or dispatcher comments on their detention/request responses.
+When fuel expenses are added through the load expenses panel or imported via Landstar statement on the Finance page, they only go into the `expenses` table. The IFTA Reporting page reads from a separate `fuel_purchases` table, so fuel data must be manually entered twice. This plan eliminates that duplication.
 
-### Solution
-Add inline expand/collapse behavior to notifications that do not have a redirect destination. Clicking these notifications will toggle an expanded view showing the full message text, dispatcher notes, and request details.
+### Approach
+Add a `jurisdiction` (state) field to the expenses table and all fuel entry points. Then use a database trigger to automatically sync Fuel/DEF expenses into the `fuel_purchases` table whenever they are created or updated.
 
-### Changes to `src/components/driver/DriverNotifications.tsx`
+---
 
-1. **Add expanded state tracking**: Track which notification ID is currently expanded using local state (`expandedId`).
+### Part 1: Database Changes
 
-2. **Update click handler logic**:
-   - If the notification type has a redirect (e.g., `load_assigned`), navigate as before.
-   - Otherwise, toggle the expanded state for that notification and mark it as read.
+**Add `jurisdiction` column to `expenses` table:**
+- New nullable `text` column for the US state code (e.g., "TX", "GA")
+- Only relevant for Fuel and DEF expense types
 
-3. **Update notification rendering**:
-   - When collapsed: Show message with `truncate` (current behavior).
-   - When expanded: Remove the `truncate` class so the full message wraps and is fully readable. Add a subtle visual indicator (e.g., slightly different background or a small chevron) so the driver knows they can collapse it again.
+**Create a database trigger function `sync_fuel_expense_to_ifta()`:**
+- Fires on INSERT and UPDATE on the `expenses` table
+- When `expense_type` is "Fuel" or "DEF":
+  - Computes `price_per_gallon` from `amount / gallons` (if gallons > 0)
+  - Upserts a matching row into `fuel_purchases` using a source reference pattern (stores `expense_id` in a new notes-based lookup or a dedicated `source_expense_id` column on `fuel_purchases`)
+  - Maps fields: `expense_date` to `purchase_date`, `amount` to `total_cost`, `gallons`, `vendor`, `jurisdiction`, `truck_id`
+  - For the `driver_id`, looks up the driver from the linked load (`fleet_loads.driver_id`) if `load_id` is set
+- When an expense is DELETED, removes the corresponding `fuel_purchases` record
+- Skips sync if `jurisdiction` is null (IFTA requires a state)
 
-4. **Update notification icons**: Add type-specific icons for `request_response` (e.g., a message reply icon) and `detention_response` types, matching the same icon set used in the `DriverRequestsCard` (Clock, Home, CalendarDays, Wrench).
+**Add `source_expense_id` column to `fuel_purchases` table:**
+- Nullable UUID column to link back to the originating expense
+- Allows the trigger to find and update/delete the matching IFTA record
+- Unique constraint to prevent duplicate syncs
 
-5. **Store `related_id` on request response notifications**: Update the dispatcher's notification creation in `DispatcherAlerts.tsx` to pass the `requestId` as `related_id` when creating request response notifications. This enables future linking if needed.
+---
 
-### Files to Modify
+### Part 2: Update ExpensesList Component (Load Expenses)
 
-| File | Change |
-|------|--------|
-| `src/components/driver/DriverNotifications.tsx` | Add expanded state, update click handler to toggle expansion for non-redirect notifications, show full message when expanded |
-| `src/components/dispatcher/DispatcherAlerts.tsx` | Include `related_id: requestId` when inserting the driver notification on approve/deny |
+**File:** `src/components/shared/ExpensesList.tsx`
 
-### Technical Details
+- Add a `jurisdiction` field to the form state
+- Show a state selector dropdown (US states list) when expense type is "Fuel" or "DEF"
+- Pass `jurisdiction` in the expense insert payload
+- The database trigger handles the rest automatically
 
-**State addition in DriverNotifications:**
-- `const [expandedId, setExpandedId] = useState<string | null>(null)` to track which notification is expanded (only one at a time for cleaner UX in the narrow popover).
+---
 
-**Updated click handler:**
-- Notifications with a navigation target (currently only `load_assigned`) continue to navigate.
-- All other notification types toggle the `expandedId` state and mark as read.
+### Part 3: Update Finance Page Expense Form
 
-**Expanded notification display:**
-- The message `<p>` tag loses its `truncate` class and gains `whitespace-pre-wrap` for proper line-break rendering.
-- A small chevron icon rotates to indicate expanded/collapsed state.
-- The expanded area has a subtle background tint to visually distinguish the open notification.
+**File:** `src/pages/Finance.tsx`
 
-**DispatcherAlerts.tsx notification insert change (line ~194):**
-- Add `related_id: requestId` to the notification insert so the request is linked for future reference.
+- Add `jurisdiction` to the expense dialog form
+- Show the state selector when creating/editing Fuel or DEF expenses
+- Include `jurisdiction` in create and update mutations
 
-No database changes are required -- the `related_id` column already exists on the `driver_notifications` table and is nullable.
+---
+
+### Part 4: Update Landstar Statement Import
+
+**File:** `src/components/finance/StatementUpload.tsx`
+
+- The Landstar parser already extracts vendor locations which often contain state info
+- Add a `jurisdiction` field to the `ExpenseWithMatch` interface
+- During import, attempt to infer the state from the vendor name/description (common patterns like "PILOT DALLAS TX" or "TA FORT WORTH TX")
+- Include `jurisdiction` in the expense insert payload
+- The database trigger will automatically create the `fuel_purchases` record
+
+---
+
+### Part 5: Update IFTA Page
+
+**File:** `src/pages/IFTA.tsx`
+
+- Add a visual indicator on fuel purchases that were auto-synced from expenses (via `source_expense_id`)
+- These auto-synced records should still be editable on the IFTA page for jurisdiction corrections
+
+---
+
+### Data Flow Diagram
+
+```
+Expense Added (any entry point)
+    |
+    v
+expenses table INSERT/UPDATE
+    |
+    v
+[DB Trigger: sync_fuel_expense_to_ifta]
+    |
+    +-- Is Fuel or DEF?
+    |       |
+    |       +-- Has jurisdiction?
+    |       |       |
+    |       |       v
+    |       |   UPSERT into fuel_purchases
+    |       |   (linked via source_expense_id)
+    |       |
+    |       +-- No jurisdiction -> Skip IFTA sync
+    |
+    +-- Not Fuel/DEF -> Skip
+```
+
+---
+
+### Technical Summary
+
+| Action | File/Location | Details |
+|--------|--------------|---------|
+| Migration | New SQL migration | Add `jurisdiction` to `expenses`, add `source_expense_id` to `fuel_purchases`, create sync trigger |
+| Modify | `src/components/shared/ExpensesList.tsx` | Add state selector for Fuel/DEF expenses |
+| Modify | `src/pages/Finance.tsx` | Add state selector to expense dialog for Fuel/DEF |
+| Modify | `src/components/finance/StatementUpload.tsx` | Extract/include jurisdiction on imported fuel expenses |
+| Modify | `src/pages/IFTA.tsx` | Show sync indicator on auto-created records |
+
+No new components needed. The database trigger ensures every entry point (load expenses, finance page, Landstar import) automatically syncs to IFTA without any additional frontend logic.
 
