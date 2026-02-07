@@ -12,8 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin } from 'lucide-react';
+import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { US_STATES } from '@/lib/us-states';
+import { Badge } from '@/components/ui/badge';
 
 interface IFTARecord {
   id: string;
@@ -40,16 +42,11 @@ interface FuelPurchase {
   total_cost: number;
   vendor: string | null;
   receipt_url: string | null;
+  source_expense_id: string | null;
   created_at: string;
 }
 
-const US_STATES = [
-  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
-];
+// US_STATES is now imported from @/lib/us-states
 
 const QUARTERS = ['2026-Q1', '2026-Q2', '2026-Q3', '2026-Q4', '2025-Q4', '2025-Q3'];
 
@@ -380,7 +377,17 @@ export default function IFTA() {
                   ) : (
                     filteredFuelPurchases.map(fp => (
                       <TableRow key={fp.id}>
-                        <TableCell>{format(parseISO(fp.purchase_date), 'MM/dd/yyyy')}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            {format(parseISO(fp.purchase_date), 'MM/dd/yyyy')}
+                            {fp.source_expense_id && (
+                              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-primary/30 text-primary">
+                                <Link2 className="h-2.5 w-2.5 mr-0.5" />
+                                synced
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <MapPin className="h-3 w-3 text-muted-foreground" />
