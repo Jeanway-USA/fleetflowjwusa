@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Alert {
   id: string;
@@ -44,6 +44,24 @@ export function DispatcherAlerts() {
     action: 'approve',
   });
   const [responseNotes, setResponseNotes] = useState('');
+
+  // Realtime subscription: auto-refresh alerts when driver_requests change
+  useEffect(() => {
+    const channel = supabase
+      .channel('dispatcher-alerts-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'driver_requests' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['dispatcher-alerts'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const { data: alerts, isLoading } = useQuery({
     queryKey: ['dispatcher-alerts'],
