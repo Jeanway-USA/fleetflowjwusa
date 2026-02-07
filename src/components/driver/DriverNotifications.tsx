@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, Package, Check, X } from 'lucide-react';
+import { Bell, Package, Check, X, ChevronDown, MessageSquareReply, Clock, Home, CalendarDays, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -29,6 +29,7 @@ interface Notification {
 
 export function DriverNotifications({ driverId }: DriverNotificationsProps) {
   const [open, setOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -104,14 +105,18 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
+  const hasRedirect = (type: string) => type === 'load_assigned';
+
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.is_read) {
       markAsReadMutation.mutate(notification.id);
     }
     
-    if (notification.notification_type === 'load_assigned' && notification.related_id) {
+    if (hasRedirect(notification.notification_type) && notification.related_id) {
       setOpen(false);
       navigate('/fleet-loads');
+    } else {
+      setExpandedId(prev => prev === notification.id ? null : notification.id);
     }
   };
 
@@ -119,6 +124,8 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
     switch (type) {
       case 'load_assigned':
         return <Package className="h-4 w-4 text-primary" />;
+      case 'request_response':
+        return <MessageSquareReply className="h-4 w-4 text-primary" />;
       default:
         return <Bell className="h-4 w-4 text-muted-foreground" />;
     }
@@ -169,16 +176,25 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
                   onClick={() => handleNotificationClick(notification)}
                   className={`w-full p-3 text-left hover:bg-muted/50 transition-colors flex gap-3 ${
                     !notification.is_read ? 'bg-primary/5' : ''
-                  }`}
+                  } ${expandedId === notification.id ? 'bg-muted/40' : ''}`}
                 >
                   <div className="mt-0.5">
                     {getNotificationIcon(notification.notification_type)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${!notification.is_read ? 'font-semibold' : ''}`}>
-                      {notification.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <div className="flex items-center gap-1">
+                      <p className={`text-sm flex-1 ${!notification.is_read ? 'font-semibold' : ''}`}>
+                        {notification.title}
+                      </p>
+                      {!hasRedirect(notification.notification_type) && (
+                        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ${
+                          expandedId === notification.id ? 'rotate-180' : ''
+                        }`} />
+                      )}
+                    </div>
+                    <p className={`text-xs text-muted-foreground mt-0.5 ${
+                      expandedId === notification.id ? 'whitespace-pre-wrap' : 'truncate'
+                    }`}>
                       {notification.message}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
@@ -186,7 +202,7 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
                     </p>
                   </div>
                   {!notification.is_read && (
-                    <div className="w-2 h-2 rounded-full bg-primary mt-1.5" />
+                    <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
                   )}
                 </button>
               ))}
