@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Users, Shield, Trash2, UserPlus, Sun, Moon, Settings2, Mail, Building2, Pencil, KeyRound } from 'lucide-react';
+import { Users, Shield, Trash2, UserPlus, Sun, Moon, Settings2, Mail, Building2, Pencil, KeyRound, Trophy } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type AppRole = Database['public']['Enums']['app_role'];
@@ -71,6 +71,65 @@ export default function Settings() {
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
   const [userToResetPassword, setUserToResetPassword] = useState<UserWithRole | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+
+  // Monthly bonus goal state
+  const [bonusGoalMiles, setBonusGoalMiles] = useState('12000');
+  const [isSavingBonusGoal, setIsSavingBonusGoal] = useState(false);
+
+  // Fetch monthly bonus goal from company_settings
+  const { data: bonusGoalSetting } = useQuery({
+    queryKey: ['company-setting', 'monthly_bonus_miles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('*')
+        .eq('setting_key', 'monthly_bonus_miles')
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: hasAdminAccess,
+  });
+
+  // Sync fetched value to local state
+  useEffect(() => {
+    if (bonusGoalSetting?.setting_value) {
+      setBonusGoalMiles(bonusGoalSetting.setting_value);
+    }
+  }, [bonusGoalSetting]);
+
+  const handleSaveBonusGoal = async () => {
+    const miles = Number(bonusGoalMiles);
+    if (!miles || miles <= 0) {
+      toast.error('Please enter a valid number of miles');
+      return;
+    }
+    setIsSavingBonusGoal(true);
+    try {
+      if (bonusGoalSetting) {
+        const { error } = await supabase
+          .from('company_settings')
+          .update({ setting_value: String(miles), updated_at: new Date().toISOString() })
+          .eq('id', bonusGoalSetting.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('company_settings')
+          .insert({
+            setting_key: 'monthly_bonus_miles',
+            setting_value: String(miles),
+            description: 'Monthly miles goal for driver bonus',
+          });
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ['company-setting', 'monthly_bonus_miles'] });
+      toast.success('Bonus goal updated');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save bonus goal');
+    } finally {
+      setIsSavingBonusGoal(false);
+    }
+  };
 
   // Get all profiles with their roles
   const { data: usersWithRoles = [], isLoading } = useQuery({
@@ -578,6 +637,41 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Driver Incentives Card */}
+          <Card className="card-elevated">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-primary" />
+                Driver Incentives
+              </CardTitle>
+              <CardDescription>Configure bonus goals for drivers</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="bonus-goal-miles">Monthly Bonus Goal (Miles)</Label>
+                <Input
+                  id="bonus-goal-miles"
+                  type="number"
+                  min="1000"
+                  step="500"
+                  value={bonusGoalMiles}
+                  onChange={(e) => setBonusGoalMiles(e.target.value)}
+                  placeholder="12000"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Drivers who reach this mileage goal in a month unlock the $0.05/mile bonus
+                </p>
+              </div>
+              <Button
+                onClick={handleSaveBonusGoal}
+                disabled={isSavingBonusGoal}
+                className="gradient-gold text-primary-foreground"
+              >
+                {isSavingBonusGoal ? 'Saving...' : 'Save Goal'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

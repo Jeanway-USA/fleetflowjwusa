@@ -219,7 +219,7 @@ export function AppSidebar() {
           ));
         })()}
         
-        {actuallyIsOwner && (
+        {actuallyIsOwner && !isSimulating && (
           <>
             <SidebarSeparator />
             <SidebarGroup>
