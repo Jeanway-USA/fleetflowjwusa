@@ -18,7 +18,9 @@ import {
   Clock,
   TrendingUp,
   Package,
-  Gauge
+  Gauge,
+  Fuel,
+  Droplets
 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, startOfYear, endOfYear, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 
@@ -118,6 +120,22 @@ export default function DriverStats() {
     enabled: !!driver?.id,
   });
 
+  // Fetch fuel purchases for the period
+  const { data: fuelPurchases = [] } = useQuery({
+    queryKey: ['driver-stats-fuel', driver?.id, dateRange.start, dateRange.end],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fuel_purchases')
+        .select('gallons, total_cost, price_per_gallon')
+        .eq('driver_id', driver?.id)
+        .gte('purchase_date', dateRange.start)
+        .lte('purchase_date', dateRange.end);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!driver?.id,
+  });
+
   // Fetch all-time stats for comparison
   const { data: allTimeLoads = [] } = useQuery({
     queryKey: ['driver-stats-alltime', driver?.id],
@@ -194,6 +212,28 @@ export default function DriverStats() {
   };
 
   const stats = calculateStats();
+
+  // Calculate fuel statistics
+  const fuelStats = (() => {
+    const totalGallons = fuelPurchases.reduce((sum: number, fp: any) => sum + (fp.gallons || 0), 0);
+    const totalFuelCost = fuelPurchases.reduce((sum: number, fp: any) => sum + (fp.total_cost || 0), 0);
+    const avgPricePerGallon = totalGallons > 0 ? totalFuelCost / totalGallons : 0;
+    const mpg = totalGallons > 0 ? stats.totalLoadedMiles / totalGallons : 0;
+    const costPerMile = stats.totalLoadedMiles > 0 ? totalFuelCost / stats.totalLoadedMiles : 0;
+
+    let mpgColor = 'text-destructive';
+    let mpgLabel = 'Poor';
+    if (mpg >= 6.5) {
+      mpgColor = 'text-success';
+      mpgLabel = 'Good';
+    } else if (mpg >= 5.5) {
+      mpgColor = 'text-warning';
+      mpgLabel = 'Average';
+    }
+
+    return { totalGallons, totalFuelCost, avgPricePerGallon, mpg, costPerMile, mpgColor, mpgLabel };
+  })();
+
   const isLoading = driverLoading || loadsLoading;
 
   if (isLoading) {
@@ -386,6 +426,76 @@ export default function DriverStats() {
                 Higher loaded percentage means more efficient routing and less deadhead
               </p>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Fuel & Efficiency */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Fuel className="h-5 w-5" />
+              Fuel &amp; Efficiency
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {fuelPurchases.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No fuel purchases recorded for this period
+              </p>
+            ) : (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Droplets className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Total Gallons</span>
+                    </div>
+                    <p className="text-2xl font-bold">
+                      {fuelStats.totalGallons.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Fuel Cost</span>
+                    </div>
+                    <p className="text-2xl font-bold">
+                      ${fuelStats.totalFuelCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div className={`p-4 rounded-lg border ${
+                    fuelStats.mpg >= 6.5 ? 'bg-success/10 border-success/20' :
+                    fuelStats.mpg >= 5.5 ? 'bg-warning/10 border-warning/20' :
+                    'bg-destructive/10 border-destructive/20'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Gauge className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Avg MPG</span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <p className={`text-2xl font-bold ${fuelStats.mpgColor}`}>
+                        {fuelStats.mpg.toFixed(1)}
+                      </p>
+                      <span className={`text-xs font-medium ${fuelStats.mpgColor}`}>
+                        {fuelStats.mpgLabel}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Route className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Cost/Mile</span>
+                    </div>
+                    <p className="text-2xl font-bold">
+                      ${fuelStats.costPerMile.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  MPG is calculated from loaded miles ÷ gallons purchased. Target: 6.5+ MPG for semi-trucks.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
