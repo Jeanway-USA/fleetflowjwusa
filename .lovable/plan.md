@@ -50,13 +50,14 @@ Caches fuel stop data fetched from Landstar or public sources so we don't scrape
 
 ### Part 2: Edge Function (`landstar-fuel-stops`)
 
-**Secrets needed:** `LANDSTAR_USERNAME` and `LANDSTAR_PASSWORD` (stored via Lovable Cloud secrets)
+**Per-driver credentials:** Each driver stores their own Landstar username/password in `driver_settings` table (columns: `landstar_username`, `landstar_password`). The edge function fetches these per-driver using the service role key.
 
 **Flow:**
 
-1. Receive request with `origin` (lat/lng), `destination` (lat/lng), and optional `corridor_miles` (default 25 miles off-route)
+1. Receive request with `driver_id`, `origin` (lat/lng), `destination` (lat/lng), and optional `corridor_miles` (default 25 miles off-route)
 2. **Attempt Landstar scrape:**
-   - POST to Landstar's login endpoint with stored credentials
+   - Fetch driver's Landstar credentials from `driver_settings`
+   - POST to Landstar's login endpoint with the driver's credentials
    - If authentication succeeds, navigate to their fuel stops/LCAPP page
    - Parse the HTML response for fuel stop locations, prices, and discounts
    - If scraping fails at any point, log the error and fall back
@@ -131,8 +132,8 @@ A card on the driver dashboard (below the active load card) that appears when th
 | Action | File/Resource | Details |
 |--------|---------------|---------|
 | Migration | New SQL migration | Create `fuel_stops_cache` table with RLS policies |
-| Secret | `LANDSTAR_USERNAME` | Landstar portal username |
-| Secret | `LANDSTAR_PASSWORD` | Landstar portal password |
+| DB columns | `driver_settings.landstar_username` | Per-driver Landstar portal username |
+| DB columns | `driver_settings.landstar_password` | Per-driver Landstar portal password |
 | Edge function | `supabase/functions/landstar-fuel-stops/index.ts` | Scrape Landstar + EIA fallback, return fuel stops along route |
 | New component | `src/components/driver/TripFuelPlanner.tsx` | Map-based fuel trip planner card |
 | Modify | `src/pages/DriverDashboard.tsx` | Add TripFuelPlanner below active load |

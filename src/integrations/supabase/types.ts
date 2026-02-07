@@ -741,6 +741,8 @@ export type Database = {
           created_at: string
           driver_id: string
           id: string
+          landstar_password: string | null
+          landstar_username: string | null
           theme_preference: string | null
           updated_at: string
           weekly_miles_goal: number | null
@@ -750,6 +752,8 @@ export type Database = {
           created_at?: string
           driver_id: string
           id?: string
+          landstar_password?: string | null
+          landstar_username?: string | null
           theme_preference?: string | null
           updated_at?: string
           weekly_miles_goal?: number | null
@@ -759,6 +763,8 @@ export type Database = {
           created_at?: string
           driver_id?: string
           id?: string
+          landstar_password?: string | null
+          landstar_username?: string | null
           theme_preference?: string | null
           updated_at?: string
           weekly_miles_goal?: number | null
