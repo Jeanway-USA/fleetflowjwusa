@@ -195,9 +195,10 @@ export function DispatcherAlerts() {
           driver_id: driverId,
           title: action === 'approve' ? 'Request Approved' : 'Request Denied',
           message: action === 'approve' 
-            ? `Your request has been approved.${notes ? ` Notes: ${notes}` : ''}`
-            : `Your request was denied.${notes ? ` Reason: ${notes}` : ''}`,
+            ? `Your request has been approved.${notes ? `\n\nDispatcher notes: ${notes}` : ''}`
+            : `Your request was denied.${notes ? `\n\nReason: ${notes}` : ''}`,
           notification_type: 'request_response',
+          related_id: requestId,
         });
 
       if (notifyError) throw notifyError;
