@@ -397,6 +397,7 @@ export type Database = {
           driver_id: string
           heading: number | null
           id: string
+          is_sharing: boolean
           latitude: number
           load_id: string | null
           longitude: number
@@ -410,6 +411,7 @@ export type Database = {
           driver_id: string
           heading?: number | null
           id?: string
+          is_sharing?: boolean
           latitude: number
           load_id?: string | null
           longitude: number
@@ -423,6 +425,7 @@ export type Database = {
           driver_id?: string
           heading?: number | null
           id?: string
+          is_sharing?: boolean
           latitude?: number
           load_id?: string | null
           longitude?: number
