@@ -12,7 +12,7 @@ interface MonthlyBonusWidgetProps {
   driverId: string;
 }
 
-const TARGET_MILES = 12000;
+const DEFAULT_TARGET_MILES = 12000;
 
 export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
   const hasTriggeredConfetti = useRef(false);
@@ -20,6 +20,22 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd');
   const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd');
   const currentMonth = format(now, 'MMMM yyyy');
+
+  // Fetch configurable bonus goal from company_settings
+  const { data: targetMiles = DEFAULT_TARGET_MILES } = useQuery({
+    queryKey: ['company-setting', 'monthly_bonus_miles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('setting_value')
+        .eq('setting_key', 'monthly_bonus_miles')
+        .maybeSingle();
+
+      if (error) throw error;
+      const parsed = Number(data?.setting_value);
+      return parsed > 0 ? parsed : DEFAULT_TARGET_MILES;
+    },
+  });
 
   const { data: monthlyMiles = 0, isLoading } = useQuery({
     queryKey: ['driver-monthly-miles', driverId, monthStart],
@@ -40,8 +56,8 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
     enabled: !!driverId,
   });
 
-  const percentage = Math.min((monthlyMiles / TARGET_MILES) * 100, 100);
-  const actualPercentage = (monthlyMiles / TARGET_MILES) * 100;
+  const percentage = Math.min((monthlyMiles / targetMiles) * 100, 100);
+  const actualPercentage = (monthlyMiles / targetMiles) * 100;
   const bonusUnlocked = actualPercentage >= 100;
 
   // Trigger confetti when bonus is unlocked
@@ -108,13 +124,13 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Drive {formatMiles(TARGET_MILES)} miles this month to unlock a{' '}
+          Drive {formatMiles(targetMiles)} miles this month to unlock a{' '}
           <span className="font-semibold text-primary">$0.05/mile bonus</span> — every mile counts!
         </p>
 
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium">
-            {isLoading ? '...' : formatMiles(monthlyMiles)} / {formatMiles(TARGET_MILES)} mi
+            {isLoading ? '...' : formatMiles(monthlyMiles)} / {formatMiles(targetMiles)} mi
           </span>
           <Badge variant={badgeVariant} className={bonusUnlocked ? 'bg-green-500 text-white animate-pulse' : ''}>
             {label}
