@@ -1,115 +1,79 @@
 
 
-## Plan: Auto-Sync Fuel Expenses to IFTA Fuel Purchases
+## Plan: Redesign ActiveLoadCard + Fix Estimated Location Logic
 
-### Problem
-When fuel expenses are added through the load expenses panel or imported via Landstar statement on the Finance page, they only go into the `expenses` table. The IFTA Reporting page reads from a separate `fuel_purchases` table, so fuel data must be manually entered twice. This plan eliminates that duplication.
+### Overview
 
-### Approach
-Add a `jurisdiction` (state) field to the expenses table and all fuel entry points. Then use a database trigger to automatically sync Fuel/DEF expenses into the `fuel_purchases` table whenever they are created or updated.
-
----
-
-### Part 1: Database Changes
-
-**Add `jurisdiction` column to `expenses` table:**
-- New nullable `text` column for the US state code (e.g., "TX", "GA")
-- Only relevant for Fuel and DEF expense types
-
-**Create a database trigger function `sync_fuel_expense_to_ifta()`:**
-- Fires on INSERT and UPDATE on the `expenses` table
-- When `expense_type` is "Fuel" or "DEF":
-  - Computes `price_per_gallon` from `amount / gallons` (if gallons > 0)
-  - Upserts a matching row into `fuel_purchases` using a source reference pattern (stores `expense_id` in a new notes-based lookup or a dedicated `source_expense_id` column on `fuel_purchases`)
-  - Maps fields: `expense_date` to `purchase_date`, `amount` to `total_cost`, `gallons`, `vendor`, `jurisdiction`, `truck_id`
-  - For the `driver_id`, looks up the driver from the linked load (`fleet_loads.driver_id`) if `load_id` is set
-- When an expense is DELETED, removes the corresponding `fuel_purchases` record
-- Skips sync if `jurisdiction` is null (IFTA requires a state)
-
-**Add `source_expense_id` column to `fuel_purchases` table:**
-- Nullable UUID column to link back to the originating expense
-- Allows the trigger to find and update/delete the matching IFTA record
-- Unique constraint to prevent duplicate syncs
+Two changes:
+1. Redesign the ActiveLoadCard on the Driver Dashboard to match the compact card style from the Driver Fleet Loads page
+2. Fix the map so that when a driver stops sharing their GPS, the "Estimated" position uses their last known location instead of a random point on the route
 
 ---
 
-### Part 2: Update ExpensesList Component (Load Expenses)
+### Part 1: Redesign ActiveLoadCard
 
-**File:** `src/components/shared/ExpensesList.tsx`
+The current ActiveLoadCard is large and verbose with a big target location box, full addresses, an embedded route map preview, and separate sections for miles, pay, and special instructions. The DriverLoadCard in the Fleet Loads page is much more compact and scannable.
 
-- Add a `jurisdiction` field to the form state
-- Show a state selector dropdown (US states list) when expense type is "Fuel" or "DEF"
-- Pass `jurisdiction` in the expense insert payload
-- The database trigger handles the rest automatically
+**File:** `src/components/driver/ActiveLoadCard.tsx`
 
----
+The card will be restructured to match the DriverLoadCard design:
 
-### Part 3: Update Finance Page Expense Form
+- **Status color bar** at the top (keep as-is)
+- **Load ID and status badge** on one line (e.g., "Load #BH123456" with a status badge)
+- **Route as a single compact line**: Origin city, ST -> Destination city, ST (with MapPin icon and arrow)
+- **Date/time row**: Shows pickup or delivery date depending on status, with relative timestamps for delivered loads
+- **Miles and estimated pay** on one line with a border-top separator
+- **Action buttons row**: "Load Details" and the status progression button side-by-side (equally sized)
+- **Remove** the large target location box, the embedded route map preview, the separate special instructions section, and the separate miles/pay blocks
 
-**File:** `src/pages/Finance.tsx`
+The Load Details dialog will remain mostly the same (it is only shown on tap), preserving full addresses, special instructions, and all detail fields.
 
-- Add `jurisdiction` to the expense dialog form
-- Show the state selector when creating/editing Fuel or DEF expenses
-- Include `jurisdiction` in create and update mutations
+The empty state (no active load) stays the same.
 
----
-
-### Part 4: Update Landstar Statement Import
-
-**File:** `src/components/finance/StatementUpload.tsx`
-
-- The Landstar parser already extracts vendor locations which often contain state info
-- Add a `jurisdiction` field to the `ExpenseWithMatch` interface
-- During import, attempt to infer the state from the vendor name/description (common patterns like "PILOT DALLAS TX" or "TA FORT WORTH TX")
-- Include `jurisdiction` in the expense insert payload
-- The database trigger will automatically create the `fuel_purchases` record
+Key helper functions being aligned to match the DriverLoadsView patterns:
+- `getCondensedAddress` will return a simple string (City, ST) instead of an object with full/short
+- Status colors will use the same color scheme (amber for pending, blue for assigned, purple for loading, emerald for in_transit)
+- Date formatting will use the same conditional logic (pickup vs delivery based on status)
 
 ---
 
-### Part 5: Update IFTA Page
+### Part 2: Fix Estimated Location After GPS Stops
 
-**File:** `src/pages/IFTA.tsx`
+**Problem:** When a driver stops GPS sharing, the `LocationSharing` component deletes their `driver_locations` row entirely. Then in `FleetMapView`, the fallback uses `getProgressFromStatus('in_transit')` which returns `0.5 + Math.random() * 0.3` -- a different random position on every re-render.
 
-- Add a visual indicator on fuel purchases that were auto-synced from expenses (via `source_expense_id`)
-- These auto-synced records should still be editable on the IFTA page for jurisdiction corrections
+**Solution:** Stop deleting the `driver_locations` row when a driver turns off GPS. Instead, add an `is_sharing` boolean column to the table. The FleetMapView already differentiates "live" vs "estimated" using a 10-minute freshness check -- we will enhance this to also use the `is_sharing` flag. When a driver stops sharing, their last coordinates stay in the database and are used as the estimated position.
 
----
+**Database migration:**
+- Add `is_sharing` boolean column to `driver_locations`, default `true`
 
-### Data Flow Diagram
+**File:** `src/components/driver/LocationSharing.tsx`
 
-```
-Expense Added (any entry point)
-    |
-    v
-expenses table INSERT/UPDATE
-    |
-    v
-[DB Trigger: sync_fuel_expense_to_ifta]
-    |
-    +-- Is Fuel or DEF?
-    |       |
-    |       +-- Has jurisdiction?
-    |       |       |
-    |       |       v
-    |       |   UPSERT into fuel_purchases
-    |       |   (linked via source_expense_id)
-    |       |
-    |       +-- No jurisdiction -> Skip IFTA sync
-    |
-    +-- Not Fuel/DEF -> Skip
-```
+- **Stop sharing**: Instead of calling `deleteLocation` (which removes the row), call a new `deactivateLocation` mutation that sets `is_sharing = false` on the existing row
+- **Start sharing**: When upserting location, also set `is_sharing = true`
+- Remove the `deleteLocation` mutation entirely
+
+**File:** `src/components/dispatcher/FleetMapView.tsx`
+
+- **Fetch all driver locations** (remove the 10-minute filter from the initial useEffect that populates `driverLocations`). Instead, include all records.
+- **Determine live vs estimated**: A location is "live" when `is_sharing = true` AND `updated_at` is within 10 minutes. Otherwise it is "last known" (estimated).
+- **Priority order for truck position**:
+  1. Live GPS (green pulsing icon) -- `is_sharing = true` and fresh
+  2. Last known GPS from `driver_locations` (blue icon) -- row exists but `is_sharing = false` or stale
+  3. Interpolated position (blue icon) -- only if no `driver_locations` record exists at all
+
+**File:** `src/lib/geocoding.ts`
+
+- Remove `Math.random()` from `getProgressFromStatus` for the `in_transit` case. Use a fixed value (e.g., `0.5`) instead. This ensures that for the rare case where no location record exists at all, the estimated position is at least stable rather than jumping around on every render.
 
 ---
 
 ### Technical Summary
 
-| Action | File/Location | Details |
-|--------|--------------|---------|
-| Migration | New SQL migration | Add `jurisdiction` to `expenses`, add `source_expense_id` to `fuel_purchases`, create sync trigger |
-| Modify | `src/components/shared/ExpensesList.tsx` | Add state selector for Fuel/DEF expenses |
-| Modify | `src/pages/Finance.tsx` | Add state selector to expense dialog for Fuel/DEF |
-| Modify | `src/components/finance/StatementUpload.tsx` | Extract/include jurisdiction on imported fuel expenses |
-| Modify | `src/pages/IFTA.tsx` | Show sync indicator on auto-created records |
-
-No new components needed. The database trigger ensures every entry point (load expenses, finance page, Landstar import) automatically syncs to IFTA without any additional frontend logic.
+| Action | File | Details |
+|--------|------|---------|
+| Migration | New SQL migration | Add `is_sharing` boolean column to `driver_locations` |
+| Modify | `src/components/driver/ActiveLoadCard.tsx` | Redesign card to compact format matching DriverLoadCard style |
+| Modify | `src/components/driver/LocationSharing.tsx` | Replace delete with `is_sharing = false` update on stop |
+| Modify | `src/components/dispatcher/FleetMapView.tsx` | Use last known GPS coords as estimated position, update live detection logic |
+| Modify | `src/lib/geocoding.ts` | Remove `Math.random()` from `getProgressFromStatus` |
 
