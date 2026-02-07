@@ -7,12 +7,10 @@ import { ActiveLoadCard } from '@/components/driver/ActiveLoadCard';
 import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
 import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
 import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
-import { DVIRButtons } from '@/components/driver/DVIRButtons';
-import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
 import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
-import { DVIRHistory } from '@/components/driver/DVIRHistory';
 import { LocationSharing } from '@/components/driver/LocationSharing';
 import { DriverNotifications } from '@/components/driver/DriverNotifications';
+import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
 import { Loader2, Sun, Moon, AlertTriangle } from 'lucide-react';
 
 export default function DriverDashboard() {
@@ -66,45 +64,9 @@ export default function DriverDashboard() {
     enabled: !!driver?.id,
   });
 
-  // Get today's inspections
-  const { data: todayInspections = [] } = useQuery({
-    queryKey: ['driver-inspections-today', driver?.id],
-    queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
-        .from('driver_inspections')
-        .select('*')
-        .eq('driver_id', driver?.id)
-        .gte('inspection_date', today + 'T00:00:00')
-        .lte('inspection_date', today + 'T23:59:59');
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!driver?.id,
-  });
-
-  // Get open maintenance requests
-  const { data: maintenanceRequests = [] } = useQuery({
-    queryKey: ['driver-maintenance-requests', driver?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('maintenance_requests')
-        .select('*, trucks(*)')
-        .eq('driver_id', driver?.id)
-        .neq('status', 'completed')
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!driver?.id,
-  });
-
   const isLoading = driverLoading || loadsLoading;
   const activeLoad = activeLoads.find(l => l.status === 'in_transit' || l.status === 'loading') || activeLoads[0];
   const nextLoad = activeLoads.find(l => l.id !== activeLoad?.id);
-
-  const hasPreTrip = todayInspections.some(i => i.inspection_type === 'pre_trip');
-  const hasPostTrip = todayInspections.some(i => i.inspection_type === 'post_trip');
 
   if (isLoading) {
     return (
@@ -173,16 +135,8 @@ export default function DriverDashboard() {
         {/* Next Load Preview */}
         {nextLoad && <NextLoadPreview load={nextLoad} />}
 
-        {/* Quick Actions - Full Width Row */}
-        <div className="grid grid-cols-3 gap-2">
-          <DVIRButtons 
-            driverId={driver.id} 
-            truckId={assignedTruck?.id} 
-            hasPreTrip={hasPreTrip}
-            hasPostTrip={hasPostTrip}
-          />
-          <DocumentScanButton driverId={driver.id} />
-        </div>
+        {/* Scan Doc Button */}
+        <DocumentScanButton driverId={driver.id} />
 
         {/* GPS + Pay in one row on larger screens */}
         <div className="grid gap-3 md:grid-cols-2">
@@ -201,15 +155,13 @@ export default function DriverDashboard() {
         {/* Monthly Bonus Goal */}
         <MonthlyBonusWidget driverId={driver.id} />
 
-        {/* Maintenance Request Status */}
-        <MaintenanceRequestCard 
-          requests={maintenanceRequests}
+        {/* Unified Driver Requests */}
+        <DriverRequestsCard 
           driverId={driver.id}
           truckId={assignedTruck?.id}
+          activeLoadId={activeLoad?.id}
+          activeLoadNumber={activeLoad?.landstar_load_id}
         />
-
-        {/* DVIR History */}
-        <DVIRHistory driverId={driver.id} />
       </div>
     </DashboardLayout>
   );
