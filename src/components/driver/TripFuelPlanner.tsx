@@ -4,15 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { geocodeLocationAsync } from '@/lib/geocoding';
+import { fetchRoute } from '@/lib/routing';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Fuel, RefreshCw, MapPin, Clock, DollarSign, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { Fuel, RefreshCw, Clock, DollarSign, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { ExpandableMap } from '@/components/shared/ExpandableMap';
 
 interface FuelStop {
   id?: string;
@@ -103,8 +104,9 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
   const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [destCoords, setDestCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geocoding, setGeocoding] = useState(true);
+  const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
 
-  // Geocode origin and destination
+  // Geocode origin and destination, then fetch route
   useEffect(() => {
     let cancelled = false;
     setGeocoding(true);
@@ -112,10 +114,17 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
     Promise.all([
       geocodeLocationAsync(origin),
       geocodeLocationAsync(destination),
-    ]).then(([o, d]) => {
+    ]).then(async ([o, d]) => {
       if (cancelled) return;
       setOriginCoords(o);
       setDestCoords(d);
+
+      // Fetch real road route
+      if (o && d) {
+        const route = await fetchRoute(o, d);
+        if (!cancelled) setRouteCoords(route);
+      }
+
       setGeocoding(false);
     }).catch(() => {
       if (!cancelled) setGeocoding(false);
@@ -150,7 +159,7 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
       };
     },
     enabled: !!originCoords && !!destCoords,
-    staleTime: 30 * 60 * 1000, // 30 min
+    staleTime: 30 * 60 * 1000,
     retry: 1,
   });
 
@@ -182,12 +191,16 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
 
   // Map bounds points
   const mapPoints = useMemo((): [number, number][] => {
-    const points: [number, number][] = [];
-    if (originCoords) points.push([originCoords.lat, originCoords.lng]);
-    if (destCoords) points.push([destCoords.lat, destCoords.lng]);
+    // Use route coordinates for bounds if available
+    const points: [number, number][] = routeCoords && routeCoords.length > 1
+      ? [...routeCoords]
+      : [
+          ...(originCoords ? [[originCoords.lat, originCoords.lng] as [number, number]] : []),
+          ...(destCoords ? [[destCoords.lat, destCoords.lng] as [number, number]] : []),
+        ];
     fuelStops.forEach(s => points.push([s.latitude, s.longitude]));
     return points;
-  }, [originCoords, destCoords, fuelStops]);
+  }, [originCoords, destCoords, fuelStops, routeCoords]);
 
   const handleRefresh = () => {
     refetch();
@@ -214,8 +227,80 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
   }
 
   if (!originCoords || !destCoords) {
-    return null; // Can't show planner without geocoded locations
+    return null;
   }
+
+  const routePositions: [number, number][] = routeCoords && routeCoords.length > 0
+    ? routeCoords
+    : [[originCoords.lat, originCoords.lng], [destCoords.lat, destCoords.lng]];
+
+  const renderMap = ({ isExpanded }: { isExpanded: boolean }) => (
+    <div className={isExpanded ? 'w-full h-full' : 'h-48 w-full rounded-lg overflow-hidden border border-border'}>
+      <MapContainer
+        center={[originCoords.lat, originCoords.lng]}
+        zoom={5}
+        style={{ height: '100%', width: '100%' }}
+        zoomControl={isExpanded}
+        dragging={isExpanded}
+        scrollWheelZoom={isExpanded}
+        doubleClickZoom={isExpanded}
+        touchZoom={isExpanded}
+        attributionControl={false}
+        className="z-0"
+      >
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <FitBounds points={mapPoints} />
+
+        {/* Route line — real road */}
+        <Polyline
+          positions={routePositions}
+          pathOptions={{
+            color: 'hsl(var(--primary))',
+            weight: 3,
+            opacity: 0.8,
+          }}
+        />
+
+        {/* Origin & Destination */}
+        <Marker position={[originCoords.lat, originCoords.lng]} icon={originIcon} />
+        <Marker position={[destCoords.lat, destCoords.lng]} icon={destinationIcon} />
+
+        {/* Fuel stop markers */}
+        {fuelStops.map((stop, i) => (
+          <Marker
+            key={`${stop.name}-${i}`}
+            position={[stop.latitude, stop.longitude]}
+            icon={stop.lcapp_discount ? lcappStopIcon : regularStopIcon}
+          >
+            <Popup>
+              <div className="text-sm min-w-[180px]">
+                <p className="font-semibold">{stop.name}</p>
+                {stop.chain && <p className="text-xs text-gray-500">{stop.chain}</p>}
+                <div className="mt-1 space-y-0.5">
+                  <p>Diesel: <span className="font-medium">${stop.diesel_price?.toFixed(2)}/gal</span></p>
+                  {stop.lcapp_discount && stop.lcapp_discount > 0 && (
+                    <p className="text-green-600 font-medium">
+                      LCAPP: -${stop.lcapp_discount.toFixed(2)}/gal → ${stop.net_price?.toFixed(2)}
+                    </p>
+                  )}
+                  {stop.distance_from_route !== undefined && (
+                    <p className="text-xs text-gray-500">
+                      {stop.distance_from_route.toFixed(0)} mi off route
+                    </p>
+                  )}
+                </div>
+                {stop.amenities && stop.amenities.length > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {stop.amenities.join(' · ')}
+                  </p>
+                )}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+    </div>
+  );
 
   return (
     <Card>
@@ -250,67 +335,8 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {/* Map */}
-        <div className="h-48 w-full rounded-lg overflow-hidden border border-border">
-          <MapContainer
-            center={[originCoords.lat, originCoords.lng]}
-            zoom={5}
-            style={{ height: '100%', width: '100%' }}
-            zoomControl={false}
-            attributionControl={false}
-            className="z-0"
-          >
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <FitBounds points={mapPoints} />
-
-            {/* Route line */}
-            <Polyline
-              positions={[
-                [originCoords.lat, originCoords.lng],
-                [destCoords.lat, destCoords.lng],
-              ]}
-              pathOptions={{ color: 'hsl(var(--primary))', weight: 3, opacity: 0.7, dashArray: '8,8' }}
-            />
-
-            {/* Origin & Destination */}
-            <Marker position={[originCoords.lat, originCoords.lng]} icon={originIcon} />
-            <Marker position={[destCoords.lat, destCoords.lng]} icon={destinationIcon} />
-
-            {/* Fuel stop markers */}
-            {fuelStops.map((stop, i) => (
-              <Marker
-                key={`${stop.name}-${i}`}
-                position={[stop.latitude, stop.longitude]}
-                icon={stop.lcapp_discount ? lcappStopIcon : regularStopIcon}
-              >
-                <Popup>
-                  <div className="text-sm min-w-[180px]">
-                    <p className="font-semibold">{stop.name}</p>
-                    {stop.chain && <p className="text-xs text-gray-500">{stop.chain}</p>}
-                    <div className="mt-1 space-y-0.5">
-                      <p>Diesel: <span className="font-medium">${stop.diesel_price?.toFixed(2)}/gal</span></p>
-                      {stop.lcapp_discount && stop.lcapp_discount > 0 && (
-                        <p className="text-green-600 font-medium">
-                          LCAPP: -${stop.lcapp_discount.toFixed(2)}/gal → ${stop.net_price?.toFixed(2)}
-                        </p>
-                      )}
-                      {stop.distance_from_route !== undefined && (
-                        <p className="text-xs text-gray-500">
-                          {stop.distance_from_route.toFixed(0)} mi off route
-                        </p>
-                      )}
-                    </div>
-                    {stop.amenities && stop.amenities.length > 0 && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        {stop.amenities.join(' · ')}
-                      </p>
-                    )}
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
-        </div>
+        {/* Map with expand capability */}
+        <ExpandableMap renderMap={renderMap} title={`Fuel Plan: ${origin} → ${destination}`} />
 
         {/* Legend */}
         <div className="flex items-center gap-4 text-xs text-muted-foreground">

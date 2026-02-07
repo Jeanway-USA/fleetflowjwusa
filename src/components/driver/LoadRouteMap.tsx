@@ -3,7 +3,9 @@ import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { geocodeLocationAsync } from '@/lib/geocoding';
+import { fetchRoute } from '@/lib/routing';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ExpandableMap } from '@/components/shared/ExpandableMap';
 
 interface Coordinates {
   lat: number;
@@ -39,16 +41,15 @@ const destinationIcon = L.divIcon({
 });
 
 // Auto-fit bounds when coordinates are ready
-function FitBounds({ origin, destination }: { origin: Coordinates; destination: Coordinates }) {
+function FitBounds({ points }: { points: [number, number][] }) {
   const map = useMap();
 
   useEffect(() => {
-    const bounds = L.latLngBounds(
-      [origin.lat, origin.lng],
-      [destination.lat, destination.lng]
-    );
-    map.fitBounds(bounds, { padding: [30, 30] });
-  }, [origin, destination, map]);
+    if (points.length >= 2) {
+      const bounds = L.latLngBounds(points);
+      map.fitBounds(bounds, { padding: [30, 30] });
+    }
+  }, [points, map]);
 
   return null;
 }
@@ -56,13 +57,14 @@ function FitBounds({ origin, destination }: { origin: Coordinates; destination: 
 export function LoadRouteMap({ origin, destination }: LoadRouteMapProps) {
   const [originCoords, setOriginCoords] = useState<Coordinates | null>(null);
   const [destCoords, setDestCoords] = useState<Coordinates | null>(null);
+  const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function geocode() {
+    async function geocodeAndRoute() {
       setLoading(true);
       setFailed(false);
 
@@ -79,6 +81,12 @@ export function LoadRouteMap({ origin, destination }: LoadRouteMapProps) {
         } else {
           setOriginCoords(oCoords);
           setDestCoords(dCoords);
+
+          // Fetch real road route if both coordinates exist
+          if (oCoords && dCoords) {
+            const route = await fetchRoute(oCoords, dCoords);
+            if (!cancelled) setRouteCoords(route);
+          }
         }
       } catch {
         if (!cancelled) setFailed(true);
@@ -87,7 +95,7 @@ export function LoadRouteMap({ origin, destination }: LoadRouteMapProps) {
       }
     }
 
-    geocode();
+    geocodeAndRoute();
     return () => { cancelled = true; };
   }, [origin, destination]);
 
@@ -99,45 +107,46 @@ export function LoadRouteMap({ origin, destination }: LoadRouteMapProps) {
     return null; // Silently hide if geocoding fails
   }
 
-  // If only one coordinate resolved, center on it
+  // Compute bounds from route or markers
+  const boundsPoints: [number, number][] = routeCoords && routeCoords.length > 1
+    ? routeCoords
+    : [
+        ...(originCoords ? [[originCoords.lat, originCoords.lng] as [number, number]] : []),
+        ...(destCoords ? [[destCoords.lat, destCoords.lng] as [number, number]] : []),
+      ];
+
   const center: [number, number] = originCoords
     ? [originCoords.lat, originCoords.lng]
     : [destCoords!.lat, destCoords!.lng];
 
-  return (
-    <div className="h-40 w-full rounded-lg overflow-hidden border border-border">
+  const renderMap = ({ isExpanded }: { isExpanded: boolean }) => (
+    <div className={isExpanded ? 'w-full h-full' : 'h-40 w-full rounded-lg overflow-hidden border border-border'}>
       <MapContainer
         center={center}
         zoom={5}
         style={{ height: '100%', width: '100%' }}
-        zoomControl={false}
-        dragging={false}
-        scrollWheelZoom={false}
-        doubleClickZoom={false}
-        touchZoom={false}
+        zoomControl={isExpanded}
+        dragging={isExpanded}
+        scrollWheelZoom={isExpanded}
+        doubleClickZoom={isExpanded}
+        touchZoom={isExpanded}
         attributionControl={false}
         className="z-0"
       >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        
+        {boundsPoints.length >= 2 && <FitBounds points={boundsPoints} />}
 
-        {originCoords && destCoords && (
-          <>
-            <FitBounds origin={originCoords} destination={destCoords} />
-            <Polyline
-              positions={[
-                [originCoords.lat, originCoords.lng],
-                [destCoords.lat, destCoords.lng],
-              ]}
-              pathOptions={{
-                color: 'hsl(var(--primary))',
-                weight: 3,
-                opacity: 0.7,
-                dashArray: '8, 8',
-              }}
-            />
-          </>
+        {/* Route polyline — real road or straight-line fallback */}
+        {routeCoords && routeCoords.length > 0 && (
+          <Polyline
+            positions={routeCoords}
+            pathOptions={{
+              color: 'hsl(var(--primary))',
+              weight: 3,
+              opacity: 0.8,
+            }}
+          />
         )}
 
         {originCoords && (
@@ -149,5 +158,9 @@ export function LoadRouteMap({ origin, destination }: LoadRouteMapProps) {
         )}
       </MapContainer>
     </div>
+  );
+
+  return (
+    <ExpandableMap renderMap={renderMap} title={`Route: ${origin} → ${destination}`} />
   );
 }
