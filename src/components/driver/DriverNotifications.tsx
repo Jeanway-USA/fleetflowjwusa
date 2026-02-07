@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, Package, Check, X, ChevronDown, MessageSquareReply, Clock, Home, CalendarDays, Wrench } from 'lucide-react';
+import { Bell, Package, Check, X, ChevronDown, MessageSquareReply, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface DriverNotificationsProps {
   driverId: string;
@@ -103,6 +104,35 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
     },
   });
 
+  // Delete single notification
+  const deleteNotificationMutation = useMutation({
+    mutationFn: async (notificationId: string) => {
+      const { error } = await supabase
+        .from('driver_notifications')
+        .delete()
+        .eq('id', notificationId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['driver-notifications', driverId] });
+    },
+  });
+
+  // Clear all notifications
+  const clearAllMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('driver_notifications')
+        .delete()
+        .eq('driver_id', driverId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['driver-notifications', driverId] });
+      toast.success('All notifications cleared');
+    },
+  });
+
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   const hasRedirect = (type: string) => type === 'load_assigned';
@@ -149,17 +179,31 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between p-3 border-b">
           <h4 className="font-semibold">Notifications</h4>
-          {unreadCount > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="text-xs h-7"
-              onClick={() => markAllAsReadMutation.mutate()}
-            >
-              <Check className="h-3 w-3 mr-1" />
-              Mark all read
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {unreadCount > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs h-7"
+                onClick={() => markAllAsReadMutation.mutate()}
+              >
+                <Check className="h-3 w-3 mr-1" />
+                Mark all read
+              </Button>
+            )}
+            {notifications.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7 text-destructive hover:text-destructive"
+                onClick={() => clearAllMutation.mutate()}
+                disabled={clearAllMutation.isPending}
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Clear all
+              </Button>
+            )}
+          </div>
         </div>
         
         <ScrollArea className="h-[300px]">
@@ -197,9 +241,21 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
                     }`}>
                       {notification.message}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNotificationMutation.mutate(notification.id);
+                        }}
+                        className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                        title="Delete notification"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
                   </div>
                   {!notification.is_read && (
                     <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />

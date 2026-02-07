@@ -655,6 +655,7 @@ export type Database = {
           created_at: string
           description: string | null
           driver_id: string
+          end_date: string | null
           id: string
           load_id: string | null
           priority: string
@@ -662,6 +663,7 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           response_notes: string | null
+          start_date: string | null
           status: string
           subject: string
           truck_id: string | null
@@ -671,6 +673,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           driver_id: string
+          end_date?: string | null
           id?: string
           load_id?: string | null
           priority?: string
@@ -678,6 +681,7 @@ export type Database = {
           responded_at?: string | null
           responded_by?: string | null
           response_notes?: string | null
+          start_date?: string | null
           status?: string
           subject: string
           truck_id?: string | null
@@ -687,6 +691,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           driver_id?: string
+          end_date?: string | null
           id?: string
           load_id?: string | null
           priority?: string
@@ -694,6 +699,7 @@ export type Database = {
           responded_at?: string | null
           responded_by?: string | null
           response_notes?: string | null
+          start_date?: string | null
           status?: string
           subject?: string
           truck_id?: string | null

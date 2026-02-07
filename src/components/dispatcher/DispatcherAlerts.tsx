@@ -32,6 +32,8 @@ interface Alert {
     requestId: string;
     driverId: string;
     notes: string;
+    startDate?: string | null;
+    endDate?: string | null;
   };
 }
 
@@ -84,6 +86,8 @@ export function DispatcherAlerts() {
           driver_id,
           load_id,
           truck_id,
+          start_date,
+          end_date,
           driver:drivers!driver_requests_driver_id_fkey(first_name, last_name)
         `)
         .eq('status', 'pending')
@@ -109,6 +113,8 @@ export function DispatcherAlerts() {
             requestId: req.id,
             driverId: req.driver_id,
             notes: req.description || '',
+            startDate: req.start_date,
+            endDate: req.end_date,
           },
         });
       });
@@ -354,6 +360,12 @@ export function DispatcherAlerts() {
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">
                           {alert.description}
                         </p>
+                        {alert.requestData?.startDate && (
+                          <p className="text-xs text-primary mt-0.5">
+                            {format(new Date(alert.requestData.startDate), 'MMM d')}
+                            {alert.requestData.endDate ? ` – ${format(new Date(alert.requestData.endDate), 'MMM d')}` : ''}
+                          </p>
+                        )}
                         
                         {/* Driver request actions */}
                         {alert.type === 'driver_request' && alert.requestData && (
