@@ -1126,6 +1126,57 @@ export type Database = {
           },
         ]
       }
+      fuel_stops_cache: {
+        Row: {
+          amenities: string[] | null
+          chain: string | null
+          city: string | null
+          created_at: string
+          diesel_price: number | null
+          fetched_at: string
+          id: string
+          latitude: number
+          lcapp_discount: number | null
+          longitude: number
+          name: string
+          net_price: number | null
+          source: string
+          state: string
+        }
+        Insert: {
+          amenities?: string[] | null
+          chain?: string | null
+          city?: string | null
+          created_at?: string
+          diesel_price?: number | null
+          fetched_at?: string
+          id?: string
+          latitude: number
+          lcapp_discount?: number | null
+          longitude: number
+          name: string
+          net_price?: number | null
+          source?: string
+          state: string
+        }
+        Update: {
+          amenities?: string[] | null
+          chain?: string | null
+          city?: string | null
+          created_at?: string
+          diesel_price?: number | null
+          fetched_at?: string
+          id?: string
+          latitude?: number
+          lcapp_discount?: number | null
+          longitude?: number
+          name?: string
+          net_price?: number | null
+          source?: string
+          state?: string
+        }
+        Relationships: []
+      }
       general_ledger: {
         Row: {
           amount: number
