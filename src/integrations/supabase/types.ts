@@ -647,6 +647,86 @@ export type Database = {
           },
         ]
       }
+      driver_requests: {
+        Row: {
+          created_at: string
+          description: string | null
+          driver_id: string
+          id: string
+          load_id: string | null
+          priority: string
+          request_type: string
+          responded_at: string | null
+          responded_by: string | null
+          response_notes: string | null
+          status: string
+          subject: string
+          truck_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          driver_id: string
+          id?: string
+          load_id?: string | null
+          priority?: string
+          request_type: string
+          responded_at?: string | null
+          responded_by?: string | null
+          response_notes?: string | null
+          status?: string
+          subject: string
+          truck_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          driver_id?: string
+          id?: string
+          load_id?: string | null
+          priority?: string
+          request_type?: string
+          responded_at?: string | null
+          responded_by?: string | null
+          response_notes?: string | null
+          status?: string
+          subject?: string
+          truck_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_requests_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_requests_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_requests_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_loads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_requests_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_settings: {
         Row: {
           created_at: string

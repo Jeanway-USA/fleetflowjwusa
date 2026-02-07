@@ -8,7 +8,7 @@ import { MapPin, Clock, Truck, Navigation, Package, CheckCircle, Loader2, FileTe
 import { format, differenceInHours, differenceInMinutes, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { RequestDetentionButton } from './RequestDetentionButton';
+
 import { LoadRouteMap } from './LoadRouteMap';
 
 // Helper to format and clean special instructions for better readability
@@ -352,13 +352,6 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
             <FileText className="h-4 w-4 mr-2" />
             Load Details
           </Button>
-          {driverId && !['delivered', 'pending'].includes(load.status) && (
-            <RequestDetentionButton
-              loadId={load.id}
-              driverId={driverId}
-              loadNumber={load.landstar_load_id}
-            />
-          )}
         </div>
 
         {/* Miles & Estimated Pay */}

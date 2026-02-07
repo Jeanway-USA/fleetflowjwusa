@@ -3,20 +3,27 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { ActiveLoadCard } from '@/components/driver/ActiveLoadCard';
 import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
 import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
 import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
-import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
-import { DVIRHistory } from '@/components/driver/DVIRHistory';
 import { LocationSharing } from '@/components/driver/LocationSharing';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, Eye, Truck, MapPin, Phone, Mail } from 'lucide-react';
+import { Loader2, ArrowLeft, Eye, Truck, MapPin, Phone, Mail, Clock, Home, CalendarDays, Wrench } from 'lucide-react';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
+
+type RequestType = 'detention' | 'home_time' | 'pto' | 'maintenance';
+
+const TYPE_META: Record<RequestType, { label: string; icon: React.ReactNode }> = {
+  detention: { label: 'Detention', icon: <Clock className="h-3.5 w-3.5" /> },
+  home_time: { label: 'Home Time', icon: <Home className="h-3.5 w-3.5" /> },
+  pto: { label: 'PTO', icon: <CalendarDays className="h-3.5 w-3.5" /> },
+  maintenance: { label: 'Issue', icon: <Wrench className="h-3.5 w-3.5" /> },
+};
 
 function DriverAvatar({ avatarPath, initials }: { avatarPath: string | null; initials: string }) {
   const isStoragePath = avatarPath && !avatarPath.startsWith('http');
@@ -91,16 +98,16 @@ export default function DriverSpectatorView() {
     enabled: !!driverId,
   });
 
-  // Get open maintenance requests
-  const { data: maintenanceRequests = [] } = useQuery({
-    queryKey: ['driver-maintenance-requests-spectator', driverId],
+  // Get driver requests (unified)
+  const { data: driverRequests = [] } = useQuery({
+    queryKey: ['driver-requests-spectator', driverId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('maintenance_requests')
-        .select('*, trucks(*)')
-        .eq('driver_id', driverId)
-        .neq('status', 'completed')
-        .order('created_at', { ascending: false });
+        .from('driver_requests')
+        .select('*')
+        .eq('driver_id', driverId!)
+        .order('created_at', { ascending: false })
+        .limit(10);
       if (error) throw error;
       return data;
     },
@@ -114,7 +121,7 @@ export default function DriverSpectatorView() {
       const { data, error } = await supabase
         .from('driver_locations')
         .select('*')
-        .eq('driver_id', driverId)
+        .eq('driver_id', driverId!)
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -122,7 +129,7 @@ export default function DriverSpectatorView() {
       return data;
     },
     enabled: !!driverId,
-    refetchInterval: 30000, // Refresh location every 30 seconds
+    refetchInterval: 30000,
   });
 
   const isLoading = driverLoading || loadsLoading;
@@ -218,12 +225,11 @@ export default function DriverSpectatorView() {
           Viewing driver dashboard in read-only mode. Actions are disabled.
         </div>
 
-        {/* Active Load Card (read-only - no status update callback) */}
+        {/* Active Load Card (read-only) */}
         <ActiveLoadCard 
           load={activeLoad} 
           payRate={driver.pay_rate} 
           payType={driver.pay_type}
-          // No onStatusUpdate - makes it read-only
         />
 
         {/* Next Load Preview */}
@@ -256,27 +262,34 @@ export default function DriverSpectatorView() {
         {/* Monthly Bonus Goal */}
         <MonthlyBonusWidget driverId={driver.id} />
 
-        {/* Maintenance Request Status (read-only display) */}
-        {maintenanceRequests.length > 0 && (
+        {/* Driver Requests (read-only) */}
+        {driverRequests.length > 0 && (
           <Card>
             <CardContent className="py-4">
-              <h3 className="font-medium mb-2">Open Maintenance Requests</h3>
+              <h3 className="font-medium mb-2">Driver Requests</h3>
               <div className="space-y-2">
-                {maintenanceRequests.map((req: any) => (
-                  <div key={req.id} className="flex items-center justify-between text-sm p-2 rounded bg-muted/50">
-                    <span>{req.issue_type}: {req.description}</span>
-                    <Badge variant={req.priority === 'urgent' ? 'destructive' : 'secondary'}>
-                      {req.status}
-                    </Badge>
-                  </div>
-                ))}
+                {driverRequests.map((req: any) => {
+                  const meta = TYPE_META[req.request_type as RequestType] || TYPE_META.detention;
+                  return (
+                    <div key={req.id} className="flex items-center gap-2 text-sm p-2 rounded bg-muted/50">
+                      <span className="text-muted-foreground">{meta.icon}</span>
+                      <span className="flex-1 truncate">{req.subject}</span>
+                      <Badge 
+                        variant={req.status === 'approved' ? 'default' : req.status === 'denied' ? 'destructive' : 'outline'}
+                        className="text-xs capitalize"
+                      >
+                        {req.status}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {formatDistanceToNow(new Date(req.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
         )}
-
-        {/* DVIR History */}
-        <DVIRHistory driverId={driver.id} />
       </div>
     </DashboardLayout>
   );
