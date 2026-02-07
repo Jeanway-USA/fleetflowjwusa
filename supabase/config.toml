@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.check-pm-schedules]
 verify_jwt = true
+
+[functions.landstar-fuel-stops]
+verify_jwt = false
