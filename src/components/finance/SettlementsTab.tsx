@@ -256,16 +256,42 @@ export function SettlementsTab() {
         if (driver.pay_type === 'percentage') {
           driverPay = grossRevenue * ((driver.pay_rate || 0) / 100);
         } else if (driver.pay_type === 'per_mile') {
-          // Would need miles data to calculate this
           driverPay = grossRevenue * 0.25; // Default 25% if per_mile
         } else {
           driverPay = driver.pay_rate || 0;
         }
       }
 
+      // Auto-pull fuel advances from expenses
+      const { data: fuelExpenses } = await supabase
+        .from('expenses')
+        .select('amount')
+        .eq('expense_type', 'fuel')
+        .gte('expense_date', formData.period_start)
+        .lte('expense_date', formData.period_end);
+
+      // Auto-pull cash advances (advance_taken from fleet_loads)
+      const loadIds = driverLoads.map(l => l.id);
+      let cashAdvancesTotal = 0;
+      if (loadIds.length > 0) {
+        const { data: loadAdvances } = await supabase
+          .from('fleet_loads')
+          .select('advance_taken, fuel_advance')
+          .in('id', loadIds);
+        
+        if (loadAdvances) {
+          cashAdvancesTotal = loadAdvances.reduce((sum, l) => sum + (l.advance_taken || 0), 0);
+          const fuelAdvancesFromLoads = loadAdvances.reduce((sum, l) => sum + (l.fuel_advance || 0), 0);
+          // Use fuel advances from loads if available
+          if (fuelAdvancesFromLoads > 0) {
+            setFormData(prev => ({ ...prev, fuel_advances: fuelAdvancesFromLoads }));
+          }
+        }
+      }
+
       // Calculate net pay
-      const totalDeductions = (formData.fuel_advances || 0) + 
-                              (formData.cash_advances || 0) + 
+      const fuelAdv = formData.fuel_advances || 0;
+      const totalDeductions = fuelAdv + cashAdvancesTotal + 
                               (formData.escrow_deduction || 0) + 
                               (formData.other_deductions || 0);
       const netPay = driverPay - totalDeductions;
@@ -274,10 +300,11 @@ export function SettlementsTab() {
         ...prev,
         gross_revenue: grossRevenue,
         driver_pay: driverPay,
+        cash_advances: cashAdvancesTotal,
         net_pay: netPay,
       }));
 
-      toast.success(`Found ${driverLoads.length} loads totaling ${formatCurrency(grossRevenue)}`);
+      toast.success(`Found ${driverLoads.length} loads totaling ${formatCurrency(grossRevenue)}${cashAdvancesTotal > 0 ? ` with ${formatCurrency(cashAdvancesTotal)} in advances` : ''}`);
     } catch (error) {
       console.error('Error generating settlement:', error);
       toast.error('Failed to generate settlement');

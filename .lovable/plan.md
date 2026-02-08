@@ -10,6 +10,8 @@ After reviewing every page, component, database table, and the overall architect
 |----------|---------|--------|
 | 1 | Break up Finance.tsx into sub-components (PLSummaryTab, RevenueTab, PayrollTab, CommissionsTab, CompensationSettingsTab) | ✅ Done |
 | 2a | Load lifecycle improvements - added at_pickup, at_delivery, unloading statuses + trailer assignment dropdown + empty miles field | ✅ Done |
+| 2b | Proof of Delivery (POD) workflow - structured capture on delivery with signature, photos, exceptions | ✅ Done |
+| 3 | Automated settlement generation - auto-pulls loads, calculates pay, pulls fuel/cash advances | ✅ Done |
 | 4 | Centralize duplicate utility functions into src/lib/formatters.ts | ✅ Done |
 | 5 | Safety dashboard expansion - integrated DefectAlerts, InspectionHistory, incident trend chart | ✅ Done |
 | 9 | Executive dashboard fixes - real on-time rate calculation, empty miles tracking & ratio | ✅ Done |
