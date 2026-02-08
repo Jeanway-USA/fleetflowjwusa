@@ -116,6 +116,7 @@ export function AppSidebar() {
   ];
 
   const operationsNavItems: NavItem[] = [
+    { title: 'Facilities', icon: Building2, path: '/facilities', roles: ['owner', 'dispatcher', 'safety', 'driver'] },
     { title: 'Resources', icon: BookOpen, path: '/resources', roles: ['owner', 'dispatcher', 'safety', 'driver'] },
     { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'] },
     { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'] },

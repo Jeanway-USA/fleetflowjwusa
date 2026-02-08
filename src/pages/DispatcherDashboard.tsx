@@ -15,6 +15,7 @@ import { TruckStatusGrid } from '@/components/dispatcher/TruckStatusGrid';
 import { DispatcherAlerts } from '@/components/dispatcher/DispatcherAlerts';
 import { FleetMapView } from '@/components/dispatcher/FleetMapView';
 import { DriverAssignmentPanel } from '@/components/dispatcher/DriverAssignmentPanel';
+import { DriverHOSOverview } from '@/components/dispatcher/DriverHOSOverview';
 
 export default function DispatcherDashboard() {
   const { user, roles, hasRole } = useAuth();
@@ -193,9 +194,10 @@ export default function DispatcherDashboard() {
         <UpcomingPickups />
 
         {/* Fleet Status Grid */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-3">
           <DriverStatusGrid />
           <TruckStatusGrid />
+          <DriverHOSOverview />
         </div>
 
         {/* Quick Actions Footer */}
