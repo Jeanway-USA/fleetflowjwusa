@@ -919,6 +919,63 @@ export type Database = {
           },
         ]
       }
+      facilities: {
+        Row: {
+          address: string
+          appointment_required: boolean | null
+          city: string | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          dock_info: string | null
+          facility_type: string
+          id: string
+          name: string
+          notes: string | null
+          operating_hours: string | null
+          state: string | null
+          updated_at: string
+          zip: string | null
+        }
+        Insert: {
+          address: string
+          appointment_required?: boolean | null
+          city?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          dock_info?: string | null
+          facility_type?: string
+          id?: string
+          name: string
+          notes?: string | null
+          operating_hours?: string | null
+          state?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Update: {
+          address?: string
+          appointment_required?: boolean | null
+          city?: string | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          dock_info?: string | null
+          facility_type?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          operating_hours?: string | null
+          state?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Relationships: []
+      }
       fleet_loads: {
         Row: {
           accessorials: number | null
@@ -1224,6 +1281,69 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      hos_logs: {
+        Row: {
+          break_taken: boolean | null
+          created_at: string
+          cycle_hours_used: number
+          driver_id: string
+          driving_hours_used: number
+          duty_status: string
+          id: string
+          last_status_change: string | null
+          log_date: string
+          notes: string | null
+          on_duty_hours_used: number
+          updated_at: string
+          violations: string[] | null
+        }
+        Insert: {
+          break_taken?: boolean | null
+          created_at?: string
+          cycle_hours_used?: number
+          driver_id: string
+          driving_hours_used?: number
+          duty_status?: string
+          id?: string
+          last_status_change?: string | null
+          log_date?: string
+          notes?: string | null
+          on_duty_hours_used?: number
+          updated_at?: string
+          violations?: string[] | null
+        }
+        Update: {
+          break_taken?: boolean | null
+          created_at?: string
+          cycle_hours_used?: number
+          driver_id?: string
+          driving_hours_used?: number
+          duty_status?: string
+          id?: string
+          last_status_change?: string | null
+          log_date?: string
+          notes?: string | null
+          on_duty_hours_used?: number
+          updated_at?: string
+          violations?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hos_logs_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hos_logs_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ifta_records: {
         Row: {
