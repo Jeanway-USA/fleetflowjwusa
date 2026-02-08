@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +36,7 @@ const statusColors: Record<string, string> = {
 
 export function ActiveLoadsBoard() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: loads, isLoading } = useQuery({
     queryKey: ['active-loads-dispatcher'],
@@ -59,6 +61,28 @@ export function ActiveLoadsBoard() {
       return data as ActiveLoad[];
     },
   });
+
+  // Subscribe to real-time load status changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('active-loads-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'fleet_loads',
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   if (isLoading) {
     return (

@@ -1,9 +1,10 @@
+import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Package, Users, Truck, Calendar, Plus, ArrowRight } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { addHours } from 'date-fns';
@@ -18,6 +19,7 @@ import { DriverAssignmentPanel } from '@/components/dispatcher/DriverAssignmentP
 export default function DispatcherDashboard() {
   const { user, roles, hasRole } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Fetch user's first name from profile
   const { data: profile } = useQuery({
@@ -85,6 +87,28 @@ export default function DispatcherDashboard() {
       };
     },
   });
+
+  // Real-time updates for dispatcher stats when loads change
+  useEffect(() => {
+    const channel = supabase
+      .channel('dispatcher-stats-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'fleet_loads',
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['dispatcher-stats'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Redirect if user doesn't have dispatcher or owner role (after all hooks)
   if (!hasRole('dispatcher') && !hasRole('owner') && roles.length > 0) {

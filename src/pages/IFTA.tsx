@@ -12,10 +12,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2 } from 'lucide-react';
+import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { US_STATES } from '@/lib/us-states';
 import { Badge } from '@/components/ui/badge';
+import { STATE_DIESEL_TAX_RATES } from '@/lib/ifta-tax-rates';
 
 interface IFTARecord {
   id: string;
@@ -217,6 +218,143 @@ export default function IFTA() {
   };
 
   const avgMpg = summary.totalGallons > 0 ? summary.totalMiles / summary.totalGallons : 0;
+
+  // --- Auto-generate IFTA records from delivered loads ---
+  const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+
+  // Extract US state abbreviation from an address string
+  const extractState = (address: string): string | null => {
+    if (!address) return null;
+    const parts = address.split(',').map(p => p.trim());
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const match = parts[i].match(/\b([A-Z]{2})\b/);
+      if (match && (US_STATES as readonly string[]).includes(match[1])) {
+        return match[1];
+      }
+    }
+    return null;
+  };
+
+  const autoGenerateIFTA = async () => {
+    setIsAutoGenerating(true);
+    try {
+      const [year, q] = selectedQuarter.split('-');
+      const quarter = parseInt(q.replace('Q', ''));
+      const startMonth = (quarter - 1) * 3;
+      const endMonth = startMonth + 3;
+      const startDate = `${year}-${String(startMonth + 1).padStart(2, '0')}-01`;
+      const endDate = quarter === 4
+        ? `${parseInt(year) + 1}-01-01`
+        : `${year}-${String(endMonth + 1).padStart(2, '0')}-01`;
+
+      // Fetch delivered loads in this quarter
+      const { data: quarterLoads, error: loadsError } = await supabase
+        .from('fleet_loads')
+        .select('id, origin, destination, booked_miles, actual_miles, empty_miles, truck_id, delivery_date')
+        .eq('status', 'delivered')
+        .gte('delivery_date', startDate)
+        .lt('delivery_date', endDate);
+
+      if (loadsError) throw loadsError;
+      if (!quarterLoads || quarterLoads.length === 0) {
+        toast.error('No delivered loads found for this quarter');
+        setIsAutoGenerating(false);
+        return;
+      }
+
+      // Aggregate miles by state
+      // Strategy: split booked_miles evenly between origin and destination states
+      // (A more accurate approach would use route geometry, but this is a practical approximation)
+      const milesByState: Record<string, { totalMiles: number; truckIds: Set<string> }> = {};
+
+      for (const load of quarterLoads) {
+        const originState = extractState(load.origin);
+        const destState = extractState(load.destination);
+        const miles = load.actual_miles || load.booked_miles || 0;
+        const emptyMiles = load.empty_miles || 0;
+        const totalLoadMiles = miles + emptyMiles;
+
+        if (!originState && !destState) continue;
+
+        if (originState === destState && originState) {
+          // Intrastate - all miles in one state
+          if (!milesByState[originState]) milesByState[originState] = { totalMiles: 0, truckIds: new Set() };
+          milesByState[originState].totalMiles += totalLoadMiles;
+          if (load.truck_id) milesByState[originState].truckIds.add(load.truck_id);
+        } else {
+          // Interstate - split miles between states
+          const halfMiles = totalLoadMiles / 2;
+          if (originState) {
+            if (!milesByState[originState]) milesByState[originState] = { totalMiles: 0, truckIds: new Set() };
+            milesByState[originState].totalMiles += halfMiles;
+            if (load.truck_id) milesByState[originState].truckIds.add(load.truck_id);
+          }
+          if (destState) {
+            if (!milesByState[destState]) milesByState[destState] = { totalMiles: 0, truckIds: new Set() };
+            milesByState[destState].totalMiles += halfMiles;
+            if (load.truck_id) milesByState[destState].truckIds.add(load.truck_id);
+          }
+        }
+      }
+
+      // Get fuel purchased by state for this quarter
+      const fuelGallonsByState: Record<string, { gallons: number; cost: number }> = {};
+      filteredFuelPurchases.forEach(fp => {
+        if (!fuelGallonsByState[fp.jurisdiction]) {
+          fuelGallonsByState[fp.jurisdiction] = { gallons: 0, cost: 0 };
+        }
+        fuelGallonsByState[fp.jurisdiction].gallons += fp.gallons;
+        fuelGallonsByState[fp.jurisdiction].cost += fp.total_cost;
+      });
+
+      // Calculate fleet average MPG for IFTA tax computation
+      const totalQuarterMiles = Object.values(milesByState).reduce((s, v) => s + v.totalMiles, 0);
+      const totalQuarterGallons = filteredFuelPurchases.reduce((s, fp) => s + fp.gallons, 0);
+      const fleetMpg = totalQuarterGallons > 0 ? totalQuarterMiles / totalQuarterGallons : 6.0; // Default 6 MPG
+
+      // Build IFTA records
+      const iftaInserts = Object.entries(milesByState).map(([state, data]) => {
+        const taxRate = STATE_DIESEL_TAX_RATES[state] || 0;
+        const totalMiles = Math.round(data.totalMiles);
+        const taxableMiles = totalMiles; // All miles are taxable for IFTA
+        const gallonsConsumed = totalMiles / fleetMpg; // Gallons consumed in this state
+        const fuelData = fuelGallonsByState[state] || { gallons: 0, cost: 0 };
+        // Tax owed = (gallons consumed × tax rate) - (gallons purchased in state × tax rate)
+        const taxOwed = (gallonsConsumed * taxRate) - (fuelData.gallons * taxRate);
+
+        return {
+          quarter: selectedQuarter,
+          jurisdiction: state,
+          total_miles: totalMiles,
+          taxable_miles: taxableMiles,
+          fuel_gallons: parseFloat(fuelData.gallons.toFixed(2)),
+          fuel_cost: parseFloat(fuelData.cost.toFixed(2)),
+          tax_rate: taxRate,
+          tax_owed: parseFloat(taxOwed.toFixed(2)),
+          truck_id: data.truckIds.size === 1 ? Array.from(data.truckIds)[0] : null,
+        };
+      });
+
+      if (iftaInserts.length === 0) {
+        toast.error('Could not extract state data from load addresses');
+        setIsAutoGenerating(false);
+        return;
+      }
+
+      // Delete existing records for this quarter then insert new ones
+      await supabase.from('ifta_records').delete().eq('quarter', selectedQuarter);
+      const { error: insertError } = await supabase.from('ifta_records').insert(iftaInserts);
+      if (insertError) throw insertError;
+
+      queryClient.invalidateQueries({ queryKey: ['ifta_records'] });
+      toast.success(`Generated IFTA records for ${iftaInserts.length} jurisdictions from ${quarterLoads.length} loads (Fleet MPG: ${fleetMpg.toFixed(2)})`);
+    } catch (error: any) {
+      console.error('IFTA auto-generation error:', error);
+      toast.error('Failed to generate IFTA records: ' + error.message);
+    } finally {
+      setIsAutoGenerating(false);
+    }
+  };
 
   // Aggregate fuel by state for summary
   const fuelByState = filteredFuelPurchases.reduce((acc, fp) => {
@@ -467,10 +605,25 @@ export default function IFTA() {
                 <CardTitle>IFTA Report - {selectedQuarter}</CardTitle>
                 <CardDescription>Jurisdiction mileage and tax summary for filing</CardDescription>
               </div>
-              <Button onClick={exportToCSV} variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={autoGenerateIFTA} 
+                  disabled={isAutoGenerating}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {isAutoGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  {isAutoGenerating ? 'Generating...' : 'Auto-Generate from Loads'}
+                </Button>
+                <Button onClick={exportToCSV} variant="outline">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {iftaRecords.length === 0 ? (
