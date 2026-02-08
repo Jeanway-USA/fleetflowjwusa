@@ -5,9 +5,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+// ===== State IFTA Diesel Excise Tax Rates (per gallon) =====
+const STATE_DIESEL_TAX: Record<string, number> = {
+  AL: 0.29, AK: 0.08, AZ: 0.26, AR: 0.285, CA: 0.4175,
+  CO: 0.205, CT: 0.4613, DE: 0.22, FL: 0.36, GA: 0.351,
+  HI: 0.16, ID: 0.32, IL: 0.467, IN: 0.56, IA: 0.325,
+  KS: 0.26, KY: 0.267, LA: 0.20, ME: 0.312, MD: 0.3675,
+  MA: 0.24, MI: 0.267, MN: 0.285, MS: 0.18, MO: 0.195,
+  MT: 0.2975, NE: 0.26, NV: 0.27, NH: 0.234, NJ: 0.485,
+  NM: 0.21, NY: 0.3055, NC: 0.382, ND: 0.23, OH: 0.385,
+  OK: 0.19, OR: 0.38, PA: 0.741, RI: 0.34, SC: 0.28,
+  SD: 0.28, TN: 0.27, TX: 0.20, UT: 0.32, VT: 0.31,
+  VA: 0.302, WA: 0.494, WV: 0.357, WI: 0.327, WY: 0.24,
+};
+
 // ===== LCAPP Partner Directory =====
-// Known truck stop chains participating in Landstar's LCAPP program
-// with typical discount ranges (cents off per gallon)
 const LCAPP_PARTNERS: Record<string, { minDiscount: number; maxDiscount: number; amenities: string[] }> = {
   'Pilot/Flying J': { minDiscount: 0.08, maxDiscount: 0.25, amenities: ['Showers', 'Parking', 'DEF', 'Scales', 'WiFi'] },
   "Love's Travel Stops": { minDiscount: 0.05, maxDiscount: 0.15, amenities: ['Showers', 'Parking', 'DEF', 'Tire Care'] },
@@ -18,7 +30,6 @@ const LCAPP_PARTNERS: Record<string, { minDiscount: number; maxDiscount: number;
 };
 
 // Known truck stop locations along major US interstates
-// This is a curated subset; the full directory would come from scraping
 const KNOWN_STOPS: Array<{
   name: string;
   chain: string;
@@ -82,7 +93,6 @@ const KNOWN_STOPS: Array<{
 ];
 
 // ===== EIA Diesel Price Data =====
-// State-level average diesel prices (fallback if API fails)
 const FALLBACK_DIESEL_PRICES: Record<string, number> = {
   'AL': 3.45, 'AK': 4.10, 'AZ': 3.65, 'AR': 3.40, 'CA': 4.85,
   'CO': 3.55, 'CT': 3.90, 'DE': 3.70, 'FL': 3.60, 'GA': 3.45,
@@ -99,7 +109,7 @@ const FALLBACK_DIESEL_PRICES: Record<string, number> = {
 // ===== Utility Functions =====
 
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 3959; // Earth radius in miles
+  const R = 3959;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
   const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -109,7 +119,6 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
   return R * c;
 }
 
-// Calculate perpendicular distance from a point to a line segment (great circle approx)
 function distanceToRouteSegment(
   pointLat: number, pointLng: number,
   originLat: number, originLng: number,
@@ -119,11 +128,9 @@ function distanceToRouteSegment(
   const d2 = haversineDistance(pointLat, pointLng, destLat, destLng);
   const dRoute = haversineDistance(originLat, originLng, destLat, destLng);
   
-  // If the point is past either endpoint, use distance to nearest endpoint
   if (d1 * d1 > d2 * d2 + dRoute * dRoute) return d2;
   if (d2 * d2 > d1 * d1 + dRoute * dRoute) return d1;
   
-  // Otherwise, calculate perpendicular distance using triangle area
   const s = (d1 + d2 + dRoute) / 2;
   const area = Math.sqrt(Math.max(0, s * (s - d1) * (s - d2) * (s - dRoute)));
   return (2 * area) / dRoute;
@@ -134,7 +141,6 @@ async function attemptLandstarScrape(username: string, password: string): Promis
   console.log('Attempting Landstar portal authentication...');
   
   try {
-    // Attempt login to LandstarOne portal
     const loginResponse = await fetch('https://www.landstaronline.com/login', {
       method: 'POST',
       headers: {
@@ -150,20 +156,17 @@ async function attemptLandstarScrape(username: string, password: string): Promis
 
     console.log(`Landstar login response status: ${loginResponse.status}`);
 
-    // Check if login succeeded (usually returns redirect with session cookie)
     if (loginResponse.status !== 302 && loginResponse.status !== 200) {
       console.warn('Landstar login failed - unexpected status code');
       return null;
     }
 
-    // Extract cookies from response
     const cookies = loginResponse.headers.get('set-cookie');
     if (!cookies) {
       console.warn('Landstar login - no session cookies received');
       return null;
     }
 
-    // Attempt to fetch LCAPP fuel stops page
     const fuelResponse = await fetch('https://www.landstaronline.com/lcapp/fuel-stops', {
       headers: {
         'Cookie': cookies,
@@ -178,11 +181,7 @@ async function attemptLandstarScrape(username: string, password: string): Promis
 
     const html = await fuelResponse.text();
     
-    // Attempt to parse fuel stop data from HTML
-    // This is fragile and depends on Landstar's page structure
     const stops: any[] = [];
-    
-    // Look for JSON data embedded in the page (common pattern for map-based UIs)
     const jsonMatch = html.match(/var\s+(?:fuelStops|stops|locations)\s*=\s*(\[[\\s\\S]*?\]);/);
     if (jsonMatch) {
       try {
@@ -194,7 +193,6 @@ async function attemptLandstarScrape(username: string, password: string): Promis
       }
     }
     
-    // If no JSON found, try parsing HTML table/list structure
     console.warn('Could not find structured fuel data in Landstar response');
     return null;
     
@@ -207,7 +205,6 @@ async function attemptLandstarScrape(username: string, password: string): Promis
 // ===== EIA API =====
 async function fetchEIADieselPrices(): Promise<Record<string, number>> {
   try {
-    // EIA API for weekly retail diesel prices by region
     const response = await fetch(
       'https://api.eia.gov/v2/petroleum/pri/gnd/data/?frequency=weekly&data[0]=value&facets[product][]=EPD2D&facets[duession][]=PG1&sort[0][column]=period&sort[0][direction]=desc&length=10',
       { headers: { 'Accept': 'application/json' } }
@@ -224,8 +221,7 @@ async function fetchEIADieselPrices(): Promise<Record<string, number>> {
       const latestPrice = parseFloat(data.response.data[0].value);
       console.log(`EIA national average diesel: $${latestPrice}/gal`);
       
-      // Scale state prices relative to national average
-      const baseAvg = 3.55; // baseline average used for fallback prices
+      const baseAvg = 3.55;
       const scaleFactor = latestPrice / baseAvg;
       
       const scaled: Record<string, number> = {};
@@ -290,15 +286,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`Fuel stops request: driver=${driver_id}, origin=(${origin_lat},${origin_lng}), dest=(${dest_lat},${dest_lng}), corridor=${corridor_miles}mi`);
+    console.log(`Fuel stops request: driver=${driver_id}, origin=(${origin_lat},${origin_lng}), dest=(${dest_lat},${dest_lng}), corridor=${corridor_miles}mi, force_refresh=${force_refresh}`);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check cache first (6 hour TTL)
+    // Check cache first (6 hour TTL) — skip if force_refresh
     if (!force_refresh) {
       const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
       
-      // Calculate bounding box for the route corridor
       const minLat = Math.min(origin_lat, dest_lat) - (corridor_miles / 69);
       const maxLat = Math.max(origin_lat, dest_lat) + (corridor_miles / 69);
       const minLng = Math.min(origin_lng, dest_lng) - (corridor_miles / 54);
@@ -316,10 +311,10 @@ Deno.serve(async (req) => {
       if (cachedStops && cachedStops.length > 0) {
         console.log(`Returning ${cachedStops.length} cached fuel stops`);
         
-        // Filter by actual corridor distance and sort by net price
         const filtered = cachedStops
           .map(stop => ({
             ...stop,
+            ifta_tax_credit: STATE_DIESEL_TAX[stop.state?.toUpperCase()] ?? 0,
             distance_from_route: distanceToRouteSegment(
               stop.latitude, stop.longitude,
               origin_lat, origin_lng, dest_lat, dest_lng
@@ -363,26 +358,27 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
 
     if (landstarData && landstarData.length > 0) {
-      // Use scraped Landstar data
       console.log(`Processing ${landstarData.length} Landstar fuel stops`);
       for (const stop of landstarData) {
+        const state = (stop.state || '').toUpperCase();
+        const iftaCredit = STATE_DIESEL_TAX[state] ?? 0;
         fuelStops.push({
           name: stop.name || stop.station_name || 'Unknown Stop',
           chain: stop.chain || stop.brand || null,
           latitude: parseFloat(stop.latitude || stop.lat),
           longitude: parseFloat(stop.longitude || stop.lng),
-          state: stop.state || '',
+          state: state,
           city: stop.city || '',
           diesel_price: parseFloat(stop.diesel_price || stop.price || 0),
           lcapp_discount: parseFloat(stop.lcapp_discount || stop.discount || 0),
           net_price: parseFloat(stop.net_price || (stop.price - (stop.discount || 0))),
+          ifta_tax_credit: iftaCredit,
           amenities: stop.amenities || [],
           source: 'landstar',
           fetched_at: now,
         });
       }
     } else {
-      // Use LCAPP partner directory + EIA prices
       console.log('Using LCAPP partner directory with EIA diesel prices');
       
       for (const stop of KNOWN_STOPS) {
@@ -392,6 +388,7 @@ Deno.serve(async (req) => {
           ? parseFloat(((partner.minDiscount + partner.maxDiscount) / 2).toFixed(2))
           : 0;
         const netPrice = parseFloat((statePrice - avgDiscount).toFixed(2));
+        const iftaCredit = STATE_DIESEL_TAX[stop.state] ?? 0;
 
         fuelStops.push({
           name: stop.name,
@@ -403,6 +400,7 @@ Deno.serve(async (req) => {
           diesel_price: statePrice,
           lcapp_discount: avgDiscount > 0 ? avgDiscount : null,
           net_price: netPrice,
+          ifta_tax_credit: iftaCredit,
           amenities: partner?.amenities || [],
           source: 'doe',
           fetched_at: now,
@@ -410,9 +408,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Cache the results (upsert by name + state to avoid duplicates)
+    // Cache the results
     if (fuelStops.length > 0) {
-      // Delete old cached stops in this corridor area
       const minLat = Math.min(origin_lat, dest_lat) - 2;
       const maxLat = Math.max(origin_lat, dest_lat) + 2;
       const minLng = Math.min(origin_lng, dest_lng) - 2;
@@ -426,9 +423,11 @@ Deno.serve(async (req) => {
         .gte('longitude', minLng)
         .lte('longitude', maxLng);
 
+      // Cache without ifta_tax_credit (computed at read time)
+      const cacheStops = fuelStops.map(({ ifta_tax_credit, distance_from_route, distance_from_origin, ...rest }) => rest);
       const { error: insertError } = await supabase
         .from('fuel_stops_cache')
-        .insert(fuelStops);
+        .insert(cacheStops);
 
       if (insertError) {
         console.warn('Failed to cache fuel stops:', insertError);
