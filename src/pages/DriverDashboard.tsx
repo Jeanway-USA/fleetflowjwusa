@@ -12,7 +12,6 @@ import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
 import { LocationSharing } from '@/components/driver/LocationSharing';
 import { DriverNotifications } from '@/components/driver/DriverNotifications';
 import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
-import { HOSStatusCard } from '@/components/driver/HOSStatusCard';
 import { Loader2, Sun, Moon, AlertTriangle } from 'lucide-react';
 
 export default function DriverDashboard() {
@@ -124,9 +123,6 @@ export default function DriverDashboard() {
             <span className="text-warning font-medium">No truck assigned - contact dispatch</span>
           </div>
         )}
-
-        {/* HOS Status */}
-        <HOSStatusCard driverId={driver.id} />
 
         {/* Active Load Card */}
         <ActiveLoadCard 
