@@ -104,7 +104,7 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
 
   // Fetch fuel stops from edge function
   const { data: fuelData, isLoading: fuelLoading, refetch, isFetching } = useQuery({
-    queryKey: ['fuel-stops', driverId, originCoords?.lat, destCoords?.lat],
+    queryKey: ['fuel-stops', driverId, originCoords?.lat, destCoords?.lat, geocodedStops.length],
     queryFn: async () => {
       if (!originCoords || !destCoords) return null;
 
@@ -118,6 +118,7 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
           origin_lng: originCoords.lng,
           dest_lat: destCoords.lat,
           dest_lng: destCoords.lng,
+          waypoints: geocodedStops.map(s => ({ lat: s.coords.lat, lng: s.coords.lng })),
           corridor_miles: 50,
           force_refresh: shouldForce,
         },
@@ -141,7 +142,7 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
         filtered_count: number;
       };
     },
-    enabled: !!originCoords && !!destCoords,
+    enabled: !!originCoords && !!destCoords && !geocoding,
     staleTime: 30 * 60 * 1000,
     retry: 1,
   });
