@@ -14,6 +14,8 @@ After reviewing every page, component, database table, and the overall architect
 | 3 | Automated settlement generation - auto-pulls loads, calculates pay, pulls fuel/cash advances | ✅ Done |
 | 4 | Centralize duplicate utility functions into src/lib/formatters.ts | ✅ Done |
 | 5 | Safety dashboard expansion - integrated DefectAlerts, InspectionHistory, incident trend chart | ✅ Done |
+| 6 | IFTA auto-calculation from delivered loads with tax rate lookup | ✅ Done |
+| 8 | Real-time dispatcher updates via Supabase Realtime on fleet_loads | ✅ Done |
 | 9 | Executive dashboard fixes - real on-time rate calculation, empty miles tracking & ratio | ✅ Done |
 
 ---
@@ -22,11 +24,7 @@ After reviewing every page, component, database table, and the overall architect
 
 | Priority | Feature | Impact |
 |----------|---------|--------|
-| 2b | Proof of Delivery (POD) workflow - structured capture on delivery | Core TMS functionality |
-| 3 | Automated settlement generation from delivered loads | Major time savings for payroll |
-| 6 | Auto-calculate IFTA miles from routes | Quarterly tax filing efficiency |
 | 7 | Customer/Facility database | Reduce repeated data entry |
-| 8 | Real-time dispatcher updates | Operational efficiency |
 | 10 | HOS tracking or ELD status display | FMCSA compliance |
 
 ---
