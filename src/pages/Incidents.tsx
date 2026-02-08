@@ -213,7 +213,7 @@ export default function Incidents() {
     );
   };
 
-  const formatCurrency = (value: number | null) => {
+  const formatCurrencyValue = (value: number | null) => {
     if (!value) return '$0';
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
   };
@@ -321,7 +321,7 @@ export default function Incidents() {
                       <TableCell>{getDriverName(incident.driver_id)}</TableCell>
                       <TableCell>{getTruckName(incident.truck_id)}</TableCell>
                       <TableCell className="max-w-[200px] truncate">{incident.location_description || '-'}</TableCell>
-                      <TableCell>{formatCurrency(incident.estimated_damage)}</TableCell>
+                      <TableCell>{formatCurrencyValue(incident.estimated_damage)}</TableCell>
                       <TableCell><StatusBadge status={incident.status} /></TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -572,7 +572,7 @@ export default function Incidents() {
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Estimated Damage</Label>
-                  <p className="font-medium">{formatCurrency(viewingIncident.estimated_damage)}</p>
+                  <p className="font-medium">{formatCurrencyValue(viewingIncident.estimated_damage)}</p>
                 </div>
                 {viewingIncident.police_report_number && (
                   <div>

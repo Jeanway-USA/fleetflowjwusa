@@ -106,6 +106,15 @@ export default function FleetLoads() {
     },
   });
 
+  const { data: trailers = [] } = useQuery({
+    queryKey: ['trailers'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('trailers').select('*').in('status', ['active', 'in_use']);
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: async ({ load, accessorials: accs }: { load: any; accessorials: Accessorial[] }) => {
       const { data, error } = await supabase.from('fleet_loads').insert(load).select().single();
@@ -708,8 +717,11 @@ export default function FleetLoads() {
                       <SelectContent>
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="assigned">Assigned</SelectItem>
+                        <SelectItem value="at_pickup">At Pickup</SelectItem>
                         <SelectItem value="loading">Loading</SelectItem>
                         <SelectItem value="in_transit">In Transit</SelectItem>
+                        <SelectItem value="at_delivery">At Delivery</SelectItem>
+                        <SelectItem value="unloading">Unloading</SelectItem>
                         <SelectItem value="delivered">Delivered</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
@@ -781,7 +793,7 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="driver_id">Driver</Label>
                     <Select value={formData.driver_id || 'none'} onValueChange={(v) => setFormData({ ...formData, driver_id: v === 'none' ? null : v })}>
@@ -801,6 +813,29 @@ export default function FleetLoads() {
                         {trucks.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.unit_number}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="trailer_id">Trailer</Label>
+                    <Select value={formData.trailer_id || 'none'} onValueChange={(v) => setFormData({ ...formData, trailer_id: v === 'none' ? null : v })}>
+                      <SelectTrigger><SelectValue placeholder="Select trailer" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Unassigned</SelectItem>
+                        {trailers.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.unit_number}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="empty_miles">Empty / Deadhead Miles</Label>
+                    <Input 
+                      id="empty_miles" 
+                      type="number" 
+                      value={formData.empty_miles || ''} 
+                      onChange={(e) => setFormData({ ...formData, empty_miles: parseInt(e.target.value) || 0 })} 
+                      placeholder="0"
+                    />
                   </div>
                 </div>
 
