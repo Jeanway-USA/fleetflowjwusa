@@ -128,12 +128,43 @@ function distanceToRouteSegment(
   const d2 = haversineDistance(pointLat, pointLng, destLat, destLng);
   const dRoute = haversineDistance(originLat, originLng, destLat, destLng);
   
+  if (dRoute < 0.1) return d1; // origin and dest are the same point
   if (d1 * d1 > d2 * d2 + dRoute * dRoute) return d2;
   if (d2 * d2 > d1 * d1 + dRoute * dRoute) return d1;
   
   const s = (d1 + d2 + dRoute) / 2;
   const area = Math.sqrt(Math.max(0, s * (s - d1) * (s - d2) * (s - dRoute)));
   return (2 * area) / dRoute;
+}
+
+// Build route segments from origin → waypoints → destination and return min distance
+function distanceToMultiSegmentRoute(
+  pointLat: number, pointLng: number,
+  originLat: number, originLng: number,
+  destLat: number, destLng: number,
+  waypoints?: Array<{ lat: number; lng: number }>
+): number {
+  if (!waypoints || waypoints.length === 0) {
+    return distanceToRouteSegment(pointLat, pointLng, originLat, originLng, destLat, destLng);
+  }
+
+  // Build ordered list of points: origin, wp1, wp2, ..., destination
+  const points = [
+    { lat: originLat, lng: originLng },
+    ...waypoints,
+    { lat: destLat, lng: destLng },
+  ];
+
+  let minDist = Infinity;
+  for (let i = 0; i < points.length - 1; i++) {
+    const d = distanceToRouteSegment(
+      pointLat, pointLng,
+      points[i].lat, points[i].lng,
+      points[i + 1].lat, points[i + 1].lng
+    );
+    if (d < minDist) minDist = d;
+  }
+  return minDist;
 }
 
 // ===== Landstar Scraper =====
@@ -275,9 +306,12 @@ Deno.serve(async (req) => {
       driver_id, 
       origin_lat, origin_lng, 
       dest_lat, dest_lng, 
+      waypoints = [] as Array<{ lat: number; lng: number }>,
       corridor_miles = 50,
       force_refresh = false 
     } = body;
+
+    console.log(`Waypoints received: ${waypoints.length}`);
 
     if (!driver_id || !origin_lat || !origin_lng || !dest_lat || !dest_lng) {
       return new Response(
@@ -294,10 +328,12 @@ Deno.serve(async (req) => {
     if (!force_refresh) {
       const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
       
-      const minLat = Math.min(origin_lat, dest_lat) - (corridor_miles / 69);
-      const maxLat = Math.max(origin_lat, dest_lat) + (corridor_miles / 69);
-      const minLng = Math.min(origin_lng, dest_lng) - (corridor_miles / 54);
-      const maxLng = Math.max(origin_lng, dest_lng) + (corridor_miles / 54);
+      const allLats = [origin_lat, dest_lat, ...waypoints.map((w: any) => w.lat)];
+      const allLngs = [origin_lng, dest_lng, ...waypoints.map((w: any) => w.lng)];
+      const minLat = Math.min(...allLats) - (corridor_miles / 69);
+      const maxLat = Math.max(...allLats) + (corridor_miles / 69);
+      const minLng = Math.min(...allLngs) - (corridor_miles / 54);
+      const maxLng = Math.max(...allLngs) + (corridor_miles / 54);
 
       const { data: cachedStops } = await supabase
         .from('fuel_stops_cache')
@@ -315,9 +351,10 @@ Deno.serve(async (req) => {
           .map(stop => ({
             ...stop,
             ifta_tax_credit: STATE_DIESEL_TAX[stop.state?.toUpperCase()] ?? 0,
-            distance_from_route: distanceToRouteSegment(
+            distance_from_route: distanceToMultiSegmentRoute(
               stop.latitude, stop.longitude,
-              origin_lat, origin_lng, dest_lat, dest_lng
+              origin_lat, origin_lng, dest_lat, dest_lng,
+              waypoints
             ),
             distance_from_origin: haversineDistance(origin_lat, origin_lng, stop.latitude, stop.longitude),
           }))
@@ -410,10 +447,12 @@ Deno.serve(async (req) => {
 
     // Cache the results
     if (fuelStops.length > 0) {
-      const minLat = Math.min(origin_lat, dest_lat) - 2;
-      const maxLat = Math.max(origin_lat, dest_lat) + 2;
-      const minLng = Math.min(origin_lng, dest_lng) - 2;
-      const maxLng = Math.max(origin_lng, dest_lng) + 2;
+      const cacheLats = [origin_lat, dest_lat, ...waypoints.map((w: any) => w.lat)];
+      const cacheLngs = [origin_lng, dest_lng, ...waypoints.map((w: any) => w.lng)];
+      const minLat = Math.min(...cacheLats) - 2;
+      const maxLat = Math.max(...cacheLats) + 2;
+      const minLng = Math.min(...cacheLngs) - 2;
+      const maxLng = Math.max(...cacheLngs) + 2;
 
       await supabase
         .from('fuel_stops_cache')
@@ -440,9 +479,10 @@ Deno.serve(async (req) => {
     const filteredStops = fuelStops
       .map(stop => ({
         ...stop,
-        distance_from_route: distanceToRouteSegment(
+        distance_from_route: distanceToMultiSegmentRoute(
           stop.latitude, stop.longitude,
-          origin_lat, origin_lng, dest_lat, dest_lng
+          origin_lat, origin_lng, dest_lat, dest_lng,
+          waypoints
         ),
         distance_from_origin: haversineDistance(origin_lat, origin_lng, stop.latitude, stop.longitude),
       }))
