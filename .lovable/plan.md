@@ -1,137 +1,158 @@
 
 
-## Plan: Fullscreen Map Expansion + Real Road Routing for All Maps
+## Plan: Intermediate Stops on All Maps with Multi-Waypoint Routing
 
 ### Overview
 
-Two improvements across all map components in the application:
+Parse intermediate stop addresses from the `notes` field of each load (under the `=== INTERMEDIATE STOPS ===` section), geocode them, and pass them as waypoints to OSRM so that all maps show the actual multi-stop driving route instead of just origin-to-destination.
 
-1. **Click-to-maximize**: Every map can be clicked/tapped to open in a fullscreen dialog overlay with full interactivity (zoom, pan, etc.)
-2. **Real truck routes**: Replace straight-line polylines with actual road-following routes fetched from the OSRM (Open Source Routing Machine) public API
-
----
-
-### Part 1: Shared Routing Utility
-
-**New file: `src/lib/routing.ts`**
-
-A shared utility that fetches actual driving routes from the OSRM public API and decodes the response into Leaflet-compatible coordinate arrays.
-
-- **Function: `fetchRoute(origin, destination)`**
-  - Calls `https://router.project-osrm.org/route/v1/driving/{lng},{lat};{lng},{lat}?overview=full&geometries=geojson`
-  - Returns an array of `[lat, lng]` coordinate pairs representing the actual road route
-  - Falls back to a straight line between origin and destination if the API call fails or times out
-  - Includes a simple in-memory cache keyed by origin+destination coordinates to avoid redundant API calls
-  - Uses `geometries=geojson` format so coordinates come back as plain JSON arrays (no polyline decoding library needed)
-
-- **Function: `fetchRoutesBatch(pairs)`**
-  - Accepts multiple origin/destination pairs
-  - Processes them sequentially with a small delay to respect rate limits on the public OSRM server
-  - Returns a Map of route key to coordinate arrays
-
-**Note on OSRM**: The public OSRM server (`router.project-osrm.org`) uses car routing profiles. There is no public truck-specific profile, but the road routes it returns follow highways and major roads that trucks use. This is a massive improvement over straight lines and accurately represents real driving paths. If a self-hosted OSRM instance with truck profiles is desired in the future, only the base URL in this utility needs to change.
+Intermediate stop markers will also appear on every map with a distinct icon (orange/amber waypoint dot) and popups showing the stop name and address.
 
 ---
 
-### Part 2: Fullscreen Map Dialog Component
+### How Intermediate Stops Are Stored
 
-**New file: `src/components/shared/ExpandableMap.tsx`**
-
-A reusable wrapper component that:
-- Renders children (the inline map) normally
-- Shows an "Expand" button overlay (maximize icon) in the top-right corner of the map
-- When clicked, opens a Radix Dialog taking up ~95% of the viewport (`max-w-[95vw] max-h-[95vh]`)
-- The dialog renders a new, full-size `MapContainer` with the same markers, routes, and popups as the inline version
-- The fullscreen map has full interactivity: zoom controls, dragging, scroll-wheel zoom, etc.
-- A close button (X) in the top-right dismisses the dialog
-
-The component accepts a `renderMap` prop -- a function that receives `{ isExpanded: boolean }` and returns the MapContainer JSX. This lets each map component control what gets rendered in both the inline and expanded views.
-
----
-
-### Part 3: Update Each Map Component
-
-#### A. LoadRouteMap (`src/components/driver/LoadRouteMap.tsx`)
-
-Currently the simplest map -- shows a static route preview on the ActiveLoadCard.
-
-**Changes:**
-- Import and use `fetchRoute` from `src/lib/routing.ts` to get real road coordinates
-- Replace the 2-point `Polyline` with the full route coordinate array
-- Add `useState` for the route coordinates, fetch them in a `useEffect` alongside geocoding
-- Wrap the map in `ExpandableMap` so clicking it opens a fullscreen version
-- In expanded mode: enable zoom controls, dragging, and scroll-wheel zoom (currently all disabled)
-- Fall back to a straight line if route fetch fails (graceful degradation)
-
-#### B. FleetMapView (`src/components/dispatcher/FleetMapView.tsx`)
-
-The dispatcher's fleet overview showing all in-transit loads.
-
-**Changes:**
-- Import `fetchRoute` and store route geometries in a `Map<string, [number, number][]>` keyed by load ID
-- When loads change, fetch routes for each origin/destination pair (using the batch function with caching)
-- Replace each load's 2-point `Polyline` with the full route coordinate array
-- Wrap the map area in `ExpandableMap`
-- In expanded mode: the map fills the dialog with all the same markers, popups, route lines, and legend
-- Add the expand button to the card header area
-
-#### C. TripFuelPlanner (`src/components/driver/TripFuelPlanner.tsx`)
-
-The fuel stop planner map for drivers.
-
-**Changes:**
-- Import `fetchRoute` and fetch the real route when origin/destination coordinates are available
-- Replace the 2-point `Polyline` with the full route coordinate array
-- Wrap the map in `ExpandableMap`
-- In expanded mode: fuel stop markers remain interactive with popups showing pricing details
-- The expanded map is especially useful here since the inline map is only 192px tall
-
----
-
-### Part 4: Implementation Details
-
-**OSRM API call format:**
+Stops are embedded in the `fleet_loads.notes` text field in this format:
 ```
-GET https://router.project-osrm.org/route/v1/driving/{lng1},{lat1};{lng2},{lat2}?overview=full&geometries=geojson
+=== INTERMEDIATE STOPS ===
+Stop 2 (Drop): Ferguson Ent 541, Ferguson Ent 541, 3001 E Kemper Rd, Cincinnati, OH 45241-1514 - 2026-01-26
+Stop 3 (Drop): 2) Supply Inc, 2) Supply Inc, 1456 N Keowee St, Dayton, OH 45404-1103 - 2026-01-26
 ```
 
-Response structure (simplified):
-```json
-{
-  "routes": [{
-    "geometry": {
-      "coordinates": [[lng, lat], [lng, lat], ...],
-      "type": "LineString"
-    },
-    "distance": 123456,
-    "duration": 12345
-  }]
-}
-```
-
-The coordinates come back as `[lng, lat]` (GeoJSON standard) and need to be flipped to `[lat, lng]` for Leaflet.
-
-**Caching strategy:**
-- Routes are cached in-memory using a key derived from rounded coordinates (to 4 decimal places)
-- Cache persists for the browser session
-- Avoids redundant fetches when components re-render or when the same route appears in multiple views
-
-**Rate limiting:**
-- The public OSRM server is for light use; we add a 200ms delay between sequential requests
-- For FleetMapView with multiple loads, routes are fetched incrementally (not all at once)
-- Cached routes return instantly on subsequent renders
+Each line has: `Stop N (Type): Facility Name, Facility Name, Address - Date`
 
 ---
 
-### Technical Summary
+### Part 1: Shared Stop Parsing Utility
+
+**New file: `src/lib/parseIntermediateStops.ts`**
+
+A small utility function that extracts structured stop data from a load's `notes` string.
+
+- Input: `notes: string | null`
+- Output: Array of `{ stopNumber: number, stopType: string, facilityName: string, address: string, date: string | null }`
+- Logic:
+  - Find the first `=== INTERMEDIATE STOPS ===` section (ignore duplicated ones after `--- Updated from Rate Confirmation ---`)
+  - Parse each `Stop N (Type): ...` line using regex
+  - Extract the full address portion (everything after the facility name duplication, up to the date)
+  - Return the parsed stops sorted by stop number
+
+This utility will be consumed by all map components and the routing layer.
+
+---
+
+### Part 2: Update Routing Utility
+
+**File: `src/lib/routing.ts`**
+
+Add support for multi-waypoint routes:
+
+- **New function: `fetchRouteWithWaypoints(origin, waypoints[], destination)`**
+  - Builds the OSRM URL with all coordinates: `origin;wp1;wp2;...;destination`
+  - OSRM natively supports up to ~100 waypoints in a single request
+  - Cache key includes all waypoint coordinates
+  - Returns the full route geometry as `[lat, lng][]` (same format as `fetchRoute`)
+  - Falls back to `fetchRoute(origin, destination)` if the waypoint request fails
+
+- **Update `fetchRoutesBatch`** to accept an optional `waypoints` array per pair, calling `fetchRouteWithWaypoints` when waypoints exist
+
+---
+
+### Part 3: Update LoadRouteMap (Driver Active Load Card)
+
+**File: `src/components/driver/LoadRouteMap.tsx`**
+
+- Add optional `notes` prop to `LoadRouteMapProps`
+- Parse intermediate stops from `notes` using the shared utility
+- Geocode each stop address (alongside origin/destination geocoding)
+- Call `fetchRouteWithWaypoints(origin, [stop1, stop2, ...], destination)` instead of `fetchRoute(origin, destination)`
+- Render an amber/orange waypoint marker for each intermediate stop with a popup showing stop number, facility name, and address
+- Include stop coordinates in the bounds calculation
+
+**File: `src/components/driver/ActiveLoadCard.tsx`**
+
+- Pass `load.notes` to `LoadRouteMap`: `<LoadRouteMap origin={load.origin} destination={load.destination} notes={load.notes} />`
+
+---
+
+### Part 4: Update FleetMapView (Dispatcher Dashboard)
+
+**File: `src/components/dispatcher/FleetMapView.tsx`**
+
+- Add `notes` to the Supabase query SELECT for in-transit loads
+- Parse intermediate stops for each load
+- Geocode stop addresses alongside origin/destination geocoding
+- When fetching routes, pass waypoints to `fetchRouteWithWaypoints`
+- Render waypoint markers on the map for each intermediate stop (same amber icon)
+- Update the `LoadWithLocation` interface to include parsed stop data
+
+---
+
+### Part 5: Update TripFuelPlanner (Driver Fuel Planner)
+
+**File: `src/components/driver/TripFuelPlanner.tsx`**
+
+- Add optional `notes` prop to `TripFuelPlannerProps`
+- Parse intermediate stops and geocode them
+- Use `fetchRouteWithWaypoints` for accurate route following all stops
+- Render waypoint markers on the fuel planner map
+- Include stop coordinates in bounds calculation
+
+**File: `src/pages/DriverDashboard.tsx`**
+
+- Pass `activeLoad.notes` to `TripFuelPlanner`
+
+---
+
+### Part 6: Waypoint Marker Icon
+
+A new shared Leaflet `divIcon` used consistently across all maps:
+
+- Amber/orange diamond or numbered circle marker (visually distinct from green origin, red destination, and blue truck markers)
+- Smaller than origin/destination markers (18px)
+- Popup shows: "Stop N (Drop/Pick)" + facility name + address
+
+---
+
+### Technical Details
+
+**OSRM Multi-Waypoint URL format:**
+```
+GET https://router.project-osrm.org/route/v1/driving/
+  {originLng},{originLat};{wp1Lng},{wp1Lat};{wp2Lng},{wp2Lat};...;{destLng},{destLat}
+  ?overview=full&geometries=geojson
+```
+
+**Stop address parsing regex:**
+```
+/Stop\s+(\d+)\s+\((\w+)\):\s*(.+?),\s*(.+?)(?:\s*-\s*(\d{4}-\d{2}-\d{2}))?\s*$/
+```
+
+The address portion (after the duplicated facility name) is what gets geocoded.
+
+**Geocoding rate limiting:**
+- Intermediate stops use the same Nominatim geocoding with existing rate limiting (1.1s between requests)
+- Results are cached in the existing `geocodeCache` so repeated renders are instant
+- For a load with 7 intermediate stops, initial geocoding takes about 8-10 seconds but is cached for the session
+
+**Graceful fallback:**
+- If any intermediate stop fails to geocode, it is skipped as a waypoint but the remaining stops still form the route
+- If the multi-waypoint OSRM request fails, falls back to simple origin-to-destination routing
+- If `notes` is null or contains no intermediate stops, behavior is identical to current (no changes)
+
+---
+
+### Files Summary
 
 | Action | File | Details |
 |--------|------|---------|
-| Create | `src/lib/routing.ts` | OSRM route fetching utility with cache and fallback |
-| Create | `src/components/shared/ExpandableMap.tsx` | Reusable click-to-expand map wrapper with Dialog |
-| Modify | `src/components/driver/LoadRouteMap.tsx` | Add real routing + expand capability |
-| Modify | `src/components/dispatcher/FleetMapView.tsx` | Add real routing for all loads + expand capability |
-| Modify | `src/components/driver/TripFuelPlanner.tsx` | Add real routing + expand capability |
+| Create | `src/lib/parseIntermediateStops.ts` | Shared parser for stop data from notes |
+| Modify | `src/lib/routing.ts` | Add `fetchRouteWithWaypoints` function |
+| Modify | `src/components/driver/LoadRouteMap.tsx` | Accept `notes`, geocode stops, multi-waypoint routing, render stop markers |
+| Modify | `src/components/driver/ActiveLoadCard.tsx` | Pass `notes` to `LoadRouteMap` |
+| Modify | `src/components/dispatcher/FleetMapView.tsx` | Fetch `notes`, parse stops, multi-waypoint routing, render stop markers |
+| Modify | `src/components/driver/TripFuelPlanner.tsx` | Accept `notes`, parse stops, multi-waypoint routing, render stop markers |
+| Modify | `src/pages/DriverDashboard.tsx` | Pass `notes` to `TripFuelPlanner` |
 
-No database changes needed. No new dependencies needed (OSRM returns GeoJSON which is plain JSON, and Dialog is already available from Radix UI).
+No database changes needed. No new dependencies needed.
 
