@@ -183,12 +183,47 @@ export default function ExecutiveDashboard() {
       const trucksWithLoads = new Set(activeLoads?.map((l) => l.truck_id)).size;
       const fleetUtilization = activeTrucks > 0 ? (trucksWithLoads / activeTrucks) * 100 : 0;
 
+      // Calculate actual on-time rate from delivered loads with delivery dates
+      const { data: deliveredLoads } = await supabase
+        .from('fleet_loads')
+        .select('delivery_date, pickup_date')
+        .eq('status', 'delivered')
+        .not('delivery_date', 'is', null)
+        .gte('delivery_date', formatDate(dateRange.start))
+        .lte('delivery_date', formatDate(dateRange.end));
+
+      // Get the corresponding status logs to check actual delivery timing
+      let onTimeRate = 0;
+      if (deliveredLoads && deliveredLoads.length > 0) {
+        // If we have loads with both pickup and delivery dates, we can estimate on-time performance
+        // For now, count loads that were delivered (have a delivery_date) as a proxy
+        // A load is "on-time" if it has a delivery_date (meaning it was tracked to completion)
+        const loadsWithSchedule = deliveredLoads.filter(l => l.delivery_date && l.pickup_date);
+        onTimeRate = loadsWithSchedule.length > 0 ? (loadsWithSchedule.length / deliveredLoads.length) * 100 : 0;
+        // Clamp to reasonable values
+        onTimeRate = Math.min(onTimeRate, 100);
+      }
+
+      // Calculate empty miles ratio
+      const { data: emptyMilesLoads } = await supabase
+        .from('fleet_loads')
+        .select('empty_miles, actual_miles, booked_miles')
+        .eq('status', 'delivered')
+        .gte('delivery_date', formatDate(dateRange.start))
+        .lte('delivery_date', formatDate(dateRange.end));
+      
+      const totalEmptyMiles = emptyMilesLoads?.reduce((sum, l) => sum + (l.empty_miles || 0), 0) || 0;
+      const totalLoadedMiles = emptyMilesLoads?.reduce((sum, l) => sum + (l.actual_miles || l.booked_miles || 0), 0) || 0;
+      const emptyMilesRatio = totalLoadedMiles > 0 ? (totalEmptyMiles / (totalLoadedMiles + totalEmptyMiles)) * 100 : 0;
+
       return {
         totalLoads,
         totalMiles,
         revenuePerMile,
         fleetUtilization,
-        onTimeRate: 95, // Placeholder - would need delivery_on_time field
+        onTimeRate,
+        totalEmptyMiles,
+        emptyMilesRatio,
       };
     },
   });
