@@ -1,158 +1,69 @@
 
 
-## Plan: Intermediate Stops on All Maps with Multi-Waypoint Routing
+## Plan: Fix Route Caching Race Condition for Intermediate Stops
 
-### Overview
+### Problem
 
-Parse intermediate stop addresses from the `notes` field of each load (under the `=== INTERMEDIATE STOPS ===` section), geocode them, and pass them as waypoints to OSRM so that all maps show the actual multi-stop driving route instead of just origin-to-destination.
+The intermediate stops are already parsed and geocoded, but there is a **race condition** that prevents them from being included in the route:
 
-Intermediate stop markers will also appear on every map with a distinct icon (orange/amber waypoint dot) and popups showing the stop name and address.
+1. Origin and destination addresses geocode quickly (2 addresses)
+2. The route-fetching effect fires as soon as `geocodedCoords` changes
+3. At that point, only origin/dest are geocoded -- the 7 intermediate stop addresses have not been geocoded yet
+4. The route is fetched from OSRM with just origin-to-destination (no waypoints)
+5. On line 288 of `FleetMapView.tsx`: `if (routeGeometries.has(load.id)) return;` -- this skips re-fetching the route once intermediate stops are geocoded later
+6. The same issue exists in the in-memory route cache in `routing.ts` -- a different cache key is used for origin-to-dest vs origin-to-waypoints-to-dest, but since the route is already stored in `routeGeometries` state, a second OSRM call is never made
+
+**Result**: The OSRM route is drawn as a direct origin-to-destination path, completely ignoring intermediate stops. You can verify this in the network requests -- the OSRM URL only contains two coordinate pairs.
 
 ---
 
-### How Intermediate Stops Are Stored
+### Fix
 
-Stops are embedded in the `fleet_loads.notes` text field in this format:
+The fix involves two changes in `FleetMapView.tsx`:
+
+**Change 1: Wait for all stop addresses to be geocoded before fetching routes**
+
+In the route-fetching `useEffect` (line 280), add a guard that checks whether all intermediate stop addresses for a load have been geocoded before attempting to fetch that load's route. If a load has stops but not all of them are geocoded yet, skip it for now -- the effect will re-run when more geocoded coordinates arrive.
+
 ```
-=== INTERMEDIATE STOPS ===
-Stop 2 (Drop): Ferguson Ent 541, Ferguson Ent 541, 3001 E Kemper Rd, Cincinnati, OH 45241-1514 - 2026-01-26
-Stop 3 (Drop): 2) Supply Inc, 2) Supply Inc, 1456 N Keowee St, Dayton, OH 45404-1103 - 2026-01-26
+// For each load with stops, check if ALL stops are geocoded
+const stops = loadStops.get(load.id) || [];
+const allStopsGeocoded = stops.every(s => geocodedCoords.has(s.address));
+if (stops.length > 0 && !allStopsGeocoded) return; // wait for more geocoding
 ```
 
-Each line has: `Stop N (Type): Facility Name, Facility Name, Address - Date`
+**Change 2: Remove the early-exit cache check that prevents re-fetching**
+
+Remove the line `if (routeGeometries.has(load.id)) return;` -- this prevents routes from ever being updated. Instead, use a smarter cache key that includes the number of resolved waypoints, so routes are re-fetched when new waypoints become available.
+
+Specifically, build a route key per load that includes the waypoint count. Store and compare against this key so that:
+- A route fetched with 0 waypoints will be re-fetched when 7 waypoints become available
+- A route fetched with 7 waypoints will not be re-fetched again
 
 ---
 
-### Part 1: Shared Stop Parsing Utility
+### Files to Modify
 
-**New file: `src/lib/parseIntermediateStops.ts`**
+| File | Change |
+|------|--------|
+| `src/components/dispatcher/FleetMapView.tsx` | Fix the route-fetching effect to wait for all stops to geocode and allow re-fetching when waypoints change |
 
-A small utility function that extracts structured stop data from a load's `notes` string.
-
-- Input: `notes: string | null`
-- Output: Array of `{ stopNumber: number, stopType: string, facilityName: string, address: string, date: string | null }`
-- Logic:
-  - Find the first `=== INTERMEDIATE STOPS ===` section (ignore duplicated ones after `--- Updated from Rate Confirmation ---`)
-  - Parse each `Stop N (Type): ...` line using regex
-  - Extract the full address portion (everything after the facility name duplication, up to the date)
-  - Return the parsed stops sorted by stop number
-
-This utility will be consumed by all map components and the routing layer.
-
----
-
-### Part 2: Update Routing Utility
-
-**File: `src/lib/routing.ts`**
-
-Add support for multi-waypoint routes:
-
-- **New function: `fetchRouteWithWaypoints(origin, waypoints[], destination)`**
-  - Builds the OSRM URL with all coordinates: `origin;wp1;wp2;...;destination`
-  - OSRM natively supports up to ~100 waypoints in a single request
-  - Cache key includes all waypoint coordinates
-  - Returns the full route geometry as `[lat, lng][]` (same format as `fetchRoute`)
-  - Falls back to `fetchRoute(origin, destination)` if the waypoint request fails
-
-- **Update `fetchRoutesBatch`** to accept an optional `waypoints` array per pair, calling `fetchRouteWithWaypoints` when waypoints exist
-
----
-
-### Part 3: Update LoadRouteMap (Driver Active Load Card)
-
-**File: `src/components/driver/LoadRouteMap.tsx`**
-
-- Add optional `notes` prop to `LoadRouteMapProps`
-- Parse intermediate stops from `notes` using the shared utility
-- Geocode each stop address (alongside origin/destination geocoding)
-- Call `fetchRouteWithWaypoints(origin, [stop1, stop2, ...], destination)` instead of `fetchRoute(origin, destination)`
-- Render an amber/orange waypoint marker for each intermediate stop with a popup showing stop number, facility name, and address
-- Include stop coordinates in the bounds calculation
-
-**File: `src/components/driver/ActiveLoadCard.tsx`**
-
-- Pass `load.notes` to `LoadRouteMap`: `<LoadRouteMap origin={load.origin} destination={load.destination} notes={load.notes} />`
-
----
-
-### Part 4: Update FleetMapView (Dispatcher Dashboard)
-
-**File: `src/components/dispatcher/FleetMapView.tsx`**
-
-- Add `notes` to the Supabase query SELECT for in-transit loads
-- Parse intermediate stops for each load
-- Geocode stop addresses alongside origin/destination geocoding
-- When fetching routes, pass waypoints to `fetchRouteWithWaypoints`
-- Render waypoint markers on the map for each intermediate stop (same amber icon)
-- Update the `LoadWithLocation` interface to include parsed stop data
-
----
-
-### Part 5: Update TripFuelPlanner (Driver Fuel Planner)
-
-**File: `src/components/driver/TripFuelPlanner.tsx`**
-
-- Add optional `notes` prop to `TripFuelPlannerProps`
-- Parse intermediate stops and geocode them
-- Use `fetchRouteWithWaypoints` for accurate route following all stops
-- Render waypoint markers on the fuel planner map
-- Include stop coordinates in bounds calculation
-
-**File: `src/pages/DriverDashboard.tsx`**
-
-- Pass `activeLoad.notes` to `TripFuelPlanner`
-
----
-
-### Part 6: Waypoint Marker Icon
-
-A new shared Leaflet `divIcon` used consistently across all maps:
-
-- Amber/orange diamond or numbered circle marker (visually distinct from green origin, red destination, and blue truck markers)
-- Smaller than origin/destination markers (18px)
-- Popup shows: "Stop N (Drop/Pick)" + facility name + address
+No other files need changes -- `LoadRouteMap.tsx` and `TripFuelPlanner.tsx` use a single sequential flow (geocode all, then fetch route) so they don't have this race condition. Only `FleetMapView` has the issue because it uses separate effects for geocoding and route fetching.
 
 ---
 
 ### Technical Details
 
-**OSRM Multi-Waypoint URL format:**
-```
-GET https://router.project-osrm.org/route/v1/driving/
-  {originLng},{originLat};{wp1Lng},{wp1Lat};{wp2Lng},{wp2Lat};...;{destLng},{destLat}
-  ?overview=full&geometries=geojson
-```
+The route-fetching `useEffect` will be updated as follows:
 
-**Stop address parsing regex:**
-```
-/Stop\s+(\d+)\s+\((\w+)\):\s*(.+?),\s*(.+?)(?:\s*-\s*(\d{4}-\d{2}-\d{2}))?\s*$/
-```
+1. Add a `routeKeys` ref or state that maps load ID to a string like `"loadId:waypointCount"` to track what version of the route was fetched
+2. When building the pairs array, compute the waypoint count for each load
+3. Skip a load only if its current route key matches (same waypoint count as last fetch)
+4. After fetching, update the route keys map
+5. Add the guard: if a load has intermediate stops but not all are geocoded yet, skip it entirely (do not fetch a partial route)
 
-The address portion (after the duplicated facility name) is what gets geocoded.
-
-**Geocoding rate limiting:**
-- Intermediate stops use the same Nominatim geocoding with existing rate limiting (1.1s between requests)
-- Results are cached in the existing `geocodeCache` so repeated renders are instant
-- For a load with 7 intermediate stops, initial geocoding takes about 8-10 seconds but is cached for the session
-
-**Graceful fallback:**
-- If any intermediate stop fails to geocode, it is skipped as a waypoint but the remaining stops still form the route
-- If the multi-waypoint OSRM request fails, falls back to simple origin-to-destination routing
-- If `notes` is null or contains no intermediate stops, behavior is identical to current (no changes)
-
----
-
-### Files Summary
-
-| Action | File | Details |
-|--------|------|---------|
-| Create | `src/lib/parseIntermediateStops.ts` | Shared parser for stop data from notes |
-| Modify | `src/lib/routing.ts` | Add `fetchRouteWithWaypoints` function |
-| Modify | `src/components/driver/LoadRouteMap.tsx` | Accept `notes`, geocode stops, multi-waypoint routing, render stop markers |
-| Modify | `src/components/driver/ActiveLoadCard.tsx` | Pass `notes` to `LoadRouteMap` |
-| Modify | `src/components/dispatcher/FleetMapView.tsx` | Fetch `notes`, parse stops, multi-waypoint routing, render stop markers |
-| Modify | `src/components/driver/TripFuelPlanner.tsx` | Accept `notes`, parse stops, multi-waypoint routing, render stop markers |
-| Modify | `src/pages/DriverDashboard.tsx` | Pass `notes` to `TripFuelPlanner` |
-
-No database changes needed. No new dependencies needed.
+This ensures:
+- Routes without stops are fetched immediately (no waiting)
+- Routes with stops wait until all stop addresses are geocoded
+- If a route was previously fetched without stops (shouldn't happen with the guard, but as a safety net), it gets re-fetched once stops are available
 
