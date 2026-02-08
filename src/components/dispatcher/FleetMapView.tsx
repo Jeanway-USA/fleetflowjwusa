@@ -128,6 +128,7 @@ export function FleetMapView() {
   const [liveCount, setLiveCount] = useState(0);
   const [geocodedCoords, setGeocodedCoords] = useState<Map<string, { lat: number; lng: number } | null>>(new Map());
   const [routeGeometries, setRouteGeometries] = useState<Map<string, [number, number][]>>(new Map());
+  const [routeKeys, setRouteKeys] = useState<Map<string, string>>(new Map());
 
   // Fetch ALL driver locations (not just recent ones)
   const { data: initialLocations } = useQuery({
@@ -282,29 +283,43 @@ export function FleetMapView() {
     if (!rawLoads || geocodedCoords.size === 0) return;
 
     const pairs: { id: string; origin: { lat: number; lng: number }; destination: { lat: number; lng: number }; waypoints?: { lat: number; lng: number }[] }[] = [];
+    const newRouteKeys = new Map<string, string>();
 
     rawLoads.forEach(load => {
-      // Skip if we already have this route
-      if (routeGeometries.has(load.id)) return;
-
       const oCoords = geocodedCoords.get(load.origin);
       const dCoords = geocodedCoords.get(load.destination);
-      if (oCoords && dCoords) {
-        // Gather waypoint coordinates for intermediate stops
-        const stops = loadStops.get(load.id) || [];
-        const waypoints: { lat: number; lng: number }[] = [];
-        stops.forEach(s => {
-          const c = geocodedCoords.get(s.address);
-          if (c) waypoints.push(c);
-        });
+      if (!oCoords || !dCoords) return;
 
-        pairs.push({
-          id: load.id,
-          origin: oCoords,
-          destination: dCoords,
-          waypoints: waypoints.length > 0 ? waypoints : undefined,
-        });
+      const stops = loadStops.get(load.id) || [];
+
+      // If load has stops, wait until ALL are geocoded before fetching
+      if (stops.length > 0) {
+        const allStopsGeocoded = stops.every(s => geocodedCoords.has(s.address));
+        if (!allStopsGeocoded) return; // wait for more geocoding
       }
+
+      // Gather waypoint coordinates for intermediate stops
+      const waypoints: { lat: number; lng: number }[] = [];
+      stops.forEach(s => {
+        const c = geocodedCoords.get(s.address);
+        if (c) waypoints.push(c);
+      });
+
+      // Build a cache key that includes waypoint count
+      const currentKey = `${load.id}:${waypoints.length}`;
+      const existingKey = routeKeys.get(load.id);
+
+      // Skip if we already fetched this exact route (same waypoint count)
+      if (existingKey === currentKey) return;
+
+      newRouteKeys.set(load.id, currentKey);
+
+      pairs.push({
+        id: load.id,
+        origin: oCoords,
+        destination: dCoords,
+        waypoints: waypoints.length > 0 ? waypoints : undefined,
+      });
     });
 
     if (pairs.length === 0) return;
@@ -315,8 +330,13 @@ export function FleetMapView() {
         routes.forEach((coords, id) => next.set(id, coords));
         return next;
       });
+      setRouteKeys(prev => {
+        const next = new Map(prev);
+        newRouteKeys.forEach((key, id) => next.set(id, key));
+        return next;
+      });
     });
-  }, [rawLoads, geocodedCoords, loadStops]);
+  }, [rawLoads, geocodedCoords, loadStops, routeKeys]);
 
   // Process loads with geocoded coordinates and GPS data
   const loads = useMemo(() => {
