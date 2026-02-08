@@ -205,6 +205,12 @@ export function FacilitiesTab({ canEdit }: FacilitiesTabProps) {
             ))}
           </SelectContent>
         </Select>
+        {canEdit && (
+          <Button onClick={() => openDialog()} className="sm:ml-auto">
+            <Building2 className="h-4 w-4 mr-2" />
+            Add Facility
+          </Button>
+        )}
       </div>
 
       {/* Summary */}
