@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +13,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Pencil, Trash2, Building2, Phone, Mail, Clock, Search, MapPin } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
 
 const FACILITY_TYPES = [
   { value: 'shipper', label: 'Shipper' },
@@ -57,8 +54,11 @@ const emptyForm: FacilityFormData = {
   notes: '',
 };
 
-export default function Facilities() {
-  const { isAdmin } = useAuth();
+interface FacilitiesTabProps {
+  canEdit: boolean;
+}
+
+export function FacilitiesTab({ canEdit }: FacilitiesTabProps) {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -182,13 +182,7 @@ export default function Facilities() {
   };
 
   return (
-    <DashboardLayout>
-      <PageHeader
-        title="Facilities"
-        description="Manage shippers, receivers, and facility contacts"
-        action={isAdmin ? { label: 'Add Facility', onClick: () => openDialog() } : undefined}
-      />
-
+    <>
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1 max-w-sm">
@@ -241,7 +235,7 @@ export default function Facilities() {
                   <TableHead>Contact</TableHead>
                   <TableHead>Hours</TableHead>
                   <TableHead>Appt</TableHead>
-                  {isAdmin && <TableHead>Actions</TableHead>}
+                  {canEdit && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -306,7 +300,7 @@ export default function Facilities() {
                           <span className="text-sm text-muted-foreground">No</span>
                         )}
                       </TableCell>
-                      {isAdmin && (
+                      {canEdit && (
                         <TableCell>
                           <div className="flex gap-1">
                             <Button size="icon" variant="ghost" onClick={() => openDialog(f)}>
@@ -421,6 +415,6 @@ export default function Facilities() {
           </form>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

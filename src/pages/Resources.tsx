@@ -10,12 +10,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Pencil, Trash2, Search, Plus, Wrench, Truck, Droplets, Users, Shield, AlertTriangle, CheckCircle, ExternalLink, Phone, Mail, MapPin } from 'lucide-react';
+import { Pencil, Trash2, Search, Wrench, Truck, Droplets, Users, AlertTriangle, CheckCircle, ExternalLink, Phone, Mail, MapPin, Building2 } from 'lucide-react';
+import { FacilitiesTab } from '@/components/resources/FacilitiesTab';
 
 const RESOURCE_TYPES = [
   { value: 'mechanic', label: 'Mechanic', icon: Wrench },
@@ -32,7 +33,7 @@ const AGENT_STATUSES = [
 export default function Resources() {
   const { hasRole, isAdmin } = useAuth();
   const isDriver = hasRole('driver') && !isAdmin;
-  const canEdit = !isDriver; // Drivers can only view, not edit
+  const canEdit = !isDriver;
   
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -48,6 +49,18 @@ export default function Resources() {
         .from('company_resources')
         .select('*')
         .order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: facilities = [] } = useQuery({
+    queryKey: ['facilities'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('facilities')
+        .select('id')
+        .limit(1000);
       if (error) throw error;
       return data;
     },
@@ -117,7 +130,6 @@ export default function Resources() {
     }
   };
 
-  // Filter resources by type and search
   const filteredResources = resources.filter((r: any) => {
     const matchesType = r.resource_type === activeTab;
     const matchesSearch = searchQuery === '' || 
@@ -129,15 +141,9 @@ export default function Resources() {
     return matchesType && matchesSearch;
   });
 
-  // Stats for load agents
   const loadAgents = resources.filter((r: any) => r.resource_type === 'load_agent');
   const safeAgents = loadAgents.filter((r: any) => r.agent_status === 'safe');
   const unsafeAgents = loadAgents.filter((r: any) => r.agent_status === 'unsafe');
-
-  const getResourceTypeIcon = (type: string) => {
-    const found = RESOURCE_TYPES.find(t => t.value === type);
-    return found ? found.icon : Wrench;
-  };
 
   const renderAgentStatus = (status: string) => {
     if (status === 'safe') {
@@ -375,15 +381,24 @@ export default function Resources() {
     </div>
   );
 
+  const isFacilitiesTab = activeTab === 'facilities';
+
+  const headerAction = canEdit
+    ? {
+        label: isFacilitiesTab ? 'Add Facility' : 'Add Resource',
+        onClick: isFacilitiesTab ? undefined : () => openDialog(),
+      }
+    : undefined;
+
   return (
     <DashboardLayout>
       <PageHeader 
         title="Company Resources" 
-        description="Searchable database of vendors, services, and load agents" 
-        action={canEdit ? { label: 'Add Resource', onClick: () => openDialog() } : undefined} 
+        description="Searchable database of vendors, services, load agents, and facilities" 
+        action={!isFacilitiesTab ? headerAction : undefined}
       />
 
-      {/* Load Agent Scorecard Summary - Compact on mobile */}
+      {/* Load Agent Scorecard Summary */}
       {activeTab === 'load_agent' && (
         <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
           <Card className="card-elevated p-3 sm:p-0">
@@ -419,21 +434,23 @@ export default function Resources() {
         </div>
       )}
 
-      {/* Search */}
-      <div className="mb-4">
-        <div className="relative w-full sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search resources..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+      {/* Search - hidden on facilities tab (it has its own) */}
+      {!isFacilitiesTab && (
+        <div className="mb-4">
+          <div className="relative w-full sm:max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search resources..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setSearchQuery(''); }}>
-        <TabsList className="w-full grid grid-cols-4 h-auto">
+        <TabsList className="w-full grid grid-cols-5 h-auto">
           {RESOURCE_TYPES.map(type => {
             const Icon = type.icon;
             const count = resources.filter((r: any) => r.resource_type === type.value).length;
@@ -445,6 +462,11 @@ export default function Resources() {
               </TabsTrigger>
             );
           })}
+          <TabsTrigger value="facilities" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 text-xs sm:text-sm">
+            <Building2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Facilities</span>
+            <Badge variant="secondary" className="text-[10px] sm:text-xs">{facilities.length}</Badge>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="load_agent" className="mt-4">
@@ -478,6 +500,10 @@ export default function Resources() {
             </Card>
           </TabsContent>
         ))}
+
+        <TabsContent value="facilities" className="mt-4">
+          <FacilitiesTab canEdit={canEdit} />
+        </TabsContent>
       </Tabs>
 
       {/* Add/Edit Resource Dialog */}
