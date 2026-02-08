@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { LoadRouteMap } from './LoadRouteMap';
+import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getRelativeTimestamp } from './RelativeTimestamp';
@@ -134,6 +135,7 @@ const formatCurrency = (value: number) => {
 export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdate }: ActiveLoadCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [podDialogOpen, setPodDialogOpen] = useState(false);
 
   if (!load) {
     return (
@@ -163,6 +165,12 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
 
   const handleProgressStatus = async () => {
     if (!nextStatus) return;
+
+    // If transitioning to delivered, open POD dialog instead
+    if (nextStatus === 'delivered') {
+      setPodDialogOpen(true);
+      return;
+    }
     
     setIsUpdating(true);
     try {
@@ -285,6 +293,19 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
           )}
         </CardContent>
       </Card>
+
+      {/* POD Dialog */}
+      {load && driverId && (
+        <ProofOfDeliveryDialog
+          open={podDialogOpen}
+          onOpenChange={setPodDialogOpen}
+          loadId={load.id}
+          loadNumber={load.landstar_load_id}
+          destination={load.destination}
+          driverId={driverId}
+          onComplete={() => onStatusUpdate?.()}
+        />
+      )}
 
       {/* Load Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
