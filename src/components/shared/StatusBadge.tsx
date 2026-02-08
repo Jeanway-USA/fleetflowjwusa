@@ -37,8 +37,9 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const type = statusMap[status.toLowerCase()] || 'default';
-  const displayText = status.replace(/_/g, ' ');
+  const safeStatus = status ?? 'unknown';
+  const type = statusMap[safeStatus.toLowerCase()] || 'default';
+  const displayText = safeStatus.replace(/_/g, ' ');
   
   return (
     <Badge 
