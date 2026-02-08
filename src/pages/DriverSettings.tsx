@@ -9,11 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Target, Sun, Moon, DollarSign, Route, Loader2, Fuel, Eye, EyeOff } from 'lucide-react';
+import { Target, Sun, Moon, DollarSign, Route, Loader2, Fuel, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
 export default function DriverSettings() {
   const { user } = useAuth();
@@ -41,16 +40,29 @@ export default function DriverSettings() {
     enabled: !!user?.id,
   });
 
-  // Fetch driver settings
+  // Fetch driver settings (goals only - credentials handled separately)
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ['driver-settings', driver?.id],
     queryFn: async () => {
       const { data, error } = await (supabase.from('driver_settings' as any) as any)
-        .select('*')
+        .select('weekly_miles_goal, weekly_revenue_goal')
         .eq('driver_id', driver?.id)
         .maybeSingle();
       if (error) throw error;
       return data;
+    },
+    enabled: !!driver?.id,
+  });
+
+  // Fetch credential status via edge function (never returns plaintext password)
+  const { data: credentialStatus } = useQuery({
+    queryKey: ['landstar-credentials', driver?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('manage-credentials', {
+        method: 'GET',
+      });
+      if (error) throw error;
+      return data as { has_credentials: boolean; landstar_username: string };
     },
     enabled: !!driver?.id,
   });
@@ -60,53 +72,86 @@ export default function DriverSettings() {
     if (settings) {
       setWeeklyMilesGoal(settings.weekly_miles_goal || 2500);
       setWeeklyRevenueGoal(settings.weekly_revenue_goal || 2000);
-      setLandstarUsername(settings.landstar_username || '');
-      setLandstarPassword(settings.landstar_password || '');
     }
   }, [settings]);
 
-  // Save settings mutation
-  const saveMutation = useMutation({
-    mutationFn: async (data: { weekly_miles_goal: number; weekly_revenue_goal: number; landstar_username: string; landstar_password: string }) => {
+  useEffect(() => {
+    if (credentialStatus) {
+      setLandstarUsername(credentialStatus.landstar_username || '');
+      // Never pre-fill password - it's encrypted server-side
+    }
+  }, [credentialStatus]);
+
+  // Save goals mutation (direct DB update - no sensitive data)
+  const saveGoalsMutation = useMutation({
+    mutationFn: async (data: { weekly_miles_goal: number; weekly_revenue_goal: number }) => {
       if (!driver?.id) throw new Error('Driver not found');
 
-      const settingsData = {
-        driver_id: driver.id,
-        weekly_miles_goal: data.weekly_miles_goal,
-        weekly_revenue_goal: data.weekly_revenue_goal,
-        landstar_username: data.landstar_username || null,
-        landstar_password: data.landstar_password || null,
-      };
+      const { data: existing } = await (supabase.from('driver_settings' as any) as any)
+        .select('id')
+        .eq('driver_id', driver.id)
+        .maybeSingle();
 
-      if (settings) {
+      if (existing) {
         const { error } = await (supabase.from('driver_settings' as any) as any)
           .update({
             weekly_miles_goal: data.weekly_miles_goal,
             weekly_revenue_goal: data.weekly_revenue_goal,
-            landstar_username: data.landstar_username || null,
-            landstar_password: data.landstar_password || null,
           })
           .eq('driver_id', driver.id);
         if (error) throw error;
       } else {
         const { error } = await (supabase.from('driver_settings' as any) as any)
-          .insert(settingsData);
+          .insert({
+            driver_id: driver.id,
+            weekly_miles_goal: data.weekly_miles_goal,
+            weekly_revenue_goal: data.weekly_revenue_goal,
+          });
         if (error) throw error;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['driver-settings'] });
-      toast.success('Settings saved successfully');
+      toast.success('Goals saved successfully');
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Failed to save settings');
+      toast.error(error.message || 'Failed to save goals');
+    },
+  });
+
+  // Save credentials via edge function (encrypted server-side)
+  const saveCredentialsMutation = useMutation({
+    mutationFn: async (data: { landstar_username: string; landstar_password: string }) => {
+      const { data: result, error } = await supabase.functions.invoke('manage-credentials', {
+        method: 'POST',
+        body: data,
+      });
+      if (error) throw error;
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['landstar-credentials'] });
+      setLandstarPassword(''); // Clear password field after save
+      toast.success('Credentials saved securely');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to save credentials');
     },
   });
 
   const handleSaveGoals = () => {
-    saveMutation.mutate({
+    saveGoalsMutation.mutate({
       weekly_miles_goal: weeklyMilesGoal,
       weekly_revenue_goal: weeklyRevenueGoal,
+    });
+  };
+
+  const handleSaveCredentials = () => {
+    if (!landstarUsername && !landstarPassword) {
+      toast.error('Please enter at least a username');
+      return;
+    }
+    saveCredentialsMutation.mutate({
       landstar_username: landstarUsername,
       landstar_password: landstarPassword,
     });
@@ -247,10 +292,10 @@ export default function DriverSettings() {
             <div className="flex justify-end">
               <Button 
                 onClick={handleSaveGoals} 
-                disabled={saveMutation.isPending}
+                disabled={saveGoalsMutation.isPending}
                 className="gradient-gold text-primary-foreground"
               >
-                {saveMutation.isPending ? (
+                {saveGoalsMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Saving...
@@ -275,6 +320,12 @@ export default function DriverSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {credentialStatus?.has_credentials && (
+              <div className="flex items-center gap-2 text-sm text-success bg-success/10 rounded-md px-3 py-2">
+                <ShieldCheck className="h-4 w-4" />
+                Credentials saved and encrypted
+              </div>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="landstarUsername">Landstar Username</Label>
@@ -288,14 +339,16 @@ export default function DriverSettings() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="landstarPassword">Landstar Password</Label>
+                <Label htmlFor="landstarPassword">
+                  {credentialStatus?.has_credentials ? 'New Password (leave blank to keep current)' : 'Landstar Password'}
+                </Label>
                 <div className="relative">
                   <Input
                     id="landstarPassword"
                     type={showPassword ? 'text' : 'password'}
                     value={landstarPassword}
                     onChange={(e) => setLandstarPassword(e.target.value)}
-                    placeholder="Your LandstarOne password"
+                    placeholder={credentialStatus?.has_credentials ? '••••••••' : 'Your LandstarOne password'}
                     autoComplete="off"
                     className="pr-10"
                   />
@@ -312,21 +365,21 @@ export default function DriverSettings() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Your credentials are stored securely and only used to fetch your personalized LCAPP fuel discounts. They are never shared.
+              Your credentials are encrypted before storage and only decrypted server-side when fetching fuel discounts. They are never sent back to your browser.
             </p>
 
             <Separator />
 
             <div className="flex justify-end">
               <Button 
-                onClick={handleSaveGoals} 
-                disabled={saveMutation.isPending}
+                onClick={handleSaveCredentials} 
+                disabled={saveCredentialsMutation.isPending}
                 className="gradient-gold text-primary-foreground"
               >
-                {saveMutation.isPending ? (
+                {saveCredentialsMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
+                    Encrypting & Saving...
                   </>
                 ) : (
                   'Save Credentials'
