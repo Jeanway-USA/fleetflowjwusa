@@ -140,6 +140,7 @@ export default function DriverDashboard() {
             origin={activeLoad.origin}
             destination={activeLoad.destination}
             bookedMiles={activeLoad.booked_miles}
+            notes={activeLoad.notes}
           />
         )}
 

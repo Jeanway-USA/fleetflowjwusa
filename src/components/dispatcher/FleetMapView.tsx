@@ -10,6 +10,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { geocodeLocationAsync, interpolatePosition, getProgressFromStatus } from '@/lib/geocoding';
 import { fetchRoutesBatch } from '@/lib/routing';
+import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
 
 // Fix Leaflet default icon issue
@@ -46,6 +47,18 @@ const truckLiveIcon = createIcon('#22c55e', 'truck-live');
 const originIcon = createIcon('#22c55e', 'origin');
 const destinationIcon = createIcon('#ef4444', 'destination');
 
+const waypointIcon = L.divIcon({
+  html: `<div style="width:18px;height:18px;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#f59e0b" width="18" height="18">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" stroke="white" stroke-width="1"/>
+    </svg>
+  </div>`,
+  className: 'custom-marker',
+  iconSize: [18, 18],
+  iconAnchor: [9, 18],
+  popupAnchor: [0, -14],
+});
+
 interface DriverLocation {
   driver_id: string;
   latitude: number;
@@ -63,12 +76,14 @@ interface LoadWithLocation {
   destination: string;
   status: string;
   driver_id: string | null;
+  notes: string | null;
   driver: { first_name: string; last_name: string } | null;
   truck: { unit_number: string } | null;
   originCoords: { lat: number; lng: number } | null;
   destCoords: { lat: number; lng: number } | null;
   truckCoords: { lat: number; lng: number } | null;
   isLiveLocation: boolean;
+  stopCoords: { lat: number; lng: number; stop: IntermediateStop }[];
 }
 
 // Determine if a location record represents a live GPS signal
@@ -80,7 +95,7 @@ function isLocationLive(loc: DriverLocation): boolean {
   return minutesAgo < 10;
 }
 
-// Component to fit map bounds
+// Component to fit map bounds (includes intermediate stop coords)
 function FitBounds({ loads }: { loads: LoadWithLocation[] }) {
   const map = useMap();
 
@@ -95,6 +110,7 @@ function FitBounds({ loads }: { loads: LoadWithLocation[] }) {
       if (load.originCoords) allCoords.push([load.originCoords.lat, load.originCoords.lng]);
       if (load.destCoords) allCoords.push([load.destCoords.lat, load.destCoords.lng]);
       if (load.truckCoords) allCoords.push([load.truckCoords.lat, load.truckCoords.lng]);
+      load.stopCoords.forEach(sc => allCoords.push([sc.lat, sc.lng]));
     });
 
     if (allCoords.length > 0) {
@@ -193,6 +209,7 @@ export function FleetMapView() {
           destination,
           status,
           driver_id,
+          notes,
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
           truck:trucks!fleet_loads_truck_id_fkey(unit_number)
         `)
@@ -204,7 +221,18 @@ export function FleetMapView() {
     refetchInterval: 30000,
   });
 
-  // Geocode addresses when loads change
+  // Parse intermediate stops for each load
+  const loadStops = useMemo(() => {
+    const map = new Map<string, IntermediateStop[]>();
+    if (!rawLoads) return map;
+    rawLoads.forEach(load => {
+      const stops = parseIntermediateStops(load.notes);
+      if (stops.length > 0) map.set(load.id, stops);
+    });
+    return map;
+  }, [rawLoads]);
+
+  // Geocode addresses when loads change (including intermediate stop addresses)
   useEffect(() => {
     if (!rawLoads) return;
 
@@ -218,6 +246,15 @@ export function FleetMapView() {
         if (!geocodedCoords.has(load.destination)) {
           addressesToGeocode.push(load.destination);
         }
+      });
+
+      // Also geocode intermediate stop addresses
+      loadStops.forEach(stops => {
+        stops.forEach(stop => {
+          if (!geocodedCoords.has(stop.address)) {
+            addressesToGeocode.push(stop.address);
+          }
+        });
       });
 
       if (addressesToGeocode.length === 0) return;
@@ -238,13 +275,13 @@ export function FleetMapView() {
     };
 
     geocodeAddresses();
-  }, [rawLoads]);
+  }, [rawLoads, loadStops]);
 
-  // Fetch real road routes when geocoded coordinates change
+  // Fetch real road routes (with waypoints) when geocoded coordinates change
   useEffect(() => {
     if (!rawLoads || geocodedCoords.size === 0) return;
 
-    const pairs: { id: string; origin: { lat: number; lng: number }; destination: { lat: number; lng: number } }[] = [];
+    const pairs: { id: string; origin: { lat: number; lng: number }; destination: { lat: number; lng: number }; waypoints?: { lat: number; lng: number }[] }[] = [];
 
     rawLoads.forEach(load => {
       // Skip if we already have this route
@@ -253,7 +290,20 @@ export function FleetMapView() {
       const oCoords = geocodedCoords.get(load.origin);
       const dCoords = geocodedCoords.get(load.destination);
       if (oCoords && dCoords) {
-        pairs.push({ id: load.id, origin: oCoords, destination: dCoords });
+        // Gather waypoint coordinates for intermediate stops
+        const stops = loadStops.get(load.id) || [];
+        const waypoints: { lat: number; lng: number }[] = [];
+        stops.forEach(s => {
+          const c = geocodedCoords.get(s.address);
+          if (c) waypoints.push(c);
+        });
+
+        pairs.push({
+          id: load.id,
+          origin: oCoords,
+          destination: dCoords,
+          waypoints: waypoints.length > 0 ? waypoints : undefined,
+        });
       }
     });
 
@@ -266,7 +316,7 @@ export function FleetMapView() {
         return next;
       });
     });
-  }, [rawLoads, geocodedCoords]);
+  }, [rawLoads, geocodedCoords, loadStops]);
 
   // Process loads with geocoded coordinates and GPS data
   const loads = useMemo(() => {
@@ -289,15 +339,25 @@ export function FleetMapView() {
         truckCoords = interpolatePosition(originCoords, destCoords, progress);
       }
 
+      // Resolve stop coordinates
+      const stops = loadStops.get(load.id) || [];
+      const stopCoords = stops
+        .map(stop => {
+          const c = geocodedCoords.get(stop.address);
+          return c ? { lat: c.lat, lng: c.lng, stop } : null;
+        })
+        .filter((sc): sc is { lat: number; lng: number; stop: IntermediateStop } => sc !== null);
+
       return {
         ...load,
         originCoords,
         destCoords,
         truckCoords,
         isLiveLocation,
+        stopCoords,
       } as LoadWithLocation;
     });
-  }, [rawLoads, driverLocations, geocodedCoords]);
+  }, [rawLoads, driverLocations, geocodedCoords, loadStops]);
 
   if (isLoading) {
     return (
@@ -387,6 +447,24 @@ export function FleetMapView() {
               </Marker>
             )}
 
+            {/* Intermediate stop markers */}
+            {load.stopCoords.map((sc, idx) => (
+              <Marker
+                key={`stop-${load.id}-${idx}`}
+                position={[sc.lat, sc.lng]}
+                icon={waypointIcon}
+              >
+                <Popup>
+                  <div className="text-sm min-w-[160px]">
+                    <p className="font-medium">Stop {sc.stop.stopNumber} ({sc.stop.stopType})</p>
+                    <p className="text-xs text-gray-600">{sc.stop.facilityName}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{sc.stop.address}</p>
+                    {sc.stop.date && <p className="text-xs text-gray-400">{sc.stop.date}</p>}
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
+
             {/* Truck marker */}
             {load.truckCoords && load.truck && (
               <Marker
@@ -466,6 +544,10 @@ export function FleetMapView() {
             <div className="flex items-center gap-1">
               <div className="w-2 h-2 rounded-full bg-red-500" />
               <span className="text-muted-foreground hidden sm:inline">Dest</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-amber-500" />
+              <span className="text-muted-foreground hidden sm:inline">Stop</span>
             </div>
             <div className="flex items-center gap-1">
               <Radio className="h-3 w-3 text-green-500" />

@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { geocodeLocationAsync } from '@/lib/geocoding';
-import { fetchRoute } from '@/lib/routing';
+import { fetchRouteWithWaypoints } from '@/lib/routing';
+import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -38,6 +39,12 @@ interface TripFuelPlannerProps {
   origin: string;
   destination: string;
   bookedMiles: number | null;
+  notes?: string | null;
+}
+
+interface GeocodedStop {
+  coords: { lat: number; lng: number };
+  stop: IntermediateStop;
 }
 
 // Fuel stop marker icons
@@ -85,6 +92,18 @@ const destinationIcon = L.divIcon({
   iconAnchor: [10, 20],
 });
 
+const waypointIcon = L.divIcon({
+  html: `<div style="width:18px;height:18px;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#f59e0b" width="18" height="18">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" stroke="white" stroke-width="1"/>
+    </svg>
+  </div>`,
+  className: 'custom-marker',
+  iconSize: [18, 18],
+  iconAnchor: [9, 18],
+  popupAnchor: [0, -14],
+});
+
 // Auto-fit map bounds
 function FitBounds({ points }: { points: [number, number][] }) {
   const map = useMap();
@@ -99,14 +118,18 @@ function FitBounds({ points }: { points: [number, number][] }) {
 
 const DEFAULT_MPG = 6.5;
 
-export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: TripFuelPlannerProps) {
+export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, notes }: TripFuelPlannerProps) {
   const [expanded, setExpanded] = useState(false);
   const [originCoords, setOriginCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [destCoords, setDestCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geocoding, setGeocoding] = useState(true);
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
+  const [geocodedStops, setGeocodedStops] = useState<GeocodedStop[]>([]);
 
-  // Geocode origin and destination, then fetch route
+  // Parse intermediate stops from notes
+  const intermediateStops = useMemo(() => parseIntermediateStops(notes || null), [notes]);
+
+  // Geocode origin, destination, intermediate stops, then fetch route with waypoints
   useEffect(() => {
     let cancelled = false;
     setGeocoding(true);
@@ -119,19 +142,35 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
       setOriginCoords(o);
       setDestCoords(d);
 
-      // Fetch real road route
+      // Geocode intermediate stops
+      const stopsGeocoded: GeocodedStop[] = [];
+      for (const stop of intermediateStops) {
+        if (cancelled) return;
+        try {
+          const coords = await geocodeLocationAsync(stop.address);
+          if (coords) {
+            stopsGeocoded.push({ coords, stop });
+          }
+        } catch {
+          // Skip failed geocode
+        }
+      }
+      if (!cancelled) setGeocodedStops(stopsGeocoded);
+
+      // Fetch real road route with waypoints
       if (o && d) {
-        const route = await fetchRoute(o, d);
+        const waypoints = stopsGeocoded.map(s => s.coords);
+        const route = await fetchRouteWithWaypoints(o, waypoints, d);
         if (!cancelled) setRouteCoords(route);
       }
 
-      setGeocoding(false);
+      if (!cancelled) setGeocoding(false);
     }).catch(() => {
       if (!cancelled) setGeocoding(false);
     });
 
     return () => { cancelled = true; };
-  }, [origin, destination]);
+  }, [origin, destination, intermediateStops]);
 
   // Fetch fuel stops from edge function
   const { data: fuelData, isLoading: fuelLoading, refetch, isFetching } = useQuery({
@@ -189,18 +228,18 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
     };
   }, [fuelStops, estimatedGallons]);
 
-  // Map bounds points
+  // Map bounds points (include waypoints)
   const mapPoints = useMemo((): [number, number][] => {
-    // Use route coordinates for bounds if available
     const points: [number, number][] = routeCoords && routeCoords.length > 1
       ? [...routeCoords]
       : [
           ...(originCoords ? [[originCoords.lat, originCoords.lng] as [number, number]] : []),
           ...(destCoords ? [[destCoords.lat, destCoords.lng] as [number, number]] : []),
+          ...geocodedStops.map(s => [s.coords.lat, s.coords.lng] as [number, number]),
         ];
     fuelStops.forEach(s => points.push([s.latitude, s.longitude]));
     return points;
-  }, [originCoords, destCoords, fuelStops, routeCoords]);
+  }, [originCoords, destCoords, fuelStops, routeCoords, geocodedStops]);
 
   const handleRefresh = () => {
     refetch();
@@ -251,7 +290,7 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <FitBounds points={mapPoints} />
 
-        {/* Route line — real road */}
+        {/* Route line — real road with waypoints */}
         <Polyline
           positions={routePositions}
           pathOptions={{
@@ -264,6 +303,24 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
         {/* Origin & Destination */}
         <Marker position={[originCoords.lat, originCoords.lng]} icon={originIcon} />
         <Marker position={[destCoords.lat, destCoords.lng]} icon={destinationIcon} />
+
+        {/* Intermediate stop markers */}
+        {geocodedStops.map((gs, idx) => (
+          <Marker
+            key={`waypoint-${idx}`}
+            position={[gs.coords.lat, gs.coords.lng]}
+            icon={waypointIcon}
+          >
+            <Popup>
+              <div className="text-sm min-w-[160px]">
+                <p className="font-semibold">Stop {gs.stop.stopNumber} ({gs.stop.stopType})</p>
+                <p className="text-xs text-gray-600">{gs.stop.facilityName}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{gs.stop.address}</p>
+                {gs.stop.date && <p className="text-xs text-gray-400">{gs.stop.date}</p>}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
 
         {/* Fuel stop markers */}
         {fuelStops.map((stop, i) => (
@@ -326,6 +383,11 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
           <span>{tripMiles.toLocaleString()} mi</span>
           <span>·</span>
           <span>~{estimatedGallons} gal needed</span>
+          {intermediateStops.length > 0 && (
+            <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 ml-1">
+              {intermediateStops.length} stops
+            </Badge>
+          )}
           {fuelData?.source === 'landstar' && (
             <Badge variant="outline" className="text-xs border-primary/50 text-primary ml-1">
               LCAPP Live
@@ -348,6 +410,12 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles }: 
             <span className="w-3 h-3 rounded-full bg-accent inline-block" />
             Other Stop
           </span>
+          {geocodedStops.length > 0 && (
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-amber-500 inline-block" />
+              Waypoint
+            </span>
+          )}
           <span className="ml-auto">{fuelStops.length} stops found</span>
         </div>
 

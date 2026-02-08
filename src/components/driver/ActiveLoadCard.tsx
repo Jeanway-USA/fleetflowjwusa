@@ -229,7 +229,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
           </div>
 
           {/* Route Map Preview */}
-          <LoadRouteMap origin={load.origin} destination={load.destination} />
+          <LoadRouteMap origin={load.origin} destination={load.destination} notes={load.notes} />
 
           {/* Miles and Estimated Pay */}
           <div className="flex items-center justify-between pt-2 border-t">
