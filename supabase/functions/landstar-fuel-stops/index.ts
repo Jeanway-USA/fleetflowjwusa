@@ -167,6 +167,36 @@ function distanceToMultiSegmentRoute(
   return minDist;
 }
 
+// ===== AES-GCM Decryption =====
+async function getEncryptionKey(): Promise<CryptoKey> {
+  const keyString = Deno.env.get('CREDENTIAL_ENCRYPTION_KEY');
+  if (!keyString || keyString.length < 16) {
+    throw new Error('CREDENTIAL_ENCRYPTION_KEY not configured');
+  }
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.digest('SHA-256', encoder.encode(keyString));
+  return crypto.subtle.importKey('raw', keyMaterial, { name: 'AES-GCM' }, false, ['decrypt']);
+}
+
+async function decryptPassword(encryptedData: string): Promise<string> {
+  if (!encryptedData.startsWith('enc:')) {
+    // Legacy plaintext password - return as-is
+    console.warn('Found legacy plaintext password - will be encrypted on next save');
+    return encryptedData;
+  }
+  const key = await getEncryptionKey();
+  const base64Data = encryptedData.slice(4);
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const iv = bytes.slice(0, 12);
+  const ciphertext = bytes.slice(12);
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return new TextDecoder().decode(decrypted);
+}
+
 // ===== Landstar Scraper =====
 async function attemptLandstarScrape(username: string, password: string): Promise<any[] | null> {
   console.log('Attempting Landstar portal authentication...');
@@ -379,10 +409,16 @@ Deno.serve(async (req) => {
 
     if (driverSettings?.landstar_username && driverSettings?.landstar_password) {
       console.log('Driver has Landstar credentials, attempting scrape...');
-      landstarData = await attemptLandstarScrape(
-        driverSettings.landstar_username,
-        driverSettings.landstar_password
-      );
+      try {
+        const decryptedPassword = await decryptPassword(driverSettings.landstar_password);
+        landstarData = await attemptLandstarScrape(
+          driverSettings.landstar_username,
+          decryptedPassword
+        );
+      } catch (decryptError) {
+        console.error('Failed to decrypt Landstar password:', decryptError);
+        console.log('Falling back to public data');
+      }
     } else {
       console.log('No Landstar credentials for this driver, using fallback data');
     }
