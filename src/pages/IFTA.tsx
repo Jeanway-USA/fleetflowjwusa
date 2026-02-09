@@ -116,7 +116,7 @@ export default function IFTA() {
     },
   });
 
-  // Query for unsynced fuel/DEF expenses (no matching fuel_purchases record)
+  // Query for unsynced fuel/DEF/Fuel Discount expenses (no matching fuel_purchases record)
   const { data: unsyncedExpenses = [] } = useQuery({
     queryKey: ['unsynced_fuel_expenses', selectedQuarter],
     queryFn: async () => {
@@ -129,11 +129,11 @@ export default function IFTA() {
         ? `${parseInt(year) + 1}-01-01`
         : `${year}-${String(endMonth + 1).padStart(2, '0')}-01`;
 
-      // Get all fuel/DEF expenses for the quarter
+      // Get all fuel/DEF/Fuel Discount expenses for the quarter
       const { data: fuelExpenses, error: expError } = await supabase
         .from('expenses')
-        .select('id, expense_date, expense_type, vendor, amount, gallons, truck_id, jurisdiction')
-        .in('expense_type', ['Fuel', 'DEF'])
+        .select('id, expense_date, expense_type, vendor, description, amount, gallons, truck_id, jurisdiction')
+        .in('expense_type', ['Fuel', 'DEF', 'Fuel Discount'])
         .gte('expense_date', startDate)
         .lt('expense_date', endDate);
 
@@ -282,14 +282,14 @@ export default function IFTA() {
 
       const { data: fuelExpenses, error: expError } = await supabase
         .from('expenses')
-        .select('id, vendor, jurisdiction, load_id, amount, gallons, expense_date, truck_id, expense_type')
-        .in('expense_type', ['Fuel', 'DEF'])
+        .select('id, vendor, description, jurisdiction, load_id, amount, gallons, expense_date, truck_id, expense_type')
+        .in('expense_type', ['Fuel', 'DEF', 'Fuel Discount'])
         .gte('expense_date', startDate)
         .lt('expense_date', endDate);
 
       if (expError) throw expError;
       if (!fuelExpenses || fuelExpenses.length === 0) {
-        toast.info('No Fuel/DEF expenses found for this quarter');
+        toast.info('No Fuel/DEF/Discount expenses found for this quarter');
         setIsSyncing(false);
         return;
       }
@@ -315,8 +315,18 @@ export default function IFTA() {
       for (const expense of unsyncedExpenses) {
         let jurisdiction = expense.jurisdiction;
 
+        // For Fuel Discount / NATS, try parsing the description first
+        if (!jurisdiction && expense.expense_type === 'Fuel Discount') {
+          jurisdiction = extractStateFromDescription(expense.description);
+        }
+
         if (!jurisdiction) {
           jurisdiction = extractJurisdictionFromVendor(expense.vendor);
+        }
+
+        // Also try the description for regular fuel expenses
+        if (!jurisdiction) {
+          jurisdiction = extractStateFromDescription(expense.description);
         }
 
         if (!jurisdiction && expense.load_id) {
@@ -363,6 +373,24 @@ export default function IFTA() {
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  /**
+   * Extract a US state abbreviation from a NATS-style description or generic description.
+   * E.g. "NATS Discount: OH765 PERRYSBURG OH" → "OH"
+   */
+  const extractStateFromDescription = (description: string | null): string | null => {
+    if (!description) return null;
+    const upper = description.toUpperCase().trim();
+    // Try the last two-letter token as a state code
+    const tokens = upper.split(/\s+/);
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      const token = tokens[i].replace(/[^A-Z]/g, '');
+      if (token.length === 2 && (US_STATES as readonly string[]).includes(token)) {
+        return token;
+      }
+    }
+    return null;
   };
 
   // Extract US state abbreviation from an address string
