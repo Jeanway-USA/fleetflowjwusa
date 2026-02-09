@@ -15,6 +15,7 @@ import {
   BarChart3,
   Crown,
   Container,
+  Contact,
   AlertTriangle,
   Award,
   Fuel,
@@ -116,6 +117,7 @@ export function AppSidebar() {
   ];
 
   const operationsNavItems: NavItem[] = [
+    { title: 'CRM', icon: Contact, path: '/crm', roles: ['owner', 'dispatcher'] },
     { title: 'Resources', icon: BookOpen, path: '/resources', roles: ['owner', 'dispatcher', 'safety', 'driver'] },
     { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'] },
     { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'] },

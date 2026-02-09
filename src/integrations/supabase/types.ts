@@ -223,6 +223,146 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_activities: {
+        Row: {
+          activity_date: string
+          activity_type: string
+          contact_id: string
+          created_at: string
+          description: string | null
+          id: string
+          subject: string
+          user_id: string
+        }
+        Insert: {
+          activity_date?: string
+          activity_type?: string
+          contact_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          subject: string
+          user_id: string
+        }
+        Update: {
+          activity_date?: string
+          activity_type?: string
+          contact_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          subject?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_contact_loads: {
+        Row: {
+          contact_id: string
+          created_at: string
+          id: string
+          load_id: string
+          relationship_type: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string
+          id?: string
+          load_id: string
+          relationship_type: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string
+          id?: string
+          load_id?: string
+          relationship_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_contact_loads_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_contact_loads_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_loads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_contacts: {
+        Row: {
+          address: string | null
+          agent_code: string | null
+          agent_status: string | null
+          city: string | null
+          company_name: string
+          contact_name: string | null
+          contact_type: string
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          notes: string | null
+          phone: string | null
+          state: string | null
+          tags: string[] | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          agent_code?: string | null
+          agent_status?: string | null
+          city?: string | null
+          company_name: string
+          contact_name?: string | null
+          contact_type: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          agent_code?: string | null
+          agent_status?: string | null
+          city?: string | null
+          company_name?: string
+          contact_name?: string | null
+          contact_type?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          phone?: string | null
+          state?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       detention_requests: {
         Row: {
           created_at: string

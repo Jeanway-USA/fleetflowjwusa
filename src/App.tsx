@@ -32,6 +32,7 @@ import Incidents from "./pages/Incidents";
 import DriverPerformance from "./pages/DriverPerformance";
 import DriverSpectatorView from "./pages/DriverSpectatorView";
 import IFTA from "./pages/IFTA";
+import CRM from "./pages/CRM";
 import NotFound from "./pages/NotFound";
 import PendingAccess from "./pages/PendingAccess";
 
@@ -73,7 +74,7 @@ const App = () => {
                   <Route path="/driver-performance" element={<DriverPerformance />} />
                   <Route path="/driver-view/:driverId" element={<DriverSpectatorView />} />
                   <Route path="/ifta" element={<IFTA />} />
-                  <Route path="/pending-access" element={<PendingAccess />} />
+                  <Route path="/crm" element={<CRM />} />
                   <Route path="/pending-access" element={<PendingAccess />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
