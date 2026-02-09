@@ -1,81 +1,105 @@
 
 
-# Account for Fuel Discounts in IFTA Reporting
+# Improve IFTA Fuel Purchases Readability and Page Simplification
 
-## Problem
+## Overview
 
-The system has "Fuel Discount" expenses (NATS discounts) like:
-- "NATS Discount: OH765 PERRYSBURG OH" -- $92.47
-- "NATS Discount: CO254 WHEAT RIDGE CO" -- $47.79
-- "NATS Discount: TX859 AMARILLO TX" -- $44.26
+Enhance the IFTA Reporting page to be more visually intuitive -- color-coding fuel purchases vs. discounts, simplifying the tab flow, improving labels, and adding a guided workflow so anyone can generate an accurate report without guesswork.
 
-These discounts reduce the actual fuel cost paid in each state, but IFTA reporting currently ignores them entirely. The Jurisdiction Summary map shows inflated fuel costs per state because the NATS discounts are not subtracted.
+---
 
-## Solution
+## 1. Color-Code Fuel Purchases vs. Discounts
 
-Three changes to properly account for fuel discounts:
+In the Fuel Purchases table, the "Total" column currently shows all values the same way. This makes it hard to distinguish actual fuel costs from NATS discounts at a glance.
 
-### 1. Include Fuel Discounts in the Sync Flow
+**Changes:**
+- Color the Total column: **red** for expenses (positive cost), **green** for discounts (negative cost)
+- Add a small visual indicator badge next to the amount (e.g., "Expense" or "Discount") using existing Badge component
+- Also color-code the amounts in the Unsynced Expenses card the same way
+- Show discount amounts with a minus sign prefix in green
 
-Update the "Sync from Expenses" button logic in IFTA.tsx to also process "Fuel Discount" expenses:
-- Expand the expense type filter from `['Fuel', 'DEF']` to `['Fuel', 'DEF', 'Fuel Discount']`
-- Parse the jurisdiction from the NATS description format (e.g., extract "OH" from "NATS Discount: OH765 PERRYSBURG OH")
-- When syncing a Fuel Discount, set its `jurisdiction` field so the database trigger creates a corresponding `fuel_purchases` record with a **negative** total_cost and zero gallons
+---
 
-### 2. Parse NATS Discount Descriptions for State Detection
+## 2. Add a "Type" Column to the Fuel Purchases Table
 
-Add a helper function to extract the state code from NATS-style descriptions:
-- Pattern: "NATS Discount: XX### CITY ST" -- the last two-letter word is typically the state
-- Falls back to the existing `extractJurisdictionFromVendor` for non-NATS formats
-- This will be used during sync and also for auto-suggesting jurisdictions in the unsynced expenses list
+Currently it's unclear which rows are fuel purchases vs. discounts. Add a "Type" column using a colored badge:
+- **Fuel / DEF**: outlined badge, neutral style
+- **Fuel Discount**: green-tinted badge labeled "Discount"
 
-### 3. Show Fuel Discounts in the Unsynced Expenses Section
+This makes it immediately obvious what each row represents.
 
-Update the unsynced expenses query to also include "Fuel Discount" expenses that lack a jurisdiction:
-- These appear alongside unsynced Fuel/DEF expenses in the "Expenses Missing Jurisdiction" card
-- The description column will show the NATS info so users can identify the state
-- Users can manually assign a jurisdiction if auto-detection fails
+---
 
-### 4. Account for Discounts in Jurisdiction Summary
+## 3. Simplify Summary Cards
 
-The JurisdictionMap component already aggregates `fuelCost` from fuel_purchases. Once discounts are synced as negative-cost fuel purchases, the map will automatically show the net fuel cost per state (gross fuel cost minus discounts). No changes needed to the map component itself -- it will work correctly once the data flows through.
+The top summary cards currently show raw numbers without context. Improvements:
+- **Total Fuel Cost card**: Show gross fuel cost and net cost (after discounts) separately, so users can see how much discounts saved them
+- Add a small subtitle showing "X discounts applied" count
+- Color the Tax Liability card value (already done, but also add an up/down arrow icon to reinforce meaning)
+
+---
+
+## 4. Add a Guided Workflow Banner
+
+First-time and returning users may not know the correct order of operations. Add a small step indicator at the top of the page (below the summary cards, above the tabs) that shows the recommended workflow:
+
+```
+Step 1: Sync fuel purchases  -->  Step 2: Generate IFTA report  -->  Step 3: Review jurisdiction summary
+```
+
+Each step highlights based on whether it has been completed (fuel purchases exist, IFTA records exist, etc.). This helps users understand the process without reading documentation.
+
+---
+
+## 5. Improve Tab Labels and Descriptions
+
+Current tab names are somewhat technical. Small improvements:
+- "Fuel Purchases" tab -- add a count badge showing how many entries exist for the quarter
+- "Jurisdiction Summary" -- add a count showing how many states
+- "IFTA Report" -- add a status indicator (e.g., green checkmark if records exist, or a warning dot if empty)
+
+---
+
+## 6. Improve the IFTA Report Tab Empty State
+
+The current empty state just says "No IFTA records." Make it more actionable:
+- Add a prominent "Auto-Generate from Loads" button directly in the empty state
+- Show how many delivered loads are available for the quarter
+- Clarify that the user should sync fuel first, then generate the report
+
+---
+
+## 7. Simplify the Unsynced Expenses Card
+
+- Add a "Sync All" button that auto-applies suggested jurisdictions where possible (e.g., pre-fill from NATS description parsing)
+- Show a suggested state next to the dropdown when one can be detected from the description but wasn't set because the expense has no `load_id`
+
+---
 
 ## Technical Details
 
 ### Files to Modify
 
 **src/pages/IFTA.tsx**
-- Update `syncFuelFromExpenses`: expand expense type filter to include `'Fuel Discount'`; add description-based state parsing for NATS discounts
-- Update `unsyncedExpenses` query: include `'Fuel Discount'` in the expense type filter
-- Add a `extractStateFromDescription` helper that parses patterns like "NATS Discount: OH765 PERRYSBURG OH"
+- Add type/color logic to the fuel purchases table rows (Total column coloring, Type badge)
+- Add a workflow stepper component (inline, simple 3-step indicator)
+- Add count badges to tab triggers
+- Improve empty state on IFTA Report tab with actionable button
+- Compute discount count and net fuel cost for summary cards
+- Update the Total Fuel Cost summary card to show gross vs. net
 
 **src/components/ifta/UnsyncedExpenses.tsx**
-- Add a `description` field to the interface and display it in the table (NATS discounts have no vendor, but their description contains the location info)
-- Show the description in a new column so users can identify where the discount applies
+- Color-code the Amount column (red for expense, green for discount)
+- Add suggested jurisdiction auto-detection from description, showing it as a pre-selected value in the dropdown
 
-### Data Flow
+**src/components/ifta/JurisdictionMap.tsx**
+- No major changes needed -- it already color-codes well. Minor: add a "Net Fuel Cost" column to the summary table that subtracts discounts from gross fuel cost per state
 
-```text
-Fuel Discount expense (e.g., "NATS Discount: CO254 WHEAT RIDGE CO", $47.79)
-    |
-    v
-Sync parses description -> extracts "CO" as jurisdiction
-    |
-    v
-Updates expense.jurisdiction = "CO"
-    |
-    v
-DB trigger creates fuel_purchases record:
-  - jurisdiction: "CO"
-  - total_cost: 47.79 (stored as positive, will be treated as discount)
-  - gallons: 0
-  - vendor: "NATS Discount"
-    |
-    v
-Jurisdiction Summary map shows CO fuel cost reduced by $47.79
-```
+### No New Files Needed
 
-### Important Note on Sign Convention
+All changes are refinements to existing components.
 
-The NATS discount expenses store amounts as positive numbers (e.g., 92.47). In the Finance page they are already flagged as refund/credit via the `isRefundExpense` function. For IFTA, these will sync as fuel_purchases with **zero gallons** and a **negative total_cost** so they correctly reduce the net fuel cost per state. The sync logic will negate the amount when creating the fuel_purchases record for Fuel Discount type expenses.
+### No Database Changes Needed
+
+All improvements are purely UI/presentation layer.
 
