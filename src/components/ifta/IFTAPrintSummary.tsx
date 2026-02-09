@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import { STATE_DIESEL_TAX_RATES } from '@/lib/ifta-tax-rates';
@@ -122,40 +122,43 @@ export function IFTAPrintSummary({
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>IFTA Quarterly Return - ${quarter}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Courier New', monospace; font-size: 11px; padding: 20px; color: #000; }
-          h1 { font-size: 16px; text-align: center; margin-bottom: 4px; }
-          h2 { font-size: 13px; text-align: center; margin-bottom: 16px; font-weight: normal; }
-          .header-info { display: flex; justify-content: space-between; margin-bottom: 16px; border: 1px solid #000; padding: 8px; }
-          .header-info div { flex: 1; }
-          .header-info label { font-weight: bold; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
-          .header-info .value { font-size: 12px; min-height: 18px; border-bottom: 1px solid #999; }
-          table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-          th, td { border: 1px solid #000; padding: 3px 5px; text-align: right; font-size: 10px; }
-          th { background: #e5e5e5; font-weight: bold; text-align: center; font-size: 9px; text-transform: uppercase; }
-          td:first-child, th:first-child { text-align: left; }
-          .totals td { font-weight: bold; background: #f0f0f0; }
-          .footer { margin-top: 30px; display: flex; justify-content: space-between; }
-          .footer .sig-line { border-top: 1px solid #000; width: 45%; padding-top: 4px; font-size: 9px; }
-          .mpg-note { margin-top: 12px; font-size: 9px; color: #666; }
-          .col-a { width: 10%; }
-          .col-b { width: 11%; }
-          @media print { body { padding: 10px; } }
-        </style>
-      </head>
-      <body>
-        ${content.innerHTML}
-        <script>window.print(); window.close();<\/script>
-      </body>
-      </html>
-    `);
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>IFTA Quarterly Return - ${quarter}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Courier New', monospace; font-size: 11px; padding: 20px; color: #000; }
+    h1 { font-size: 16px; text-align: center; margin-bottom: 4px; }
+    h2 { font-size: 13px; text-align: center; margin-bottom: 16px; font-weight: normal; }
+    .header-info { display: flex; justify-content: space-between; margin-bottom: 16px; border: 1px solid #000; padding: 8px; }
+    .header-info div { flex: 1; }
+    .header-info label { font-weight: bold; display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 2px; }
+    .header-info .value { font-size: 12px; min-height: 18px; border-bottom: 1px solid #999; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border: 1px solid #000; padding: 3px 5px; text-align: right; font-size: 10px; }
+    th { background: #e5e5e5; font-weight: bold; text-align: center; font-size: 9px; text-transform: uppercase; }
+    td:first-child, th:first-child { text-align: left; }
+    .totals td { font-weight: bold; background: #f0f0f0; }
+    .footer { margin-top: 30px; display: flex; justify-content: space-between; }
+    .footer .sig-line { border-top: 1px solid #000; width: 45%; padding-top: 4px; font-size: 9px; }
+    .mpg-note { margin-top: 12px; font-size: 9px; color: #666; }
+    @media print { body { padding: 10px; } }
+  </style>
+</head>
+<body>
+  ${content.innerHTML}
+</body>
+</html>`;
+
+    printWindow.document.write(html);
     printWindow.document.close();
+
+    // Wait for the document to fully load before triggering print
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
   };
 
   const [year, q] = quarter.split('-');
@@ -302,13 +305,15 @@ export function IFTAPrintSummary({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogDescription className="sr-only">Print or save a PDF of the IFTA quarterly filing summary</DialogDescription>
+
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
           <Button onClick={handlePrint} className="gap-2">
             <Printer className="h-4 w-4" />
             Print / Save PDF
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
