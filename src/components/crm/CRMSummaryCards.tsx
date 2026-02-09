@@ -1,9 +1,9 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Building2, Users, Warehouse, Truck, Wrench, UserCheck } from 'lucide-react';
-import type { CRMContact } from '@/hooks/useCRMData';
+import type { UnifiedContact } from '@/hooks/useCRMData';
 
 interface CRMSummaryCardsProps {
-  contacts: CRMContact[];
+  contacts: UnifiedContact[];
 }
 
 const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
