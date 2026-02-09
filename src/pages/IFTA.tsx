@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -19,6 +20,8 @@ import { extractJurisdictionFromVendor } from '@/lib/us-states';
 import { Badge } from '@/components/ui/badge';
 import { STATE_DIESEL_TAX_RATES } from '@/lib/ifta-tax-rates';
 import { JurisdictionMap } from '@/components/ifta/JurisdictionMap';
+import { UnsyncedExpenses } from '@/components/ifta/UnsyncedExpenses';
+import { analyzeLoadRoute } from '@/lib/ifta-route-analysis';
 
 interface IFTARecord {
   id: string;
@@ -110,6 +113,44 @@ export default function IFTA() {
       const { data, error } = await supabase.from('fleet_loads').select('*');
       if (error) throw error;
       return data;
+    },
+  });
+
+  // Query for unsynced fuel/DEF expenses (no matching fuel_purchases record)
+  const { data: unsyncedExpenses = [] } = useQuery({
+    queryKey: ['unsynced_fuel_expenses', selectedQuarter],
+    queryFn: async () => {
+      const [year, q] = selectedQuarter.split('-');
+      const quarter = parseInt(q.replace('Q', ''));
+      const startMonth = (quarter - 1) * 3;
+      const endMonth = startMonth + 3;
+      const startDate = `${year}-${String(startMonth + 1).padStart(2, '0')}-01`;
+      const endDate = quarter === 4
+        ? `${parseInt(year) + 1}-01-01`
+        : `${year}-${String(endMonth + 1).padStart(2, '0')}-01`;
+
+      // Get all fuel/DEF expenses for the quarter
+      const { data: fuelExpenses, error: expError } = await supabase
+        .from('expenses')
+        .select('id, expense_date, expense_type, vendor, amount, gallons, truck_id, jurisdiction')
+        .in('expense_type', ['Fuel', 'DEF'])
+        .gte('expense_date', startDate)
+        .lt('expense_date', endDate);
+
+      if (expError) throw expError;
+      if (!fuelExpenses || fuelExpenses.length === 0) return [];
+
+      // Find which ones already have a fuel_purchases record
+      const expenseIds = fuelExpenses.map(e => e.id);
+      const { data: synced } = await supabase
+        .from('fuel_purchases')
+        .select('source_expense_id')
+        .in('source_expense_id', expenseIds);
+
+      const syncedSet = new Set((synced || []).map(r => r.source_expense_id));
+
+      // Return only unsynced expenses that have no jurisdiction
+      return fuelExpenses.filter(e => !syncedSet.has(e.id) && !e.jurisdiction);
     },
   });
 
@@ -223,6 +264,7 @@ export default function IFTA() {
 
   // --- Auto-generate IFTA records from delivered loads ---
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+  const [autoGenProgress, setAutoGenProgress] = useState({ current: 0, total: 0, message: '' });
   const [isSyncing, setIsSyncing] = useState(false);
 
   // --- Sync Fuel Purchases from Expenses ---
@@ -338,6 +380,7 @@ export default function IFTA() {
 
   const autoGenerateIFTA = async () => {
     setIsAutoGenerating(true);
+    setAutoGenProgress({ current: 0, total: 0, message: 'Fetching loads...' });
     try {
       const [year, q] = selectedQuarter.split('-');
       const quarter = parseInt(q.replace('Q', ''));
@@ -351,7 +394,7 @@ export default function IFTA() {
       // Fetch delivered loads in this quarter
       const { data: quarterLoads, error: loadsError } = await supabase
         .from('fleet_loads')
-        .select('id, origin, destination, booked_miles, actual_miles, empty_miles, truck_id, delivery_date')
+        .select('id, origin, destination, booked_miles, actual_miles, empty_miles, truck_id, delivery_date, notes')
         .eq('status', 'delivered')
         .gte('delivery_date', startDate)
         .lt('delivery_date', endDate);
@@ -363,40 +406,82 @@ export default function IFTA() {
         return;
       }
 
-      // Aggregate miles by state
-      // Strategy: split booked_miles evenly between origin and destination states
-      // (A more accurate approach would use route geometry, but this is a practical approximation)
-      const milesByState: Record<string, { totalMiles: number; truckIds: Set<string> }> = {};
+      setAutoGenProgress({ current: 0, total: quarterLoads.length, message: 'Analyzing routes...' });
 
-      for (const load of quarterLoads) {
-        const originState = extractState(load.origin);
-        const destState = extractState(load.destination);
+      // Aggregate miles by state using route analysis
+      const milesByState: Record<string, { totalMiles: number; truckIds: Set<string> }> = {};
+      let routeAnalyzedCount = 0;
+      let fallbackCount = 0;
+
+      for (let i = 0; i < quarterLoads.length; i++) {
+        const load = quarterLoads[i];
         const miles = load.actual_miles || load.booked_miles || 0;
         const emptyMiles = load.empty_miles || 0;
         const totalLoadMiles = miles + emptyMiles;
 
-        if (!originState && !destState) continue;
+        if (totalLoadMiles <= 0) continue;
 
-        if (originState === destState && originState) {
-          // Intrastate - all miles in one state
-          if (!milesByState[originState]) milesByState[originState] = { totalMiles: 0, truckIds: new Set() };
-          milesByState[originState].totalMiles += totalLoadMiles;
-          if (load.truck_id) milesByState[originState].truckIds.add(load.truck_id);
-        } else {
-          // Interstate - split miles between states
-          const halfMiles = totalLoadMiles / 2;
-          if (originState) {
-            if (!milesByState[originState]) milesByState[originState] = { totalMiles: 0, truckIds: new Set() };
-            milesByState[originState].totalMiles += halfMiles;
-            if (load.truck_id) milesByState[originState].truckIds.add(load.truck_id);
+        setAutoGenProgress({
+          current: i + 1,
+          total: quarterLoads.length,
+          message: `Analyzing load ${i + 1}/${quarterLoads.length}: ${load.origin.split(',')[0]} → ${load.destination.split(',')[0]}`,
+        });
+
+        // Try route-based analysis first
+        let stateBreakdown: Record<string, number> | null = null;
+        try {
+          stateBreakdown = await analyzeLoadRoute(
+            load.origin,
+            load.destination,
+            totalLoadMiles,
+            load.notes,
+          );
+        } catch (err) {
+          console.warn(`Route analysis failed for load ${load.id}, falling back`, err);
+        }
+
+        if (stateBreakdown && Object.keys(stateBreakdown).length > 0) {
+          // Use route-based state breakdown
+          routeAnalyzedCount++;
+          for (const [state, stateMiles] of Object.entries(stateBreakdown)) {
+            if (!milesByState[state]) milesByState[state] = { totalMiles: 0, truckIds: new Set() };
+            milesByState[state].totalMiles += stateMiles;
+            if (load.truck_id) milesByState[state].truckIds.add(load.truck_id);
           }
-          if (destState) {
-            if (!milesByState[destState]) milesByState[destState] = { totalMiles: 0, truckIds: new Set() };
-            milesByState[destState].totalMiles += halfMiles;
-            if (load.truck_id) milesByState[destState].truckIds.add(load.truck_id);
+        } else {
+          // Fallback: 50/50 split between origin and destination states
+          fallbackCount++;
+          const originState = extractState(load.origin);
+          const destState = extractState(load.destination);
+
+          if (!originState && !destState) continue;
+
+          if (originState === destState && originState) {
+            if (!milesByState[originState]) milesByState[originState] = { totalMiles: 0, truckIds: new Set() };
+            milesByState[originState].totalMiles += totalLoadMiles;
+            if (load.truck_id) milesByState[originState].truckIds.add(load.truck_id);
+          } else {
+            const halfMiles = totalLoadMiles / 2;
+            if (originState) {
+              if (!milesByState[originState]) milesByState[originState] = { totalMiles: 0, truckIds: new Set() };
+              milesByState[originState].totalMiles += halfMiles;
+              if (load.truck_id) milesByState[originState].truckIds.add(load.truck_id);
+            }
+            if (destState) {
+              if (!milesByState[destState]) milesByState[destState] = { totalMiles: 0, truckIds: new Set() };
+              milesByState[destState].totalMiles += halfMiles;
+              if (load.truck_id) milesByState[destState].truckIds.add(load.truck_id);
+            }
           }
         }
+
+        // Brief delay between loads to respect API rate limits
+        if (i < quarterLoads.length - 1) {
+          await new Promise(r => setTimeout(r, 300));
+        }
       }
+
+      setAutoGenProgress({ current: quarterLoads.length, total: quarterLoads.length, message: 'Computing tax liability...' });
 
       // Get fuel purchased by state for this quarter
       const fuelGallonsByState: Record<string, { gallons: number; cost: number }> = {};
@@ -411,16 +496,15 @@ export default function IFTA() {
       // Calculate fleet average MPG for IFTA tax computation
       const totalQuarterMiles = Object.values(milesByState).reduce((s, v) => s + v.totalMiles, 0);
       const totalQuarterGallons = filteredFuelPurchases.reduce((s, fp) => s + fp.gallons, 0);
-      const fleetMpg = totalQuarterGallons > 0 ? totalQuarterMiles / totalQuarterGallons : 6.0; // Default 6 MPG
+      const fleetMpg = totalQuarterGallons > 0 ? totalQuarterMiles / totalQuarterGallons : 6.0;
 
       // Build IFTA records
       const iftaInserts = Object.entries(milesByState).map(([state, data]) => {
         const taxRate = STATE_DIESEL_TAX_RATES[state] || 0;
         const totalMiles = Math.round(data.totalMiles);
-        const taxableMiles = totalMiles; // All miles are taxable for IFTA
-        const gallonsConsumed = totalMiles / fleetMpg; // Gallons consumed in this state
+        const taxableMiles = totalMiles;
+        const gallonsConsumed = totalMiles / fleetMpg;
         const fuelData = fuelGallonsByState[state] || { gallons: 0, cost: 0 };
-        // Tax owed = (gallons consumed × tax rate) - (gallons purchased in state × tax rate)
         const taxOwed = (gallonsConsumed * taxRate) - (fuelData.gallons * taxRate);
 
         return {
@@ -448,12 +532,16 @@ export default function IFTA() {
       if (insertError) throw insertError;
 
       queryClient.invalidateQueries({ queryKey: ['ifta_records'] });
-      toast.success(`Generated IFTA records for ${iftaInserts.length} jurisdictions from ${quarterLoads.length} loads (Fleet MPG: ${fleetMpg.toFixed(2)})`);
+      const methodMsg = routeAnalyzedCount > 0
+        ? `${routeAnalyzedCount} route-analyzed, ${fallbackCount} estimated`
+        : `${fallbackCount} estimated`;
+      toast.success(`Generated IFTA for ${iftaInserts.length} states from ${quarterLoads.length} loads (${methodMsg}, Fleet MPG: ${fleetMpg.toFixed(2)})`);
     } catch (error: any) {
       console.error('IFTA auto-generation error:', error);
       toast.error('Failed to generate IFTA records: ' + error.message);
     } finally {
       setIsAutoGenerating(false);
+      setAutoGenProgress({ current: 0, total: 0, message: '' });
     }
   };
 
@@ -671,6 +759,9 @@ export default function IFTA() {
               </Table>
             </CardContent>
           </Card>
+
+          {/* Unsynced expenses needing jurisdiction */}
+          <UnsyncedExpenses expenses={unsyncedExpenses} trucks={trucks} />
         </TabsContent>
 
         <TabsContent value="summary" className="mt-6">
@@ -709,6 +800,12 @@ export default function IFTA() {
                 </Button>
               </div>
             </CardHeader>
+            {isAutoGenerating && autoGenProgress.total > 0 && (
+              <div className="px-6 pb-4 space-y-1.5">
+                <Progress value={(autoGenProgress.current / autoGenProgress.total) * 100} className="h-2" />
+                <p className="text-xs text-muted-foreground">{autoGenProgress.message}</p>
+              </div>
+            )}
             <CardContent>
               {iftaRecords.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
