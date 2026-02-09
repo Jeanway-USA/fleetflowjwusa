@@ -4,6 +4,7 @@ import { STATE_COORDINATES, STATE_NAMES } from '@/lib/state-coordinates';
 import { STATE_DIESEL_TAX_RATES } from '@/lib/ifta-tax-rates';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { IFTATooltip } from '@/components/ifta/IFTATooltip';
 import 'leaflet/dist/leaflet.css';
 
 interface JurisdictionData {
@@ -189,14 +190,14 @@ export function JurisdictionMap({ iftaRecords, fuelPurchases, fleetMpg, quarter 
             <TableHeader>
               <TableRow>
                 <TableHead>State</TableHead>
-                <TableHead className="text-right">Miles</TableHead>
-                <TableHead className="text-right">Gal Purchased</TableHead>
-                <TableHead className="text-right">Fuel Cost</TableHead>
-                <TableHead className="text-right">Gal Consumed</TableHead>
-                <TableHead className="text-right">Tax Rate</TableHead>
-                <TableHead className="text-right">Tax Owed</TableHead>
-                <TableHead className="text-right">Tax Credit</TableHead>
-                <TableHead className="text-right">Net Position</TableHead>
+                <TableHead className="text-right">Miles<IFTATooltip term="Total Miles" /></TableHead>
+                <TableHead className="text-right">Gal Purchased<IFTATooltip term="Gal Purchased" /></TableHead>
+                <TableHead className="text-right">Fuel Cost<IFTATooltip term="Fuel Cost" /></TableHead>
+                <TableHead className="text-right">Gal Consumed<IFTATooltip term="Gal Consumed" /></TableHead>
+                <TableHead className="text-right">Tax Rate<IFTATooltip term="Tax Rate" /></TableHead>
+                <TableHead className="text-right">Tax Owed<IFTATooltip term="Tax Owed" /></TableHead>
+                <TableHead className="text-right">Tax Credit<IFTATooltip term="Tax Credit" /></TableHead>
+                <TableHead className="text-right">Net Position<IFTATooltip term="Net Position" /></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
