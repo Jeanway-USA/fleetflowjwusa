@@ -93,7 +93,7 @@ export default function Incidents() {
   const { data: drivers = [] } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('drivers').select('id, first_name, last_name');
+      const { data, error } = await supabase.from('drivers_public_view').select('id, first_name, last_name');
       if (error) throw error;
       return data;
     },

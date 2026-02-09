@@ -114,7 +114,7 @@ export default function Trailers() {
     queryKey: ['drivers-for-trailer-assignment'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('drivers')
+        .from('drivers_public_view')
         .select('id, first_name, last_name, status')
         .eq('status', 'active')
         .order('first_name');

@@ -2464,12 +2464,14 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string | null
+          email: string | null
           endorsements: string[] | null
           first_name: string | null
           has_twic: boolean | null
           hire_date: string | null
           id: string | null
           last_name: string | null
+          phone: string | null
           status: string | null
           updated_at: string | null
           user_id: string | null
@@ -2477,12 +2479,14 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
+          email?: string | null
           endorsements?: string[] | null
           first_name?: string | null
           has_twic?: boolean | null
           hire_date?: string | null
           id?: string | null
           last_name?: string | null
+          phone?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -2490,12 +2494,14 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string | null
+          email?: string | null
           endorsements?: string[] | null
           first_name?: string | null
           has_twic?: boolean | null
           hire_date?: string | null
           id?: string | null
           last_name?: string | null
+          phone?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string | null

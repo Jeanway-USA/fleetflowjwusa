@@ -91,7 +91,7 @@ export default function FleetLoads() {
   const { data: drivers = [] } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('drivers').select('*').eq('status', 'active');
+      const { data, error } = await supabase.from('drivers_public_view').select('*').eq('status', 'active');
       if (error) throw error;
       return data;
     },

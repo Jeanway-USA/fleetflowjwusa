@@ -54,7 +54,7 @@ export default function DispatcherDashboard() {
 
       // Available drivers (active drivers not on a load)
       const { data: drivers } = await supabase
-        .from('drivers')
+        .from('drivers_public_view')
         .select('id')
         .eq('status', 'active');
 

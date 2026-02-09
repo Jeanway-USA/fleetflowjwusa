@@ -34,7 +34,7 @@ export function DriverAssignmentPanel() {
     queryKey: ['available-drivers-assignment'],
     queryFn: async () => {
       const { data: drivers } = await supabase
-        .from('drivers')
+        .from('drivers_public_view')
         .select('id, first_name, last_name, phone')
         .eq('status', 'active');
 
