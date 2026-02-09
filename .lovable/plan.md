@@ -1,104 +1,145 @@
 
 
-# IFTA Page Enhancements: Reset, Tooltips, and Printable Filing Summary
+# CRM -- Unified Business Relationship Management
 
 ## Overview
 
-Three additions to the IFTA Reporting page:
-
-1. **Reset Quarter Data** -- A "Reset" button that clears all IFTA records and/or fuel purchases for the selected quarter so the user can start fresh.
-2. **IFTA Terminology Tooltips** -- Informational tooltips on key terms like "Taxable Miles," "Tax Credit," "Net Position," "Fleet MPG," and more, explaining what they mean in plain language.
-3. **Printable IFTA Filing Summary** -- A dedicated view formatted to match the standard IFTA quarterly return layout, optimized for printing or PDF export via the browser's print function.
+Add a full CRM (Customer Relationship Management) page that centralizes all business contacts -- brokers, agents, shippers, receivers, and vendors -- into a single searchable directory. Each contact has an activity log, linked load history, and revenue analytics. This replaces scattered free-text fields with structured, trackable relationships.
 
 ---
 
-## 1. Reset Quarter Data
+## What You'll Get
 
-### What It Does
-Adds a "Reset Quarter" button to the page header area (next to the quarter/truck filters). Clicking it opens a confirmation dialog letting the user choose what to clear:
-- **IFTA Records** (the generated mileage/tax report for the quarter)
-- **Fuel Purchases** (synced and manually-added fuel data for the quarter)
-- **Both** (start completely fresh)
+### 1. Contacts Directory
+A new **/crm** page with a unified view of all business contacts, organized by type:
+- **Brokers** -- companies that book loads for you
+- **Agents** -- Landstar agent codes you work with (migrated from Resources)
+- **Shippers** -- pickup locations (linked from Facilities)
+- **Receivers** -- delivery locations (linked from Facilities)
+- **Vendors** -- mechanics, roadside, truck washes (linked from Resources)
 
-### Implementation
-- Add a "Reset Quarter" button with a destructive/outline style and a trash/refresh icon
-- Use the existing `ConfirmDeleteDialog` pattern (AlertDialog) for confirmation
-- On confirm, delete the selected data:
-  - IFTA records: `DELETE FROM ifta_records WHERE quarter = selectedQuarter`
-  - Fuel purchases: filter by date range matching the quarter, delete matching rows
-- Invalidate queries after deletion so the UI refreshes
-- Show a success toast confirming what was cleared
-- The workflow stepper will automatically update (steps revert to incomplete)
+Each contact card shows name, type, contact info, tags, and quick stats (total loads, total revenue).
 
----
+### 2. Contact Detail View
+Clicking any contact opens a detail panel (sheet/drawer) with:
+- Editable contact info (name, phone, email, address, notes)
+- **Activity Log** -- timestamped entries for calls, emails, notes, meetings. Anyone with access can log an interaction.
+- **Load History** -- all loads linked to this contact (matched by broker name, agent code, or facility), with dates, routes, and revenue
+- **Revenue Analytics** -- total revenue, average rate per mile, load count, and a small trend chart
 
-## 2. IFTA Terminology Tooltips
+### 3. Smart Linking
+- When creating/editing a load on Fleet Loads, the broker/agent fields become searchable dropdowns that pull from CRM contacts
+- Existing loads will be matched to CRM contacts by broker name and agent code
+- Facilities from the Resources page can be linked as CRM contacts (shipper/receiver type)
 
-### What It Does
-Adds small info-circle icons next to IFTA-specific terms throughout the page. Hovering (or tapping on mobile) shows a plain-language explanation.
-
-### Terms to Annotate
-
-| Term | Location | Tooltip Text |
-|------|----------|-------------|
-| Taxable Miles | IFTA Report table header | "Miles driven on public roads that are subject to IFTA fuel tax. Usually equals total miles unless exempt miles apply." |
-| Tax Rate | IFTA Report + Jurisdiction Summary headers | "The per-gallon diesel fuel tax rate set by each state. Rates vary by jurisdiction and may change quarterly." |
-| Tax Credit | Jurisdiction Summary header | "Credit for fuel taxes already paid at the pump in this state. The more fuel you buy in a state, the higher your credit." |
-| Net Position | Jurisdiction Summary header | "The difference between tax owed and tax credit. Red means you owe additional tax; green means you overpaid and get a credit." |
-| Tax Liability | Summary card | "Your total net tax position across all jurisdictions. This is the amount you owe (or are owed) for the quarter." |
-| Fleet MPG | (add to summary or report) | "Fleet miles per gallon -- total miles driven divided by total gallons purchased. Used to calculate how many gallons were consumed in each state." |
-| Gal Consumed | Jurisdiction Summary header | "Estimated gallons of fuel used in this state, calculated by dividing miles driven by your fleet MPG." |
-| Gal Purchased | Jurisdiction Summary header | "Actual gallons of fuel bought at stations in this state, as recorded in your fuel purchases." |
-
-### Implementation
-- Use the existing `Tooltip`, `TooltipTrigger`, `TooltipContent`, and `TooltipProvider` components from `@/components/ui/tooltip`
-- Wrap a small `HelpCircle` (from lucide-react) icon next to each term
-- Keep tooltip text concise (1-2 sentences max)
-- Apply to headers in: IFTA Report table, Jurisdiction Summary table, and summary cards
-- Add a `TooltipProvider` wrapper at the page level if not already present
+### 4. Dashboard Summary Cards
+Top of the CRM page shows:
+- Total contacts by type
+- Top 5 contacts by revenue (last 90 days)
+- Contacts with no activity in 30+ days (follow-up needed)
 
 ---
 
-## 3. Printable IFTA Filing Summary
+## Navigation
 
-### What It Does
-Adds a "Print Filing Summary" button that opens a clean, print-optimized view of the IFTA quarterly return data. This view:
-- Matches the standard IFTA quarterly return layout with carrier info header, reporting period, and jurisdiction breakdown
-- Includes all the key fields: jurisdiction, total miles, taxable miles, tax rate, gallons consumed, gallons purchased, tax owed, tax credit, net tax
-- Has a totals row at the bottom
-- Is styled for clean printing (no sidebar, no navigation, minimal color, good borders)
-- Uses the browser's native `window.print()` for PDF export
-
-### Implementation
-- Create a new component `src/components/ifta/IFTAPrintSummary.tsx`
-- This component renders as a dialog/sheet containing the formatted return
-- Layout includes:
-  - Header: "IFTA Quarterly Fuel Tax Return" with quarter, date generated
-  - Carrier section: company name placeholder, license number placeholder (can be filled in by user)
-  - Main table: jurisdiction data in the standard IFTA column order
-  - Totals row
-  - Footer: signature/date line for paper filing
-- Add print-specific CSS using `@media print` to hide everything except the summary content
-- Add a "Print / Save PDF" button inside the view that triggers `window.print()`
-- The button to open this view goes in the IFTA Report tab header (next to "Export CSV")
+The CRM page will be added to the sidebar under a new **"CRM"** group (or under the existing **Operations** group), accessible to **owner** and **dispatcher** roles.
 
 ---
 
 ## Technical Details
 
+### New Database Table: `crm_contacts`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | Auto-generated |
+| contact_type | text | 'broker', 'agent', 'shipper', 'receiver', 'vendor' |
+| company_name | text | Company or business name |
+| contact_name | text | Primary contact person |
+| phone | text | Phone number |
+| email | text | Email address |
+| address | text | Physical address |
+| city | text | City |
+| state | text | State abbreviation |
+| tags | text[] | Flexible tags for categorization |
+| agent_code | text | Landstar agent code (for agents) |
+| agent_status | text | 'safe' or 'unsafe' (for agents) |
+| website | text | Website URL |
+| notes | text | General notes |
+| is_active | boolean | Whether contact is active (default true) |
+| created_at | timestamptz | Auto-set |
+| updated_at | timestamptz | Auto-updated |
+
+RLS Policies:
+- Owner and dispatcher can perform all operations (using `has_operations_access`)
+- Safety role gets read-only access
+- Drivers get read-only access (for looking up contact info)
+
+### New Database Table: `crm_activities`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | Auto-generated |
+| contact_id | uuid (FK) | References crm_contacts |
+| user_id | uuid | Who logged the activity |
+| activity_type | text | 'call', 'email', 'note', 'meeting', 'load_booked' |
+| subject | text | Brief subject line |
+| description | text | Detailed notes |
+| activity_date | timestamptz | When it happened |
+| created_at | timestamptz | Auto-set |
+
+RLS Policies:
+- Operations access for full CRUD
+- Read-only for safety and drivers
+
+### New Database Table: `crm_contact_loads`
+A linking table to associate CRM contacts with fleet loads:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid (PK) | Auto-generated |
+| contact_id | uuid (FK) | References crm_contacts |
+| load_id | uuid (FK) | References fleet_loads |
+| relationship_type | text | 'broker', 'agent', 'shipper', 'receiver' |
+| created_at | timestamptz | Auto-set |
+
+RLS Policies:
+- Same as crm_contacts (operations access)
+
 ### Files to Create
-- `src/components/ifta/IFTAPrintSummary.tsx` -- Printable IFTA quarterly return component
+
+1. **`src/pages/CRM.tsx`** -- Main CRM page with:
+   - Contact type filter tabs (All, Brokers, Agents, Shippers, Receivers, Vendors)
+   - Search bar with real-time filtering
+   - Summary cards (total contacts, top revenue contacts, follow-up needed)
+   - Contact table/grid with sortable columns
+   - Add/Edit contact dialog
+   - Delete confirmation
+
+2. **`src/components/crm/ContactDetailSheet.tsx`** -- Slide-out detail view with:
+   - Contact info header (editable)
+   - Tabbed content: Activity Log, Load History, Revenue Analytics
+   - "Log Activity" form
+
+3. **`src/components/crm/ActivityTimeline.tsx`** -- Chronological list of activities with icons per type, relative timestamps
+
+4. **`src/components/crm/ContactRevenueStats.tsx`** -- Revenue analytics card showing total revenue, load count, avg rate/mile, and a small bar chart of monthly revenue (using recharts)
+
+5. **`src/components/crm/ContactLoadHistory.tsx`** -- Table of linked loads with date, route, rate, status
 
 ### Files to Modify
-- `src/pages/IFTA.tsx` -- Add reset button + confirmation dialog, add tooltips throughout, add print summary button
-- `src/components/ifta/JurisdictionMap.tsx` -- Add tooltips to the Jurisdiction Summary table headers
 
-### No Database Changes Needed
-All operations use existing delete queries. No schema changes required.
+1. **`src/App.tsx`** -- Add `/crm` route
+2. **`src/components/layout/AppSidebar.tsx`** -- Add CRM nav item under Operations (accessible to owner, dispatcher)
 
-### Key Decisions
-- The reset confirmation uses the existing AlertDialog pattern for consistency
-- Tooltips use the already-installed Radix Tooltip components (no new dependencies)
-- The print view uses `@media print` CSS + `window.print()` rather than a third-party PDF library, keeping it simple and dependency-free
-- The print layout uses a Dialog so it can be previewed on screen before printing
+### Database Migration
+One migration to create the three new tables (`crm_contacts`, `crm_activities`, `crm_contact_loads`) with:
+- RLS enabled on all three
+- Appropriate policies using existing `has_operations_access`, `has_safety_access` functions
+- Foreign key constraints
+- Updated_at trigger on `crm_contacts`
+- Unique constraint on `crm_contact_loads` (contact_id, load_id, relationship_type)
+
+### No New Dependencies
+Uses existing: recharts, lucide-react, Radix UI components, TanStack Query, date-fns.
 
