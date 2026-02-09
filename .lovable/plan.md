@@ -1,117 +1,81 @@
 
 
-# IFTA Enhancements: Jurisdiction Editing + Route-Based State Detection
+# Account for Fuel Discounts in IFTA Reporting
 
-## Overview
+## Problem
 
-Two improvements to make IFTA reporting more accurate:
+The system has "Fuel Discount" expenses (NATS discounts) like:
+- "NATS Discount: OH765 PERRYSBURG OH" -- $92.47
+- "NATS Discount: CO254 WHEAT RIDGE CO" -- $47.79
+- "NATS Discount: TX859 AMARILLO TX" -- $44.26
 
-1. **Manual Jurisdiction Editing** -- Allow users to set or correct the state on fuel expenses that couldn't be auto-detected during sync, directly from the IFTA Fuel Purchases tab.
-2. **Route-Based Multi-State Mileage Splitting** -- When auto-generating IFTA records from loads, use OSRM routing data to determine which states the route actually passes through and allocate miles proportionally, instead of the current 50/50 origin-destination split.
+These discounts reduce the actual fuel cost paid in each state, but IFTA reporting currently ignores them entirely. The Jurisdiction Summary map shows inflated fuel costs per state because the NATS discounts are not subtracted.
 
----
+## Solution
 
-## Feature 1: Edit Jurisdiction on Unsynced Expenses
+Three changes to properly account for fuel discounts:
 
-### Problem
-After running "Sync from Expenses," some fuel expenses get skipped because no state could be determined (vendor string has no state, and the expense isn't linked to a load). Currently, these sit in the expenses table with no way to fix them from the IFTA page.
+### 1. Include Fuel Discounts in the Sync Flow
 
-There are currently 3 such expenses (PILOT #436, LOVES #609, FLYING J #237241) -- no jurisdiction, no load_id.
+Update the "Sync from Expenses" button logic in IFTA.tsx to also process "Fuel Discount" expenses:
+- Expand the expense type filter from `['Fuel', 'DEF']` to `['Fuel', 'DEF', 'Fuel Discount']`
+- Parse the jurisdiction from the NATS description format (e.g., extract "OH" from "NATS Discount: OH765 PERRYSBURG OH")
+- When syncing a Fuel Discount, set its `jurisdiction` field so the database trigger creates a corresponding `fuel_purchases` record with a **negative** total_cost and zero gallons
 
-### Solution
-Add an "Unsynced Expenses" section at the bottom of the Fuel Purchases tab that:
-- Shows fuel/DEF expenses from the selected quarter that have no matching `fuel_purchases` record
-- Displays a compact inline state dropdown on each row so the user can assign a jurisdiction
-- On state selection, updates the expense's `jurisdiction` field, which triggers the existing database function (`sync_fuel_expense_to_ifta`) to automatically create the fuel purchase record
-- Once synced, the expense moves from the "unsynced" list to the main fuel purchases table
+### 2. Parse NATS Discount Descriptions for State Detection
 
-### UI Design
-A secondary card titled "Expenses Missing Jurisdiction" appears below the main Fuel Purchases table when there are unsynced items. Each row shows:
-- Date, Type, Vendor, Amount, Gallons
-- An inline state `Select` dropdown to assign jurisdiction
-- A small "Save" button to confirm
+Add a helper function to extract the state code from NATS-style descriptions:
+- Pattern: "NATS Discount: XX### CITY ST" -- the last two-letter word is typically the state
+- Falls back to the existing `extractJurisdictionFromVendor` for non-NATS formats
+- This will be used during sync and also for auto-suggesting jurisdictions in the unsynced expenses list
 
-### Changes to `src/pages/IFTA.tsx`
-- Add a new query to fetch fuel/DEF expenses without matching fuel_purchases for the selected quarter
-- Add a mutation to update the jurisdiction on an expense
-- Render the "Expenses Missing Jurisdiction" card with inline dropdowns
+### 3. Show Fuel Discounts in the Unsynced Expenses Section
 
----
+Update the unsynced expenses query to also include "Fuel Discount" expenses that lack a jurisdiction:
+- These appear alongside unsynced Fuel/DEF expenses in the "Expenses Missing Jurisdiction" card
+- The description column will show the NATS info so users can identify the state
+- Users can manually assign a jurisdiction if auto-detection fails
 
-## Feature 2: Route-Based Multi-State Mileage Splitting
+### 4. Account for Discounts in Jurisdiction Summary
 
-### Problem
-The current IFTA auto-generation splits miles 50/50 between origin and destination states. For a load from Mississippi to Texas, this means MS and TX each get half the miles -- but the route actually passes through Alabama, Mississippi, Louisiana, and Texas. This significantly misallocates IFTA tax liability.
-
-### Solution
-Use the existing OSRM routing infrastructure to fetch the actual route geometry for each load, then sample points along the route to determine which states are traversed and how many miles occur in each state.
-
-### How It Works
-
-1. **Geocode origin/destination** -- Use `geocodeLocationAsync()` from the existing geocoding utility
-2. **Parse intermediate stops** -- Use `parseIntermediateStops()` to get waypoints from load notes
-3. **Fetch OSRM route** -- Use `fetchRouteWithWaypoints()` to get the full route polyline with per-leg distances
-4. **State detection via reverse geocoding** -- Sample points along the route at regular intervals (every ~50 miles) and use Nominatim's reverse geocoding to determine which US state each point falls in
-5. **Proportional allocation** -- Calculate what fraction of the route falls in each state and multiply by total load miles
-
-### Implementation: New Utility
-
-Create `src/lib/ifta-route-analysis.ts` with:
-- `analyzeRouteStates(routeCoords, totalMiles)` -- Samples route points at intervals, reverse-geocodes them to get states, and returns a `Record<string, number>` mapping state codes to miles
-- Uses a simple point-in-state approach: samples the route polyline at distance intervals and reverse-geocodes using Nominatim
-- Includes caching of reverse geocode results to avoid redundant API calls
-- Falls back to the existing 50/50 split if route analysis fails
-
-### Changes to `src/pages/IFTA.tsx`
-
-Update the `autoGenerateIFTA` function:
-- For each delivered load, geocode origin + destination, parse intermediate stops, and fetch the OSRM route
-- Pass the route geometry to the new analysis function to get per-state mile breakdown
-- Aggregate the state-level miles across all loads
-- Show a progress indicator since route analysis takes longer than the instant 50/50 split
-- Add rate-limiting delays between loads to respect OSRM and Nominatim rate limits
-- Fall back to the current 50/50 split for any load where route analysis fails
-
-### Performance Considerations
-- Route data is cached in-memory by the existing `fetchRoute`/`fetchRouteWithWaypoints` functions
-- Reverse geocode results are cached to avoid repeated lookups for nearby points
-- Sequential processing with delays respects public API rate limits
-- A progress toast shows "Analyzing routes: 3/12 loads..."
-- For a typical quarter with ~20 loads, the process should take about 30-60 seconds
-
----
+The JurisdictionMap component already aggregates `fuelCost` from fuel_purchases. Once discounts are synced as negative-cost fuel purchases, the map will automatically show the net fuel cost per state (gross fuel cost minus discounts). No changes needed to the map component itself -- it will work correctly once the data flows through.
 
 ## Technical Details
 
-### Files to Create
-- `src/lib/ifta-route-analysis.ts` -- Route sampling and state detection utility
-
 ### Files to Modify
-- `src/pages/IFTA.tsx` -- Add unsynced expenses section + integrate route-based mileage analysis
 
-### Dependencies
-No new dependencies needed. Uses existing:
-- `geocodeLocationAsync` from `src/lib/geocoding.ts`
-- `fetchRouteWithWaypoints` from `src/lib/routing.ts`
-- `parseIntermediateStops` from `src/lib/parseIntermediateStops.ts`
-- Nominatim reverse geocoding API (same service already used for forward geocoding)
+**src/pages/IFTA.tsx**
+- Update `syncFuelFromExpenses`: expand expense type filter to include `'Fuel Discount'`; add description-based state parsing for NATS discounts
+- Update `unsyncedExpenses` query: include `'Fuel Discount'` in the expense type filter
+- Add a `extractStateFromDescription` helper that parses patterns like "NATS Discount: OH765 PERRYSBURG OH"
 
-### Data Flow: Route-Based State Detection
+**src/components/ifta/UnsyncedExpenses.tsx**
+- Add a `description` field to the interface and display it in the table (NATS discounts have no vendor, but their description contains the location info)
+- Show the description in a new column so users can identify where the discount applies
+
+### Data Flow
 
 ```text
-For each delivered load:
-  1. Geocode origin + destination addresses
-  2. Parse intermediate stops from notes
-  3. Geocode intermediate stop addresses
-  4. Fetch OSRM route (origin -> waypoints -> destination)
-  5. Calculate total route distance from geometry
-  6. Sample points along route every ~50 miles
-  7. Reverse-geocode each sample point -> get state
-  8. Calculate distance between consecutive samples
-  9. Attribute each segment's distance to its state
-  10. Return { TX: 312, LA: 178, MS: 95, ... }
+Fuel Discount expense (e.g., "NATS Discount: CO254 WHEAT RIDGE CO", $47.79)
+    |
+    v
+Sync parses description -> extracts "CO" as jurisdiction
+    |
+    v
+Updates expense.jurisdiction = "CO"
+    |
+    v
+DB trigger creates fuel_purchases record:
+  - jurisdiction: "CO"
+  - total_cost: 47.79 (stored as positive, will be treated as discount)
+  - gallons: 0
+  - vendor: "NATS Discount"
+    |
+    v
+Jurisdiction Summary map shows CO fuel cost reduced by $47.79
 ```
 
-### Fallback Strategy
-If any step fails for a load (geocoding failure, OSRM timeout, etc.), that load falls back to the existing 50/50 origin/destination split. This ensures the feature degrades gracefully without blocking the entire IFTA generation.
+### Important Note on Sign Convention
+
+The NATS discount expenses store amounts as positive numbers (e.g., 92.47). In the Finance page they are already flagged as refund/credit via the `isRefundExpense` function. For IFTA, these will sync as fuel_purchases with **zero gallons** and a **negative total_cost** so they correctly reduce the net fuel cost per state. The sync logic will negate the amount when creating the fuel_purchases record for Fuel Discount type expenses.
 
