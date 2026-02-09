@@ -12,8 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles, RefreshCw, TrendingDown } from 'lucide-react';
+import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles, RefreshCw, TrendingDown, RotateCcw, Printer } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { US_STATES } from '@/lib/us-states';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
@@ -22,6 +23,9 @@ import { STATE_DIESEL_TAX_RATES } from '@/lib/ifta-tax-rates';
 import { JurisdictionMap } from '@/components/ifta/JurisdictionMap';
 import { UnsyncedExpenses } from '@/components/ifta/UnsyncedExpenses';
 import { IFTAWorkflowStepper } from '@/components/ifta/IFTAWorkflowStepper';
+import { IFTATooltip } from '@/components/ifta/IFTATooltip';
+import { IFTAPrintSummary } from '@/components/ifta/IFTAPrintSummary';
+import { ResetQuarterDialog } from '@/components/ifta/ResetQuarterDialog';
 import { analyzeLoadRoute } from '@/lib/ifta-route-analysis';
 import { cn } from '@/lib/utils';
 
@@ -65,6 +69,8 @@ export default function IFTA() {
   const [fuelDialogOpen, setFuelDialogOpen] = useState(false);
   const [editingFuel, setEditingFuel] = useState<FuelPurchase | null>(null);
   const [fuelFormData, setFuelFormData] = useState<Partial<FuelPurchase>>({});
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [printSummaryOpen, setPrintSummaryOpen] = useState(false);
 
   const { data: trucks = [] } = useQuery({
     queryKey: ['trucks'],
@@ -629,8 +635,42 @@ export default function IFTA() {
     toast.success('IFTA report exported');
   };
 
+  const handleResetQuarter = async (target: 'records' | 'fuel' | 'both') => {
+    const [year, q] = selectedQuarter.split('-');
+    const quarter = parseInt(q.replace('Q', ''));
+    const startMonth = (quarter - 1) * 3;
+    const endMonth = startMonth + 3;
+    const startDate = `${year}-${String(startMonth + 1).padStart(2, '0')}-01`;
+    const endDate = quarter === 4
+      ? `${parseInt(year) + 1}-01-01`
+      : `${year}-${String(endMonth + 1).padStart(2, '0')}-01`;
+
+    try {
+      if (target === 'records' || target === 'both') {
+        const { error } = await supabase.from('ifta_records').delete().eq('quarter', selectedQuarter);
+        if (error) throw error;
+      }
+      if (target === 'fuel' || target === 'both') {
+        const { error } = await supabase
+          .from('fuel_purchases')
+          .delete()
+          .gte('purchase_date', startDate)
+          .lt('purchase_date', endDate);
+        if (error) throw error;
+      }
+      queryClient.invalidateQueries({ queryKey: ['ifta_records'] });
+      queryClient.invalidateQueries({ queryKey: ['fuel_purchases'] });
+      queryClient.invalidateQueries({ queryKey: ['unsynced_fuel_expenses'] });
+      const label = target === 'both' ? 'all data' : target === 'records' ? 'IFTA records' : 'fuel purchases';
+      toast.success(`Reset ${label} for ${selectedQuarter}`);
+    } catch (error: any) {
+      toast.error('Reset failed: ' + error.message);
+    }
+  };
+
   return (
     <DashboardLayout>
+      <TooltipProvider>
       <PageHeader 
         title="IFTA Reporting" 
         description="Track fuel purchases and mileage by jurisdiction for quarterly IFTA tax filing"
@@ -660,13 +700,26 @@ export default function IFTA() {
             ))}
           </SelectContent>
         </Select>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 text-destructive hover:text-destructive"
+          onClick={() => setResetDialogOpen(true)}
+        >
+          <RotateCcw className="h-4 w-4" />
+          Reset Quarter
+        </Button>
       </div>
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Miles</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Miles
+              <IFTATooltip term="Total Miles" />
+            </CardTitle>
             <Route className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
@@ -676,17 +729,26 @@ export default function IFTA() {
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Gallons</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Gallons
+              <IFTATooltip term="Gal Purchased" />
+            </CardTitle>
             <Fuel className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{summary.totalGallons.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground">Fuel purchased</p>
+            <p className="text-xs text-muted-foreground">
+              Fleet MPG: {avgMpg > 0 ? avgMpg.toFixed(2) : '—'}
+              <IFTATooltip term="Fleet MPG" />
+            </p>
           </CardContent>
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Net Fuel Cost</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Net Fuel Cost
+              <IFTATooltip term="Net Fuel Cost" />
+            </CardTitle>
             <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
@@ -705,7 +767,10 @@ export default function IFTA() {
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Tax Liability</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Tax Liability
+              <IFTATooltip term="Tax Liability" />
+            </CardTitle>
             <DollarSign className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
@@ -901,6 +966,12 @@ export default function IFTA() {
                   )}
                   {isAutoGenerating ? 'Generating...' : 'Auto-Generate from Loads'}
                 </Button>
+                {iftaRecords.length > 0 && (
+                  <Button onClick={() => setPrintSummaryOpen(true)} variant="outline" className="gap-2">
+                    <Printer className="h-4 w-4" />
+                    Print Filing Summary
+                  </Button>
+                )}
                 <Button onClick={exportToCSV} variant="outline">
                   <Download className="h-4 w-4 mr-2" />
                   Export CSV
@@ -940,12 +1011,12 @@ export default function IFTA() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Jurisdiction</TableHead>
-                      <TableHead className="text-right">Total Miles</TableHead>
-                      <TableHead className="text-right">Taxable Miles</TableHead>
-                      <TableHead className="text-right">Fuel Gallons</TableHead>
-                      <TableHead className="text-right">Fuel Cost</TableHead>
-                      <TableHead className="text-right">Tax Rate</TableHead>
-                      <TableHead className="text-right">Tax Owed</TableHead>
+                      <TableHead className="text-right">Total Miles<IFTATooltip term="Total Miles" /></TableHead>
+                      <TableHead className="text-right">Taxable Miles<IFTATooltip term="Taxable Miles" /></TableHead>
+                      <TableHead className="text-right">Fuel Gallons<IFTATooltip term="Gal Purchased" /></TableHead>
+                      <TableHead className="text-right">Fuel Cost<IFTATooltip term="Fuel Cost" /></TableHead>
+                      <TableHead className="text-right">Tax Rate<IFTATooltip term="Tax Rate" /></TableHead>
+                      <TableHead className="text-right">Tax Owed<IFTATooltip term="Tax Owed" /></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1110,6 +1181,26 @@ export default function IFTA() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Reset Quarter Dialog */}
+      <ResetQuarterDialog
+        open={resetDialogOpen}
+        onOpenChange={setResetDialogOpen}
+        onConfirm={handleResetQuarter}
+        quarter={selectedQuarter}
+      />
+
+      {/* Print Filing Summary */}
+      <IFTAPrintSummary
+        open={printSummaryOpen}
+        onOpenChange={setPrintSummaryOpen}
+        quarter={selectedQuarter}
+        iftaRecords={iftaRecords}
+        fuelPurchases={filteredFuelPurchases}
+        fleetMpg={avgMpg}
+      />
+
+      </TooltipProvider>
     </DashboardLayout>
   );
 }
