@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { AlertTriangle, Check, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { US_STATES } from '@/lib/us-states';
+import { cn } from '@/lib/utils';
 
 interface UnsyncedExpense {
   id: string;
@@ -106,8 +107,11 @@ export function UnsyncedExpenses({ expenses, trucks }: UnsyncedExpensesProps) {
                   {exp.vendor || exp.description || '-'}
                 </TableCell>
                 <TableCell>{getTruckName(exp.truck_id)}</TableCell>
-                <TableCell className="text-right">
-                  ${exp.amount.toFixed(2)}
+                <TableCell className={cn(
+                  "text-right font-medium",
+                  exp.expense_type === 'Fuel Discount' ? 'text-success' : 'text-destructive'
+                )}>
+                  {exp.expense_type === 'Fuel Discount' ? '-' : ''}${exp.amount.toFixed(2)}
                 </TableCell>
                 <TableCell className="text-right">
                   {exp.gallons?.toFixed(2) || '-'}
