@@ -11,7 +11,6 @@ import {
   Shield,
   Building2,
   TrendingUp,
-  BookOpen,
   BarChart3,
   Crown,
   Container,
@@ -117,8 +116,7 @@ export function AppSidebar() {
   ];
 
   const operationsNavItems: NavItem[] = [
-    { title: 'CRM', icon: Contact, path: '/crm', roles: ['owner', 'dispatcher'] },
-    { title: 'Resources', icon: BookOpen, path: '/resources', roles: ['owner', 'dispatcher', 'safety', 'driver'] },
+    { title: 'CRM', icon: Contact, path: '/crm', roles: ['owner', 'dispatcher', 'safety', 'driver'] },
     { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'] },
     { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'] },
     { title: 'Safety', icon: Shield, path: '/safety', roles: ['owner', 'safety'] },

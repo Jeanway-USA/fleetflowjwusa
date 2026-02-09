@@ -18,7 +18,7 @@ import FleetLoads from "./pages/FleetLoads";
 import AgencyLoads from "./pages/AgencyLoads";
 import Finance from "./pages/Finance";
 import CompanyInsights from "./pages/CompanyInsights";
-import Resources from "./pages/Resources";
+import { Navigate } from "react-router-dom";
 import MaintenanceManagement from "./pages/MaintenanceManagement";
 import Documents from "./pages/Documents";
 import Safety from "./pages/Safety";
@@ -60,7 +60,7 @@ const App = () => {
                   <Route path="/finance" element={<Finance />} />
                   <Route path="/ledger" element={<Finance />} />
                   <Route path="/insights" element={<CompanyInsights />} />
-                  <Route path="/resources" element={<Resources />} />
+                  <Route path="/resources" element={<Navigate to="/crm" replace />} />
                   <Route path="/maintenance" element={<MaintenanceManagement />} />
                   <Route path="/documents" element={<Documents />} />
                   <Route path="/safety" element={<Safety />} />

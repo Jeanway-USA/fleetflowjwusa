@@ -2,17 +2,17 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Phone, Mail, Globe, MapPin, Edit2 } from 'lucide-react';
+import { Phone, Mail, Globe, MapPin, Edit2, Clock, Info } from 'lucide-react';
 import { ActivityTimeline } from './ActivityTimeline';
 import { ContactLoadHistory } from './ContactLoadHistory';
 import { ContactRevenueStats } from './ContactRevenueStats';
-import type { CRMContact } from '@/hooks/useCRMData';
+import { getSubTypeLabel, type UnifiedContact } from '@/hooks/useCRMData';
 
 interface ContactDetailSheetProps {
-  contact: CRMContact | null;
+  contact: UnifiedContact | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onEdit: (contact: CRMContact) => void;
+  onEdit: (contact: UnifiedContact) => void;
   readOnly?: boolean;
 }
 
@@ -27,6 +27,9 @@ const TYPE_COLORS: Record<string, string> = {
 export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOnly = false }: ContactDetailSheetProps) {
   if (!contact) return null;
 
+  const subType = getSubTypeLabel(contact);
+  const isCRM = contact.source === 'crm';
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
@@ -34,12 +37,21 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
           <div className="flex items-start justify-between gap-2">
             <div>
               <SheetTitle className="text-lg">{contact.company_name}</SheetTitle>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <Badge variant="outline" className={`text-xs capitalize ${TYPE_COLORS[contact.contact_type] || ''}`}>
                   {contact.contact_type}
                 </Badge>
+                {subType && (
+                  <Badge variant="secondary" className="text-[10px]">{subType}</Badge>
+                )}
                 {contact.agent_code && (
                   <Badge variant="outline" className="text-xs">Code: {contact.agent_code}</Badge>
+                )}
+                {contact.agent_status === 'unsafe' && (
+                  <Badge variant="destructive" className="text-xs">Unsafe</Badge>
+                )}
+                {contact.agent_status === 'safe' && contact.source === 'resource' && (
+                  <Badge variant="outline" className="text-xs bg-success/10 text-success border-success/20">Safe</Badge>
                 )}
                 {!contact.is_active && (
                   <Badge variant="destructive" className="text-xs">Inactive</Badge>
@@ -71,7 +83,7 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
               </a>
             )}
             {contact.website && (
-              <a href={contact.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-foreground">
+              <a href={contact.website.startsWith('http') ? contact.website : `https://${contact.website}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-foreground">
                 <Globe className="h-3 w-3" /> Website
               </a>
             )}
@@ -79,9 +91,34 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
           {(contact.city || contact.state || contact.address) && (
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <MapPin className="h-3 w-3" />
-              {[contact.address, contact.city, contact.state].filter(Boolean).join(', ')}
+              {[contact.address, contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}
             </p>
           )}
+          {contact.service_area && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <MapPin className="h-3 w-3" /> Service Area: {contact.service_area}
+            </p>
+          )}
+
+          {/* Facility-specific info */}
+          {contact.source === 'facility' && (
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              {contact.operating_hours && (
+                <p className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" /> {contact.operating_hours}
+                </p>
+              )}
+              {contact.dock_info && (
+                <p className="flex items-center gap-1">
+                  <Info className="h-3 w-3" /> Dock: {contact.dock_info}
+                </p>
+              )}
+              {contact.appointment_required && (
+                <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Appointment Required</Badge>
+              )}
+            </div>
+          )}
+
           {contact.tags && contact.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">
               {contact.tags.map((tag) => (
@@ -94,23 +131,29 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
           )}
         </div>
 
-        {/* Tabbed Content */}
-        <Tabs defaultValue="activity" className="mt-4">
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="activity" className="text-xs">Activity</TabsTrigger>
-            <TabsTrigger value="loads" className="text-xs">Load History</TabsTrigger>
-            <TabsTrigger value="revenue" className="text-xs">Revenue</TabsTrigger>
-          </TabsList>
-          <TabsContent value="activity" className="mt-3">
-            <ActivityTimeline contactId={contact.id} readOnly={readOnly} />
-          </TabsContent>
-          <TabsContent value="loads" className="mt-3">
-            <ContactLoadHistory contactId={contact.id} />
-          </TabsContent>
-          <TabsContent value="revenue" className="mt-3">
-            <ContactRevenueStats contactId={contact.id} />
-          </TabsContent>
-        </Tabs>
+        {/* Tabbed Content - only for CRM contacts that support activities/loads */}
+        {isCRM ? (
+          <Tabs defaultValue="activity" className="mt-4">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="activity" className="text-xs">Activity</TabsTrigger>
+              <TabsTrigger value="loads" className="text-xs">Load History</TabsTrigger>
+              <TabsTrigger value="revenue" className="text-xs">Revenue</TabsTrigger>
+            </TabsList>
+            <TabsContent value="activity" className="mt-3">
+              <ActivityTimeline contactId={contact.id} readOnly={readOnly} />
+            </TabsContent>
+            <TabsContent value="loads" className="mt-3">
+              <ContactLoadHistory contactId={contact.id} />
+            </TabsContent>
+            <TabsContent value="revenue" className="mt-3">
+              <ContactRevenueStats contactId={contact.id} />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <div className="mt-4 text-xs text-muted-foreground text-center py-6">
+            Activity log & revenue analytics are available for CRM contacts (brokers).
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );
