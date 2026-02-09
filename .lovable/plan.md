@@ -1,145 +1,84 @@
 
 
-# CRM -- Unified Business Relationship Management
+# Merge Resources into CRM
 
 ## Overview
 
-Add a full CRM (Customer Relationship Management) page that centralizes all business contacts -- brokers, agents, shippers, receivers, and vendors -- into a single searchable directory. Each contact has an activity log, linked load history, and revenue analytics. This replaces scattered free-text fields with structured, trackable relationships.
+Consolidate the separate Resources page (load agents, mechanics, roadside, truck washes, and facilities) into the existing CRM page, creating a single unified contacts directory. The Resources page and its `/resources` route will be removed. The `/resources` URL will redirect to `/crm` so existing bookmarks still work.
 
 ---
 
-## What You'll Get
+## What Changes
 
-### 1. Contacts Directory
-A new **/crm** page with a unified view of all business contacts, organized by type:
-- **Brokers** -- companies that book loads for you
-- **Agents** -- Landstar agent codes you work with (migrated from Resources)
-- **Shippers** -- pickup locations (linked from Facilities)
-- **Receivers** -- delivery locations (linked from Facilities)
-- **Vendors** -- mechanics, roadside, truck washes (linked from Resources)
+### Data Stays Where It Is
+The existing `company_resources` and `facilities` database tables remain untouched. No data migration needed. Instead, the CRM page will query both tables alongside `crm_contacts` and display everything in one unified view.
 
-Each contact card shows name, type, contact info, tags, and quick stats (total loads, total revenue).
+### Mapping Resource Types to CRM Types
 
-### 2. Contact Detail View
-Clicking any contact opens a detail panel (sheet/drawer) with:
-- Editable contact info (name, phone, email, address, notes)
-- **Activity Log** -- timestamped entries for calls, emails, notes, meetings. Anyone with access can log an interaction.
-- **Load History** -- all loads linked to this contact (matched by broker name, agent code, or facility), with dates, routes, and revenue
-- **Revenue Analytics** -- total revenue, average rate per mile, load count, and a small trend chart
+| Old Resources Tab | CRM Contact Type | Data Source |
+|---|---|---|
+| Load Agents | Agent | `company_resources` (resource_type = 'load_agent') |
+| Mechanics | Vendor | `company_resources` (resource_type = 'mechanic') |
+| Roadside | Vendor | `company_resources` (resource_type = 'roadside') |
+| Truck Washes | Vendor | `company_resources` (resource_type = 'truck_wash') |
+| Facilities (Shipper) | Shipper | `facilities` (facility_type = 'shipper' or 'both') |
+| Facilities (Receiver) | Receiver | `facilities` (facility_type = 'receiver' or 'both') |
+| Facilities (Warehouse/Terminal) | Shipper | `facilities` (facility_type = 'warehouse'/'terminal') |
+| Brokers | Broker | `crm_contacts` (contact_type = 'broker') |
 
-### 3. Smart Linking
-- When creating/editing a load on Fleet Loads, the broker/agent fields become searchable dropdowns that pull from CRM contacts
-- Existing loads will be matched to CRM contacts by broker name and agent code
-- Facilities from the Resources page can be linked as CRM contacts (shipper/receiver type)
+### What You'll See on the CRM Page
 
-### 4. Dashboard Summary Cards
-Top of the CRM page shows:
-- Total contacts by type
-- Top 5 contacts by revenue (last 90 days)
-- Contacts with no activity in 30+ days (follow-up needed)
+The same filter tabs (All, Brokers, Agents, Shippers, Receivers, Vendors) but now the Agents tab also shows load agents from `company_resources`, the Vendors tab shows mechanics/roadside/truck washes, and the Shippers/Receivers tabs show facilities. Each entry displays its data source subtly (e.g., a small "Facility" or "Resource" label) so you can tell them apart.
 
----
+The unified search will work across all three data sources at once.
 
-## Navigation
-
-The CRM page will be added to the sidebar under a new **"CRM"** group (or under the existing **Operations** group), accessible to **owner** and **dispatcher** roles.
+### Access Control
+The CRM page currently requires owner or dispatcher roles. Since Resources was also visible to safety and driver roles (read-only), the CRM route will be expanded to include safety and driver roles with read-only access (matching what they had before).
 
 ---
 
 ## Technical Details
 
-### New Database Table: `crm_contacts`
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid (PK) | Auto-generated |
-| contact_type | text | 'broker', 'agent', 'shipper', 'receiver', 'vendor' |
-| company_name | text | Company or business name |
-| contact_name | text | Primary contact person |
-| phone | text | Phone number |
-| email | text | Email address |
-| address | text | Physical address |
-| city | text | City |
-| state | text | State abbreviation |
-| tags | text[] | Flexible tags for categorization |
-| agent_code | text | Landstar agent code (for agents) |
-| agent_status | text | 'safe' or 'unsafe' (for agents) |
-| website | text | Website URL |
-| notes | text | General notes |
-| is_active | boolean | Whether contact is active (default true) |
-| created_at | timestamptz | Auto-set |
-| updated_at | timestamptz | Auto-updated |
-
-RLS Policies:
-- Owner and dispatcher can perform all operations (using `has_operations_access`)
-- Safety role gets read-only access
-- Drivers get read-only access (for looking up contact info)
-
-### New Database Table: `crm_activities`
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid (PK) | Auto-generated |
-| contact_id | uuid (FK) | References crm_contacts |
-| user_id | uuid | Who logged the activity |
-| activity_type | text | 'call', 'email', 'note', 'meeting', 'load_booked' |
-| subject | text | Brief subject line |
-| description | text | Detailed notes |
-| activity_date | timestamptz | When it happened |
-| created_at | timestamptz | Auto-set |
-
-RLS Policies:
-- Operations access for full CRUD
-- Read-only for safety and drivers
-
-### New Database Table: `crm_contact_loads`
-A linking table to associate CRM contacts with fleet loads:
-
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid (PK) | Auto-generated |
-| contact_id | uuid (FK) | References crm_contacts |
-| load_id | uuid (FK) | References fleet_loads |
-| relationship_type | text | 'broker', 'agent', 'shipper', 'receiver' |
-| created_at | timestamptz | Auto-set |
-
-RLS Policies:
-- Same as crm_contacts (operations access)
-
-### Files to Create
-
-1. **`src/pages/CRM.tsx`** -- Main CRM page with:
-   - Contact type filter tabs (All, Brokers, Agents, Shippers, Receivers, Vendors)
-   - Search bar with real-time filtering
-   - Summary cards (total contacts, top revenue contacts, follow-up needed)
-   - Contact table/grid with sortable columns
-   - Add/Edit contact dialog
-   - Delete confirmation
-
-2. **`src/components/crm/ContactDetailSheet.tsx`** -- Slide-out detail view with:
-   - Contact info header (editable)
-   - Tabbed content: Activity Log, Load History, Revenue Analytics
-   - "Log Activity" form
-
-3. **`src/components/crm/ActivityTimeline.tsx`** -- Chronological list of activities with icons per type, relative timestamps
-
-4. **`src/components/crm/ContactRevenueStats.tsx`** -- Revenue analytics card showing total revenue, load count, avg rate/mile, and a small bar chart of monthly revenue (using recharts)
-
-5. **`src/components/crm/ContactLoadHistory.tsx`** -- Table of linked loads with date, route, rate, status
-
 ### Files to Modify
 
-1. **`src/App.tsx`** -- Add `/crm` route
-2. **`src/components/layout/AppSidebar.tsx`** -- Add CRM nav item under Operations (accessible to owner, dispatcher)
+1. **`src/pages/CRM.tsx`**
+   - Import and query `company_resources` and `facilities` tables alongside `crm_contacts`
+   - Normalize all three data sources into a unified display format for the table
+   - Keep the existing `crm_contacts` CRUD as-is for broker contacts
+   - For resources and facilities, use their existing CRUD patterns (same mutations as Resources page)
+   - The "Add Contact" button opens a form that creates entries in the appropriate table based on contact type
+   - Add a sub-type indicator (e.g., "Mechanic", "Roadside", "Truck Wash") for vendor entries
+   - Include facility-specific fields (operating hours, dock info, appointment required) in the detail sheet for facility-type entries
 
-### Database Migration
-One migration to create the three new tables (`crm_contacts`, `crm_activities`, `crm_contact_loads`) with:
-- RLS enabled on all three
-- Appropriate policies using existing `has_operations_access`, `has_safety_access` functions
-- Foreign key constraints
-- Updated_at trigger on `crm_contacts`
-- Unique constraint on `crm_contact_loads` (contact_id, load_id, relationship_type)
+2. **`src/hooks/useCRMData.ts`**
+   - Add new hooks: `useCompanyResources()` and `useFacilities()` to fetch from those tables
+   - Add a normalizer function that maps resources and facilities into the same shape as CRM contacts for unified display
+   - Add resource and facility mutation hooks (create/update/delete)
 
-### No New Dependencies
-Uses existing: recharts, lucide-react, Radix UI components, TanStack Query, date-fns.
+3. **`src/components/crm/ContactFormDialog.tsx`**
+   - Extend the form to handle vendor sub-types (mechanic, roadside, truck_wash) with appropriate fields (service area for roadside, address for others)
+   - Add facility-specific fields (operating hours, dock info, appointment required, zip) when the type is shipper/receiver
+   - Route the save action to the correct table based on the contact type and data source
+
+4. **`src/components/crm/ContactDetailSheet.tsx`**
+   - Show facility-specific info (operating hours, dock info, appointment required) when viewing a facility
+   - Show vendor sub-type info (service area for roadside contacts)
+
+5. **`src/components/crm/CRMSummaryCards.tsx`**
+   - Update counts to include resources and facilities in the totals
+
+6. **`src/components/layout/AppSidebar.tsx`**
+   - Remove the "Resources" nav item
+   - Update CRM roles to include `safety` and `driver` (read-only access, matching what Resources had)
+
+7. **`src/App.tsx`**
+   - Remove the Resources import and route
+   - Add a redirect from `/resources` to `/crm` so existing bookmarks work
+
+### Files to Remove
+- `src/pages/Resources.tsx`
+- `src/components/resources/FacilitiesTab.tsx`
+
+### No Database Changes
+All data stays in its existing tables. No migrations needed. The CRM page simply queries multiple tables and presents them in one unified view.
 
