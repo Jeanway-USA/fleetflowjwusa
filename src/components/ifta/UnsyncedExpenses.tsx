@@ -16,6 +16,7 @@ interface UnsyncedExpense {
   expense_date: string;
   expense_type: string;
   vendor: string | null;
+  description: string | null;
   amount: number;
   gallons: number | null;
   truck_id: string | null;
@@ -84,7 +85,7 @@ export function UnsyncedExpenses({ expenses, trucks }: UnsyncedExpensesProps) {
             <TableRow>
               <TableHead>Date</TableHead>
               <TableHead>Type</TableHead>
-              <TableHead>Vendor</TableHead>
+              <TableHead>Vendor / Description</TableHead>
               <TableHead>Truck</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead className="text-right">Gallons</TableHead>
@@ -101,7 +102,9 @@ export function UnsyncedExpenses({ expenses, trucks }: UnsyncedExpensesProps) {
                     {exp.expense_type}
                   </Badge>
                 </TableCell>
-                <TableCell>{exp.vendor || '-'}</TableCell>
+                <TableCell className="max-w-[200px] truncate" title={exp.description || exp.vendor || ''}>
+                  {exp.vendor || exp.description || '-'}
+                </TableCell>
                 <TableCell>{getTruckName(exp.truck_id)}</TableCell>
                 <TableCell className="text-right">
                   ${exp.amount.toFixed(2)}
