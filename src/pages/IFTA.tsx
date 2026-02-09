@@ -12,11 +12,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles } from 'lucide-react';
+import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { US_STATES } from '@/lib/us-states';
+import { extractJurisdictionFromVendor } from '@/lib/us-states';
 import { Badge } from '@/components/ui/badge';
 import { STATE_DIESEL_TAX_RATES } from '@/lib/ifta-tax-rates';
+import { JurisdictionMap } from '@/components/ifta/JurisdictionMap';
 
 interface IFTARecord {
   id: string;
@@ -221,6 +223,105 @@ export default function IFTA() {
 
   // --- Auto-generate IFTA records from delivered loads ---
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // --- Sync Fuel Purchases from Expenses ---
+  const syncFuelFromExpenses = async () => {
+    setIsSyncing(true);
+    try {
+      const [year, q] = selectedQuarter.split('-');
+      const quarter = parseInt(q.replace('Q', ''));
+      const startMonth = (quarter - 1) * 3;
+      const endMonth = startMonth + 3;
+      const startDate = `${year}-${String(startMonth + 1).padStart(2, '0')}-01`;
+      const endDate = quarter === 4
+        ? `${parseInt(year) + 1}-01-01`
+        : `${year}-${String(endMonth + 1).padStart(2, '0')}-01`;
+
+      const { data: fuelExpenses, error: expError } = await supabase
+        .from('expenses')
+        .select('id, vendor, jurisdiction, load_id, amount, gallons, expense_date, truck_id, expense_type')
+        .in('expense_type', ['Fuel', 'DEF'])
+        .gte('expense_date', startDate)
+        .lt('expense_date', endDate);
+
+      if (expError) throw expError;
+      if (!fuelExpenses || fuelExpenses.length === 0) {
+        toast.info('No Fuel/DEF expenses found for this quarter');
+        setIsSyncing(false);
+        return;
+      }
+
+      const expenseIds = fuelExpenses.map(e => e.id);
+      const { data: existingSynced } = await supabase
+        .from('fuel_purchases')
+        .select('source_expense_id')
+        .in('source_expense_id', expenseIds);
+
+      const syncedIds = new Set((existingSynced || []).map(r => r.source_expense_id));
+      const unsyncedExpenses = fuelExpenses.filter(e => !syncedIds.has(e.id));
+
+      if (unsyncedExpenses.length === 0) {
+        toast.info('All fuel expenses are already synced');
+        setIsSyncing(false);
+        return;
+      }
+
+      let syncedCount = 0;
+      let skippedCount = 0;
+
+      for (const expense of unsyncedExpenses) {
+        let jurisdiction = expense.jurisdiction;
+
+        if (!jurisdiction) {
+          jurisdiction = extractJurisdictionFromVendor(expense.vendor);
+        }
+
+        if (!jurisdiction && expense.load_id) {
+          const { data: load } = await supabase
+            .from('fleet_loads')
+            .select('origin, destination')
+            .eq('id', expense.load_id)
+            .single();
+
+          if (load) {
+            jurisdiction = extractState(load.origin) || extractState(load.destination);
+          }
+        }
+
+        if (!jurisdiction) {
+          skippedCount++;
+          continue;
+        }
+
+        const { error: updateError } = await supabase
+          .from('expenses')
+          .update({ jurisdiction })
+          .eq('id', expense.id);
+
+        if (updateError) {
+          console.error(`Failed to update expense ${expense.id}:`, updateError);
+          skippedCount++;
+        } else {
+          syncedCount++;
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['fuel_purchases'] });
+      
+      if (syncedCount > 0) {
+        toast.success(`Synced ${syncedCount} of ${unsyncedExpenses.length} fuel expenses`);
+      }
+      if (skippedCount > 0) {
+        toast.warning(`${skippedCount} expenses skipped (no jurisdiction found)`);
+      }
+    } catch (error: any) {
+      console.error('Fuel sync error:', error);
+      toast.error('Failed to sync: ' + error.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Extract US state abbreviation from an address string
   const extractState = (address: string): string | null => {
@@ -481,10 +582,25 @@ export default function IFTA() {
                 <CardTitle>Fuel Purchases</CardTitle>
                 <CardDescription>Track all fuel purchases with jurisdiction</CardDescription>
               </div>
-              <Button onClick={() => openFuelDialog()} className="gradient-gold text-primary-foreground">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Fuel Purchase
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={syncFuelFromExpenses}
+                  disabled={isSyncing}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {isSyncing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  {isSyncing ? 'Syncing...' : 'Sync from Expenses'}
+                </Button>
+                <Button onClick={() => openFuelDialog()} className="gradient-gold text-primary-foreground">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Fuel Purchase
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -558,44 +674,12 @@ export default function IFTA() {
         </TabsContent>
 
         <TabsContent value="summary" className="mt-6">
-          <Card className="card-elevated">
-            <CardHeader>
-              <CardTitle>Fuel by Jurisdiction</CardTitle>
-              <CardDescription>Summary of fuel purchases by state for {selectedQuarter}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>State</TableHead>
-                    <TableHead className="text-right">Gallons</TableHead>
-                    <TableHead className="text-right">Total Cost</TableHead>
-                    <TableHead className="text-right">Avg $/Gallon</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Object.entries(fuelByState).length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                        No fuel data for this quarter
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    Object.entries(fuelByState)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([state, data]) => (
-                        <TableRow key={state}>
-                          <TableCell className="font-medium">{state}</TableCell>
-                          <TableCell className="text-right">{data.gallons.toFixed(2)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(data.cost)}</TableCell>
-                          <TableCell className="text-right">${(data.cost / data.gallons).toFixed(3)}</TableCell>
-                        </TableRow>
-                      ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <JurisdictionMap
+            iftaRecords={iftaRecords}
+            fuelPurchases={filteredFuelPurchases}
+            fleetMpg={avgMpg}
+            quarter={selectedQuarter}
+          />
         </TabsContent>
 
         <TabsContent value="report" className="mt-6">
