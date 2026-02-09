@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles, RefreshCw } from 'lucide-react';
+import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles, RefreshCw, TrendingDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { US_STATES } from '@/lib/us-states';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
@@ -21,7 +21,9 @@ import { Badge } from '@/components/ui/badge';
 import { STATE_DIESEL_TAX_RATES } from '@/lib/ifta-tax-rates';
 import { JurisdictionMap } from '@/components/ifta/JurisdictionMap';
 import { UnsyncedExpenses } from '@/components/ifta/UnsyncedExpenses';
+import { IFTAWorkflowStepper } from '@/components/ifta/IFTAWorkflowStepper';
 import { analyzeLoadRoute } from '@/lib/ifta-route-analysis';
+import { cn } from '@/lib/utils';
 
 interface IFTARecord {
   id: string;
@@ -72,7 +74,6 @@ export default function IFTA() {
       return data;
     },
   });
-
   const { data: drivers = [] } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
@@ -81,6 +82,7 @@ export default function IFTA() {
       return data;
     },
   });
+
 
   const { data: fuelPurchases = [], isLoading: fuelLoading } = useQuery({
     queryKey: ['fuel_purchases'],
@@ -228,11 +230,6 @@ export default function IFTA() {
     return truck ? `#${truck.unit_number}` : '-';
   };
 
-  const getDriverName = (driverId: string | null) => {
-    if (!driverId) return '-';
-    const driver = drivers.find(d => d.id === driverId);
-    return driver ? `${driver.first_name} ${driver.last_name}` : '-';
-  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
@@ -253,6 +250,14 @@ export default function IFTA() {
   });
 
   // Calculate summary stats
+  const grossFuelCost = filteredFuelPurchases
+    .filter(p => p.total_cost > 0)
+    .reduce((s, p) => s + p.total_cost, 0);
+  const discountTotal = filteredFuelPurchases
+    .filter(p => p.total_cost < 0)
+    .reduce((s, p) => s + Math.abs(p.total_cost), 0);
+  const discountCount = filteredFuelPurchases.filter(p => p.total_cost < 0).length;
+
   const summary = {
     totalMiles: iftaRecords.reduce((s, r) => s + r.total_miles, 0),
     totalGallons: filteredFuelPurchases.reduce((s, p) => s + p.gallons, 0),
@@ -261,6 +266,25 @@ export default function IFTA() {
   };
 
   const avgMpg = summary.totalGallons > 0 ? summary.totalMiles / summary.totalGallons : 0;
+
+  // Count unique states in jurisdiction summary
+  const jurisdictionStates = new Set([
+    ...iftaRecords.map(r => r.jurisdiction),
+    ...filteredFuelPurchases.map(fp => fp.jurisdiction),
+  ]);
+
+  // Count delivered loads for the quarter (for empty state)
+  const quarterDeliveredLoads = loads.filter(l => {
+    if (l.status !== 'delivered' || !l.delivery_date) return false;
+    const date = parseISO(l.delivery_date);
+    const [year, q] = selectedQuarter.split('-');
+    const quarter = parseInt(q.replace('Q', ''));
+    const startMonth = (quarter - 1) * 3;
+    const endMonth = startMonth + 3;
+    return date.getFullYear() === parseInt(year) &&
+           date.getMonth() >= startMonth &&
+           date.getMonth() < endMonth;
+  });
 
   // --- Auto-generate IFTA records from delivered loads ---
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
@@ -662,12 +686,21 @@ export default function IFTA() {
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Average MPG</CardTitle>
-            <Calculator className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium">Net Fuel Cost</CardTitle>
+            <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{avgMpg.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Fleet efficiency</p>
+            <div className="text-2xl font-bold">{formatCurrency(summary.totalFuelCost)}</div>
+            {discountCount > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                <span className="text-destructive">{formatCurrency(grossFuelCost)}</span>
+                {' gross · '}
+                <span className="text-success">-{formatCurrency(discountTotal)}</span>
+                {` (${discountCount} discount${discountCount !== 1 ? 's' : ''})`}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">No discounts applied</p>
+            )}
           </CardContent>
         </Card>
         <Card className="card-elevated">
@@ -684,11 +717,37 @@ export default function IFTA() {
         </Card>
       </div>
 
+      {/* Workflow Stepper */}
+      <IFTAWorkflowStepper
+        hasFuelPurchases={filteredFuelPurchases.length > 0}
+        hasIFTARecords={iftaRecords.length > 0}
+        hasJurisdictionData={jurisdictionStates.size > 0}
+      />
+
       <Tabs defaultValue="fuel" className="w-full">
         <TabsList>
-          <TabsTrigger value="fuel">Fuel Purchases</TabsTrigger>
-          <TabsTrigger value="summary">Jurisdiction Summary</TabsTrigger>
-          <TabsTrigger value="report">IFTA Report</TabsTrigger>
+          <TabsTrigger value="fuel" className="gap-1.5">
+            Fuel Purchases
+            {filteredFuelPurchases.length > 0 && (
+              <Badge variant="secondary" className="h-5 min-w-5 px-1 text-[10px]">
+                {filteredFuelPurchases.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="summary" className="gap-1.5">
+            Jurisdiction Summary
+            {jurisdictionStates.size > 0 && (
+              <Badge variant="secondary" className="h-5 min-w-5 px-1 text-[10px]">
+                {jurisdictionStates.size}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="report" className="gap-1.5">
+            IFTA Report
+            {iftaRecords.length > 0 && (
+              <span className="h-2 w-2 rounded-full bg-success" />
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="fuel" className="mt-6">
@@ -723,9 +782,9 @@ export default function IFTA() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>State</TableHead>
                     <TableHead>Truck</TableHead>
-                    <TableHead>Driver</TableHead>
                     <TableHead>Vendor</TableHead>
                     <TableHead className="text-right">Gallons</TableHead>
                     <TableHead className="text-right">$/Gallon</TableHead>
@@ -736,52 +795,72 @@ export default function IFTA() {
                 <TableBody>
                   {fuelLoading ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8">Loading...</TableCell>
+                      <TableCell colSpan={10} className="text-center py-8">Loading...</TableCell>
                     </TableRow>
                   ) : filteredFuelPurchases.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                        No fuel purchases for this quarter
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                        No fuel purchases for this quarter. Use "Sync from Expenses" to import.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredFuelPurchases.map(fp => (
-                      <TableRow key={fp.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            {format(parseISO(fp.purchase_date), 'MM/dd/yyyy')}
-                            {fp.source_expense_id && (
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-primary/30 text-primary">
-                                <Link2 className="h-2.5 w-2.5 mr-0.5" />
-                                synced
+                    filteredFuelPurchases.map(fp => {
+                      const isDiscount = fp.total_cost < 0;
+                      return (
+                        <TableRow key={fp.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              {format(parseISO(fp.purchase_date), 'MM/dd/yyyy')}
+                              {fp.source_expense_id && (
+                                <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 border-primary/30 text-primary">
+                                  <Link2 className="h-2.5 w-2.5 mr-0.5" />
+                                  synced
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {isDiscount ? (
+                              <Badge className="bg-success/10 text-success border-success/20 text-[11px]" variant="outline">
+                                <TrendingDown className="h-3 w-3 mr-0.5" />
+                                Discount
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[11px]">
+                                <Fuel className="h-3 w-3 mr-0.5" />
+                                Fuel
                               </Badge>
                             )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-muted-foreground" />
-                            {fp.jurisdiction}
-                          </div>
-                        </TableCell>
-                        <TableCell>{getTruckName(fp.truck_id)}</TableCell>
-                        <TableCell>{getDriverName(fp.driver_id)}</TableCell>
-                        <TableCell>{fp.vendor || '-'}</TableCell>
-                        <TableCell className="text-right">{fp.gallons.toFixed(2)}</TableCell>
-                        <TableCell className="text-right">${fp.price_per_gallon.toFixed(3)}</TableCell>
-                        <TableCell className="text-right font-medium">{formatCurrency(fp.total_cost)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button size="icon" variant="ghost" onClick={() => openFuelDialog(fp)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteFuelMutation.mutate(fp.id)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              {fp.jurisdiction}
+                            </div>
+                          </TableCell>
+                          <TableCell>{getTruckName(fp.truck_id)}</TableCell>
+                          <TableCell>{fp.vendor || '-'}</TableCell>
+                          <TableCell className="text-right">{fp.gallons.toFixed(2)}</TableCell>
+                          <TableCell className="text-right">${fp.price_per_gallon.toFixed(3)}</TableCell>
+                          <TableCell className={cn(
+                            "text-right font-medium",
+                            isDiscount ? 'text-success' : 'text-destructive'
+                          )}>
+                            {formatCurrency(fp.total_cost)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button size="icon" variant="ghost" onClick={() => openFuelDialog(fp)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteFuelMutation.mutate(fp.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -838,8 +917,23 @@ export default function IFTA() {
               {iftaRecords.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Calculator className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No IFTA records for {selectedQuarter}</p>
-                  <p className="text-sm mt-2">Records are generated from fleet load data</p>
+                  <p className="font-medium text-foreground">No IFTA records for {selectedQuarter}</p>
+                  <p className="text-sm mt-1 mb-4">
+                    {quarterDeliveredLoads.length > 0
+                      ? `${quarterDeliveredLoads.length} delivered load${quarterDeliveredLoads.length !== 1 ? 's' : ''} available for this quarter`
+                      : 'No delivered loads found for this quarter'}
+                  </p>
+                  {filteredFuelPurchases.length === 0 && (
+                    <p className="text-xs mb-3">Tip: Sync fuel purchases first for accurate tax calculations</p>
+                  )}
+                  <Button
+                    onClick={autoGenerateIFTA}
+                    disabled={isAutoGenerating || quarterDeliveredLoads.length === 0}
+                    className="gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Auto-Generate from Loads
+                  </Button>
                 </div>
               ) : (
                 <Table>

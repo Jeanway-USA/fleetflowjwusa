@@ -191,6 +191,7 @@ export function JurisdictionMap({ iftaRecords, fuelPurchases, fleetMpg, quarter 
                 <TableHead>State</TableHead>
                 <TableHead className="text-right">Miles</TableHead>
                 <TableHead className="text-right">Gal Purchased</TableHead>
+                <TableHead className="text-right">Fuel Cost</TableHead>
                 <TableHead className="text-right">Gal Consumed</TableHead>
                 <TableHead className="text-right">Tax Rate</TableHead>
                 <TableHead className="text-right">Tax Owed</TableHead>
@@ -201,7 +202,7 @@ export function JurisdictionMap({ iftaRecords, fuelPurchases, fleetMpg, quarter 
             <TableBody>
               {jurisdictionData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     No jurisdiction data. Generate IFTA records from the Report tab first.
                   </TableCell>
                 </TableRow>
@@ -214,6 +215,7 @@ export function JurisdictionMap({ iftaRecords, fuelPurchases, fleetMpg, quarter 
                       </TableCell>
                       <TableCell className="text-right">{d.totalMiles.toLocaleString()}</TableCell>
                       <TableCell className="text-right">{d.gallonsPurchased.toFixed(2)}</TableCell>
+                      <TableCell className={`text-right ${d.fuelCost < 0 ? 'text-success' : ''}`}>{fmt(d.fuelCost)}</TableCell>
                       <TableCell className="text-right">{d.gallonsConsumed.toFixed(2)}</TableCell>
                       <TableCell className="text-right">${d.taxRate.toFixed(4)}</TableCell>
                       <TableCell className="text-right">{fmt(d.taxOwed)}</TableCell>
@@ -227,6 +229,7 @@ export function JurisdictionMap({ iftaRecords, fuelPurchases, fleetMpg, quarter 
                     <TableCell>TOTAL</TableCell>
                     <TableCell className="text-right">{totals.totalMiles.toLocaleString()}</TableCell>
                     <TableCell className="text-right">{totals.gallonsPurchased.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{fmt(totals.fuelCost)}</TableCell>
                     <TableCell className="text-right">{totals.gallonsConsumed.toFixed(2)}</TableCell>
                     <TableCell className="text-right">—</TableCell>
                     <TableCell className="text-right">{fmt(totals.taxOwed)}</TableCell>
