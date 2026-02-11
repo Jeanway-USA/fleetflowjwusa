@@ -1,36 +1,40 @@
 
-
-# Fix: Rate Confirmation Parsing on Live Site
+# Fix: Rate Confirmation Upload Failing on Live Site
 
 ## Problem
-The "Failed to send a request to the Edge Function" error occurs because the 6-page PDF, when converted to base64 and sent as a JSON body, creates a request payload of 5-10MB. The Supabase functions relay rejects this before it reaches the edge function. Only the OPTIONS preflight succeeds; the actual POST never arrives.
+The current approach uploads the PDF to storage first, then passes the path to the edge function. On the live site, the `supabase.storage.upload()` call returns an HTML error page instead of JSON, causing the "Unexpected token '<'" parse error.
+
+## Root Cause
+The Supabase relay/proxy on the live domain appears to intercept or reject the storage upload request and returns an HTML error page instead of a proper JSON response. This doesn't happen in the preview environment.
 
 ## Solution
-Instead of sending the entire PDF as base64 in the request body, upload it to temporary storage first, then pass the storage path to the edge function. The function downloads the file server-side (no size limit concerns) and processes it.
+Send the PDF file directly to the edge function as raw binary (not base64 in JSON, not through storage). Use `fetch()` with the raw file as the body and `Content-Type: application/pdf`. This bypasses both:
+- The JSON payload size limit (which broke the original base64 approach)
+- The storage upload issue (which breaks the current approach on live)
 
 ## Technical Details
 
 ### 1. Update `src/components/loads/RateConfirmationUpload.tsx`
 
-Change the `processFile` function to:
-1. Upload the PDF to the `documents` storage bucket under a `temp-rc/` prefix
-2. Call the edge function with just the `filePath` instead of `pdfBase64`
-3. Clean up the temporary file after parsing completes (success or failure)
-4. Add better error messaging to surface the actual error details
+Replace the storage-upload-then-invoke pattern with a direct `fetch()` call:
+- Get the current session token via `supabase.auth.refreshSession()`
+- Build the edge function URL from `VITE_SUPABASE_URL`
+- Send the PDF file as raw binary body with `Content-Type: application/pdf`
+- Include the Authorization header and apikey header manually
+- Remove all storage upload/cleanup code
 
 ### 2. Update `supabase/functions/parse-rate-confirmation/index.ts`
 
-Modify the edge function to:
-1. Accept either `filePath` (new) or `pdfBase64` (backward-compatible)
-2. If `filePath` is provided, download the file from the `documents` storage bucket using the service role client
-3. Convert the downloaded file to base64 for the AI Gateway call
-4. Delete the temporary file from storage after processing
-5. Keep all existing AI prompt logic, authentication, and CORS unchanged
+Modify the edge function to accept the PDF in three ways:
+- **New (primary):** Raw binary body with `Content-Type: application/pdf` -- reads `req.arrayBuffer()`, converts to base64
+- **Existing:** `filePath` in JSON body (backward compat)
+- **Existing:** `pdfBase64` in JSON body (backward compat)
 
-### 3. No Database Changes
-No migrations needed. Uses the existing `documents` storage bucket for temporary file storage.
+Detection logic: check the `Content-Type` header. If it's `application/pdf`, read the body as raw bytes. Otherwise, parse as JSON and use the existing `filePath`/`pdfBase64` logic.
+
+### 3. No Database or Storage Changes
+No migrations needed. No storage policy changes. The solution completely bypasses client-side storage operations.
 
 ### Files Modified
-- `src/components/loads/RateConfirmationUpload.tsx` -- Upload PDF to storage, send path instead of base64
-- `supabase/functions/parse-rate-confirmation/index.ts` -- Download from storage instead of receiving base64
-
+- `src/components/loads/RateConfirmationUpload.tsx` -- Direct fetch to edge function with raw PDF body
+- `supabase/functions/parse-rate-confirmation/index.ts` -- Accept raw PDF binary body
