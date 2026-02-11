@@ -87,36 +87,17 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     setExtractedData(null);
 
     try {
-      // Refresh session to get a fresh token
-      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
-      if (sessionError || !sessionData.session) {
-        throw new Error('Your session has expired. Please log out and log back in, then try again.');
-      }
-
-      const token = sessionData.session.access_token;
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      // Send PDF directly to edge function as raw binary
-      const response = await fetch(`${supabaseUrl}/functions/v1/parse-rate-confirmation`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'apikey': anonKey,
-          'Content-Type': 'application/pdf',
-        },
+      const { data, error: fnError } = await supabase.functions.invoke('parse-rate-confirmation', {
         body: file,
+        headers: { 'Content-Type': 'application/pdf' },
       });
 
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => ({ error: `Server error (${response.status})` }));
-        throw new Error(errBody.error || `Server error (${response.status})`);
+      if (fnError) {
+        throw new Error(fnError.message || 'Failed to process file');
       }
 
-      const data: ExtractedLoadData = await response.json();
-
-      if ((data as any).error) {
-        throw new Error((data as any).error);
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
       console.log('Extracted load data:', data);
