@@ -91,8 +91,8 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     let uploadedPath: string | null = null;
 
     try {
-      // 0. Ensure we have a valid session before proceeding
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      // 0. Refresh session to get a fresh token before proceeding
+      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
       if (sessionError || !sessionData.session) {
         throw new Error('Your session has expired. Please log out and log back in, then try again.');
       }
