@@ -1,49 +1,38 @@
 
-# Fix: Rate Confirmation Upload Failing on Published Site
+
+# Fix: Rate Confirmation Upload on Published Site
 
 ## Problem
-The "Failed to fetch" error occurs only on the published (live) site because the code uses a raw `fetch()` call directly to the Supabase URL. On the published site, Lovable Cloud routes edge function calls through a relay/proxy. All other edge functions in the codebase use `supabase.functions.invoke()` which automatically routes through this relay -- but `parse-rate-confirmation` bypasses it.
+The `supabase.functions.invoke()` call with a raw `File` body fails on the published site. The Lovable Cloud relay does not correctly forward raw binary bodies -- it likely serializes or wraps them in a way the edge function cannot read, resulting in "Failed to send a request to the Edge Function."
 
-## Root Cause
-In the previous fix, we switched from `supabase.functions.invoke()` to raw `fetch()` to support sending the PDF as binary. However, the direct Supabase URL is not accessible from the published domain, causing a network-level failure ("Failed to fetch").
+## Why Previous Approaches Failed
+1. **Raw `fetch()` to Supabase URL** -- blocked by the relay on published domain ("Failed to fetch")
+2. **`supabase.functions.invoke()` with raw File body** -- relay corrupts binary body ("Failed to send a request")
+3. **Storage upload then invoke** -- storage upload returns HTML on live ("Unexpected token '<'")
 
-## Solution
-Switch back to using `supabase.functions.invoke()` but pass the raw `File` object as the body with the correct `Content-Type` header. The Supabase JS SDK supports non-JSON bodies (Blob, File, ArrayBuffer) and will route through the relay automatically.
+## Solution: Base64 in JSON Body
+Convert the PDF to base64 on the client side and send it as a standard JSON payload via `supabase.functions.invoke()`. This uses the normal SDK path through the relay with a standard JSON `Content-Type`, which is proven to work for all other edge function calls in the app.
+
+Rate confirmation PDFs are typically 50-200KB, which converts to ~70-270KB base64. This is well within the JSON payload limits.
 
 ## Technical Details
 
-### File: `src/components/loads/RateConfirmationUpload.tsx`
+### 1. Update `src/components/loads/RateConfirmationUpload.tsx`
+- Add a helper function to read a `File` as base64 using `FileReader`
+- Replace the current invoke call:
+  ```typescript
+  // Convert file to base64 on client
+  const base64 = await fileToBase64(file);
+  
+  const { data, error } = await supabase.functions.invoke('parse-rate-confirmation', {
+    body: { pdfBase64: base64 },
+  });
+  ```
+- Remove the custom `Content-Type: application/pdf` header so the SDK uses its default `application/json`
 
-Replace the raw `fetch()` call:
-```typescript
-// CURRENT (broken on live):
-const response = await fetch(`${supabaseUrl}/functions/v1/parse-rate-confirmation`, {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'apikey': anonKey,
-    'Content-Type': 'application/pdf',
-  },
-  body: file,
-});
-```
-
-With `supabase.functions.invoke()`:
-```typescript
-// NEW (works on both preview and live):
-const { data, error: fnError } = await supabase.functions.invoke('parse-rate-confirmation', {
-  body: file,
-  headers: { 'Content-Type': 'application/pdf' },
-});
-```
-
-- Remove the manual session refresh, URL construction, and raw fetch logic
-- Remove the `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` references
-- Handle the SDK response format (`data`/`error`) instead of raw Response parsing
-- Keep the rest of the component (extracted data preview, matching logic) unchanged
-
-### File: `supabase/functions/parse-rate-confirmation/index.ts`
-No changes needed -- the edge function already handles `application/pdf` content type.
+### 2. Edge Function -- No Changes Needed
+The edge function already handles `pdfBase64` in a JSON body (lines 232-233 of the current code). This is the "backward compat" path that was kept from a previous iteration. It will work as-is.
 
 ### Files Modified
-- `src/components/loads/RateConfirmationUpload.tsx` -- Switch from raw fetch to SDK invoke
+- `src/components/loads/RateConfirmationUpload.tsx` -- Convert file to base64 client-side, send as JSON
+
