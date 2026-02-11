@@ -1,28 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Allowed origins for CORS - restrict to known domains
-const ALLOWED_ORIGINS = [
-  'https://fleetflowjwusa.lovable.app',
-  'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app',
-  'http://localhost:5173',
-  'http://localhost:8080',
-];
-
-function getCorsHeaders(request: Request): Record<string, string> {
-  const origin = request.headers.get('Origin') || '';
-  const isAllowed = ALLOWED_ORIGINS.some(allowed => 
-    origin === allowed || 
-    origin.endsWith('.lovable.app') || 
-    origin.endsWith('.lovableproject.com')
-  );
-  
-  return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : ALLOWED_ORIGINS[0],
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  };
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 interface IntermediateStop {
   stop_number: number;
@@ -136,7 +118,7 @@ IMPORTANT:
 - Extract pickup_time and delivery_time from the stop information - they may appear next to or below the dates.`;
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
+  
   
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -354,7 +336,7 @@ serve(async (req) => {
     )) ? error.message : 'An internal error occurred while parsing the document.';
     return new Response(
       JSON.stringify({ error: safeMessage }),
-      { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
