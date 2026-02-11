@@ -2600,6 +2600,54 @@ export type Database = {
       }
     }
     Views: {
+      driver_settings_safe: {
+        Row: {
+          created_at: string | null
+          driver_id: string | null
+          id: string | null
+          landstar_username: string | null
+          theme_preference: string | null
+          updated_at: string | null
+          weekly_miles_goal: number | null
+          weekly_revenue_goal: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          driver_id?: string | null
+          id?: string | null
+          landstar_username?: string | null
+          theme_preference?: string | null
+          updated_at?: string | null
+          weekly_miles_goal?: number | null
+          weekly_revenue_goal?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          driver_id?: string | null
+          id?: string | null
+          landstar_username?: string | null
+          theme_preference?: string | null
+          updated_at?: string | null
+          weekly_miles_goal?: number | null
+          weekly_revenue_goal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_settings_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_settings_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drivers_public_view: {
         Row: {
           avatar_url: string | null
