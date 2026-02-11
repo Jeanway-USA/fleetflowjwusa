@@ -15,7 +15,10 @@ import jwBannerLight from '@/assets/JW_Banner.png';
 import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 
 const emailSchema = z.string().email('Please enter a valid email address');
-const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
+const passwordSchema = z.string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
+  .regex(/[0-9]/, 'Must contain at least one number');
 
 export default function Auth() {
   const [email, setEmail] = useState('');
