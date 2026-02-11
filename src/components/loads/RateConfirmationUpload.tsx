@@ -127,9 +127,16 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
       
       // Check if this load already exists by Freight Bill #
       if (data.landstar_load_id) {
-        const existingLoad = existingLoads.find(
-          load => load.landstar_load_id === data.landstar_load_id
-        );
+        // Query database directly for reliable duplicate detection
+        const { data: existingRows } = await supabase
+          .from('fleet_loads')
+          .select('id, landstar_load_id, origin, destination, rate, pickup_date')
+          .eq('landstar_load_id', data.landstar_load_id)
+          .limit(1);
+
+        const existingLoad = existingRows?.[0] || 
+          existingLoads.find(load => load.landstar_load_id === data.landstar_load_id);
+
         if (existingLoad) {
           setMatchingLoad(existingLoad);
           toast.info(`Found existing load with Freight Bill #${data.landstar_load_id}`);
