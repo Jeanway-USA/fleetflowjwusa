@@ -1,38 +1,122 @@
 
 
-# Fix: Rate Confirmation Upload on Published Site
+# Thorough Fix: Rate Confirmation Upload on Published Site
 
-## Problem
-The `supabase.functions.invoke()` call with a raw `File` body fails on the published site. The Lovable Cloud relay does not correctly forward raw binary bodies -- it likely serializes or wraps them in a way the edge function cannot read, resulting in "Failed to send a request to the Edge Function."
+## Root Cause Analysis
 
-## Why Previous Approaches Failed
-1. **Raw `fetch()` to Supabase URL** -- blocked by the relay on published domain ("Failed to fetch")
-2. **`supabase.functions.invoke()` with raw File body** -- relay corrupts binary body ("Failed to send a request")
-3. **Storage upload then invoke** -- storage upload returns HTML on live ("Unexpected token '<'")
+The edge function analytics prove the request from the published site never reaches the backend. The "Failed to send a request to the Edge Function" error is a client-side network failure occurring at the Lovable Cloud relay layer.
 
-## Solution: Base64 in JSON Body
-Convert the PDF to base64 on the client side and send it as a standard JSON payload via `supabase.functions.invoke()`. This uses the normal SDK path through the relay with a standard JSON `Content-Type`, which is proven to work for all other edge function calls in the app.
+Three possible causes:
+1. The published site may still be running older code (raw `fetch()` approach) that was not yet published
+2. The relay has a request body size limit and the base64-encoded PDF exceeds it
+3. The relay is timing out or rejecting the request for another reason
 
-Rate confirmation PDFs are typically 50-200KB, which converts to ~70-270KB base64. This is well within the JSON payload limits.
+## Solution: Defense-in-Depth Approach
+
+We will implement multiple layers of protection to ensure the upload works reliably regardless of the specific relay behavior.
+
+### 1. Client-Side: Add File Size Validation and Retry Logic
+
+**File: `src/components/loads/RateConfirmationUpload.tsx`**
+
+- Add file size check before processing (max 5MB raw = ~6.7MB base64). Show a clear error if the file is too large.
+- Add retry logic: if the first `supabase.functions.invoke` call fails with a network error, retry once after a 1-second delay.
+- Add detailed error categorization so the user sees a helpful message:
+  - "File is too large" for size issues
+  - "Network error - please check your connection" for fetch failures
+  - "Server error" for function-level errors
+- Log the actual error details to console for debugging
+
+### 2. Edge Function: Add Published URL to CORS and Support FormData
+
+**File: `supabase/functions/parse-rate-confirmation/index.ts`**
+
+- Add the published URL `https://fleetflowjwusa.lovable.app` explicitly to the ALLOWED_ORIGINS list (don't rely solely on the wildcard)
+- Add support for `multipart/form-data` Content-Type as a third input method -- this allows sending the raw file via FormData which is ~33% smaller than base64 and handled more naturally by HTTP proxies
+- Detection order:
+  1. `application/pdf` -- raw binary body
+  2. `multipart/form-data` -- FormData with file
+  3. `application/json` or other -- JSON body with `pdfBase64` or `filePath`
+
+### 3. Client-Side: FormData Fallback
+
+**File: `src/components/loads/RateConfirmationUpload.tsx`**
+
+If the primary base64 JSON approach fails with a network error:
+1. First retry with the same base64 JSON approach (handles transient failures)
+2. If that also fails, try a FormData approach where the raw File is sent directly via `supabase.functions.invoke({ body: formData })` -- this avoids the 33% base64 overhead and may pass through the relay
+
+```text
+Attempt Flow:
+  [1] SDK invoke with { pdfBase64 } (JSON, ~133% of file size)
+       |
+       v -- fails? -->
+  [2] Retry SDK invoke with { pdfBase64 } after 1s delay
+       |
+       v -- fails? -->
+  [3] SDK invoke with FormData (raw file, ~100% of file size)
+       |
+       v -- fails? -->
+  [4] Show detailed error with file size info
+```
+
+### 4. Matching `parse-landstar-statement` CORS Pattern
+
+Ensure the CORS configuration exactly matches the working `parse-landstar-statement` function for consistency. Currently they're slightly different (rate confirmation has extra Supabase client headers that statement doesn't).
 
 ## Technical Details
 
-### 1. Update `src/components/loads/RateConfirmationUpload.tsx`
-- Add a helper function to read a `File` as base64 using `FileReader`
-- Replace the current invoke call:
-  ```typescript
-  // Convert file to base64 on client
-  const base64 = await fileToBase64(file);
+### Edge Function CORS Update
+```typescript
+const ALLOWED_ORIGINS = [
+  'https://fleetflowjwusa.lovable.app',   // published
+  'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app',  // preview
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+```
+
+### Edge Function FormData Support
+```typescript
+if (contentType.includes('multipart/form-data')) {
+  const formData = await req.formData();
+  const file = formData.get('file');
+  if (file && file instanceof File) {
+    const arrayBuffer = await file.arrayBuffer();
+    pdfBase64 = uint8ArrayToBase64(new Uint8Array(arrayBuffer));
+  }
+}
+```
+
+### Client Retry + Fallback
+```typescript
+const processFile = async (file: File) => {
+  // Size validation
+  if (file.size > 5 * 1024 * 1024) {
+    toast.error('PDF file must be under 5MB');
+    return;
+  }
+
+  // Attempt 1: base64 JSON via SDK
+  let result = await tryInvokeWithBase64(file);
   
-  const { data, error } = await supabase.functions.invoke('parse-rate-confirmation', {
-    body: { pdfBase64: base64 },
-  });
-  ```
-- Remove the custom `Content-Type: application/pdf` header so the SDK uses its default `application/json`
+  // Attempt 2: retry base64 JSON
+  if (result.networkError) {
+    await delay(1000);
+    result = await tryInvokeWithBase64(file);
+  }
+  
+  // Attempt 3: FormData fallback
+  if (result.networkError) {
+    result = await tryInvokeWithFormData(file);
+  }
+};
+```
 
-### 2. Edge Function -- No Changes Needed
-The edge function already handles `pdfBase64` in a JSON body (lines 232-233 of the current code). This is the "backward compat" path that was kept from a previous iteration. It will work as-is.
+## Files Modified
+- `src/components/loads/RateConfirmationUpload.tsx` -- file size validation, retry logic, FormData fallback, better error messages
+- `supabase/functions/parse-rate-confirmation/index.ts` -- published URL in CORS, FormData input support
 
-### Files Modified
-- `src/components/loads/RateConfirmationUpload.tsx` -- Convert file to base64 client-side, send as JSON
+## Important: Publishing
+After these changes are implemented, you MUST publish the app before testing on the live site. The error may be happening because the published site is still running code from a previous iteration.
 
