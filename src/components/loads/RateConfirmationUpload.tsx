@@ -75,6 +75,8 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     setIsDragging(false);
   }, []);
 
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -84,9 +86,71 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     });
   };
 
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  const isNetworkError = (err: unknown): boolean => {
+    if (err instanceof Error) {
+      const msg = err.message.toLowerCase();
+      return msg.includes('failed to send') || msg.includes('failed to fetch') || 
+             msg.includes('network') || msg.includes('load failed') ||
+             msg.includes('typeerror');
+    }
+    return false;
+  };
+
+  type InvokeResult = { data: any; error: string | null; networkError: boolean };
+
+  const tryInvokeWithBase64 = async (file: File): Promise<InvokeResult> => {
+    try {
+      const base64 = await fileToBase64(file);
+      console.log(`[RC Upload] Attempting base64 JSON invoke, payload ~${Math.round(base64.length / 1024)}KB`);
+      const { data, error: fnError } = await supabase.functions.invoke('parse-rate-confirmation', {
+        body: { pdfBase64: base64 },
+      });
+      if (fnError) {
+        console.error('[RC Upload] Base64 invoke error:', fnError);
+        return { data: null, error: fnError.message, networkError: isNetworkError(fnError) };
+      }
+      if (data?.error) {
+        return { data: null, error: data.error, networkError: false };
+      }
+      return { data, error: null, networkError: false };
+    } catch (err) {
+      console.error('[RC Upload] Base64 invoke exception:', err);
+      return { data: null, error: err instanceof Error ? err.message : 'Unknown error', networkError: isNetworkError(err) };
+    }
+  };
+
+  const tryInvokeWithFormData = async (file: File): Promise<InvokeResult> => {
+    try {
+      console.log(`[RC Upload] Attempting FormData invoke, file size ${Math.round(file.size / 1024)}KB`);
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data, error: fnError } = await supabase.functions.invoke('parse-rate-confirmation', {
+        body: formData,
+      });
+      if (fnError) {
+        console.error('[RC Upload] FormData invoke error:', fnError);
+        return { data: null, error: fnError.message, networkError: isNetworkError(fnError) };
+      }
+      if (data?.error) {
+        return { data: null, error: data.error, networkError: false };
+      }
+      return { data, error: null, networkError: false };
+    } catch (err) {
+      console.error('[RC Upload] FormData invoke exception:', err);
+      return { data: null, error: err instanceof Error ? err.message : 'Unknown error', networkError: isNetworkError(err) };
+    }
+  };
+
   const processFile = async (file: File) => {
     if (!file.type.includes('pdf')) {
       toast.error('Please upload a PDF file');
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error(`PDF file must be under 5MB. This file is ${(file.size / (1024 * 1024)).toFixed(1)}MB.`);
       return;
     }
 
@@ -96,19 +160,30 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     setExtractedData(null);
 
     try {
-      const base64 = await fileToBase64(file);
-      const { data, error: fnError } = await supabase.functions.invoke('parse-rate-confirmation', {
-        body: { pdfBase64: base64 },
-      });
+      // Attempt 1: base64 JSON
+      let result = await tryInvokeWithBase64(file);
 
-      if (fnError) {
-        throw new Error(fnError.message || 'Failed to process file');
+      // Attempt 2: retry base64 JSON after delay
+      if (result.networkError) {
+        console.log('[RC Upload] Attempt 1 failed with network error, retrying in 1s...');
+        await delay(1000);
+        result = await tryInvokeWithBase64(file);
       }
 
-      if (data?.error) {
-        throw new Error(data.error);
+      // Attempt 3: FormData fallback
+      if (result.networkError) {
+        console.log('[RC Upload] Attempt 2 failed with network error, trying FormData fallback...');
+        result = await tryInvokeWithFormData(file);
       }
 
+      if (result.error) {
+        const userMessage = result.networkError
+          ? `Network error — please check your connection and try again. (File: ${(file.size / 1024).toFixed(0)}KB)`
+          : result.error;
+        throw new Error(userMessage);
+      }
+
+      const data = result.data;
       console.log('Extracted load data:', data);
       setExtractedData(data);
       

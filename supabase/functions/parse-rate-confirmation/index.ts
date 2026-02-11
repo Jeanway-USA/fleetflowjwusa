@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Allowed origins for CORS - restrict to known domains
 const ALLOWED_ORIGINS = [
+  'https://fleetflowjwusa.lovable.app',
   'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app',
   'http://localhost:5173',
   'http://localhost:8080',
@@ -206,6 +207,27 @@ serve(async (req) => {
       }
       pdfBase64 = uint8ArrayToBase64(new Uint8Array(arrayBuffer));
       console.log("PDF binary converted to base64, length:", pdfBase64.length);
+    } else if (contentType.includes('multipart/form-data')) {
+      // FormData: file sent via FormData (fallback for relay issues)
+      console.log("Receiving multipart/form-data body");
+      const formData = await req.formData();
+      const file = formData.get('file');
+      if (file && file instanceof File) {
+        const arrayBuffer = await file.arrayBuffer();
+        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+          return new Response(
+            JSON.stringify({ error: "Empty file in FormData" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        pdfBase64 = uint8ArrayToBase64(new Uint8Array(arrayBuffer));
+        console.log("FormData file converted to base64, length:", pdfBase64.length);
+      } else {
+        return new Response(
+          JSON.stringify({ error: "No 'file' field found in FormData" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     } else {
       // Legacy JSON body
       const body = await req.json();
