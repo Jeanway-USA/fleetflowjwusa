@@ -75,6 +75,15 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     setIsDragging(false);
   }, []);
 
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result?.toString().split(',')[1] || '');
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const processFile = async (file: File) => {
     if (!file.type.includes('pdf')) {
       toast.error('Please upload a PDF file');
@@ -87,9 +96,9 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     setExtractedData(null);
 
     try {
+      const base64 = await fileToBase64(file);
       const { data, error: fnError } = await supabase.functions.invoke('parse-rate-confirmation', {
-        body: file,
-        headers: { 'Content-Type': 'application/pdf' },
+        body: { pdfBase64: base64 },
       });
 
       if (fnError) {
