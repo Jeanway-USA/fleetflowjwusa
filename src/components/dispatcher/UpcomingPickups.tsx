@@ -21,6 +21,12 @@ interface UpcomingLoad {
   truck: { unit_number: string } | null;
 }
 
+// Parse date-only strings as local timezone (not UTC)
+const parsePickupDate = (dateStr: string) => {
+  if (!dateStr.includes('T')) return new Date(dateStr + 'T00:00:00');
+  return new Date(dateStr);
+};
+
 export function UpcomingPickups() {
   const navigate = useNavigate();
 
@@ -29,6 +35,8 @@ export function UpcomingPickups() {
     queryFn: async () => {
       const now = new Date();
       const in48Hours = addHours(now, 48);
+      const nowDate = now.toISOString().split('T')[0];
+      const futureDate = in48Hours.toISOString().split('T')[0];
       
       const { data, error } = await supabase
         .from('fleet_loads')
@@ -45,8 +53,8 @@ export function UpcomingPickups() {
           truck:trucks!fleet_loads_truck_id_fkey(unit_number)
         `)
         .in('status', ['pending', 'booked', 'assigned'])
-        .gte('pickup_date', now.toISOString())
-        .lte('pickup_date', in48Hours.toISOString())
+        .gte('pickup_date', nowDate)
+        .lte('pickup_date', futureDate)
         .order('pickup_date', { ascending: true });
       
       if (error) throw error;
@@ -77,7 +85,7 @@ export function UpcomingPickups() {
   const needsAttention = (load: UpcomingLoad) => !load.driver_id || !load.truck_id;
   const isUrgent = (load: UpcomingLoad) => {
     if (!load.pickup_date) return false;
-    return isBefore(new Date(load.pickup_date), addHours(new Date(), 6));
+    return isBefore(parsePickupDate(load.pickup_date), addHours(new Date(), 6));
   };
 
   return (
@@ -132,10 +140,10 @@ export function UpcomingPickups() {
                   <div className="flex items-center gap-1 mt-2 text-xs">
                     <Clock className={`h-3 w-3 ${isUrgent(load) ? 'text-destructive' : 'text-muted-foreground'}`} />
                     <span className={isUrgent(load) ? 'text-destructive font-medium' : 'text-muted-foreground'}>
-                      {formatDistanceToNow(new Date(load.pickup_date), { addSuffix: true })}
+                      {formatDistanceToNow(parsePickupDate(load.pickup_date), { addSuffix: true })}
                     </span>
                     <span className="text-muted-foreground">
-                      ({format(new Date(load.pickup_date), 'MMM d, h:mm a')})
+                      ({format(parsePickupDate(load.pickup_date), 'MMM d, h:mm a')})
                     </span>
                   </div>
                 )}
