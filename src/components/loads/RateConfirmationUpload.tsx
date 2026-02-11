@@ -91,6 +91,12 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     let uploadedPath: string | null = null;
 
     try {
+      // 0. Ensure we have a valid session before proceeding
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        throw new Error('Your session has expired. Please log out and log back in, then try again.');
+      }
+
       // 1. Upload PDF to storage bucket
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
