@@ -1,24 +1,29 @@
 
-# Remove All Hours of Service (HOS) References
+# Fix: Pickup Date Timezone Offset in Upcoming Pickups
 
-Since HOS is managed entirely by your separate ELD hardware in the truck, we'll clean out all HOS-related code from the website.
+## Problem
+The Upcoming Pickups card shows "Feb 10, 4:00 PM" for a load with pickup_date `2026-02-11`. JavaScript's `new Date('2026-02-11')` interprets date-only strings as UTC midnight, which shifts backward when converted to the user's local timezone (e.g., Central Time = Feb 10, 6:00 PM).
 
-## Changes
+## Solution
+Apply the project's established date-handling standard: append `T00:00:00` to date-only strings before parsing. This forces local timezone interpretation.
 
-### 1. Dispatcher Dashboard -- Remove HOS Overview card
-**File: `src/pages/DispatcherDashboard.tsx`**
-- Remove the `DriverHOSOverview` import (line 18)
-- Remove `<DriverHOSOverview />` from the Fleet Status Grid (line 200)
-- The grid will show just Driver Status and Truck Status (2 columns instead of 3, adjust grid to `md:grid-cols-2`)
+## Technical Details
 
-### 2. Delete HOS component files
-- Delete `src/components/dispatcher/DriverHOSOverview.tsx`
-- Delete `src/components/driver/HOSStatusCard.tsx`
+### File: `src/components/dispatcher/UpcomingPickups.tsx`
 
-These are standalone components with no other imports depending on them.
+Create a helper to safely parse pickup dates:
 
-### 3. No database changes needed
-The `hos_logs` table will remain in the database but simply won't be used by the UI. Removing the table would require a migration and there's no harm in leaving it -- it just won't be referenced by any frontend code.
+```typescript
+const parsePickupDate = (dateStr: string) => {
+  // If date-only (no T), append T00:00:00 to force local timezone
+  if (!dateStr.includes('T')) return new Date(dateStr + 'T00:00:00');
+  return new Date(dateStr);
+};
+```
 
-## Result
-The Dispatcher Dashboard's Fleet Status section will show a clean 2-column grid with Driver Status and Truck Status only. No HOS references will remain anywhere in the UI.
+Replace all `new Date(load.pickup_date)` calls (lines 80, 135, 138) with `parsePickupDate(load.pickup_date)`.
+
+Also fix the query filters (lines 48-49) which compare ISO timestamps against date-only values -- these should use date strings instead of `toISOString()` to avoid the same UTC offset issue in filtering.
+
+### Files Modified
+- `src/components/dispatcher/UpcomingPickups.tsx` -- fix all date parsing to use local timezone
