@@ -153,23 +153,33 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase configuration missing');
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    // Use getClaims() for JWT validation - validates cryptographically without
+    // requiring an active server-side session (handles cross-domain session invalidation)
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey || supabaseServiceKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
 
-    if (authError || !user) {
+    if (claimsError || !claimsData?.claims) {
+      console.error("JWT validation failed:", claimsError);
       return new Response(
         JSON.stringify({ error: 'Invalid authentication token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log("Authenticated user:", user.id);
+    const userId = claimsData.claims.sub;
+    console.log("Authenticated user:", userId);
+
+    // Create admin client for storage operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
