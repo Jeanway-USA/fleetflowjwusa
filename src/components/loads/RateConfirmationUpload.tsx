@@ -86,40 +86,37 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     setError(null);
     setExtractedData(null);
 
-    // Upload PDF to temporary storage, then pass path to edge function
-    const tempPath = `temp-rc/${Date.now()}-${file.name}`;
-    let uploadedPath: string | null = null;
-
     try {
-      // 0. Refresh session to get a fresh token before proceeding
+      // Refresh session to get a fresh token
       const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession();
       if (sessionError || !sessionData.session) {
         throw new Error('Your session has expired. Please log out and log back in, then try again.');
       }
 
-      // 1. Upload PDF to storage bucket
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(tempPath, file, { contentType: 'application/pdf' });
+      const token = sessionData.session.access_token;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
-      }
-
-      uploadedPath = uploadData.path;
-      console.log('PDF uploaded to storage:', uploadedPath);
-
-      // 2. Call edge function with file path instead of base64
-      const { data, error: fnError } = await supabase.functions.invoke('parse-rate-confirmation', {
-        body: { filePath: uploadedPath },
+      // Send PDF directly to edge function as raw binary
+      const response = await fetch(`${supabaseUrl}/functions/v1/parse-rate-confirmation`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'apikey': anonKey,
+          'Content-Type': 'application/pdf',
+        },
+        body: file,
       });
 
-      if (fnError) {
-        throw new Error(fnError.message || 'Failed to parse rate confirmation');
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({ error: `Server error (${response.status})` }));
+        throw new Error(errBody.error || `Server error (${response.status})`);
       }
 
-      if (data.error) {
-        throw new Error(data.error);
+      const data: ExtractedLoadData = await response.json();
+
+      if ((data as any).error) {
+        throw new Error((data as any).error);
       }
 
       console.log('Extracted load data:', data);
@@ -146,10 +143,6 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
       setError(message);
       toast.error(message);
     } finally {
-      // 3. Clean up temp file from storage
-      if (uploadedPath) {
-        supabase.storage.from('documents').remove([uploadedPath]).catch(() => {});
-      }
       setIsProcessing(false);
     }
   };

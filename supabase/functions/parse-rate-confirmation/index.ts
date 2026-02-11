@@ -186,37 +186,57 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const body = await req.json();
-    const { filePath, pdfBase64: rawBase64 } = body;
-
-    // Resolve PDF base64: either from storage (new) or from request body (legacy)
+    // Resolve PDF base64 from one of three sources:
+    // 1. Raw binary body (Content-Type: application/pdf) - primary method
+    // 2. filePath in JSON body (storage path) - backward compat
+    // 3. pdfBase64 in JSON body - backward compat
     let pdfBase64: string;
 
-    if (filePath) {
-      console.log("Downloading PDF from storage:", filePath);
-      const { data: fileData, error: downloadError } = await supabaseAdmin.storage
-        .from('documents')
-        .download(filePath);
+    const contentType = req.headers.get('Content-Type') || '';
 
-      if (downloadError || !fileData) {
-        throw new Error(`Failed to download PDF from storage: ${downloadError?.message || 'No data'}`);
+    if (contentType.includes('application/pdf')) {
+      // Primary: raw PDF binary sent directly
+      console.log("Receiving raw PDF binary body");
+      const arrayBuffer = await req.arrayBuffer();
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+        return new Response(
+          JSON.stringify({ error: "Empty PDF body" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
-
-      const arrayBuffer = await fileData.arrayBuffer();
       pdfBase64 = uint8ArrayToBase64(new Uint8Array(arrayBuffer));
-      console.log("PDF downloaded and converted, base64 length:", pdfBase64.length);
-
-      // Clean up temp file from storage
-      supabaseAdmin.storage.from('documents').remove([filePath]).catch((err: Error) => {
-        console.warn("Failed to clean up temp file:", err.message);
-      });
-    } else if (rawBase64 && typeof rawBase64 === "string") {
-      pdfBase64 = rawBase64;
+      console.log("PDF binary converted to base64, length:", pdfBase64.length);
     } else {
-      return new Response(
-        JSON.stringify({ error: "Either filePath or pdfBase64 is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      // Legacy JSON body
+      const body = await req.json();
+      const { filePath, pdfBase64: rawBase64 } = body;
+
+      if (filePath) {
+        console.log("Downloading PDF from storage:", filePath);
+        const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+          .from('documents')
+          .download(filePath);
+
+        if (downloadError || !fileData) {
+          throw new Error(`Failed to download PDF from storage: ${downloadError?.message || 'No data'}`);
+        }
+
+        const arrayBuffer = await fileData.arrayBuffer();
+        pdfBase64 = uint8ArrayToBase64(new Uint8Array(arrayBuffer));
+        console.log("PDF downloaded and converted, base64 length:", pdfBase64.length);
+
+        // Clean up temp file from storage
+        supabaseAdmin.storage.from('documents').remove([filePath]).catch((err: Error) => {
+          console.warn("Failed to clean up temp file:", err.message);
+        });
+      } else if (rawBase64 && typeof rawBase64 === "string") {
+        pdfBase64 = rawBase64;
+      } else {
+        return new Response(
+          JSON.stringify({ error: "Either filePath or pdfBase64 is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     console.log("Parsing rate confirmation PDF, base64 length:", pdfBase64.length);
