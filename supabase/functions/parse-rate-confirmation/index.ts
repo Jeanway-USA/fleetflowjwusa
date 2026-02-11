@@ -256,7 +256,7 @@ serve(async (req) => {
         );
       }
       
-      throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
+      throw new Error('Document processing service is temporarily unavailable.');
     }
 
     const aiResponse = await response.json();
@@ -295,8 +295,13 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Parse rate confirmation error:", error);
+    const safeMessage = (error instanceof Error && (
+      error.message === 'Failed to parse extracted data' || 
+      error.message === 'Document processing service is temporarily unavailable.' ||
+      error.message.startsWith('Failed to download PDF')
+    )) ? error.message : 'An internal error occurred while parsing the document.';
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: safeMessage }),
       { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   }

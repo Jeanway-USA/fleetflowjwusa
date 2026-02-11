@@ -10,7 +10,7 @@ const corsHeaders = {
 async function getEncryptionKey(): Promise<CryptoKey> {
   const keyString = Deno.env.get('CREDENTIAL_ENCRYPTION_KEY');
   if (!keyString || keyString.length < 16) {
-    throw new Error('CREDENTIAL_ENCRYPTION_KEY not configured or too short (min 16 chars)');
+    throw new Error('Server encryption configuration error');
   }
 
   // Derive a 256-bit key from the secret using SHA-256
@@ -200,10 +200,9 @@ Deno.serve(async (req) => {
     );
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Credential management error:', error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: 'An internal error occurred. Please try again.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

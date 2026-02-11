@@ -255,8 +255,7 @@ Deno.serve(async (req) => {
 
   } catch (error: unknown) {
     console.error('Error inviting user:', error);
-    const message = error instanceof Error ? error.message : 'An unexpected error occurred';
-    return new Response(JSON.stringify({ error: message }), {
+    return new Response(JSON.stringify({ error: 'An internal error occurred while sending the invitation.' }), {
       status: 500,
       headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
