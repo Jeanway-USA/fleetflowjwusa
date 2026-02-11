@@ -226,7 +226,7 @@ IMPORTANT:
         );
       }
       
-      throw new Error(`AI Gateway error: ${response.status} - ${errorText}`);
+      throw new Error('Document processing service is temporarily unavailable.');
     }
 
     const aiResponse = await response.json();
@@ -265,8 +265,12 @@ IMPORTANT:
     });
   } catch (error) {
     console.error("Parse Landstar statement error:", error);
+    const safeMessage = (error instanceof Error && (
+      error.message === 'Failed to parse extracted data' ||
+      error.message === 'Document processing service is temporarily unavailable.'
+    )) ? error.message : 'An internal error occurred while parsing the statement.';
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: safeMessage }),
       { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   }
