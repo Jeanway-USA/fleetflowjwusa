@@ -75,20 +75,6 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     setIsDragging(false);
   }, []);
 
-  const convertFileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        // Remove the data URL prefix (e.g., "data:application/pdf;base64,")
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
   const processFile = async (file: File) => {
     if (!file.type.includes('pdf')) {
       toast.error('Please upload a PDF file');
@@ -100,19 +86,26 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     setError(null);
     setExtractedData(null);
 
+    // Upload PDF to temporary storage, then pass path to edge function
+    const tempPath = `temp-rc/${Date.now()}-${file.name}`;
+    let uploadedPath: string | null = null;
+
     try {
-      // Convert PDF to base64 for multimodal AI processing
-      const pdfBase64 = await convertFileToBase64(file);
-      
-      if (!pdfBase64 || pdfBase64.length < 100) {
-        throw new Error('Could not read PDF file.');
+      // 1. Upload PDF to storage bucket
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(tempPath, file, { contentType: 'application/pdf' });
+
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      console.log('PDF base64 length:', pdfBase64.length);
+      uploadedPath = uploadData.path;
+      console.log('PDF uploaded to storage:', uploadedPath);
 
-      // Send to edge function for AI parsing with multimodal capabilities
+      // 2. Call edge function with file path instead of base64
       const { data, error: fnError } = await supabase.functions.invoke('parse-rate-confirmation', {
-        body: { pdfBase64 },
+        body: { filePath: uploadedPath },
       });
 
       if (fnError) {
@@ -147,6 +140,10 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
       setError(message);
       toast.error(message);
     } finally {
+      // 3. Clean up temp file from storage
+      if (uploadedPath) {
+        supabase.storage.from('documents').remove([uploadedPath]).catch(() => {});
+      }
       setIsProcessing(false);
     }
   };

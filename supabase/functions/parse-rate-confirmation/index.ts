@@ -56,61 +56,16 @@ interface ExtractedLoadData {
   confidence: Record<string, number>;
 }
 
-serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
-  
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+// Convert Uint8Array to base64
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
   }
+  return btoa(binary);
+}
 
-  try {
-    // Validate user authentication
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized - Authentication required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase configuration missing');
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid authentication token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log("Authenticated user:", user.id);
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    const { pdfBase64 } = await req.json();
-
-    if (!pdfBase64 || typeof pdfBase64 !== "string") {
-      return new Response(
-        JSON.stringify({ error: "PDF base64 content is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("Parsing rate confirmation PDF, base64 length:", pdfBase64.length);
-
-    const systemPrompt = `You are an expert at extracting structured data from Landstar BCO Load Detail documents (Rate Confirmations). 
+const systemPrompt = `You are an expert at extracting structured data from Landstar BCO Load Detail documents (Rate Confirmations). 
 You will be given a PDF document image. Extract the load information accurately and return it in a structured JSON format.
 
 CRITICAL INSTRUCTIONS:
@@ -132,7 +87,7 @@ CRITICAL INSTRUCTIONS:
 6. For accessorials, extract any charges that aren't the base Line Haul or Fuel Surcharge (like Stop Of, Detention, etc.).
 7. For TIMES: Extract pickup and delivery appointment times in 12-hour format (e.g., "8:00 AM", "2:30 PM"). Look for times next to or below dates in the stop information section.`;
 
-    const userPrompt = `Analyze this Landstar BCO Load Detail PDF document and extract the load information.
+const userPrompt = `Analyze this Landstar BCO Load Detail PDF document and extract the load information.
 
 Return ONLY a valid JSON object with this exact structure (no markdown, no code blocks):
 {
@@ -178,6 +133,83 @@ IMPORTANT:
 - If there are stops between the first and last stop, include them in intermediate_stops array.
 - If this is a simple 2-stop load (origin to destination), leave intermediate_stops as an empty array [].
 - Extract pickup_time and delivery_time from the stop information - they may appear next to or below the dates.`;
+
+serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+  
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Validate user authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase configuration missing');
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log("Authenticated user:", user.id);
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    const body = await req.json();
+    const { filePath, pdfBase64: rawBase64 } = body;
+
+    // Resolve PDF base64: either from storage (new) or from request body (legacy)
+    let pdfBase64: string;
+
+    if (filePath) {
+      console.log("Downloading PDF from storage:", filePath);
+      const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+        .from('documents')
+        .download(filePath);
+
+      if (downloadError || !fileData) {
+        throw new Error(`Failed to download PDF from storage: ${downloadError?.message || 'No data'}`);
+      }
+
+      const arrayBuffer = await fileData.arrayBuffer();
+      pdfBase64 = uint8ArrayToBase64(new Uint8Array(arrayBuffer));
+      console.log("PDF downloaded and converted, base64 length:", pdfBase64.length);
+
+      // Clean up temp file from storage
+      supabaseAdmin.storage.from('documents').remove([filePath]).catch((err: Error) => {
+        console.warn("Failed to clean up temp file:", err.message);
+      });
+    } else if (rawBase64 && typeof rawBase64 === "string") {
+      pdfBase64 = rawBase64;
+    } else {
+      return new Response(
+        JSON.stringify({ error: "Either filePath or pdfBase64 is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Parsing rate confirmation PDF, base64 length:", pdfBase64.length);
 
     // Call Gemini with the PDF as a document
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
