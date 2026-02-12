@@ -1,200 +1,130 @@
 
 
-# Add SaaS Layer: Multi-Tenant TMS with Subscription Tiers
+# RLS Audit: Multi-Tenant Data Isolation
 
-## Overview
+## Critical Finding
 
-Add a public-facing SaaS layer on top of the existing JeanWay TMS. The current functionality stays intact as-is. New concepts introduced: **Organizations** (multi-tenancy), **Subscription Tiers** (feature gating), and a **Public Landing/Pricing Page**. Existing roles (owner, dispatcher, driver, etc.) continue to work within each organization.
+**Every single RLS policy in the database is missing `org_id` isolation.** This means an owner, dispatcher, or any admin-level user from Company A can currently read and modify ALL data from Company B, Company C, and every other organization.
 
-## Architecture
+The `org_id` column was added to 37 tables during Phase 1, but none of the existing RLS policies were updated to include the `org_id = get_user_org_id(auth.uid())` check. The `get_user_org_id()` helper function exists but is unused outside the `organizations` table itself.
 
-The core idea: every data table gets an `org_id` column. Each user belongs to one organization. The organization has a subscription tier that controls which features are visible. Roles within the org control permissions.
+---
 
-```text
-+------------------+     +------------------+     +------------------+
-|   organizations  |     |     profiles      |     |    user_roles    |
-|------------------|     |------------------|     |------------------|
-| id (PK)          |<----| org_id (FK)       |     | user_id          |
-| name             |     | user_id           |---->| role (app_role)  |
-| subscription_tier|     | first_name        |     +------------------+
-| trial_ends_at    |     | ...               |
-| stripe_customer  |     +------------------+
-+------------------+
-        |
-        | org_id FK on all data tables
-        v
-  fleet_loads, trucks, drivers, expenses, ...
-```
+## Detailed Breakdown
 
-## Phase 1: Database Changes (Migration)
+### Severity: CRITICAL -- Complete cross-tenant data leakage
 
-### 1A. Create `organizations` table
+Every policy below checks only role (e.g., `is_owner(auth.uid())`) without scoping to the user's organization. An owner from Org A passes `is_owner()` and sees ALL rows across ALL orgs.
 
+### Tables with org_id but NO org_id in any RLS policy (37 tables):
+
+| Category | Tables |
+|----------|--------|
+| Core Operations | `fleet_loads`, `trucks`, `trailers`, `drivers`, `expenses` |
+| Financial | `settlements`, `settlement_line_items`, `driver_payroll`, `general_ledger`, `agent_commissions`, `load_expenses` |
+| Agency | `agency_loads` |
+| CRM | `crm_contacts`, `crm_contact_loads`, `crm_activities` |
+| Driver Data | `driver_inspections`, `driver_notifications`, `driver_requests`, `driver_settings`, `driver_locations`, `driver_performance_metrics`, `detention_requests`, `hos_logs` |
+| Safety | `incidents`, `incident_photos`, `incident_witnesses`, `inspection_photos`, `maintenance_requests` |
+| Documents | `documents` |
+| IFTA/Fuel | `ifta_records`, `fuel_purchases`, `fuel_stops_cache` |
+| Other | `company_resources`, `company_settings`, `profiles`, `audit_logs`, `load_accessorials` |
+
+### Tables missing org_id entirely (also need migration):
+
+| Table | Risk |
+|-------|------|
+| `load_status_logs` | Cross-tenant load history visible |
+| `maintenance_logs` | Cross-tenant maintenance data visible |
+| `service_schedules` | Cross-tenant PM schedules visible |
+| `work_orders` | Cross-tenant work orders visible |
+| `pm_notifications` | Cross-tenant PM alerts visible |
+| `manufacturer_pm_profiles` | Shared reference data (may be acceptable) |
+| `facilities` | Cross-tenant facility data visible |
+| `trailer_assignments` | Cross-tenant assignment history visible |
+| `user_roles` | Owner from Org A can manage roles for Org B users |
+
+### Helper functions lack org scoping:
+
+The functions `is_owner()`, `has_operations_access()`, `has_payroll_access()`, `has_safety_access()`, and `has_admin_access()` all query `user_roles` without any `org_id` filter. While they correctly identify if a user HAS a role, they do not restrict what DATA that role can access. The data restriction must come from the table-level RLS policies themselves.
+
+Similarly, `get_driver_id_for_user()` returns a driver record without org scoping, so a driver-level policy like `driver_id = get_driver_id_for_user(auth.uid())` is safe only because a user's driver record is unique to them -- but admin-level policies that use `has_operations_access()` without org filtering are fully exposed.
+
+---
+
+## Remediation Plan
+
+### Step 1: Add org_id to missing tables (migration)
+
+Add `org_id uuid REFERENCES public.organizations(id)` to:
+- `load_status_logs`
+- `maintenance_logs`
+- `service_schedules`
+- `work_orders`
+- `pm_notifications`
+- `facilities`
+- `trailer_assignments`
+
+Backfill with the existing JeanWay org UUID.
+
+### Step 2: Update ALL admin-level RLS policies to include org_id check
+
+For every policy that uses `is_owner()`, `has_operations_access()`, `has_payroll_access()`, `has_safety_access()`, or `has_admin_access()`, add `AND org_id = get_user_org_id(auth.uid())`.
+
+**Example transformation:**
+
+Before:
 ```sql
-CREATE TABLE public.organizations (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  subscription_tier text NOT NULL DEFAULT 'solo_bco',
-  trial_ends_at timestamptz DEFAULT (now() + interval '14 days'),
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+-- Owner dispatcher can manage fleet loads
+USING (is_owner(auth.uid()) OR has_role(auth.uid(), 'dispatcher'::app_role))
 ```
 
-### 1B. Add `org_id` to `profiles` table
-
+After:
 ```sql
-ALTER TABLE public.profiles ADD COLUMN org_id uuid REFERENCES public.organizations(id);
+USING (
+  (is_owner(auth.uid()) OR has_role(auth.uid(), 'dispatcher'::app_role))
+  AND org_id = get_user_org_id(auth.uid())
+)
 ```
 
-### 1C. Add `org_id` to all data tables
+This must be applied to approximately 80+ policies across all 37+ tables.
 
-Add `org_id uuid REFERENCES public.organizations(id)` to these tables:
-- fleet_loads, trucks, trailers, drivers, expenses
-- agency_loads, agent_commissions, settlements, driver_payroll
-- crm_contacts, crm_contact_loads, crm_activities
-- documents, incidents, work_orders, maintenance_requests
-- driver_inspections, driver_notifications, driver_requests
-- general_ledger, company_resources, company_settings
+### Step 3: Update driver-scoped policies for defense-in-depth
 
-### 1D. Create helper function
+While driver-scoped policies (e.g., `driver_id = get_driver_id_for_user(auth.uid())`) are not directly exploitable cross-tenant (a user can only match their own driver record), adding `AND org_id = get_user_org_id(auth.uid())` provides defense-in-depth.
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_user_org_id(_user_id uuid)
-RETURNS uuid
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT org_id FROM public.profiles WHERE user_id = _user_id LIMIT 1
-$$;
-```
+### Step 4: Secure user_roles table
 
-### 1E. Update RLS policies
+Add org-scoping to `user_roles` policies. Currently `is_owner(auth.uid())` on user_roles means an owner from Org A can manage roles for users in Org B. Options:
+- Add `org_id` to `user_roles` and filter by it
+- Or join through `profiles` to verify the target user belongs to the same org
 
-All existing RLS policies need an additional `org_id = get_user_org_id(auth.uid())` condition so users only see data belonging to their organization. This is the most labor-intensive part.
+### Step 5: Secure profiles table
 
-### 1F. Create a default organization for existing data
+The current profiles SELECT policy uses `has_admin_access(auth.uid())` with no org filter, meaning any admin can view all profiles across all organizations. Add org_id scoping.
 
-```sql
--- Create org for JeanWay (existing data)
-INSERT INTO organizations (id, name, subscription_tier)
-VALUES ('...generated-uuid...', 'JeanWay USA', 'all_in_one');
+### Step 6: Update INSERT policies with_check
 
--- Backfill org_id on all existing rows
-UPDATE profiles SET org_id = '...uuid...' WHERE org_id IS NULL;
-UPDATE fleet_loads SET org_id = '...uuid...' WHERE org_id IS NULL;
--- ... repeat for all tables
-```
+All INSERT policies must include `WITH CHECK (org_id = get_user_org_id(auth.uid()))` to prevent users from inserting data into another organization's namespace.
 
-## Phase 2: Subscription Tier Feature Gating
+---
 
-### 2A. Create `useSubscriptionTier` hook
+## Technical Implementation
 
-A React hook that reads the current user's organization tier and exposes feature flags:
+This will be a single large migration that:
 
-```typescript
-// src/hooks/useSubscriptionTier.ts
-const TIER_FEATURES = {
-  solo_bco: ['loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss'],
-  fleet_owner: ['...solo_bco', 'drivers', 'dispatch', 'settlements', 'fleet_analytics', 'gps_tracking'],
-  agency: ['agency_loads', 'carrier_vetting', 'commissions', 'crm', 'load_board'],
-  all_in_one: ['...all features'],
-};
-```
+1. Drops and recreates all affected RLS policies with org_id conditions
+2. Adds org_id to the ~8 tables currently missing it
+3. Backfills org_id on new tables
+4. Adds org_id to `user_roles` for cross-tenant role management prevention
 
-### 2B. Gate sidebar navigation
+The migration will be structured as a single transaction to ensure atomicity.
 
-Modify `AppSidebar.tsx` to filter nav items based on both role AND subscription tier. Items not included in the tier are hidden entirely (not just disabled).
+### Estimated scope:
+- ~80 policy rewrites
+- ~8 table alterations
+- ~8 backfill statements
+- 1 new column on `user_roles`
 
-### 2C. Gate page access
-
-Add a `<TierGate requiredFeature="dispatch">` wrapper component that shows an upgrade prompt if the feature isn't available in the user's tier.
-
-## Phase 3: Public Pages
-
-### 3A. Landing Page (`/` for unauthenticated users)
-
-- Hero section with value proposition for Landstar BCOs
-- Feature highlights by tier
-- "Start 14-Day Beta Trial" CTA
-- "Try Demo" button
-
-### 3B. Pricing Page (`/pricing`)
-
-- Three cards: Solo BCO, Fleet Owner, Agency
-- "All-in-One" toggle that shows a fourth combined card
-- Feature comparison table
-- "Start 14-Day Beta Trial" button on each card
-
-### 3C. Signup flow update
-
-- Modify `Auth.tsx` signup to include tier selection
-- On signup, auto-create an `organizations` row with the selected tier
-- Set `trial_ends_at` to 14 days from signup
-
-## Phase 4: Demo Mode
-
-### 4A. Create demo organization
-
-Seed a read-only organization with sample Landstar load data (pre-populated trucks, loads, drivers, expenses).
-
-### 4B. Demo login
-
-- "Try Demo" button on landing page
-- Logs user into a shared demo account (or creates an ephemeral guest session)
-- Demo data is read-only (enforced via RLS or UI-level restrictions)
-- Banner at top: "You're in Demo Mode -- Sign up to start your own workspace"
-
-## Phase 5: Updated Routing
-
-### 5A. New routes
-
-```text
-/              -- Landing page (unauthenticated) or RoleBasedRedirect (authenticated)
-/pricing       -- Pricing page (public)
-/auth          -- Updated with tier selection on signup
-/dashboard     -- Dynamic dashboard based on tier + role
-```
-
-### 5B. RoleBasedRedirect updates
-
-- Solo BCO -> `/dashboard` (personal load/profit view)
-- Fleet Owner -> `/executive-dashboard`
-- Agency -> `/agency-dashboard` (new)
-- All-in-One -> `/executive-dashboard`
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/pages/Landing.tsx` | Public landing page |
-| `src/pages/Pricing.tsx` | Pricing comparison page |
-| `src/hooks/useSubscriptionTier.ts` | Tier detection + feature flags |
-| `src/components/shared/TierGate.tsx` | Feature gating wrapper |
-| `src/pages/SoloBCODashboard.tsx` | Solo owner dashboard |
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/App.tsx` | Add Landing, Pricing routes; update `/` logic |
-| `src/pages/Auth.tsx` | Add tier selection to signup |
-| `src/components/layout/AppSidebar.tsx` | Filter nav by tier + role |
-| `src/components/shared/RoleBasedRedirect.tsx` | Route by tier |
-| `src/contexts/AuthContext.tsx` | Include org_id and tier in context |
-
-## Implementation Order
-
-Due to the scope, this should be built in phases:
-
-1. **Phase 1** (Database) -- Organizations table, org_id columns, RLS updates, backfill existing data
-2. **Phase 2** (Feature Gating) -- useSubscriptionTier hook, sidebar gating, TierGate component
-3. **Phase 3** (Public Pages) -- Landing page, Pricing page, updated signup
-4. **Phase 4** (Demo Mode) -- Seed data, demo login flow
-5. **Phase 5** (Routing) -- New dashboards, updated redirects
-
-**Recommendation**: Start with Phase 1 + 3 (database + landing/pricing pages) as they're independent. Phase 2 and 5 depend on Phase 1. Phase 4 can be done last.
-
-This is a multi-session effort. Approve to begin with Phase 1 (database setup) and Phase 3 (landing + pricing pages).
+This is a large but essential security fix. No code changes are needed on the frontend -- the RLS policies are enforced server-side regardless of what the client sends.
 
