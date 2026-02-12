@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -21,7 +21,7 @@ export default function DriverPerformance() {
   const { drivers, driverMetrics, fleetAverages } = useDriverPerformanceData(selectedPeriod);
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader
         title="Driver Performance"
         description="Track driver metrics, scorecards, and rankings"
@@ -130,6 +130,6 @@ export default function DriverPerformance() {
           <PerformanceCharts metrics={driverMetrics} />
         </TabsContent>
       </Tabs>
-    </DashboardLayout>
+    </>
   );
 }

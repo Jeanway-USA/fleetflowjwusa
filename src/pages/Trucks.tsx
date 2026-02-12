@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -303,7 +303,7 @@ export default function Trucks() {
   const [viewingTruck, setViewingTruck] = useState<TruckWithDriver | null>(null);
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader title="Trucks" description="Manage your fleet vehicles" action={{ label: 'Add Truck', onClick: () => openDialog() }} />
       <DataTable columns={columns} data={trucks} loading={isLoading} emptyMessage="No trucks registered yet" />
 
@@ -462,6 +462,6 @@ export default function Trucks() {
           )}
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -90,7 +90,7 @@ export default function CRM() {
   const isDeleting = deleteCRMMutation.isPending || deleteResourceMutation.isPending || deleteFacilityMutation.isPending;
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader
         title="CRM"
         description="Manage brokers, agents, shippers, receivers, and vendors"
@@ -235,6 +235,6 @@ export default function CRM() {
         description={`Are you sure you want to delete "${deleteTarget?.company_name}"? This action cannot be undone.`}
         isDeleting={isDeleting}
       />
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -174,7 +174,7 @@ export default function Safety() {
   const openIncidents = incidents.filter(i => i.status === 'reported' || i.status === 'under_review').length;
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader title="Safety Dashboard" description="Monitor inspections, compliance, incidents, and alerts" />
 
       {/* Defect Alerts Banner */}
@@ -354,6 +354,6 @@ export default function Safety() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

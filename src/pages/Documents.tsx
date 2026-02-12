@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { DocumentViewer } from '@/components/shared/DocumentViewer';
@@ -136,7 +136,7 @@ export default function Documents() {
   ];
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader title="Documents" description="Upload and manage BOLs, PODs, receipts, and other documents" />
       
       <div className="space-y-6">
@@ -211,6 +211,6 @@ export default function Documents() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { ExpensesList } from '@/components/shared/ExpensesList';
@@ -474,18 +474,18 @@ export default function FleetLoads() {
   // Driver-only view - mobile-friendly, read-only except status updates
   if (isDriverOnly) {
     return (
-      <DashboardLayout>
+      <>
         <PageHeader 
           title="My Loads" 
           description="View your assigned loads and update status" 
         />
         <DriverLoadsView />
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader 
         title="Fleet Loads" 
         description="Track loads, revenue, and settlements" 
@@ -1106,6 +1106,6 @@ export default function FleetLoads() {
           </form>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

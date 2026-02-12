@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,7 +25,7 @@ export default function MaintenanceManagement() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader 
         title="Maintenance Management" 
         description="Fleet maintenance tracking, work orders, and preventive maintenance schedules"
@@ -105,6 +105,6 @@ export default function MaintenanceManagement() {
         open={truckDrawerOpen}
         onOpenChange={setTruckDrawerOpen}
       />
-    </DashboardLayout>
+    </>
   );
 }

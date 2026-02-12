@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -227,7 +227,7 @@ export default function Incidents() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader 
         title="Incident Reports" 
         description="Track and manage accidents, incidents, and near-misses"
@@ -618,6 +618,6 @@ export default function Incidents() {
           )}
         </SheetContent>
       </Sheet>
-    </DashboardLayout>
+    </>
   );
 }
