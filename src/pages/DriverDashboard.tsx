@@ -1,4 +1,4 @@
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,7 +27,7 @@ export default function DriverDashboard() {
         .from('drivers')
         .select('*, trucks!trucks_current_driver_id_fkey(*)')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -71,17 +71,17 @@ export default function DriverDashboard() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex items-center justify-center min-h-[60vh]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (!driver) {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
           <div className="bg-destructive/10 p-6 rounded-full mb-4">
             <Moon className="h-12 w-12 text-destructive" />
@@ -91,12 +91,12 @@ export default function DriverDashboard() {
             Your account is not linked to a driver profile. Please contact your dispatcher or administrator to link your account.
           </p>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-3 pb-6 max-w-4xl mx-auto">
         {/* Compact Header */}
         <div className="flex items-center justify-between py-1">
@@ -175,6 +175,6 @@ export default function DriverDashboard() {
           activeLoadNumber={activeLoad?.landstar_load_id}
         />
       </div>
-    </DashboardLayout>
+    </>
   );
 }

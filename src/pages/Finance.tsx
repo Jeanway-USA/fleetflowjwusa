@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -474,7 +474,7 @@ export default function Finance() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader title="Finance & P/L" description="Track revenue, expenses, and profitability" />
 
       {/* Period and Truck Selector */}
@@ -905,6 +905,6 @@ export default function Finance() {
           </form>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

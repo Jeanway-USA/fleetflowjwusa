@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Package, Users, Truck, Calendar, Plus, ArrowRight } from 'lucide-react';
@@ -134,7 +134,7 @@ export default function DispatcherDashboard() {
   ];
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -223,6 +223,6 @@ export default function DispatcherDashboard() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

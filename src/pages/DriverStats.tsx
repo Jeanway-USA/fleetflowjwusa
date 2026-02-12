@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -238,32 +238,32 @@ export default function DriverStats() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <>
         <PageHeader title="My Stats" description="Performance metrics and equipment info" />
         <div className="space-y-4">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-48 w-full" />
           <Skeleton className="h-48 w-full" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (!driver) {
     return (
-      <DashboardLayout>
+      <>
         <PageHeader title="My Stats" description="Performance metrics and equipment info" />
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
             Driver profile not found. Please contact an administrator.
           </CardContent>
         </Card>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader title="My Stats" description="Performance metrics and equipment info" />
 
       <div className="space-y-6">
@@ -544,6 +544,6 @@ export default function DriverStats() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

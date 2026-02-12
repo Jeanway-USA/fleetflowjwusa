@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -669,7 +669,7 @@ export default function IFTA() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <TooltipProvider>
       <PageHeader 
         title="IFTA Reporting" 
@@ -1201,6 +1201,6 @@ export default function IFTA() {
       />
 
       </TooltipProvider>
-    </DashboardLayout>
+    </>
   );
 }

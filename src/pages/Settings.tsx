@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -362,7 +362,7 @@ export default function Settings() {
   // Access denied for non-owners (but still show personal settings)
   if (!hasAdminAccess) {
     return (
-      <DashboardLayout>
+      <>
         <PageHeader title="Settings" description="Manage your preferences" />
         
         <div className="max-w-2xl space-y-6">
@@ -400,12 +400,12 @@ export default function Settings() {
             </CardContent>
           </Card>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader title="Settings" description="Manage users, roles, and system configuration" />
 
       {isDemoMode && (
@@ -874,6 +874,6 @@ export default function Settings() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </DashboardLayout>
+    </>
   );
 }

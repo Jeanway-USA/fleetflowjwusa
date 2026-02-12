@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off, Eye } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 
 const endorsementOptions = ['H - Hazmat', 'N - Tank', 'P - Passenger', 'S - School Bus', 'T - Double/Triple', 'X - Hazmat + Tank'];
 
@@ -212,15 +212,15 @@ export default function Drivers() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <>
         <PageHeader title="Drivers" description="Manage your drivers" />
         <div className="text-center py-12 text-muted-foreground">Loading...</div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <PageHeader title="Drivers" description="Manage your drivers" action={{ label: 'Add Driver', onClick: () => openDialog() }} />
 
       {drivers.length === 0 ? (
@@ -566,6 +566,6 @@ export default function Drivers() {
           )}
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

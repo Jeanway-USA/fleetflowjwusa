@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -138,17 +138,17 @@ export default function DriverSpectatorView() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex items-center justify-center min-h-[60vh]">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (!driver) {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
           <h2 className="text-xl font-semibold mb-2">Driver Not Found</h2>
           <p className="text-muted-foreground mb-4">
@@ -159,14 +159,14 @@ export default function DriverSpectatorView() {
             Back to Drivers
           </Button>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   const initials = `${driver.first_name?.[0] || ''}${driver.last_name?.[0] || ''}`;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-4 pb-6 max-w-4xl mx-auto">
         {/* Spectator Mode Banner */}
         <Card className="border-primary/50 bg-primary/5">
@@ -291,6 +291,6 @@ export default function DriverSpectatorView() {
           </Card>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

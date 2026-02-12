@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, subWeeks, subMonths, subQuarters, subYears, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PeriodSelector, TimePeriod } from '@/components/executive/PeriodSelector';
 import { RevenueKPICards } from '@/components/executive/RevenueKPICards';
@@ -678,7 +678,7 @@ export default function ExecutiveDashboard() {
   const isLoading = kpiLoading || trendsLoading || operationalLoading || costLoading || performersLoading;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -728,6 +728,6 @@ export default function ExecutiveDashboard() {
           <QuickInsights insights={insights} isLoading={isLoading} />
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }
