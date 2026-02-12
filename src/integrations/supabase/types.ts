@@ -1271,6 +1271,7 @@ export type Database = {
           name: string
           notes: string | null
           operating_hours: string | null
+          org_id: string | null
           state: string | null
           updated_at: string
           zip: string | null
@@ -1289,6 +1290,7 @@ export type Database = {
           name: string
           notes?: string | null
           operating_hours?: string | null
+          org_id?: string | null
           state?: string | null
           updated_at?: string
           zip?: string | null
@@ -1307,11 +1309,20 @@ export type Database = {
           name?: string
           notes?: string | null
           operating_hours?: string | null
+          org_id?: string | null
           state?: string | null
           updated_at?: string
           zip?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "facilities_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       fleet_loads: {
         Row: {
@@ -2237,6 +2248,7 @@ export type Database = {
           load_id: string
           new_status: string
           notes: string | null
+          org_id: string | null
           previous_status: string | null
         }
         Insert: {
@@ -2246,6 +2258,7 @@ export type Database = {
           load_id: string
           new_status: string
           notes?: string | null
+          org_id?: string | null
           previous_status?: string | null
         }
         Update: {
@@ -2255,6 +2268,7 @@ export type Database = {
           load_id?: string
           new_status?: string
           notes?: string | null
+          org_id?: string | null
           previous_status?: string | null
         }
         Relationships: [
@@ -2263,6 +2277,13 @@ export type Database = {
             columns: ["load_id"]
             isOneToOne: false
             referencedRelation: "fleet_loads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "load_status_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2274,6 +2295,7 @@ export type Database = {
           description: string | null
           id: string
           next_service_date: string | null
+          org_id: string | null
           service_date: string
           service_type: string
           truck_id: string
@@ -2286,6 +2308,7 @@ export type Database = {
           description?: string | null
           id?: string
           next_service_date?: string | null
+          org_id?: string | null
           service_date?: string
           service_type: string
           truck_id: string
@@ -2298,6 +2321,7 @@ export type Database = {
           description?: string | null
           id?: string
           next_service_date?: string | null
+          org_id?: string | null
           service_date?: string
           service_type?: string
           truck_id?: string
@@ -2305,6 +2329,13 @@ export type Database = {
           vendor?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "maintenance_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "maintenance_logs_truck_id_fkey"
             columns: ["truck_id"]
@@ -2462,6 +2493,7 @@ export type Database = {
           id: string
           is_read: boolean
           notification_type: string
+          org_id: string | null
           service_code: string | null
           service_name: string
           truck_id: string
@@ -2475,6 +2507,7 @@ export type Database = {
           id?: string
           is_read?: boolean
           notification_type: string
+          org_id?: string | null
           service_code?: string | null
           service_name: string
           truck_id: string
@@ -2488,6 +2521,7 @@ export type Database = {
           id?: string
           is_read?: boolean
           notification_type?: string
+          org_id?: string | null
           service_code?: string | null
           service_name?: string
           truck_id?: string
@@ -2495,6 +2529,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pm_notifications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pm_notifications_truck_id_fkey"
             columns: ["truck_id"]
@@ -2559,6 +2600,7 @@ export type Database = {
           interval_miles: number | null
           last_performed_date: string | null
           last_performed_miles: number | null
+          org_id: string | null
           profile_service_id: string | null
           service_name: string
           truck_id: string
@@ -2571,6 +2613,7 @@ export type Database = {
           interval_miles?: number | null
           last_performed_date?: string | null
           last_performed_miles?: number | null
+          org_id?: string | null
           profile_service_id?: string | null
           service_name: string
           truck_id: string
@@ -2583,12 +2626,20 @@ export type Database = {
           interval_miles?: number | null
           last_performed_date?: string | null
           last_performed_miles?: number | null
+          org_id?: string | null
           profile_service_id?: string | null
           service_name?: string
           truck_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "service_schedules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "service_schedules_profile_service_id_fkey"
             columns: ["profile_service_id"]
@@ -2727,6 +2778,7 @@ export type Database = {
           created_at: string
           driver_id: string | null
           id: string
+          org_id: string | null
           released_at: string | null
           trailer_id: string
           truck_id: string | null
@@ -2736,6 +2788,7 @@ export type Database = {
           created_at?: string
           driver_id?: string | null
           id?: string
+          org_id?: string | null
           released_at?: string | null
           trailer_id: string
           truck_id?: string | null
@@ -2745,11 +2798,19 @@ export type Database = {
           created_at?: string
           driver_id?: string | null
           id?: string
+          org_id?: string | null
           released_at?: string | null
           trailer_id?: string
           truck_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "trailer_assignments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "trailer_assignments_trailer_id_fkey"
             columns: ["trailer_id"]
@@ -2922,22 +2983,33 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          org_id: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
+          org_id?: string | null
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          org_id?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       work_orders: {
         Row: {
@@ -2953,6 +3025,7 @@ export type Database = {
           is_reimbursable: boolean | null
           notes: string | null
           odometer_reading: number | null
+          org_id: string | null
           service_type: string
           service_types: string[] | null
           status: string
@@ -2973,6 +3046,7 @@ export type Database = {
           is_reimbursable?: boolean | null
           notes?: string | null
           odometer_reading?: number | null
+          org_id?: string | null
           service_type: string
           service_types?: string[] | null
           status?: string
@@ -2993,6 +3067,7 @@ export type Database = {
           is_reimbursable?: boolean | null
           notes?: string | null
           odometer_reading?: number | null
+          org_id?: string | null
           service_type?: string
           service_types?: string[] | null
           status?: string
@@ -3001,6 +3076,13 @@ export type Database = {
           vendor?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "work_orders_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "work_orders_truck_id_fkey"
             columns: ["truck_id"]
