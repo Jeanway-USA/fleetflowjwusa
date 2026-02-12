@@ -191,7 +191,7 @@ export default function Pricing() {
                 <Button 
                   className={`w-full ${tier.popular ? 'gradient-gold text-primary-foreground glow-gold' : ''}`}
                   variant={tier.popular ? 'default' : 'outline'}
-                  onClick={() => navigate('/auth')}
+                  onClick={() => navigate(`/auth?tier=${tier.id}`)}
                 >
                   Start 14-Day Beta Trial
                   <ArrowRight className="ml-2 h-4 w-4" />

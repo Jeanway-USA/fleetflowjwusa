@@ -25,6 +25,7 @@ import jwBannerLight from '@/assets/JW_Banner.png';
 import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import type { SubscriptionTier } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   Sidebar,
@@ -49,12 +50,41 @@ interface NavItem {
   icon: LucideIcon;
   path: string;
   roles: AppRole[];
+  /** Feature key for tier gating. If undefined, always shown when role matches. */
+  feature?: string;
 }
+
+// Maps tier to the set of feature keys it unlocks
+const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
+  solo_bco: new Set([
+    'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
+    'dvir', 'fuel_planner', 'crm_basic',
+  ]),
+  fleet_owner: new Set([
+    'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
+    'dvir', 'fuel_planner', 'crm_basic',
+    'drivers', 'dispatch', 'settlements', 'fleet_analytics',
+    'gps_tracking', 'payroll', 'driver_performance', 'maintenance_full',
+    'trucks', 'trailers', 'incidents', 'safety', 'executive_dashboard',
+    'insights',
+  ]),
+  agency: new Set([
+    'agency_loads', 'commissions', 'crm', 'documents', 'insights',
+  ]),
+  all_in_one: new Set([
+    'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
+    'dvir', 'fuel_planner', 'crm_basic',
+    'drivers', 'dispatch', 'settlements', 'fleet_analytics',
+    'gps_tracking', 'payroll', 'driver_performance', 'maintenance_full',
+    'trucks', 'trailers', 'incidents', 'safety', 'executive_dashboard',
+    'agency_loads', 'commissions', 'crm', 'insights',
+  ]),
+};
 
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole } = useAuth();
+  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier } = useAuth();
   const { theme } = useTheme();
   
   // Check if user is actually an owner (not simulated)
@@ -99,37 +129,43 @@ export function AppSidebar() {
   };
 
   const fleetNavItems: NavItem[] = [
-    { title: 'Trucks', icon: Truck, path: '/trucks', roles: ['owner', 'dispatcher', 'safety'] },
-    { title: 'Trailers', icon: Container, path: '/trailers', roles: ['owner', 'dispatcher', 'safety'] },
-    { title: 'Drivers', icon: Users, path: '/drivers', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety'] },
+    { title: 'Trucks', icon: Truck, path: '/trucks', roles: ['owner', 'dispatcher', 'safety'], feature: 'trucks' },
+    { title: 'Trailers', icon: Container, path: '/trailers', roles: ['owner', 'dispatcher', 'safety'], feature: 'trailers' },
+    { title: 'Drivers', icon: Users, path: '/drivers', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety'], feature: 'drivers' },
   ];
 
   const loadsNavItems: NavItem[] = [
-    { title: 'Fleet Loads', icon: Package, path: '/fleet-loads', roles: ['owner', 'dispatcher', 'safety', 'driver'] },
-    { title: 'Agency Loads', icon: Building2, path: '/agency-loads', roles: ['owner', 'dispatcher'] },
+    { title: 'Fleet Loads', icon: Package, path: '/fleet-loads', roles: ['owner', 'dispatcher', 'safety', 'driver'], feature: 'loads' },
+    { title: 'Agency Loads', icon: Building2, path: '/agency-loads', roles: ['owner', 'dispatcher'], feature: 'agency_loads' },
   ];
 
   const financeNavItems: NavItem[] = [
-    { title: 'Finance & P/L', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'] },
-    { title: 'Company Insights', icon: BarChart3, path: '/insights', roles: ['owner', 'payroll_admin'] },
-    { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'] },
+    { title: 'Finance & P/L', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
+    { title: 'Company Insights', icon: BarChart3, path: '/insights', roles: ['owner', 'payroll_admin'], feature: 'insights' },
+    { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta' },
   ];
 
   const operationsNavItems: NavItem[] = [
-    { title: 'CRM', icon: Contact, path: '/crm', roles: ['owner', 'dispatcher', 'safety', 'driver'] },
-    { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'] },
-    { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'] },
-    { title: 'Safety', icon: Shield, path: '/safety', roles: ['owner', 'safety'] },
-    { title: 'Incidents', icon: AlertTriangle, path: '/incidents', roles: ['owner', 'safety', 'dispatcher'] },
-    { title: 'Driver Performance', icon: Award, path: '/driver-performance', roles: ['owner', 'safety', 'dispatcher'] },
+    { title: 'CRM', icon: Contact, path: '/crm', roles: ['owner', 'dispatcher', 'safety', 'driver'], feature: 'crm' },
+    { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'], feature: 'maintenance_full' },
+    { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'], feature: 'documents' },
+    { title: 'Safety', icon: Shield, path: '/safety', roles: ['owner', 'safety'], feature: 'safety' },
+    { title: 'Incidents', icon: AlertTriangle, path: '/incidents', roles: ['owner', 'safety', 'dispatcher'], feature: 'incidents' },
+    { title: 'Driver Performance', icon: Award, path: '/driver-performance', roles: ['owner', 'safety', 'dispatcher'], feature: 'driver_performance' },
   ];
 
-  const filterByRole = (items: NavItem[]) => items.filter(item => item.roles.some(role => hasRole(role)));
+  const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
+
+  const filterByRoleAndTier = (items: NavItem[]) => items.filter(item => {
+    const roleMatch = item.roles.some(role => hasRole(role));
+    const tierMatch = !item.feature || tierFeatures.has(item.feature);
+    return roleMatch && tierMatch;
+  });
 
   const renderNavGroup = (label: string, items: NavItem[], isDashboardGroup: boolean = false) => {
     const filteredItems = isDashboardGroup && actuallyIsOwner 
       ? items // Show all dashboard items for actual owners
-      : filterByRole(items);
+      : filterByRoleAndTier(items);
     if (filteredItems.length === 0) return null;
 
     return (
@@ -208,7 +244,7 @@ export function AppSidebar() {
           const visibleGroups = groups.filter(g => 
             g.isDashboard && actuallyIsOwner 
               ? g.items.length > 0 
-              : filterByRole(g.items).length > 0
+              : filterByRoleAndTier(g.items).length > 0
           );
           
           return visibleGroups.map((group, index) => (
