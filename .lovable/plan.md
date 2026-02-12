@@ -1,114 +1,130 @@
 
 
-# Implement Tier + Role Combined Access Control
+# Live Demo Experience with Tier Switcher
 
-## What This Solves
+## Overview
 
-Right now, the sidebar hides links based on tier and role -- but if someone types a URL directly (e.g., `/drivers` or `/finance`), nothing stops them. A Dispatcher in a Solo BCO org can visit `/drivers` manually. A Driver can visit `/finance`. This plan adds page-level enforcement so both tier AND role are checked before any page renders.
+The demo login infrastructure already exists -- a `demo-login` edge function creates a demo org with `all_in_one` tier and seeds sample data. This plan enhances the experience with a floating tier switcher, read-only safeguards, and a persistent signup CTA.
 
-## Changes Overview
+## Changes
 
-### 1. Create a `ProtectedRoute` wrapper component
+### 1. Demo Tier Switcher (Floating Panel)
 
-A new reusable component that wraps every dashboard route. It checks:
-- Is the user authenticated? (redirect to `/auth` if not)
-- Does the user have the required role? (redirect to `/` or show "Access Denied" if not)
-- Does the org's tier include the required feature? (show `TierGate` upgrade prompt if not)
+Create a new `DemoControls` component that renders a floating panel in the bottom-right corner, visible only when the logged-in user is `demo@fleetflow-tms.com`.
 
-This replaces the auth check currently inside `DashboardLayout`.
+The panel will contain:
+- Three buttons: "Solo BCO", "Fleet Owner", "Agency"
+- The active tier is highlighted
+- Clicking a tier updates the `subscription_tier` on the demo org via a direct Supabase update, then reloads the AuthContext state so the sidebar and TierGate components immediately reflect the new tier
 
-### 2. Update App.tsx routes with access rules
+This works because the demo user is an `owner` with `all_in_one` tier. When the user clicks "Solo BCO", the component updates the org's `subscription_tier` to `solo_bco` in the database. The sidebar (which reads tier from AuthContext) will re-filter navigation items, and any pages gated by `TierGate` will show the upgrade prompt. Switching back to "Fleet Owner" or "Agency" works the same way.
 
-Every route gets explicit role and feature requirements:
+**File**: `src/components/demo/DemoControls.tsx` (new)
 
-| Route | Allowed Roles | Required Feature |
-|-------|--------------|-----------------|
-| `/executive-dashboard` | owner | executive_dashboard |
-| `/dispatcher-dashboard` | owner, dispatcher | dispatch |
-| `/driver-dashboard` | owner, driver | (none -- always allowed) |
-| `/trucks` | owner, dispatcher, safety | trucks |
-| `/trailers` | owner, dispatcher, safety | trailers |
-| `/drivers` | owner, payroll_admin, dispatcher, safety | drivers |
-| `/fleet-loads` | owner, dispatcher, safety, driver | loads |
-| `/agency-loads` | owner, dispatcher | agency_loads |
-| `/finance` | owner, payroll_admin | profit_loss |
-| `/insights` | owner, payroll_admin | insights |
-| `/ifta` | owner, payroll_admin | ifta |
-| `/crm` | owner, dispatcher, safety, driver | crm |
-| `/maintenance` | owner, safety | maintenance_full |
-| `/documents` | owner, payroll_admin, dispatcher, safety, driver | documents |
-| `/safety` | owner, safety | safety |
-| `/incidents` | owner, safety, dispatcher | incidents |
-| `/driver-performance` | owner, safety, dispatcher | driver_performance |
-| `/settings` | owner | (none -- always allowed) |
-| `/driver-settings` | driver | (none -- always allowed) |
-| `/driver-stats` | driver | (none -- always allowed) |
+### 2. Seed Agency Sample Data
 
-### 3. Update RoleBasedRedirect to route by tier
+Update the `demo-login` edge function to also insert:
+- Sample `crm_contacts` (shipper, carrier, agent records)
+- Sample `agency_loads` (brokered loads with commission data)
+- Sample `agent_commissions`
 
-Currently it only checks role. Updated logic:
+This ensures the Agency tier view has data to display.
 
-- **Solo BCO owner**: redirect to `/fleet-loads` (personal load view -- no executive dashboard in this tier)
-- **Fleet Owner owner**: redirect to `/executive-dashboard`
-- **Agency owner**: redirect to `/agency-loads`
-- **All-in-One owner**: redirect to `/executive-dashboard`
-- **Dispatcher**: redirect to `/dispatcher-dashboard`
-- **Driver**: redirect to `/driver-dashboard`
+**File**: `supabase/functions/demo-login/index.ts` (modify)
 
-### 4. Hide billing/subscription info from non-owners
+### 3. Read-Only Restrictions in Demo Mode
 
-The Settings page and any subscription-related UI should only render for users with the `owner` role. Dispatchers in any tier should not see billing information. This is already partially done (Settings is owner-only in sidebar) but needs enforcement at the page level.
+Create a `useDemoMode` hook that checks if the current user email is `demo@fleetflow-tms.com`. Components will use this to:
+- Disable delete buttons (show toast "Disabled in demo mode")
+- Disable Settings page edits (redirect or show message)
+- Disable any destructive mutations
+
+Rather than modifying every individual component, we will:
+- Add a `isDemoMode` boolean to `AuthContext` (derived from `user?.email`)
+- Update `DashboardLayout` to pass demo state down
+- Add a global `useDemoGuard()` helper that components can call before mutations -- returns `true` if blocked, showing a toast
+- Specifically disable the Settings nav link and delete confirmations
+
+**Files**: 
+- `src/hooks/useDemoGuard.ts` (new)
+- `src/contexts/AuthContext.tsx` (add `isDemoMode` field)
+- `src/components/shared/ConfirmDeleteDialog.tsx` (check demo mode)
+- `src/pages/Settings.tsx` (show read-only banner)
+
+### 4. Persistent CTA Banner
+
+Enhance the existing demo banner in `DashboardLayout.tsx`:
+- Make it sticky at the top (already is)
+- Add the tier switcher inline on desktop, or keep it in the floating panel on mobile
+- Update the "Sign Up for Real" button styling to be more prominent (gradient-gold)
+
+**File**: `src/components/layout/DashboardLayout.tsx` (modify)
+
+### 5. Refresh AuthContext Tier on Demo Switch
+
+Add a `refreshOrgData()` method to `AuthContext` that re-fetches the org's subscription tier. The `DemoControls` component will call this after updating the tier in the database, so the entire app re-renders with the new tier's navigation and feature gates.
+
+**File**: `src/contexts/AuthContext.tsx` (add `refreshOrgData`)
 
 ## Technical Details
 
-### New file: `src/components/shared/ProtectedRoute.tsx`
+### DemoControls Component (new)
+```text
++----------------------------------+
+|  Demo Controls                   |
+|  [Solo BCO] [Fleet] [Agency]     |
+|  "Like what you see?"            |
+|  [Start Your Beta Account ->]    |
++----------------------------------+
+```
+- Positioned `fixed bottom-6 right-6 z-50`
+- Only renders when `isDemoMode` is true
+- Updates `organizations.subscription_tier` via Supabase client (the demo user is an owner, so RLS allows this)
+- Calls `refreshOrgData()` from AuthContext after update
 
+### useDemoGuard Hook (new)
 ```typescript
-interface ProtectedRouteProps {
-  children: ReactNode;
-  allowedRoles: AppRole[];
-  requiredFeature?: string;
+export function useDemoGuard() {
+  const { isDemoMode } = useAuth();
+  
+  const guard = (action?: string) => {
+    if (isDemoMode) {
+      toast.info(
+        action 
+          ? `${action} is disabled in demo mode` 
+          : 'This action is disabled in demo mode'
+      );
+      return true; // blocked
+    }
+    return false; // allowed
+  };
+  
+  return { isDemoMode, guard };
 }
 ```
 
-This component:
-1. Shows a loading spinner while auth/roles resolve
-2. Redirects to `/auth` if not authenticated
-3. Redirects to `/` if the user's role doesn't match `allowedRoles`
-4. Wraps children in `TierGate` if `requiredFeature` is specified
-5. Wraps children in `DashboardLayout`
+### AuthContext Changes
+- Add `isDemoMode: boolean` (derived: `user?.email === 'demo@fleetflow-tms.com'`)
+- Add `refreshOrgData: () => Promise<void>` method that re-reads org data
+- Expose both in context value
 
-### Modified file: `src/App.tsx`
+### Edge Function Seed Data Additions
+Add after existing expense seeding:
+- 3 CRM contacts (shipper, carrier, agent)
+- 3 agency loads with commission data
+- This ensures the Agency view has content
 
-Routes change from:
-```tsx
-<Route path="/trucks" element={<Trucks />} />
-```
-To:
-```tsx
-<Route path="/trucks" element={
-  <ProtectedRoute allowedRoles={['owner','dispatcher','safety']} requiredFeature="trucks">
-    <Trucks />
-  </ProtectedRoute>
-} />
-```
-
-### Modified file: `src/components/shared/RoleBasedRedirect.tsx`
-
-Add tier-aware routing logic using `subscriptionTier` from AuthContext.
-
-### Modified file: `src/components/layout/DashboardLayout.tsx`
-
-Remove the auth check (loading spinner + redirect to `/auth`) since `ProtectedRoute` now handles this. `DashboardLayout` becomes a pure layout wrapper.
-
-## Files Summary
+## File Summary
 
 | File | Action |
 |------|--------|
-| `src/components/shared/ProtectedRoute.tsx` | Create |
-| `src/App.tsx` | Modify -- wrap all routes |
-| `src/components/shared/RoleBasedRedirect.tsx` | Modify -- add tier logic |
-| `src/components/layout/DashboardLayout.tsx` | Modify -- remove auth guard |
+| `src/components/demo/DemoControls.tsx` | Create |
+| `src/hooks/useDemoGuard.ts` | Create |
+| `src/contexts/AuthContext.tsx` | Modify (add isDemoMode, refreshOrgData) |
+| `src/components/layout/DashboardLayout.tsx` | Modify (render DemoControls, enhance banner) |
+| `src/components/shared/ConfirmDeleteDialog.tsx` | Modify (block deletes in demo) |
+| `src/pages/Settings.tsx` | Modify (read-only banner in demo) |
+| `supabase/functions/demo-login/index.ts` | Modify (seed agency data) |
 
-No database changes needed. All enforcement is additive UI-layer logic on top of the existing RLS policies (which already enforce isolation server-side).
+No database migrations needed. The demo user already has owner access and can update their own org's tier via existing RLS policies.
 
