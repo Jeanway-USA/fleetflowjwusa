@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { 
   Truck, DollarSign, Shield, BarChart3, Users, Package, 
-  ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin 
+  ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play
 } from 'lucide-react';
 
 const TIERS = [
@@ -39,6 +42,30 @@ const STATS = [
 
 export default function Landing() {
   const navigate = useNavigate();
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const handleDemoLogin = async () => {
+    setDemoLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('demo-login');
+      if (error) throw error;
+      if (data?.session) {
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+        toast.success('Welcome to the demo!');
+        navigate('/');
+      } else {
+        throw new Error('No session returned');
+      }
+    } catch (err: any) {
+      toast.error('Demo login failed. Please try again.');
+      console.error('Demo login error:', err);
+    } finally {
+      setDemoLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -86,9 +113,14 @@ export default function Landing() {
                 size="lg" 
                 variant="outline"
                 className="text-lg px-8"
-                onClick={() => navigate('/pricing')}
+                onClick={handleDemoLogin}
+                disabled={demoLoading}
               >
-                View Pricing
+                {demoLoading ? (
+                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading Demo...</>
+                ) : (
+                  <><Play className="mr-2 h-5 w-5" /> Try Demo</>
+                )}
               </Button>
             </div>
           </div>
