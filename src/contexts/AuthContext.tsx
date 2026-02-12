@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
 type AppRole = Database['public']['Enums']['app_role'];
+export type SubscriptionTier = 'solo_bco' | 'fleet_owner' | 'agency' | 'all_in_one';
 
 interface AuthContextType {
   user: User | null;
@@ -12,6 +13,9 @@ interface AuthContextType {
   rolesLoading: boolean;
   roles: AppRole[];
   simulatedRole: AppRole | null;
+  orgId: string | null;
+  orgName: string | null;
+  subscriptionTier: SubscriptionTier;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -40,6 +44,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [rolesLoading, setRolesLoading] = useState(true);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [simulatedRole, setSimulatedRole] = useState<AppRole | null>(null);
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [orgName, setOrgName] = useState<string | null>(null);
+  const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('solo_bco');
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase
@@ -53,6 +60,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     return data?.map(r => r.role) || [];
+  };
+
+  const fetchOrgData = async (userId: string) => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (profile?.org_id) {
+      setOrgId(profile.org_id);
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('name, subscription_tier')
+        .eq('id', profile.org_id)
+        .single();
+
+      if (orgData) {
+        setOrgName(orgData.name);
+        setSubscriptionTier((orgData.subscription_tier as SubscriptionTier) || 'solo_bco');
+      }
+    }
   };
 
   useEffect(() => {
@@ -69,11 +98,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setRoles(fetchedRoles);
               setRolesLoading(false);
             });
+            fetchOrgData(session.user.id);
           }, 0);
         } else {
           setRoles([]);
           setRolesLoading(false);
-          setSimulatedRole(null); // Clear simulation on logout
+          setSimulatedRole(null);
+          setOrgId(null);
+          setOrgName(null);
+          setSubscriptionTier('solo_bco');
         }
         
         setLoading(false);
@@ -91,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setRoles(fetchedRoles);
           setRolesLoading(false);
         });
+        fetchOrgData(session.user.id);
       } else {
         setRolesLoading(false);
       }
@@ -214,6 +248,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasPayrollAccess,
       hasOperationsAccess,
       hasSafetyAccess,
+      orgId,
+      orgName,
+      subscriptionTier,
     }}>
       {children}
     </AuthContext.Provider>

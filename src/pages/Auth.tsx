@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
@@ -25,14 +26,25 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [selectedTier, setSelectedTier] = useState('solo_bco');
   const [formLoading, setFormLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [searchParams] = useSearchParams();
   const { signIn, signUp, user, loading: authLoading } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
   
   const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
+
+  // Initialize tier from URL param (e.g., /auth?tier=fleet_owner)
+  useEffect(() => {
+    const tierParam = searchParams.get('tier');
+    if (tierParam && ['solo_bco', 'fleet_owner', 'agency', 'all_in_one'].includes(tierParam)) {
+      setSelectedTier(tierParam);
+    }
+  }, [searchParams]);
 
   // Redirect if already logged in (only after auth state is resolved)
   useEffect(() => {
@@ -103,10 +115,31 @@ export default function Auth() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
+    if (!companyName.trim()) {
+      toast.error('Please enter your company name');
+      return;
+    }
     
     setFormLoading(true);
+    
+    // 1. Create the organization first
+    const { data: orgData, error: orgError } = await supabase
+      .from('organizations')
+      .insert({
+        name: companyName.trim(),
+        subscription_tier: selectedTier,
+      })
+      .select('id')
+      .single();
+
+    if (orgError) {
+      toast.error('Failed to create organization. Please try again.');
+      setFormLoading(false);
+      return;
+    }
+
+    // 2. Sign up the user
     const { error } = await signUp(email, password, firstName, lastName);
-    setFormLoading(false);
 
     if (error) {
       if (error.message.includes('already registered')) {
@@ -114,10 +147,28 @@ export default function Auth() {
       } else {
         toast.error(error.message);
       }
-    } else {
-      toast.success('Account created! Please contact an administrator to assign your role.');
-      navigate('/');
+      setFormLoading(false);
+      return;
     }
+
+    // 3. Link profile to org (the handle_new_user trigger creates the profile,
+    //    so we update it with the org_id after a brief delay)
+    const { data: { user: newUser } } = await supabase.auth.getUser();
+    if (newUser && orgData?.id) {
+      await supabase
+        .from('profiles')
+        .update({ org_id: orgData.id })
+        .eq('user_id', newUser.id);
+
+      // 4. Give the signup user the 'owner' role for their new org
+      await supabase
+        .from('user_roles')
+        .insert({ user_id: newUser.id, role: 'owner' });
+    }
+
+    setFormLoading(false);
+    toast.success('Account created! Welcome to FleetFlow.');
+    navigate('/');
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -338,6 +389,33 @@ export default function Auth() {
                     </div>
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="company-name">Company Name</Label>
+                    <Input
+                      id="company-name"
+                      type="text"
+                      placeholder="Your Trucking Co."
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      required
+                      className="bg-background"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tier-select">Plan</Label>
+                    <Select value={selectedTier} onValueChange={setSelectedTier}>
+                      <SelectTrigger className="bg-background">
+                        <SelectValue placeholder="Select a plan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="solo_bco">Solo BCO — $49/mo</SelectItem>
+                        <SelectItem value="fleet_owner">Fleet Owner — $149/mo</SelectItem>
+                        <SelectItem value="agency">Agency — $99/mo</SelectItem>
+                        <SelectItem value="all_in_one">All-in-One — $199/mo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">14-day free trial included</p>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
                     <Input
                       id="signup-email"
@@ -372,7 +450,7 @@ export default function Auth() {
                         Creating account...
                       </>
                     ) : (
-                      'Create Account'
+                      'Start 14-Day Free Trial'
                     )}
                   </Button>
                 </form>
