@@ -1,4 +1,5 @@
 
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +15,7 @@ import { DriverNotifications } from '@/components/driver/DriverNotifications';
 import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
 import { Loader2, Sun, Moon, AlertTriangle } from 'lucide-react';
 
-export default function DriverDashboard() {
+const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboard(_, _ref) {
   const { user } = useAuth();
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
@@ -58,8 +59,8 @@ export default function DriverDashboard() {
         .from('trucks')
         .select('*')
         .eq('current_driver_id', driver?.id)
-        .single();
-      if (error && error.code !== 'PGRST116') throw error;
+        .maybeSingle();
+      if (error) throw error;
       return data;
     },
     enabled: !!driver?.id,
@@ -177,4 +178,6 @@ export default function DriverDashboard() {
       </div>
     </>
   );
-}
+});
+
+export default DriverDashboard;

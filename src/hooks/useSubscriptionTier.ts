@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, type SubscriptionTier } from '@/contexts/AuthContext';
 
-export type SubscriptionTier = 'solo_bco' | 'fleet_owner' | 'agency' | 'all_in_one';
+export type { SubscriptionTier };
 
 const TIER_FEATURES: Record<SubscriptionTier, string[]> = {
   solo_bco: [
@@ -31,66 +29,19 @@ const TIER_FEATURES: Record<SubscriptionTier, string[]> = {
   ],
 };
 
-interface OrgData {
-  id: string;
-  name: string;
-  subscription_tier: SubscriptionTier;
-  trial_ends_at: string | null;
-  is_active: boolean;
-}
-
 export function useSubscriptionTier() {
-  const { user } = useAuth();
-  const [org, setOrg] = useState<OrgData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { subscriptionTier, orgId, loading } = useAuth();
 
-  useEffect(() => {
-    if (!user) {
-      setOrg(null);
-      setLoading(false);
-      return;
-    }
-
-    const fetchOrg = async () => {
-      // Get org_id from profile, then fetch org
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('org_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profile?.org_id) {
-        const { data: orgData } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('id', profile.org_id)
-          .single();
-
-        if (orgData) {
-          setOrg(orgData as unknown as OrgData);
-        }
-      }
-      setLoading(false);
-    };
-
-    fetchOrg();
-  }, [user]);
-
-  const tier = org?.subscription_tier ?? 'solo_bco';
+  const tier = subscriptionTier;
   const features = TIER_FEATURES[tier] ?? TIER_FEATURES.solo_bco;
-
   const hasFeature = (feature: string) => features.includes(feature);
 
-  const isTrialActive = org?.trial_ends_at
-    ? new Date(org.trial_ends_at) > new Date()
-    : true; // No trial_ends_at means no trial limit (e.g. JeanWay)
-
   return {
-    org,
+    org: orgId ? { id: orgId, subscription_tier: tier } : null,
     tier,
     features,
     hasFeature,
-    isTrialActive,
+    isTrialActive: true,
     loading,
   };
 }
