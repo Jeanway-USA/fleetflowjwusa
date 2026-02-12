@@ -2,11 +2,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { RoleBasedRedirect } from "@/components/shared/RoleBasedRedirect";
+import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -18,7 +19,6 @@ import FleetLoads from "./pages/FleetLoads";
 import AgencyLoads from "./pages/AgencyLoads";
 import Finance from "./pages/Finance";
 import CompanyInsights from "./pages/CompanyInsights";
-import { Navigate } from "react-router-dom";
 import MaintenanceManagement from "./pages/MaintenanceManagement";
 import Documents from "./pages/Documents";
 import Safety from "./pages/Safety";
@@ -51,35 +51,139 @@ const App = () => {
             <AuthProvider>
               <ErrorBoundary>
                 <Routes>
+                  {/* Public routes */}
                   <Route path="/" element={<RoleBasedRedirect />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route path="/trucks" element={<Trucks />} />
-                  <Route path="/trailers" element={<Trailers />} />
-                  <Route path="/drivers" element={<Drivers />} />
-                  <Route path="/fleet-loads" element={<FleetLoads />} />
-                  <Route path="/agency-loads" element={<AgencyLoads />} />
-                  <Route path="/finance" element={<Finance />} />
-                  <Route path="/ledger" element={<Finance />} />
-                  <Route path="/insights" element={<CompanyInsights />} />
-                  <Route path="/resources" element={<Navigate to="/crm" replace />} />
-                  <Route path="/maintenance" element={<MaintenanceManagement />} />
-                  <Route path="/documents" element={<Documents />} />
-                  <Route path="/safety" element={<Safety />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/driver-dashboard" element={<DriverDashboard />} />
-                  <Route path="/dispatcher-dashboard" element={<DispatcherDashboard />} />
-                  <Route path="/executive-dashboard" element={<ExecutiveDashboard />} />
-                  <Route path="/driver-settings" element={<DriverSettings />} />
-                  <Route path="/driver-stats" element={<DriverStats />} />
-                  <Route path="/incidents" element={<Incidents />} />
-                  <Route path="/driver-performance" element={<DriverPerformance />} />
-                  <Route path="/driver-view/:driverId" element={<DriverSpectatorView />} />
-                  <Route path="/ifta" element={<IFTA />} />
-                  <Route path="/crm" element={<CRM />} />
                   <Route path="/pending-access" element={<PendingAccess />} />
                   <Route path="/landing" element={<Landing />} />
                   <Route path="/pricing" element={<Pricing />} />
+
+                  {/* Dashboard routes */}
+                  <Route path="/executive-dashboard" element={
+                    <ProtectedRoute allowedRoles={['owner']} requiredFeature="executive_dashboard">
+                      <ExecutiveDashboard />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/dispatcher-dashboard" element={
+                    <ProtectedRoute allowedRoles={['owner', 'dispatcher']} requiredFeature="dispatch">
+                      <DispatcherDashboard />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/driver-dashboard" element={
+                    <ProtectedRoute allowedRoles={['owner', 'driver']}>
+                      <DriverDashboard />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Fleet management */}
+                  <Route path="/trucks" element={
+                    <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety']} requiredFeature="trucks">
+                      <Trucks />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/trailers" element={
+                    <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety']} requiredFeature="trailers">
+                      <Trailers />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/drivers" element={
+                    <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety']} requiredFeature="drivers">
+                      <Drivers />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Loads */}
+                  <Route path="/fleet-loads" element={
+                    <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety', 'driver']} requiredFeature="loads">
+                      <FleetLoads />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/agency-loads" element={
+                    <ProtectedRoute allowedRoles={['owner', 'dispatcher']} requiredFeature="agency_loads">
+                      <AgencyLoads />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Finance */}
+                  <Route path="/finance" element={
+                    <ProtectedRoute allowedRoles={['owner', 'payroll_admin']} requiredFeature="profit_loss">
+                      <Finance />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/ledger" element={
+                    <ProtectedRoute allowedRoles={['owner', 'payroll_admin']} requiredFeature="profit_loss">
+                      <Finance />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/insights" element={
+                    <ProtectedRoute allowedRoles={['owner', 'payroll_admin']} requiredFeature="insights">
+                      <CompanyInsights />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/ifta" element={
+                    <ProtectedRoute allowedRoles={['owner', 'payroll_admin']} requiredFeature="ifta">
+                      <IFTA />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Operations */}
+                  <Route path="/crm" element={
+                    <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety', 'driver']} requiredFeature="crm">
+                      <CRM />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/resources" element={<Navigate to="/crm" replace />} />
+                  <Route path="/maintenance" element={
+                    <ProtectedRoute allowedRoles={['owner', 'safety']} requiredFeature="maintenance_full">
+                      <MaintenanceManagement />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/documents" element={
+                    <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver']} requiredFeature="documents">
+                      <Documents />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Safety */}
+                  <Route path="/safety" element={
+                    <ProtectedRoute allowedRoles={['owner', 'safety']} requiredFeature="safety">
+                      <Safety />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/incidents" element={
+                    <ProtectedRoute allowedRoles={['owner', 'safety', 'dispatcher']} requiredFeature="incidents">
+                      <Incidents />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/driver-performance" element={
+                    <ProtectedRoute allowedRoles={['owner', 'safety', 'dispatcher']} requiredFeature="driver_performance">
+                      <DriverPerformance />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/driver-view/:driverId" element={
+                    <ProtectedRoute allowedRoles={['owner', 'safety', 'dispatcher']}>
+                      <DriverSpectatorView />
+                    </ProtectedRoute>
+                  } />
+
+                  {/* Settings */}
+                  <Route path="/settings" element={
+                    <ProtectedRoute allowedRoles={['owner']}>
+                      <Settings />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/driver-settings" element={
+                    <ProtectedRoute allowedRoles={['driver']}>
+                      <DriverSettings />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/driver-stats" element={
+                    <ProtectedRoute allowedRoles={['driver']}>
+                      <DriverStats />
+                    </ProtectedRoute>
+                  } />
+
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ErrorBoundary>

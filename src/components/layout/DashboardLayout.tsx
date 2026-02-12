@@ -2,8 +2,8 @@ import { ReactNode } from 'react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate, useNavigate } from 'react-router-dom';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const DEMO_EMAIL = 'demo@fleetflow-tms.com';
@@ -13,24 +13,9 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { user, loading, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const isDemo = user?.email === DEMO_EMAIL;
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
 
   return (
     <SidebarProvider>

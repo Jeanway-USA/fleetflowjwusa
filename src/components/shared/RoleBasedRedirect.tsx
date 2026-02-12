@@ -3,9 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 export function RoleBasedRedirect() {
-  const { user, loading, rolesLoading, hasRole } = useAuth();
+  const { user, loading, rolesLoading, hasRole, subscriptionTier } = useAuth();
 
-  // Still loading auth state or roles
   if (loading || rolesLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -14,14 +13,22 @@ export function RoleBasedRedirect() {
     );
   }
 
-  // Not authenticated - show landing page
   if (!user) {
     return <Navigate to="/landing" replace />;
   }
 
-  // Route based on role priority
+  // Owner routing — tier-aware
   if (hasRole('owner')) {
-    return <Navigate to="/executive-dashboard" replace />;
+    switch (subscriptionTier) {
+      case 'solo_bco':
+        return <Navigate to="/fleet-loads" replace />;
+      case 'agency':
+        return <Navigate to="/agency-loads" replace />;
+      case 'fleet_owner':
+      case 'all_in_one':
+      default:
+        return <Navigate to="/executive-dashboard" replace />;
+    }
   }
 
   if (hasRole('dispatcher')) {
@@ -36,6 +43,5 @@ export function RoleBasedRedirect() {
     return <Navigate to="/executive-dashboard" replace />;
   }
 
-  // Fallback for users with no recognized role
   return <Navigate to="/pending-access" replace />;
 }
