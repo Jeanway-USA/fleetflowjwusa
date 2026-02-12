@@ -14,9 +14,9 @@ export function RoleBasedRedirect() {
     );
   }
 
-  // Not authenticated - go to login
+  // Not authenticated - show landing page
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/landing" replace />;
   }
 
   // Route based on role priority

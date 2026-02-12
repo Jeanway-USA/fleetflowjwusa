@@ -35,6 +35,8 @@ import IFTA from "./pages/IFTA";
 import CRM from "./pages/CRM";
 import NotFound from "./pages/NotFound";
 import PendingAccess from "./pages/PendingAccess";
+import Landing from "./pages/Landing";
+import Pricing from "./pages/Pricing";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +78,8 @@ const App = () => {
                   <Route path="/ifta" element={<IFTA />} />
                   <Route path="/crm" element={<CRM />} />
                   <Route path="/pending-access" element={<PendingAccess />} />
+                  <Route path="/landing" element={<Landing />} />
+                  <Route path="/pricing" element={<Pricing />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ErrorBoundary>
