@@ -109,6 +109,28 @@ serve(async (req) => {
       ]);
     }
 
+    // Sample CRM contacts for Agency view
+    await supabase.from("crm_contacts").insert([
+      { company_name: "Swift Logistics", contact_name: "John Davis", contact_type: "shipper", email: "john@swiftlogistics.com", phone: "555-0201", city: "Dallas", state: "TX", is_active: true, org_id: orgId },
+      { company_name: "Prime Carriers", contact_name: "Maria Santos", contact_type: "carrier", email: "maria@primecarriers.com", phone: "555-0202", city: "Atlanta", state: "GA", is_active: true, org_id: orgId },
+      { company_name: "Landstar BCO Network", contact_name: "Tom Mitchell", contact_type: "agent", agent_code: "AGT-501", agent_status: "active", email: "tom@landstar.com", phone: "555-0203", city: "Jacksonville", state: "FL", is_active: true, org_id: orgId },
+    ]);
+
+    // Sample agency loads
+    const { data: agencyLoads } = await supabase.from("agency_loads").insert([
+      { origin: "Memphis, TN", destination: "Nashville, TN", broker_name: "Swift Logistics", broker_rate: 2800, carrier_name: "Prime Carriers", carrier_rate: 2400, margin: 400, status: "delivered", pickup_date: "2026-02-01", delivery_date: "2026-02-02", org_id: orgId },
+      { origin: "Jacksonville, FL", destination: "Savannah, GA", broker_name: "Swift Logistics", broker_rate: 1600, carrier_name: "Prime Carriers", carrier_rate: 1350, margin: 250, status: "in_transit", pickup_date: "2026-02-10", org_id: orgId },
+      { origin: "Houston, TX", destination: "San Antonio, TX", broker_name: "Swift Logistics", broker_rate: 1200, carrier_name: "Prime Carriers", carrier_rate: 1000, margin: 200, status: "pending", pickup_date: "2026-02-15", org_id: orgId },
+    ]).select("id");
+
+    // Sample agent commissions
+    if (agencyLoads && agencyLoads.length > 0) {
+      await supabase.from("agent_commissions").insert([
+        { agent_name: "Tom Mitchell", load_id: agencyLoads[0].id, commission_rate: 10, commission_amount: 280, status: "paid", payout_date: "2026-02-05", org_id: orgId },
+        { agent_name: "Tom Mitchell", load_id: agencyLoads[1].id, commission_rate: 10, commission_amount: 160, status: "pending", org_id: orgId },
+      ]);
+    }
+
     // 6. Sign in as demo user and return session
     const { data: session, error: sessionError } = await supabase.auth.signInWithPassword({
       email: DEMO_EMAIL,

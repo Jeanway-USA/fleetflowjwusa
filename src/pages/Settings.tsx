@@ -39,7 +39,7 @@ const roleLabels: Record<AppRole, string> = {
 
 export default function Settings() {
   const queryClient = useQueryClient();
-  const { isOwner, user, canSimulateRoles } = useAuth();
+  const { isOwner, user, canSimulateRoles, isDemoMode } = useAuth();
   const { theme, toggleTheme } = useTheme();
   
   // Use canSimulateRoles (actuallyIsOwner) for admin access - owners should always have access
@@ -407,6 +407,12 @@ export default function Settings() {
   return (
     <DashboardLayout>
       <PageHeader title="Settings" description="Manage users, roles, and system configuration" />
+
+      {isDemoMode && (
+        <div className="mb-6 p-4 rounded-lg bg-primary/10 border border-primary/20">
+          <p className="text-sm font-medium">🔒 Settings are read-only in demo mode. Sign up for a real account to manage your organization.</p>
+        </div>
+      )}
 
       <Tabs defaultValue="users" className="w-full">
         <TabsList className="mb-6">
