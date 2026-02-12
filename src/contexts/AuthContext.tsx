@@ -16,6 +16,7 @@ interface AuthContextType {
   orgId: string | null;
   orgName: string | null;
   subscriptionTier: SubscriptionTier;
+  isDemoMode: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -33,6 +34,7 @@ interface AuthContextType {
   hasPayrollAccess: boolean;
   hasOperationsAccess: boolean;
   hasSafetyAccess: boolean;
+  refreshOrgData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,6 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data?.map(r => r.role) || [];
   };
 
+  const DEMO_EMAIL = 'demo@fleetflow-tms.com';
+  const isDemoMode = user?.email === DEMO_EMAIL;
+
   const fetchOrgData = async (userId: string) => {
     const { data: profile } = await supabase
       .from('profiles')
@@ -81,6 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOrgName(orgData.name);
         setSubscriptionTier((orgData.subscription_tier as SubscriptionTier) || 'solo_bco');
       }
+    }
+  };
+
+  const refreshOrgData = async () => {
+    if (user) {
+      await fetchOrgData(user.id);
     }
   };
 
@@ -236,6 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       rolesLoading,
       roles,
       simulatedRole,
+      isDemoMode,
       signIn,
       signUp,
       signOut,
@@ -251,6 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       orgId,
       orgName,
       subscriptionTier,
+      refreshOrgData,
     }}>
       {children}
     </AuthContext.Provider>

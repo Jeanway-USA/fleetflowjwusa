@@ -9,6 +9,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
+import { useDemoGuard } from '@/hooks/useDemoGuard';
 
 interface ConfirmDeleteDialogProps {
   open: boolean;
@@ -29,9 +30,16 @@ export function ConfirmDeleteDialog({
   itemName,
   isDeleting = false,
 }: ConfirmDeleteDialogProps) {
+  const { isDemoMode, guard } = useDemoGuard();
+
   const defaultDescription = itemName
     ? `Are you sure you want to delete "${itemName}"? This action cannot be undone.`
     : 'Are you sure you want to delete this item? This action cannot be undone.';
+
+  const handleConfirm = () => {
+    if (guard('Deleting items')) return;
+    onConfirm();
+  };
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -39,7 +47,9 @@ export function ConfirmDeleteDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>
-            {description || defaultDescription}
+            {isDemoMode
+              ? 'Deleting items is disabled in demo mode. Sign up for a real account to manage your data.'
+              : description || defaultDescription}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -47,9 +57,9 @@ export function ConfirmDeleteDialog({
           <AlertDialogAction
             onClick={(e) => {
               e.preventDefault();
-              onConfirm();
+              handleConfirm();
             }}
-            disabled={isDeleting}
+            disabled={isDeleting || isDemoMode}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isDeleting ? (
