@@ -122,8 +122,9 @@ export default function FleetLoads() {
       
       // Insert accessorials if any
       if (accs.length > 0) {
-        const accessorialRecords = accs.map(acc => ({
+      const accessorialRecords = accs.map(acc => ({
           load_id: data.id,
+          org_id: data.org_id,
           accessorial_type: acc.accessorial_type,
           amount: acc.amount,
           percentage: acc.percentage,
@@ -152,8 +153,11 @@ export default function FleetLoads() {
       if (deleteError) throw deleteError;
 
       if (accessorialItems.length > 0) {
+        // Fetch the load's org_id for RLS compliance
+        const { data: loadData } = await supabase.from('fleet_loads').select('org_id').eq('id', id).single();
         const accessorialRecords = accessorialItems.map((acc: Accessorial) => ({
           load_id: id,
+          org_id: loadData?.org_id,
           accessorial_type: acc.accessorial_type,
           amount: acc.amount,
           percentage: acc.percentage,
