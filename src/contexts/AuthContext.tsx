@@ -11,6 +11,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   rolesLoading: boolean;
+  orgLoading: boolean;
   roles: AppRole[];
   simulatedRole: AppRole | null;
   orgId: string | null;
@@ -49,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('solo_bco');
+  const [orgLoading, setOrgLoading] = useState(true);
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase
@@ -104,12 +106,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (session?.user) {
           setRolesLoading(true);
+          setOrgLoading(true);
           setTimeout(() => {
             fetchUserRoles(session.user.id).then((fetchedRoles) => {
               setRoles(fetchedRoles);
               setRolesLoading(false);
             });
-            fetchOrgData(session.user.id);
+            fetchOrgData(session.user.id).finally(() => setOrgLoading(false));
           }, 0);
         } else {
           setRoles([]);
@@ -118,6 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setOrgId(null);
           setOrgName(null);
           setSubscriptionTier('solo_bco');
+          setOrgLoading(false);
         }
         
         setLoading(false);
@@ -131,13 +135,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (session?.user) {
         setRolesLoading(true);
+        setOrgLoading(true);
         fetchUserRoles(session.user.id).then((fetchedRoles) => {
           setRoles(fetchedRoles);
           setRolesLoading(false);
         });
-        fetchOrgData(session.user.id);
+        fetchOrgData(session.user.id).finally(() => setOrgLoading(false));
       } else {
         setRolesLoading(false);
+        setOrgLoading(false);
       }
       
       setLoading(false);
@@ -245,6 +251,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       loading,
       rolesLoading,
+      orgLoading,
       roles,
       simulatedRole,
       isDemoMode,

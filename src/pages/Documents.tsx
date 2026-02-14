@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -29,6 +30,7 @@ const documentCategories = [
 ];
 
 export default function Documents() {
+  const { orgId } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -90,6 +92,7 @@ export default function Documents() {
         document_type: selectedType,
         related_type: 'general',
         uploaded_by: user.id,
+        org_id: orgId,
       });
 
       if (dbError) throw dbError;
