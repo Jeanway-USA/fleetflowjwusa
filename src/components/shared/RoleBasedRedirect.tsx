@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import Landing from '@/pages/Landing';
 
 export function RoleBasedRedirect() {
   const { user, loading, rolesLoading, hasRole, subscriptionTier, orgId } = useAuth();
@@ -14,7 +15,7 @@ export function RoleBasedRedirect() {
   }
 
   if (!user) {
-    return <Navigate to="/landing" replace />;
+    return <Landing />;
   }
 
   // User signed up but hasn't completed onboarding (no org yet)
