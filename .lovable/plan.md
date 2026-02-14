@@ -1,95 +1,80 @@
 
 
-# Optimization, Bug Testing, and Feature Testing Fixes
+# Step-by-Step Onboarding Wizard
 
-## Bugs Found
+## Overview
 
-### 1. React Ref Warning on DriverDashboard
-The console shows "Function components cannot be given refs" for `DriverDashboard`. This happens because React Router internally tries to attach a ref to the route element. The component uses `export default function` without `forwardRef`, causing the warning on every render.
+Replace the current single-form signup experience in `Auth.tsx` with a multi-step onboarding wizard that guides new users through account creation, organization setup, tier selection, and optionally creating their first load. The wizard launches after signup and lives on a new `/onboarding` route.
 
-**Fix**: Wrap `DriverDashboard` (and other default-exported page components that show this warning) with `React.forwardRef`.
+## User Flow
 
-### 2. Truck Query Uses `.single()` Instead of `.maybeSingle()`
-In `DriverDashboard.tsx` line 61, the truck lookup query uses `.single()`. When a driver has no assigned truck, this triggers a PostgREST error (suppressed by the `PGRST116` check, but still noisy). Should use `.maybeSingle()` for consistency with the pattern established for the driver query.
-
-### 3. TierGate Doesn't React to Demo Tier Switches
-This is a functional bug affecting the demo experience. When a demo user switches tiers via `DemoControls`, the `AuthContext.subscriptionTier` updates correctly (sidebar re-renders). However, `TierGate` uses `useSubscriptionTier()` which has its own **independent** `useState`/`useEffect` that fetches org data separately. It never re-fetches after `refreshOrgData()` runs, so pages gated by `TierGate` (via `ProtectedRoute`) won't show/hide correctly until a full page reload.
-
-**Fix**: Refactor `useSubscriptionTier` to read the tier from `AuthContext` (which already has `subscriptionTier` and `orgId`) instead of doing its own duplicate database fetch. This eliminates the stale-data bug and removes redundant network requests on every page load.
-
-### 4. Duplicate Org Data Fetching
-Both `AuthContext` and `useSubscriptionTier` independently query `profiles` and `organizations` tables to get the same subscription tier data. Every page that uses `TierGate` fires 2 extra queries that are already handled by `AuthContext`. Consolidating saves ~2 network requests per protected page load.
-
-### 5. Missing DialogDescription Accessibility Warnings
-Multiple dialogs across the app use `DialogContent` without a `DialogDescription`, causing console warnings. The most impactful ones are in frequently-used pages.
-
----
-
-## Changes
-
-### File: `src/hooks/useSubscriptionTier.ts` -- Refactor
-Remove the independent database fetch. Instead, read `subscriptionTier` and `orgId` directly from `AuthContext`. Keep the `TIER_FEATURES` map and `hasFeature()` logic, but derive everything from the already-fetched context values. This fixes both bug 3 (stale tier after demo switch) and bug 4 (duplicate fetching).
-
-### File: `src/pages/DriverDashboard.tsx` -- Two fixes
-1. Change the truck query on line 61 from `.single()` to `.maybeSingle()` and remove the manual `PGRST116` error check.
-2. Wrap the component with `React.forwardRef` to fix the ref warning.
-
-### File: `src/components/ui/dialog.tsx` -- Add default DialogDescription
-Add a `VisuallyHidden` description fallback within `DialogContent` so dialogs that don't explicitly provide a `DialogDescription` won't trigger accessibility warnings. This is a one-time fix that covers all dialogs app-wide.
-
----
-
-## Technical Details
-
-### useSubscriptionTier Refactor
-
-Before (fetches from DB independently):
-```typescript
-export function useSubscriptionTier() {
-  const { user } = useAuth();
-  const [org, setOrg] = useState(null);
-  useEffect(() => { /* fetch profiles, then organizations */ }, [user]);
-  // ...
-}
+```text
+Auth (Sign Up tab)
+  |-- Creates user account only (email + password + name)
+  |-- Redirects to /onboarding
+  v
+Step 1: Company Setup
+  |-- Company name, MC/DOT number (optional)
+  v
+Step 2: Choose Your Plan
+  |-- Visual tier cards (reuses pricing data)
+  |-- Highlights current selection
+  v
+Step 3: Create Your First Load (optional)
+  |-- Origin, destination, rate, pickup date
+  |-- "Skip for now" option
+  v
+Done: Confetti + redirect to dashboard
 ```
 
-After (reads from AuthContext):
-```typescript
-export function useSubscriptionTier() {
-  const { subscriptionTier, orgId, loading } = useAuth();
-  const tier = subscriptionTier;
-  const features = TIER_FEATURES[tier] ?? TIER_FEATURES.solo_bco;
-  const hasFeature = (feature: string) => features.includes(feature);
-  return { tier, features, hasFeature, loading };
-}
-```
+## Technical Changes
 
-### DriverDashboard forwardRef
+### 1. New File: `src/pages/Onboarding.tsx`
 
-```typescript
-const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboard(_, ref) {
-  // existing component body
-});
-export default DriverDashboard;
-```
+A multi-step wizard component with 3 steps:
 
-### Truck query fix
+- **Step 1 -- Company Setup**: Text inputs for company name (required) and optional MC/DOT number. On "Next", creates the `organizations` row, links the user's profile via `org_id`, and inserts the `owner` role into `user_roles`.
+- **Step 2 -- Plan Selection**: Renders the 4 tier cards (Solo BCO, Fleet Owner, Agency, All-in-One) as selectable cards with feature highlights. On "Next", updates `organizations.subscription_tier`.
+- **Step 3 -- First Load (Optional)**: A simplified load form with origin, destination, rate, and pickup date. "Skip" button bypasses this step. On submit, inserts into `fleet_loads` with the user's `org_id`.
+- **Complete**: Fires `canvas-confetti`, calls `refreshOrgData()` on `AuthContext`, then redirects to `/` (which triggers `RoleBasedRedirect` for tier-aware landing).
 
-```typescript
-// Line 61: change .single() to .maybeSingle()
-const { data, error } = await supabase
-  .from('trucks')
-  .select('*')
-  .eq('current_driver_id', driver?.id)
-  .maybeSingle();
-if (error) throw error;
-return data;
-```
+Each step shows a progress bar at the top and back/next navigation at the bottom. State is held in component-level `useState` (no persistence needed since the wizard is completed in one session).
+
+### 2. Modify: `src/pages/Auth.tsx`
+
+Simplify the Sign Up tab:
+- Remove the company name input, tier selector, and all org/role creation logic from `handleSignUp`.
+- After successful `signUp()`, redirect to `/onboarding` instead of `/`.
+- The sign-up form becomes: First Name, Last Name, Email, Password only.
+
+### 3. Modify: `src/App.tsx`
+
+- Import the new `Onboarding` page.
+- Add route: `<Route path="/onboarding" element={<Onboarding />} />` as a semi-protected route (requires auth but no role check, since the user won't have a role yet).
+
+### 4. Modify: `src/components/shared/RoleBasedRedirect.tsx`
+
+- Before the "no roles" redirect to `/pending-access`, check if the user has no `org_id` in their profile. If so, redirect to `/onboarding` instead. This handles the case where a user signs up but closes the browser before completing onboarding.
+
+### 5. Modify: `src/contexts/AuthContext.tsx`
+
+- Expose `orgId` loading state so the onboarding redirect logic can distinguish "no org yet" from "org exists but no role assigned."
+- The existing `refreshOrgData` function is already available and will be called at the end of onboarding.
+
+## Validation
+
+- Company name: required, trimmed, max 100 characters (zod).
+- Tier selection: required (defaults to `solo_bco`).
+- Load fields (if not skipped): origin and destination required (max 200 chars), rate must be a positive number, pickup date required and must be today or later.
 
 ## Files Summary
 
 | File | Change |
 |------|--------|
-| `src/hooks/useSubscriptionTier.ts` | Refactor to read from AuthContext instead of duplicate DB fetch |
-| `src/pages/DriverDashboard.tsx` | Fix `.single()` to `.maybeSingle()`, add `forwardRef` |
-| `src/components/ui/dialog.tsx` | Add VisuallyHidden description fallback for accessibility |
+| `src/pages/Onboarding.tsx` | **New** -- Multi-step wizard (company, tier, first load) |
+| `src/pages/Auth.tsx` | Simplify signup form, redirect to `/onboarding` |
+| `src/App.tsx` | Add `/onboarding` route |
+| `src/components/shared/RoleBasedRedirect.tsx` | Redirect org-less users to `/onboarding` |
+
+No database migrations required -- all tables (`organizations`, `profiles`, `user_roles`, `fleet_loads`) already exist with the needed columns and RLS policies.
+
