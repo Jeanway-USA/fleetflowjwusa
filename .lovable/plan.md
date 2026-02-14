@@ -1,37 +1,19 @@
 
 
-# Make Landing Page the Root Route
+# Fix: "new row violates row-level security policy for table load_accessorials"
 
-## Change
+## Root Cause
 
-Move the landing page from `/landing` to `/` so it's the first thing visitors see. Authenticated users continue to be redirected to their role-appropriate dashboard.
+When inserting into `load_accessorials` (both during create and update), the code does not include `org_id` in the record. The RLS policy requires `org_id = get_user_org_id(auth.uid())`, so the insert is rejected.
 
-## Technical Details
+## Fix
 
-### File: `src/components/shared/RoleBasedRedirect.tsx`
+### File: `src/pages/FleetLoads.tsx`
 
-- Change the unauthenticated redirect from `<Navigate to="/landing" replace />` to render the `<Landing />` component directly (or redirect is no longer needed since Landing will be at `/`).
+Add `org_id` to all `load_accessorials` insert operations. The `org_id` is already available from the `fleet_loads` record (or from `AuthContext`). There are two places to fix:
 
-### File: `src/App.tsx`
+1. **Create mutation (line ~125-131)**: Add `org_id` from the newly created load's `org_id` to each accessorial record.
+2. **Update mutation (line ~155-161)**: Add `org_id` to each accessorial record during the delete-and-reinsert flow.
 
-- Change the `/` route from `<RoleBasedRedirect />` to a new wrapper component that shows `<Landing />` for unauthenticated users and performs the role-based redirect for authenticated users.
-- Remove the `/landing` route (or redirect it to `/` for backward compatibility).
-
-### Implementation Approach
-
-Update `RoleBasedRedirect` to render `<Landing />` inline when there's no authenticated user, instead of redirecting to a separate route. This keeps all the existing role-based logic intact:
-
-```
-/ (root)
-  |-- Not signed in --> Show Landing page
-  |-- Signed in, no org --> Redirect to /onboarding
-  |-- Signed in, has org --> Redirect to tier-appropriate dashboard
-```
-
-### Files Summary
-
-| File | Change |
-|------|--------|
-| `src/components/shared/RoleBasedRedirect.tsx` | Render `<Landing />` instead of redirecting to `/landing` |
-| `src/App.tsx` | Remove `/landing` route (or make it redirect to `/`) |
+Both spots follow the same pattern -- just spread `org_id` into the accessorial insert objects. The `org_id` can come from the parent `fleet_loads` record (which already has it) or from `useAuth().orgId`.
 
