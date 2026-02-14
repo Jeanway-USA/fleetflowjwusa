@@ -1,19 +1,37 @@
 
 
-# Separate MC Number and DOT Number Fields
+# Make Landing Page the Root Route
 
 ## Change
 
-Split the single "MC / DOT Number" input in Step 1 of the onboarding wizard into two distinct fields:
-
-- **MC Number** (optional) -- placeholder: "MC-123456"
-- **DOT Number** (optional) -- placeholder: "1234567"
+Move the landing page from `/landing` to `/` so it's the first thing visitors see. Authenticated users continue to be redirected to their role-appropriate dashboard.
 
 ## Technical Details
 
-### File: `src/pages/Onboarding.tsx`
+### File: `src/components/shared/RoleBasedRedirect.tsx`
 
-1. Replace the single `mcNumber` state variable with two: `mcNumber` and `dotNumber`.
-2. Replace the single input field with a side-by-side grid (`grid-cols-1 sm:grid-cols-2`) containing both fields.
-3. No database changes needed -- these values are not currently persisted (the `organizations` table doesn't have MC/DOT columns). The state variables exist for future use.
+- Change the unauthenticated redirect from `<Navigate to="/landing" replace />` to render the `<Landing />` component directly (or redirect is no longer needed since Landing will be at `/`).
+
+### File: `src/App.tsx`
+
+- Change the `/` route from `<RoleBasedRedirect />` to a new wrapper component that shows `<Landing />` for unauthenticated users and performs the role-based redirect for authenticated users.
+- Remove the `/landing` route (or redirect it to `/` for backward compatibility).
+
+### Implementation Approach
+
+Update `RoleBasedRedirect` to render `<Landing />` inline when there's no authenticated user, instead of redirecting to a separate route. This keeps all the existing role-based logic intact:
+
+```
+/ (root)
+  |-- Not signed in --> Show Landing page
+  |-- Signed in, no org --> Redirect to /onboarding
+  |-- Signed in, has org --> Redirect to tier-appropriate dashboard
+```
+
+### Files Summary
+
+| File | Change |
+|------|--------|
+| `src/components/shared/RoleBasedRedirect.tsx` | Render `<Landing />` instead of redirecting to `/landing` |
+| `src/App.tsx` | Remove `/landing` route (or make it redirect to `/`) |
 
