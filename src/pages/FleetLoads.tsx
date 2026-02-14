@@ -46,7 +46,7 @@ interface Accessorial {
 import { format, parseISO } from 'date-fns';
 
 export default function FleetLoads() {
-  const { hasRole, isAdmin } = useAuth();
+  const { hasRole, isAdmin, orgId } = useAuth();
   const isDriverOnly = hasRole('driver') && !isAdmin;
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -304,6 +304,7 @@ export default function FleetLoads() {
     const payload = {
       ...formData,
       ...calculated,
+      org_id: orgId,
     };
 
     if (editingLoad) {
