@@ -1,15 +1,45 @@
 
-# Fix: "new row violates row-level security policy for table fleet_loads"
+# Fix: Document Upload RLS Error + False Onboarding Redirect
 
-## Root Cause
+## Issue 1: Document Upload Fails with RLS Error
 
-The `fleet_loads` INSERT uses an "ALL" policy with `WITH CHECK (org_id = get_user_org_id(auth.uid()))`. The load payload constructed in `handleSubmit` does not include `org_id`, so the RLS check fails.
+The `/documents` page insert is missing `org_id`. The RLS policy requires `org_id = get_user_org_id(auth.uid())`.
 
-## Fix
+### File: `src/pages/Documents.tsx`
+- Import `useAuth` and destructure `orgId`
+- Add `org_id: orgId` to the document insert payload (line ~86-93)
 
-### File: `src/pages/FleetLoads.tsx`
+Also fix the shared hook:
 
-1. Destructure `orgId` from `useAuth()` (line ~49, already imports `useAuth`).
-2. In `handleSubmit` (line ~304), add `org_id: orgId` to the `payload` object so the inserted row satisfies the RLS WITH CHECK condition.
+### File: `src/hooks/useDocumentUpload.ts`
+- Import `useAuth` and destructure `orgId`
+- Add `org_id: orgId` to the document insert payload in `uploadDocument`
 
-This is a one-line addition to the payload construction.
+---
+
+## Issue 2: Signed-In Users Redirected to Onboarding
+
+The `AuthContext` sets `loading = false` before `fetchOrgData` finishes. So `RoleBasedRedirect` sees `orgId === null` and redirects to `/onboarding` even for users who already have an org.
+
+### File: `src/contexts/AuthContext.tsx`
+- Add a new state: `orgLoading` (default `true`)
+- Set `orgLoading = false` only after `fetchOrgData` completes (in both `onAuthStateChange` and `getSession` code paths)
+- When no user, set `orgLoading = false`
+- Expose `orgLoading` in the context
+
+### File: `src/components/shared/RoleBasedRedirect.tsx`
+- Destructure `orgLoading` from `useAuth()`
+- Add `orgLoading` to the loading check: `if (loading || rolesLoading || orgLoading)`
+
+This ensures the redirect to `/onboarding` only happens after org data has been fully fetched, preventing the false redirect.
+
+---
+
+## Summary
+
+| File | Change |
+|------|--------|
+| `src/pages/Documents.tsx` | Add `org_id` to document insert |
+| `src/hooks/useDocumentUpload.ts` | Add `org_id` to document insert |
+| `src/contexts/AuthContext.tsx` | Add `orgLoading` state, set false after `fetchOrgData` completes |
+| `src/components/shared/RoleBasedRedirect.tsx` | Wait for `orgLoading` before redirecting |
