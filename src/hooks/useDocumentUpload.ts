@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 import { uploadToStorage } from './useSignedUrl';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
@@ -14,6 +15,7 @@ interface UploadOptions {
 }
 
 export function useDocumentUpload() {
+  const { orgId } = useAuth();
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
 
@@ -33,12 +35,13 @@ export function useDocumentUpload() {
 
       const { error: dbError } = await supabase.from('documents').insert({
         file_name: file.name,
-        file_path: path, // Store the path, not public URL
+        file_path: path,
         file_size: file.size,
         document_type: options.documentType,
         related_type: options.relatedType,
         related_id: options.relatedId,
         uploaded_by: user.id,
+        org_id: orgId,
       });
 
       if (dbError) throw dbError;

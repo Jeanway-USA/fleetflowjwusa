@@ -4,9 +4,9 @@ import { Loader2 } from 'lucide-react';
 import Landing from '@/pages/Landing';
 
 export function RoleBasedRedirect() {
-  const { user, loading, rolesLoading, hasRole, subscriptionTier, orgId } = useAuth();
+  const { user, loading, rolesLoading, orgLoading, hasRole, subscriptionTier, orgId } = useAuth();
 
-  if (loading || rolesLoading) {
+  if (loading || rolesLoading || orgLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
