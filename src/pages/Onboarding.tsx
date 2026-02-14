@@ -69,6 +69,7 @@ export default function Onboarding() {
   // Step 1
   const [companyName, setCompanyName] = useState('');
   const [mcNumber, setMcNumber] = useState('');
+  const [dotNumber, setDotNumber] = useState('');
 
   // Step 2
   const [selectedTier, setSelectedTier] = useState('solo_bco');
@@ -243,15 +244,27 @@ export default function Onboarding() {
                       autoFocus
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="mc-number">MC / DOT Number (optional)</Label>
-                    <Input
-                      id="mc-number"
-                      placeholder="MC-123456"
-                      value={mcNumber}
-                      onChange={(e) => setMcNumber(e.target.value)}
-                      className="bg-background"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="mc-number">MC Number (optional)</Label>
+                      <Input
+                        id="mc-number"
+                        placeholder="MC-123456"
+                        value={mcNumber}
+                        onChange={(e) => setMcNumber(e.target.value)}
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dot-number">DOT Number (optional)</Label>
+                      <Input
+                        id="dot-number"
+                        placeholder="1234567"
+                        value={dotNumber}
+                        onChange={(e) => setDotNumber(e.target.value)}
+                        className="bg-background"
+                      />
+                    </div>
                   </div>
                 </div>
 
