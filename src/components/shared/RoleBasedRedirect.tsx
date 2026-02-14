@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 export function RoleBasedRedirect() {
-  const { user, loading, rolesLoading, hasRole, subscriptionTier } = useAuth();
+  const { user, loading, rolesLoading, hasRole, subscriptionTier, orgId } = useAuth();
 
   if (loading || rolesLoading) {
     return (
@@ -15,6 +15,11 @@ export function RoleBasedRedirect() {
 
   if (!user) {
     return <Navigate to="/landing" replace />;
+  }
+
+  // User signed up but hasn't completed onboarding (no org yet)
+  if (!orgId) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   // Owner routing — tier-aware

@@ -37,6 +37,7 @@ import NotFound from "./pages/NotFound";
 import PendingAccess from "./pages/PendingAccess";
 import Landing from "./pages/Landing";
 import Pricing from "./pages/Pricing";
+import Onboarding from "./pages/Onboarding";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const App = () => {
                   <Route path="/pending-access" element={<PendingAccess />} />
                   <Route path="/landing" element={<Landing />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/onboarding" element={<Onboarding />} />
 
                   {/* Dashboard routes */}
                   <Route path="/executive-dashboard" element={
