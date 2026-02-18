@@ -32,7 +32,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 className="h-7 text-xs gradient-gold text-primary-foreground"
                 onClick={async () => {
                   await signOut();
-                  navigate('/auth');
+                  navigate('/');
                 }}
               >
                 Start Your Beta Account
