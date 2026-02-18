@@ -11,7 +11,7 @@ export default function PendingAccess() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/auth');
+    navigate('/');
   };
 
   if (loading) {

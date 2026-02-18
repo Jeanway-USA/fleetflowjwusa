@@ -95,7 +95,7 @@ export function AppSidebar() {
 
   const handleSignOut = async () => {
     // Navigate immediately so the user sees the auth screen even if sign-out takes a moment.
-    navigate('/auth');
+    navigate('/');
     await signOut();
   };
 
