@@ -1,17 +1,23 @@
 
 
-## Changes
+## Fix: CORS blocking Landstar Statement uploads
 
-### 1. Redirect sign-out to landing page instead of `/auth`
+### Problem
+The `parse-landstar-statement` edge function has a custom CORS allowlist that only permits `*.lovable.app` origins. However, the preview site now serves from `*.lovableproject.com`, causing the browser to block the request entirely ("Failed to fetch").
 
-Three files navigate to `/auth` after sign-out. Update each to navigate to `/` instead (which shows the Landing page for unauthenticated users via `RoleBasedRedirect`):
+### Solution
+Update the CORS configuration in `supabase/functions/parse-landstar-statement/index.ts` to also allow `*.lovableproject.com` origins, matching the pattern used in the memory notes for other hardened edge functions.
 
-- **`src/components/layout/AppSidebar.tsx`** (line 98): Change `navigate('/auth')` to `navigate('/')`
-- **`src/components/layout/DashboardLayout.tsx`** (line 35): Change `navigate('/auth')` to `navigate('/')`
-- **`src/components/demo/DemoControls.tsx`** (line 88): Change `navigate('/auth')` to `navigate('/')`
-- **`src/pages/PendingAccess.tsx`** (line 14): Change `navigate('/auth')` to `navigate('/')`
+### Technical Details
 
-### 2. Add a "Back to Home" button on the Auth page
+**File:** `supabase/functions/parse-landstar-statement/index.ts`
 
-- **`src/pages/Auth.tsx`**: Add a link/button above or near the card that navigates back to `/` (the landing page). This will use a simple link with an arrow icon and "Back to Home" text, consistent with the existing design language.
+- Add `*.lovableproject.com` to the origin check in the `getCorsHeaders` function (around line 16):
+  ```typescript
+  const isAllowed = ALLOWED_ORIGINS.some(allowed => 
+    origin === allowed || origin.endsWith('.lovable.app') || origin.endsWith('.lovableproject.com')
+  );
+  ```
+
+This is a one-line change that fixes the CORS mismatch for both preview and published URLs.
 
