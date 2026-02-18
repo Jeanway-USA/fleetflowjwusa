@@ -1,23 +1,21 @@
 
-
-## Fix: CORS blocking Landstar Statement uploads
+## Fix: "Failed to import expenses" after statement parsing
 
 ### Problem
-The `parse-landstar-statement` edge function has a custom CORS allowlist that only permits `*.lovable.app` origins. However, the preview site now serves from `*.lovableproject.com`, causing the browser to block the request entirely ("Failed to fetch").
+The `StatementUpload` component inserts and updates rows in the `expenses` table without including `org_id` in the payload. The RLS policy on `expenses` requires `org_id = get_user_org_id(auth.uid())` via its `WITH CHECK` clause, so the database rejects the mutation.
 
 ### Solution
-Update the CORS configuration in `supabase/functions/parse-landstar-statement/index.ts` to also allow `*.lovableproject.com` origins, matching the pattern used in the memory notes for other hardened edge functions.
+Pass `org_id` from the `useAuth()` hook into the `StatementUpload` component and include it in every insert and update payload.
 
 ### Technical Details
 
-**File:** `supabase/functions/parse-landstar-statement/index.ts`
+**File: `src/pages/Finance.tsx`**
+- Import `useAuth` (if not already imported) and destructure `orgId`
+- Pass `orgId` as a prop to `<StatementUpload orgId={orgId} />`
 
-- Add `*.lovableproject.com` to the origin check in the `getCorsHeaders` function (around line 16):
-  ```typescript
-  const isAllowed = ALLOWED_ORIGINS.some(allowed => 
-    origin === allowed || origin.endsWith('.lovable.app') || origin.endsWith('.lovableproject.com')
-  );
-  ```
+**File: `src/components/finance/StatementUpload.tsx`**
+- Add `orgId: string | null` to `StatementUploadProps`
+- In the insert payload (line ~311-322), add `org_id: orgId`
+- In the update payload (line ~331-342), add `org_id: orgId`
 
-This is a one-line change that fixes the CORS mismatch for both preview and published URLs.
-
+This follows the same pattern used throughout the codebase per the multi-tenant RLS architecture.
