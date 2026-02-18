@@ -61,6 +61,7 @@ interface StatementUploadProps {
   trucks: Truck[];
   existingExpenses: ExistingExpense[];
   onExpensesImported: () => void;
+  orgId: string | null;
 }
 
 interface ExpenseWithMatch extends ExtractedExpense {
@@ -72,7 +73,7 @@ interface ExpenseWithMatch extends ExtractedExpense {
   jurisdiction: string | null;
 }
 
-export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported }: StatementUploadProps) {
+export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported, orgId }: StatementUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -319,6 +320,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
           truck_id: exp.matchedTruck?.id || null,
           notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
           jurisdiction: exp.jurisdiction,
+          org_id: orgId,
         }));
 
         const { error } = await supabase.from('expenses').insert(expenseInserts);
@@ -339,6 +341,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
           truck_id: exp.matchedTruck?.id || null,
           notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
           jurisdiction: exp.jurisdiction,
+          org_id: orgId,
           updated_at: new Date().toISOString(),
         };
 

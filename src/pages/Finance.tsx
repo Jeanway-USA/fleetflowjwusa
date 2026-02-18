@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -44,6 +45,7 @@ const GALLONS_EXPENSE_TYPES = ['Fuel', 'DEF'];
 
 export default function Finance() {
   const queryClient = useQueryClient();
+  const { orgId } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState<string>('2026-Q1');
   const [selectedTruck, setSelectedTruck] = useState<string>('all');
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
@@ -577,6 +579,7 @@ export default function Finance() {
             trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
             existingExpenses={expenses.map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id }))}
             onExpensesImported={() => queryClient.invalidateQueries({ queryKey: ['expenses'] })}
+            orgId={orgId}
           />
 
           <Card className="card-elevated">
