@@ -11,8 +11,19 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Target, Sun, Moon, DollarSign, Route, Loader2, Fuel, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Target, Sun, Moon, DollarSign, Route, Loader2, Fuel, Eye, EyeOff, ShieldCheck, CalendarClock } from 'lucide-react';
+
+const DAY_OPTIONS = [
+  { value: 0, label: 'Sunday' },
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+];
 
 export default function DriverSettings() {
   const { user } = useAuth();
@@ -21,6 +32,7 @@ export default function DriverSettings() {
   
   const [weeklyMilesGoal, setWeeklyMilesGoal] = useState(2500);
   const [weeklyRevenueGoal, setWeeklyRevenueGoal] = useState(2000);
+  const [payWeekStartDay, setPayWeekStartDay] = useState(0);
   const [landstarUsername, setLandstarUsername] = useState('');
   const [landstarPassword, setLandstarPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -45,7 +57,7 @@ export default function DriverSettings() {
     queryKey: ['driver-settings', driver?.id],
     queryFn: async () => {
       const { data, error } = await (supabase.from('driver_settings' as any) as any)
-        .select('weekly_miles_goal, weekly_revenue_goal')
+        .select('weekly_miles_goal, weekly_revenue_goal, pay_week_start_day')
         .eq('driver_id', driver?.id)
         .maybeSingle();
       if (error) throw error;
@@ -72,6 +84,7 @@ export default function DriverSettings() {
     if (settings) {
       setWeeklyMilesGoal(settings.weekly_miles_goal || 2500);
       setWeeklyRevenueGoal(settings.weekly_revenue_goal || 2000);
+      setPayWeekStartDay(settings.pay_week_start_day ?? 0);
     }
   }, [settings]);
 
@@ -84,7 +97,7 @@ export default function DriverSettings() {
 
   // Save goals mutation (direct DB update - no sensitive data)
   const saveGoalsMutation = useMutation({
-    mutationFn: async (data: { weekly_miles_goal: number; weekly_revenue_goal: number }) => {
+    mutationFn: async (data: { weekly_miles_goal: number; weekly_revenue_goal: number; pay_week_start_day: number }) => {
       if (!driver?.id) throw new Error('Driver not found');
 
       const { data: existing } = await (supabase.from('driver_settings' as any) as any)
@@ -97,6 +110,7 @@ export default function DriverSettings() {
           .update({
             weekly_miles_goal: data.weekly_miles_goal,
             weekly_revenue_goal: data.weekly_revenue_goal,
+            pay_week_start_day: data.pay_week_start_day,
           })
           .eq('driver_id', driver.id);
         if (error) throw error;
@@ -106,6 +120,7 @@ export default function DriverSettings() {
             driver_id: driver.id,
             weekly_miles_goal: data.weekly_miles_goal,
             weekly_revenue_goal: data.weekly_revenue_goal,
+            pay_week_start_day: data.pay_week_start_day,
           });
         if (error) throw error;
       }
@@ -143,6 +158,7 @@ export default function DriverSettings() {
     saveGoalsMutation.mutate({
       weekly_miles_goal: weeklyMilesGoal,
       weekly_revenue_goal: weeklyRevenueGoal,
+      pay_week_start_day: payWeekStartDay,
     });
   };
 
@@ -285,6 +301,32 @@ export default function DriverSettings() {
                   Your target earnings each week
                 </p>
               </div>
+            </div>
+
+            {/* Pay Week Start Day */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <CalendarClock className="h-4 w-4" />
+                Pay Week Start Day (Scan Day)
+              </Label>
+              <Select
+                value={String(payWeekStartDay)}
+                onValueChange={(val) => setPayWeekStartDay(Number(val))}
+              >
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="Select scan day" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAY_OPTIONS.map((d) => (
+                    <SelectItem key={d.value} value={String(d.value)}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Set this to your Landstar scan day so the weekly progress in the dashboard matches your settlement cycle.
+              </p>
             </div>
 
             <Separator />

@@ -16,15 +16,13 @@ interface DriverPayWidgetProps {
 
 export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetProps) {
   const [accessorialsOpen, setAccessorialsOpen] = useState(false);
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
-  const weekEnd = endOfWeek(new Date(), { weekStartsOn: 0 });
 
-  // Get driver settings for goals
+  // Get driver settings for goals and pay week start day
   const { data: driverSettings } = useQuery({
     queryKey: ['driver-settings', driverId],
     queryFn: async () => {
       const { data, error } = await (supabase.from('driver_settings' as any) as any)
-        .select('weekly_miles_goal, weekly_revenue_goal')
+        .select('weekly_miles_goal, weekly_revenue_goal, pay_week_start_day')
         .eq('driver_id', driverId)
         .maybeSingle();
       if (error) throw error;
@@ -32,6 +30,10 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
     },
     enabled: !!driverId,
   });
+
+  const weekStartsOn = (driverSettings?.pay_week_start_day ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const weekStart = startOfWeek(new Date(), { weekStartsOn });
+  const weekEnd = endOfWeek(new Date(), { weekStartsOn });
 
   // Get this week's delivered loads (only count pay after delivery)
   const { data: weeklyLoads = [] } = useQuery({
