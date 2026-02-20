@@ -1050,6 +1050,7 @@ export type Database = {
           landstar_password: string | null
           landstar_username: string | null
           org_id: string | null
+          pay_week_start_day: number
           theme_preference: string | null
           updated_at: string
           weekly_miles_goal: number | null
@@ -1062,6 +1063,7 @@ export type Database = {
           landstar_password?: string | null
           landstar_username?: string | null
           org_id?: string | null
+          pay_week_start_day?: number
           theme_preference?: string | null
           updated_at?: string
           weekly_miles_goal?: number | null
@@ -1074,6 +1076,7 @@ export type Database = {
           landstar_password?: string | null
           landstar_username?: string | null
           org_id?: string | null
+          pay_week_start_day?: number
           theme_preference?: string | null
           updated_at?: string
           weekly_miles_goal?: number | null
