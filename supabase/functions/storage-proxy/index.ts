@@ -467,6 +467,146 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ===== MIGRATE =====
+    if (req.method === 'POST' && action === 'migrate') {
+      if (!storageConfig?.provider || storageConfig.provider !== 'google_drive' || !storageConfig.encrypted_credentials) {
+        return new Response(JSON.stringify({ error: 'Google Drive not connected' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const creds: DriveCredentials = JSON.parse(await decrypt(storageConfig.encrypted_credentials));
+      const accessToken = await getAccessToken(creds, supabase, orgId);
+      const rootFolderId = storageConfig.root_folder_id || 'root';
+
+      let migrated = 0;
+      let failed = 0;
+      const errors: string[] = [];
+
+      // Helper to migrate a single file
+      async function migrateFile(
+        bucket: string,
+        storedPath: string,
+        table: string,
+        recordId: string,
+        column: string,
+      ) {
+        try {
+          // Skip already migrated
+          if (storedPath.startsWith('gdrive:')) return;
+
+          // Normalize path: strip any full URL prefix
+          let cleanPath = storedPath;
+          const publicPattern = `/storage/v1/object/public/${bucket}/`;
+          const idx = cleanPath.indexOf(publicPattern);
+          if (idx !== -1) {
+            cleanPath = cleanPath.slice(idx + publicPattern.length);
+          }
+
+          // Download from built-in storage
+          const { data: fileData, error: dlError } = await supabase.storage
+            .from(bucket)
+            .download(cleanPath);
+
+          if (dlError || !fileData) {
+            throw new Error(`Download failed: ${dlError?.message || 'no data'}`);
+          }
+
+          const fileBytes = new Uint8Array(await fileData.arrayBuffer());
+          const fileName = cleanPath.split('/').pop() || 'file';
+          const contentType = fileData.type || 'application/octet-stream';
+
+          // Create bucket subfolder in Drive
+          const bucketFolderId = await ensureFolderExists(accessToken, rootFolderId, bucket);
+
+          // Create path subfolders (minus filename)
+          const pathParts = cleanPath.split('/');
+          pathParts.pop(); // remove filename
+          let currentFolderId = bucketFolderId;
+          for (const part of pathParts) {
+            if (part) currentFolderId = await ensureFolderExists(accessToken, currentFolderId, part);
+          }
+
+          // Upload to Drive
+          const driveFileId = await uploadToDrive(accessToken, currentFolderId, fileName, fileBytes, contentType);
+          const newRef = `gdrive:${driveFileId}`;
+
+          // Update DB record
+          const { error: updateError } = await supabase
+            .from(table)
+            .update({ [column]: newRef })
+            .eq('id', recordId);
+
+          if (updateError) {
+            // Rollback: delete from Drive
+            try { await deleteFromDrive(accessToken, driveFileId); } catch {}
+            throw new Error(`DB update failed: ${updateError.message}`);
+          }
+
+          // Delete from built-in storage
+          await supabase.storage.from(bucket).remove([cleanPath]);
+          migrated++;
+        } catch (err) {
+          failed++;
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`${bucket}/${storedPath}: ${msg}`);
+          console.error(`Migration failed for ${bucket}/${storedPath}:`, msg);
+        }
+      }
+
+      // 1. documents table -> bucket "documents", column "file_path"
+      const { data: docs } = await supabase
+        .from('documents')
+        .select('id, file_path')
+        .eq('org_id', orgId)
+        .not('file_path', 'like', 'gdrive:%');
+
+      if (docs) {
+        for (const doc of docs) {
+          await migrateFile('documents', doc.file_path, 'documents', doc.id, 'file_path');
+        }
+      }
+
+      // 2. driver_inspections -> bucket "dvir-photos", column "signature_url" (photos)
+      const { data: inspections } = await supabase
+        .from('driver_inspections')
+        .select('id, signature_url')
+        .eq('org_id', orgId)
+        .not('signature_url', 'is', null)
+        .not('signature_url', 'like', 'gdrive:%');
+
+      if (inspections) {
+        for (const insp of inspections) {
+          if (insp.signature_url) {
+            // Determine bucket from path pattern
+            const isSignature = insp.signature_url.includes('dvir-signatures') || insp.signature_url.includes('signature');
+            const bucket = isSignature ? 'dvir-signatures' : 'dvir-photos';
+            await migrateFile(bucket, insp.signature_url, 'driver_inspections', insp.id, 'signature_url');
+          }
+        }
+      }
+
+      // 3. company_settings -> bucket "branding-assets", column "setting_value" for branding keys
+      const { data: brandingSettings } = await supabase
+        .from('company_settings')
+        .select('id, setting_key, setting_value')
+        .eq('org_id', orgId)
+        .in('setting_key', ['logo_url', 'banner_url'])
+        .not('setting_value', 'like', 'gdrive:%');
+
+      if (brandingSettings) {
+        for (const setting of brandingSettings) {
+          if (setting.setting_value && !setting.setting_value.startsWith('gdrive:')) {
+            await migrateFile('branding-assets', setting.setting_value, 'company_settings', setting.id, 'setting_value');
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ migrated, failed, errors }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // ===== STATUS =====
     if (req.method === 'GET' && action === 'status') {
       return new Response(JSON.stringify({
