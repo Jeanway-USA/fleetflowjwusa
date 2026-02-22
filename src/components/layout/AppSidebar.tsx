@@ -27,6 +27,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import type { SubscriptionTier } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 import {
   Sidebar,
   SidebarContent,
@@ -84,14 +85,18 @@ const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier } = useAuth();
+  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl } = useAuth();
   const { theme } = useTheme();
   
   // Check if user is actually an owner (not simulated)
   const actuallyIsOwner = roles.includes('owner');
   
+  // Dynamic banner: use org's custom banner if available, otherwise defaults
+  const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
+  
   // Use dark banner on light backgrounds, light banner on dark backgrounds
-  const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
+  const defaultBannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
+  const bannerSrc = signedBannerUrl || defaultBannerSrc;
 
   const handleSignOut = async () => {
     // Navigate immediately so the user sees the auth screen even if sign-out takes a moment.

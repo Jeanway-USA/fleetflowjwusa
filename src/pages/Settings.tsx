@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -15,7 +15,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Users, Shield, Trash2, UserPlus, Sun, Moon, Settings2, Mail, Building2, Pencil, KeyRound, Trophy } from 'lucide-react';
+import { Users, Shield, Trash2, UserPlus, Sun, Moon, Mail, Building2, Pencil, KeyRound, Palette, CreditCard } from 'lucide-react';
+import { CompanyTab } from '@/components/settings/CompanyTab';
+import { BrandingTab } from '@/components/settings/BrandingTab';
+import { BillingTab } from '@/components/settings/BillingTab';
 import type { Database } from '@/integrations/supabase/types';
 
 type AppRole = Database['public']['Enums']['app_role'];
@@ -71,65 +74,6 @@ export default function Settings() {
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
   const [userToResetPassword, setUserToResetPassword] = useState<UserWithRole | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
-
-  // Monthly bonus goal state
-  const [bonusGoalMiles, setBonusGoalMiles] = useState('12000');
-  const [isSavingBonusGoal, setIsSavingBonusGoal] = useState(false);
-
-  // Fetch monthly bonus goal from company_settings
-  const { data: bonusGoalSetting } = useQuery({
-    queryKey: ['company-setting', 'monthly_bonus_miles'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('company_settings')
-        .select('*')
-        .eq('setting_key', 'monthly_bonus_miles')
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: hasAdminAccess,
-  });
-
-  // Sync fetched value to local state
-  useEffect(() => {
-    if (bonusGoalSetting?.setting_value) {
-      setBonusGoalMiles(bonusGoalSetting.setting_value);
-    }
-  }, [bonusGoalSetting]);
-
-  const handleSaveBonusGoal = async () => {
-    const miles = Number(bonusGoalMiles);
-    if (!miles || miles <= 0) {
-      toast.error('Please enter a valid number of miles');
-      return;
-    }
-    setIsSavingBonusGoal(true);
-    try {
-      if (bonusGoalSetting) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update({ setting_value: String(miles), updated_at: new Date().toISOString() })
-          .eq('id', bonusGoalSetting.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('company_settings')
-          .insert({
-            setting_key: 'monthly_bonus_miles',
-            setting_value: String(miles),
-            description: 'Monthly miles goal for driver bonus',
-          });
-        if (error) throw error;
-      }
-      queryClient.invalidateQueries({ queryKey: ['company-setting', 'monthly_bonus_miles'] });
-      toast.success('Bonus goal updated');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to save bonus goal');
-    } finally {
-      setIsSavingBonusGoal(false);
-    }
-  };
 
   // Get all profiles with their roles
   const { data: usersWithRoles = [], isLoading } = useQuery({
@@ -415,18 +359,26 @@ export default function Settings() {
       )}
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="mb-6">
+        <TabsList className="mb-6 flex-wrap">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Users & Roles
+          </TabsTrigger>
+          <TabsTrigger value="company" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Company
+          </TabsTrigger>
+          <TabsTrigger value="branding" className="flex items-center gap-2">
+            <Palette className="h-4 w-4" />
+            Branding
           </TabsTrigger>
           <TabsTrigger value="appearance" className="flex items-center gap-2">
             <Sun className="h-4 w-4" />
             Appearance
           </TabsTrigger>
-          <TabsTrigger value="general" className="flex items-center gap-2">
-            <Settings2 className="h-4 w-4" />
-            General
+          <TabsTrigger value="billing" className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Billing
           </TabsTrigger>
         </TabsList>
 
@@ -600,86 +552,19 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
-        {/* General Tab */}
-        <TabsContent value="general" className="space-y-6">
-          <Card className="card-elevated">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-primary" />
-                Company Information
-              </CardTitle>
-              <CardDescription>Basic company settings</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Company Name</Label>
-                <Input value="JeanWay USA" disabled className="bg-muted" />
-                <p className="text-xs text-muted-foreground">Contact support to change company name</p>
-              </div>
-              <div className="space-y-2">
-                <Label>Timezone</Label>
-                <Select defaultValue="america-chicago">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="america-new_york">Eastern Time (ET)</SelectItem>
-                    <SelectItem value="america-chicago">Central Time (CT)</SelectItem>
-                    <SelectItem value="america-denver">Mountain Time (MT)</SelectItem>
-                    <SelectItem value="america-los_angeles">Pacific Time (PT)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Date Format</Label>
-                <Select defaultValue="mm-dd-yyyy">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mm-dd-yyyy">MM/DD/YYYY</SelectItem>
-                    <SelectItem value="dd-mm-yyyy">DD/MM/YYYY</SelectItem>
-                    <SelectItem value="yyyy-mm-dd">YYYY-MM-DD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Company Tab */}
+        <TabsContent value="company">
+          <CompanyTab />
+        </TabsContent>
 
-          {/* Driver Incentives Card */}
-          <Card className="card-elevated">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-primary" />
-                Driver Incentives
-              </CardTitle>
-              <CardDescription>Configure bonus goals for drivers</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="bonus-goal-miles">Monthly Bonus Goal (Miles)</Label>
-                <Input
-                  id="bonus-goal-miles"
-                  type="number"
-                  min="1000"
-                  step="500"
-                  value={bonusGoalMiles}
-                  onChange={(e) => setBonusGoalMiles(e.target.value)}
-                  placeholder="12000"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Drivers who reach this mileage goal in a month unlock the $0.05/mile bonus
-                </p>
-              </div>
-              <Button
-                onClick={handleSaveBonusGoal}
-                disabled={isSavingBonusGoal}
-                className="gradient-gold text-primary-foreground"
-              >
-                {isSavingBonusGoal ? 'Saving...' : 'Save Goal'}
-              </Button>
-            </CardContent>
-          </Card>
+        {/* Branding Tab */}
+        <TabsContent value="branding">
+          <BrandingTab />
+        </TabsContent>
+
+        {/* Billing Tab */}
+        <TabsContent value="billing">
+          <BillingTab />
         </TabsContent>
       </Tabs>
 

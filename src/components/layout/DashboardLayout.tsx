@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -6,14 +6,41 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DemoControls } from '@/components/demo/DemoControls';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { isDemoMode, signOut } = useAuth();
+  const { isDemoMode, signOut, primaryColor } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
+
+  // Apply org brand color as CSS custom properties
+  useEffect(() => {
+    if (!primaryColor) return;
+    const root = document.documentElement;
+    const vars = ['--primary', '--accent', '--ring', '--sidebar-primary', '--sidebar-ring'];
+    
+    // Parse HSL and adjust for dark mode
+    const parts = primaryColor.split(' ');
+    let lightHsl = primaryColor;
+    let darkHsl = primaryColor;
+    if (parts.length >= 3) {
+      const l = parseInt(parts[2]);
+      lightHsl = `${parts[0]} ${parts[1]} ${l}%`;
+      darkHsl = `${parts[0]} ${parts[1]} ${Math.min(l + 5, 60)}%`;
+    }
+
+    const hsl = theme === 'dark' ? darkHsl : lightHsl;
+    vars.forEach(v => root.style.setProperty(v, hsl));
+
+    return () => {
+      // Clean up inline styles on unmount so CSS cascade takes over
+      vars.forEach(v => root.style.removeProperty(v));
+    };
+  }, [primaryColor, theme]);
 
   return (
     <SidebarProvider>

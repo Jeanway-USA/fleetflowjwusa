@@ -17,6 +17,9 @@ interface AuthContextType {
   orgId: string | null;
   orgName: string | null;
   subscriptionTier: SubscriptionTier;
+  primaryColor: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
   isDemoMode: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: Error | null }>;
@@ -51,6 +54,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('solo_bco');
+  const [primaryColor, setPrimaryColor] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [orgLoading, setOrgLoading] = useState(true);
 
   const fetchUserRoles = async (userId: string) => {
@@ -81,13 +87,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOrgId(profile.org_id);
       const { data: orgData } = await supabase
         .from('organizations')
-        .select('name, subscription_tier')
+        .select('name, subscription_tier, primary_color, logo_url, banner_url')
         .eq('id', profile.org_id)
         .single();
 
       if (orgData) {
         setOrgName(orgData.name);
         setSubscriptionTier((orgData.subscription_tier as SubscriptionTier) || 'solo_bco');
+        setPrimaryColor(orgData.primary_color || null);
+        setLogoUrl(orgData.logo_url || null);
+        setBannerUrl(orgData.banner_url || null);
       }
     }
   };
@@ -278,6 +287,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       orgId,
       orgName,
       subscriptionTier,
+      primaryColor,
+      logoUrl,
+      bannerUrl,
       refreshOrgData,
       refreshRoles,
     }}>
