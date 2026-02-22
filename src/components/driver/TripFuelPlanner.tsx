@@ -127,6 +127,7 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
           route_polyline: routePolyline,
           corridor_miles: 25,
           force_refresh: shouldForce,
+          booked_miles: bookedMiles,
         },
       });
 
@@ -306,6 +307,25 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
         </div>
 
         {/* Cost Estimate Summary */}
+        {/* Projected Savings from backend */}
+        {fuelData?.projected_savings && fuelData.projected_savings.total_savings > 0 && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-primary flex items-center gap-1.5">
+                <TrendingDown className="h-4 w-4" />
+                Projected Fuel Savings
+              </span>
+              <span className="text-lg font-bold text-primary">
+                ${fuelData.projected_savings.total_savings.toFixed(0)}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Best stop at ${fuelData.projected_savings.cheapest_net.toFixed(2)}/gal vs ${fuelData.projected_savings.avg_price.toFixed(2)} national avg
+              {' '}(${fuelData.projected_savings.savings_per_gallon.toFixed(2)}/gal × ~{estimatedGallons} gal)
+            </p>
+          </div>
+        )}
+
         {costEstimate && (
           <div className="bg-muted/50 rounded-lg p-3 space-y-2">
             <div className="flex items-center justify-between">

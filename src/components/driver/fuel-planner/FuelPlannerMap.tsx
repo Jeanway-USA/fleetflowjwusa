@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -32,6 +32,7 @@ interface FuelPlannerMapProps {
   mapPoints: [number, number][];
   fuelStops: FuelStop[];
   geocodedStops: GeocodedStop[];
+  corridorMiles?: number;
 }
 
 // ===== Map Marker Icons =====
@@ -56,6 +57,17 @@ const regularStopIcon = L.divIcon({
   className: 'custom-fuel-marker',
   iconSize: [24, 24],
   iconAnchor: [12, 12],
+});
+
+const recommendedStopIcon = L.divIcon({
+  html: `<div style="width:28px;height:28px;background:#f59e0b;border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(245,158,11,0.5);">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="16" height="16">
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+    </svg>
+  </div>`,
+  className: 'custom-fuel-marker',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
 });
 
 const originIcon = L.divIcon({
@@ -104,6 +116,23 @@ function FitBounds({ points }: { points: [number, number][] }) {
   return null;
 }
 
+// Identify cheapest LCAPP stop within 25mi as the "recommended" stop
+function getRecommendedStopIndex(fuelStops: FuelStop[]): number {
+  let bestIdx = -1;
+  let bestPrice = Infinity;
+  for (let i = 0; i < fuelStops.length; i++) {
+    const s = fuelStops[i];
+    if (s.lcapp_discount && s.lcapp_discount > 0 && (s.distance_from_route ?? 0) <= 25) {
+      const price = s.net_price ?? s.diesel_price ?? 999;
+      if (price < bestPrice) {
+        bestPrice = price;
+        bestIdx = i;
+      }
+    }
+  }
+  return bestIdx;
+}
+
 export function FuelPlannerMap({
   isExpanded,
   originCoords,
@@ -112,7 +141,42 @@ export function FuelPlannerMap({
   mapPoints,
   fuelStops,
   geocodedStops,
+  corridorMiles = 25,
 }: FuelPlannerMapProps) {
+  const recommendedIdx = useMemo(() => getRecommendedStopIndex(fuelStops), [fuelStops]);
+
+  // Build a subtle corridor buffer by offsetting route positions
+  const corridorPositions = useMemo(() => {
+    if (routePositions.length < 2) return null;
+    // Sample route for buffer (every 10th point for perf)
+    const sampled = routePositions.filter((_, i) => i % 10 === 0 || i === routePositions.length - 1);
+    if (sampled.length < 2) return null;
+
+    // ~0.36 degrees ≈ 25mi at mid-latitudes
+    const bufferDeg = corridorMiles / 69;
+    const left: [number, number][] = [];
+    const right: [number, number][] = [];
+
+    for (let i = 0; i < sampled.length; i++) {
+      const [lat, lng] = sampled[i];
+      let dx = 0, dy = 0;
+      if (i < sampled.length - 1) {
+        dx = sampled[i + 1][1] - lng;
+        dy = sampled[i + 1][0] - lat;
+      } else {
+        dx = lng - sampled[i - 1][1];
+        dy = lat - sampled[i - 1][0];
+      }
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
+      left.push([lat + nx * bufferDeg, lng + ny * bufferDeg]);
+      right.push([lat - nx * bufferDeg, lng - ny * bufferDeg]);
+    }
+
+    return [...left, ...right.reverse()];
+  }, [routePositions, corridorMiles]);
+
   return (
     <div className={isExpanded ? 'w-full h-full' : 'h-48 w-full rounded-lg overflow-hidden border border-border'}>
       <MapContainer
@@ -129,6 +193,21 @@ export function FuelPlannerMap({
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <FitBounds points={mapPoints} />
+
+        {/* Corridor buffer visualization */}
+        {corridorPositions && (
+          <Polyline
+            positions={corridorPositions}
+            pathOptions={{
+              color: 'hsl(var(--primary))',
+              weight: 1,
+              opacity: 0.15,
+              fill: true,
+              fillColor: 'hsl(var(--primary))',
+              fillOpacity: 0.06,
+            }}
+          />
+        )}
 
         <Polyline
           positions={routePositions}
@@ -159,43 +238,56 @@ export function FuelPlannerMap({
           </Marker>
         ))}
 
-        {fuelStops.map((stop, i) => (
-          <Marker
-            key={`${stop.name}-${i}`}
-            position={[stop.latitude, stop.longitude]}
-            icon={stop.lcapp_discount ? lcappStopIcon : regularStopIcon}
-          >
-            <Popup>
-              <div className="text-sm min-w-[180px]">
-                <p className="font-semibold">{stop.name}</p>
-                {stop.chain && <p className="text-xs text-gray-500">{stop.chain}</p>}
-                <div className="mt-1 space-y-0.5">
-                  <p>Diesel: <span className="font-medium">${stop.diesel_price?.toFixed(2)}/gal</span></p>
-                  {stop.lcapp_discount && stop.lcapp_discount > 0 && (
-                    <p className="text-green-600 font-medium">
-                      LCAPP: -${stop.lcapp_discount.toFixed(2)}/gal → ${stop.net_price?.toFixed(2)}
-                    </p>
+        {fuelStops.map((stop, i) => {
+          const isRecommended = i === recommendedIdx;
+          const icon = isRecommended
+            ? recommendedStopIcon
+            : stop.lcapp_discount ? lcappStopIcon : regularStopIcon;
+
+          return (
+            <Marker
+              key={`${stop.name}-${i}`}
+              position={[stop.latitude, stop.longitude]}
+              icon={icon}
+            >
+              <Popup>
+                <div className="text-sm min-w-[180px]">
+                  <p className="font-semibold">
+                    {isRecommended && '⭐ '}
+                    {stop.name}
+                  </p>
+                  {isRecommended && (
+                    <p className="text-xs font-medium text-amber-600">Recommended — Best LCAPP Price</p>
                   )}
-                  {stop.ifta_tax_credit && stop.ifta_tax_credit > 0 && (
-                    <p className="text-emerald-700 text-xs">
-                      IFTA Credit: -${stop.ifta_tax_credit.toFixed(2)}/gal
-                    </p>
-                  )}
-                  {stop.distance_from_route !== undefined && (
-                    <p className="text-xs text-gray-500">
-                      {stop.distance_from_route.toFixed(0)} mi off route
+                  {stop.chain && <p className="text-xs text-gray-500">{stop.chain}</p>}
+                  <div className="mt-1 space-y-0.5">
+                    <p>Diesel: <span className="font-medium">${stop.diesel_price?.toFixed(2)}/gal</span></p>
+                    {stop.lcapp_discount && stop.lcapp_discount > 0 && (
+                      <p className="text-green-600 font-medium">
+                        LCAPP: -${stop.lcapp_discount.toFixed(2)}/gal → ${stop.net_price?.toFixed(2)}
+                      </p>
+                    )}
+                    {stop.ifta_tax_credit && stop.ifta_tax_credit > 0 && (
+                      <p className="text-emerald-700 text-xs">
+                        IFTA Credit: -${stop.ifta_tax_credit.toFixed(2)}/gal
+                      </p>
+                    )}
+                    {stop.distance_from_route !== undefined && (
+                      <p className="text-xs text-gray-500">
+                        {stop.distance_from_route.toFixed(0)} mi off route
+                      </p>
+                    )}
+                  </div>
+                  {stop.amenities && stop.amenities.length > 0 && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      {stop.amenities.join(' · ')}
                     </p>
                   )}
                 </div>
-                {stop.amenities && stop.amenities.length > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    {stop.amenities.join(' · ')}
-                  </p>
-                )}
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+              </Popup>
+            </Marker>
+          );
+        })}
       </MapContainer>
     </div>
   );
