@@ -1,12 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { HardDrive, CloudOff, CheckCircle, Loader2, ExternalLink, AlertTriangle, FolderOpen } from 'lucide-react';
+import { HardDrive, CloudOff, CheckCircle, Loader2, FolderOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,13 +19,10 @@ interface StorageConfig {
 export function StorageTab() {
   const { orgId, isDemoMode } = useAuth();
   const queryClient = useQueryClient();
-  const [clientId, setClientId] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
-  // Fetch storage status
   const { data: config, isLoading } = useQuery({
     queryKey: ['storage-config', orgId],
     queryFn: async (): Promise<StorageConfig> => {
@@ -43,33 +37,53 @@ export function StorageTab() {
 
   const isConnected = config?.provider === 'google_drive' && config?.is_active;
 
-  const handleConnect = async () => {
-    if (!clientId || !clientSecret) {
-      toast.error('Please enter both Client ID and Client Secret');
-      return;
+  // Handle OAuth callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const authCode = urlParams.get('code');
+
+    if (authCode && !isConnected) {
+      window.history.replaceState({}, '', window.location.pathname);
+
+      const exchangeCode = async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('google-drive-auth', {
+            body: {
+              action: 'exchange_code',
+              code: authCode,
+              redirect_uri: `${window.location.origin}/settings`,
+            },
+          });
+
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+
+          queryClient.invalidateQueries({ queryKey: ['storage-config'] });
+          queryClient.invalidateQueries({ queryKey: ['storage-status'] });
+          toast.success('Google Drive connected successfully!');
+        } catch (err: any) {
+          toast.error(err.message || 'Failed to complete connection');
+        }
+      };
+
+      exchangeCode();
     }
+  }, []);
 
+  const handleConnect = async () => {
     setIsConnecting(true);
-
     try {
-      // Build Google OAuth URL
-      const redirectUri = `${window.location.origin}/settings`;
-      const scope = 'https://www.googleapis.com/auth/drive.file';
-      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-      authUrl.searchParams.set('client_id', clientId);
-      authUrl.searchParams.set('redirect_uri', redirectUri);
-      authUrl.searchParams.set('response_type', 'code');
-      authUrl.searchParams.set('scope', scope);
-      authUrl.searchParams.set('access_type', 'offline');
-      authUrl.searchParams.set('prompt', 'consent');
-      authUrl.searchParams.set('state', JSON.stringify({ clientId, clientSecret }));
+      const { data, error } = await supabase.functions.invoke('google-drive-auth', {
+        body: {
+          action: 'get_auth_url',
+          redirect_uri: `${window.location.origin}/settings`,
+        },
+      });
 
-      // Store credentials temporarily in sessionStorage for the callback
-      sessionStorage.setItem('gdrive_client_id', clientId);
-      sessionStorage.setItem('gdrive_client_secret', clientSecret);
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      // Redirect to Google OAuth
-      window.location.href = authUrl.toString();
+      window.location.href = data.auth_url;
     } catch (error: any) {
       toast.error(error.message || 'Failed to initiate connection');
       setIsConnecting(false);
@@ -94,50 +108,6 @@ export function StorageTab() {
       setIsDisconnecting(false);
     }
   };
-
-  // Handle OAuth callback
-  const urlParams = new URLSearchParams(window.location.search);
-  const authCode = urlParams.get('code');
-
-  if (authCode && !isConnected) {
-    // Process OAuth callback
-    const storedClientId = sessionStorage.getItem('gdrive_client_id');
-    const storedClientSecret = sessionStorage.getItem('gdrive_client_secret');
-
-    if (storedClientId && storedClientSecret) {
-      // Clear URL params
-      window.history.replaceState({}, '', window.location.pathname);
-
-      // Exchange code
-      const exchangeCode = async () => {
-        try {
-          const { data, error } = await supabase.functions.invoke('google-drive-auth', {
-            body: {
-              action: 'exchange_code',
-              code: authCode,
-              redirect_uri: `${window.location.origin}/settings`,
-              client_id: storedClientId,
-              client_secret: storedClientSecret,
-            },
-          });
-
-          if (error) throw error;
-          if (data?.error) throw new Error(data.error);
-
-          sessionStorage.removeItem('gdrive_client_id');
-          sessionStorage.removeItem('gdrive_client_secret');
-
-          queryClient.invalidateQueries({ queryKey: ['storage-config'] });
-          queryClient.invalidateQueries({ queryKey: ['storage-status'] });
-          toast.success('Google Drive connected successfully!');
-        } catch (err: any) {
-          toast.error(err.message || 'Failed to complete connection');
-        }
-      };
-
-      exchangeCode();
-    }
-  }
 
   if (isLoading) {
     return (
@@ -226,57 +196,13 @@ export function StorageTab() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                You'll need a Google Cloud project with the Drive API enabled and OAuth 2.0 credentials.{' '}
-                <a
-                  href="https://console.cloud.google.com/apis/credentials"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
-                >
-                  Google Cloud Console <ExternalLink className="h-3 w-3" />
-                </a>
-              </AlertDescription>
-            </Alert>
-
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="client-id">OAuth Client ID</Label>
-                <Input
-                  id="client-id"
-                  type="text"
-                  placeholder="xxxx.apps.googleusercontent.com"
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                  disabled={isDemoMode}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="client-secret">OAuth Client Secret</Label>
-                <Input
-                  id="client-secret"
-                  type="password"
-                  placeholder="Enter your client secret"
-                  value={clientSecret}
-                  onChange={(e) => setClientSecret(e.target.value)}
-                  disabled={isDemoMode}
-                />
-              </div>
-
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p><strong>Redirect URI:</strong> Add this to your Google Cloud OAuth settings:</p>
-                <code className="block px-3 py-2 bg-muted rounded text-xs break-all">
-                  {window.location.origin}/settings
-                </code>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Sign in with your Google account to store all uploads in a dedicated "FleetFlow Storage" folder in your Drive.
+            </p>
 
             <Button
               onClick={handleConnect}
-              disabled={!clientId || !clientSecret || isConnecting || isDemoMode}
+              disabled={isConnecting || isDemoMode}
               className="w-full"
             >
               {isConnecting ? (
@@ -304,22 +230,18 @@ export function StorageTab() {
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li className="flex items-start gap-2">
               <span className="font-medium text-foreground mt-0.5">1.</span>
-              Create a Google Cloud project and enable the Google Drive API
+              Click "Connect Google Drive" and sign in with your Google account
             </li>
             <li className="flex items-start gap-2">
               <span className="font-medium text-foreground mt-0.5">2.</span>
-              Create OAuth 2.0 credentials (Web application type) and add the redirect URI shown above
+              Grant FleetFlow permission to manage files in a dedicated folder
             </li>
             <li className="flex items-start gap-2">
               <span className="font-medium text-foreground mt-0.5">3.</span>
-              Enter your Client ID and Secret above, then authorize with your Google account
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="font-medium text-foreground mt-0.5">4.</span>
               All new uploads will be stored in a "FleetFlow Storage" folder in your Google Drive
             </li>
             <li className="flex items-start gap-2">
-              <span className="font-medium text-foreground mt-0.5">5.</span>
+              <span className="font-medium text-foreground mt-0.5">4.</span>
               Existing files in built-in storage continue to work — they won't be moved automatically
             </li>
           </ul>
