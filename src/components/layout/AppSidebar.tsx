@@ -19,6 +19,7 @@ import {
   Award,
   Fuel,
   BarChart,
+  ShieldCheck,
   LucideIcon
 } from 'lucide-react';
 import jwBannerLight from '@/assets/JW_Banner.png';
@@ -82,11 +83,14 @@ const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
   ]),
 };
 
+const SUPER_ADMIN_EMAILS = ['andrew@jeanwayusa.com', 'siadrak@jeanwayusa.com'];
+
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl } = useAuth();
   const { theme } = useTheme();
+  const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(user?.email || '');
   
   // Check if user is actually an owner (not simulated)
   const actuallyIsOwner = roles.includes('owner');
@@ -296,6 +300,29 @@ export function AppSidebar() {
                     <SidebarMenuButton isActive={location.pathname === '/driver-settings'} onClick={() => navigate('/driver-settings')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary">
                       <Settings className="h-4 w-4" />
                       <span>My Settings</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
+
+        {isSuperAdmin && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-muted-foreground uppercase text-xs tracking-wider">System</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={location.pathname === '/super-admin'}
+                      onClick={() => navigate('/super-admin')}
+                      className="hover:bg-sidebar-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                      <span>Super Admin</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>

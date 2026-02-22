@@ -3556,24 +3556,39 @@ export type Database = {
       }
       super_admin_organizations: {
         Row: {
+          banner_url: string | null
           created_at: string | null
           id: string | null
+          is_active: boolean | null
+          logo_url: string | null
           name: string | null
+          primary_color: string | null
           subscription_tier: string | null
+          trial_ends_at: string | null
           user_count: number | null
         }
         Insert: {
+          banner_url?: string | null
           created_at?: string | null
           id?: string | null
+          is_active?: boolean | null
+          logo_url?: string | null
           name?: string | null
+          primary_color?: string | null
           subscription_tier?: string | null
+          trial_ends_at?: string | null
           user_count?: never
         }
         Update: {
+          banner_url?: string | null
           created_at?: string | null
           id?: string | null
+          is_active?: boolean | null
+          logo_url?: string | null
           name?: string | null
+          primary_color?: string | null
           subscription_tier?: string | null
+          trial_ends_at?: string | null
           user_count?: never
         }
         Relationships: []
@@ -3610,6 +3625,14 @@ export type Database = {
       has_safety_access: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      super_admin_update_org: {
+        Args: {
+          new_is_active?: boolean
+          new_tier?: string
+          target_org_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "owner" | "payroll_admin" | "dispatcher" | "safety" | "driver"
