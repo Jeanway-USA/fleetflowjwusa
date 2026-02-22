@@ -6,8 +6,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Palette, ImageIcon, Upload, X } from 'lucide-react';
-import { useSignedUrl } from '@/hooks/useSignedUrl';
-import { useStorageProvider } from '@/hooks/useStorageProvider';
+import { useStorageProvider, useProviderSignedUrl } from '@/hooks/useStorageProvider';
 
 const COLOR_PRESETS = [
   { name: 'Gold', hsl: '45 80% 45%', dark: '45 80% 50%' },
@@ -28,8 +27,8 @@ export function BrandingTab() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
-  const { url: signedLogoUrl } = useSignedUrl('branding-assets', logoUrl || null);
-  const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
+  const { url: signedLogoUrl } = useProviderSignedUrl('branding-assets', logoUrl || null);
+  const { url: signedBannerUrl } = useProviderSignedUrl('branding-assets', bannerUrl || null);
 
   const handleSaveColor = async () => {
     if (!orgId) return;
