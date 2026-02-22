@@ -602,6 +602,22 @@ Deno.serve(async (req) => {
         }
       }
 
+      // 4. organizations -> bucket "branding-assets", columns "logo_url" and "banner_url"
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('id, logo_url, banner_url')
+        .eq('id', orgId)
+        .single();
+
+      if (orgData) {
+        if (orgData.logo_url && !orgData.logo_url.startsWith('gdrive:')) {
+          await migrateFile('branding-assets', orgData.logo_url, 'organizations', orgData.id, 'logo_url');
+        }
+        if (orgData.banner_url && !orgData.banner_url.startsWith('gdrive:')) {
+          await migrateFile('branding-assets', orgData.banner_url, 'organizations', orgData.id, 'banner_url');
+        }
+      }
+
       return new Response(JSON.stringify({ migrated, failed, errors }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
