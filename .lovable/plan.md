@@ -1,28 +1,36 @@
 
-## Add Recommended Resolution Sizes to Logo & Banner Upload Labels
 
-### Change
-Update the two `Label` elements in `src/components/settings/BrandingTab.tsx` to include recommended pixel dimensions so users know what size to prepare their images.
+## Fix: Monthly Bonus Goal RLS Violation
 
-### Details
+### Problem
+The `company_settings` table has an RLS policy requiring `org_id` to match the user's organization. The `handleSaveBonusGoal` function in `CompanyTab.tsx` does not include `org_id` when inserting a new row, causing the "new row violates row-level security policy" error.
 
-**Line 190** -- Logo label:
-```
-Company Logo (Square, max 2MB)
-```
-becomes:
-```
-Company Logo (Square, 512x512px recommended, max 2MB)
+### Fix
+In `src/components/settings/CompanyTab.tsx`, add `org_id` (from `useAuth()`) to the `.insert()` call on line 82:
+
+```typescript
+// Before (line 80-85)
+const { error } = await supabase
+  .from('company_settings')
+  .insert({
+    setting_key: 'monthly_bonus_miles',
+    setting_value: String(miles),
+    description: 'Monthly miles goal for driver bonus',
+  });
+
+// After
+const { error } = await supabase
+  .from('company_settings')
+  .insert({
+    setting_key: 'monthly_bonus_miles',
+    setting_value: String(miles),
+    description: 'Monthly miles goal for driver bonus',
+    org_id: orgId,
+  });
 ```
 
-**Line 237** -- Banner label:
-```
-Sidebar Banner (Wide, max 2MB)
-```
-becomes:
-```
-Sidebar Banner (Wide, 800x200px recommended, max 2MB)
-```
+`orgId` is already destructured from `useAuth()` at the top of the component, so no additional imports or state changes are needed. This is a one-line addition.
 
 ### Files Modified
-- `src/components/settings/BrandingTab.tsx` -- two label text changes (lines 190 and 237)
+- `src/components/settings/CompanyTab.tsx` -- add `org_id: orgId` to the insert payload (line ~84)
+
