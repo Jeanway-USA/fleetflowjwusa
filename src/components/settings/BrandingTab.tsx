@@ -187,7 +187,7 @@ export function BrandingTab() {
         <CardContent className="space-y-6">
           {/* Logo */}
           <div className="space-y-3">
-            <Label>Company Logo (Square, max 2MB)</Label>
+            <Label>Company Logo (Square, 512×512px recommended, max 2MB)</Label>
             <div className="flex items-center gap-4">
               <div className="w-20 h-20 rounded-lg border border-border bg-muted flex items-center justify-center overflow-hidden">
                 {signedLogoUrl ? (
@@ -234,7 +234,7 @@ export function BrandingTab() {
 
           {/* Banner */}
           <div className="space-y-3">
-            <Label>Sidebar Banner (Wide, max 2MB)</Label>
+            <Label>Sidebar Banner (Wide, 800×200px recommended, max 2MB)</Label>
             <div className="flex items-center gap-4">
               <div className="w-48 h-16 rounded-lg border border-border bg-muted flex items-center justify-center overflow-hidden">
                 {signedBannerUrl ? (
