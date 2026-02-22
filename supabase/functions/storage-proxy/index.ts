@@ -290,27 +290,32 @@ Deno.serve(async (req) => {
 
       // Google Drive path
       if (storageConfig?.provider === 'google_drive' && storageConfig.encrypted_credentials) {
-        const creds: DriveCredentials = JSON.parse(await decrypt(storageConfig.encrypted_credentials));
-        const accessToken = await getAccessToken(creds, supabase, orgId);
+        try {
+          const creds: DriveCredentials = JSON.parse(await decrypt(storageConfig.encrypted_credentials));
+          const accessToken = await getAccessToken(creds, supabase, orgId);
 
-        // Create bucket subfolder if needed
-        const rootFolderId = storageConfig.root_folder_id || 'root';
-        const bucketFolderId = await ensureFolderExists(accessToken, rootFolderId, bucket);
+          // Create bucket subfolder if needed
+          const rootFolderId = storageConfig.root_folder_id || 'root';
+          const bucketFolderId = await ensureFolderExists(accessToken, rootFolderId, bucket);
 
-        // Create path subfolders
-        const pathParts = filePath.split('/');
-        const fileName = pathParts.pop()!;
-        let currentFolderId = bucketFolderId;
-        for (const part of pathParts) {
-          currentFolderId = await ensureFolderExists(accessToken, currentFolderId, part);
+          // Create path subfolders
+          const pathParts = filePath.split('/');
+          const fileName = pathParts.pop()!;
+          let currentFolderId = bucketFolderId;
+          for (const part of pathParts) {
+            currentFolderId = await ensureFolderExists(accessToken, currentFolderId, part);
+          }
+
+          const driveFileId = await uploadToDrive(accessToken, currentFolderId, fileName, fileData, file.type || 'application/octet-stream');
+
+          return new Response(JSON.stringify({
+            path: `gdrive:${driveFileId}`,
+            provider: 'google_drive',
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        } catch (driveError) {
+          console.error('Google Drive upload failed, falling back to built-in storage:', driveError);
+          // Fall through to built-in storage below
         }
-
-        const driveFileId = await uploadToDrive(accessToken, currentFolderId, fileName, fileData, file.type || 'application/octet-stream');
-
-        return new Response(JSON.stringify({
-          path: `gdrive:${driveFileId}`,
-          provider: 'google_drive',
-        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       // Fallback: built-in storage
