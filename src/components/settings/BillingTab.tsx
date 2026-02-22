@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Calendar, CheckCircle2, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { CreditCard, Calendar, CheckCircle2, AlertTriangle, ArrowUpRight, Gift } from 'lucide-react';
 import { format, differenceInDays, isPast } from 'date-fns';
 import type { SubscriptionTier } from '@/contexts/AuthContext';
 
@@ -33,7 +33,7 @@ export function BillingTab() {
       if (!orgId) return null;
       const { data, error } = await supabase
         .from('organizations')
-        .select('name, subscription_tier, trial_ends_at, is_active, created_at')
+        .select('name, subscription_tier, trial_ends_at, is_active, created_at, is_complimentary, complimentary_ends_at')
         .eq('id', orgId)
         .single();
       if (error) throw error;
@@ -41,6 +41,10 @@ export function BillingTab() {
     },
     enabled: !!orgId,
   });
+
+  const isComplimentary = !!org?.is_complimentary;
+  const compEndsAt = org?.complimentary_ends_at ? new Date(org.complimentary_ends_at) : null;
+  const isPermanentComp = isComplimentary && !compEndsAt;
 
   const trialEndsAt = org?.trial_ends_at ? new Date(org.trial_ends_at) : null;
   const trialExpired = trialEndsAt ? isPast(trialEndsAt) : false;
@@ -70,27 +74,44 @@ export function BillingTab() {
             </Badge>
           </div>
 
-          <Button
-            variant="outline"
-            onClick={() => navigate('/pricing')}
-            className="gap-2"
-          >
-            <ArrowUpRight className="h-4 w-4" />
-            View Plans & Upgrade
-          </Button>
+          {!isPermanentComp && (
+            <Button
+              variant="outline"
+              onClick={() => navigate('/pricing')}
+              className="gap-2"
+            >
+              <ArrowUpRight className="h-4 w-4" />
+              View Plans & Upgrade
+            </Button>
+          )}
         </CardContent>
       </Card>
 
-      {/* Trial Status */}
+      {/* Complimentary / Trial Status */}
       <Card className="card-elevated">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            Trial Status
+            {isComplimentary ? (
+              <><Gift className="h-5 w-5 text-primary" /> Complimentary Plan</>
+            ) : (
+              <><Calendar className="h-5 w-5 text-primary" /> Trial Status</>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {trialEndsAt ? (
+          {isComplimentary ? (
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
+              <div>
+                <p className="font-medium">Complimentary Access</p>
+                <p className="text-sm text-muted-foreground">
+                  {isPermanentComp
+                    ? 'You have permanent free access to this plan.'
+                    : `Free access until ${format(compEndsAt!, 'MMM d, yyyy')}`}
+                </p>
+              </div>
+            </div>
+          ) : trialEndsAt ? (
             <div className="flex items-center gap-3">
               {trialExpired ? (
                 <>
