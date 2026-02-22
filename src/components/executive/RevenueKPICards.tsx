@@ -1,7 +1,8 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingUp, TrendingDown, DollarSign, Percent, Banknote, PiggyBank } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Percent, Banknote, PiggyBank, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useOperationalCPM } from '@/hooks/useOperationalCPM';
 
 interface KPIData {
   grossRevenue: number;
@@ -14,6 +15,8 @@ interface KPIData {
   prevProfitMargin: number;
   deliveredLoadCount: number;
   prevDeliveredLoadCount: number;
+  totalMiles?: number;
+  prevTotalMiles?: number;
 }
 
 interface RevenueKPICardsProps {
@@ -104,8 +107,16 @@ function KPICard({
 }
 
 export function RevenueKPICards({ data, isLoading }: RevenueKPICardsProps) {
+  const { costPerMile, calculateTrueProfit } = useOperationalCPM();
+
+  const totalMiles = data?.totalMiles || data?.deliveredLoadCount ? (data?.totalMiles || (data?.deliveredLoadCount || 0) * 350) : 0;
+  const prevTotalMiles = data?.prevTotalMiles || data?.prevDeliveredLoadCount ? (data?.prevTotalMiles || (data?.prevDeliveredLoadCount || 0) * 350) : 0;
+
+  const trueProfit = calculateTrueProfit(data?.grossRevenue ?? 0, totalMiles);
+  const prevTrueProfit = calculateTrueProfit(data?.prevGrossRevenue ?? 0, prevTotalMiles);
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       <KPICard
         title="Gross Revenue"
         value={data?.grossRevenue ?? 0}
@@ -129,6 +140,15 @@ export function RevenueKPICards({ data, isLoading }: RevenueKPICardsProps) {
         icon={PiggyBank}
         isLoading={isLoading}
         subtitle="Company earnings"
+      />
+      <KPICard
+        title="True Profit Margin"
+        value={trueProfit.margin}
+        previousValue={prevTrueProfit.margin}
+        icon={Target}
+        format="percent"
+        isLoading={isLoading}
+        subtitle={`CPM: $${costPerMile.toFixed(2)} · ${formatCurrency(trueProfit.trueProfit)} net`}
       />
       <KPICard
         title="Retention Rate"

@@ -20,6 +20,8 @@ import {
   Fuel,
   BarChart,
   ShieldCheck,
+  ChevronsUpDown,
+  Plus,
   LucideIcon
 } from 'lucide-react';
 import jwBannerLight from '@/assets/JW_Banner.png';
@@ -43,6 +45,13 @@ import {
   SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { Database } from '@/integrations/supabase/types';
 
 type AppRole = Database['public']['Enums']['app_role'];
@@ -208,7 +217,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="border-r border-sidebar-border">
-      <SidebarHeader className="border-b border-sidebar-border p-4">
+      <SidebarHeader className="border-b border-sidebar-border p-4 space-y-2">
         <div className="flex items-center justify-center">
           <img 
             src={bannerSrc} 
@@ -216,6 +225,26 @@ export function AppSidebar() {
             className="h-12 w-auto object-contain"
           />
         </div>
+        {/* Workspace Switcher Placeholder */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="w-full flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-1.5 text-xs hover:bg-muted/50 transition-colors">
+              <span className="font-medium truncate">{user?.email?.split('@')[0] || 'Workspace'}</span>
+              <ChevronsUpDown className="h-3 w-3 text-muted-foreground shrink-0 ml-1" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuItem disabled className="opacity-100 font-medium">
+              <span className="truncate">{user?.email?.split('@')[0] || 'Workspace'}</span>
+              <Badge variant="outline" className="ml-auto text-[10px] px-1">Active</Badge>
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled className="text-muted-foreground">
+              <Plus className="h-3.5 w-3.5 mr-2" />
+              Add Workspace
+              <Badge variant="secondary" className="ml-auto text-[10px] px-1">Soon</Badge>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarHeader>
 
       <SidebarContent className="px-2">

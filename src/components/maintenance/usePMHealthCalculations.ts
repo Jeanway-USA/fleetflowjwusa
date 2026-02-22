@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { TruckWithSchedules, ManufacturerService } from '@/hooks/useMaintenanceData';
+import { calculateWearPartHealth, type WearPartHealth } from '@/lib/truck-maintenance-profiles';
 
 export type TruckHealthStatus = 'overdue' | 'due-soon' | 'on-track';
 
@@ -8,6 +9,7 @@ interface TruckHealthInfo {
   status: TruckHealthStatus;
   worstRemainingMiles: number;
   worstRemainingDays: number;
+  wearPartHealth: WearPartHealth[];
 }
 
 const MILES_WARNING_THRESHOLD = 1000;
@@ -117,11 +119,20 @@ export function getTruckHealthStatus(truck: TruckWithSchedules): TruckHealthInfo
     else if (status === 'due-soon' && worstStatus !== 'overdue') worstStatus = 'due-soon';
   }
 
+  // Calculate wear part health based on truck profile
+  const wearPartHealth = calculateWearPartHealth(
+    truck.make,
+    null,
+    truck.calculated_odometer || truck.current_odometer || 0,
+    truck.purchase_mileage || 0
+  );
+
   return {
     truck,
     status: worstStatus,
     worstRemainingMiles,
     worstRemainingDays,
+    wearPartHealth,
   };
 }
 
@@ -129,23 +140,21 @@ export function usePMHealthCalculations(trucks: TruckWithSchedules[] | undefined
   return useMemo(() => {
     if (!trucks?.length) {
       return {
-        truckHealthList: [],
+        truckHealthList: [] as TruckHealthInfo[],
         overdueCount: 0,
         dueSoonCount: 0,
         onTrackCount: 0,
+        urgentParts: [] as { truck: TruckWithSchedules; parts: WearPartHealth[] }[],
       };
     }
 
     const truckHealthList = trucks.map(getTruckHealthStatus);
     
     // Sort by urgency: overdue first, then due-soon, then on-track
-    // Within each group, sort by worst remaining (lowest first)
     truckHealthList.sort((a, b) => {
       const statusOrder = { 'overdue': 0, 'due-soon': 1, 'on-track': 2 };
       const statusDiff = statusOrder[a.status] - statusOrder[b.status];
       if (statusDiff !== 0) return statusDiff;
-      
-      // Sort by worst remaining miles (more urgent = lower remaining)
       return a.worstRemainingMiles - b.worstRemainingMiles;
     });
 
@@ -153,11 +162,20 @@ export function usePMHealthCalculations(trucks: TruckWithSchedules[] | undefined
     const dueSoonCount = truckHealthList.filter(t => t.status === 'due-soon').length;
     const onTrackCount = truckHealthList.filter(t => t.status === 'on-track').length;
 
+    // Collect trucks with urgent wear parts (below 20% health)
+    const urgentParts = truckHealthList
+      .filter(t => t.wearPartHealth.some(p => p.is_urgent))
+      .map(t => ({
+        truck: t.truck,
+        parts: t.wearPartHealth.filter(p => p.is_urgent),
+      }));
+
     return {
       truckHealthList,
       overdueCount,
       dueSoonCount,
       onTrackCount,
+      urgentParts,
     };
   }, [trucks]);
 }
