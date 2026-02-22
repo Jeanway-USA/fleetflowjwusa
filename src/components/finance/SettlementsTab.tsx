@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,6 +67,7 @@ interface FleetLoad {
 
 export function SettlementsTab() {
   const queryClient = useQueryClient();
+  const { orgId } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
   const [viewingSettlement, setViewingSettlement] = useState<Settlement | null>(null);
@@ -345,6 +347,7 @@ export function SettlementsTab() {
         driver_id: formData.driver_id,
         period_start: formData.period_start,
         period_end: formData.period_end,
+        org_id: orgId,
       });
       
       // Create line items for each load
@@ -366,6 +369,7 @@ export function SettlementsTab() {
             description: `Load ${load.landstar_load_id || 'N/A'}: ${load.origin.split(',')[0]} → ${load.destination.split(',')[0]}`,
             amount: load.net_revenue || 0,
             category: 'revenue',
+            org_id: orgId,
           }));
           await createLineItemsMutation.mutateAsync(items);
         }
