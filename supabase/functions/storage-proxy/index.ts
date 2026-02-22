@@ -61,13 +61,17 @@ async function getAccessToken(creds: DriveCredentials, supabase: any, orgId: str
     return creds.access_token;
   }
 
+  // Use platform-level OAuth credentials (not stored per-org)
+  const clientId = creds.client_id || Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')!;
+  const clientSecret = creds.client_secret || Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')!;
+
   // Refresh the access token
   const resp = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: creds.client_id,
-      client_secret: creds.client_secret,
+      client_id: clientId,
+      client_secret: clientSecret,
       refresh_token: creds.refresh_token,
       grant_type: 'refresh_token',
     }),
@@ -125,6 +129,8 @@ async function ensureFolderExists(accessToken: string, parentFolderId: string, f
   });
 
   if (!createResp.ok) {
+    const errText = await createResp.text();
+    console.error(`Failed to create folder '${folderName}':`, errText);
     throw new Error(`Failed to create folder: ${folderName}`);
   }
 
