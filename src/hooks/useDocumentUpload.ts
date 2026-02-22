@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
-import { uploadToStorage } from './useSignedUrl';
 import { useAuth } from '@/contexts/AuthContext';
+import { useStorageProvider } from './useStorageProvider';
 
 type Document = Database['public']['Tables']['documents']['Row'];
 
@@ -16,6 +16,7 @@ interface UploadOptions {
 
 export function useDocumentUpload() {
   const { orgId } = useAuth();
+  const { upload, remove } = useStorageProvider();
   const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
 
@@ -28,8 +29,8 @@ export function useDocumentUpload() {
       const fileExt = file.name.split('.').pop();
       const filePath = `${options.relatedType}/${options.relatedId}/${Date.now()}.${fileExt}`;
 
-      // Upload to private bucket and store the path (not public URL)
-      const { path, error: uploadError } = await uploadToStorage('documents', filePath, file);
+      // Upload through storage provider (Google Drive or built-in)
+      const { path, error: uploadError } = await upload('documents', filePath, file);
 
       if (uploadError || !path) throw uploadError || new Error('Upload failed');
 
@@ -58,27 +59,9 @@ export function useDocumentUpload() {
 
   const deleteDocument = useMutation({
     mutationFn: async (doc: Document) => {
-      // Extract file path - handle both old URL format and new path format
-      let storagePath: string | null = null;
-      
-      if (doc.file_path.startsWith('http')) {
-        // Old format: extract from public URL
-        try {
-          const url = new URL(doc.file_path);
-          const pathParts = url.pathname.split('/storage/v1/object/public/documents/');
-          if (pathParts[1]) {
-            storagePath = pathParts[1];
-          }
-        } catch {
-          // Invalid URL, skip storage deletion
-        }
-      } else {
-        // New format: direct path
-        storagePath = doc.file_path;
-      }
-      
-      if (storagePath) {
-        await supabase.storage.from('documents').remove([storagePath]);
+      // Delete file from storage provider
+      if (doc.file_path) {
+        await remove('documents', doc.file_path);
       }
       
       const { error } = await supabase.from('documents').delete().eq('id', doc.id);

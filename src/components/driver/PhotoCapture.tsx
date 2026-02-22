@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Camera, X, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { uploadFile } from '@/hooks/useStorageProvider';
+import { useStorageStatus } from '@/hooks/useStorageProvider';
 
 interface PhotoCaptureProps {
   onPhotosCaptured: (urls: string[]) => void;
@@ -47,7 +49,7 @@ export function PhotoCapture({ onPhotosCaptured, disabled, maxPhotos = 5 }: Phot
     });
   };
 
-  const uploadPhotos = async (): Promise<string[]> => {
+  const uploadPhotos = async (useProxy: boolean = false): Promise<string[]> => {
     if (photos.length === 0) return [];
 
     setUploading(true);
@@ -59,14 +61,10 @@ export function PhotoCapture({ onPhotosCaptured, disabled, maxPhotos = 5 }: Phot
 
       for (const photo of photos) {
         const filePath = `${user.id}/${Date.now()}-${photo.file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('dvir-photos')
-          .upload(filePath, photo.file);
+        const { path, error: uploadError } = await uploadFile('dvir-photos', filePath, photo.file, useProxy);
 
-        if (uploadError) throw uploadError;
-
-        // Store the path (not public URL) for private bucket
-        paths.push(filePath);
+        if (uploadError || !path) throw uploadError || new Error('Upload failed');
+        paths.push(path);
       }
 
       onPhotosCaptured(paths);
@@ -194,7 +192,7 @@ export function usePhotoUpload() {
     });
   };
 
-  const uploadAll = async (): Promise<string[]> => {
+  const uploadAll = async (useProxy: boolean = false): Promise<string[]> => {
     if (photos.length === 0) return [];
     
     setUploading(true);
@@ -206,14 +204,10 @@ export function usePhotoUpload() {
 
       for (const photo of photos) {
         const filePath = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
-        const { error: uploadError } = await supabase.storage
-          .from('dvir-photos')
-          .upload(filePath, photo.file);
+        const { path, error: uploadError } = await uploadFile('dvir-photos', filePath, photo.file, useProxy);
 
-        if (uploadError) throw uploadError;
-
-        // Store the path (not public URL) for private bucket
-        paths.push(filePath);
+        if (uploadError || !path) throw uploadError || new Error('Upload failed');
+        paths.push(path);
       }
 
       // Clean up

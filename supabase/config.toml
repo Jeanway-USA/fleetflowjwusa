@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.manage-credentials]
 verify_jwt = false
+
+[functions.storage-proxy]
+verify_jwt = false
+
+[functions.google-drive-auth]
+verify_jwt = false

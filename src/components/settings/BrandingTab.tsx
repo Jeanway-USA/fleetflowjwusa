@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Palette, ImageIcon, Upload, X } from 'lucide-react';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
+import { useStorageProvider } from '@/hooks/useStorageProvider';
 
 const COLOR_PRESETS = [
   { name: 'Gold', hsl: '45 80% 45%', dark: '45 80% 50%' },
@@ -19,6 +20,7 @@ const COLOR_PRESETS = [
 
 export function BrandingTab() {
   const { orgId, isDemoMode, refreshOrgData, primaryColor, logoUrl, bannerUrl } = useAuth();
+  const { upload: storageUpload, remove: storageRemove } = useStorageProvider();
   const [selectedColor, setSelectedColor] = useState(primaryColor || '45 80% 45%');
   const [isSavingColor, setIsSavingColor] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -59,17 +61,14 @@ export function BrandingTab() {
       const ext = file.name.split('.').pop() || 'png';
       const filePath = `${orgId}/${type}.${ext}`;
 
-      // Upload file (upsert)
-      const { error: uploadError } = await supabase.storage
-        .from('branding-assets')
-        .upload(filePath, file, { upsert: true });
-      if (uploadError) throw uploadError;
+      // Upload through storage provider
+      const { path, error: uploadError } = await storageUpload('branding-assets', filePath, file);
+      if (uploadError || !path) throw uploadError || new Error('Upload failed');
 
-      // Save path to org
       const updateCol = type === 'logo' ? 'logo_url' : 'banner_url';
       const { error: dbError } = await supabase
         .from('organizations')
-        .update({ [updateCol]: filePath })
+        .update({ [updateCol]: path })
         .eq('id', orgId);
       if (dbError) throw dbError;
 
@@ -87,7 +86,7 @@ export function BrandingTab() {
     try {
       const path = type === 'logo' ? logoUrl : bannerUrl;
       if (path) {
-        await supabase.storage.from('branding-assets').remove([path]);
+        await storageRemove('branding-assets', path);
       }
       const updateCol = type === 'logo' ? 'logo_url' : 'banner_url';
       await supabase
