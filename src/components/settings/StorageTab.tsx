@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Progress } from '@/components/ui/progress';
 import { HardDrive, CloudOff, CheckCircle, Loader2, FolderOpen, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,6 +23,7 @@ export function StorageTab() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   const { data: config, isLoading } = useQuery({
     queryKey: ['storage-config', orgId],
@@ -36,6 +38,44 @@ export function StorageTab() {
   });
 
   const isConnected = config?.provider === 'google_drive' && config?.is_active;
+
+  const runMigration = async () => {
+    setIsMigrating(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const resp = await fetch(`${supabaseUrl}/functions/v1/storage-proxy?action=migrate`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.error || 'Migration failed');
+      }
+
+      const result = await resp.json();
+      if (result.migrated > 0 && result.failed === 0) {
+        toast.success(`Migrated ${result.migrated} file(s) to Google Drive`);
+      } else if (result.migrated > 0 && result.failed > 0) {
+        toast.warning(`Migrated ${result.migrated} file(s), ${result.failed} failed`);
+      } else if (result.migrated === 0 && result.failed === 0) {
+        toast.info('No files to migrate — all files are already on Google Drive');
+      } else {
+        toast.error(`Migration failed for ${result.failed} file(s)`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Migration failed');
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   // Handle OAuth callback
   useEffect(() => {
@@ -60,7 +100,10 @@ export function StorageTab() {
 
           queryClient.invalidateQueries({ queryKey: ['storage-config'] });
           queryClient.invalidateQueries({ queryKey: ['storage-status'] });
-          toast.success('Google Drive connected successfully!');
+          toast.success('Google Drive connected! Migrating existing files...');
+
+          // Auto-run migration after connecting
+          await runMigration();
         } catch (err: any) {
           toast.error(err.message || 'Failed to complete connection');
         }
@@ -121,6 +164,22 @@ export function StorageTab() {
 
   return (
     <div className="space-y-6">
+      {/* Migration Progress */}
+      {isMigrating && (
+        <Card className="card-elevated border-primary/30">
+          <CardContent className="py-6">
+            <div className="flex items-center gap-3 mb-3">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <p className="font-medium">Migrating existing files to Google Drive...</p>
+            </div>
+            <Progress value={undefined} className="h-2" />
+            <p className="text-sm text-muted-foreground mt-2">
+              This may take a few minutes depending on the number of files.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Current Status */}
       <Card className="card-elevated">
         <CardHeader>
@@ -173,10 +232,7 @@ export function StorageTab() {
           {isConnected && (
             <div className="flex flex-wrap gap-2">
               {config?.root_folder_id && config.root_folder_id !== 'root' && (
-                <Button
-                  variant="outline"
-                  asChild
-                >
+                <Button variant="outline" asChild>
                   <a
                     href={`https://drive.google.com/drive/folders/${config.root_folder_id}`}
                     target="_blank"
@@ -187,6 +243,18 @@ export function StorageTab() {
                   </a>
                 </Button>
               )}
+              <Button
+                variant="outline"
+                onClick={runMigration}
+                disabled={isMigrating}
+              >
+                {isMigrating ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FolderOpen className="h-4 w-4 mr-2" />
+                )}
+                Migrate Remaining Files
+              </Button>
               <Button
                 variant="outline"
                 className="text-destructive hover:text-destructive"
@@ -214,7 +282,7 @@ export function StorageTab() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Sign in with your Google account to store all uploads in a dedicated "FleetFlow Storage" folder in your Drive.
+              Sign in with your Google account to store all uploads in a dedicated folder in your Drive. Existing files will be automatically migrated.
             </p>
 
             <Button
@@ -251,15 +319,15 @@ export function StorageTab() {
             </li>
             <li className="flex items-start gap-2">
               <span className="font-medium text-foreground mt-0.5">2.</span>
-              Grant FleetFlow permission to manage files in a dedicated folder
+              Grant permission to manage files in a dedicated folder
             </li>
             <li className="flex items-start gap-2">
               <span className="font-medium text-foreground mt-0.5">3.</span>
-              All new uploads will be stored in your organization's Google Drive folder
+              All existing files are automatically migrated to your Google Drive
             </li>
             <li className="flex items-start gap-2">
               <span className="font-medium text-foreground mt-0.5">4.</span>
-              Once connected, all documents are stored in Google Drive — reducing platform storage usage
+              All new uploads go directly to Google Drive — reducing platform storage usage
             </li>
           </ul>
         </CardContent>
