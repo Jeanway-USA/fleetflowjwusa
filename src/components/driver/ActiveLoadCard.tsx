@@ -384,11 +384,9 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
                 <p className="text-xs text-warning font-medium uppercase tracking-wide mb-2">
                   Special Instructions
                 </p>
-              <ScrollArea className="max-h-40">
-                  <div className="pr-3">
+                <div className="max-h-40 overflow-y-auto pr-3">
                     {formatSpecialInstructions(load.notes)}
-                  </div>
-                </ScrollArea>
+                </div>
                 <p className="text-[10px] text-warning/60 mt-1 italic">Scroll for more ↓</p>
               </div>
             )}

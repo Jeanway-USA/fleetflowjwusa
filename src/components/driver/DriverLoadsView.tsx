@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
@@ -328,11 +328,9 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
                 <p className="text-xs text-warning font-medium uppercase tracking-wide mb-2">
                   Special Instructions
                 </p>
-                <ScrollArea className="max-h-40">
-                  <div className="pr-3">
+                <div className="max-h-40 overflow-y-auto pr-3">
                     <p className="text-sm whitespace-pre-wrap leading-relaxed">{load.notes}</p>
-                  </div>
-                </ScrollArea>
+                </div>
                 <p className="text-[10px] text-warning/60 mt-1 italic">Scroll for more ↓</p>
               </div>
             )}
