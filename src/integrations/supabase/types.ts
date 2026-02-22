@@ -3701,24 +3701,15 @@ export type Database = {
           total_bytes: number
         }[]
       }
-      super_admin_update_org:
-        | {
-            Args: {
-              new_is_active?: boolean
-              new_tier?: string
-              target_org_id: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              new_is_active?: boolean
-              new_tier?: string
-              new_trial_ends_at?: string
-              target_org_id: string
-            }
-            Returns: undefined
-          }
+      super_admin_update_org: {
+        Args: {
+          new_is_active?: boolean
+          new_tier?: string
+          new_trial_ends_at?: string
+          target_org_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "owner" | "payroll_admin" | "dispatcher" | "safety" | "driver"
