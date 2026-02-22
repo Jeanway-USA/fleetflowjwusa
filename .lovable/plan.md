@@ -1,13 +1,16 @@
 
 
-## Fix: Rapid Call Workflow Modal Too Narrow
+## Fix: Rapid Call Modal Address Overflow
 
-The `RapidCallModal` dialog uses `sm:max-w-md` (448px), which is too narrow for long origin/destination addresses. The load summary and action buttons overflow horizontally.
+The long origin/destination addresses are rendering on a single line and overflowing horizontally, even at `sm:max-w-lg`.
 
-### Change
+### Changes
 
 **File: `src/components/dispatcher/RapidCallModal.tsx`**
 
-- Change `sm:max-w-md` to `sm:max-w-lg` on the `DialogContent` to give the modal more breathing room (~512px).
-- This single class change resolves the overflow for long address strings and the RPM badge placement.
+1. Widen the dialog further to `sm:max-w-2xl` (672px) to fit full addresses
+2. Change the origin/destination layout from a single inline row to a stacked (vertical) layout so long addresses wrap naturally instead of overflowing
+3. Add `break-all` or `break-words` to address text to handle edge cases
+
+This ensures the modal content fits comfortably regardless of address length.
 
