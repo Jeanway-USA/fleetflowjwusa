@@ -81,7 +81,7 @@ export function CompanyTab() {
             org_id: orgId,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'setting_key' }
+          { onConflict: 'setting_key,org_id' }
         );
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['company-setting', 'monthly_bonus_miles'] });
