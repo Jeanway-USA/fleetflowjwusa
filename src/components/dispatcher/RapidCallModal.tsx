@@ -133,7 +133,7 @@ export function RapidCallModal({ load, open, onOpenChange }: RapidCallModalProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Phone className="h-5 w-5 text-primary" />
@@ -147,11 +147,15 @@ export function RapidCallModal({ load, open, onOpenChange }: RapidCallModalProps
             <span className="font-medium text-sm">{load.landstar_load_id || load.id.slice(0, 8)}</span>
             {rpm && <Badge variant="outline" className="text-xs">${rpm}/mi</Badge>}
           </div>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <MapPin className="h-3 w-3 shrink-0" />
-            <span className="truncate">{load.origin}</span>
-            <span className="mx-1">→</span>
-            <span className="truncate">{load.destination}</span>
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+            <div className="flex items-start gap-1.5">
+              <MapPin className="h-3 w-3 shrink-0 mt-0.5" />
+              <span className="break-words">{load.origin}</span>
+            </div>
+            <div className="flex items-start gap-1.5 pl-0.5">
+              <span className="text-xs">→</span>
+              <span className="break-words">{load.destination}</span>
+            </div>
           </div>
           {load.agency_code && (
             <p className="text-xs text-muted-foreground">Agent: {load.agency_code}</p>
