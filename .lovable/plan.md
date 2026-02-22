@@ -1,16 +1,23 @@
 
 
-## Fix: Rapid Call Modal Address Overflow
+## Revert Active Loads Board to Original Design
 
-The long origin/destination addresses are rendering on a single line and overflowing horizontally, even at `sm:max-w-lg`.
+Remove the "Load Vetting Board" features and restore the original "Active Loads" board with a clean, simple layout.
 
 ### Changes
 
-**File: `src/components/dispatcher/RapidCallModal.tsx`**
+**File: `src/components/dispatcher/ActiveLoadsBoard.tsx`**
 
-1. Widen the dialog further to `sm:max-w-2xl` (672px) to fit full addresses
-2. Change the origin/destination layout from a single inline row to a stacked (vertical) layout so long addresses wrap naturally instead of overflowing
-3. Add `break-all` or `break-words` to address text to handle edge cases
+- Rename title from "Load Vetting Board" back to "Active Loads"
+- Remove imports: `useAgentTrustScore`, `RapidCallModal`, shield icons, `AlertTriangle`, `Phone`
+- Remove the `AgentTrustBadge` sub-component
+- Remove the `isSuspiciousLoad` function and all suspicious-load highlighting (amber borders, flag badges, reason chips)
+- Remove the `trustIcons` and `trustColors` maps
+- Remove `selectedLoad` and `rapidCallOpen` state
+- Remove the `RapidCallModal` at the bottom of the component
+- Remove the phone button from each load card
+- Remove the card-level `onClick` handler that opens the modal
+- Keep the existing load card layout (load ID, status badge, RPM, origin/destination, driver, truck, dates, rate) and the dropdown menu with "View Details"
 
-This ensures the modal content fits comfortably regardless of address length.
+This restores the board to a straightforward active-loads list without vetting, trust scoring, or rapid-call features.
 
