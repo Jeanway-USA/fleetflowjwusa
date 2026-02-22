@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
@@ -40,6 +40,9 @@ interface AuthContextType {
   hasSafetyAccess: boolean;
   refreshOrgData: () => Promise<void>;
   refreshRoles: () => Promise<void>;
+  simulatedOrgId: string | null;
+  simulatedOrgName: string | null;
+  clearOrgSimulation: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,6 +61,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [orgLoading, setOrgLoading] = useState(true);
+  const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(() => localStorage.getItem('simulatedOrgId'));
+  const [simulatedOrgName, setSimulatedOrgName] = useState<string | null>(() => localStorage.getItem('simulatedOrgName'));
+  const [simulatedOrgTier, setSimulatedOrgTier] = useState<string | null>(() => localStorage.getItem('simulatedOrgTier'));
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase
@@ -113,6 +119,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRoles(fetchedRoles);
     }
   };
+
+  const clearOrgSimulation = useCallback(() => {
+    localStorage.removeItem('simulatedOrgId');
+    localStorage.removeItem('simulatedOrgName');
+    localStorage.removeItem('simulatedOrgTier');
+    setSimulatedOrgId(null);
+    setSimulatedOrgName(null);
+    setSimulatedOrgTier(null);
+  }, []);
+
+  // Listen for simulatedOrgChanged events from other components
+  useEffect(() => {
+    const handler = () => {
+      setSimulatedOrgId(localStorage.getItem('simulatedOrgId'));
+      setSimulatedOrgName(localStorage.getItem('simulatedOrgName'));
+      setSimulatedOrgTier(localStorage.getItem('simulatedOrgTier'));
+    };
+    window.addEventListener('simulatedOrgChanged', handler);
+    return () => window.removeEventListener('simulatedOrgChanged', handler);
+  }, []);
 
   useEffect(() => {
     // Set up auth state listener first
@@ -284,14 +310,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasPayrollAccess,
       hasOperationsAccess,
       hasSafetyAccess,
-      orgId,
-      orgName,
-      subscriptionTier,
+      orgId: simulatedOrgId || orgId,
+      orgName: simulatedOrgName || orgName,
+      subscriptionTier: (simulatedOrgTier as SubscriptionTier) || subscriptionTier,
       primaryColor,
       logoUrl,
       bannerUrl,
       refreshOrgData,
       refreshRoles,
+      simulatedOrgId,
+      simulatedOrgName,
+      clearOrgSimulation,
     }}>
       {children}
     </AuthContext.Provider>

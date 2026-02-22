@@ -13,7 +13,7 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { isDemoMode, signOut, primaryColor } = useAuth();
+  const { isDemoMode, signOut, primaryColor, simulatedOrgId, simulatedOrgName, clearOrgSimulation } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
 
@@ -47,6 +47,25 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="min-h-screen flex w-full bg-background">
         <AppSidebar />
         <main className="flex-1 flex flex-col min-h-screen">
+          {simulatedOrgId && (
+            <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <span className="font-medium text-amber-700 dark:text-amber-300">Simulating: {simulatedOrgName}</span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                onClick={() => {
+                  clearOrgSimulation();
+                  navigate('/super-admin');
+                }}
+              >
+                Exit Simulation
+              </Button>
+            </div>
+          )}
           {isDemoMode && (
             <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
