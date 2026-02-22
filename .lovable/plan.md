@@ -1,36 +1,53 @@
 
 
-## Fix: Monthly Bonus Goal RLS Violation
+## Fix: Duplicate Key Error on Bonus Goal Save
 
 ### Problem
-The `company_settings` table has an RLS policy requiring `org_id` to match the user's organization. The `handleSaveBonusGoal` function in `CompanyTab.tsx` does not include `org_id` when inserting a new row, causing the "new row violates row-level security policy" error.
+The `company_settings` table has a unique constraint on `setting_key`. A row for `monthly_bonus_miles` already exists from a previous save attempt (the one that succeeded after adding `org_id`). However, the SELECT query fetching `bonusGoalSetting` may not return it due to RLS filtering, so the code tries to INSERT again, hitting the unique constraint.
 
 ### Fix
-In `src/components/settings/CompanyTab.tsx`, add `org_id` (from `useAuth()`) to the `.insert()` call on line 82:
+Replace the separate insert/update logic in `handleSaveBonusGoal` with a single **upsert** using `.upsert()` with `onConflict: 'setting_key'`. This handles both cases cleanly.
+
+### Changes
+
+**`src/components/settings/CompanyTab.tsx`** -- replace lines 72-90 (the `handleSaveBonusGoal` function body):
 
 ```typescript
-// Before (line 80-85)
-const { error } = await supabase
-  .from('company_settings')
-  .insert({
-    setting_key: 'monthly_bonus_miles',
-    setting_value: String(miles),
-    description: 'Monthly miles goal for driver bonus',
-  });
-
-// After
-const { error } = await supabase
-  .from('company_settings')
-  .insert({
-    setting_key: 'monthly_bonus_miles',
-    setting_value: String(miles),
-    description: 'Monthly miles goal for driver bonus',
-    org_id: orgId,
-  });
+const handleSaveBonusGoal = async () => {
+  const miles = Number(bonusGoalMiles);
+  if (!miles || miles <= 0) {
+    toast.error('Please enter a valid number of miles');
+    return;
+  }
+  setIsSavingBonusGoal(true);
+  try {
+    const { error } = await supabase
+      .from('company_settings')
+      .upsert(
+        {
+          setting_key: 'monthly_bonus_miles',
+          setting_value: String(miles),
+          description: 'Monthly miles goal for driver bonus',
+          org_id: orgId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'setting_key' }
+      );
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ['company-setting', 'monthly_bonus_miles'] });
+    toast.success('Bonus goal updated');
+  } catch (error: any) {
+    toast.error(error.message || 'Failed to save bonus goal');
+  } finally {
+    setIsSavingBonusGoal(false);
+  }
+};
 ```
 
-`orgId` is already destructured from `useAuth()` at the top of the component, so no additional imports or state changes are needed. This is a one-line addition.
+### Why This Works
+- `upsert` with `onConflict: 'setting_key'` inserts if no row exists, updates if it does
+- Eliminates the need to check `bonusGoalSetting` before deciding insert vs update
+- Includes `org_id` to satisfy RLS policies
 
 ### Files Modified
-- `src/components/settings/CompanyTab.tsx` -- add `org_id: orgId` to the insert payload (line ~84)
-
+- `src/components/settings/CompanyTab.tsx`
