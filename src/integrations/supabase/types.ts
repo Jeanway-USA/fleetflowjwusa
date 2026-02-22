@@ -77,6 +77,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "agency_loads_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       agent_commissions: {
@@ -134,6 +141,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "agent_commissions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       audit_logs: {
@@ -176,6 +190,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -237,6 +258,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "company_resources_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       company_settings: {
@@ -273,6 +301,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -326,6 +361,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "crm_activities_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       crm_contact_loads: {
@@ -373,6 +415,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_contact_loads_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -446,6 +495,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "crm_contacts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       detention_requests: {
@@ -514,6 +570,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "detention_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       documents: {
@@ -562,6 +625,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -635,6 +705,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_inspections_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
           {
@@ -722,6 +799,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "driver_locations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "driver_locations_truck_id_fkey"
             columns: ["truck_id"]
             isOneToOne: false
@@ -784,6 +868,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_notifications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -857,6 +948,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_payroll_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -942,6 +1040,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_performance_metrics_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1034,6 +1139,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "driver_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "driver_requests_truck_id_fkey"
             columns: ["truck_id"]
             isOneToOne: false
@@ -1102,6 +1214,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1184,6 +1303,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "drivers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       expenses: {
@@ -1248,6 +1374,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
           {
@@ -1323,6 +1456,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facilities_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1465,6 +1605,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fleet_loads_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fleet_loads_truck_id_fkey"
             columns: ["truck_id"]
             isOneToOne: false
@@ -1545,6 +1692,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "fuel_purchases_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fuel_purchases_source_expense_id_fkey"
             columns: ["source_expense_id"]
             isOneToOne: true
@@ -1620,6 +1774,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fuel_stops_cache_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       general_ledger: {
@@ -1671,6 +1832,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "general_ledger_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1746,6 +1914,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "hos_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       ifta_records: {
@@ -1803,6 +1978,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ifta_records_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ifta_records_truck_id_fkey"
             columns: ["truck_id"]
             isOneToOne: false
@@ -1851,6 +2033,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "incident_photos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       incident_witnesses: {
@@ -1897,6 +2086,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_witnesses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2000,6 +2196,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "incidents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "incidents_trailer_id_fkey"
             columns: ["trailer_id"]
             isOneToOne: false
@@ -2055,6 +2258,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "inspection_photos_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       load_accessorials: {
@@ -2104,6 +2314,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "load_accessorials_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2241,6 +2458,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "load_expenses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       load_status_logs: {
@@ -2287,6 +2511,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "load_status_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2337,6 +2568,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
           {
@@ -2408,6 +2646,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
           {
@@ -2549,6 +2794,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pm_notifications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pm_notifications_truck_id_fkey"
             columns: ["truck_id"]
             isOneToOne: false
@@ -2602,6 +2854,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       service_schedules: {
@@ -2650,6 +2909,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_schedules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
           {
@@ -2705,6 +2971,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlement_line_items_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
           {
@@ -2782,6 +3055,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "settlements_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       trailer_assignments: {
@@ -2821,6 +3101,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trailer_assignments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
           {
@@ -2902,6 +3189,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trailers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2989,6 +3283,13 @@ export type Database = {
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "trucks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_roles: {
@@ -3019,6 +3320,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -3093,6 +3401,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
           {
@@ -3202,6 +3517,67 @@ export type Database = {
         }
         Relationships: []
       }
+      super_admin_audit_logs: {
+        Row: {
+          action: string | null
+          created_at: string | null
+          details: Json | null
+          id: string | null
+          org_id: string | null
+          record_id: string | null
+          table_name: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      super_admin_dashboard_data: {
+        Row: {
+          signups_30d: number | null
+          signups_7d: number | null
+          tier_distribution: Json | null
+          total_orgs: number | null
+        }
+        Relationships: []
+      }
+      super_admin_organizations: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          name: string | null
+          subscription_tier: string | null
+          user_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          subscription_tier?: string | null
+          user_count?: never
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          name?: string | null
+          subscription_tier?: string | null
+          user_count?: never
+        }
+        Relationships: []
+      }
     }
     Functions: {
       create_audit_log: {
@@ -3233,6 +3609,7 @@ export type Database = {
       }
       has_safety_access: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      is_super_admin: { Args: never; Returns: boolean }
     }
     Enums: {
       app_role: "owner" | "payroll_admin" | "dispatcher" | "safety" | "driver"

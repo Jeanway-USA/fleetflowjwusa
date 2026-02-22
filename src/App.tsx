@@ -38,6 +38,8 @@ import PendingAccess from "./pages/PendingAccess";
 import Landing from "./pages/Landing";
 import Pricing from "./pages/Pricing";
 import Onboarding from "./pages/Onboarding";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import { SuperAdminGuard } from "@/components/shared/SuperAdminGuard";
 
 const queryClient = new QueryClient();
 
@@ -186,6 +188,11 @@ const App = () => {
                     </ProtectedRoute>
                   } />
 
+                  <Route path="/super-admin" element={
+                    <SuperAdminGuard>
+                      <SuperAdminDashboard />
+                    </SuperAdminGuard>
+                  } />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </ErrorBoundary>
