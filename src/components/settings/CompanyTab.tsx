@@ -71,23 +71,19 @@ export function CompanyTab() {
     }
     setIsSavingBonusGoal(true);
     try {
-      if (bonusGoalSetting) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update({ setting_value: String(miles), updated_at: new Date().toISOString() })
-          .eq('id', bonusGoalSetting.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('company_settings')
-          .insert({
+      const { error } = await supabase
+        .from('company_settings')
+        .upsert(
+          {
             setting_key: 'monthly_bonus_miles',
             setting_value: String(miles),
             description: 'Monthly miles goal for driver bonus',
             org_id: orgId,
-          });
-        if (error) throw error;
-      }
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'setting_key' }
+        );
+      if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ['company-setting', 'monthly_bonus_miles'] });
       toast.success('Bonus goal updated');
     } catch (error: any) {
