@@ -1,23 +1,33 @@
 
 
-## Revert Active Loads Board to Original Design
+## Unified Load Details Dialog for Active Loads Board
 
-Remove the "Load Vetting Board" features and restore the original "Active Loads" board with a clean, simple layout.
+When "View Details" is clicked on the dispatcher's Active Loads board, it will open an inline dialog matching the same design used on the Driver Dashboard's ActiveLoadCard -- ensuring visual consistency across the app.
 
-### Changes
+### What Changes
 
 **File: `src/components/dispatcher/ActiveLoadsBoard.tsx`**
 
-- Rename title from "Load Vetting Board" back to "Active Loads"
-- Remove imports: `useAgentTrustScore`, `RapidCallModal`, shield icons, `AlertTriangle`, `Phone`
-- Remove the `AgentTrustBadge` sub-component
-- Remove the `isSuspiciousLoad` function and all suspicious-load highlighting (amber borders, flag badges, reason chips)
-- Remove the `trustIcons` and `trustColors` maps
-- Remove `selectedLoad` and `rapidCallOpen` state
-- Remove the `RapidCallModal` at the bottom of the component
-- Remove the phone button from each load card
-- Remove the card-level `onClick` handler that opens the modal
-- Keep the existing load card layout (load ID, status badge, RPM, origin/destination, driver, truck, dates, rate) and the dropdown menu with "View Details"
+1. **Expand the query** to also fetch `pickup_time`, `delivery_time`, `notes`, `empty_miles`, and `load_accessorials(amount)` so the dialog has all the data it needs.
 
-This restores the board to a straightforward active-loads list without vetting, trust scoring, or rapid-call features.
+2. **Add dialog state** (`detailsOpen`, `selectedLoad`) to track which load's detail sheet is showing.
+
+3. **Replace the "View Details" dropdown action** so it sets `selectedLoad` and opens the dialog instead of navigating to `/fleet-loads`.
+
+4. **Render a `Dialog`** at the bottom of the component that mirrors the ActiveLoadCard detail dialog:
+   - Status badge with colored background
+   - Origin with pickup date/time
+   - Destination with delivery date/time
+   - Route map preview (reusing `LoadRouteMap`)
+   - Booked Miles row
+   - Rate display
+   - Special Instructions section (reusing the same formatting logic from ActiveLoadCard)
+
+### Technical Details
+
+- Reuses the existing `LoadRouteMap` component from `@/components/driver/LoadRouteMap`
+- Reuses the `formatSpecialInstructions` helper (extracted or duplicated from ActiveLoadCard)
+- Imports `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle` from the shared UI library
+- The dialog width will be `max-w-lg` to match the driver dashboard's detail dialog
+- No new components or files needed -- all changes are within `ActiveLoadsBoard.tsx`
 
