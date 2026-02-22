@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { HardDrive, CloudOff, CheckCircle, Loader2, FolderOpen } from 'lucide-react';
+import { HardDrive, CloudOff, CheckCircle, Loader2, FolderOpen, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
@@ -171,14 +171,31 @@ export function StorageTab() {
           </div>
 
           {isConnected && (
-            <Button
-              variant="outline"
-              className="text-destructive hover:text-destructive"
-              onClick={() => setDisconnectDialogOpen(true)}
-            >
-              <CloudOff className="h-4 w-4 mr-2" />
-              Disconnect Google Drive
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {config?.root_folder_id && config.root_folder_id !== 'root' && (
+                <Button
+                  variant="outline"
+                  asChild
+                >
+                  <a
+                    href={`https://drive.google.com/drive/folders/${config.root_folder_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open in Google Drive
+                  </a>
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setDisconnectDialogOpen(true)}
+              >
+                <CloudOff className="h-4 w-4 mr-2" />
+                Disconnect Google Drive
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
