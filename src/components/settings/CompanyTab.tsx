@@ -84,6 +84,7 @@ export function CompanyTab() {
             setting_key: 'monthly_bonus_miles',
             setting_value: String(miles),
             description: 'Monthly miles goal for driver bonus',
+            org_id: orgId,
           });
         if (error) throw error;
       }
