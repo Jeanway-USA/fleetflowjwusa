@@ -7,7 +7,6 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
@@ -15,6 +14,10 @@ import { Building2, Users, TrendingUp, Shield, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { OrgDetailSheet } from '@/components/superadmin/OrgDetailSheet';
 import { AuditLogDetailSheet } from '@/components/superadmin/AuditLogDetailSheet';
+import { OrgActionsDropdown } from '@/components/superadmin/OrgActionsDropdown';
+import { EngagementTab } from '@/components/superadmin/EngagementTab';
+import { InfrastructureTab } from '@/components/superadmin/InfrastructureTab';
+import { ResetDemoDialog } from '@/components/superadmin/ResetDemoDialog';
 
 const TIER_COLORS: Record<string, string> = {
   solo_bco: 'hsl(45, 80%, 45%)',
@@ -74,15 +77,6 @@ export default function SuperAdminDashboard() {
 
   const tierDistribution = dashboardData?.tier_distribution || [];
 
-  const handleSimulate = (org: any, e: React.MouseEvent) => {
-    e.stopPropagation();
-    localStorage.setItem('simulatedOrgId', org.id);
-    localStorage.setItem('simulatedOrgName', org.name);
-    localStorage.setItem('simulatedOrgTier', org.subscription_tier);
-    window.dispatchEvent(new Event('simulatedOrgChanged'));
-    navigate('/executive-dashboard');
-  };
-
   const handleOrgClick = (org: any) => {
     setSelectedOrg(org);
     setSheetOpen(true);
@@ -95,19 +89,17 @@ export default function SuperAdminDashboard() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Super Admin Panel" />
+      <PageHeader title="Super Admin Panel">
+        <ResetDemoDialog />
+      </PageHeader>
 
       <Tabs defaultValue="overview" className="mt-6">
         <TabsList className="gradient-gold text-primary-foreground">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-background data-[state=active]:text-foreground">
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="organizations" className="data-[state=active]:bg-background data-[state=active]:text-foreground">
-            Organizations
-          </TabsTrigger>
-          <TabsTrigger value="health" className="data-[state=active]:bg-background data-[state=active]:text-foreground">
-            System Health
-          </TabsTrigger>
+          <TabsTrigger value="overview" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Overview</TabsTrigger>
+          <TabsTrigger value="organizations" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Organizations</TabsTrigger>
+          <TabsTrigger value="engagement" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Engagement</TabsTrigger>
+          <TabsTrigger value="infrastructure" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Infrastructure</TabsTrigger>
+          <TabsTrigger value="health" className="data-[state=active]:bg-background data-[state=active]:text-foreground">System Health</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Overview */}
@@ -174,22 +166,11 @@ export default function SuperAdminDashboard() {
                           onClick={() => handleOrgClick(org)}
                         >
                           <TableCell className="font-medium">{org.name}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{TIER_LABELS[org.subscription_tier] || org.subscription_tier}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={org.is_active ? 'default' : 'destructive'}>
-                              {org.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </TableCell>
+                          <TableCell><Badge variant="secondary">{TIER_LABELS[org.subscription_tier] || org.subscription_tier}</Badge></TableCell>
+                          <TableCell><Badge variant={org.is_active ? 'default' : 'destructive'}>{org.is_active ? 'Active' : 'Inactive'}</Badge></TableCell>
                           <TableCell>{format(new Date(org.created_at), 'MMM d, yyyy')}</TableCell>
                           <TableCell>{org.user_count}</TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="outline" className="gap-1.5" onClick={(e) => handleSimulate(org, e)}>
-                              <Eye className="h-3.5 w-3.5" />
-                              Simulate
-                            </Button>
-                          </TableCell>
+                          <TableCell><OrgActionsDropdown org={org} /></TableCell>
                         </TableRow>
                       ))}
                       {(!orgs || orgs.length === 0) && (
@@ -205,7 +186,17 @@ export default function SuperAdminDashboard() {
           </Card>
         </TabsContent>
 
-        {/* Tab 3: System Health */}
+        {/* Tab 3: Engagement */}
+        <TabsContent value="engagement">
+          <EngagementTab />
+        </TabsContent>
+
+        {/* Tab 4: Infrastructure */}
+        <TabsContent value="infrastructure">
+          <InfrastructureTab />
+        </TabsContent>
+
+        {/* Tab 5: System Health */}
         <TabsContent value="health">
           <Card>
             <CardHeader>
@@ -240,13 +231,9 @@ export default function SuperAdminDashboard() {
                           <TableCell className="text-xs">{format(new Date(log.created_at), 'MMM d, HH:mm:ss')}</TableCell>
                           <TableCell className="text-xs">{log.org_name || '—'}</TableCell>
                           <TableCell className="font-mono text-xs truncate max-w-[120px]">{log.user_id?.slice(0, 8)}…</TableCell>
-                          <TableCell>
-                            <Badge variant={log.action === 'DELETE' ? 'destructive' : 'secondary'}>{log.action}</Badge>
-                          </TableCell>
+                          <TableCell><Badge variant={log.action === 'DELETE' ? 'destructive' : 'secondary'}>{log.action}</Badge></TableCell>
                           <TableCell>{log.table_name}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground truncate max-w-[200px]">
-                            {log.details ? JSON.stringify(log.details) : '—'}
-                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground truncate max-w-[200px]">{log.details ? JSON.stringify(log.details) : '—'}</TableCell>
                         </TableRow>
                       ))}
                       {(!auditLogs || auditLogs.length === 0) && (
