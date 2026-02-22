@@ -1,21 +1,22 @@
 
 
-## Make Special Instructions Scrollable
+## Fix Special Instructions Scrolling
 
 ### Problem
-The special instructions text in the Load Details dialog gets cut off on mobile screens. While there is a `ScrollArea` with `max-h-64` in the ActiveLoadCard dialog, the dialog's own scroll (`max-h-[90vh] overflow-y-auto`) competes with it, preventing the inner scroll from activating properly. The DriverLoadsView dialog uses a basic `max-h-32` which is too small.
+The `ScrollArea` component from Radix does not activate scrolling when only `max-h-40` is applied to its root. The Radix `Viewport` inside uses `h-full w-full`, which doesn't create the overflow needed to trigger the scrollbar. The text gets clipped and the "Scroll for more" hint is misleading.
+
+### Solution
+Replace the Radix `ScrollArea` with a plain `div` using `max-h-40 overflow-y-auto`. This is the simplest, most reliable way to get native scrolling on both mobile and desktop. The styled Radix scrollbar is unnecessary here since the content is inside a small box and native scrollbars work fine.
 
 ### Changes
 
 **File 1: `src/components/driver/ActiveLoadCard.tsx`**
-- Change the special instructions `ScrollArea` from `max-h-64` to `max-h-40` so it activates sooner within the dialog's viewport
-- Add a visible scroll indicator style so users know the content is scrollable
+- Replace `<ScrollArea className="max-h-40">` with `<div className="max-h-40 overflow-y-auto pr-3">`
+- Remove the inner `<div className="pr-3">` wrapper (padding moves to the scrollable div)
 
 **File 2: `src/components/driver/DriverLoadsView.tsx`**
-- Replace the plain `div` with `max-h-32 overflow-y-auto` with a proper `ScrollArea` component (matching the ActiveLoadCard pattern)
-- Add the same warning-styled container and `formatSpecialInstructions` helper used in ActiveLoadCard for consistency
-- Set `max-h-40` for the scroll area
+- Same replacement: `ScrollArea` to `<div className="max-h-40 overflow-y-auto pr-3">`
+- Remove the `ScrollArea` import if no longer used elsewhere in the file
 
-### Technical Notes
-- Both dialogs already have `max-h-[90vh] overflow-y-auto` on the `DialogContent`, which allows the entire dialog to scroll. The inner `ScrollArea` ensures the special instructions section itself is independently scrollable when it contains long text.
-- The `ScrollArea` component from Radix provides a styled scrollbar thumb, making it more visible to users that more content exists below.
+Both files keep the "Scroll for more" indicator and the warning-styled container unchanged.
+
