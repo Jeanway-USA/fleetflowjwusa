@@ -1,89 +1,120 @@
 
+## Super Admin Panel Enhancements
 
-## Super Admin Panel
+### 1. Add Super Admin Button to Sidebar
 
-### Overview
-Build a system-wide monitoring panel restricted to `andrew@jeanwayusa.com` and `siadrak@jeanwayusa.com`, using `SECURITY DEFINER` views to bypass org-scoped RLS without modifying existing policies.
+Add a "Super Admin" link in `AppSidebar.tsx` visible only to the two authorized emails. This will appear as a separate section at the bottom of the sidebar content, above the footer, with a distinctive icon (ShieldCheck).
 
-### 1. Database Migration
+**File: `src/components/layout/AppSidebar.tsx`**
+- Import `ShieldCheck` from lucide-react
+- After the Admin/Settings section and before the Driver "My Account" section, add a conditional block that checks `user?.email` against the super admin list
+- Renders a "Super Admin" nav link to `/super-admin`
 
-Create a migration with:
+### 2. Organization Detail Sheet
 
-**`is_super_admin()` function:**
+Create a new component `src/components/superadmin/OrgDetailSheet.tsx` that opens as a slide-out Sheet when clicking an org row in the Organizations table.
+
+**Content displayed:**
+- Org name, subscription tier (with badge), created date
+- Trial end date (from `trial_ends_at` column)
+- Active status (`is_active`)
+- User count
+- Branding info (primary color, logo URL, banner URL)
+- A "Deactivate Organization" button that sets `is_active = false` on the organizations table (via a SECURITY DEFINER function to bypass RLS)
+- A "Change Tier" dropdown to update `subscription_tier`
+
+### 3. Database Migration
+
+**New SECURITY DEFINER view `super_admin_org_detail`** -- extends the organizations view to include `trial_ends_at`, `is_active`, `primary_color`, `logo_url`, `banner_url`.
+
+Or simpler: update the existing `super_admin_organizations` view to include these extra columns.
+
+**New SECURITY DEFINER function `super_admin_update_org`** -- allows super admins to update org fields (subscription_tier, is_active) bypassing RLS:
 ```sql
-CREATE OR REPLACE FUNCTION public.is_super_admin()
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER
+CREATE OR REPLACE FUNCTION public.super_admin_update_org(
+  target_org_id uuid,
+  new_tier text DEFAULT NULL,
+  new_is_active boolean DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path TO 'public'
 AS $$
-  SELECT coalesce(
-    (auth.jwt() ->> 'email') IN ('andrew@jeanwayusa.com', 'siadrak@jeanwayusa.com'),
-    false
-  )
+BEGIN
+  IF NOT is_super_admin() THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+  UPDATE organizations
+  SET
+    subscription_tier = COALESCE(new_tier, subscription_tier),
+    is_active = COALESCE(new_is_active, is_active),
+    updated_at = now()
+  WHERE id = target_org_id;
+END;
 $$;
 ```
 
-**`super_admin_dashboard_data` view** (SECURITY DEFINER) -- aggregates:
-- Total org count
-- Tier distribution (solo_bco, fleet_owner, agency, all_in_one)
-- Signups in last 7 and 30 days
+### 4. Simulate Button Functionality
 
-**`super_admin_organizations` view** (SECURITY DEFINER) -- lists all orgs (id, name, subscription_tier, created_at, user count) with `WHERE is_super_admin()`.
+Make the "Simulate" button navigate to the executive dashboard while overriding the org context. Since the existing role simulation only swaps roles within the same org, org-level simulation requires a different approach.
 
-**`super_admin_audit_logs` view** (SECURITY DEFINER) -- exposes the 50 most recent `audit_logs` rows across all orgs with `WHERE is_super_admin()`.
+Implementation: Store a `simulatedOrgId` in localStorage, and create a banner in `DashboardLayout` that shows when simulating. The `AuthContext` will read this override to swap `orgId`/`orgName`/`subscriptionTier` when a super admin is simulating. An "Exit Simulation" button clears it and returns to `/super-admin`.
 
-Grant SELECT on all three views to the `authenticated` role; revoke from `anon`.
+**Files modified:**
+- `src/contexts/AuthContext.tsx` -- add `simulatedOrgId` state, read from localStorage, override org data when set
+- `src/components/layout/DashboardLayout.tsx` -- show simulation banner when `simulatedOrgId` is active
+- `src/pages/SuperAdminDashboard.tsx` -- wire up Simulate button to set localStorage + navigate
 
-### 2. Frontend Components
-
-**`src/components/shared/SuperAdminGuard.tsx`**
-- Checks `user.email` against the two approved emails
-- If not matched, redirects to `/`
-- Renders children if authorized
-
-**`src/pages/SuperAdminDashboard.tsx`**
-- Three-tab layout using shadcn Tabs
-
-**Tab 1 -- Overview:**
-- KPI cards (total orgs, 7-day signups, 30-day signups)
-- Recharts PieChart showing tier distribution
-- Uses `gradient-gold` and `glow-gold` theme classes
-
-**Tab 2 -- Organizations List:**
-- DataTable fetching from `super_admin_organizations`
-- Columns: Org Name, Tier (StatusBadge), Created Date, User Count
-- "Simulate Org" button per row -- sets a local state/context override so the admin can browse as that org (UI-only, similar to existing role simulation pattern)
-
-**Tab 3 -- System Health:**
-- Table showing 50 most recent audit_log entries (timestamp, user_id, action, table_name, details)
-
-### 3. Routing
-
-In `App.tsx`, add:
-```tsx
-<Route path="/super-admin" element={
-  <SuperAdminGuard>
-    <DashboardLayout>
-      <SuperAdminDashboard />
-    </DashboardLayout>
-  </SuperAdminGuard>
-} />
-```
-
-This route is outside `ProtectedRoute` to avoid role-based blocking, but `SuperAdminGuard` enforces its own auth + email check.
-
-### 4. Files to Create/Modify
+### 5. Summary of All Changes
 
 | File | Action |
 |------|--------|
-| `supabase/migrations/...super_admin.sql` | Create -- function + 3 views |
-| `src/components/shared/SuperAdminGuard.tsx` | Create |
-| `src/pages/SuperAdminDashboard.tsx` | Create |
-| `src/App.tsx` | Modify -- add `/super-admin` route |
+| `supabase/migrations/...` | Update `super_admin_organizations` view + add `super_admin_update_org` function |
+| `src/components/layout/AppSidebar.tsx` | Add Super Admin nav link for authorized emails |
+| `src/components/superadmin/OrgDetailSheet.tsx` | New -- org detail slide-out with tier change + deactivate |
+| `src/pages/SuperAdminDashboard.tsx` | Add org click handler, wire Simulate button |
+| `src/contexts/AuthContext.tsx` | Add `simulatedOrgId` support for org-level simulation |
+| `src/components/layout/DashboardLayout.tsx` | Show org simulation banner |
 
-### 5. Constraints
-- No changes to existing RLS policies on `organizations`, `profiles`, `audit_logs`, etc.
-- All cross-tenant reads go through SECURITY DEFINER views gated by `is_super_admin()`
-- TanStack Query for all data fetching
-- Consistent use of `gradient-gold` / `glow-gold` theme utilities
+### Technical Details
 
+**Database migration SQL:**
+```sql
+-- Update organizations view to include more fields
+CREATE OR REPLACE VIEW public.super_admin_organizations
+WITH (security_invoker = false)
+AS
+SELECT
+  o.id, o.name, o.subscription_tier, o.created_at,
+  o.trial_ends_at, o.is_active, o.primary_color, o.logo_url, o.banner_url,
+  (SELECT count(*) FROM public.profiles p WHERE p.org_id = o.id)::int AS user_count
+FROM public.organizations o
+WHERE public.is_super_admin();
+
+-- RPC to update org (bypasses RLS)
+CREATE OR REPLACE FUNCTION public.super_admin_update_org(
+  target_org_id uuid,
+  new_tier text DEFAULT NULL,
+  new_is_active boolean DEFAULT NULL
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public' AS $$
+BEGIN
+  IF NOT is_super_admin() THEN RAISE EXCEPTION 'Access denied'; END IF;
+  UPDATE organizations SET
+    subscription_tier = COALESCE(new_tier, subscription_tier),
+    is_active = COALESCE(new_is_active, is_active),
+    updated_at = now()
+  WHERE id = target_org_id;
+END; $$;
+```
+
+**Sidebar super admin check:** Check `user?.email` against `['andrew@jeanwayusa.com', 'siadrak@jeanwayusa.com']` -- same list used in `SuperAdminGuard`.
+
+**Org simulation flow:**
+1. Click "Simulate" on an org row
+2. Store `simulatedOrgId` in localStorage + AuthContext state
+3. AuthContext fetches that org's data and overrides `orgId`, `orgName`, `subscriptionTier`
+4. Navigate to `/executive-dashboard`
+5. A gold banner shows "Simulating: [Org Name]" with an "Exit" button
+6. Exit clears localStorage + state, navigates back to `/super-admin`
