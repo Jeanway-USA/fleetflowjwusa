@@ -15,10 +15,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Users, Shield, Trash2, UserPlus, Sun, Moon, Mail, Building2, Pencil, KeyRound, Palette, CreditCard } from 'lucide-react';
+import { Users, Shield, Trash2, UserPlus, Sun, Moon, Mail, Building2, Pencil, KeyRound, Palette, CreditCard, HardDrive } from 'lucide-react';
 import { CompanyTab } from '@/components/settings/CompanyTab';
 import { BrandingTab } from '@/components/settings/BrandingTab';
 import { BillingTab } from '@/components/settings/BillingTab';
+import { StorageTab } from '@/components/settings/StorageTab';
 import type { Database } from '@/integrations/supabase/types';
 
 type AppRole = Database['public']['Enums']['app_role'];
@@ -380,6 +381,10 @@ export default function Settings() {
             <CreditCard className="h-4 w-4" />
             Billing
           </TabsTrigger>
+          <TabsTrigger value="storage" className="flex items-center gap-2">
+            <HardDrive className="h-4 w-4" />
+            Storage
+          </TabsTrigger>
         </TabsList>
 
         {/* Users & Roles Tab */}
@@ -565,6 +570,11 @@ export default function Settings() {
         {/* Billing Tab */}
         <TabsContent value="billing">
           <BillingTab />
+        </TabsContent>
+
+        {/* Storage Tab */}
+        <TabsContent value="storage">
+          <StorageTab />
         </TabsContent>
       </Tabs>
 

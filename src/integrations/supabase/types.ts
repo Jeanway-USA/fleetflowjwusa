@@ -2703,6 +2703,57 @@ export type Database = {
         }
         Relationships: []
       }
+      org_storage_config: {
+        Row: {
+          connected_at: string | null
+          created_at: string
+          encrypted_credentials: string | null
+          id: string
+          is_active: boolean
+          org_id: string
+          provider: string
+          root_folder_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          connected_at?: string | null
+          created_at?: string
+          encrypted_credentials?: string | null
+          id?: string
+          is_active?: boolean
+          org_id: string
+          provider?: string
+          root_folder_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          connected_at?: string | null
+          created_at?: string
+          encrypted_credentials?: string | null
+          id?: string
+          is_active?: boolean
+          org_id?: string
+          provider?: string
+          root_folder_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_storage_config_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_storage_config_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           banner_url: string | null

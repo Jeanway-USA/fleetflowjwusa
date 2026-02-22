@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useStorageProvider } from '@/hooks/useStorageProvider';
 
 interface DocumentScanButtonProps {
   driverId: string;
@@ -24,6 +25,7 @@ const DOC_TYPES = [
 
 export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
   const { user } = useAuth();
+  const { upload } = useStorageProvider();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -38,17 +40,13 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
       const fileExt = selectedFile.name.split('.').pop();
       const filePath = `${driverId}/${Date.now()}.${fileExt}`;
 
-      // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, selectedFile);
-      
-      if (uploadError) throw uploadError;
+      // Upload through storage provider
+      const { path, error: uploadError } = await upload('documents', filePath, selectedFile);
+      if (uploadError || !path) throw uploadError || new Error('Upload failed');
 
-      // Save document record with the path (not public URL) for private bucket
       const { error: dbError } = await supabase.from('documents').insert({
         file_name: selectedFile.name,
-        file_path: filePath,
+        file_path: path,
         file_size: selectedFile.size,
         document_type: docType,
         uploaded_by: user?.id,

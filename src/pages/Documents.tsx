@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Upload, Trash2, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { extractStoragePath } from '@/hooks/useSignedUrl';
+import { useStorageProvider } from '@/hooks/useStorageProvider';
 import type { Database } from '@/integrations/supabase/types';
 
 type Document = Database['public']['Tables']['documents']['Row'];
@@ -32,6 +32,7 @@ const documentCategories = [
 export default function Documents() {
   const { orgId } = useAuth();
   const queryClient = useQueryClient();
+  const { upload: storageUpload, remove: storageRemove } = useStorageProvider();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [selectedType, setSelectedType] = useState('BOL');
@@ -51,10 +52,8 @@ export default function Documents() {
 
   const deleteMutation = useMutation({
     mutationFn: async (doc: Document) => {
-      // Handle both old URL format and new path format
-      const storagePath = extractStoragePath(doc.file_path, 'documents') || doc.file_path;
-      if (storagePath) {
-        await supabase.storage.from('documents').remove([storagePath]);
+      if (doc.file_path) {
+        await storageRemove('documents', doc.file_path);
       }
       const { error } = await supabase.from('documents').delete().eq('id', doc.id);
       if (error) throw error;
@@ -78,16 +77,13 @@ export default function Documents() {
       const fileExt = file.name.split('.').pop();
       const filePath = `general/${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file);
+      const { path, error: uploadError } = await storageUpload('documents', filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError || !path) throw uploadError || new Error('Upload failed');
 
-      // Store the path (not public URL) for private bucket
       const { error: dbError } = await supabase.from('documents').insert({
         file_name: file.name,
-        file_path: filePath,
+        file_path: path,
         file_size: file.size,
         document_type: selectedType,
         related_type: 'general',
