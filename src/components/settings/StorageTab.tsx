@@ -255,11 +255,11 @@ export function StorageTab() {
             </li>
             <li className="flex items-start gap-2">
               <span className="font-medium text-foreground mt-0.5">3.</span>
-              All new uploads will be stored in a "FleetFlow Storage" folder in your Google Drive
+              All new uploads will be stored in your organization's Google Drive folder
             </li>
             <li className="flex items-start gap-2">
               <span className="font-medium text-foreground mt-0.5">4.</span>
-              Existing files in built-in storage continue to work — they won't be moved automatically
+              Once connected, all documents are stored in Google Drive — reducing platform storage usage
             </li>
           </ul>
         </CardContent>

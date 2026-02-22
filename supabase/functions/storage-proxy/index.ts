@@ -313,12 +313,17 @@ Deno.serve(async (req) => {
             provider: 'google_drive',
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         } catch (driveError) {
-          console.error('Google Drive upload failed, falling back to built-in storage:', driveError);
-          // Fall through to built-in storage below
+          console.error('Google Drive upload failed:', driveError);
+          const message = driveError instanceof Error ? driveError.message : 'Google Drive upload failed';
+          return new Response(JSON.stringify({ 
+            error: `Google Drive upload failed: ${message}. Please ensure the Google Drive API is enabled in your Google Cloud project, then disconnect and reconnect Google Drive in Settings.` 
+          }), {
+            status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
       }
 
-      // Fallback: built-in storage
+      // No Google Drive configured — use built-in storage
       const { error: uploadError } = await supabase.storage
         .from(bucket)
         .upload(filePath, fileData, { contentType: file.type || 'application/octet-stream' });
