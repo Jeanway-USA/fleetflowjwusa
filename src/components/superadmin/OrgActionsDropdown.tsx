@@ -8,7 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { MoreHorizontal, Eye, CalendarIcon, KeyRound } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { MoreHorizontal, Eye, CalendarIcon, KeyRound, Gift } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -20,28 +23,44 @@ interface OrgActionsDropdownProps {
 export function OrgActionsDropdown({ org }: OrgActionsDropdownProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [trialOpen, setTrialOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
+  
+  // Trial state
   const [trialDate, setTrialDate] = useState<Date | undefined>(
     org.trial_ends_at ? new Date(org.trial_ends_at) : undefined
   );
   const [trialActive, setTrialActive] = useState(!!org.trial_ends_at);
 
-  const updateTrial = useMutation({
+  // Complimentary state
+  const [compActive, setCompActive] = useState(!!org.is_complimentary);
+  const [compDuration, setCompDuration] = useState<'permanent' | 'until_date'>(
+    org.is_complimentary && org.complimentary_ends_at ? 'until_date' : 'permanent'
+  );
+  const [compDate, setCompDate] = useState<Date | undefined>(
+    org.complimentary_ends_at ? new Date(org.complimentary_ends_at) : undefined
+  );
+
+  const updatePlan = useMutation({
     mutationFn: async () => {
       const newTrialEndsAt = trialActive ? (trialDate?.toISOString() ?? null) : null;
+      const newIsComplimentary = compActive;
+      const newCompEndsAt = compActive && compDuration === 'until_date' ? (compDate?.toISOString() ?? null) : null;
+
       const { error } = await supabase.rpc('super_admin_update_org' as any, {
         target_org_id: org.id,
         new_trial_ends_at: newTrialEndsAt,
+        new_is_complimentary: newIsComplimentary,
+        new_complimentary_ends_at: newCompEndsAt,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['super-admin-organizations'] });
       queryClient.invalidateQueries({ queryKey: ['super-admin-dashboard'] });
-      toast.success('Trial status updated');
-      setTrialOpen(false);
+      toast.success('Plan access updated');
+      setPlanOpen(false);
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to update trial'),
+    onError: (err: any) => toast.error(err.message || 'Failed to update plan access'),
   });
 
   const resetPassword = useMutation({
@@ -86,8 +105,8 @@ export function OrgActionsDropdown({ org }: OrgActionsDropdownProps) {
           <DropdownMenuItem onClick={handleSimulate}>
             <Eye className="h-4 w-4 mr-2" /> Simulate
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setTrialOpen(true)}>
-            <CalendarIcon className="h-4 w-4 mr-2" /> Manage Trial
+          <DropdownMenuItem onClick={() => setPlanOpen(true)}>
+            <Gift className="h-4 w-4 mr-2" /> Manage Plan Access
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handlePasswordReset}>
@@ -96,41 +115,88 @@ export function OrgActionsDropdown({ org }: OrgActionsDropdownProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Dialog open={trialOpen} onOpenChange={setTrialOpen}>
+      <Dialog open={planOpen} onOpenChange={setPlanOpen}>
         <DialogContent className="sm:max-w-sm" onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
-            <DialogTitle>Manage Trial — {org.name}</DialogTitle>
-            <DialogDescription>Toggle trial status and set end date.</DialogDescription>
+            <DialogTitle>Manage Plan Access — {org.name}</DialogTitle>
+            <DialogDescription>Grant complimentary access or manage trial status.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Trial Active</span>
-              <Switch checked={trialActive} onCheckedChange={setTrialActive} />
-            </div>
-            {trialActive && (
-              <div className="space-y-2">
-                <label className="text-sm text-muted-foreground">Trial End Date</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !trialDate && 'text-muted-foreground')}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {trialDate ? format(trialDate, 'PPP') : 'Pick a date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={trialDate}
-                      onSelect={setTrialDate}
-                      initialFocus
-                      className={cn('p-3 pointer-events-auto')}
-                    />
-                  </PopoverContent>
-                </Popover>
+            {/* Complimentary Access */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Complimentary Access</span>
+                <Switch checked={compActive} onCheckedChange={setCompActive} />
               </div>
-            )}
-            <Button className="w-full" disabled={updateTrial.isPending} onClick={() => updateTrial.mutate()}>
-              {updateTrial.isPending ? 'Saving…' : 'Save Trial Settings'}
+              {compActive && (
+                <div className="space-y-3 pl-1">
+                  <RadioGroup value={compDuration} onValueChange={(v) => setCompDuration(v as any)}>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="permanent" id="comp-perm" />
+                      <Label htmlFor="comp-perm" className="text-sm">Permanent</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="until_date" id="comp-date" />
+                      <Label htmlFor="comp-date" className="text-sm">Until specific date</Label>
+                    </div>
+                  </RadioGroup>
+                  {compDuration === 'until_date' && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !compDate && 'text-muted-foreground')}>
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {compDate ? format(compDate, 'PPP') : 'Pick a date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={compDate}
+                          onSelect={setCompDate}
+                          initialFocus
+                          className={cn('p-3 pointer-events-auto')}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Trial Controls */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Trial Active</span>
+                <Switch checked={trialActive} onCheckedChange={setTrialActive} />
+              </div>
+              {trialActive && (
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Trial End Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className={cn('w-full justify-start text-left font-normal', !trialDate && 'text-muted-foreground')}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {trialDate ? format(trialDate, 'PPP') : 'Pick a date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={trialDate}
+                        onSelect={setTrialDate}
+                        initialFocus
+                        className={cn('p-3 pointer-events-auto')}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
+            </div>
+
+            <Button className="w-full" disabled={updatePlan.isPending} onClick={() => updatePlan.mutate()}>
+              {updatePlan.isPending ? 'Saving…' : 'Save Plan Settings'}
             </Button>
           </div>
         </DialogContent>

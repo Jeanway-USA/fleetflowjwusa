@@ -95,6 +95,20 @@ export function OrgDetailSheet({ org, open, onOpenChange }: OrgDetailSheetProps)
             </span>
           </div>
 
+          {/* Plan Access */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Plan Access</span>
+            {org.is_complimentary ? (
+              <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600">
+                {org.complimentary_ends_at
+                  ? `Complimentary (until ${format(new Date(org.complimentary_ends_at), 'MMM d, yyyy')})`
+                  : 'Complimentary (Permanent)'}
+              </Badge>
+            ) : (
+              <Badge variant="secondary">Standard</Badge>
+            )}
+          </div>
+
           {/* Trial */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Trial Ends</span>

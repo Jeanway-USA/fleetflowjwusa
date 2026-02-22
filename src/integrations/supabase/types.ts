@@ -2757,9 +2757,11 @@ export type Database = {
       organizations: {
         Row: {
           banner_url: string | null
+          complimentary_ends_at: string | null
           created_at: string
           id: string
           is_active: boolean
+          is_complimentary: boolean
           logo_url: string | null
           name: string
           primary_color: string | null
@@ -2769,9 +2771,11 @@ export type Database = {
         }
         Insert: {
           banner_url?: string | null
+          complimentary_ends_at?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
+          is_complimentary?: boolean
           logo_url?: string | null
           name: string
           primary_color?: string | null
@@ -2781,9 +2785,11 @@ export type Database = {
         }
         Update: {
           banner_url?: string | null
+          complimentary_ends_at?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
+          is_complimentary?: boolean
           logo_url?: string | null
           name?: string
           primary_color?: string | null
@@ -3609,9 +3615,11 @@ export type Database = {
       super_admin_organizations: {
         Row: {
           banner_url: string | null
+          complimentary_ends_at: string | null
           created_at: string | null
           id: string | null
           is_active: boolean | null
+          is_complimentary: boolean | null
           logo_url: string | null
           name: string | null
           primary_color: string | null
@@ -3621,9 +3629,11 @@ export type Database = {
         }
         Insert: {
           banner_url?: string | null
+          complimentary_ends_at?: string | null
           created_at?: string | null
           id?: string | null
           is_active?: boolean | null
+          is_complimentary?: boolean | null
           logo_url?: string | null
           name?: string | null
           primary_color?: string | null
@@ -3633,9 +3643,11 @@ export type Database = {
         }
         Update: {
           banner_url?: string | null
+          complimentary_ends_at?: string | null
           created_at?: string | null
           id?: string | null
           is_active?: boolean | null
+          is_complimentary?: boolean | null
           logo_url?: string | null
           name?: string | null
           primary_color?: string | null
@@ -3701,15 +3713,27 @@ export type Database = {
           total_bytes: number
         }[]
       }
-      super_admin_update_org: {
-        Args: {
-          new_is_active?: boolean
-          new_tier?: string
-          new_trial_ends_at?: string
-          target_org_id: string
-        }
-        Returns: undefined
-      }
+      super_admin_update_org:
+        | {
+            Args: {
+              new_is_active?: boolean
+              new_tier?: string
+              new_trial_ends_at?: string
+              target_org_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              new_complimentary_ends_at?: string
+              new_is_active?: boolean
+              new_is_complimentary?: boolean
+              new_tier?: string
+              new_trial_ends_at?: string
+              target_org_id: string
+            }
+            Returns: undefined
+          }
     }
     Enums: {
       app_role: "owner" | "payroll_admin" | "dispatcher" | "safety" | "driver"
