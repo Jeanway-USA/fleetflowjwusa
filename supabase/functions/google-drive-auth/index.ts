@@ -28,19 +28,6 @@ async function encrypt(plaintext: string): Promise<string> {
   return 'enc:' + btoa(binary);
 }
 
-async function decrypt(encryptedData: string): Promise<string> {
-  if (!encryptedData.startsWith('enc:')) return encryptedData;
-  const key = await getEncryptionKey();
-  const base64Data = encryptedData.slice(4);
-  const binaryString = atob(base64Data);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-  const iv = bytes.slice(0, 12);
-  const ciphertext = bytes.slice(12);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
-  return new TextDecoder().decode(decrypted);
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -50,6 +37,14 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const googleClientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')!;
+    const googleClientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')!;
+
+    if (!googleClientId || !googleClientSecret) {
+      return new Response(JSON.stringify({ error: 'Google OAuth not configured on the platform' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Authenticate user
     const authHeader = req.headers.get('Authorization');
@@ -83,7 +78,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify user is owner
     const { data: roleData } = await supabase
       .from('user_roles')
       .select('role')
@@ -101,24 +95,46 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action } = body;
 
+    // ===== GET AUTH URL =====
+    if (action === 'get_auth_url') {
+      const { redirect_uri } = body;
+      if (!redirect_uri) {
+        return new Response(JSON.stringify({ error: 'Missing redirect_uri' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const scope = 'https://www.googleapis.com/auth/drive.file';
+      const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      authUrl.searchParams.set('client_id', googleClientId);
+      authUrl.searchParams.set('redirect_uri', redirect_uri);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('scope', scope);
+      authUrl.searchParams.set('access_type', 'offline');
+      authUrl.searchParams.set('prompt', 'consent');
+
+      return new Response(JSON.stringify({ auth_url: authUrl.toString() }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // ===== EXCHANGE AUTH CODE =====
     if (action === 'exchange_code') {
-      const { code, redirect_uri, client_id, client_secret } = body;
+      const { code, redirect_uri } = body;
 
-      if (!code || !redirect_uri || !client_id || !client_secret) {
+      if (!code || !redirect_uri) {
         return new Response(JSON.stringify({ error: 'Missing required fields' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Exchange auth code for tokens
       const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
           code,
-          client_id,
-          client_secret,
+          client_id: googleClientId,
+          client_secret: googleClientSecret,
           redirect_uri,
           grant_type: 'authorization_code',
         }),
@@ -127,7 +143,7 @@ Deno.serve(async (req) => {
       if (!tokenResp.ok) {
         const err = await tokenResp.text();
         console.error('Token exchange failed:', err);
-        return new Response(JSON.stringify({ error: 'Failed to connect Google Drive. Please check your credentials.' }), {
+        return new Response(JSON.stringify({ error: 'Failed to connect Google Drive. Please try again.' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -140,7 +156,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Create a root folder for FleetFlow in the user's Drive
+      // Create root folder
       const accessToken = tokenData.access_token;
       const createFolderResp = await fetch('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
@@ -160,10 +176,8 @@ Deno.serve(async (req) => {
         rootFolderId = folderData.id;
       }
 
-      // Encrypt credentials
+      // Encrypt credentials (no client_id/secret needed — platform provides those)
       const credentials = {
-        client_id,
-        client_secret,
         refresh_token: tokenData.refresh_token,
         access_token: tokenData.access_token,
         token_expiry: Date.now() + (tokenData.expires_in || 3600) * 1000,
@@ -171,7 +185,6 @@ Deno.serve(async (req) => {
 
       const encryptedCreds = await encrypt(JSON.stringify(credentials));
 
-      // Upsert storage config
       const { error: upsertError } = await supabase
         .from('org_storage_config')
         .upsert({
@@ -195,10 +208,7 @@ Deno.serve(async (req) => {
     if (action === 'disconnect') {
       const { error } = await supabase
         .from('org_storage_config')
-        .update({
-          is_active: false,
-          provider: 'built_in',
-        })
+        .update({ is_active: false, provider: 'built_in' })
         .eq('org_id', orgId);
 
       if (error) throw error;
