@@ -106,6 +106,9 @@ const FALLBACK_DIESEL_PRICES: Record<string, number> = {
   'VA': 3.55, 'WA': 3.90, 'WV': 3.60, 'WI': 3.50, 'WY': 3.50,
 };
 
+// National average for savings comparison
+const NATIONAL_AVG_DIESEL = 3.55;
+
 // ===== Utility Functions =====
 
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -128,7 +131,7 @@ function distanceToRouteSegment(
   const d2 = haversineDistance(pointLat, pointLng, destLat, destLng);
   const dRoute = haversineDistance(originLat, originLng, destLat, destLng);
   
-  if (dRoute < 0.1) return d1; // origin and dest are the same point
+  if (dRoute < 0.1) return d1;
   if (d1 * d1 > d2 * d2 + dRoute * dRoute) return d2;
   if (d2 * d2 > d1 * d1 + dRoute * dRoute) return d1;
   
@@ -148,7 +151,6 @@ function distanceToMultiSegmentRoute(
     return distanceToRouteSegment(pointLat, pointLng, originLat, originLng, destLat, destLng);
   }
 
-  // Build ordered list of points: origin, wp1, wp2, ..., destination
   const points = [
     { lat: originLat, lng: originLng },
     ...waypoints,
@@ -167,6 +169,64 @@ function distanceToMultiSegmentRoute(
   return minDist;
 }
 
+// Polyline-based distance: compute min distance from a point to any segment of the polyline
+function distanceToPolyline(
+  pointLat: number, pointLng: number,
+  polyline: Array<[number, number]>
+): number {
+  if (polyline.length < 2) {
+    return polyline.length === 1
+      ? haversineDistance(pointLat, pointLng, polyline[0][0], polyline[0][1])
+      : Infinity;
+  }
+
+  let minDist = Infinity;
+  for (let i = 0; i < polyline.length - 1; i++) {
+    const d = distanceToRouteSegment(
+      pointLat, pointLng,
+      polyline[i][0], polyline[i][1],
+      polyline[i + 1][0], polyline[i + 1][1]
+    );
+    if (d < minDist) minDist = d;
+  }
+  return minDist;
+}
+
+// Compute distance from a point to the route, preferring polyline if available
+function distanceFromRoute(
+  pointLat: number, pointLng: number,
+  originLat: number, originLng: number,
+  destLat: number, destLng: number,
+  waypoints?: Array<{ lat: number; lng: number }>,
+  routePolyline?: Array<[number, number]>
+): number {
+  if (routePolyline && routePolyline.length >= 2) {
+    return distanceToPolyline(pointLat, pointLng, routePolyline);
+  }
+  return distanceToMultiSegmentRoute(pointLat, pointLng, originLat, originLng, destLat, destLng, waypoints);
+}
+
+// Compute projected savings
+function computeProjectedSavings(
+  filteredStops: Array<{ net_price: number | null; diesel_price: number | null; lcapp_discount: number | null; state: string }>,
+  estimatedGallons: number
+): { cheapest_net: number; avg_price: number; savings_per_gallon: number; total_savings: number } | null {
+  if (filteredStops.length === 0) return null;
+
+  const priced = filteredStops.filter(s => (s.net_price ?? s.diesel_price ?? null) !== null);
+  if (priced.length === 0) return null;
+
+  const cheapestNet = Math.min(...priced.map(s => s.net_price ?? s.diesel_price ?? 999));
+  const savingsPerGallon = Math.max(0, NATIONAL_AVG_DIESEL - cheapestNet);
+
+  return {
+    cheapest_net: parseFloat(cheapestNet.toFixed(2)),
+    avg_price: NATIONAL_AVG_DIESEL,
+    savings_per_gallon: parseFloat(savingsPerGallon.toFixed(3)),
+    total_savings: parseFloat((savingsPerGallon * estimatedGallons).toFixed(2)),
+  };
+}
+
 // ===== AES-GCM Decryption =====
 async function getEncryptionKey(): Promise<CryptoKey> {
   const keyString = Deno.env.get('CREDENTIAL_ENCRYPTION_KEY');
@@ -180,7 +240,6 @@ async function getEncryptionKey(): Promise<CryptoKey> {
 
 async function decryptPassword(encryptedData: string): Promise<string> {
   if (!encryptedData.startsWith('enc:')) {
-    // Legacy plaintext password - return as-is
     console.warn('Found legacy plaintext password - will be encrypted on next save');
     return encryptedData;
   }
@@ -242,7 +301,6 @@ async function attemptLandstarScrape(username: string, password: string): Promis
 
     const html = await fuelResponse.text();
     
-    const stops: any[] = [];
     const jsonMatch = html.match(/var\s+(?:fuelStops|stops|locations)\s*=\s*(\[[\\s\\S]*?\]);/);
     if (jsonMatch) {
       try {
@@ -337,11 +395,13 @@ Deno.serve(async (req) => {
       origin_lat, origin_lng, 
       dest_lat, dest_lng, 
       waypoints = [] as Array<{ lat: number; lng: number }>,
+      route_polyline,
       corridor_miles = 50,
-      force_refresh = false 
+      force_refresh = false,
+      booked_miles,
     } = body;
 
-    console.log(`Waypoints received: ${waypoints.length}`);
+    console.log(`Waypoints received: ${waypoints.length}, route_polyline points: ${route_polyline?.length ?? 0}`);
 
     if (!driver_id || !origin_lat || !origin_lng || !dest_lat || !dest_lng) {
       return new Response(
@@ -353,6 +413,10 @@ Deno.serve(async (req) => {
     console.log(`Fuel stops request: driver=${driver_id}, origin=(${origin_lat},${origin_lng}), dest=(${dest_lat},${dest_lng}), corridor=${corridor_miles}mi, force_refresh=${force_refresh}`);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Estimate gallons for projected savings
+    const tripMiles = booked_miles || haversineDistance(origin_lat, origin_lng, dest_lat, dest_lng);
+    const estimatedGallons = tripMiles / 6.5;
 
     // Check cache first (6 hour TTL) — skip if force_refresh
     if (!force_refresh) {
@@ -381,18 +445,20 @@ Deno.serve(async (req) => {
           .map(stop => ({
             ...stop,
             ifta_tax_credit: STATE_DIESEL_TAX[stop.state?.toUpperCase()] ?? 0,
-            distance_from_route: distanceToMultiSegmentRoute(
+            distance_from_route: distanceFromRoute(
               stop.latitude, stop.longitude,
               origin_lat, origin_lng, dest_lat, dest_lng,
-              waypoints
+              waypoints, route_polyline
             ),
             distance_from_origin: haversineDistance(origin_lat, origin_lng, stop.latitude, stop.longitude),
           }))
           .filter(stop => stop.distance_from_route <= corridor_miles)
           .sort((a, b) => (a.net_price || 999) - (b.net_price || 999));
 
+        const projected_savings = computeProjectedSavings(filtered, estimatedGallons);
+
         return new Response(
-          JSON.stringify({ fuel_stops: filtered, source: 'cache', fetched_at: cachedStops[0]?.fetched_at }),
+          JSON.stringify({ fuel_stops: filtered, source: 'cache', fetched_at: cachedStops[0]?.fetched_at, projected_savings }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -498,8 +564,7 @@ Deno.serve(async (req) => {
         .gte('longitude', minLng)
         .lte('longitude', maxLng);
 
-      // Cache without ifta_tax_credit (computed at read time)
-      const cacheStops = fuelStops.map(({ ifta_tax_credit, distance_from_route, distance_from_origin, ...rest }) => rest);
+      const cacheStops = fuelStops.map(({ ifta_tax_credit, distance_from_route, distance_from_origin, ...rest }: any) => rest);
       const { error: insertError } = await supabase
         .from('fuel_stops_cache')
         .insert(cacheStops);
@@ -511,21 +576,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Filter stops within the corridor and calculate distances
+    // Filter stops within the corridor using polyline or multi-segment fallback
     const filteredStops = fuelStops
-      .map(stop => ({
+      .map((stop: any) => ({
         ...stop,
-        distance_from_route: distanceToMultiSegmentRoute(
+        distance_from_route: distanceFromRoute(
           stop.latitude, stop.longitude,
           origin_lat, origin_lng, dest_lat, dest_lng,
-          waypoints
+          waypoints, route_polyline
         ),
         distance_from_origin: haversineDistance(origin_lat, origin_lng, stop.latitude, stop.longitude),
       }))
-      .filter(stop => stop.distance_from_route <= corridor_miles)
-      .sort((a, b) => (a.net_price || 999) - (b.net_price || 999));
+      .filter((stop: any) => stop.distance_from_route <= corridor_miles)
+      .sort((a: any, b: any) => (a.net_price || 999) - (b.net_price || 999));
 
-    console.log(`Returning ${filteredStops.length} fuel stops within ${corridor_miles}mi corridor`);
+    const projected_savings = computeProjectedSavings(filteredStops, estimatedGallons);
+
+    console.log(`Returning ${filteredStops.length} fuel stops within ${corridor_miles}mi corridor (polyline: ${!!route_polyline})`);
 
     return new Response(
       JSON.stringify({
@@ -534,6 +601,7 @@ Deno.serve(async (req) => {
         fetched_at: now,
         total_available: fuelStops.length,
         filtered_count: filteredStops.length,
+        projected_savings,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
