@@ -1,31 +1,21 @@
 
 
-## Plan: Fix Branding Assets to Use Google Drive
+## Fix: Settlement Creation RLS Error
 
-### The Situation
+The error "new row violates row-level security policy for table settlements" occurs because `org_id` is not included in the insert payload when creating a settlement. The RLS policy requires `org_id = get_user_org_id(auth.uid())`.
 
-The `BrandingTab` component already uploads via `useStorageProvider`, which correctly routes to Google Drive when connected. However, there are two issues:
+### Root Cause
 
-1. **Display is broken for Google Drive files** -- the component uses `useSignedUrl` (built-in storage only) to display the logo and banner. If the file path is `gdrive:...`, `useSignedUrl` won't resolve it. It needs to use `useProviderSignedUrl` instead.
+In `src/components/finance/SettlementsTab.tsx`, the `createMutation` inserts a settlement without setting `org_id`. The component does not import `useAuth` or access `orgId` at all.
 
-2. **The `organizations` table stores `logo_url` and `banner_url`** -- these are separate from the `documents` table. The migration action already handles `company_settings` but needs to also handle `organizations.logo_url` and `organizations.banner_url` columns.
+### Fix
 
-### Changes
+**File: `src/components/finance/SettlementsTab.tsx`**
 
-| File | Change |
-|------|--------|
-| `src/components/settings/BrandingTab.tsx` | Replace `useSignedUrl` with `useProviderSignedUrl` from `useStorageProvider` so that `gdrive:` paths resolve correctly |
-| `supabase/functions/storage-proxy/index.ts` | Add `organizations.logo_url` and `organizations.banner_url` to the migrate action so existing branding assets get moved to Google Drive during migration |
+1. Import `useAuth` from `@/contexts/AuthContext`
+2. Destructure `orgId` from `useAuth()` inside the component
+3. Add `org_id: orgId` to the settlement insert payload (line ~343)
+4. Also add `org_id: orgId` to the line items insert if the `settlement_line_items` table has the same RLS requirement
 
-### Technical Details
-
-**BrandingTab.tsx:**
-- Replace `import { useSignedUrl }` with `import { useProviderSignedUrl }` from `@/hooks/useStorageProvider`
-- Change `useSignedUrl('branding-assets', logoUrl)` to `useProviderSignedUrl('branding-assets', logoUrl)`
-- Change `useSignedUrl('branding-assets', bannerUrl)` to `useProviderSignedUrl('branding-assets', bannerUrl)`
-- This ensures that when the stored path is `gdrive:...`, the proxy is used to fetch the image
-
-**storage-proxy/index.ts (migrate action):**
-- Add a new section in the migrate handler that queries the `organizations` table for `logo_url` and `banner_url` where the org matches and the path does NOT start with `gdrive:`
-- For each branding asset found, download from `branding-assets` bucket, upload to Google Drive under a `branding-assets` subfolder, update the column to `gdrive:{id}`, and delete from built-in storage
+This is a small, targeted fix -- just adding the missing `org_id` field to comply with existing RLS policies.
 
