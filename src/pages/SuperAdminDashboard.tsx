@@ -14,6 +14,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import { Building2, Users, TrendingUp, Shield, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { OrgDetailSheet } from '@/components/superadmin/OrgDetailSheet';
+import { AuditLogDetailSheet } from '@/components/superadmin/AuditLogDetailSheet';
 
 const TIER_COLORS: Record<string, string> = {
   solo_bco: 'hsl(45, 80%, 45%)',
@@ -33,6 +34,8 @@ export default function SuperAdminDashboard() {
   const navigate = useNavigate();
   const [selectedOrg, setSelectedOrg] = useState<any | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<any | null>(null);
+  const [logSheetOpen, setLogSheetOpen] = useState(false);
 
   const { data: dashboardData, isLoading: dashLoading } = useQuery({
     queryKey: ['super-admin-dashboard'],
@@ -83,6 +86,11 @@ export default function SuperAdminDashboard() {
   const handleOrgClick = (org: any) => {
     setSelectedOrg(org);
     setSheetOpen(true);
+  };
+
+  const handleLogClick = (log: any) => {
+    setSelectedLog(log);
+    setLogSheetOpen(true);
   };
 
   return (
@@ -215,6 +223,7 @@ export default function SuperAdminDashboard() {
                     <TableHeader>
                       <TableRow className="bg-muted/50">
                         <TableHead className="font-semibold">Timestamp</TableHead>
+                        <TableHead className="font-semibold">Organization</TableHead>
                         <TableHead className="font-semibold">User ID</TableHead>
                         <TableHead className="font-semibold">Action</TableHead>
                         <TableHead className="font-semibold">Table</TableHead>
@@ -223,8 +232,13 @@ export default function SuperAdminDashboard() {
                     </TableHeader>
                     <TableBody>
                       {auditLogs?.map((log: any) => (
-                        <TableRow key={log.id}>
+                        <TableRow
+                          key={log.id}
+                          className="cursor-pointer hover:bg-muted/30"
+                          onClick={() => handleLogClick(log)}
+                        >
                           <TableCell className="text-xs">{format(new Date(log.created_at), 'MMM d, HH:mm:ss')}</TableCell>
+                          <TableCell className="text-xs">{log.org_name || '—'}</TableCell>
                           <TableCell className="font-mono text-xs truncate max-w-[120px]">{log.user_id?.slice(0, 8)}…</TableCell>
                           <TableCell>
                             <Badge variant={log.action === 'DELETE' ? 'destructive' : 'secondary'}>{log.action}</Badge>
@@ -237,7 +251,7 @@ export default function SuperAdminDashboard() {
                       ))}
                       {(!auditLogs || auditLogs.length === 0) && (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">No audit logs found</TableCell>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">No audit logs found</TableCell>
                         </TableRow>
                       )}
                     </TableBody>
@@ -250,6 +264,7 @@ export default function SuperAdminDashboard() {
       </Tabs>
 
       <OrgDetailSheet org={selectedOrg} open={sheetOpen} onOpenChange={setSheetOpen} />
+      <AuditLogDetailSheet log={selectedLog} open={logSheetOpen} onOpenChange={setLogSheetOpen} />
     </DashboardLayout>
   );
 }
