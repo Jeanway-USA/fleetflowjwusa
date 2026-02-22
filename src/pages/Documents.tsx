@@ -21,6 +21,8 @@ const documentCategories = [
   { value: 'all', label: 'All Documents' },
   { value: 'BOL', label: 'BOL' },
   { value: 'POD', label: 'POD' },
+  { value: 'Rate Confirmation', label: 'Rate Confirmations' },
+  { value: 'Statement', label: 'Statements' },
   { value: 'Receipt', label: 'Receipts' },
   { value: 'Invoice', label: 'Invoices' },
   { value: 'License', label: 'Licenses' },

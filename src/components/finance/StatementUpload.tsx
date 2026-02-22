@@ -9,6 +9,9 @@ import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, Link, Unlink, E
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
+import { useAuth } from '@/contexts/AuthContext';
+import { useStorageProvider } from '@/hooks/useStorageProvider';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Select,
   SelectContent,
@@ -83,6 +86,35 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
   const [error, setError] = useState<string | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingFileRef = useRef<File | null>(null);
+  const { user } = useAuth();
+  const { upload: storageUpload } = useStorageProvider();
+  const queryClient = useQueryClient();
+
+  const saveToDocuments = async (file: File) => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `statements/${Date.now()}.${fileExt}`;
+      const { path, error: uploadError } = await storageUpload('documents', filePath, file);
+      if (uploadError || !path) {
+        console.error('[Statement] Failed to save to documents:', uploadError);
+        return;
+      }
+      await supabase.from('documents').insert({
+        file_name: file.name,
+        file_path: path,
+        file_size: file.size,
+        document_type: 'Statement',
+        related_type: 'general',
+        uploaded_by: user?.id || null,
+        org_id: orgId,
+      });
+      queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+      console.log('[Statement] PDF saved to Documents tab');
+    } catch (err) {
+      console.error('[Statement] Error saving PDF to documents:', err);
+    }
+  };
 
   const findMatchingLoad = (tripNumber: string | null): FleetLoad | null => {
     if (!tripNumber) return null;
@@ -159,6 +191,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     setError(null);
     setStatementData(null);
     setExpenses([]);
+    pendingFileRef.current = file;
 
     try {
       const pdfBase64 = await convertFileToBase64(file);
@@ -360,6 +393,11 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       if (updatedCount > 0) messages.push(`${updatedCount} updated`);
       
       toast.success(`Successfully imported: ${messages.join(', ')} expenses`);
+      // Save the PDF to documents tab
+      if (pendingFileRef.current) {
+        saveToDocuments(pendingFileRef.current);
+        pendingFileRef.current = null;
+      }
       handleCancel();
       onExpensesImported();
     } catch (err) {

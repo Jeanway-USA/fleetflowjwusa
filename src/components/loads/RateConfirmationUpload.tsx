@@ -6,6 +6,9 @@ import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, RefreshCw, Plus
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { useStorageProvider } from '@/hooks/useStorageProvider';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface IntermediateStop {
   stop_number: number;
@@ -64,6 +67,36 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
   const [matchingLoad, setMatchingLoad] = useState<ExistingLoad | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingFileRef = useRef<File | null>(null);
+  const { orgId, user } = useAuth();
+  const { upload: storageUpload } = useStorageProvider();
+  const queryClient = useQueryClient();
+
+  const saveToDocuments = async (file: File, loadId?: string) => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `rate-confirmations/${Date.now()}.${fileExt}`;
+      const { path, error: uploadError } = await storageUpload('documents', filePath, file);
+      if (uploadError || !path) {
+        console.error('[RC] Failed to save to documents:', uploadError);
+        return;
+      }
+      await supabase.from('documents').insert({
+        file_name: file.name,
+        file_path: path,
+        file_size: file.size,
+        document_type: 'Rate Confirmation',
+        related_type: loadId ? 'load' : 'general',
+        related_id: loadId || null,
+        uploaded_by: user?.id || null,
+        org_id: orgId,
+      });
+      queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+      console.log('[RC] PDF saved to Documents tab');
+    } catch (err) {
+      console.error('[RC] Error saving PDF to documents:', err);
+    }
+  };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -93,6 +126,7 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     setFileName(file.name);
     setError(null);
     setExtractedData(null);
+    pendingFileRef.current = file;
 
     try {
       // Step 1: Upload PDF to storage (bypasses functions relay)
@@ -208,17 +242,26 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
     }
   };
 
-  const handleUseData = (updateExisting: boolean = false) => {
+  const handleUseData = async (updateExisting: boolean = false) => {
     if (extractedData) {
       const matchedData = matchDriversAndTrucks(extractedData);
       if (updateExisting && matchingLoad) {
         onDataExtracted(matchedData as any, matchingLoad.id);
+        // Save PDF to documents linked to the existing load
+        if (pendingFileRef.current) {
+          saveToDocuments(pendingFileRef.current, matchingLoad.id);
+        }
       } else {
         onDataExtracted(matchedData as any);
+        // Save PDF to documents (no load ID yet for new loads)
+        if (pendingFileRef.current) {
+          saveToDocuments(pendingFileRef.current);
+        }
       }
       setExtractedData(null);
       setFileName(null);
       setMatchingLoad(null);
+      pendingFileRef.current = null;
     }
   };
 
