@@ -4,9 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Progress } from '@/components/ui/progress';
 import { useTruckHistory } from '@/hooks/useMaintenanceData';
+import { calculateWearPartHealth } from '@/lib/truck-maintenance-profiles';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Truck, DollarSign, Wrench, Calendar, FileText } from 'lucide-react';
+import { Truck, DollarSign, Wrench, Calendar, FileText, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface TruckHistoryDrawerProps {
@@ -15,8 +17,29 @@ interface TruckHistoryDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
+function getHealthColor(pct: number) {
+  if (pct > 50) return 'bg-green-500';
+  if (pct > 20) return 'bg-amber-500';
+  return 'bg-destructive';
+}
+
+function getHealthTextColor(pct: number) {
+  if (pct > 50) return 'text-green-600 dark:text-green-400';
+  if (pct > 20) return 'text-amber-600 dark:text-amber-400';
+  return 'text-destructive';
+}
+
 export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistoryDrawerProps) {
   const { data, isLoading } = useTruckHistory(truckId);
+
+  const wearParts = data?.truck
+    ? calculateWearPartHealth(
+        data.truck.make,
+        null,
+        data.truck.current_odometer || 0,
+        data.truck.purchase_mileage || 0
+      )
+    : [];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -86,6 +109,46 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                   <Calendar className="h-4 w-4" />
                   Last service: {formatDistanceToNow(new Date(data.stats.lastServiceDate), { addSuffix: true })}
                 </div>
+              )}
+
+              {/* Component Health Section */}
+              {wearParts.length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
+                      Component Health
+                    </h3>
+                    <div className="space-y-3">
+                      {wearParts.map(part => (
+                        <div key={part.part_name} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium">{part.part_name}</span>
+                            <span className={cn('text-xs font-semibold', getHealthTextColor(part.health_pct))}>
+                              {part.health_pct.toFixed(0)}%
+                              {part.is_urgent && (
+                                <Badge variant="destructive" className="ml-1.5 text-[10px] px-1 py-0">
+                                  URGENT
+                                </Badge>
+                              )}
+                            </span>
+                          </div>
+                          <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+                            <div
+                              className={cn('h-full rounded-full transition-all', getHealthColor(part.health_pct))}
+                              style={{ width: `${Math.max(2, part.health_pct)}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-[10px] text-muted-foreground">
+                            <span>{part.miles_used.toLocaleString()} mi used</span>
+                            <span>{part.lifespan_miles.toLocaleString()} mi lifespan</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
 
               <Separator />
@@ -180,7 +243,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                 </div>
               )}
 
-              {data.workOrders.length === 0 && data.logs.length === 0 && (
+              {data.workOrders.length === 0 && data.logs.length === 0 && wearParts.length === 0 && (
                 <div className="text-center py-8">
                   <Wrench className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">No maintenance history for this truck.</p>

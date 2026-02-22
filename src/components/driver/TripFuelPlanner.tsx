@@ -111,6 +111,11 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
       const shouldForce = forceRefreshRef.current;
       forceRefreshRef.current = false;
 
+      // Send route polyline for precise corridor filtering
+      const routePolyline = routeCoords && routeCoords.length > 0
+        ? routeCoords.filter((_, i) => i % 20 === 0 || i === routeCoords.length - 1)
+        : undefined;
+
       const { data, error } = await supabase.functions.invoke('landstar-fuel-stops', {
         body: {
           driver_id: driverId,
@@ -119,7 +124,8 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
           dest_lat: destCoords.lat,
           dest_lng: destCoords.lng,
           waypoints: geocodedStops.map(s => ({ lat: s.coords.lat, lng: s.coords.lng })),
-          corridor_miles: 50,
+          route_polyline: routePolyline,
+          corridor_miles: 25,
           force_refresh: shouldForce,
         },
       });
@@ -140,6 +146,7 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
         source: string;
         fetched_at: string;
         filtered_count: number;
+        projected_savings?: { cheapest_net: number; avg_price: number; savings_per_gallon: number; total_savings: number };
       };
     },
     enabled: !!originCoords && !!destCoords && !geocoding,

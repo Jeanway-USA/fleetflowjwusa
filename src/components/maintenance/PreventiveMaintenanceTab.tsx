@@ -2,13 +2,14 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { usePMSchedule, TruckWithSchedules, ManufacturerService } from '@/hooks/useMaintenanceData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { HealthBar, InspectionCountdown } from './HealthBar';
 import { CompactHealthDot, CompactInspectionDot } from './CompactHealthDot';
 import { PMScheduleFilters, HealthStatus, ManufacturerFilter } from './PMScheduleFilters';
 import { PMFleetHealthSummary } from './PMFleetHealthSummary';
 import { usePMHealthCalculations, TruckHealthStatus } from './usePMHealthCalculations';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Wrench } from 'lucide-react';
+import { ChevronDown, Wrench, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
@@ -435,7 +436,7 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
   }, 200);
 
   // Calculate health for all trucks
-  const { truckHealthList, overdueCount, dueSoonCount, onTrackCount } = usePMHealthCalculations(trucks);
+  const { truckHealthList, overdueCount, dueSoonCount, onTrackCount, urgentParts } = usePMHealthCalculations(trucks);
 
   // Apply filters
   const filteredTrucks = useMemo(() => {
@@ -544,6 +545,34 @@ export function PreventiveMaintenanceTab({ onViewTruck }: PreventiveMaintenanceT
 
   return (
     <div className="space-y-4">
+      {/* Urgent Action Required Banner */}
+      {urgentParts.length > 0 && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
+            <h3 className="font-semibold text-destructive text-sm">Urgent Action Required</h3>
+            <Badge variant="destructive" className="text-xs ml-auto">{urgentParts.length} truck{urgentParts.length > 1 ? 's' : ''}</Badge>
+          </div>
+          <div className="space-y-1.5">
+            {urgentParts.slice(0, 5).map(({ truck, parts }) => (
+              <button
+                key={truck.id}
+                onClick={() => onViewTruck(truck.id)}
+                className="w-full text-left text-xs p-2 rounded bg-destructive/5 hover:bg-destructive/10 transition-colors flex items-center justify-between"
+              >
+                <span className="font-medium">{truck.unit_number}</span>
+                <span className="text-destructive">
+                  {parts.map(p => `${p.part_name} (${p.health_pct.toFixed(0)}%)`).join(', ')}
+                </span>
+              </button>
+            ))}
+            {urgentParts.length > 5 && (
+              <p className="text-xs text-muted-foreground pl-2">+{urgentParts.length - 5} more trucks need attention</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Fleet Health Summary */}
       <PMFleetHealthSummary
         overdueCount={overdueCount}
