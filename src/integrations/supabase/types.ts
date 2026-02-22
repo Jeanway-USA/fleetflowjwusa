@@ -3594,6 +3594,17 @@ export type Database = {
         }
         Relationships: []
       }
+      super_admin_usage_metrics: {
+        Row: {
+          loads_per_day_30d: Json | null
+          total_agency_loads: number | null
+          total_drivers: number | null
+          total_fleet_loads: number | null
+          total_trailers: number | null
+          total_trucks: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       create_audit_log: {
@@ -3626,14 +3637,37 @@ export type Database = {
       has_safety_access: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
-      super_admin_update_org: {
-        Args: {
-          new_is_active?: boolean
-          new_tier?: string
-          target_org_id: string
-        }
-        Returns: undefined
+      super_admin_get_owner_email: {
+        Args: { target_org_id: string }
+        Returns: string
       }
+      super_admin_reset_demo: { Args: never; Returns: undefined }
+      super_admin_storage_stats: {
+        Args: never
+        Returns: {
+          bucket_id: string
+          file_count: number
+          total_bytes: number
+        }[]
+      }
+      super_admin_update_org:
+        | {
+            Args: {
+              new_is_active?: boolean
+              new_tier?: string
+              target_org_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              new_is_active?: boolean
+              new_tier?: string
+              new_trial_ends_at?: string
+              target_org_id: string
+            }
+            Returns: undefined
+          }
     }
     Enums: {
       app_role: "owner" | "payroll_admin" | "dispatcher" | "safety" | "driver"
