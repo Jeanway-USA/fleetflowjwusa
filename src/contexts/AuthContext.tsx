@@ -36,6 +36,7 @@ interface AuthContextType {
   hasOperationsAccess: boolean;
   hasSafetyAccess: boolean;
   refreshOrgData: () => Promise<void>;
+  refreshRoles: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -94,6 +95,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshOrgData = async () => {
     if (user) {
       await fetchOrgData(user.id);
+    }
+  };
+
+  const refreshRoles = async () => {
+    if (user) {
+      const fetchedRoles = await fetchUserRoles(user.id);
+      setRoles(fetchedRoles);
     }
   };
 
@@ -271,6 +279,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       orgName,
       subscriptionTier,
       refreshOrgData,
+      refreshRoles,
     }}>
       {children}
     </AuthContext.Provider>

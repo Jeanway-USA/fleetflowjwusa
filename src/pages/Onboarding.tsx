@@ -59,7 +59,7 @@ const TIERS: Array<{
 ];
 
 export default function Onboarding() {
-  const { user, refreshOrgData } = useAuth();
+  const { user, refreshOrgData, refreshRoles } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
 
@@ -158,6 +158,7 @@ export default function Onboarding() {
       }
 
       await refreshOrgData();
+      await refreshRoles();
 
       // Confetti!
       confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
