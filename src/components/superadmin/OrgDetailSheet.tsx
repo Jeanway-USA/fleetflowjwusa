@@ -28,11 +28,12 @@ export function OrgDetailSheet({ org, open, onOpenChange }: OrgDetailSheetProps)
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
 
   const updateOrg = useMutation({
-    mutationFn: async ({ newTier, newIsActive }: { newTier?: string; newIsActive?: boolean }) => {
+    mutationFn: async ({ newTier, newIsActive, newTrialEndsAt }: { newTier?: string; newIsActive?: boolean; newTrialEndsAt?: string }) => {
       const { error } = await supabase.rpc('super_admin_update_org' as any, {
         target_org_id: org.id,
         new_tier: newTier ?? null,
         new_is_active: newIsActive ?? null,
+        new_trial_ends_at: newTrialEndsAt ?? null,
       });
       if (error) throw error;
     },
