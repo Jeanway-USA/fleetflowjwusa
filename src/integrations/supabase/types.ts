@@ -3524,6 +3524,7 @@ export type Database = {
           details: Json | null
           id: string | null
           org_id: string | null
+          org_name: string | null
           record_id: string | null
           table_name: string | null
           user_id: string | null
