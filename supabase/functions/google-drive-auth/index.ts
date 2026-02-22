@@ -156,6 +156,15 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Fetch org name for folder naming
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', orgId)
+        .single();
+
+      const folderName = orgData?.name || 'FleetFlow Storage';
+
       // Create root folder
       const accessToken = tokenData.access_token;
       const createFolderResp = await fetch('https://www.googleapis.com/drive/v3/files', {
@@ -165,7 +174,7 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: 'FleetFlow Storage',
+          name: folderName,
           mimeType: 'application/vnd.google-apps.folder',
         }),
       });
