@@ -2460,28 +2460,37 @@ export type Database = {
       }
       organizations: {
         Row: {
+          banner_url: string | null
           created_at: string
           id: string
           is_active: boolean
+          logo_url: string | null
           name: string
+          primary_color: string | null
           subscription_tier: string
           trial_ends_at: string | null
           updated_at: string
         }
         Insert: {
+          banner_url?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
+          logo_url?: string | null
           name: string
+          primary_color?: string | null
           subscription_tier?: string
           trial_ends_at?: string | null
           updated_at?: string
         }
         Update: {
+          banner_url?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
+          logo_url?: string | null
           name?: string
+          primary_color?: string | null
           subscription_tier?: string
           trial_ends_at?: string | null
           updated_at?: string
