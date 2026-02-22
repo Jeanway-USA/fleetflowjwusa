@@ -98,30 +98,13 @@ export default function Onboarding() {
 
     setLoading(true);
     try {
-      // Create org
-      const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
-        .insert({ name: companyName.trim(), subscription_tier: 'solo_bco' })
-        .select('id')
-        .single();
+      const { data: newOrgId, error } = await supabase.rpc('create_onboarding_org', {
+        _name: companyName.trim(),
+      });
 
-      if (orgError) throw orgError;
+      if (error) throw error;
 
-      // Link profile to org
-      if (user && orgData?.id) {
-        await supabase
-          .from('profiles')
-          .update({ org_id: orgData.id })
-          .eq('user_id', user.id);
-
-        // Assign owner role
-        await supabase
-          .from('user_roles')
-          .insert({ user_id: user.id, role: 'owner' });
-
-        setOrgId(orgData.id);
-      }
-
+      setOrgId(newOrgId);
       setStep(2);
     } catch {
       toast.error('Failed to create organization. Please try again.');

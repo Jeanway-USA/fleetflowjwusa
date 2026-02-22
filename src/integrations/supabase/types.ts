@@ -3206,6 +3206,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_onboarding_org: {
+        Args: { _name: string; _tier?: string }
+        Returns: string
+      }
       get_driver_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       has_admin_access: { Args: { _user_id: string }; Returns: boolean }
