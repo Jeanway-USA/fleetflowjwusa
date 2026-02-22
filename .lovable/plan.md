@@ -1,21 +1,46 @@
 
 
-## Fix: Settlement Creation RLS Error
+## Fix: Ambiguous RPC Call for Organization Update
 
-The error "new row violates row-level security policy for table settlements" occurs because `org_id` is not included in the insert payload when creating a settlement. The RLS policy requires `org_id = get_user_org_id(auth.uid())`.
+### Problem
 
-### Root Cause
+There are two overloads of `super_admin_update_org` in the database (3-param and 4-param versions). When the RPC is called without all parameters, Postgres cannot determine which function to use.
 
-In `src/components/finance/SettlementsTab.tsx`, the `createMutation` inserts a settlement without setting `org_id`. The component does not import `useAuth` or access `orgId` at all.
+### Solution
 
-### Fix
+Update `src/components/superadmin/OrgDetailSheet.tsx` to always pass all four parameters (`target_org_id`, `new_tier`, `new_is_active`, `new_trial_ends_at`) in the RPC call, using `null` for any that aren't being changed. This removes the ambiguity.
 
-**File: `src/components/finance/SettlementsTab.tsx`**
+### Technical Details
 
-1. Import `useAuth` from `@/contexts/AuthContext`
-2. Destructure `orgId` from `useAuth()` inside the component
-3. Add `org_id: orgId` to the settlement insert payload (line ~343)
-4. Also add `org_id: orgId` to the line items insert if the `settlement_line_items` table has the same RLS requirement
+**File: `src/components/superadmin/OrgDetailSheet.tsx`** (line ~35)
 
-This is a small, targeted fix -- just adding the missing `org_id` field to comply with existing RLS policies.
+Change the `mutationFn` from:
+```ts
+await supabase.rpc('super_admin_update_org', {
+  target_org_id: org.id,
+  new_tier: newTier ?? null,
+  new_is_active: newIsActive ?? null,
+});
+```
+
+To:
+```ts
+await supabase.rpc('super_admin_update_org', {
+  target_org_id: org.id,
+  new_tier: newTier ?? null,
+  new_is_active: newIsActive ?? null,
+  new_trial_ends_at: newTrialEndsAt ?? null,
+});
+```
+
+Also update the mutation call signature to accept `newTrialEndsAt` as an optional parameter (it may already be used elsewhere in this component for trial date changes).
+
+Additionally, drop the redundant 3-parameter overload via a migration so this ambiguity doesn't recur.
+
+### Changes Summary
+
+| File | Change |
+|------|--------|
+| `src/components/superadmin/OrgDetailSheet.tsx` | Always pass all 4 RPC params including `new_trial_ends_at` |
+| Database migration | Drop the old 3-param overload of `super_admin_update_org` |
 
