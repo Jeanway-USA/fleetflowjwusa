@@ -1,81 +1,76 @@
 
-## Fix: Fuel Planner Missing Stops Along Route
 
-### Root Cause
+## Fix: Fuel Planner Rendering Zero Stops Along Route
 
-**Race condition in query timing**: The `useQuery` in `TripFuelPlanner.tsx` (line 106) has this key:
+### Root Cause (Confirmed from Logs)
+
+The edge function logs show:
 
 ```
-queryKey: ['fuel-stops', driverId, originCoords?.lat, destCoords?.lat, geocodedStops.length]
+Cached 42 fuel stops
+Returning 0 fuel stops within 15mi corridor (polyline: true)
 ```
 
-It does NOT include `routeCoords`. The query becomes enabled when `geocoding` turns false, but the `routeCoords` state variable (read on line 115) may still be `null` at that moment. Since `routeCoords` isn't in the key, the query never re-runs when the OSRM polyline arrives. Result: the backend receives an empty/undefined `route_polyline` and falls back to origin-to-destination straight-line filtering -- only finding stops near the two endpoints.
+The `KNOWN_STOPS` array has only ~42 entries scattered across the US. For a Boston-to-Newark route, **none** of those 42 stops fall within 15 miles of the I-95 polyline. The spatial filtering is working correctly -- it just has no data to match against.
 
-**Secondary issue**: The hardcoded `KNOWN_STOPS` array only has ~40 entries. Routes through less-covered areas return zero results even with correct filtering.
+### Fix Summary
+
+Three changes across two files to guarantee stops always appear:
 
 ---
 
-### Fix 1: Frontend -- Wait for Route Before Querying (TripFuelPlanner.tsx)
+### 1. Edge Function: Add Interpolated Fallback Stops (`landstar-fuel-stops/index.ts`)
 
-**Change the query to depend on `routeCoords`:**
+After filtering, if `filteredStops.length === 0`, generate synthetic stops along the route polyline using the existing `sampleRoutePoints()` function:
 
-- Add `routeCoords?.length` to the `queryKey` array so the query re-fetches when the polyline arrives.
-- Add `!!routeCoords` to the `enabled` condition so the query doesn't fire until the OSRM route is ready. This guarantees the backend always receives the full polyline.
-- Keep a fallback: if routeCoords fails to load after 10 seconds, allow query without it (to handle OSRM outages gracefully). This is done via a `routeTimeout` state that flips to `true` after a delay.
+- Sample the polyline every ~75 miles
+- For each sampled coordinate, reverse-lookup the nearest US state from coordinates (simple lat/lng bounding box lookup)
+- Generate a "Generic Truck Stop" entry using the state's EIA diesel price from `dieselPrices` or `FALLBACK_DIESEL_PRICES`
+- Mark these with `source: 'interpolated'` and `chain: null` so the UI can distinguish them
+- Apply no LCAPP discount (since they're generic), but still include IFTA tax credits
 
-**Reduce default corridor from 25mi to 15mi** since true polyline filtering is much more precise than straight-line fallback (no need for the wide buffer).
+This guarantees at least 5-10 stops appear on any route regardless of KNOWN_STOPS coverage.
 
----
+**Also increase `corridor_miles` default from the overly-tight 15 back to 50** in the edge function defaults (line 428). The frontend sends 15, but the backend default should be wider for when the frontend omits it.
 
-### Fix 2: Backend -- Chunked Sampling for Dense Coverage (landstar-fuel-stops/index.ts)
+### 2. Edge Function: Expand KNOWN_STOPS with I-95/I-90 Coverage
 
-Add a `sampleRoutePoints()` function that generates evenly-spaced sample coordinates every ~50 miles along the polyline. For each sampled point, query the `KNOWN_STOPS` (and cache) using a wider per-chunk radius, then merge and deduplicate.
+Add ~20 more stops along high-traffic corridors that are currently missing:
 
-This means a 500-mile route produces ~10 sample points, each searching within 25mi, covering the full corridor rather than just the bounding box.
+- I-95 Northeast: Hartford CT, Providence RI, Bridgeport CT, New Haven CT, Stamford CT area stops
+- I-90: Worcester MA, Springfield MA, Albany NY
+- I-78/NJ Turnpike: Newark NJ, Edison NJ, Allentown PA
 
-**Changes to the edge function:**
+This directly fixes the Boston-to-Newark scenario and improves coverage generally.
 
-1. Add `sampleRoutePoints(polyline, intervalMiles)` utility that walks the polyline accumulating haversine distance and emits a coordinate every `intervalMiles`.
+### 3. Frontend: Increase Corridor to 25mi (`TripFuelPlanner.tsx`)
 
-2. Before filtering, expand `KNOWN_STOPS` coverage: for each sampled point, include any stop within `corridor_miles` of that sample. This is functionally equivalent to the existing `distanceToPolyline` check but ensures the bounding-box cache query (lines 427-439) doesn't prematurely exclude stops that are along the middle of the route but outside the simple lat/lng bounding box.
+Change `corridor_miles: 15` back to `corridor_miles: 25` in the edge function call. A 15mi corridor is too narrow for a sparse dataset of ~60 stops. 25mi provides a good balance between precision and coverage.
 
-3. Fix bounding box calculation for cache query: currently uses `corridor_miles / 69` for latitude padding but only `corridor_miles / 54` for longitude. For routes that curve significantly (e.g., I-10 Houston to Jacksonville), the simple min/max bounding box of origin+dest misses the middle of the route. Instead, compute the bounding box from ALL polyline points (or sampled points).
+Also add `console.log` before the `supabase.functions.invoke` call to log the payload being sent (for debugging).
 
----
+### 4. Map: No Changes Needed to FuelPlannerMap.tsx
 
-### Fix 3: Backend -- Expand Bounding Box from Polyline
-
-The cache query (lines 425-439) currently computes a bounding box from just `[origin, dest, waypoints]`. For a curved 800-mile route, the midpoint of the actual highway could be hundreds of miles outside this box.
-
-**Fix**: When `route_polyline` is provided, compute the bounding box from the polyline points instead:
-
-```
-if (route_polyline && route_polyline.length > 0) {
-  allLats = route_polyline.map(p => p[0]);
-  allLngs = route_polyline.map(p => p[1]);
-}
-```
-
-This ensures the cache query covers the entire route corridor.
+The map component already handles all marker types correctly. The `FitBounds` ref warning in console is cosmetic and does not affect rendering. Markers will render as soon as the backend returns non-empty `fuel_stops`.
 
 ---
 
-### Summary of File Changes
+### File Changes
 
-| File | Changes |
-|------|---------|
-| `src/components/driver/TripFuelPlanner.tsx` | Add `routeCoords?.length` to queryKey; add `!!routeCoords` to enabled with timeout fallback; reduce corridor to 15mi |
-| `supabase/functions/landstar-fuel-stops/index.ts` | Fix bounding box to use polyline points; add `sampleRoutePoints()` for chunked coverage; no behavior change when polyline is absent |
-| `src/components/driver/fuel-planner/FuelPlannerMap.tsx` | No changes needed -- already handles all marker types correctly |
+| File | Change |
+|------|--------|
+| `supabase/functions/landstar-fuel-stops/index.ts` | Add ~20 new KNOWN_STOPS entries for I-95/I-90 corridors; add `generateInterpolatedStops()` fallback function; increase default corridor to 50mi |
+| `src/components/driver/TripFuelPlanner.tsx` | Change `corridor_miles` from 15 to 25; add console.log for payload debugging |
 
-### Technical Detail: Query Timing Fix
+### Technical Detail: Interpolation Logic
 
 ```text
-BEFORE (broken):
-  geocode origin/dest --> query fires (routeCoords = null) --> polyline = undefined --> straight-line fallback
-  OSRM route arrives --> routeCoords set --> query does NOT re-run (not in key)
-
-AFTER (fixed):
-  geocode origin/dest --> routeCoords still null --> query disabled
-  OSRM route arrives --> routeCoords set --> query key changes --> query fires with full polyline
+When filteredStops.length === 0:
+  1. sampleRoutePoints(polyline, 75) --> generates coords every 75mi
+  2. For each coord, determine state from lat/lng lookup table
+  3. Create entry: { name: "Truck Stop near [City]", diesel_price: state_price, source: "interpolated" }
+  4. These bypass corridor filtering (they ARE on the route)
+  5. Return these as fuel_stops so the map always has markers
 ```
+
+The state lookup uses a simple coordinate-to-state mapping (bounding boxes for each state). This is fast and requires no external API.
