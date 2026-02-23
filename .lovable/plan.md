@@ -1,112 +1,78 @@
 
 
-## Broaden Overpass Query and Add Server-Side Filtering
+## Greedy Name/Brand Regex Query with Finer Chunking and Deduplication
 
 ### Problem
-The current query filters by `"name"~"Pilot|Love|..."` which misses locations where the brand is stored in `tags.brand` or `tags.operator` instead of `tags.name`. It also only fetches `node` elements, missing `way` (polygon) locations. Result: ~160 locations instead of thousands.
+The `hgv=yes` tag is rarely applied by US OSM contributors, resulting in only ~600 locations. We need to query purely by name/brand regex to capture thousands more stops.
 
-### Changes (single file)
+### Changes
 
-**File:** `supabase/functions/sync-official-truck-stops/index.ts`
+#### 1. Edge Function (`supabase/functions/sync-official-truck-stops/index.ts`)
 
-**1. Broaden the Overpass query**
+**Replace the Overpass query** -- drop `amenity=fuel` and `hgv=yes` entirely. Query `nwr` by name and brand regex:
 
-Replace the current name-filtered node-only query:
 ```
-node["amenity"="fuel"]["name"~"...",i](BBOX);out body;
-```
-
-With an HGV-based query that fetches both nodes and ways:
-```
-[out:json][timeout:180];
+[out:json][timeout:300];
 (
-  node["amenity"="fuel"]["hgv"="yes"](BBOX);
-  way["amenity"="fuel"]["hgv"="yes"](BBOX);
+  nwr["name"~"Pilot|Flying J|Love's|Loves|TravelCenters of America|\\bTA\\b|Petro|AMBEST|Roady's",i](BBOX);
+  nwr["brand"~"Pilot|Flying J|Love's|Loves|TravelCenters of America|\\bTA\\b|Petro|AMBEST|Roady's",i](BBOX);
 );
 out center;
 ```
 
-This returns all truck-accessible fuel stations, giving us a much larger dataset to filter from.
+**Add proximity deduplication** before upsert:
+- Sort stops by brand, then lat
+- For each stop, check if the previous stop has the same brand and is within 0.01 degrees (~1km) on both lat and lon
+- If so, skip the duplicate (keep the first one encountered)
+- This prevents the same physical location from being inserted twice when Overpass returns both a node and a way for it
 
-**2. Expand `classifyBrand` to check `tags.operator` too**
+**Keep everything else** -- retry logic, classifyBrand, fallback store_number, batch upsert -- unchanged.
 
-Current function only checks `tags.brand` and `tags.name`. Update to also check `tags.operator`, and add "Roady's" and "AMBEST" as recognized brands.
+#### 2. Frontend (`src/components/superadmin/SyncMapModal.tsx`)
 
-**3. Handle `way` elements (use `center.lat`/`center.lon`)**
+**Increase regions from 6 to 12** by splitting each current region roughly in half (east/west or north/south). Smaller bounding boxes prevent Overpass timeouts on the greedy regex query.
 
-Current code skips elements without `el.lat`/`el.lon`. Ways don't have those -- they have `el.center.lat`/`el.center.lon` (from `out center`). Update the extraction to fall back to center coordinates.
+New region grid:
+| # | Name | Bounds (S, W, N, E) |
+|---|------|---------------------|
+| 1 | New England | 41.0, -73.5, 47.5, -66.5 |
+| 2 | Mid-Atlantic | 37.0, -82.0, 41.0, -73.5 |
+| 3 | Southeast Coast | 30.0, -85.0, 37.0, -75.0 |
+| 4 | Deep South | 24.0, -92.0, 30.0, -75.0 |
+| 5 | Great Lakes | 41.0, -92.0, 49.5, -82.0 |
+| 6 | Upper Midwest | 36.0, -104.0, 49.5, -92.0 |
+| 7 | Texas | 24.0, -104.0, 37.0, -97.0 |
+| 8 | Gulf States | 24.0, -97.0, 37.0, -85.0 |
+| 9 | Mountain North | 42.0, -117.0, 49.5, -104.0 |
+| 10 | Mountain South | 31.0, -117.0, 42.0, -104.0 |
+| 11 | Pacific Northwest | 42.0, -125.0, 49.5, -117.0 |
+| 12 | California | 24.0, -125.0, 42.0, -117.0 |
 
-**4. Generate fallback store numbers for missing `tags.ref`**
+Update the status text from "6 US regions" to reference `regions.length` dynamically (already does in most places).
 
-Current fallback is `osm-{id}`. Update to a more descriptive format: if city and state are available, use `{Brand}-{City}-{State}` (e.g., `Pilot-Dallas-TX`). Fall back to `{Brand}-{type}-{id}` if no city/state.
+### Technical Details
 
-**5. Remove the hard requirement for `addr:state`**
-
-Currently, stops without `addr:state` are silently dropped. Many valid OSM entries lack this tag. Instead, still include the stop but with an empty state string -- the data is still valuable for the map.
-
-### Detailed code changes
-
+**Deduplication algorithm** (runs in the edge function after classification, before upsert):
 ```typescript
-// Remove BRAND_REGEX constant (no longer used in query)
-
-// Updated classifyBrand - check brand, name, AND operator
-function classifyBrand(tags: Record<string, string>): string | null {
-  const brand = (tags.brand || '').toLowerCase();
-  const name = (tags.name || '').toLowerCase();
-  const operator = (tags.operator || '').toLowerCase();
-  const combined = `${brand} ${name} ${operator}`;
-
-  if (combined.includes('flying j')) return 'Flying J';
-  if (combined.includes('pilot')) return 'Pilot';
-  if (combined.includes("love's") || combined.includes('loves')) return "Love's";
-  if (combined.includes('petro')) return 'Petro';
-  if (/\bta\b/.test(combined) || combined.includes('travelcenter') || combined.includes('travel center')) return 'TA';
-  if (combined.includes("roady's") || combined.includes('roadys')) return "Roady's";
-  if (combined.includes('ambest')) return 'AMBEST';
-  return null;
-}
-
-// Updated query (line 75)
-const query = `[out:json][timeout:180];\n(\n  node["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n  way["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n);\nout center;`;
-
-// Updated element processing loop
-for (const el of elements) {
-  const tags = el.tags;
-  if (!tags) continue;
-
-  // Support both nodes (el.lat/el.lon) and ways (el.center.lat/el.center.lon)
-  const lat = el.lat ?? el.center?.lat;
-  const lon = el.lon ?? el.center?.lon;
-  if (!lat || !lon) continue;
-
-  const brand = classifyBrand(tags);
-  if (!brand) continue;
-
-  const city = tags['addr:city'] || '';
-  const state = (tags['addr:state'] || '').toUpperCase().slice(0, 2);
-
-  // Fallback store_number: Brand-City-State or Brand-type-id
-  let storeNumber = tags.ref;
-  if (!storeNumber) {
-    storeNumber = (city && state)
-      ? `${brand}-${city}-${state}`
-      : `${brand}-${el.type}-${el.id}`;
+function deduplicateStops(stops: StopRecord[]): StopRecord[] {
+  stops.sort((a, b) => a.brand.localeCompare(b.brand) || a.latitude - b.latitude);
+  const result: StopRecord[] = [];
+  for (const stop of stops) {
+    const prev = result[result.length - 1];
+    if (prev && prev.brand === stop.brand &&
+        Math.abs(prev.latitude - stop.latitude) < 0.01 &&
+        Math.abs(prev.longitude - stop.longitude) < 0.01) {
+      continue; // skip duplicate
+    }
+    result.push(stop);
   }
-
-  stops.push({
-    brand,
-    store_number: storeNumber,
-    name: tags.name || `${brand} Travel Center`,
-    address: tags['addr:street'] || '',
-    city,
-    state,
-    latitude: lat,
-    longitude: lon,
-    amenities: ['Diesel', 'Parking'],
-  });
+  return result;
 }
 ```
 
-### No other files change
-The frontend `SyncMapModal` and `InfrastructureTab` remain unchanged -- they still send `{ bbox: [...] }` and receive `{ upserted, total_in_database }`.
+**File changes:**
+| File | Action |
+|------|--------|
+| `supabase/functions/sync-official-truck-stops/index.ts` | Edit -- greedy query + dedup |
+| `src/components/superadmin/SyncMapModal.tsx` | Edit -- 12 regions instead of 6 |
 
