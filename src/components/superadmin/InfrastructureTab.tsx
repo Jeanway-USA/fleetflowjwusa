@@ -31,20 +31,27 @@ export function InfrastructureTab() {
   const { data: truckStopStats, refetch: refetchStops } = useQuery({
     queryKey: ['super-admin-truck-stop-stats'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('official_truck_stops')
-        .select('brand, updated_at')
-        .order('updated_at', { ascending: false });
-      if (error) throw error;
+      // Use server-side count to bypass 1000-row limit
+      const [brandResult, countResult] = await Promise.all([
+        supabase.rpc('truck_stop_brand_counts' as any),
+        supabase.from('official_truck_stops').select('*', { count: 'exact', head: true }),
+      ]);
+
+      if (brandResult.error) throw brandResult.error;
 
       const brandCounts: Record<string, number> = {};
       let latestSync: string | null = null;
-      for (const row of (data || [])) {
-        const brand = (row as any).brand || 'Unknown';
-        brandCounts[brand] = (brandCounts[brand] || 0) + 1;
-        if (!latestSync) latestSync = (row as any).updated_at;
+      for (const row of (brandResult.data || [])) {
+        const r = row as { brand: string; stop_count: number; latest_sync: string };
+        brandCounts[r.brand] = Number(r.stop_count);
+        if (!latestSync || r.latest_sync > latestSync) latestSync = r.latest_sync;
       }
-      return { brandCounts, total: data?.length || 0, lastSync: latestSync };
+
+      return {
+        brandCounts,
+        total: countResult.count || 0,
+        lastSync: latestSync,
+      };
     },
   });
 
