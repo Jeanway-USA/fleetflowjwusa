@@ -27,7 +27,7 @@ export type Database = {
           load_reference: string | null
           margin: number | null
           notes: string | null
-          org_id: string | null
+          org_id: string
           origin: string
           pickup_date: string | null
           status: string
@@ -45,7 +45,7 @@ export type Database = {
           load_reference?: string | null
           margin?: number | null
           notes?: string | null
-          org_id?: string | null
+          org_id: string
           origin: string
           pickup_date?: string | null
           status?: string
@@ -63,7 +63,7 @@ export type Database = {
           load_reference?: string | null
           margin?: number | null
           notes?: string | null
-          org_id?: string | null
+          org_id?: string
           origin?: string
           pickup_date?: string | null
           status?: string
@@ -888,7 +888,7 @@ export type Database = {
           id: string
           net_pay: number | null
           notes: string | null
-          org_id: string | null
+          org_id: string
           other_deductions: number | null
           period_end: string
           period_start: string
@@ -904,7 +904,7 @@ export type Database = {
           id?: string
           net_pay?: number | null
           notes?: string | null
-          org_id?: string | null
+          org_id: string
           other_deductions?: number | null
           period_end: string
           period_start: string
@@ -920,7 +920,7 @@ export type Database = {
           id?: string
           net_pay?: number | null
           notes?: string | null
-          org_id?: string | null
+          org_id?: string
           other_deductions?: number | null
           period_end?: string
           period_start?: string
@@ -1240,7 +1240,7 @@ export type Database = {
           license_expiry: string | null
           license_number: string | null
           medical_card_expiry: string | null
-          org_id: string | null
+          org_id: string
           pay_rate: number | null
           pay_type: string | null
           phone: string | null
@@ -1263,7 +1263,7 @@ export type Database = {
           license_expiry?: string | null
           license_number?: string | null
           medical_card_expiry?: string | null
-          org_id?: string | null
+          org_id: string
           pay_rate?: number | null
           pay_type?: string | null
           phone?: string | null
@@ -1286,7 +1286,7 @@ export type Database = {
           license_expiry?: string | null
           license_number?: string | null
           medical_card_expiry?: string | null
-          org_id?: string | null
+          org_id?: string
           pay_rate?: number | null
           pay_type?: string | null
           phone?: string | null
@@ -1324,7 +1324,7 @@ export type Database = {
           jurisdiction: string | null
           load_id: string | null
           notes: string | null
-          org_id: string | null
+          org_id: string
           truck_id: string | null
           updated_at: string
           vendor: string | null
@@ -1340,7 +1340,7 @@ export type Database = {
           jurisdiction?: string | null
           load_id?: string | null
           notes?: string | null
-          org_id?: string | null
+          org_id: string
           truck_id?: string | null
           updated_at?: string
           vendor?: string | null
@@ -1356,7 +1356,7 @@ export type Database = {
           jurisdiction?: string | null
           load_id?: string | null
           notes?: string | null
-          org_id?: string | null
+          org_id?: string
           truck_id?: string | null
           updated_at?: string
           vendor?: string | null
@@ -1492,7 +1492,7 @@ export type Database = {
           lumper: number | null
           net_revenue: number | null
           notes: string | null
-          org_id: string | null
+          org_id: string
           origin: string
           pickup_date: string | null
           pickup_time: string | null
@@ -1530,7 +1530,7 @@ export type Database = {
           lumper?: number | null
           net_revenue?: number | null
           notes?: string | null
-          org_id?: string | null
+          org_id: string
           origin: string
           pickup_date?: string | null
           pickup_time?: string | null
@@ -1568,7 +1568,7 @@ export type Database = {
           lumper?: number | null
           net_revenue?: number | null
           notes?: string | null
-          org_id?: string | null
+          org_id?: string
           origin?: string
           pickup_date?: string | null
           pickup_time?: string | null
@@ -3359,7 +3359,7 @@ export type Database = {
           make: string | null
           model: string | null
           next_inspection_date: string | null
-          org_id: string | null
+          org_id: string
           purchase_mileage: number | null
           status: string
           unit_number: string
@@ -3379,7 +3379,7 @@ export type Database = {
           make?: string | null
           model?: string | null
           next_inspection_date?: string | null
-          org_id?: string | null
+          org_id: string
           purchase_mileage?: number | null
           status?: string
           unit_number: string
@@ -3399,7 +3399,7 @@ export type Database = {
           make?: string | null
           model?: string | null
           next_inspection_date?: string | null
-          org_id?: string | null
+          org_id?: string
           purchase_mileage?: number | null
           status?: string
           unit_number?: string
