@@ -2756,6 +2756,7 @@ export type Database = {
       }
       organizations: {
         Row: {
+          applied_promo_code_id: string | null
           banner_url: string | null
           complimentary_ends_at: string | null
           created_at: string
@@ -2770,6 +2771,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          applied_promo_code_id?: string | null
           banner_url?: string | null
           complimentary_ends_at?: string | null
           created_at?: string
@@ -2784,6 +2786,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          applied_promo_code_id?: string | null
           banner_url?: string | null
           complimentary_ends_at?: string | null
           created_at?: string
@@ -2797,7 +2800,15 @@ export type Database = {
           trial_ends_at?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "organizations_applied_promo_code_id_fkey"
+            columns: ["applied_promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pm_notifications: {
         Row: {
@@ -2919,6 +2930,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      promo_codes: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          discount_amount: number | null
+          discount_percentage: number | null
+          id: string
+          is_global_event: boolean
+          max_uses: number | null
+          times_used: number
+          updated_at: string
+          valid_from: string
+          valid_until: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          discount_amount?: number | null
+          discount_percentage?: number | null
+          id?: string
+          is_global_event?: boolean
+          max_uses?: number | null
+          times_used?: number
+          updated_at?: string
+          valid_from?: string
+          valid_until: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          discount_amount?: number | null
+          discount_percentage?: number | null
+          id?: string
+          is_global_event?: boolean
+          max_uses?: number | null
+          times_used?: number
+          updated_at?: string
+          valid_from?: string
+          valid_until?: string
+        }
+        Relationships: []
       }
       service_schedules: {
         Row: {
@@ -3120,6 +3176,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      subscription_plans: {
+        Row: {
+          base_price_annual: number
+          base_price_monthly: number
+          created_at: string
+          features_json: Json | null
+          id: string
+          is_active: boolean
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          base_price_annual?: number
+          base_price_monthly?: number
+          created_at?: string
+          features_json?: Json | null
+          id?: string
+          is_active?: boolean
+          tier: string
+          updated_at?: string
+        }
+        Update: {
+          base_price_annual?: number
+          base_price_monthly?: number
+          created_at?: string
+          features_json?: Json | null
+          id?: string
+          is_active?: boolean
+          tier?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       trailer_assignments: {
         Row: {
