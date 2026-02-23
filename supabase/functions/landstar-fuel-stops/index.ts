@@ -767,7 +767,7 @@ Deno.serve(async (req) => {
             distance_from_origin: haversineDistance(origin_lat, origin_lng, stop.latitude, stop.longitude),
           }))
           .filter(stop => stop.distance_from_route <= corridor_miles)
-          .sort((a, b) => (a.net_price || 999) - (b.net_price || 999));
+          .sort((a, b) => (a.distance_from_origin || 0) - (b.distance_from_origin || 0));
 
         // If cache had stops but none within corridor, fall through to generate interpolated
         if (filtered.length > 0) {
@@ -913,7 +913,7 @@ Deno.serve(async (req) => {
         distance_from_origin: haversineDistance(origin_lat, origin_lng, stop.latitude, stop.longitude),
       }))
       .filter((stop: any) => stop.distance_from_route <= corridor_miles)
-      .sort((a: any, b: any) => (a.net_price || 999) - (b.net_price || 999));
+      .sort((a: any, b: any) => (a.distance_from_origin || 0) - (b.distance_from_origin || 0));
 
     console.log(`Filtered to ${filteredStops.length} stops within ${corridor_miles}mi corridor (total available: ${fuelStops.length})`);
 

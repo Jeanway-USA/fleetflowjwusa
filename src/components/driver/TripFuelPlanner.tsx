@@ -198,7 +198,9 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
   const costEstimate = useMemo(() => {
     if (fuelStops.length === 0) return null;
 
-    const cheapest = fuelStops[0];
+    const cheapest = fuelStops.reduce((min, s) =>
+      (s.net_price || s.diesel_price || 999) < (min.net_price || min.diesel_price || 999) ? s : min
+    , fuelStops[0]);
     const avgPrice = fuelStops.reduce((sum, s) => sum + (s.net_price || s.diesel_price || 0), 0) / fuelStops.length;
     const lcappStops = fuelStops.filter(s => s.lcapp_discount && s.lcapp_discount > 0);
     const avgLcappSaving = lcappStops.length > 0
