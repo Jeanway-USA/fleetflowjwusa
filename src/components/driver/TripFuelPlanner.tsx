@@ -57,6 +57,7 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [geocodedStops, setGeocodedStops] = useState<GeocodedStop[]>([]);
   const forceRefreshRef = useRef(false);
+  const [routeTimedOut, setRouteTimedOut] = useState(false);
 
   // Parse intermediate stops from notes
   const intermediateStops = useMemo(() => parseIntermediateStops(notes || null), [notes]);
@@ -102,9 +103,18 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
     return () => { cancelled = true; };
   }, [origin, destination, intermediateStops]);
 
+  // Timeout fallback: allow query without routeCoords after 10s (OSRM outage)
+  useEffect(() => {
+    if (routeCoords || routeTimedOut) return;
+    const timer = setTimeout(() => setRouteTimedOut(true), 10000);
+    return () => clearTimeout(timer);
+  }, [routeCoords, routeTimedOut]);
+
+  const routeReady = !!routeCoords || routeTimedOut;
+
   // Fetch fuel stops from edge function
   const { data: fuelData, isLoading: fuelLoading, refetch, isFetching } = useQuery({
-    queryKey: ['fuel-stops', driverId, originCoords?.lat, destCoords?.lat, geocodedStops.length],
+    queryKey: ['fuel-stops', driverId, originCoords?.lat, destCoords?.lat, geocodedStops.length, routeCoords?.length ?? 0],
     queryFn: async () => {
       if (!originCoords || !destCoords) return null;
 
@@ -125,7 +135,7 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
           dest_lng: destCoords.lng,
           waypoints: geocodedStops.map(s => ({ lat: s.coords.lat, lng: s.coords.lng })),
           route_polyline: routePolyline,
-          corridor_miles: 25,
+          corridor_miles: 15,
           force_refresh: shouldForce,
           booked_miles: bookedMiles,
         },
@@ -150,7 +160,7 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
         projected_savings?: { cheapest_net: number; avg_price: number; savings_per_gallon: number; total_savings: number };
       };
     },
-    enabled: !!originCoords && !!destCoords && !geocoding,
+    enabled: !!originCoords && !!destCoords && !geocoding && routeReady,
     staleTime: 30 * 60 * 1000,
     retry: 1,
   });
