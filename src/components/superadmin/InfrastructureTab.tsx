@@ -6,8 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { HardDrive, Database, RefreshCw, Fuel } from 'lucide-react';
-import { SyncMapModal } from './SyncMapModal';
+import { HardDrive, Database, RefreshCw, Fuel, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -17,7 +17,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function InfrastructureTab() {
-  const [syncModalOpen, setSyncModalOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['super-admin-storage-stats'],
@@ -50,6 +50,21 @@ export function InfrastructureTab() {
 
   const totalFiles = data?.reduce((s, r) => s + (r.file_count ?? 0), 0) ?? 0;
   const totalBytes = data?.reduce((s, r) => s + (r.total_bytes ?? 0), 0) ?? 0;
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke('sync-official-truck-stops');
+      if (error) throw error;
+      const count = result?.upserted ?? result?.total_in_database ?? 0;
+      toast.success(`Successfully synced ${count.toLocaleString()} official locations from corporate servers.`);
+      refetchStops();
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to sync truck stop data.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -117,12 +132,16 @@ export function InfrastructureTab() {
                 <span className="font-medium">Official Truck Stop Data</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Sync store directories from Pilot/Flying J, Love's, and TA/Petro.
+                Sync store directories from Love's, Pilot/Flying J, and TA/Petro corporate servers.
               </p>
             </div>
-            <Button onClick={() => setSyncModalOpen(true)} variant="outline" className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              Sync Official Truck Stop Data
+            <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
+              {syncing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {syncing ? 'Syncing...' : 'Sync Official Truck Stop Data'}
             </Button>
           </div>
 
@@ -159,12 +178,6 @@ export function InfrastructureTab() {
           )}
         </CardContent>
       </Card>
-
-      <SyncMapModal
-        open={syncModalOpen}
-        onOpenChange={setSyncModalOpen}
-        onComplete={() => refetchStops()}
-      />
     </div>
   );
 }
