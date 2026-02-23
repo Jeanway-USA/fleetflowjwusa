@@ -134,15 +134,30 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
         dest_lng: destCoords.lng,
         waypoints: geocodedStops.map(s => ({ lat: s.coords.lat, lng: s.coords.lng })),
         route_polyline: routePolyline,
-        corridor_miles: 25,
+        corridor_miles: 35,
         force_refresh: shouldForce,
         booked_miles: bookedMiles,
       };
+
+      // Estimate route distance from polyline
+      let polylineDistance = 0;
+      if (routePolyline && routePolyline.length > 1) {
+        for (let i = 1; i < routePolyline.length; i++) {
+          const [lat1, lng1] = routePolyline[i - 1];
+          const [lat2, lng2] = routePolyline[i];
+          const R = 3959;
+          const dLat = (lat2 - lat1) * Math.PI / 180;
+          const dLng = (lng2 - lng1) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+          polylineDistance += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+      }
 
       console.log('[FuelPlanner] Invoking landstar-fuel-stops with payload:', {
         origin: `${payload.origin_lat},${payload.origin_lng}`,
         dest: `${payload.dest_lat},${payload.dest_lng}`,
         polylinePoints: routePolyline?.length ?? 0,
+        estimatedRouteMiles: Math.round(polylineDistance),
         waypoints: payload.waypoints.length,
         corridor_miles: payload.corridor_miles,
       });

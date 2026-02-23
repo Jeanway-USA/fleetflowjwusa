@@ -102,6 +102,18 @@ const KNOWN_STOPS: Array<{
   // I-65 Corridor
   { name: "Pilot Travel Center #275", chain: "Pilot/Flying J", lat: 38.2527, lng: -85.7585, state: "KY", city: "Louisville" },
   { name: "Love's Travel Stop #405", chain: "Love's Travel Stops", lat: 34.7304, lng: -86.5861, state: "AL", city: "Huntsville" },
+  // I-81 / I-77 / I-40 Corridor (PA to TN)
+  { name: "Pilot Travel Center #820", chain: "Pilot/Flying J", lat: 40.2732, lng: -76.8867, state: "PA", city: "Harrisburg" },
+  { name: "Love's Travel Stop #825", chain: "Love's Travel Stops", lat: 40.2015, lng: -77.1890, state: "PA", city: "Carlisle" },
+  { name: "TA #830", chain: "TA/Petro", lat: 39.6418, lng: -77.7200, state: "MD", city: "Hagerstown" },
+  { name: "Pilot Travel Center #835", chain: "Pilot/Flying J", lat: 39.1857, lng: -78.1633, state: "VA", city: "Winchester" },
+  { name: "Love's Travel Stop #840", chain: "Love's Travel Stops", lat: 38.1496, lng: -79.0717, state: "VA", city: "Staunton" },
+  { name: "TA #845", chain: "TA/Petro", lat: 37.2710, lng: -79.9414, state: "VA", city: "Roanoke" },
+  { name: "Pilot Travel Center #850", chain: "Pilot/Flying J", lat: 36.9849, lng: -81.1950, state: "VA", city: "Wytheville" },
+  { name: "Love's Travel Stop #855", chain: "Love's Travel Stops", lat: 36.5951, lng: -82.1887, state: "VA", city: "Bristol" },
+  { name: "Pilot Travel Center #860", chain: "Pilot/Flying J", lat: 35.9606, lng: -83.9207, state: "TN", city: "Knoxville" },
+  { name: "TA #865", chain: "TA/Petro", lat: 36.1628, lng: -85.5016, state: "TN", city: "Cookeville" },
+  { name: "Love's Travel Stop #870", chain: "Love's Travel Stops", lat: 35.9489, lng: -84.9394, state: "TN", city: "Crossville" },
   // Additional high-traffic stops
   { name: "Pilot Travel Center #600", chain: "Pilot/Flying J", lat: 36.1699, lng: -115.1398, state: "NV", city: "Las Vegas" },
   { name: "Love's Travel Stop #920", chain: "Love's Travel Stops", lat: 47.6062, lng: -122.3321, state: "WA", city: "Seattle" },
@@ -324,31 +336,38 @@ function sampleRoutePoints(
   return sampled;
 }
 
-// Generate interpolated truck stops along polyline when no real stops are found
+// Generate interpolated truck stops along polyline to fill gaps
 function generateInterpolatedStops(
   polyline: Array<[number, number]>,
   dieselPrices: Record<string, number>,
-  now: string
+  now: string,
+  originLat: number,
+  originLng: number,
+  destLat: number,
+  destLng: number
 ): any[] {
-  const sampled = sampleRoutePoints(polyline, 75);
+  const sampled = sampleRoutePoints(polyline, 50);
   const stops: any[] = [];
 
   for (let i = 0; i < sampled.length; i++) {
     const [lat, lng] = sampled[i];
+    
+    // Skip points within 20 miles of origin or destination
+    const distToOrigin = haversineDistance(lat, lng, originLat, originLng);
+    const distToDest = haversineDistance(lat, lng, destLat, destLng);
+    if (distToOrigin < 20 || distToDest < 20) continue;
+
     const state = lookupStateFromCoords(lat, lng);
     const statePrice = dieselPrices[state] || FALLBACK_DIESEL_PRICES[state] || 3.55;
     const iftaCredit = STATE_DIESEL_TAX[state] ?? 0;
 
-    // Skip points too close to origin or destination (first and last)
-    if (i === 0 || i === sampled.length - 1) continue;
-
     stops.push({
-      name: `Truck Stop - Mile ${(i * 75)}`,
+      name: `Truck Stop - Mile ${Math.round(distToOrigin)}`,
       chain: null,
       latitude: lat,
       longitude: lng,
       state,
-      city: `${state} - I-${i}`,
+      city: `${state} Corridor`,
       diesel_price: statePrice,
       lcapp_discount: null,
       net_price: statePrice,
@@ -357,11 +376,11 @@ function generateInterpolatedStops(
       source: 'interpolated',
       fetched_at: now,
       distance_from_route: 0,
-      distance_from_origin: 0,
+      distance_from_origin: distToOrigin,
     });
   }
 
-  console.log(`Generated ${stops.length} interpolated stops along route`);
+  console.log(`Generated ${stops.length} interpolated stops along route (sampled ${sampled.length} points at 50mi intervals)`);
   return stops;
 }
 
@@ -770,21 +789,41 @@ Deno.serve(async (req) => {
 
     console.log(`Filtered to ${filteredStops.length} stops within ${corridor_miles}mi corridor (total available: ${fuelStops.length})`);
 
-    // ===== INTERPOLATED FALLBACK: guarantee stops on every route =====
+    // ===== DENSITY-BASED INTERPOLATED FALLBACK =====
+    const minExpectedStops = Math.max(3, Math.floor(tripMiles / 100));
     let finalStops = filteredStops;
-    if (filteredStops.length === 0 && route_polyline && route_polyline.length >= 2) {
-      console.log('No real stops found within corridor — generating interpolated stops along polyline');
-      finalStops = generateInterpolatedStops(route_polyline, dieselPrices, now);
+    let source = landstarData ? 'landstar' : 'doe';
+
+    if (filteredStops.length < minExpectedStops && route_polyline && route_polyline.length >= 2) {
+      console.log(`Sparse results: ${filteredStops.length} stops for ${Math.round(tripMiles)}mi trip (need ${minExpectedStops}). Generating interpolated stops...`);
+      const interpolated = generateInterpolatedStops(
+        route_polyline, dieselPrices, now,
+        origin_lat, origin_lng, dest_lat, dest_lng
+      );
+
+      // Deduplicate: remove interpolated stops within 15mi of a real stop
+      const dedupedInterpolated = interpolated.filter(iStop => {
+        return !filteredStops.some((rStop: any) =>
+          haversineDistance(iStop.latitude, iStop.longitude, rStop.latitude, rStop.longitude) < 15
+        );
+      });
+
+      // Merge real + interpolated, sort by distance from origin
+      finalStops = [...filteredStops, ...dedupedInterpolated]
+        .sort((a: any, b: any) => (a.distance_from_origin || 0) - (b.distance_from_origin || 0));
+
+      console.log(`Density fill: ${filteredStops.length} real + ${dedupedInterpolated.length} interpolated (${interpolated.length - dedupedInterpolated.length} deduped) = ${finalStops.length} total`);
+      if (filteredStops.length === 0) source = 'interpolated';
     }
 
-    const projected_savings = computeProjectedSavings(finalStops, estimatedGallons);
+    console.log(`total_waypoints_sampled: ${route_polyline?.length ?? 0}, total_deduplicated_stops_found: ${finalStops.length}`);
 
-    console.log(`Returning ${finalStops.length} fuel stops (polyline: ${!!route_polyline})`);
+    const projected_savings = computeProjectedSavings(finalStops, estimatedGallons);
 
     return new Response(
       JSON.stringify({
         fuel_stops: finalStops,
-        source: landstarData ? 'landstar' : (filteredStops.length > 0 ? 'doe' : 'interpolated'),
+        source,
         fetched_at: now,
         total_available: fuelStops.length,
         filtered_count: finalStops.length,
