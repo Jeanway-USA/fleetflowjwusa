@@ -206,6 +206,35 @@ function distanceFromRoute(
   return distanceToMultiSegmentRoute(pointLat, pointLng, originLat, originLng, destLat, destLng, waypoints);
 }
 
+// Sample evenly-spaced points along a polyline every `intervalMiles`
+function sampleRoutePoints(
+  polyline: Array<[number, number]>,
+  intervalMiles: number
+): Array<[number, number]> {
+  if (polyline.length < 2) return [...polyline];
+  const sampled: Array<[number, number]> = [polyline[0]];
+  let accumulated = 0;
+
+  for (let i = 1; i < polyline.length; i++) {
+    const segDist = haversineDistance(
+      polyline[i - 1][0], polyline[i - 1][1],
+      polyline[i][0], polyline[i][1]
+    );
+    accumulated += segDist;
+    if (accumulated >= intervalMiles) {
+      sampled.push(polyline[i]);
+      accumulated = 0;
+    }
+  }
+
+  // Always include the last point
+  const last = polyline[polyline.length - 1];
+  if (sampled[sampled.length - 1] !== last) {
+    sampled.push(last);
+  }
+  return sampled;
+}
+
 // Compute projected savings
 function computeProjectedSavings(
   filteredStops: Array<{ net_price: number | null; diesel_price: number | null; lcapp_discount: number | null; state: string }>,
@@ -422,8 +451,16 @@ Deno.serve(async (req) => {
     if (!force_refresh) {
       const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
       
-      const allLats = [origin_lat, dest_lat, ...waypoints.map((w: any) => w.lat)];
-      const allLngs = [origin_lng, dest_lng, ...waypoints.map((w: any) => w.lng)];
+      // Compute bounding box from polyline if available, otherwise from endpoints + waypoints
+      let allLats: number[];
+      let allLngs: number[];
+      if (route_polyline && route_polyline.length > 0) {
+        allLats = route_polyline.map((p: [number, number]) => p[0]);
+        allLngs = route_polyline.map((p: [number, number]) => p[1]);
+      } else {
+        allLats = [origin_lat, dest_lat, ...waypoints.map((w: any) => w.lat)];
+        allLngs = [origin_lng, dest_lng, ...waypoints.map((w: any) => w.lng)];
+      }
       const minLat = Math.min(...allLats) - (corridor_miles / 69);
       const maxLat = Math.max(...allLats) + (corridor_miles / 69);
       const minLng = Math.min(...allLngs) - (corridor_miles / 54);
@@ -549,8 +586,15 @@ Deno.serve(async (req) => {
 
     // Cache the results
     if (fuelStops.length > 0) {
-      const cacheLats = [origin_lat, dest_lat, ...waypoints.map((w: any) => w.lat)];
-      const cacheLngs = [origin_lng, dest_lng, ...waypoints.map((w: any) => w.lng)];
+      let cacheLats: number[];
+      let cacheLngs: number[];
+      if (route_polyline && route_polyline.length > 0) {
+        cacheLats = route_polyline.map((p: [number, number]) => p[0]);
+        cacheLngs = route_polyline.map((p: [number, number]) => p[1]);
+      } else {
+        cacheLats = [origin_lat, dest_lat, ...waypoints.map((w: any) => w.lat)];
+        cacheLngs = [origin_lng, dest_lng, ...waypoints.map((w: any) => w.lng)];
+      }
       const minLat = Math.min(...cacheLats) - 2;
       const maxLat = Math.max(...cacheLats) + 2;
       const minLng = Math.min(...cacheLngs) - 2;
