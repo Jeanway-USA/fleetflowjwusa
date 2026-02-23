@@ -1,103 +1,102 @@
 
 
-## Rewrite: Corporate-Only Truck Stop Sync (No More OSM/Overpass)
+## Restore Dual-Mode Fuel Trip Planner and Remove Truck Stop Scraper
 
-### Problem
-The Overpass API returned irrelevant POIs (schools, parks, restaurants) due to broad regex matching. All OSM-sourced data is unreliable for a commercial TMS.
+### Overview
 
-### Strategy
-Abandon Overpass entirely. Fetch exclusively from corporate sources:
-
-1. **Love's** -- Try the Sitecore locator endpoint (`GetNearbyStores`) that powers their website. If it returns data, great. If WAF-blocked, the fetcher returns empty gracefully.
-2. **Pilot/Flying J** -- Scrape all 50 US state directory pages from `locations.pilotflyingj.com/us/{state_code}` which contain structured JSON-LD with lat/lng, store numbers, addresses, and brand classification (Pilot vs Flying J vs One9).
-3. **TA/Petro** -- Keep the existing HTML directory parser at `ta-petro.com/location/all-locations/` with the static CITY_COORDS lookup for geocoding.
-
-### Important Reality Check
-All three brands' official REST APIs (Love's developer portal, TA developer portal) require OAuth/API key registration. The "corporate locator APIs" we're targeting are the **public-facing locator infrastructure** that powers their consumer websites -- not authenticated developer APIs. This is the best available option without API keys.
+Remove the failed `official_truck_stops` database/scraper infrastructure entirely and rewrite the `landstar-fuel-stops` edge function to work in two modes: real Landstar LCAPP data (when credentials exist) or deterministic fallback stops generated along the route polyline. Both modes produce stops plotted directly on the route.
 
 ---
 
 ### Changes
 
-#### 1. Edge Function Full Rewrite (`supabase/functions/sync-official-truck-stops/index.ts`)
+#### 1. Delete `sync-official-truck-stops` Edge Function
+- Delete the entire `supabase/functions/sync-official-truck-stops/` directory
+- Remove the `[functions.sync-official-truck-stops]` entry from `supabase/config.toml`
 
-**Remove entirely:**
-- All Overpass API code (`OVERPASS_URL`, `fetchFromOverpass`, `classifyBrand`, retry logic)
-- The `US_BBOX` constant
+#### 2. Clean Up `InfrastructureTab.tsx`
+- Remove the entire "Database Management" card (lines 126-190) which contains the Sync button, truck stop stats, and brand counts
+- Remove unused imports: `Database`, `RefreshCw`, `Fuel`, `Loader2`, `Badge`, `Button`
+- Remove the `syncing` state, `handleSync` function, and `truckStopStats` query
+- Keep the Storage Usage card intact
 
-**Keep:**
-- `BROWSER_HEADERS` (updated with Referer header per user request)
-- `CITY_COORDS` static lookup
-- `StopRecord` interface
-- Auth check and CORS headers
-- Batch upsert logic
+#### 3. Database Migration
+- `DROP TABLE IF EXISTS public.official_truck_stops CASCADE;` -- remove the table entirely
+- `DROP FUNCTION IF EXISTS public.truck_stop_brand_counts();` -- remove the RPC
 
-**New fetchers:**
+#### 4. Rewrite `landstar-fuel-stops/index.ts` (Core Change)
 
-##### `fetchLoves()`
-- POST to `https://www.loves.com/api/sitecore/StoreLocator/GetNearbyStores`
-- Body: `latitude=39.8283&longitude=-98.5795&radius=5000&brandId=1` (center of US, huge radius)
-- Headers: browser spoofing + `Referer: https://www.loves.com/en/location-and-fuel-price-search`
-- Parse JSON response, map each location to `{ brand: "Love's", store_number, name, address, city, state, latitude, longitude }`
-- Aggressive error logging on failure (log status + first 500 chars of body)
+Remove all references to `official_truck_stops` and the `queryOfficialStops` function. The new architecture:
 
-##### `fetchPilot()`
-- Iterate over all 50 US state codes, fetch `https://locations.pilotflyingj.com/us/{state_code_lowercase}`
-- Extract JSON-LD (`application/ld+json`) from each HTML page -- contains structured location data with lat/lng, address, store name
-- Classify brand from name: "Flying J" / "Pilot" / "One9" / etc.
-- Extract store number from name pattern (e.g., "Pilot Travel Center #180")
-- Add 500ms delay between state fetches to be respectful
-- Total: ~50 requests over ~25 seconds
+**Keep unchanged:**
+- CORS headers, auth validation
+- `STATE_DIESEL_TAX` rates, `FALLBACK_DIESEL_PRICES`, `NATIONAL_AVG_DIESEL`
+- `LCAPP_PARTNERS` directory and `matchLCAPP` function
+- `STATE_BOUNDS` and `lookupStateFromCoords` for geometric state lookup
+- All distance/haversine utility functions including `distanceToPolyline`, `sampleRoutePoints`
+- AES-GCM decryption for Landstar credentials
+- `attemptLandstarScrape` function
+- EIA diesel price fetcher
+- `computeProjectedSavings`
+- Cache logic (`fuel_stops_cache`)
 
-##### `fetchTA()`
-- Existing TA/Petro HTML directory parser (unchanged logic)
-- Uses CITY_COORDS static lookup for geocoding
-- Already handles TA, Petro, TA Express brands
+**Remove:**
+- `queryOfficialStops` function (lines 229-257)
+- All STEP 2 references to `official_truck_stops`
 
-**Main handler changes:**
-- **TRUNCATE before upsert**: Delete all existing rows from `official_truck_stops` before inserting fresh data (user requested "start fresh")
-- Execute all three fetchers with `Promise.allSettled()`
-- Merge successful results, filter out entries with lat=0/lng=0
-- Batch upsert with conflict on `(brand, store_number)`
-- Return per-brand counts
+**Add/modify the main handler flow:**
 
-#### 2. Database Cleanup
-- Run a migration to TRUNCATE the `official_truck_stops` table to start fresh
-- No schema changes needed -- table structure stays the same
+1. **Parse request** (unchanged)
+2. **Check cache** (unchanged -- 6h TTL)
+3. **Check Landstar credentials** -- query `driver_settings` for `landstar_username`/`landstar_password`
+4. **Fetch EIA diesel prices** (unchanged)
+5. **Mode A (Landstar Auth):**
+   - If credentials exist, attempt `attemptLandstarScrape()`
+   - If Landstar returns data, sample the route polyline every 50 miles, match each Landstar stop within 20mi of any sample point
+   - Enrich matched stops with IFTA tax credits via `lookupStateFromCoords`
+   - Set `source: 'landstar'`
+6. **Mode B (Fallback -- no auth or Landstar failed):**
+   - Sample route polyline every ~75 miles using `sampleRoutePoints()`
+   - At each sample point, generate a deterministic fallback stop:
+     - Name: `"Travel Center - Mile {X}"` or generic chain name from `LCAPP_PARTNERS` keys (rotate through them)
+     - State: determined by `lookupStateFromCoords(lat, lng)`
+     - Diesel price: from EIA state prices
+     - Generic estimated discount: $0.40/gal savings (labeled as "Estimated Generic Discount")
+     - IFTA tax credit: from `STATE_DIESEL_TAX[state]`
+   - Skip points within 20mi of origin/destination
+   - Set `source: 'estimated'`
+7. **Both modes:** Sort by `distance_from_origin`, compute `projected_savings`, cache results
+8. **Response payload** includes a new field `stop_type` per stop: `'landstar'` or `'estimated'`
 
-#### 3. Frontend (`InfrastructureTab.tsx`)
-- Already simplified from previous iteration -- no changes needed
-- The single "Sync" button and RPC-based stats display remain as-is
+#### 5. Frontend Updates (`TripFuelPlanner.tsx`)
 
----
+**FuelStop interface update:**
+- Add `stop_type?: 'landstar' | 'estimated'` field
 
-### Technical Details
+**Source badge (line 305-309):**
+- If `source === 'landstar'`: Show "LCAPP Live" badge (green, existing)
+- If `source === 'estimated'`: Show "Estimated Prices" badge (amber)
 
-**Browser Spoofing Headers (all fetchers):**
-```
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36
-Accept: application/json, text/plain, */*
-Accept-Language: en-US,en;q=0.9
-Referer: https://www.google.com/
-```
+**Legend update (lines 330-347):**
+- "LCAPP Partner" stays green
+- Rename "Other Stop" to "Estimated Stop" when source is estimated
 
-**Error Logging Pattern (all fetchers):**
-```
-if (!res.ok) {
-  const body = await res.text().catch(() => '[unreadable]');
-  console.error(`[Brand] HTTP ${res.status} from ${url}`);
-  console.error(`[Brand] Body (500 chars): ${body.substring(0, 500)}`);
-}
-```
+**Stop list cards (lines 438-486):**
+- Show stop type label per card:
+  - Landstar stops: display "Landstar Network Price" in primary color
+  - Estimated stops: display "Est. Generic Price" in amber
+- LCAPP discount line: show "LCAPP Discount" for Landstar, "Est. Savings" for estimated
+- IFTA tax credit line: already displayed correctly (lines 478-482), keep as-is
+- State name shown alongside IFTA credit: add `({stop.state})` after the IFTA amount
 
-**Pilot/FJ JSON-LD extraction:**
-The state directory pages at `locations.pilotflyingj.com/us/{state}` embed `<script type="application/ld+json">` blocks containing an array of location objects with `geo.latitude`, `geo.longitude`, `address`, and `name` fields. This is the same structured data Google uses for search results.
+**Projected Savings card (lines 351-367):**
+- No structural change needed -- already shows cheapest net price vs national average
+- Add a subtle note if source is estimated: "Based on estimated regional pricing"
 
-**Expected Results:**
-- Love's: ~600 locations (if Sitecore endpoint responds) or 0 (if WAF-blocked)
-- Pilot/Flying J: ~800 locations from 50 state pages
-- TA/Petro: ~250 locations (limited by CITY_COORDS coverage)
-- Total runtime: ~60-90 seconds (well within 300s timeout)
+**Cost estimate section (lines 369-411):**
+- Rename "LCAPP savings" label to be dynamic:
+  - If source is `landstar`: "LCAPP savings"
+  - If source is `estimated`: "Est. discount savings"
 
 ---
 
@@ -105,6 +104,9 @@ The state directory pages at `locations.pilotflyingj.com/us/{state}` embed `<scr
 
 | File | Action |
 |------|--------|
-| `supabase/functions/sync-official-truck-stops/index.ts` | Full rewrite -- remove Overpass, add corporate fetchers |
-| Database migration | TRUNCATE `official_truck_stops` |
+| `supabase/functions/sync-official-truck-stops/` | Delete entirely |
+| `supabase/functions/landstar-fuel-stops/index.ts` | Rewrite -- remove official_truck_stops dependency, add dual-mode logic |
+| `src/components/superadmin/InfrastructureTab.tsx` | Edit -- remove Database Management card |
+| `src/components/driver/TripFuelPlanner.tsx` | Edit -- add stop_type handling, dynamic labels |
+| Database migration | DROP TABLE official_truck_stops, DROP FUNCTION truck_stop_brand_counts |
 
