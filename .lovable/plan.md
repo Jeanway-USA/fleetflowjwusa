@@ -1,115 +1,112 @@
 
 
-## Truck Stop Sync -- Grid Progress Map and Live ETA Tracker
+## Broaden Overpass Query and Add Server-Side Filtering
 
-### Overview
+### Problem
+The current query filters by `"name"~"Pilot|Love|..."` which misses locations where the brand is stored in `tags.brand` or `tags.operator` instead of `tags.name`. It also only fetches `node` elements, missing `way` (polygon) locations. Result: ~160 locations instead of thousands.
 
-Move the geographic chunking loop from the Edge Function to the frontend. The Edge Function becomes a simple single-region worker that accepts one bounding box, fetches from Overpass, upserts, and returns a count. The frontend orchestrates the 6 regions sequentially, rendering a live Leaflet map with color-coded rectangles and a progress bar with ETA.
+### Changes (single file)
 
-### Architecture
+**File:** `supabase/functions/sync-official-truck-stops/index.ts`
 
-```text
-Frontend (SyncMapModal)              Edge Function (simplified)
-  |                                    |
-  |-- Region 1 bbox ------------------>|-- Overpass query
-  |<-- { upserted: 245 } -------------|-- Upsert to DB
-  |   [delay 3s]                       |
-  |-- Region 2 bbox ------------------>|
-  |<-- { upserted: 180 } -------------|
-  |   ...                              |
-  |-- Region 6 bbox ------------------>|
-  |<-- { upserted: 310 } -------------|
-  |                                    |
-  | Calculate ETA, update map colors   |
+**1. Broaden the Overpass query**
+
+Replace the current name-filtered node-only query:
+```
+node["amenity"="fuel"]["name"~"...",i](BBOX);out body;
 ```
 
-### 1. Edge Function Simplification (`sync-official-truck-stops/index.ts`)
-
-Strip the server-side loop. The function now:
-
-- Accepts `{ bbox: [minLat, minLon, maxLat, maxLon] }` from the request body
-- Builds a single Overpass query with that bbox: `node["amenity"="fuel"]["name"~"Pilot|Love|...",i](minLat,minLon,maxLat,maxLon);`
-- Classifies brands using the existing `classifyBrand()` logic
-- Upserts matching stops into `official_truck_stops`
-- Returns `{ upserted: number, total_in_database: number }`
-- No delays, no looping -- single request in, single response out
-- Auth check (super admin) remains unchanged
-
-### 2. New Component: `SyncMapModal` (`src/components/superadmin/SyncMapModal.tsx`)
-
-A Dialog-based modal opened from the Infrastructure tab when the user clicks "Sync Official Truck Stop Data".
-
-**State:**
-- `regions`: Array of 6 region objects with `name`, `bbox` (as `[south, west, north, east]`), and `status` (`'pending' | 'fetching' | 'done' | 'error'`)
-- `currentIndex`: Which region is being fetched (-1 = not started)
-- `results`: Per-region upsert counts
-- `startTime`: Timestamp when sync began
-- `isRunning`: Boolean
-
-**Regions (same 6 as current edge function):**
-| Region | Bounds (S, W, N, E) |
-|--------|---------------------|
-| Northeast | 37.0, -82.0, 47.5, -66.5 |
-| Southeast | 24.0, -92.0, 37.0, -75.0 |
-| Midwest | 36.0, -104.0, 49.5, -82.0 |
-| South Central | 24.0, -104.0, 37.0, -92.0 |
-| Northwest | 40.0, -125.0, 49.5, -104.0 |
-| Southwest | 24.0, -125.0, 40.0, -104.0 |
-
-**`runSync` function:**
-1. Set `isRunning = true`, record `startTime`
-2. Loop through regions sequentially
-3. Set current region status to `'fetching'`
-4. `await supabase.functions.invoke('sync-official-truck-stops', { body: { bbox: region.bbox } })`
-5. On success: set status to `'done'`, store upsert count
-6. On error: set status to `'error'`
-7. `await delay(3000)` between calls (rate limiting)
-8. After loop: toast summary, refetch truck stop stats
-
-**ETA calculation:**
+With an HGV-based query that fetches both nodes and ways:
 ```
-elapsedMs = Date.now() - startTime
-avgMsPerChunk = elapsedMs / completedChunks
-etaMs = avgMsPerChunk * remainingChunks
+[out:json][timeout:180];
+(
+  node["amenity"="fuel"]["hgv"="yes"](BBOX);
+  way["amenity"="fuel"]["hgv"="yes"](BBOX);
+);
+out center;
 ```
 
-**UI Layout inside the Dialog (max-w-3xl):**
+This returns all truck-accessible fuel stations, giving us a much larger dataset to filter from.
 
-- **Map** (h-72): Leaflet `MapContainer` fitted to US bounds `[[24, -125], [50, -66]]` with 6 `<Rectangle>` layers, color-coded:
-  - Gray (`#94a3b8`, opacity 0.2): Pending
-  - Yellow (`#eab308`, opacity 0.3) + dashed stroke: Currently fetching
-  - Green (`#22c55e`, opacity 0.3): Done
-  - Red (`#ef4444`, opacity 0.3): Error
-  - Each rectangle has a `<Popup>` or `<Tooltip>` showing region name and count
+**2. Expand `classifyBrand` to check `tags.operator` too**
 
-- **Progress section** below map:
-  - Shadcn `<Progress />` bar driven by `(completedChunks / totalChunks) * 100`
-  - Text: "Fetching Region {n} of 6 -- {regionName}... Estimated Time Remaining: {eta}s"
-  - After completion: "Sync complete! {totalUpserted} stops synced across 6 regions."
+Current function only checks `tags.brand` and `tags.name`. Update to also check `tags.operator`, and add "Roady's" and "AMBEST" as recognized brands.
 
-- **Start button**: "Begin Sync" button at the bottom, disabled while running
+**3. Handle `way` elements (use `center.lat`/`center.lon`)**
 
-### 3. InfrastructureTab Changes
+Current code skips elements without `el.lat`/`el.lon`. Ways don't have those -- they have `el.center.lat`/`el.center.lon` (from `out center`). Update the extraction to fall back to center coordinates.
 
-- Import `SyncMapModal`
-- Replace the inline `handleSync` with opening the modal: `setSyncModalOpen(true)`
-- Add `<SyncMapModal open={syncModalOpen} onOpenChange={setSyncModalOpen} onComplete={() => refetchStops()} />`
-- The existing stats card (brand counts, last synced) remains unchanged
+**4. Generate fallback store numbers for missing `tags.ref`**
 
-### File Changes Summary
+Current fallback is `osm-{id}`. Update to a more descriptive format: if city and state are available, use `{Brand}-{City}-{State}` (e.g., `Pilot-Dallas-TX`). Fall back to `{Brand}-{type}-{id}` if no city/state.
 
-| File | Action |
-|------|--------|
-| `supabase/functions/sync-official-truck-stops/index.ts` | Rewrite -- accept single bbox, remove loop/delays |
-| `src/components/superadmin/SyncMapModal.tsx` | New -- map + progress modal |
-| `src/components/superadmin/InfrastructureTab.tsx` | Edit -- open modal instead of direct invoke |
+**5. Remove the hard requirement for `addr:state`**
 
-### Technical Notes
+Currently, stops without `addr:state` are silently dropped. Many valid OSM entries lack this tag. Instead, still include the stop but with an empty state string -- the data is still valuable for the map.
 
-- Uses `react-leaflet`'s `Rectangle` component (already available in the installed package)
-- Map tiles from OpenStreetMap (same as existing `FuelPlannerMap`)
-- No new dependencies required
-- The 3-second delay between chunks is enforced on the frontend, giving the Overpass API breathing room
-- Each edge function call is independent and fast (single region, ~5-15s)
-- If a region fails, the loop continues to the next -- partial syncs are fine since data is upserted
+### Detailed code changes
+
+```typescript
+// Remove BRAND_REGEX constant (no longer used in query)
+
+// Updated classifyBrand - check brand, name, AND operator
+function classifyBrand(tags: Record<string, string>): string | null {
+  const brand = (tags.brand || '').toLowerCase();
+  const name = (tags.name || '').toLowerCase();
+  const operator = (tags.operator || '').toLowerCase();
+  const combined = `${brand} ${name} ${operator}`;
+
+  if (combined.includes('flying j')) return 'Flying J';
+  if (combined.includes('pilot')) return 'Pilot';
+  if (combined.includes("love's") || combined.includes('loves')) return "Love's";
+  if (combined.includes('petro')) return 'Petro';
+  if (/\bta\b/.test(combined) || combined.includes('travelcenter') || combined.includes('travel center')) return 'TA';
+  if (combined.includes("roady's") || combined.includes('roadys')) return "Roady's";
+  if (combined.includes('ambest')) return 'AMBEST';
+  return null;
+}
+
+// Updated query (line 75)
+const query = `[out:json][timeout:180];\n(\n  node["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n  way["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n);\nout center;`;
+
+// Updated element processing loop
+for (const el of elements) {
+  const tags = el.tags;
+  if (!tags) continue;
+
+  // Support both nodes (el.lat/el.lon) and ways (el.center.lat/el.center.lon)
+  const lat = el.lat ?? el.center?.lat;
+  const lon = el.lon ?? el.center?.lon;
+  if (!lat || !lon) continue;
+
+  const brand = classifyBrand(tags);
+  if (!brand) continue;
+
+  const city = tags['addr:city'] || '';
+  const state = (tags['addr:state'] || '').toUpperCase().slice(0, 2);
+
+  // Fallback store_number: Brand-City-State or Brand-type-id
+  let storeNumber = tags.ref;
+  if (!storeNumber) {
+    storeNumber = (city && state)
+      ? `${brand}-${city}-${state}`
+      : `${brand}-${el.type}-${el.id}`;
+  }
+
+  stops.push({
+    brand,
+    store_number: storeNumber,
+    name: tags.name || `${brand} Travel Center`,
+    address: tags['addr:street'] || '',
+    city,
+    state,
+    latitude: lat,
+    longitude: lon,
+    amenities: ['Diesel', 'Parking'],
+  });
+}
+```
+
+### No other files change
+The frontend `SyncMapModal` and `InfrastructureTab` remain unchanged -- they still send `{ bbox: [...] }` and receive `{ upserted, total_in_database }`.
 
