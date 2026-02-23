@@ -34,6 +34,7 @@ const INITIAL_REGIONS: Omit<Region, 'status'>[] = [
   { name: 'Pacific Northwest', bbox: [42.0, -125.0, 49.5, -117.0] },
   { name: 'California',        bbox: [24.0, -125.0, 42.0, -117.0] },
   { name: 'Upstate NY / PA',   bbox: [41.0, -82.0, 49.5, -73.5] },
+  { name: 'Ohio Valley',      bbox: [37.0, -92.0, 41.0, -82.0] },
 ];
 
 const US_BOUNDS: LatLngBoundsExpression = [[24, -125], [50, -66]];
