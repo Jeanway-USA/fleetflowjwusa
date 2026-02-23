@@ -6,7 +6,18 @@ const corsHeaders = {
 };
 
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
-const US_BBOX = '(24.0,-125.0,50.0,-66.0)';
+
+// 6 US regional bounding boxes (south, west, north, east)
+const US_REGIONS = [
+  { name: 'Northeast',    bbox: '(37.0,-82.0,47.5,-66.5)' },
+  { name: 'Southeast',    bbox: '(24.0,-92.0,37.0,-75.0)' },
+  { name: 'Midwest',      bbox: '(36.0,-104.0,49.5,-82.0)' },
+  { name: 'South Central', bbox: '(24.0,-104.0,37.0,-92.0)' },
+  { name: 'Northwest',    bbox: '(40.0,-125.0,49.5,-104.0)' },
+  { name: 'Southwest',    bbox: '(24.0,-125.0,40.0,-104.0)' },
+];
+
+const BRAND_REGEX = 'Pilot|Love|Loves|TA |TravelCenters|Flying J|Petro';
 
 interface StopRecord {
   brand: string;
@@ -24,28 +35,35 @@ function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function fetchOverpassBrand(brandNames: string[]): Promise<StopRecord[]> {
-  const unionParts = brandNames.map(b =>
-    `node["amenity"="fuel"]["brand"="${b}"]${US_BBOX};`
-  ).join('\n  ');
+function classifyBrand(tags: Record<string, string>): string | null {
+  const brand = (tags.brand || '').toLowerCase();
+  const name = (tags.name || '').toLowerCase();
+  const combined = `${brand} ${name}`;
 
-  const query = `[out:json][timeout:60];\n(\n  ${unionParts}\n);\nout body;`;
+  if (combined.includes('flying j')) return 'Flying J';
+  if (combined.includes('pilot')) return 'Pilot';
+  if (combined.includes("love's") || combined.includes('loves')) return "Love's";
+  if (combined.includes('petro')) return 'Petro';
+  if (/\bta\b/.test(combined) || combined.includes('travelcenter') || combined.includes('travel center')) return 'TA';
+  return null;
+}
+
+async function fetchRegion(region: { name: string; bbox: string }): Promise<{ stops: StopRecord[]; osmIds: Set<number> }> {
+  const query = `[out:json][timeout:180];\nnode["amenity"="fuel"]["name"~"${BRAND_REGEX}",i]${region.bbox};\nout body;`;
 
   const res = await fetch(OVERPASS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `data=${encodeURIComponent(query)}`,
-    signal: AbortSignal.timeout(90000),
+    signal: AbortSignal.timeout(200000),
   });
 
-  // Check content type BEFORE parsing
   const contentType = res.headers.get('content-type') || '';
   if (!contentType.includes('application/json') && !contentType.includes('text/json')) {
     const text = await res.text().catch(() => '');
     if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<?xml')) {
-      throw new Error(`Overpass returned HTML/XML instead of JSON (status ${res.status}) - likely rate limited. Try again in a few minutes.`);
+      throw new Error(`Overpass returned HTML/XML (status ${res.status}) - likely rate limited`);
     }
-    // Some Overpass mirrors return json without proper content-type, try parsing anyway
   }
 
   if (!res.ok) {
@@ -56,18 +74,21 @@ async function fetchOverpassBrand(brandNames: string[]): Promise<StopRecord[]> {
   const data = await res.json();
   const elements = data?.elements || [];
   const stops: StopRecord[] = [];
+  const osmIds = new Set<number>();
 
   for (const el of elements) {
     if (!el.lat || !el.lon || !el.tags) continue;
     const tags = el.tags;
-    const brand = tags.brand || brandNames[0];
-    const storeNum = tags.ref || `osm-${el.id}`;
+    const brand = classifyBrand(tags);
+    if (!brand) continue;
+
     const state = tags['addr:state'] || '';
     if (!state) continue;
 
+    osmIds.add(el.id);
     stops.push({
       brand,
-      store_number: storeNum,
+      store_number: tags.ref || `osm-${el.id}`,
       name: tags.name || `${brand} Travel Center`,
       address: tags['addr:street'] || '',
       city: tags['addr:city'] || '',
@@ -78,7 +99,7 @@ async function fetchOverpassBrand(brandNames: string[]): Promise<StopRecord[]> {
     });
   }
 
-  return stops;
+  return { stops, osmIds };
 }
 
 async function upsertStops(supabase: any, stops: StopRecord[]): Promise<number> {
@@ -134,50 +155,55 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const results: Record<string, number> = {};
+    const allStops: StopRecord[] = [];
+    const seenOsmIds = new Set<number>();
+    const regionResults: Record<string, number> = {};
     const errors: string[] = [];
 
-    // Process brand groups sequentially with delays to avoid Overpass rate limits
-    const brandGroups: Array<{ name: string; brands: string[] }> = [
-      { name: 'Pilot/Flying J', brands: ['Pilot', 'Flying J'] },
-      { name: "Love's", brands: ["Love's"] },
-      { name: 'TA/Petro', brands: ['TA', 'Petro'] },
-    ];
+    for (let idx = 0; idx < US_REGIONS.length; idx++) {
+      const region = US_REGIONS[idx];
 
-    for (let idx = 0; idx < brandGroups.length; idx++) {
-      const group = brandGroups[idx];
+      if (idx > 0) {
+        console.log(`Waiting 5s before fetching ${region.name}...`);
+        await delay(5000);
+      }
+
       try {
-        // Wait 15 seconds between queries to respect Overpass rate limits
-        if (idx > 0) {
-          console.log(`Waiting 15s before next Overpass query to avoid rate limiting...`);
-          await delay(15000);
+        console.log(`Fetching ${region.name} ${region.bbox}...`);
+        const { stops, osmIds } = await fetchRegion(region);
+
+        // Deduplicate across regions
+        let added = 0;
+        for (let i = 0; i < stops.length; i++) {
+          const osmId = [...osmIds][i];
+          if (osmId && !seenOsmIds.has(osmId)) {
+            seenOsmIds.add(osmId);
+            allStops.push(stops[i]);
+            added++;
+          }
         }
 
-        console.log(`Fetching ${group.name} from Overpass...`);
-        const stops = await fetchOverpassBrand(group.brands);
-        console.log(`${group.name}: fetched ${stops.length} stops`);
-
-        if (stops.length > 0) {
-          const count = await upsertStops(supabase, stops);
-          results[group.name] = count;
-        } else {
-          results[group.name] = 0;
-          errors.push(`${group.name}: No stops returned from Overpass`);
-        }
+        regionResults[region.name] = added;
+        console.log(`${region.name}: ${stops.length} raw, ${added} unique added`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        errors.push(`${group.name}: ${msg}`);
-        results[group.name] = 0;
-        console.error(`${group.name} sync failed:`, msg);
+        errors.push(`${region.name}: ${msg}`);
+        regionResults[region.name] = 0;
+        console.error(`${region.name} failed:`, msg);
       }
     }
+
+    // Upsert all deduplicated stops
+    const upsertedCount = await upsertStops(supabase, allStops);
 
     const { count: totalCount } = await supabase
       .from('official_truck_stops')
       .select('*', { count: 'exact', head: true });
 
     const summary = {
-      synced: results,
+      regions: regionResults,
+      total_fetched: allStops.length,
+      total_upserted: upsertedCount,
       total_in_database: totalCount || 0,
       errors: errors.length > 0 ? errors : undefined,
       synced_at: new Date().toISOString(),
