@@ -29,20 +29,17 @@ const LCAPP_PARTNERS: Record<string, { minDiscount: number; maxDiscount: number;
   "Buc-ee's": { minDiscount: 0.03, maxDiscount: 0.10, amenities: ['Parking', 'DEF', 'Food'] },
 };
 
-// Brand name → LCAPP key mapping for OSM brand tags
+// Brand → LCAPP key mapping
 const BRAND_TO_LCAPP: Record<string, string> = {
   'pilot': 'Pilot/Flying J',
   'flying j': 'Pilot/Flying J',
   "love's": "Love's Travel Stops",
   'loves': "Love's Travel Stops",
   'ta': 'TA/Petro',
-  'travelcenters of america': 'TA/Petro',
   'petro': 'TA/Petro',
-  'petro stopping center': 'TA/Petro',
   'sapp bros': 'Sapp Bros',
   "casey's": "Casey's General Stores",
   "buc-ee's": "Buc-ee's",
-  "bucees": "Buc-ee's",
 };
 
 function matchLCAPP(name: string, brand: string | null): string | null {
@@ -190,7 +187,6 @@ function distanceToPolyline(pointLat: number, pointLng: number, polyline: Array<
     return polyline.length === 1 ? haversineDistance(pointLat, pointLng, polyline[0][0], polyline[0][1]) : Infinity;
   }
   let minDist = Infinity;
-  // Sample every 5th segment for performance on large polylines
   const step = polyline.length > 200 ? 5 : 1;
   for (let i = 0; i < polyline.length - step; i += step) {
     const j = Math.min(i + step, polyline.length - 1);
@@ -230,178 +226,8 @@ function sampleRoutePoints(polyline: Array<[number, number]>, intervalMiles: num
   return sampled;
 }
 
-// ===== Overpass API: Fetch real truck stops from OpenStreetMap =====
-
-interface BBox {
-  minLat: number;
-  maxLat: number;
-  minLng: number;
-  maxLng: number;
-}
-
-/**
- * Chunk a route polyline into bounding boxes (~50mi segments).
- * Merge overlapping boxes. Cap at 15 chunks.
- */
-function chunkRouteToBBoxes(polyline: Array<[number, number]>, segmentMiles: number = 50): BBox[] {
-  const sampled = sampleRoutePoints(polyline, segmentMiles);
-  const bufferDeg = 0.3; // ~20mi radius at mid-latitudes
-  const boxes: BBox[] = [];
-
-  for (const [lat, lng] of sampled) {
-    boxes.push({
-      minLat: lat - bufferDeg,
-      maxLat: lat + bufferDeg,
-      minLng: lng - bufferDeg,
-      maxLng: lng + bufferDeg,
-    });
-  }
-
-  // Merge overlapping boxes
-  const merged: BBox[] = [];
-  for (const box of boxes) {
-    let didMerge = false;
-    for (const m of merged) {
-      if (box.minLat <= m.maxLat && box.maxLat >= m.minLat &&
-          box.minLng <= m.maxLng && box.maxLng >= m.minLng) {
-        m.minLat = Math.min(m.minLat, box.minLat);
-        m.maxLat = Math.max(m.maxLat, box.maxLat);
-        m.minLng = Math.min(m.minLng, box.minLng);
-        m.maxLng = Math.max(m.maxLng, box.maxLng);
-        didMerge = true;
-        break;
-      }
-    }
-    if (!didMerge) merged.push({ ...box });
-  }
-
-  // Cap at 15 chunks
-  return merged.slice(0, 15);
-}
-
-interface OverpassStop {
-  osm_id: number;
-  name: string;
-  brand: string | null;
-  latitude: number;
-  longitude: number;
-  city: string | null;
-  state: string;
-  amenities: string[];
-}
-
-/**
- * Fetch truck fuel stops from Overpass API for a single bounding box.
- * Targets nodes with amenity=fuel + hgv=yes, or major truck stop brand names.
- */
-async function fetchOverpassStops(bbox: BBox): Promise<OverpassStop[]> {
-  const { minLat, minLng, maxLat, maxLng } = bbox;
-  const query = `[out:json][timeout:5];(node["amenity"="fuel"]["hgv"="yes"](${minLat},${minLng},${maxLat},${maxLng});node["amenity"="fuel"]["brand"~"Pilot|Love|Flying J|TA |Petro|Sapp|Casey|Buc-ee",i](${minLat},${minLng},${maxLat},${maxLng}););out body;`;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
-
-  try {
-    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
-
-    if (res.status === 429) {
-      console.warn('Overpass API rate limited (429)');
-      return [];
-    }
-    if (!res.ok) {
-      console.warn(`Overpass API error: ${res.status}`);
-      return [];
-    }
-
-    const data = await res.json();
-    const elements = data?.elements || [];
-    const stops: OverpassStop[] = [];
-
-    for (const el of elements) {
-      if (el.type !== 'node' || !el.lat || !el.lon) continue;
-      const tags = el.tags || {};
-      const name = tags.name || tags.brand || 'Truck Stop';
-      const brand = tags.brand || null;
-      const city = tags['addr:city'] || null;
-      const stateTag = tags['addr:state'] || '';
-      const state = stateTag.toUpperCase() || lookupStateFromCoords(el.lat, el.lon);
-
-      // Parse amenities from OSM tags
-      const amenities: string[] = [];
-      if (tags.shower === 'yes' || tags.showers === 'yes') amenities.push('Showers');
-      if (tags.parking === 'yes' || tags.hgv === 'yes') amenities.push('Parking');
-      if (tags.fuel?.includes('diesel') || tags.amenity === 'fuel') amenities.push('Diesel');
-      if (tags['fuel:adblue'] === 'yes' || tags['fuel:def'] === 'yes') amenities.push('DEF');
-      if (tags.shop === 'yes' || tags.shop) amenities.push('Shop');
-      if (tags.restaurant === 'yes' || tags.food === 'yes') amenities.push('Food');
-      if (amenities.length === 0) amenities.push('Diesel', 'Parking');
-
-      stops.push({
-        osm_id: el.id,
-        name,
-        brand,
-        latitude: el.lat,
-        longitude: el.lon,
-        city,
-        state,
-        amenities,
-      });
-    }
-
-    console.log(`Overpass returned ${stops.length} truck stops for bbox [${minLat.toFixed(2)},${minLng.toFixed(2)},${maxLat.toFixed(2)},${maxLng.toFixed(2)}]`);
-    return stops;
-  } catch (error) {
-    clearTimeout(timeout);
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      console.warn('Overpass API timed out for bbox');
-    } else {
-      console.warn('Overpass API fetch error:', error);
-    }
-    return [];
-  }
-}
-
-/**
- * Upsert parsed Overpass stops into the truck_stops table.
- * Uses osm_id as the deterministic dedup key.
- */
-async function upsertStops(supabase: any, stops: OverpassStop[]): Promise<void> {
-  if (stops.length === 0) return;
-
-  const rows = stops.map(s => ({
-    osm_id: s.osm_id,
-    name: s.name,
-    brand: s.brand,
-    latitude: s.latitude,
-    longitude: s.longitude,
-    state: s.state,
-    city: s.city,
-    amenities: s.amenities,
-    source: 'overpass',
-    fetched_at: new Date().toISOString(),
-  }));
-
-  // Batch in chunks of 200 to avoid payload limits
-  for (let i = 0; i < rows.length; i += 200) {
-    const batch = rows.slice(i, i + 200);
-    const { error } = await supabase
-      .from('truck_stops')
-      .upsert(batch, { onConflict: 'osm_id', ignoreDuplicates: false });
-
-    if (error) {
-      console.warn(`Upsert batch ${i / 200 + 1} error:`, error.message);
-    }
-  }
-
-  console.log(`Upserted ${rows.length} stops into truck_stops table`);
-}
-
-/**
- * Query truck_stops table for stops within a bounding box.
- */
-async function queryLocalStops(
+// ===== Query official_truck_stops table =====
+async function queryOfficialStops(
   supabase: any,
   allLats: number[],
   allLngs: number[],
@@ -414,7 +240,7 @@ async function queryLocalStops(
   const maxLng = Math.max(...allLngs) + (corridorMiles / 54);
 
   const { data, error } = await supabase
-    .from('truck_stops')
+    .from('official_truck_stops')
     .select('*')
     .gte('latitude', minLat)
     .lte('latitude', maxLat)
@@ -423,7 +249,7 @@ async function queryLocalStops(
     .limit(500);
 
   if (error) {
-    console.warn('truck_stops query error:', error.message);
+    console.warn('official_truck_stops query error:', error.message);
     return [];
   }
 
@@ -453,6 +279,9 @@ function generateInterpolatedStops(
     stops.push({
       name: `Truck Stop - Mile ${Math.round(distToOrigin)}`,
       chain: null,
+      brand: null,
+      store_number: null,
+      address: null,
       latitude: lat,
       longitude: lng,
       state,
@@ -658,50 +487,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ===== STEP 2: Query local truck_stops table =====
-    let localStops = await queryLocalStops(supabase, allLats, allLngs, corridor_miles);
-    console.log(`Local truck_stops: ${localStops.length} in bounding box`);
+    // ===== STEP 2: Query official_truck_stops table =====
+    const officialStops = await queryOfficialStops(supabase, allLats, allLngs, corridor_miles);
+    console.log(`Official truck stops: ${officialStops.length} in bounding box`);
 
-    // ===== STEP 3: Check density, fetch from Overpass if sparse =====
-    const minExpectedStops = Math.max(3, Math.floor(tripMiles / 100));
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const freshStops = localStops.filter((s: any) => s.fetched_at > thirtyDaysAgo);
-    const needsOverpassFetch = force_refresh || freshStops.length < minExpectedStops;
-
-    if (needsOverpassFetch && route_polyline && route_polyline.length >= 2) {
-      console.log(`Sparse local data (${freshStops.length}/${minExpectedStops} needed). Fetching from Overpass...`);
-      const bboxes = chunkRouteToBBoxes(route_polyline);
-      console.log(`Route chunked into ${bboxes.length} bounding boxes`);
-
-      const allOverpassStops: OverpassStop[] = [];
-      for (let i = 0; i < bboxes.length; i++) {
-        const stops = await fetchOverpassStops(bboxes[i]);
-        allOverpassStops.push(...stops);
-        // Small delay between chunks to be nice to Overpass
-        if (i < bboxes.length - 1 && stops.length > 0) {
-          await new Promise(r => setTimeout(r, 1500));
-        }
-      }
-
-      // Deduplicate by osm_id
-      const seen = new Set<number>();
-      const uniqueStops = allOverpassStops.filter(s => {
-        if (seen.has(s.osm_id)) return false;
-        seen.add(s.osm_id);
-        return true;
-      });
-
-      console.log(`Overpass total: ${allOverpassStops.length}, deduplicated: ${uniqueStops.length}`);
-
-      // Upsert into truck_stops table
-      await upsertStops(supabase, uniqueStops);
-
-      // Re-query to get the full set including what was already there
-      localStops = await queryLocalStops(supabase, allLats, allLngs, corridor_miles);
-      console.log(`Post-upsert local truck_stops: ${localStops.length}`);
-    }
-
-    // ===== STEP 4: Attempt Landstar scrape for LCAPP pricing =====
+    // ===== STEP 3: Attempt Landstar scrape for LCAPP pricing =====
     let landstarData: any[] | null = null;
     const { data: driverSettings } = await supabase
       .from('driver_settings')
@@ -718,11 +508,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ===== STEP 5: Fetch EIA diesel prices =====
+    // ===== STEP 4: Fetch EIA diesel prices =====
     const dieselPrices = await fetchEIADieselPrices();
 
-    // ===== STEP 6: Enrich local stops with pricing =====
-    const enrichedStops = localStops.map((stop: any) => {
+    // ===== STEP 5: Enrich official stops with pricing =====
+    const enrichedStops = officialStops.map((stop: any) => {
       const state = (stop.state || '').toUpperCase();
       const statePrice = dieselPrices[state] || FALLBACK_DIESEL_PRICES[state] || 3.55;
       const iftaCredit = STATE_DIESEL_TAX[state] ?? 0;
@@ -748,6 +538,9 @@ Deno.serve(async (req) => {
 
       return {
         name: stop.name,
+        brand: stop.brand,
+        store_number: stop.store_number,
+        address: stop.address,
         chain: lcappKey || stop.brand || null,
         latitude: stop.latitude,
         longitude: stop.longitude,
@@ -758,8 +551,8 @@ Deno.serve(async (req) => {
         net_price: landstarPrice ? (landstarPrice - (landstarDiscount || 0)) : netPrice,
         ifta_tax_credit: iftaCredit,
         amenities: partner?.amenities || stop.amenities || ['Diesel', 'Parking'],
-        source: landstarPrice ? 'landstar' : 'overpass',
-        fetched_at: stop.fetched_at || now,
+        source: landstarPrice ? 'landstar' : 'official',
+        fetched_at: stop.updated_at || now,
         distance_from_route: distanceFromRoute(
           stop.latitude, stop.longitude,
           origin_lat, origin_lng, dest_lat, dest_lng,
@@ -769,15 +562,16 @@ Deno.serve(async (req) => {
       };
     });
 
-    // ===== STEP 7: Filter within corridor =====
+    // ===== STEP 6: Filter within corridor =====
     let filteredStops = enrichedStops
       .filter((stop: any) => stop.distance_from_route <= corridor_miles)
       .sort((a: any, b: any) => (a.distance_from_origin || 0) - (b.distance_from_origin || 0));
 
     console.log(`Filtered to ${filteredStops.length} stops within ${corridor_miles}mi corridor (from ${enrichedStops.length} enriched)`);
 
-    // ===== STEP 8: Density-based interpolated fallback =====
-    let source = landstarData ? 'landstar' : 'overpass';
+    // ===== STEP 7: Density-based interpolated fallback =====
+    const minExpectedStops = Math.max(3, Math.floor(tripMiles / 100));
+    let source = landstarData ? 'landstar' : 'official';
     if (filteredStops.length < minExpectedStops && route_polyline && route_polyline.length >= 2) {
       console.log(`Sparse: ${filteredStops.length}/${minExpectedStops}. Adding interpolated stops...`);
       const interpolated = generateInterpolatedStops(route_polyline, dieselPrices, now, origin_lat, origin_lng, dest_lat, dest_lng);
@@ -791,7 +585,7 @@ Deno.serve(async (req) => {
       if (filteredStops.length === 0) source = 'interpolated';
     }
 
-    // ===== STEP 9: Cache results =====
+    // ===== STEP 8: Cache results =====
     if (filteredStops.length > 0) {
       const cacheStops = filteredStops.map(({ ifta_tax_credit, distance_from_route, distance_from_origin, ...rest }: any) => rest);
       const bufDeg2 = 2;
@@ -811,7 +605,7 @@ Deno.serve(async (req) => {
       fuel_stops: filteredStops,
       source,
       fetched_at: now,
-      total_available: localStops.length,
+      total_available: officialStops.length,
       filtered_count: filteredStops.length,
       projected_savings,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
