@@ -20,8 +20,11 @@ interface StopRecord {
   amenities: string[];
 }
 
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function fetchOverpassBrand(brandNames: string[]): Promise<StopRecord[]> {
-  // Build union of brand queries
   const unionParts = brandNames.map(b =>
     `node["amenity"="fuel"]["brand"="${b}"]${US_BBOX};`
   ).join('\n  ');
@@ -34,6 +37,16 @@ async function fetchOverpassBrand(brandNames: string[]): Promise<StopRecord[]> {
     body: `data=${encodeURIComponent(query)}`,
     signal: AbortSignal.timeout(90000),
   });
+
+  // Check content type BEFORE parsing
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json') && !contentType.includes('text/json')) {
+    const text = await res.text().catch(() => '');
+    if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<?xml')) {
+      throw new Error(`Overpass returned HTML/XML instead of JSON (status ${res.status}) - likely rate limited. Try again in a few minutes.`);
+    }
+    // Some Overpass mirrors return json without proper content-type, try parsing anyway
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -50,7 +63,7 @@ async function fetchOverpassBrand(brandNames: string[]): Promise<StopRecord[]> {
     const brand = tags.brand || brandNames[0];
     const storeNum = tags.ref || `osm-${el.id}`;
     const state = tags['addr:state'] || '';
-    if (!state) continue; // skip if no state
+    if (!state) continue;
 
     stops.push({
       brand,
@@ -102,7 +115,6 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-    // Auth check
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Authorization required' }),
@@ -125,14 +137,22 @@ Deno.serve(async (req) => {
     const results: Record<string, number> = {};
     const errors: string[] = [];
 
+    // Process brand groups sequentially with delays to avoid Overpass rate limits
     const brandGroups: Array<{ name: string; brands: string[] }> = [
       { name: 'Pilot/Flying J', brands: ['Pilot', 'Flying J'] },
       { name: "Love's", brands: ["Love's"] },
       { name: 'TA/Petro', brands: ['TA', 'Petro'] },
     ];
 
-    for (const group of brandGroups) {
+    for (let idx = 0; idx < brandGroups.length; idx++) {
+      const group = brandGroups[idx];
       try {
+        // Wait 15 seconds between queries to respect Overpass rate limits
+        if (idx > 0) {
+          console.log(`Waiting 15s before next Overpass query to avoid rate limiting...`);
+          await delay(15000);
+        }
+
         console.log(`Fetching ${group.name} from Overpass...`);
         const stops = await fetchOverpassBrand(group.brands);
         console.log(`${group.name}: fetched ${stops.length} stops`);
