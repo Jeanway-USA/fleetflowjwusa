@@ -50,11 +50,30 @@ const KNOWN_STOPS: Array<{
   { name: "Love's Travel Stop #401", chain: "Love's Travel Stops", lat: 31.7619, lng: -106.4850, state: "TX", city: "El Paso" },
   { name: "TA #75", chain: "TA/Petro", lat: 29.4241, lng: -98.4936, state: "TX", city: "San Antonio" },
   { name: "Pilot Travel Center #680", chain: "Pilot/Flying J", lat: 30.3322, lng: -81.6557, state: "FL", city: "Jacksonville" },
-  // I-95 Corridor  
+  // I-95 Corridor (expanded)
   { name: "Pilot Travel Center #201", chain: "Pilot/Flying J", lat: 36.8529, lng: -75.9780, state: "VA", city: "Virginia Beach" },
   { name: "Love's Travel Stop #550", chain: "Love's Travel Stops", lat: 35.2271, lng: -80.8431, state: "NC", city: "Charlotte" },
   { name: "TA #157", chain: "TA/Petro", lat: 39.2904, lng: -76.6122, state: "MD", city: "Baltimore" },
   { name: "Pilot Travel Center #320", chain: "Pilot/Flying J", lat: 34.0007, lng: -81.0348, state: "SC", city: "Columbia" },
+  // I-95 Northeast additions
+  { name: "TA #220", chain: "TA/Petro", lat: 41.7658, lng: -72.6734, state: "CT", city: "Hartford" },
+  { name: "Pilot Travel Center #188", chain: "Pilot/Flying J", lat: 41.8240, lng: -71.4128, state: "RI", city: "Providence" },
+  { name: "Love's Travel Stop #622", chain: "Love's Travel Stops", lat: 41.1865, lng: -73.1952, state: "CT", city: "Bridgeport" },
+  { name: "TA #198", chain: "TA/Petro", lat: 41.3083, lng: -72.9279, state: "CT", city: "New Haven" },
+  { name: "Pilot Travel Center #195", chain: "Pilot/Flying J", lat: 41.0534, lng: -73.5387, state: "CT", city: "Stamford" },
+  { name: "Love's Travel Stop #710", chain: "Love's Travel Stops", lat: 39.3643, lng: -74.4229, state: "NJ", city: "Atlantic City" },
+  { name: "TA #165", chain: "TA/Petro", lat: 39.6837, lng: -75.7497, state: "DE", city: "Newark DE" },
+  { name: "Pilot Travel Center #177", chain: "Pilot/Flying J", lat: 37.5407, lng: -77.4360, state: "VA", city: "Richmond" },
+  { name: "Love's Travel Stop #480", chain: "Love's Travel Stops", lat: 38.8816, lng: -77.0910, state: "VA", city: "Alexandria" },
+  // I-90 / I-78 / NJ Turnpike additions
+  { name: "TA #250", chain: "TA/Petro", lat: 40.7357, lng: -74.1724, state: "NJ", city: "Newark NJ" },
+  { name: "Pilot Travel Center #260", chain: "Pilot/Flying J", lat: 40.5187, lng: -74.4121, state: "NJ", city: "Edison" },
+  { name: "Love's Travel Stop #340", chain: "Love's Travel Stops", lat: 40.6023, lng: -75.4714, state: "PA", city: "Allentown" },
+  { name: "TA #275", chain: "TA/Petro", lat: 42.2626, lng: -71.8023, state: "MA", city: "Worcester" },
+  { name: "Pilot Travel Center #285", chain: "Pilot/Flying J", lat: 42.1015, lng: -72.5898, state: "MA", city: "Springfield" },
+  { name: "Love's Travel Stop #295", chain: "Love's Travel Stops", lat: 42.6526, lng: -73.7562, state: "NY", city: "Albany" },
+  { name: "TA #300", chain: "TA/Petro", lat: 42.8864, lng: -78.8784, state: "NY", city: "Buffalo" },
+  { name: "Pilot Travel Center #305", chain: "Pilot/Flying J", lat: 43.0481, lng: -76.1474, state: "NY", city: "Syracuse" },
   // I-75 Corridor
   { name: "Pilot Travel Center #105", chain: "Pilot/Flying J", lat: 33.7490, lng: -84.3880, state: "GA", city: "Atlanta" },
   { name: "Love's Travel Stop #620", chain: "Love's Travel Stops", lat: 36.1627, lng: -86.7816, state: "TN", city: "Nashville" },
@@ -108,6 +127,76 @@ const FALLBACK_DIESEL_PRICES: Record<string, number> = {
 
 // National average for savings comparison
 const NATIONAL_AVG_DIESEL = 3.55;
+
+// ===== State bounding boxes for reverse geocoding coords → state =====
+const STATE_BOUNDS: Array<{ state: string; minLat: number; maxLat: number; minLng: number; maxLng: number }> = [
+  { state: 'ME', minLat: 43.06, maxLat: 47.46, minLng: -71.08, maxLng: -66.95 },
+  { state: 'NH', minLat: 42.70, maxLat: 45.30, minLng: -72.56, maxLng: -70.70 },
+  { state: 'VT', minLat: 42.73, maxLat: 45.02, minLng: -73.44, maxLng: -71.46 },
+  { state: 'MA', minLat: 41.24, maxLat: 42.89, minLng: -73.51, maxLng: -69.93 },
+  { state: 'RI', minLat: 41.15, maxLat: 42.02, minLng: -71.86, maxLng: -71.12 },
+  { state: 'CT', minLat: 40.99, maxLat: 42.05, minLng: -73.73, maxLng: -71.79 },
+  { state: 'NY', minLat: 40.50, maxLat: 45.01, minLng: -79.76, maxLng: -71.86 },
+  { state: 'NJ', minLat: 38.93, maxLat: 41.36, minLng: -75.56, maxLng: -73.89 },
+  { state: 'PA', minLat: 39.72, maxLat: 42.27, minLng: -80.52, maxLng: -74.69 },
+  { state: 'DE', minLat: 38.45, maxLat: 39.84, minLng: -75.79, maxLng: -75.05 },
+  { state: 'MD', minLat: 37.91, maxLat: 39.72, minLng: -79.49, maxLng: -75.05 },
+  { state: 'VA', minLat: 36.54, maxLat: 39.47, minLng: -83.68, maxLng: -75.24 },
+  { state: 'WV', minLat: 37.20, maxLat: 40.64, minLng: -82.64, maxLng: -77.72 },
+  { state: 'NC', minLat: 33.84, maxLat: 36.59, minLng: -84.32, maxLng: -75.46 },
+  { state: 'SC', minLat: 32.03, maxLat: 35.21, minLng: -83.35, maxLng: -78.54 },
+  { state: 'GA', minLat: 30.36, maxLat: 35.00, minLng: -85.61, maxLng: -80.84 },
+  { state: 'FL', minLat: 24.40, maxLat: 31.00, minLng: -87.63, maxLng: -80.03 },
+  { state: 'AL', minLat: 30.22, maxLat: 35.01, minLng: -88.47, maxLng: -84.89 },
+  { state: 'MS', minLat: 30.17, maxLat: 34.99, minLng: -91.66, maxLng: -88.10 },
+  { state: 'TN', minLat: 34.98, maxLat: 36.68, minLng: -90.31, maxLng: -81.65 },
+  { state: 'KY', minLat: 36.50, maxLat: 39.15, minLng: -89.57, maxLng: -81.96 },
+  { state: 'OH', minLat: 38.40, maxLat: 41.98, minLng: -84.82, maxLng: -80.52 },
+  { state: 'IN', minLat: 37.77, maxLat: 41.76, minLng: -88.10, maxLng: -84.78 },
+  { state: 'MI', minLat: 41.70, maxLat: 48.26, minLng: -90.42, maxLng: -82.12 },
+  { state: 'IL', minLat: 36.97, maxLat: 42.51, minLng: -91.51, maxLng: -87.02 },
+  { state: 'WI', minLat: 42.49, maxLat: 47.08, minLng: -92.89, maxLng: -86.25 },
+  { state: 'MN', minLat: 43.50, maxLat: 49.38, minLng: -97.24, maxLng: -89.49 },
+  { state: 'IA', minLat: 40.38, maxLat: 43.50, minLng: -96.64, maxLng: -90.14 },
+  { state: 'MO', minLat: 35.99, maxLat: 40.61, minLng: -95.77, maxLng: -89.10 },
+  { state: 'AR', minLat: 33.00, maxLat: 36.50, minLng: -94.62, maxLng: -89.64 },
+  { state: 'LA', minLat: 28.93, maxLat: 33.02, minLng: -94.04, maxLng: -88.82 },
+  { state: 'TX', minLat: 25.84, maxLat: 36.50, minLng: -106.65, maxLng: -93.51 },
+  { state: 'OK', minLat: 33.62, maxLat: 37.00, minLng: -103.00, maxLng: -94.43 },
+  { state: 'KS', minLat: 37.00, maxLat: 40.00, minLng: -102.05, maxLng: -94.59 },
+  { state: 'NE', minLat: 40.00, maxLat: 43.00, minLng: -104.05, maxLng: -95.31 },
+  { state: 'SD', minLat: 42.48, maxLat: 45.95, minLng: -104.06, maxLng: -96.44 },
+  { state: 'ND', minLat: 45.94, maxLat: 49.00, minLng: -104.05, maxLng: -96.55 },
+  { state: 'MT', minLat: 44.36, maxLat: 49.00, minLng: -116.05, maxLng: -104.04 },
+  { state: 'WY', minLat: 41.00, maxLat: 45.01, minLng: -111.06, maxLng: -104.05 },
+  { state: 'CO', minLat: 37.00, maxLat: 41.00, minLng: -109.06, maxLng: -102.04 },
+  { state: 'NM', minLat: 31.33, maxLat: 37.00, minLng: -109.05, maxLng: -103.00 },
+  { state: 'AZ', minLat: 31.33, maxLat: 37.00, minLng: -114.81, maxLng: -109.04 },
+  { state: 'UT', minLat: 37.00, maxLat: 42.00, minLng: -114.05, maxLng: -109.04 },
+  { state: 'NV', minLat: 35.00, maxLat: 42.00, minLng: -120.01, maxLng: -114.04 },
+  { state: 'ID', minLat: 42.00, maxLat: 49.00, minLng: -117.24, maxLng: -111.04 },
+  { state: 'WA', minLat: 45.54, maxLat: 49.00, minLng: -124.85, maxLng: -116.92 },
+  { state: 'OR', minLat: 41.99, maxLat: 46.29, minLng: -124.57, maxLng: -116.46 },
+  { state: 'CA', minLat: 32.53, maxLat: 42.01, minLng: -124.48, maxLng: -114.13 },
+];
+
+function lookupStateFromCoords(lat: number, lng: number): string {
+  for (const b of STATE_BOUNDS) {
+    if (lat >= b.minLat && lat <= b.maxLat && lng >= b.minLng && lng <= b.maxLng) {
+      return b.state;
+    }
+  }
+  // Fallback: find nearest state center
+  let nearest = 'TX';
+  let minDist = Infinity;
+  for (const b of STATE_BOUNDS) {
+    const cLat = (b.minLat + b.maxLat) / 2;
+    const cLng = (b.minLng + b.maxLng) / 2;
+    const d = Math.abs(lat - cLat) + Math.abs(lng - cLng);
+    if (d < minDist) { minDist = d; nearest = b.state; }
+  }
+  return nearest;
+}
 
 // ===== Utility Functions =====
 
@@ -233,6 +322,47 @@ function sampleRoutePoints(
     sampled.push(last);
   }
   return sampled;
+}
+
+// Generate interpolated truck stops along polyline when no real stops are found
+function generateInterpolatedStops(
+  polyline: Array<[number, number]>,
+  dieselPrices: Record<string, number>,
+  now: string
+): any[] {
+  const sampled = sampleRoutePoints(polyline, 75);
+  const stops: any[] = [];
+
+  for (let i = 0; i < sampled.length; i++) {
+    const [lat, lng] = sampled[i];
+    const state = lookupStateFromCoords(lat, lng);
+    const statePrice = dieselPrices[state] || FALLBACK_DIESEL_PRICES[state] || 3.55;
+    const iftaCredit = STATE_DIESEL_TAX[state] ?? 0;
+
+    // Skip points too close to origin or destination (first and last)
+    if (i === 0 || i === sampled.length - 1) continue;
+
+    stops.push({
+      name: `Truck Stop - Mile ${(i * 75)}`,
+      chain: null,
+      latitude: lat,
+      longitude: lng,
+      state,
+      city: `${state} - I-${i}`,
+      diesel_price: statePrice,
+      lcapp_discount: null,
+      net_price: statePrice,
+      ifta_tax_credit: iftaCredit,
+      amenities: ['Diesel', 'Parking', 'Restrooms'],
+      source: 'interpolated',
+      fetched_at: now,
+      distance_from_route: 0,
+      distance_from_origin: 0,
+    });
+  }
+
+  console.log(`Generated ${stops.length} interpolated stops along route`);
+  return stops;
 }
 
 // Compute projected savings
@@ -430,7 +560,7 @@ Deno.serve(async (req) => {
       booked_miles,
     } = body;
 
-    console.log(`Waypoints received: ${waypoints.length}, route_polyline points: ${route_polyline?.length ?? 0}`);
+    console.log(`Waypoints received: ${waypoints.length}, route_polyline points: ${route_polyline?.length ?? 0}, corridor: ${corridor_miles}mi`);
 
     if (!driver_id || !origin_lat || !origin_lng || !dest_lat || !dest_lng) {
       return new Response(
@@ -476,7 +606,7 @@ Deno.serve(async (req) => {
         .lte('longitude', maxLng);
 
       if (cachedStops && cachedStops.length > 0) {
-        console.log(`Returning ${cachedStops.length} cached fuel stops`);
+        console.log(`Found ${cachedStops.length} cached fuel stops in bounding box`);
         
         const filtered = cachedStops
           .map(stop => ({
@@ -492,12 +622,16 @@ Deno.serve(async (req) => {
           .filter(stop => stop.distance_from_route <= corridor_miles)
           .sort((a, b) => (a.net_price || 999) - (b.net_price || 999));
 
-        const projected_savings = computeProjectedSavings(filtered, estimatedGallons);
+        // If cache had stops but none within corridor, fall through to generate interpolated
+        if (filtered.length > 0) {
+          const projected_savings = computeProjectedSavings(filtered, estimatedGallons);
 
-        return new Response(
-          JSON.stringify({ fuel_stops: filtered, source: 'cache', fetched_at: cachedStops[0]?.fetched_at, projected_savings }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+          return new Response(
+            JSON.stringify({ fuel_stops: filtered, source: 'cache', fetched_at: cachedStops[0]?.fetched_at, projected_savings }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        console.log('Cache had stops but none within corridor, continuing to fresh fetch...');
       }
     }
 
@@ -634,17 +768,26 @@ Deno.serve(async (req) => {
       .filter((stop: any) => stop.distance_from_route <= corridor_miles)
       .sort((a: any, b: any) => (a.net_price || 999) - (b.net_price || 999));
 
-    const projected_savings = computeProjectedSavings(filteredStops, estimatedGallons);
+    console.log(`Filtered to ${filteredStops.length} stops within ${corridor_miles}mi corridor (total available: ${fuelStops.length})`);
 
-    console.log(`Returning ${filteredStops.length} fuel stops within ${corridor_miles}mi corridor (polyline: ${!!route_polyline})`);
+    // ===== INTERPOLATED FALLBACK: guarantee stops on every route =====
+    let finalStops = filteredStops;
+    if (filteredStops.length === 0 && route_polyline && route_polyline.length >= 2) {
+      console.log('No real stops found within corridor — generating interpolated stops along polyline');
+      finalStops = generateInterpolatedStops(route_polyline, dieselPrices, now);
+    }
+
+    const projected_savings = computeProjectedSavings(finalStops, estimatedGallons);
+
+    console.log(`Returning ${finalStops.length} fuel stops (polyline: ${!!route_polyline})`);
 
     return new Response(
       JSON.stringify({
-        fuel_stops: filteredStops,
-        source: landstarData ? 'landstar' : 'doe',
+        fuel_stops: finalStops,
+        source: landstarData ? 'landstar' : (filteredStops.length > 0 ? 'doe' : 'interpolated'),
         fetched_at: now,
         total_available: fuelStops.length,
-        filtered_count: filteredStops.length,
+        filtered_count: finalStops.length,
         projected_savings,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

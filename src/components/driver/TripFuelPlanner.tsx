@@ -126,19 +126,29 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
         ? routeCoords.filter((_, i) => i % 20 === 0 || i === routeCoords.length - 1)
         : undefined;
 
+      const payload = {
+        driver_id: driverId,
+        origin_lat: originCoords.lat,
+        origin_lng: originCoords.lng,
+        dest_lat: destCoords.lat,
+        dest_lng: destCoords.lng,
+        waypoints: geocodedStops.map(s => ({ lat: s.coords.lat, lng: s.coords.lng })),
+        route_polyline: routePolyline,
+        corridor_miles: 25,
+        force_refresh: shouldForce,
+        booked_miles: bookedMiles,
+      };
+
+      console.log('[FuelPlanner] Invoking landstar-fuel-stops with payload:', {
+        origin: `${payload.origin_lat},${payload.origin_lng}`,
+        dest: `${payload.dest_lat},${payload.dest_lng}`,
+        polylinePoints: routePolyline?.length ?? 0,
+        waypoints: payload.waypoints.length,
+        corridor_miles: payload.corridor_miles,
+      });
+
       const { data, error } = await supabase.functions.invoke('landstar-fuel-stops', {
-        body: {
-          driver_id: driverId,
-          origin_lat: originCoords.lat,
-          origin_lng: originCoords.lng,
-          dest_lat: destCoords.lat,
-          dest_lng: destCoords.lng,
-          waypoints: geocodedStops.map(s => ({ lat: s.coords.lat, lng: s.coords.lng })),
-          route_polyline: routePolyline,
-          corridor_miles: 15,
-          force_refresh: shouldForce,
-          booked_miles: bookedMiles,
-        },
+        body: payload,
       });
 
       if (error) throw error;
