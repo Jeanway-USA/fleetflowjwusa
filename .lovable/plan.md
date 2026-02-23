@@ -1,121 +1,110 @@
 
 
-## Cache-on-Demand Architecture: Live Overpass API Fuel Stops
+## Simplified Cache-on-Demand with Mapbox Search API
 
-### Overview
+### Prerequisites
 
-Replace the static `KNOWN_STOPS` array with a live-fetching architecture that queries OpenStreetMap's Overpass API for real truck stops along the route, upserts them into a persistent `truck_stops` table, and then queries that table for corridor-filtered results.
+A `MAPBOX_ACCESS_TOKEN` secret needs to be added to the project. This will be requested before implementation begins.
 
-### Architecture Flow
+### 1. Database Migration
 
-```text
-Request comes in with route polyline
-       |
-       v
-1. Query local `truck_stops` table for stops along corridor
-       |
-       v
-2. If density is sparse (< 1 stop per 100mi):
-   a. Chunk the route into bounding boxes (~50mi segments)
-   b. Query Overpass API for each chunk (truck fuel stops)
-   c. Parse OSM response, extract real names/coords
-   d. UPSERT into `truck_stops` (OSM node ID = deterministic key)
-   e. Re-query `truck_stops` for corridor
-       |
-       v
-3. Enrich with EIA diesel prices + LCAPP discounts + IFTA credits
-4. Sort by distance_from_origin, return to frontend
+**Alter `truck_stops` table** to support Mapbox place IDs instead of OSM node IDs:
+
+- Add column `place_id` (text, UNIQUE)
+- Add column `address` (text)
+- Drop the `osm_id` unique constraint and column (only 7 rows exist currently, safe to clear)
+- Truncate existing data (7 stale Overpass rows) since the new source is Mapbox
+
+```sql
+TRUNCATE truck_stops;
+ALTER TABLE truck_stops DROP COLUMN IF EXISTS osm_id;
+ALTER TABLE truck_stops ADD COLUMN place_id text UNIQUE NOT NULL;
+ALTER TABLE truck_stops ADD COLUMN address text;
 ```
 
-### Database Changes
-
-**New table: `truck_stops`** (persistent, grows over time)
-
+Final schema:
 | Column | Type | Notes |
 |--------|------|-------|
-| id | uuid | PK, default gen_random_uuid() |
-| osm_id | bigint | UNIQUE -- OpenStreetMap node ID, prevents duplicates |
-| name | text | Real stop name from OSM (e.g., "Pilot Travel Center") |
-| brand | text | nullable -- OSM "brand" tag |
+| id | uuid | PK |
+| place_id | text | UNIQUE, Mapbox feature ID |
+| name | text | Real stop name |
+| brand | text | nullable |
+| address | text | Full formatted address |
 | latitude | numeric | NOT NULL |
 | longitude | numeric | NOT NULL |
-| state | text | NOT NULL -- derived from coords |
+| state | text | NOT NULL |
 | city | text | nullable |
-| amenities | text[] | parsed from OSM tags |
-| source | text | default 'overpass' |
-| fetched_at | timestamptz | when this stop was last refreshed from OSM |
-| created_at | timestamptz | default now() |
+| amenities | text[] | |
+| source | text | default 'mapbox' |
+| fetched_at | timestamptz | |
+| created_at | timestamptz | |
 
-RLS: Service role only (edge function uses service key). No user-facing RLS needed since users never query this table directly.
+### 2. Edge Function Rewrite (`landstar-fuel-stops/index.ts`)
 
-**No PostGIS needed** -- we continue using the existing haversine-based corridor filtering which works well and avoids needing the PostGIS extension.
+**Simplified architecture -- 3 clean steps:**
 
-### Edge Function Changes (`landstar-fuel-stops/index.ts`)
+**Step A: Sample waypoints from route**
+- Take the route polyline and sample 5-10 equidistant points (max 10, no matter how long the route)
+- Use the existing `sampleRoutePoints` utility
 
-**Remove:** The entire `KNOWN_STOPS` array (~220 lines of hardcoded data).
+**Step B: Mapbox Search for each waypoint**
+- For each sampled point, call `https://api.mapbox.com/search/searchbox/v1/forward` with:
+  - `q`: "truck stop" (or cycle through "Pilot", "Love's", "TA" for richer results)
+  - `proximity`: `lng,lat` of the waypoint
+  - `limit`: 10
+  - `types`: "poi"
+  - `access_token`: from `MAPBOX_ACCESS_TOKEN` secret
+- Each call wrapped in try/catch with 5s timeout
+- If Mapbox returns 429 or errors, skip that waypoint gracefully
 
-**Add: `fetchOverpassStops(bbox)` function:**
-- Constructs an Overpass QL query targeting `node["amenity"="fuel"]` with filters for truck-relevant tags (`hgv=yes`, or brand names like Pilot, Love's, TA, Flying J, Petro, Sapp Bros, Buc-ee's, Casey's)
-- Makes HTTP GET to `https://overpass-api.de/api/interpreter`
-- Parses the JSON response, extracting: `id` (OSM node ID), `tags.name`, `tags.brand`, `lat`, `lon`, `tags.addr:city`, `tags.addr:state`
-- Returns parsed array
+**Step C: Upsert and query**
+- Parse Mapbox response: extract `properties.mapbox_id` (place_id), `properties.name`, `properties.full_address`, `geometry.coordinates`, `properties.context` (for city/state)
+- UPSERT into `truck_stops` on `place_id` conflict
+- Query `truck_stops` for all stops within `corridor_miles` of the route
+- Enrich with EIA diesel prices, LCAPP discounts, IFTA credits (preserved from current code)
+- Sort by `distance_from_origin`, return
 
-**Add: `upsertStops(supabase, stops)` function:**
-- Takes parsed Overpass results
-- Calls `supabase.from('truck_stops').upsert(...)` with `onConflict: 'osm_id'`
-- Updates `fetched_at` on conflict so we know freshness
+**Preserved from current code:**
+- CORS headers and auth validation
+- EIA diesel price fetching
+- LCAPP partner matching and discount calculation
+- IFTA tax credit enrichment
+- Projected savings calculation
+- Landstar scrape path (if credentials exist)
+- `fuel_stops_cache` for 6h TTL fast-path
+- Interpolated fallback if both Mapbox and local DB are empty
 
-**Add: `queryLocalStops(supabase, polyline, corridorMiles)` function:**
-- Computes bounding box from route polyline
-- Queries `truck_stops` table within that bounding box
-- Applies haversine corridor filtering (same logic as today)
-- Returns filtered + sorted array
+**Removed:**
+- All Overpass API code (`fetchOverpassStops`, `chunkRouteToBBoxes`, etc.)
+- Overpass-specific type definitions
 
-**Modified main flow:**
-1. Query local `truck_stops` for corridor stops
-2. Check density: if stops < `max(3, tripMiles/100)`, trigger Overpass fetch
-3. Chunk route into ~50mi bounding boxes, fetch each from Overpass (with 2s timeout per chunk)
-4. Upsert results, re-query local table
-5. Enrich all stops with EIA prices, LCAPP discounts, IFTA credits
-6. Sort by `distance_from_origin`, return
+**Error handling:**
+- Each Mapbox fetch in try/catch with AbortController (5s timeout)
+- If all Mapbox calls fail, fall back to local `truck_stops` table
+- If local table is also empty, fall back to interpolated stops
+- Never crashes -- always returns at least interpolated data
 
-**Preserved:** Landstar scrape path (if driver has credentials), EIA pricing, LCAPP partner discounts, IFTA credits, projected savings calculation, cache path for `fuel_stops_cache`.
+### 3. Frontend (`TripFuelPlanner.tsx`)
 
-**Error handling:** Each Overpass fetch is wrapped in try/catch with a 5-second timeout. If Overpass rate-limits (HTTP 429) or times out, we log the error and gracefully fall back to whatever is already in the local `truck_stops` table. If the table is also empty, we fall back to the existing interpolated stops generator.
+**Minor updates:**
+- Add `address` to the `FuelStop` interface
+- Show address in the stop list instead of just `city, state`
+- Update loading skeleton text to "Fetching live truck stops..." when `isFetching` is true
+- Show a "Live" badge when `source === 'mapbox'`
 
-### Frontend Changes
-
-**None required.** The `TripFuelPlanner.tsx` component already consumes the `fuel_stops` array from the edge function response. The response shape stays identical -- the stops will just have real OSM data instead of hardcoded entries.
+No structural changes needed -- the component already handles the response shape correctly.
 
 ### File Changes
 
 | File | Change |
 |------|--------|
-| `supabase/functions/landstar-fuel-stops/index.ts` | Remove KNOWN_STOPS array; add Overpass fetch, upsert, and local query functions; modify main handler flow |
-| Database migration | Create `truck_stops` table with `osm_id` unique constraint |
+| Database migration | Alter `truck_stops`: drop `osm_id`, add `place_id` + `address` |
+| `supabase/functions/landstar-fuel-stops/index.ts` | Replace Overpass with Mapbox Search; simplify to 5-10 waypoint searches |
+| `src/components/driver/TripFuelPlanner.tsx` | Add `address` field display; update loading/source badges |
 
-### Technical Details
+### Secret Required
 
-**Overpass QL query per chunk:**
-```
-[out:json][timeout:5];
-(
-  node["amenity"="fuel"]["hgv"="yes"](minLat,minLng,maxLat,maxLng);
-  node["amenity"="fuel"]["brand"~"Pilot|Love|Flying J|TA |Petro|Sapp|Casey|Buc-ee"](minLat,minLng,maxLat,maxLng);
-);
-out body;
-```
-
-**Chunking strategy:**
-- Sample route polyline every 50 miles
-- For each sample point, create a bounding box of +/- 0.3 degrees (~20mi radius)
-- Merge overlapping boxes to reduce API calls
-- Limit to max 15 chunks per request to avoid Overpass rate limits
-
-**Deduplication:**
-- OSM node ID is the deterministic key (bigint, globally unique)
-- UPSERT with `ON CONFLICT (osm_id) DO UPDATE SET fetched_at = now()` keeps data fresh without duplicates
-- Frontend deduplication is unnecessary since the DB enforces uniqueness
-
-**Freshness:** Stops older than 30 days in `truck_stops` are eligible for re-fetch on the next request that passes through their area. This keeps the database current without aggressive polling.
+| Secret | Value |
+|--------|-------|
+| `MAPBOX_ACCESS_TOKEN` | User's Mapbox public access token (from mapbox.com account) |
 
