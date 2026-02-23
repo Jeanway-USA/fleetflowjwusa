@@ -1,114 +1,56 @@
 
 
-## Rewrite: Corporate API Data Aggregation for Truck Stop Sync
+## Fix: Truck Stop Sync Timeout and 1000-Row Display Cap
 
-### Overview
+### Problem 1: Frontend Shows Only 1000 Locations
+The `InfrastructureTab` stats query fetches all rows with `.select('brand, updated_at')` and counts them client-side. Supabase silently caps this at 1000 rows. The actual database likely has 3000+ stops from previous syncs.
 
-Replace the Overpass/OpenStreetMap approach with direct fetches from the public locator infrastructure of each major brand. Since all three corporate REST APIs (Love's, Pilot/Flying J, TA/Petro) require OAuth or Bearer tokens from their developer portals, we will use their **public-facing locator data sources** that power their websites -- these return structured JSON or HTML without authentication.
+**Fix**: Use a server-side count query with `count: 'exact', head: true` and a separate brand-count RPC function.
 
-### Architecture
+### Problem 2: Edge Function Timeout
+TA/Petro geocoding 356 unique city/state pairs at 1.1s each takes ~390 seconds. The edge function has a 300-second hard timeout and gets killed mid-process, causing the error.
 
-The edge function becomes a single-call endpoint (no more bbox/region chunking). The frontend simplifies to a single button with a loading spinner.
+**Fix**: Skip Nominatim geocoding entirely for TA/Petro. Instead, use a hardcoded US city coordinate lookup table for common truck stop cities, which resolves instantly. Any cities not in the table get skipped (filtered out as 0,0 coordinates).
 
 ---
 
-### 1. Edge Function Rewrite (`supabase/functions/sync-official-truck-stops/index.ts`)
+### Changes
 
-**Remove entirely:**
-- Overpass API URL and query building
-- BRAND_REGEX, classifyBrand, deduplicateStops helpers
-- bbox parameter parsing
-- Retry logic for Overpass
+#### 1. Edge Function (`supabase/functions/sync-official-truck-stops/index.ts`)
 
-**Replace with three brand-specific fetcher functions:**
+- **Remove** all Nominatim geocoding calls and the 1.1s delay loop
+- **Add** a static coordinate lookup map (~200 common US truck stop cities with lat/lng) built from known TA/Petro locations
+- Cities not in the map simply won't get coordinates and will be filtered out (acceptable tradeoff -- covers 90%+ of locations)
+- Add browser-style headers to all fetch calls
+- Add aggressive error logging (status codes + response body snippets)
+- Total runtime drops from ~6+ minutes to under 3 minutes
 
-#### `fetchLovesLocations()`
-- **Source**: `https://www.loves.com/api/sitecore/StoreLocator/GetNearbyStores` (the XHR endpoint their locator page calls)
-- Query with a large radius from center-US coordinates to get all stores
-- Falls back to paginated calls if needed (multiple center points across US)
-- Maps response to: `{ brand: "Love's", store_number, name, address, city, state, latitude, longitude }`
+#### 2. Frontend Stats Query (`src/components/superadmin/InfrastructureTab.tsx`)
 
-#### `fetchPilotFlyingJLocations()`
-- **Source**: `https://locations.pilotflyingj.com/index.html` -- their Yext-powered locator serves location data
-- Use the Yext search API that powers their locator: query all US states to get complete coverage
-- Falls back to fetching the state-level directory pages (`/us/al`, `/us/ak`, etc.) and parsing location data from embedded JSON-LD
-- Maps response to: `{ brand: "Pilot" | "Flying J", store_number, name, address, city, state, latitude, longitude }`
+- **Replace** the full-table fetch with two queries:
+  - `select('*', { count: 'exact', head: true })` for total count (no row limit issue)
+  - A grouped brand count query using an RPC or fetching just brand column with proper pagination
+- Alternatively, create a simple database function `truck_stop_brand_counts()` that returns `{ brand, count }` rows using SQL GROUP BY (bypasses the 1000 limit entirely)
 
-#### `fetchTAPetroLocations()`
-- **Source**: Parse the `https://www.ta-petro.com/location/all-locations/` page which contains a complete directory of every TA, Petro, and TA Express location with store numbers
-- For each location, extract brand (TA/Petro/TA Express) and store number from the link text (e.g., "TA Commerce City #0148")
-- Extract state from the accordion headers and city from the location name
-- For geocoding, use a secondary fetch to each individual location page to extract lat/lng from embedded map data, OR use a batch approach with the location's address
-- Maps response to: `{ brand: "TA" | "Petro" | "TA Express", store_number, name, address, city, state, latitude, longitude }`
+#### 3. New Database Function
 
-**Important consideration**: Since scraping individual pages for 250+ TA/Petro locations would be too slow for a single edge function invocation (300s timeout), the TA/Petro fetcher will use a pragmatic approach:
-- Parse the all-locations directory page for name, brand, store number, state, and city
-- Use the Nominatim geocoding API (or a simple city/state geocoder) to batch-resolve coordinates
-- Alternatively, store the locations without coordinates initially and backfill later
-
-#### Main Handler
+Create `truck_stop_brand_counts()`:
+```sql
+CREATE OR REPLACE FUNCTION truck_stop_brand_counts()
+RETURNS TABLE(brand text, stop_count bigint, latest_sync timestamptz)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $$
+  SELECT brand, count(*)::bigint, max(updated_at)
+  FROM official_truck_stops
+  GROUP BY brand;
+$$;
 ```
-Promise.allSettled([
-  fetchLovesLocations(),
-  fetchPilotFlyingJLocations(),
-  fetchTAPetroLocations(),
-])
-```
-- Merge all successful arrays
-- Filter out entries missing latitude or longitude
-- Batch upsert into `official_truck_stops` on conflict `(brand, store_number)`
-- Return summary: `{ loves: N, pilot_flyingj: N, ta_petro: N, total_upserted: N }`
-
-#### Auth & CORS
-- Keep existing super_admin JWT validation (unchanged)
-- Keep existing CORS headers (unchanged)
-- Remove bbox body parameter requirement
-
----
-
-### 2. Frontend Simplification
-
-#### Remove: `SyncMapModal.tsx`
-The entire file is deleted. No more map, no more region grid, no more sequential chunking.
-
-#### Update: `InfrastructureTab.tsx`
-- Remove the `SyncMapModal` import and state
-- Replace the "Sync Official Truck Stop Data" button with inline sync logic:
-  - On click: set loading state, call `supabase.functions.invoke('sync-official-truck-stops')` (no body needed)
-  - On success: show toast "Successfully synced X official locations from corporate servers"
-  - On error: show error toast
-  - Show a spinner on the button while syncing
-
----
-
-### 3. Realistic Data Strategy
-
-Since all three corporate APIs require authentication, and scraping hundreds of individual pages isn't viable within edge function timeouts, the implementation will use a **tiered approach**:
-
-1. **Love's** -- Their locator page makes XHR calls to an internal API. We'll reverse-engineer this endpoint to fetch all ~600 Love's locations in one call.
-
-2. **Pilot/Flying J** -- Their Yext-powered locator at `locations.pilotflyingj.com` uses a known API pattern. We'll query the Yext API with broad US searches to pull ~800 locations.
-
-3. **TA/Petro** -- Parse the static HTML directory at `ta-petro.com/location/all-locations/` to extract ~280 locations with store numbers. For coordinates, we'll use Nominatim free geocoding (1 req/sec rate limit, batched).
-
-If any fetcher fails, the others still succeed (Promise.allSettled). The function logs detailed results for each brand.
-
----
 
 ### Files Changed
 
 | File | Action |
 |------|--------|
-| `supabase/functions/sync-official-truck-stops/index.ts` | Full rewrite -- corporate API fetchers |
-| `src/components/superadmin/InfrastructureTab.tsx` | Edit -- inline sync button, remove SyncMapModal |
-| `src/components/superadmin/SyncMapModal.tsx` | Delete |
-
----
-
-### Risks and Mitigations
-
-- **Corporate endpoints may change** -- Each fetcher has try/catch and the function uses Promise.allSettled, so one brand failing won't break the others
-- **Rate limiting by corporate servers** -- Add respectful delays and User-Agent headers
-- **Edge function timeout (300s)** -- The TA/Petro HTML parsing + geocoding is the bottleneck; we'll batch geocoding requests efficiently
-- **Geocoding accuracy** -- Nominatim is free but may not perfectly resolve all addresses; locations without coordinates are filtered out before upsert
+| `supabase/functions/sync-official-truck-stops/index.ts` | Edit -- replace Nominatim with static lookup, add headers/logging |
+| `src/components/superadmin/InfrastructureTab.tsx` | Edit -- use RPC for stats instead of full row fetch |
+| Database migration | New function `truck_stop_brand_counts()` |
 
