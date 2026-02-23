@@ -121,6 +121,134 @@ const KNOWN_STOPS: Array<{
   { name: "Pilot Travel Center #700", chain: "Pilot/Flying J", lat: 34.0522, lng: -118.2437, state: "CA", city: "Los Angeles" },
   { name: "Love's Travel Stop #150", chain: "Love's Travel Stops", lat: 33.4484, lng: -112.0740, state: "AZ", city: "Phoenix" },
   { name: "Pilot Travel Center #810", chain: "Pilot/Flying J", lat: 45.5152, lng: -122.6784, state: "OR", city: "Portland" },
+
+  // ===== I-5 (West Coast): Seattle → Sacramento → LA → San Diego =====
+  { name: "Love's Travel Stop #931", chain: "Love's Travel Stops", lat: 46.6021, lng: -120.5059, state: "WA", city: "Yakima" },
+  { name: "Pilot Travel Center #932", chain: "Pilot/Flying J", lat: 45.8788, lng: -122.7551, state: "WA", city: "Woodland" },
+  { name: "TA #933", chain: "TA/Petro", lat: 44.9429, lng: -123.0351, state: "OR", city: "Salem" },
+  { name: "Pilot Travel Center #934", chain: "Pilot/Flying J", lat: 44.0521, lng: -123.0868, state: "OR", city: "Eugene" },
+  { name: "Love's Travel Stop #935", chain: "Love's Travel Stops", lat: 42.3265, lng: -122.8756, state: "OR", city: "Medford" },
+  { name: "Pilot Travel Center #936", chain: "Pilot/Flying J", lat: 40.5865, lng: -122.3917, state: "CA", city: "Redding" },
+  { name: "TA #937", chain: "TA/Petro", lat: 38.5816, lng: -121.4944, state: "CA", city: "Sacramento" },
+  { name: "Love's Travel Stop #938", chain: "Love's Travel Stops", lat: 32.7157, lng: -117.1611, state: "CA", city: "San Diego" },
+
+  // ===== I-10 (Southern): Jacksonville → Mobile → Beaumont → Tucson =====
+  { name: "Pilot Travel Center #941", chain: "Pilot/Flying J", lat: 30.4213, lng: -87.2169, state: "FL", city: "Pensacola" },
+  { name: "Love's Travel Stop #942", chain: "Love's Travel Stops", lat: 30.6954, lng: -88.0399, state: "AL", city: "Mobile" },
+  { name: "TA #943", chain: "TA/Petro", lat: 30.3960, lng: -88.8853, state: "MS", city: "Biloxi" },
+  { name: "Pilot Travel Center #944", chain: "Pilot/Flying J", lat: 30.0802, lng: -93.7501, state: "TX", city: "Beaumont" },
+  { name: "Love's Travel Stop #945", chain: "Love's Travel Stops", lat: 32.2217, lng: -110.9265, state: "AZ", city: "Tucson" },
+  { name: "TA #946", chain: "TA/Petro", lat: 32.3513, lng: -107.8480, state: "NM", city: "Deming" },
+
+  // ===== I-15 (Mountain West): San Diego → Las Vegas → SLC → Idaho Falls =====
+  { name: "Pilot Travel Center #951", chain: "Pilot/Flying J", lat: 34.8958, lng: -117.0173, state: "CA", city: "Barstow" },
+  { name: "Love's Travel Stop #952", chain: "Love's Travel Stops", lat: 37.2753, lng: -113.5103, state: "UT", city: "St. George" },
+  { name: "TA #953", chain: "TA/Petro", lat: 38.5733, lng: -112.3383, state: "UT", city: "Beaver" },
+  { name: "Pilot Travel Center #954", chain: "Pilot/Flying J", lat: 40.2338, lng: -111.6585, state: "UT", city: "Provo" },
+  { name: "Love's Travel Stop #955", chain: "Love's Travel Stops", lat: 43.4917, lng: -112.0339, state: "ID", city: "Idaho Falls" },
+
+  // ===== I-20 (Deep South): Atlanta → Jackson MS → Midland TX =====
+  { name: "Pilot Travel Center #961", chain: "Pilot/Flying J", lat: 33.4735, lng: -82.0105, state: "GA", city: "Augusta" },
+  { name: "Love's Travel Stop #962", chain: "Love's Travel Stops", lat: 32.2988, lng: -90.1848, state: "MS", city: "Jackson" },
+  { name: "TA #963", chain: "TA/Petro", lat: 32.3513, lng: -90.8779, state: "MS", city: "Vicksburg" },
+  { name: "Pilot Travel Center #964", chain: "Pilot/Flying J", lat: 31.9974, lng: -102.0779, state: "TX", city: "Midland" },
+
+  // ===== I-24 / I-59 (Southeast): Chattanooga connectors =====
+  { name: "Love's Travel Stop #971", chain: "Love's Travel Stops", lat: 35.0456, lng: -85.3097, state: "TN", city: "Chattanooga" },
+  { name: "Pilot Travel Center #972", chain: "Pilot/Flying J", lat: 36.1745, lng: -86.7670, state: "TN", city: "Murfreesboro" },
+  { name: "TA #973", chain: "TA/Petro", lat: 32.3513, lng: -88.7034, state: "MS", city: "Meridian" },
+
+  // ===== I-30 (TX-AR): Dallas → Texarkana → Little Rock =====
+  { name: "Pilot Travel Center #976", chain: "Pilot/Flying J", lat: 33.4418, lng: -94.0477, state: "TX", city: "Texarkana" },
+  { name: "Love's Travel Stop #977", chain: "Love's Travel Stops", lat: 33.9137, lng: -93.0016, state: "AR", city: "Arkadelphia" },
+  { name: "TA #978", chain: "TA/Petro", lat: 34.7465, lng: -92.2896, state: "AR", city: "Little Rock" },
+
+  // ===== I-35 (Central): Laredo → San Antonio → Waco → Wichita → KC =====
+  { name: "Pilot Travel Center #981", chain: "Pilot/Flying J", lat: 27.5036, lng: -99.5076, state: "TX", city: "Laredo" },
+  { name: "Love's Travel Stop #982", chain: "Love's Travel Stops", lat: 29.8833, lng: -97.9414, state: "TX", city: "San Marcos" },
+  { name: "Buc-ee's #983", chain: "Buc-ee's", lat: 31.5493, lng: -97.1467, state: "TX", city: "Waco" },
+  { name: "TA #984", chain: "TA/Petro", lat: 37.6872, lng: -97.3301, state: "KS", city: "Wichita" },
+  { name: "Love's Travel Stop #985", chain: "Love's Travel Stops", lat: 36.1540, lng: -95.9928, state: "OK", city: "Tulsa" },
+
+  // ===== I-40 (Cross-Country): Barstow → Flagstaff → Amarillo → Little Rock → Wilmington =====
+  { name: "Pilot Travel Center #991", chain: "Pilot/Flying J", lat: 34.8958, lng: -117.0173, state: "CA", city: "Barstow" },
+  { name: "Love's Travel Stop #992", chain: "Love's Travel Stops", lat: 35.3100, lng: -118.0014, state: "CA", city: "Mojave" },
+  { name: "TA #993", chain: "TA/Petro", lat: 35.1983, lng: -111.6513, state: "AZ", city: "Flagstaff" },
+  { name: "Pilot Travel Center #994", chain: "Pilot/Flying J", lat: 35.1107, lng: -106.6100, state: "NM", city: "Albuquerque West" },
+  { name: "Love's Travel Stop #995", chain: "Love's Travel Stops", lat: 35.2220, lng: -101.8313, state: "TX", city: "Amarillo" },
+  { name: "Pilot Travel Center #996", chain: "Pilot/Flying J", lat: 35.3859, lng: -94.3985, state: "AR", city: "Alma" },
+  { name: "Love's Travel Stop #997", chain: "Love's Travel Stops", lat: 34.2257, lng: -77.9447, state: "NC", city: "Wilmington" },
+
+  // ===== I-44 (OK-MO): Tulsa → Joplin → Springfield MO =====
+  { name: "TA #1001", chain: "TA/Petro", lat: 36.0726, lng: -94.5143, state: "OK", city: "Vinita" },
+  { name: "Pilot Travel Center #1002", chain: "Pilot/Flying J", lat: 37.0842, lng: -94.5133, state: "MO", city: "Joplin" },
+  { name: "Love's Travel Stop #1003", chain: "Love's Travel Stops", lat: 37.2090, lng: -93.2923, state: "MO", city: "Springfield" },
+
+  // ===== I-55 (Mississippi Valley): New Orleans → Jackson → Memphis → Springfield IL =====
+  { name: "Pilot Travel Center #1006", chain: "Pilot/Flying J", lat: 29.9511, lng: -90.0715, state: "LA", city: "New Orleans" },
+  { name: "Love's Travel Stop #1007", chain: "Love's Travel Stops", lat: 31.3113, lng: -89.2903, state: "MS", city: "Hattiesburg" },
+  { name: "TA #1008", chain: "TA/Petro", lat: 36.3242, lng: -89.5299, state: "TN", city: "Dyersburg" },
+  { name: "Casey's #1009", chain: "Casey's General Stores", lat: 39.7817, lng: -89.6501, state: "IL", city: "Springfield" },
+
+  // ===== I-64 (Mid-Atlantic): Norfolk → Richmond → Charleston WV → Lexington KY =====
+  { name: "Pilot Travel Center #1011", chain: "Pilot/Flying J", lat: 36.8508, lng: -76.2859, state: "VA", city: "Norfolk" },
+  { name: "Love's Travel Stop #1012", chain: "Love's Travel Stops", lat: 37.5538, lng: -77.4603, state: "VA", city: "Richmond" },
+  { name: "TA #1013", chain: "TA/Petro", lat: 38.3498, lng: -81.6326, state: "WV", city: "Charleston" },
+  { name: "Pilot Travel Center #1014", chain: "Pilot/Flying J", lat: 38.0406, lng: -84.5037, state: "KY", city: "Lexington" },
+
+  // ===== I-65 (North-South Central): Mobile → Montgomery → Bowling Green → Indianapolis =====
+  { name: "Love's Travel Stop #1016", chain: "Love's Travel Stops", lat: 30.6954, lng: -88.0399, state: "AL", city: "Mobile" },
+  { name: "Pilot Travel Center #1017", chain: "Pilot/Flying J", lat: 32.3792, lng: -86.3077, state: "AL", city: "Montgomery" },
+  { name: "TA #1018", chain: "TA/Petro", lat: 36.9685, lng: -86.4808, state: "KY", city: "Bowling Green" },
+  { name: "Love's Travel Stop #1019", chain: "Love's Travel Stops", lat: 39.1653, lng: -86.5264, state: "IN", city: "Bloomington IN" },
+
+  // ===== I-70 (East-West Central): Indianapolis → Columbus → Wheeling → Hagerstown =====
+  { name: "Pilot Travel Center #1021", chain: "Pilot/Flying J", lat: 39.7684, lng: -86.1581, state: "IN", city: "Indianapolis" },
+  { name: "Love's Travel Stop #1022", chain: "Love's Travel Stops", lat: 39.9612, lng: -82.9988, state: "OH", city: "Columbus" },
+  { name: "TA #1023", chain: "TA/Petro", lat: 40.0639, lng: -80.7209, state: "WV", city: "Wheeling" },
+  { name: "Pilot Travel Center #1024", chain: "Pilot/Flying J", lat: 39.6418, lng: -77.7200, state: "MD", city: "Hagerstown" },
+
+  // ===== I-71 (OH-KY): Cincinnati → Columbus → Cleveland =====
+  { name: "Love's Travel Stop #1026", chain: "Love's Travel Stops", lat: 39.1031, lng: -84.5120, state: "OH", city: "Cincinnati" },
+  { name: "Pilot Travel Center #1027", chain: "Pilot/Flying J", lat: 40.7580, lng: -82.5154, state: "OH", city: "Mansfield" },
+  { name: "TA #1028", chain: "TA/Petro", lat: 41.4993, lng: -81.6944, state: "OH", city: "Cleveland" },
+
+  // ===== I-74 / I-57 (Midwest): Champaign → Bloomington → Peoria =====
+  { name: "Casey's #1031", chain: "Casey's General Stores", lat: 40.1164, lng: -88.2434, state: "IL", city: "Champaign" },
+  { name: "Pilot Travel Center #1032", chain: "Pilot/Flying J", lat: 40.4842, lng: -88.9937, state: "IL", city: "Bloomington" },
+  { name: "Love's Travel Stop #1033", chain: "Love's Travel Stops", lat: 40.6936, lng: -89.5890, state: "IL", city: "Peoria" },
+
+  // ===== I-75 (Great Lakes to FL): Tampa → Ocala → Macon → Chattanooga → Lexington → Toledo =====
+  { name: "Pilot Travel Center #1036", chain: "Pilot/Flying J", lat: 27.9506, lng: -82.4572, state: "FL", city: "Tampa" },
+  { name: "Love's Travel Stop #1037", chain: "Love's Travel Stops", lat: 29.1872, lng: -82.1401, state: "FL", city: "Ocala" },
+  { name: "TA #1038", chain: "TA/Petro", lat: 32.8407, lng: -83.6324, state: "GA", city: "Macon" },
+  { name: "Pilot Travel Center #1039", chain: "Pilot/Flying J", lat: 35.0456, lng: -85.3097, state: "TN", city: "Chattanooga" },
+  { name: "Love's Travel Stop #1040", chain: "Love's Travel Stops", lat: 38.0406, lng: -84.5037, state: "KY", city: "Lexington" },
+  { name: "TA #1041", chain: "TA/Petro", lat: 41.6528, lng: -83.5379, state: "OH", city: "Toledo" },
+
+  // ===== I-76 / PA Turnpike: Philadelphia → Harrisburg → Pittsburgh =====
+  { name: "Pilot Travel Center #1043", chain: "Pilot/Flying J", lat: 39.9526, lng: -75.1652, state: "PA", city: "Philadelphia" },
+  { name: "Love's Travel Stop #1044", chain: "Love's Travel Stops", lat: 40.2732, lng: -76.8867, state: "PA", city: "Harrisburg" },
+
+  // ===== I-80 (Northern): Reno → Cheyenne → Des Moines → Toledo → Youngstown =====
+  { name: "Pilot Travel Center #1046", chain: "Pilot/Flying J", lat: 39.5296, lng: -119.8138, state: "NV", city: "Reno" },
+  { name: "Love's Travel Stop #1047", chain: "Love's Travel Stops", lat: 41.1400, lng: -104.8202, state: "WY", city: "Cheyenne" },
+  { name: "Sapp Bros #1048", chain: "Sapp Bros", lat: 40.9206, lng: -98.3422, state: "NE", city: "Kearney" },
+  { name: "Casey's #1049", chain: "Casey's General Stores", lat: 41.6611, lng: -93.6087, state: "IA", city: "Des Moines" },
+  { name: "TA #1050", chain: "TA/Petro", lat: 41.0998, lng: -80.6495, state: "OH", city: "Youngstown" },
+
+  // ===== I-85 (Piedmont): Atlanta → Greenville SC → Durham NC → Petersburg VA =====
+  { name: "Pilot Travel Center #1052", chain: "Pilot/Flying J", lat: 33.7490, lng: -84.3880, state: "GA", city: "Atlanta" },
+  { name: "Love's Travel Stop #1053", chain: "Love's Travel Stops", lat: 34.8526, lng: -82.3940, state: "SC", city: "Greenville" },
+  { name: "TA #1054", chain: "TA/Petro", lat: 35.9940, lng: -78.8986, state: "NC", city: "Durham" },
+  { name: "Pilot Travel Center #1055", chain: "Pilot/Flying J", lat: 37.2279, lng: -77.4019, state: "VA", city: "Petersburg" },
+
+  // ===== I-90 (Northern Tier): Spokane → Billings → Sioux Falls → Madison → Erie =====
+  { name: "Love's Travel Stop #1057", chain: "Love's Travel Stops", lat: 47.6588, lng: -117.4260, state: "WA", city: "Spokane" },
+  { name: "Pilot Travel Center #1058", chain: "Pilot/Flying J", lat: 45.7833, lng: -108.5007, state: "MT", city: "Billings" },
+  { name: "TA #1059", chain: "TA/Petro", lat: 43.5460, lng: -96.7313, state: "SD", city: "Sioux Falls" },
+  { name: "Pilot Travel Center #1060", chain: "Pilot/Flying J", lat: 43.0731, lng: -89.4012, state: "WI", city: "Madison" },
+  { name: "Love's Travel Stop #1061", chain: "Love's Travel Stops", lat: 42.1292, lng: -80.0851, state: "PA", city: "Erie" },
 ];
 
 // ===== EIA Diesel Price Data =====
