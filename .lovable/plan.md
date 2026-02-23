@@ -1,65 +1,114 @@
 
 
-## Add Complimentary Plan Management to Super Admin
+## Billing and Promotions Tab for Super Admin Panel
 
-Allow super admins to grant any organization free access to their chosen plan -- either permanently or for a set duration.
+Add a comprehensive "Billing and Promotions" tab to the Super Admin Dashboard that enables dynamic SaaS pricing control, promo code management, and site-wide sales configuration.
 
-### How It Works
+### Overview
 
-- A new `is_complimentary` boolean column on the `organizations` table marks whether an org has free access (no payment required).
-- A new `complimentary_ends_at` timestamp column is nullable: when `NULL` and `is_complimentary` is `true`, the free access is permanent. When set to a date, the free access expires on that date.
-- The existing `super_admin_update_org` RPC is updated to accept and save these two new fields.
-- The BillingTab reflects complimentary status so users on a free plan see "Complimentary" instead of trial/payment prompts.
+This feature adds three core capabilities to the admin panel:
+- **Plan Pricing Management** -- Edit monthly/annual prices for each subscription tier
+- **Promo Code Engine** -- Create, manage, and track discount codes
+- **Global Event Sales** -- Toggle site-wide promotions that apply automatically
 
-### Database Changes
+A KPI row at the top provides estimated MRR, active promo count, and total redemptions at a glance.
 
-**Migration: Add complimentary columns to `organizations`**
+---
+
+### Database Changes (Migration)
+
+**1. Update `is_super_admin()` function** to include `hr@jeanwayusa.com`:
 ```sql
-ALTER TABLE organizations
-  ADD COLUMN is_complimentary boolean NOT NULL DEFAULT false,
-  ADD COLUMN complimentary_ends_at timestamptz DEFAULT NULL;
+CREATE OR REPLACE FUNCTION is_super_admin() ...
+  (auth.jwt() ->> 'email') IN (
+    'andrew@jeanwayusa.com',
+    'siadrak@jeanwayusa.com',
+    'hr@jeanwayusa.com'
+  )
 ```
 
-**Update RPC: `super_admin_update_org`**
-Add two new parameters (`new_is_complimentary` and `new_complimentary_ends_at`) and update the function body to apply them via `COALESCE`.
+**2. Create `subscription_plans` table:**
+- `id` (uuid, PK)
+- `tier` (text, unique -- solo_bco, fleet_owner, agency, all_in_one)
+- `base_price_monthly` (numeric)
+- `base_price_annual` (numeric)
+- `features_json` (jsonb)
+- `is_active` (boolean, default true)
+- `created_at`, `updated_at`
 
-**Update view: `super_admin_organizations`**
-Add the two new columns so the super admin panel can display them.
+RLS: Public SELECT, super-admin-only INSERT/UPDATE/DELETE.
 
-### UI Changes
+Seed with current hardcoded prices (49/149/99/199 monthly).
 
-**1. `src/components/superadmin/OrgActionsDropdown.tsx`**
-- Rename the existing "Manage Trial" dialog to "Manage Plan Access"
-- Add a section with:
-  - A "Complimentary Access" toggle (Switch)
-  - When toggled on, show a radio-style choice: "Permanent" or "Until specific date"
-  - If "Until specific date" is chosen, show a date picker for the end date
-  - The existing trial controls remain below, separated visually
-- Save button calls the updated `super_admin_update_org` RPC with the new parameters
+**3. Create `promo_codes` table:**
+- `id` (uuid, PK)
+- `code` (text, unique)
+- `discount_percentage` (integer, nullable)
+- `discount_amount` (numeric, nullable)
+- `valid_from` (timestamptz)
+- `valid_until` (timestamptz)
+- `max_uses` (integer, nullable)
+- `times_used` (integer, default 0)
+- `is_global_event` (boolean, default false)
+- `description` (text, nullable)
+- `created_at`, `updated_at`
 
-**2. `src/components/superadmin/OrgDetailSheet.tsx`**
-- Add a row showing "Plan Access" with a badge: "Complimentary (Permanent)", "Complimentary (until Mar 15, 2027)", or "Standard"
-- If complimentary with an end date, show the expiry date
+RLS: Public SELECT, super-admin-only INSERT/UPDATE/DELETE.
 
-**3. `src/components/settings/BillingTab.tsx`**
-- Query the new `is_complimentary` and `complimentary_ends_at` columns
-- If complimentary, replace the Trial Status card content with a "Complimentary Plan" indicator showing either "Permanent" or the end date
-- Hide the "View Plans and Upgrade" button for permanently complimentary orgs
+**4. Add `applied_promo_code_id` column to `organizations`:**
+- Nullable UUID referencing `promo_codes(id)`
+
+---
+
+### Frontend Changes
+
+**New file: `src/components/superadmin/BillingPromotionsTab.tsx`**
+
+A single component with three sections:
+
+**KPI Row (top):**
+- Estimated MRR -- calculated from active orgs x their tier prices (minus complimentary orgs)
+- Active Promos -- count of currently valid promo codes
+- Total Redemptions -- sum of `times_used` across all promo codes
+
+**Section A: Plan Pricing Management**
+- Grid of 4 Cards, one per tier (Solo BCO, Fleet Owner, Agency, All-in-One)
+- Each card shows current monthly and annual price
+- "Edit Pricing" button opens a Dialog with react-hook-form + Zod validation
+- Save calls a direct update on `subscription_plans` (protected by RLS)
+- Uses `useMutation` with `onSuccess` invalidation and `toast.promise`
+
+**Section B: Promo Code Engine**
+- Table listing all promo codes with columns: Code, Discount, Valid Dates, Usage, Status
+- "Create Promo Code" button opens a Dialog form:
+  - Custom code text input
+  - Discount type selector (percentage or flat amount)
+  - Discount value input
+  - Valid from/until date pickers
+  - Optional max uses
+  - Optional description
+- Status auto-computed: Active (within date range), Expired, or Exhausted
+
+**Section C: Global Event Sales**
+- A distinct Card with a Switch toggle
+- When ON, shows/creates a promo code with `is_global_event = true`
+- Allows setting event name, discount percentage, and valid dates
+- Includes a note that Landing and /pricing pages should fetch active global events to display dynamically
+
+**Update: `src/pages/SuperAdminDashboard.tsx`**
+- Import `BillingPromotionsTab`
+- Add a 6th tab trigger: "Billing"
+- Add corresponding `TabsContent` rendering the new component
+
+---
 
 ### Technical Details
 
-- The `super_admin_update_org` function signature changes to:
-  ```sql
-  CREATE OR REPLACE FUNCTION super_admin_update_org(
-    target_org_id uuid,
-    new_tier text DEFAULT NULL,
-    new_is_active boolean DEFAULT NULL,
-    new_trial_ends_at timestamptz DEFAULT NULL,
-    new_is_complimentary boolean DEFAULT NULL,
-    new_complimentary_ends_at timestamptz DEFAULT NULL
-  )
-  ```
-- The `super_admin_organizations` view needs to be recreated to include `is_complimentary` and `complimentary_ends_at`
-- No RLS changes needed since the columns live on `organizations` which already has proper policies
-- The `BillingTab` query adds the two new columns to its SELECT
+- All writes to `subscription_plans` and `promo_codes` are protected by RLS policies that check `is_super_admin()`
+- Public SELECT on both tables allows the pricing page to eventually read dynamic prices
+- All mutations use TanStack Query `useMutation` with `queryClient.invalidateQueries` on success
+- Form submissions wrapped in `toast.promise` for immediate feedback
+- The `subscription_plans` table is seeded with the 4 current tiers and their prices so the admin has data immediately
+- Annual prices default to 10x monthly (a ~17% discount) as a starting point
+- No changes to the Pricing page or Landing page in this implementation -- a code comment will note that those pages should be updated to read from `subscription_plans` and check for active global events
 
