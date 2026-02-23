@@ -27,5 +27,3 @@ verify_jwt = false
 [functions.google-drive-auth]
 verify_jwt = false
 
-[functions.sync-official-truck-stops]
-verify_jwt = false
