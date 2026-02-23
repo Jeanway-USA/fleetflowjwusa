@@ -18,6 +18,7 @@ import { OrgActionsDropdown } from '@/components/superadmin/OrgActionsDropdown';
 import { EngagementTab } from '@/components/superadmin/EngagementTab';
 import { InfrastructureTab } from '@/components/superadmin/InfrastructureTab';
 import { ResetDemoDialog } from '@/components/superadmin/ResetDemoDialog';
+import { BillingPromotionsTab } from '@/components/superadmin/BillingPromotionsTab';
 
 const TIER_COLORS: Record<string, string> = {
   solo_bco: 'hsl(45, 80%, 45%)',
@@ -100,6 +101,7 @@ export default function SuperAdminDashboard() {
           <TabsTrigger value="engagement" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Engagement</TabsTrigger>
           <TabsTrigger value="infrastructure" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Infrastructure</TabsTrigger>
           <TabsTrigger value="health" className="data-[state=active]:bg-background data-[state=active]:text-foreground">System Health</TabsTrigger>
+          <TabsTrigger value="billing" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Billing</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Overview */}
@@ -247,6 +249,11 @@ export default function SuperAdminDashboard() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tab 6: Billing & Promotions */}
+        <TabsContent value="billing">
+          <BillingPromotionsTab />
         </TabsContent>
       </Tabs>
 
