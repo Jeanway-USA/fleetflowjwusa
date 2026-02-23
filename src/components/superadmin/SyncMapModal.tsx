@@ -21,12 +21,18 @@ interface Region {
 }
 
 const INITIAL_REGIONS: Omit<Region, 'status'>[] = [
-  { name: 'Northeast',     bbox: [37.0, -82.0, 47.5, -66.5] },
-  { name: 'Southeast',     bbox: [24.0, -92.0, 37.0, -75.0] },
-  { name: 'Midwest',       bbox: [36.0, -104.0, 49.5, -82.0] },
-  { name: 'South Central', bbox: [24.0, -104.0, 37.0, -92.0] },
-  { name: 'Northwest',     bbox: [40.0, -125.0, 49.5, -104.0] },
-  { name: 'Southwest',     bbox: [24.0, -125.0, 40.0, -104.0] },
+  { name: 'New England',       bbox: [41.0, -73.5, 47.5, -66.5] },
+  { name: 'Mid-Atlantic',      bbox: [37.0, -82.0, 41.0, -73.5] },
+  { name: 'Southeast Coast',   bbox: [30.0, -85.0, 37.0, -75.0] },
+  { name: 'Deep South',        bbox: [24.0, -92.0, 30.0, -75.0] },
+  { name: 'Great Lakes',       bbox: [41.0, -92.0, 49.5, -82.0] },
+  { name: 'Upper Midwest',     bbox: [36.0, -104.0, 49.5, -92.0] },
+  { name: 'Texas',             bbox: [24.0, -104.0, 37.0, -97.0] },
+  { name: 'Gulf States',       bbox: [24.0, -97.0, 37.0, -85.0] },
+  { name: 'Mountain North',    bbox: [42.0, -117.0, 49.5, -104.0] },
+  { name: 'Mountain South',    bbox: [31.0, -117.0, 42.0, -104.0] },
+  { name: 'Pacific Northwest', bbox: [42.0, -125.0, 49.5, -117.0] },
+  { name: 'California',        bbox: [24.0, -125.0, 42.0, -117.0] },
 ];
 
 const US_BOUNDS: LatLngBoundsExpression = [[24, -125], [50, -66]];

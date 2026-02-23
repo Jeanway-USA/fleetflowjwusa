@@ -7,6 +7,8 @@ const corsHeaders = {
 
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 
+const BRAND_REGEX = "Pilot|Flying J|Love's|Loves|TravelCenters of America|\\\\bTA\\\\b|Petro|AMBEST|Roady's|Roadys";
+
 interface StopRecord {
   brand: string;
   store_number: string;
@@ -33,6 +35,24 @@ function classifyBrand(tags: Record<string, string>): string | null {
   if (combined.includes("roady's") || combined.includes('roadys')) return "Roady's";
   if (combined.includes('ambest')) return 'AMBEST';
   return null;
+}
+
+function deduplicateStops(stops: StopRecord[]): StopRecord[] {
+  stops.sort((a, b) => a.brand.localeCompare(b.brand) || a.latitude - b.latitude);
+  const result: StopRecord[] = [];
+  for (const stop of stops) {
+    const prev = result[result.length - 1];
+    if (
+      prev &&
+      prev.brand === stop.brand &&
+      Math.abs(prev.latitude - stop.latitude) < 0.01 &&
+      Math.abs(prev.longitude - stop.longitude) < 0.01
+    ) {
+      continue;
+    }
+    result.push(stop);
+  }
+  return result;
 }
 
 Deno.serve(async (req) => {
@@ -74,7 +94,14 @@ Deno.serve(async (req) => {
 
     const [south, west, north, east] = bbox;
     const bboxStr = `(${south},${west},${north},${east})`;
-    const query = `[out:json][timeout:300];\n(\n  node["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n  way["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n);\nout center;`;
+
+    // Greedy name/brand regex query — no amenity or hgv filter
+    const query = `[out:json][timeout:300];
+(
+  nwr["name"~"${BRAND_REGEX}",i]${bboxStr};
+  nwr["brand"~"${BRAND_REGEX}",i]${bboxStr};
+);
+out center;`;
 
     console.log(`Fetching bbox ${bboxStr}...`);
 
@@ -89,23 +116,21 @@ Deno.serve(async (req) => {
         signal: AbortSignal.timeout(200000),
       });
 
-      // Retry on 429 (rate limit) or 504 (gateway timeout)
       if ((res.status === 429 || res.status === 504) && attempt < MAX_RETRIES) {
-        const wait = (attempt + 1) * 20000; // 20s, 40s, 60s
+        const wait = (attempt + 1) * 20000;
         console.warn(`Overpass ${res.status} — retrying in ${wait / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
-        await res.text().catch(() => {}); // drain body
+        await res.text().catch(() => {});
         await new Promise(r => setTimeout(r, wait));
         continue;
       }
 
-      // Check for HTML/XML responses (also retryable)
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('application/json') && !contentType.includes('text/json')) {
         const text = await res.text().catch(() => '');
         if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<?xml')) {
           if (attempt < MAX_RETRIES) {
             const wait = (attempt + 1) * 20000;
-            console.warn(`Overpass returned HTML (status ${res.status}) — retrying in ${wait / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+            console.warn(`Overpass returned HTML (status ${res.status}) — retrying in ${wait / 1000}s`);
             await new Promise(r => setTimeout(r, wait));
             continue;
           }
@@ -121,8 +146,9 @@ Deno.serve(async (req) => {
       data = await res.json();
       break;
     }
+
     const elements = data?.elements || [];
-    const stops: StopRecord[] = [];
+    const rawStops: StopRecord[] = [];
 
     for (const el of elements) {
       const tags = el.tags;
@@ -145,7 +171,7 @@ Deno.serve(async (req) => {
           : `${brand}-${el.type}-${el.id}`;
       }
 
-      stops.push({
+      rawStops.push({
         brand,
         store_number: storeNumber,
         name: tags.name || `${brand} Travel Center`,
@@ -157,6 +183,10 @@ Deno.serve(async (req) => {
         amenities: ['Diesel', 'Parking'],
       });
     }
+
+    // Deduplicate nearby same-brand stops
+    const stops = deduplicateStops(rawStops);
+    console.log(`Raw: ${elements.length} elements, classified: ${rawStops.length}, after dedup: ${stops.length}`);
 
     // Upsert
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -185,9 +215,10 @@ Deno.serve(async (req) => {
 
     const summary = {
       upserted,
+      deduplicated: rawStops.length - stops.length,
       total_in_database: totalCount || 0,
       raw_fetched: elements.length,
-      classified: stops.length,
+      classified: rawStops.length,
     };
 
     console.log('Region sync complete:', JSON.stringify(summary));
