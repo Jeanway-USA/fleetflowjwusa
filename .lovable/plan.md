@@ -1,70 +1,65 @@
 
 
-## Fix: Replace Fake Brand APIs with Overpass (OpenStreetMap) Queries
+## Fix: Bounding Box Chunking for Complete Truck Stop Sync
 
-### The Problem
+### Problem
+The current function queries the entire US in a single Overpass request per brand group. This hits Overpass's server-side timeout/memory limits, returning only ~100 locations instead of thousands.
 
-The three "public API endpoints" in the current sync function are fabricated URLs:
-- `pilotflyingj.com/umbraco/api/...` -- returns HTML, not JSON
-- `loves.com/api/sitecore/StoreSearch/...` -- 404
-- `ta-petro.com/api/location-search` -- 404
+### Solution
+Split the US into 6 regional bounding boxes and use a combined regex-based name query (instead of per-brand queries) to fetch all major brands in one pass per region. This reduces total API calls from 3 (one per brand group) to 6 (one per region), while keeping each query small enough to succeed.
 
-None of these brands offer free, unauthenticated JSON APIs.
+### Implementation Details
 
-### The Solution
+**File:** `supabase/functions/sync-official-truck-stops/index.ts`
 
-Use the **Overpass API** (OpenStreetMap's free, public query API) to fetch real truck stop data with brand names, store numbers, and coordinates. OSM has excellent coverage of major US truck stops with verified brand tags.
+**1. Replace brand-based querying with region-based chunking**
 
-### How It Works
+Define 6 US regional bounding boxes:
+- **Northeast** (37.0, -82.0, 47.5, -66.5)
+- **Southeast** (24.0, -92.0, 37.0, -75.0)
+- **Midwest** (36.0, -104.0, 49.5, -82.0)
+- **South Central** (24.0, -104.0, 37.0, -92.0)
+- **Northwest** (40.0, -125.0, 49.5, -104.0)
+- **Southwest** (24.0, -125.0, 40.0, -104.0)
 
-For each brand, run a simple Overpass QL query:
+**2. Use a single regex query per region**
 
-```text
-[out:json][timeout:30];
-(
-  node["amenity"="fuel"]["brand"="Pilot"](24.0,-125.0,50.0,-66.0);
-  node["amenity"="fuel"]["brand"="Flying J"](24.0,-125.0,50.0,-66.0);
-);
+Instead of separate brand queries, use one Overpass query per region that matches all brands via regex:
+```
+[out:json][timeout:180];
+node["amenity"="fuel"]["name"~"Pilot|Love|Loves|TA |TravelCenters|Flying J|Petro",i](BBOX);
 out body;
 ```
 
-This queries the entire continental US bounding box for fuel stations tagged with specific brands. The Overpass API is:
-- Free, no API key needed
-- Rate-limited but generous (10,000 queries/day)
-- Returns real JSON with lat/lng, name, brand, address tags
+This captures all major brands in one call, reducing total API calls and improving coverage.
 
-### Implementation
+**3. Sequential fetching with 5-second delays**
 
-**File changed:** `supabase/functions/sync-official-truck-stops/index.ts`
+Loop through regions sequentially with a 5-second delay between each to respect rate limits. Total runtime: ~30-60 seconds for all 6 regions.
 
-Replace the three fake `fetch*` functions with a single `fetchOverpassBrand()` function:
+**4. Brand classification from name/tags**
 
-1. **`fetchOverpassBrand(brands: string[])`** -- Queries Overpass for nodes with `amenity=fuel` and matching `brand` tag across the continental US bounding box
-2. **Three query groups:**
-   - Pilot + Flying J (same parent company)
-   - Love's
-   - TA + Petro (same parent company)
-3. **Parse OSM tags:** Extract `brand`, `ref` (store number), `name`, `addr:street`, `addr:city`, `addr:state` from OSM element tags
-4. **UPSERT** into `official_truck_stops` using the existing `(brand, store_number)` composite key
-5. **Fallback store_number:** If OSM node lacks a `ref` tag, use the OSM node ID as the store number to ensure uniqueness
+After fetching, classify each result into a brand based on the `brand` tag or by matching the `name` against known patterns:
+- Name contains "Pilot" -> brand "Pilot"
+- Name contains "Flying J" -> brand "Flying J"  
+- Name contains "Love" -> brand "Love's"
+- Name contains "TA " or "TravelCenters" -> brand "TA"
+- Name contains "Petro" -> brand "Petro"
 
-**Error handling:**
-- 30-second timeout per query via AbortController
-- Each brand group is independent -- if one fails, others still sync
-- Graceful error messages returned in the summary
+**5. Deduplicate by OSM node ID before upserting**
 
-**No other files change** -- the table schema, admin UI, config, and frontend are all correct already.
+Since regions overlap slightly, deduplicate results by OSM node ID before upserting into the database.
 
-### Technical Details
+**6. Upsert all results at once**
 
-```
-Overpass endpoint: https://overpass-api.de/api/interpreter
-Method: POST (form-encoded body with `data=` query)
-Response: JSON with `elements` array of nodes
-Each node has: id, lat, lon, tags (name, brand, ref, addr:*)
-```
+After all regions are fetched and deduplicated, upsert the full master array into `official_truck_stops` using the existing batch logic (200 rows per batch).
 
 ### Expected Results
+- 700+ Pilot/Flying J locations
+- 600+ Love's locations  
+- 250+ TA/Petro locations
+- Total: 1,500+ official truck stops
 
-After sync, the database should contain 800+ Pilot/Flying J stops, 600+ Love's stops, and 200+ TA/Petro stops -- all with real coordinates and brand names from OpenStreetMap's verified data.
+### No Other Files Change
+The table schema, admin UI, config, and frontend all remain the same.
 
