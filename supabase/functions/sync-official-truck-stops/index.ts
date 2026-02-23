@@ -74,11 +74,11 @@ Deno.serve(async (req) => {
 
     const [south, west, north, east] = bbox;
     const bboxStr = `(${south},${west},${north},${east})`;
-    const query = `[out:json][timeout:180];\n(\n  node["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n  way["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n);\nout center;`;
+    const query = `[out:json][timeout:300];\n(\n  node["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n  way["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n);\nout center;`;
 
     console.log(`Fetching bbox ${bboxStr}...`);
 
-    // Fetch with retry for 429 rate limits
+    // Fetch with retry for 429 rate limits and 504 timeouts
     let data: any;
     const MAX_RETRIES = 3;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -89,19 +89,27 @@ Deno.serve(async (req) => {
         signal: AbortSignal.timeout(200000),
       });
 
-      if (res.status === 429 && attempt < MAX_RETRIES) {
-        const wait = (attempt + 1) * 15000; // 15s, 30s, 45s
-        console.warn(`Overpass 429 — retrying in ${wait / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+      // Retry on 429 (rate limit) or 504 (gateway timeout)
+      if ((res.status === 429 || res.status === 504) && attempt < MAX_RETRIES) {
+        const wait = (attempt + 1) * 20000; // 20s, 40s, 60s
+        console.warn(`Overpass ${res.status} — retrying in ${wait / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
         await res.text().catch(() => {}); // drain body
         await new Promise(r => setTimeout(r, wait));
         continue;
       }
 
+      // Check for HTML/XML responses (also retryable)
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('application/json') && !contentType.includes('text/json')) {
         const text = await res.text().catch(() => '');
         if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<?xml')) {
-          throw new Error(`Overpass returned HTML/XML (status ${res.status}) - likely rate limited`);
+          if (attempt < MAX_RETRIES) {
+            const wait = (attempt + 1) * 20000;
+            console.warn(`Overpass returned HTML (status ${res.status}) — retrying in ${wait / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+            await new Promise(r => setTimeout(r, wait));
+            continue;
+          }
+          throw new Error(`Overpass returned HTML/XML (status ${res.status}) after ${MAX_RETRIES} retries`);
         }
       }
 
