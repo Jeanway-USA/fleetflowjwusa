@@ -3364,6 +3364,51 @@ export type Database = {
           },
         ]
       }
+      truck_stops: {
+        Row: {
+          amenities: string[] | null
+          brand: string | null
+          city: string | null
+          created_at: string
+          fetched_at: string
+          id: string
+          latitude: number
+          longitude: number
+          name: string
+          osm_id: number
+          source: string | null
+          state: string
+        }
+        Insert: {
+          amenities?: string[] | null
+          brand?: string | null
+          city?: string | null
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          name: string
+          osm_id: number
+          source?: string | null
+          state: string
+        }
+        Update: {
+          amenities?: string[] | null
+          brand?: string | null
+          city?: string | null
+          created_at?: string
+          fetched_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          name?: string
+          osm_id?: number
+          source?: string | null
+          state?: string
+        }
+        Relationships: []
+      }
       trucks: {
         Row: {
           created_at: string
