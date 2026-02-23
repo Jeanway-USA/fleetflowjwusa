@@ -116,9 +116,9 @@ export function SyncMapModal({ open, onOpenChange, onComplete }: SyncMapModalPro
         setEtaText('');
       }
 
-      // Rate limit delay between calls (skip after last)
+      // Rate limit delay between calls (skip after last) — 15s for Overpass
       if (i < working.length - 1) {
-        await delay(3000);
+        await delay(15000);
       }
     }
 

@@ -76,27 +76,41 @@ Deno.serve(async (req) => {
 
     console.log(`Fetching bbox ${bboxStr}...`);
 
-    const res = await fetch(OVERPASS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `data=${encodeURIComponent(query)}`,
-      signal: AbortSignal.timeout(200000),
-    });
+    // Fetch with retry for 429 rate limits
+    let data: any;
+    const MAX_RETRIES = 3;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      const res = await fetch(OVERPASS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(query)}`,
+        signal: AbortSignal.timeout(200000),
+      });
 
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.includes('application/json') && !contentType.includes('text/json')) {
-      const text = await res.text().catch(() => '');
-      if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<?xml')) {
-        throw new Error(`Overpass returned HTML/XML (status ${res.status}) - likely rate limited`);
+      if (res.status === 429 && attempt < MAX_RETRIES) {
+        const wait = (attempt + 1) * 15000; // 15s, 30s, 45s
+        console.warn(`Overpass 429 — retrying in ${wait / 1000}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await res.text().catch(() => {}); // drain body
+        await new Promise(r => setTimeout(r, wait));
+        continue;
       }
-    }
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`Overpass ${res.status}: ${text.slice(0, 200)}`);
-    }
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('application/json') && !contentType.includes('text/json')) {
+        const text = await res.text().catch(() => '');
+        if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<?xml')) {
+          throw new Error(`Overpass returned HTML/XML (status ${res.status}) - likely rate limited`);
+        }
+      }
 
-    const data = await res.json();
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Overpass ${res.status}: ${text.slice(0, 200)}`);
+      }
+
+      data = await res.json();
+      break;
+    }
     const elements = data?.elements || [];
     const stops: StopRecord[] = [];
 
