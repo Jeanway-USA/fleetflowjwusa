@@ -1,112 +1,81 @@
 
+## Fix: Fuel Planner Missing Stops Along Route
 
-## Upgrade Settlements Tab for Landstar BCO Operations
+### Root Cause
 
-Redesign the settlements experience with Landstar-specific deduction fields, a professional ledger-style settlement sheet, and direct PDF import integration.
+**Race condition in query timing**: The `useQuery` in `TripFuelPlanner.tsx` (line 106) has this key:
 
----
-
-### 1. Database Migration -- Add Itemized Deduction Columns
-
-Add 6 new nullable numeric columns (defaulting to 0) to the `settlements` table for Landstar BCO-specific deductions:
-
-| Column | Description |
-|--------|-------------|
-| `lcn_satellite_fees` | LCN/Satellite communication fees |
-| `prepass_scale_fees` | PrePass/Scale bypass fees |
-| `insurance_liability` | Unladen liability insurance |
-| `trailer_rental` | Trailer lease/rental payment |
-| `plates_permits` | Plates, permits, registration |
-| `cpp_benefits` | CPP/Benefits deductions |
-
-```sql
-ALTER TABLE settlements
-  ADD COLUMN lcn_satellite_fees numeric DEFAULT 0,
-  ADD COLUMN prepass_scale_fees numeric DEFAULT 0,
-  ADD COLUMN insurance_liability numeric DEFAULT 0,
-  ADD COLUMN trailer_rental numeric DEFAULT 0,
-  ADD COLUMN plates_permits numeric DEFAULT 0,
-  ADD COLUMN cpp_benefits numeric DEFAULT 0;
+```
+queryKey: ['fuel-stops', driverId, originCoords?.lat, destCoords?.lat, geocodedStops.length]
 ```
 
-No RLS changes needed -- existing policies already cover the table.
+It does NOT include `routeCoords`. The query becomes enabled when `geocoding` turns false, but the `routeCoords` state variable (read on line 115) may still be `null` at that moment. Since `routeCoords` isn't in the key, the query never re-runs when the OSRM polyline arrives. Result: the backend receives an empty/undefined `route_polyline` and falls back to origin-to-destination straight-line filtering -- only finding stops near the two endpoints.
+
+**Secondary issue**: The hardcoded `KNOWN_STOPS` array only has ~40 entries. Routes through less-covered areas return zero results even with correct filtering.
 
 ---
 
-### 2. Frontend: Expanded Settlement Interface and Form
+### Fix 1: Frontend -- Wait for Route Before Querying (TripFuelPlanner.tsx)
 
-**Update `src/components/finance/SettlementsTab.tsx`:**
+**Change the query to depend on `routeCoords`:**
 
-**Settlement interface** -- Add all 6 new fields to the TypeScript `Settlement` interface and the `formData` defaults.
+- Add `routeCoords?.length` to the `queryKey` array so the query re-fetches when the polyline arrives.
+- Add `!!routeCoords` to the `enabled` condition so the query doesn't fire until the OSRM route is ready. This guarantees the backend always receives the full polyline.
+- Keep a fallback: if routeCoords fails to load after 10 seconds, allow query without it (to handle OSRM outages gracefully). This is done via a `routeTimeout` state that flips to `true` after a delay.
 
-**Create/Edit Dialog** -- Replace the current 4-field "Deductions" section with a 2-column grid of all deduction inputs organized into two groups:
-
-- **Standard Deductions**: Fuel Advances, Cash Advances, Escrow
-- **Landstar BCO Deductions**: LCN/Satellite, PrePass/Scale, Insurance/Liability, Trailer Rental, Plates/Permits, CPP/Benefits, Other Deductions
-
-The **Net Pay** calculation at the bottom updates to sum all 9 deduction fields (existing 4 + new 5 + other_deductions).
-
-**Settlements Table** -- The "Deductions" column already shows total deductions; it will now sum all 9 fields.
+**Reduce default corridor from 25mi to 15mi** since true polyline filtering is much more precise than straight-line fallback (no need for the wide buffer).
 
 ---
 
-### 3. Frontend: Professional Ledger-Style Settlement Sheet
+### Fix 2: Backend -- Chunked Sampling for Dense Coverage (landstar-fuel-stops/index.ts)
 
-**Redesign the "View Settlement" Sheet** (`SheetContent`) to mirror a traditional BCO settlement statement with three distinct sections:
+Add a `sampleRoutePoints()` function that generates evenly-spaced sample coordinates every ~50 miles along the polyline. For each sampled point, query the `KNOWN_STOPS` (and cache) using a wider per-chunk radius, then merge and deduplicate.
 
-**Section 1 -- Header**
-- Driver name, settlement period, status badge
-- Compact header with company branding feel
+This means a 500-mile route produces ~10 sample points, each searching within 25mi, covering the full corridor rather than just the bounding box.
 
-**Section 2 -- Gross Revenue**
-- Revenue line items from `settlement_line_items` (loads)
-- Subtotal row with bold green text
+**Changes to the edge function:**
 
-**Section 3 -- Itemized Deductions**
-- Every deduction field shown as a ledger row in red text with leading minus sign
-- Only non-zero deductions are displayed (keeps it clean)
-- Categories grouped: "Advances", "Recurring Deductions", "Other"
-- Each line: left-aligned label, right-aligned red amount
-- Subtotal row for total deductions
+1. Add `sampleRoutePoints(polyline, intervalMiles)` utility that walks the polyline accumulating haversine distance and emits a coordinate every `intervalMiles`.
 
-**Section 4 -- Net Pay**
-- Double-bordered final row, large bold text
-- Clear visual separation (double line above)
+2. Before filtering, expand `KNOWN_STOPS` coverage: for each sampled point, include any stop within `corridor_miles` of that sample. This is functionally equivalent to the existing `distanceToPolyline` check but ensures the bounding-box cache query (lines 427-439) doesn't prematurely exclude stops that are along the middle of the route but outside the simple lat/lng bounding box.
 
-Style: Monospace-influenced font sizing for amounts, tight spacing (`py-1`), alternating subtle backgrounds, high-contrast red for deductions and green/primary for revenue.
+3. Fix bounding box calculation for cache query: currently uses `corridor_miles / 69` for latitude padding but only `corridor_miles / 54` for longitude. For routes that curve significantly (e.g., I-10 Houston to Jacksonville), the simple min/max bounding box of origin+dest misses the middle of the route. Instead, compute the bounding box from ALL polyline points (or sampled points).
 
 ---
 
-### 4. Import Landstar PDF Integration
+### Fix 3: Backend -- Expand Bounding Box from Polyline
 
-Add an **"Import Landstar PDF"** button inside the Create/Edit Settlement dialog (alongside "Auto-Generate from Loads"). When clicked:
+The cache query (lines 425-439) currently computes a bounding box from just `[origin, dest, waypoints]`. For a curved 800-mile route, the midpoint of the actual highway could be hundreds of miles outside this box.
 
-1. Opens a file picker for PDF upload
-2. Converts to base64 and calls `parse-landstar-statement` edge function via `supabase.functions.invoke()`
-3. On success, maps the parsed expense categories to settlement deduction fields:
-   - `Fuel` expenses -> `fuel_advances`
-   - `Cash Advance` -> `cash_advances`
-   - `Escrow Payment` -> `escrow_deduction`
-   - `LCN/Satellite` -> `lcn_satellite_fees`
-   - `PrePass/Scale` -> `prepass_scale_fees`
-   - `Insurance` -> `insurance_liability`
-   - `Trailer Payment` -> `trailer_rental`
-   - `Licensing/Permits` + `Registration/Plates` -> `plates_permits`
-   - `CPP/Benefits` -> `cpp_benefits`
-   - Everything else -> `other_deductions`
-4. Also sets `period_start` and `period_end` from the parsed statement if available
-5. Shows a toast with the extraction summary
+**Fix**: When `route_polyline` is provided, compute the bounding box from the polyline points instead:
 
-This reuses the same edge function already used by `StatementUpload.tsx` -- no backend changes needed.
+```
+if (route_polyline && route_polyline.length > 0) {
+  allLats = route_polyline.map(p => p[0]);
+  allLngs = route_polyline.map(p => p[1]);
+}
+```
+
+This ensures the cache query covers the entire route corridor.
 
 ---
 
-### 5. Files Changed
+### Summary of File Changes
 
-| File | Action |
-|------|--------|
-| `supabase/migrations/...sql` | New migration adding 6 columns |
-| `src/components/finance/SettlementsTab.tsx` | Major rewrite: expanded interface, new form fields, ledger sheet, PDF import |
+| File | Changes |
+|------|---------|
+| `src/components/driver/TripFuelPlanner.tsx` | Add `routeCoords?.length` to queryKey; add `!!routeCoords` to enabled with timeout fallback; reduce corridor to 15mi |
+| `supabase/functions/landstar-fuel-stops/index.ts` | Fix bounding box to use polyline points; add `sampleRoutePoints()` for chunked coverage; no behavior change when polyline is absent |
+| `src/components/driver/fuel-planner/FuelPlannerMap.tsx` | No changes needed -- already handles all marker types correctly |
 
-No new files needed. No edge function changes.
+### Technical Detail: Query Timing Fix
 
+```text
+BEFORE (broken):
+  geocode origin/dest --> query fires (routeCoords = null) --> polyline = undefined --> straight-line fallback
+  OSRM route arrives --> routeCoords set --> query does NOT re-run (not in key)
+
+AFTER (fixed):
+  geocode origin/dest --> routeCoords still null --> query disabled
+  OSRM route arrives --> routeCoords set --> query key changes --> query fires with full polyline
+```
