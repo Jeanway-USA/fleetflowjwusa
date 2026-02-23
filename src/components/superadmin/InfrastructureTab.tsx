@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { HardDrive, Database, RefreshCw, Fuel } from 'lucide-react';
-import { toast } from 'sonner';
+import { SyncMapModal } from './SyncMapModal';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -17,7 +17,7 @@ function formatBytes(bytes: number): string {
 }
 
 export function InfrastructureTab() {
-  const [syncing, setSyncing] = useState(false);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['super-admin-storage-stats'],
@@ -50,34 +50,6 @@ export function InfrastructureTab() {
 
   const totalFiles = data?.reduce((s, r) => s + (r.file_count ?? 0), 0) ?? 0;
   const totalBytes = data?.reduce((s, r) => s + (r.total_bytes ?? 0), 0) ?? 0;
-
-  const handleSync = async () => {
-    setSyncing(true);
-    try {
-      const { data: result, error } = await supabase.functions.invoke('sync-official-truck-stops');
-      if (error) throw error;
-      
-      const synced = result?.synced || {};
-      const errors = result?.errors || [];
-      const total = result?.total_in_database || 0;
-      
-      const brandSummary = Object.entries(synced)
-        .map(([brand, count]) => `${brand}: ${count}`)
-        .join(', ');
-      
-      if (errors.length > 0) {
-        toast.warning(`Sync partial: ${total} total stops. ${errors.join('; ')}`);
-      } else {
-        toast.success(`Sync complete: ${total} total stops (${brandSummary})`);
-      }
-      
-      refetchStops();
-    } catch (e) {
-      toast.error('Sync failed: ' + (e instanceof Error ? e.message : 'Unknown error'));
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -148,9 +120,9 @@ export function InfrastructureTab() {
                 Sync store directories from Pilot/Flying J, Love's, and TA/Petro.
               </p>
             </div>
-            <Button onClick={handleSync} disabled={syncing} variant="outline" className="gap-2">
-              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync Official Truck Stop Data'}
+            <Button onClick={() => setSyncModalOpen(true)} variant="outline" className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Sync Official Truck Stop Data
             </Button>
           </div>
 
@@ -187,6 +159,12 @@ export function InfrastructureTab() {
           )}
         </CardContent>
       </Card>
+
+      <SyncMapModal
+        open={syncModalOpen}
+        onOpenChange={setSyncModalOpen}
+        onComplete={() => refetchStops()}
+      />
     </div>
   );
 }
