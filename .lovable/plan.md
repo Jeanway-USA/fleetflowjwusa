@@ -1,106 +1,70 @@
 
 
-## Official Truck Stop Database -- Cache-on-Demand Architecture
+## Fix: Replace Fake Brand APIs with Overpass (OpenStreetMap) Queries
 
-### Overview
+### The Problem
 
-Replace the Overpass (OpenStreetMap) data source with a curated database of official truck stop locations from major brands (Pilot/Flying J, Love's, TA/Petro). A new admin-triggered sync edge function fetches data from public store locator endpoints and UPSERTs into a dedicated table. The existing `landstar-fuel-stops` function is updated to query this official data instead of Overpass.
+The three "public API endpoints" in the current sync function are fabricated URLs:
+- `pilotflyingj.com/umbraco/api/...` -- returns HTML, not JSON
+- `loves.com/api/sitecore/StoreSearch/...` -- 404
+- `ta-petro.com/api/location-search` -- 404
 
-No external API keys are required -- the sync function uses publicly accessible store locator endpoints from the truck stop brands themselves.
+None of these brands offer free, unauthenticated JSON APIs.
 
-### 1. Database Migration
+### The Solution
 
-Create `official_truck_stops` table (no PostGIS needed -- uses existing bounding-box + haversine pattern):
+Use the **Overpass API** (OpenStreetMap's free, public query API) to fetch real truck stop data with brand names, store numbers, and coordinates. OSM has excellent coverage of major US truck stops with verified brand tags.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK, default gen_random_uuid() |
-| brand | text | NOT NULL (Pilot, Love's, TA, etc.) |
-| store_number | text | NOT NULL |
-| name | text | NOT NULL |
-| address | text | |
-| city | text | |
-| state | text | NOT NULL |
-| latitude | numeric | NOT NULL |
-| longitude | numeric | NOT NULL |
-| amenities | text[] | default '{}' |
-| created_at | timestamptz | default now() |
-| updated_at | timestamptz | default now() |
+### How It Works
 
-Constraints:
-- UNIQUE on (brand, store_number)
-- RLS enabled, read access for authenticated users, write via service role only
+For each brand, run a simple Overpass QL query:
 
-### 2. New Edge Function: `sync-official-truck-stops`
+```text
+[out:json][timeout:30];
+(
+  node["amenity"="fuel"]["brand"="Pilot"](24.0,-125.0,50.0,-66.0);
+  node["amenity"="fuel"]["brand"="Flying J"](24.0,-125.0,50.0,-66.0);
+);
+out body;
+```
 
-A super-admin-only function that fetches store directories from public brand endpoints:
+This queries the entire continental US bounding box for fuel stations tagged with specific brands. The Overpass API is:
+- Free, no API key needed
+- Rate-limited but generous (10,000 queries/day)
+- Returns real JSON with lat/lng, name, brand, address tags
 
-**Brand endpoints attempted (in order):**
-- Pilot/Flying J: `https://www.pilotflyingj.com/api/en/location-results` (public store locator JSON)
-- Love's: `https://www.loves.com/api/sitecore/StoreSearch/SearchStores` (public search API)
-- TA/Petro: `https://www.ta-petro.com/api/location-search` (public locator)
+### Implementation
 
-**For each brand:**
-1. Fetch JSON from the public endpoint
-2. Parse store_number, name, address, city, state, lat, lng
-3. UPSERT into `official_truck_stops` on (brand, store_number) conflict
-4. Return count of synced stops per brand
+**File changed:** `supabase/functions/sync-official-truck-stops/index.ts`
+
+Replace the three fake `fetch*` functions with a single `fetchOverpassBrand()` function:
+
+1. **`fetchOverpassBrand(brands: string[])`** -- Queries Overpass for nodes with `amenity=fuel` and matching `brand` tag across the continental US bounding box
+2. **Three query groups:**
+   - Pilot + Flying J (same parent company)
+   - Love's
+   - TA + Petro (same parent company)
+3. **Parse OSM tags:** Extract `brand`, `ref` (store number), `name`, `addr:street`, `addr:city`, `addr:state` from OSM element tags
+4. **UPSERT** into `official_truck_stops` using the existing `(brand, store_number)` composite key
+5. **Fallback store_number:** If OSM node lacks a `ref` tag, use the OSM node ID as the store number to ensure uniqueness
 
 **Error handling:**
-- Each brand fetch is independent -- if one fails, others still sync
-- 10s timeout per request
-- Returns a summary: `{ pilot: 450, loves: 380, ta: 290, errors: ['TA endpoint returned 403'] }`
+- 30-second timeout per query via AbortController
+- Each brand group is independent -- if one fails, others still sync
+- Graceful error messages returned in the summary
 
-**Auth:** Requires super admin (validated via `is_super_admin()` RPC)
+**No other files change** -- the table schema, admin UI, config, and frontend are all correct already.
 
-### 3. Admin UI: InfrastructureTab
+### Technical Details
 
-Add a "Database Management" card below the existing "Storage Usage" card with:
-- "Sync Official Truck Stop Data" button
-- Shows last sync timestamp and stop counts per brand
-- Loading spinner during sync
-- Toast notification on success/failure
+```
+Overpass endpoint: https://overpass-api.de/api/interpreter
+Method: POST (form-encoded body with `data=` query)
+Response: JSON with `elements` array of nodes
+Each node has: id, lat, lon, tags (name, brand, ref, addr:*)
+```
 
-### 4. Update `landstar-fuel-stops` Edge Function
+### Expected Results
 
-**Changes to existing function:**
-- Remove all Overpass code (~130 lines): `fetchOverpassStops`, `chunkRouteToBBoxes`, `BBox` interface, `OverpassStop` interface, `upsertStops`
-- Replace `queryLocalStops` to query `official_truck_stops` instead of `truck_stops`
-- Keep all existing logic: CORS, auth, EIA pricing, LCAPP matching, IFTA credits, Landstar scrape, interpolated fallback, caching
-
-**Modified flow:**
-1. Check `fuel_stops_cache` (6h TTL) -- unchanged
-2. Query `official_truck_stops` within bounding box (replaces `truck_stops` query)
-3. No more Overpass fetch step -- data is pre-populated by admin sync
-4. Enrich with EIA prices, LCAPP discounts, IFTA credits -- unchanged
-5. Filter within corridor, sort by distance -- unchanged
-6. Interpolated fallback if sparse -- unchanged
-7. Cache results -- unchanged
-
-### 5. Frontend: TripFuelPlanner.tsx
-
-**Updates to stop display:**
-- Show brand + store number: "Love's Travel Stop - Store #452"
-- Show full address line below the name
-- Update source badge: show brand icon/badge when source is 'official'
-- Add `address` and `store_number` to the `FuelStop` interface
-
-### File Changes Summary
-
-| File | Action |
-|------|--------|
-| SQL migration | Create `official_truck_stops` table |
-| `supabase/functions/sync-official-truck-stops/index.ts` | New edge function |
-| `supabase/config.toml` | Add `[functions.sync-official-truck-stops]` entry |
-| `supabase/functions/landstar-fuel-stops/index.ts` | Remove Overpass, query `official_truck_stops` |
-| `src/components/superadmin/InfrastructureTab.tsx` | Add sync button card |
-| `src/components/driver/TripFuelPlanner.tsx` | Update stop display with brand/store# |
-
-### Technical Notes
-
-- No PostGIS extension needed -- uses the same bounding-box lat/lng filtering already in place
-- No external API keys required -- brand store locators are public endpoints
-- The sync function is designed to be run periodically (truck stops rarely move) -- once per month is sufficient
-- If a brand endpoint changes or blocks requests, the function gracefully skips that brand and reports the error
-- Existing `truck_stops` and `fuel_stops_cache` tables remain untouched for backward compatibility
+After sync, the database should contain 800+ Pilot/Flying J stops, 600+ Love's stops, and 200+ TA/Petro stops -- all with real coordinates and brand names from OpenStreetMap's verified data.
 
