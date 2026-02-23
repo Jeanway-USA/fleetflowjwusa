@@ -6,7 +6,6 @@ const corsHeaders = {
 };
 
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
-const BRAND_REGEX = 'Pilot|Love|Loves|TA |TravelCenters|Flying J|Petro';
 
 interface StopRecord {
   brand: string;
@@ -23,13 +22,16 @@ interface StopRecord {
 function classifyBrand(tags: Record<string, string>): string | null {
   const brand = (tags.brand || '').toLowerCase();
   const name = (tags.name || '').toLowerCase();
-  const combined = `${brand} ${name}`;
+  const operator = (tags.operator || '').toLowerCase();
+  const combined = `${brand} ${name} ${operator}`;
 
   if (combined.includes('flying j')) return 'Flying J';
   if (combined.includes('pilot')) return 'Pilot';
   if (combined.includes("love's") || combined.includes('loves')) return "Love's";
   if (combined.includes('petro')) return 'Petro';
   if (/\bta\b/.test(combined) || combined.includes('travelcenter') || combined.includes('travel center')) return 'TA';
+  if (combined.includes("roady's") || combined.includes('roadys')) return "Roady's";
+  if (combined.includes('ambest')) return 'AMBEST';
   return null;
 }
 
@@ -72,7 +74,7 @@ Deno.serve(async (req) => {
 
     const [south, west, north, east] = bbox;
     const bboxStr = `(${south},${west},${north},${east})`;
-    const query = `[out:json][timeout:180];\nnode["amenity"="fuel"]["name"~"${BRAND_REGEX}",i]${bboxStr};\nout body;`;
+    const query = `[out:json][timeout:180];\n(\n  node["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n  way["amenity"="fuel"]["hgv"="yes"]${bboxStr};\n);\nout center;`;
 
     console.log(`Fetching bbox ${bboxStr}...`);
 
@@ -115,23 +117,35 @@ Deno.serve(async (req) => {
     const stops: StopRecord[] = [];
 
     for (const el of elements) {
-      if (!el.lat || !el.lon || !el.tags) continue;
       const tags = el.tags;
+      if (!tags) continue;
+
+      const lat = el.lat ?? el.center?.lat;
+      const lon = el.lon ?? el.center?.lon;
+      if (!lat || !lon) continue;
+
       const brand = classifyBrand(tags);
       if (!brand) continue;
 
-      const state = tags['addr:state'] || '';
-      if (!state) continue;
+      const city = tags['addr:city'] || '';
+      const state = (tags['addr:state'] || '').toUpperCase().slice(0, 2);
+
+      let storeNumber = tags.ref;
+      if (!storeNumber) {
+        storeNumber = (city && state)
+          ? `${brand}-${city}-${state}`
+          : `${brand}-${el.type}-${el.id}`;
+      }
 
       stops.push({
         brand,
-        store_number: tags.ref || `osm-${el.id}`,
+        store_number: storeNumber,
         name: tags.name || `${brand} Travel Center`,
         address: tags['addr:street'] || '',
-        city: tags['addr:city'] || '',
-        state: state.toUpperCase().slice(0, 2),
-        latitude: el.lat,
-        longitude: el.lon,
+        city,
+        state,
+        latitude: lat,
+        longitude: lon,
         amenities: ['Diesel', 'Parking'],
       });
     }
