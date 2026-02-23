@@ -1,110 +1,106 @@
 
 
-## Simplified Cache-on-Demand with Mapbox Search API
+## Official Truck Stop Database -- Cache-on-Demand Architecture
 
-### Prerequisites
+### Overview
 
-A `MAPBOX_ACCESS_TOKEN` secret needs to be added to the project. This will be requested before implementation begins.
+Replace the Overpass (OpenStreetMap) data source with a curated database of official truck stop locations from major brands (Pilot/Flying J, Love's, TA/Petro). A new admin-triggered sync edge function fetches data from public store locator endpoints and UPSERTs into a dedicated table. The existing `landstar-fuel-stops` function is updated to query this official data instead of Overpass.
+
+No external API keys are required -- the sync function uses publicly accessible store locator endpoints from the truck stop brands themselves.
 
 ### 1. Database Migration
 
-**Alter `truck_stops` table** to support Mapbox place IDs instead of OSM node IDs:
+Create `official_truck_stops` table (no PostGIS needed -- uses existing bounding-box + haversine pattern):
 
-- Add column `place_id` (text, UNIQUE)
-- Add column `address` (text)
-- Drop the `osm_id` unique constraint and column (only 7 rows exist currently, safe to clear)
-- Truncate existing data (7 stale Overpass rows) since the new source is Mapbox
-
-```sql
-TRUNCATE truck_stops;
-ALTER TABLE truck_stops DROP COLUMN IF EXISTS osm_id;
-ALTER TABLE truck_stops ADD COLUMN place_id text UNIQUE NOT NULL;
-ALTER TABLE truck_stops ADD COLUMN address text;
-```
-
-Final schema:
 | Column | Type | Notes |
 |--------|------|-------|
-| id | uuid | PK |
-| place_id | text | UNIQUE, Mapbox feature ID |
-| name | text | Real stop name |
-| brand | text | nullable |
-| address | text | Full formatted address |
+| id | uuid | PK, default gen_random_uuid() |
+| brand | text | NOT NULL (Pilot, Love's, TA, etc.) |
+| store_number | text | NOT NULL |
+| name | text | NOT NULL |
+| address | text | |
+| city | text | |
+| state | text | NOT NULL |
 | latitude | numeric | NOT NULL |
 | longitude | numeric | NOT NULL |
-| state | text | NOT NULL |
-| city | text | nullable |
-| amenities | text[] | |
-| source | text | default 'mapbox' |
-| fetched_at | timestamptz | |
-| created_at | timestamptz | |
+| amenities | text[] | default '{}' |
+| created_at | timestamptz | default now() |
+| updated_at | timestamptz | default now() |
 
-### 2. Edge Function Rewrite (`landstar-fuel-stops/index.ts`)
+Constraints:
+- UNIQUE on (brand, store_number)
+- RLS enabled, read access for authenticated users, write via service role only
 
-**Simplified architecture -- 3 clean steps:**
+### 2. New Edge Function: `sync-official-truck-stops`
 
-**Step A: Sample waypoints from route**
-- Take the route polyline and sample 5-10 equidistant points (max 10, no matter how long the route)
-- Use the existing `sampleRoutePoints` utility
+A super-admin-only function that fetches store directories from public brand endpoints:
 
-**Step B: Mapbox Search for each waypoint**
-- For each sampled point, call `https://api.mapbox.com/search/searchbox/v1/forward` with:
-  - `q`: "truck stop" (or cycle through "Pilot", "Love's", "TA" for richer results)
-  - `proximity`: `lng,lat` of the waypoint
-  - `limit`: 10
-  - `types`: "poi"
-  - `access_token`: from `MAPBOX_ACCESS_TOKEN` secret
-- Each call wrapped in try/catch with 5s timeout
-- If Mapbox returns 429 or errors, skip that waypoint gracefully
+**Brand endpoints attempted (in order):**
+- Pilot/Flying J: `https://www.pilotflyingj.com/api/en/location-results` (public store locator JSON)
+- Love's: `https://www.loves.com/api/sitecore/StoreSearch/SearchStores` (public search API)
+- TA/Petro: `https://www.ta-petro.com/api/location-search` (public locator)
 
-**Step C: Upsert and query**
-- Parse Mapbox response: extract `properties.mapbox_id` (place_id), `properties.name`, `properties.full_address`, `geometry.coordinates`, `properties.context` (for city/state)
-- UPSERT into `truck_stops` on `place_id` conflict
-- Query `truck_stops` for all stops within `corridor_miles` of the route
-- Enrich with EIA diesel prices, LCAPP discounts, IFTA credits (preserved from current code)
-- Sort by `distance_from_origin`, return
-
-**Preserved from current code:**
-- CORS headers and auth validation
-- EIA diesel price fetching
-- LCAPP partner matching and discount calculation
-- IFTA tax credit enrichment
-- Projected savings calculation
-- Landstar scrape path (if credentials exist)
-- `fuel_stops_cache` for 6h TTL fast-path
-- Interpolated fallback if both Mapbox and local DB are empty
-
-**Removed:**
-- All Overpass API code (`fetchOverpassStops`, `chunkRouteToBBoxes`, etc.)
-- Overpass-specific type definitions
+**For each brand:**
+1. Fetch JSON from the public endpoint
+2. Parse store_number, name, address, city, state, lat, lng
+3. UPSERT into `official_truck_stops` on (brand, store_number) conflict
+4. Return count of synced stops per brand
 
 **Error handling:**
-- Each Mapbox fetch in try/catch with AbortController (5s timeout)
-- If all Mapbox calls fail, fall back to local `truck_stops` table
-- If local table is also empty, fall back to interpolated stops
-- Never crashes -- always returns at least interpolated data
+- Each brand fetch is independent -- if one fails, others still sync
+- 10s timeout per request
+- Returns a summary: `{ pilot: 450, loves: 380, ta: 290, errors: ['TA endpoint returned 403'] }`
 
-### 3. Frontend (`TripFuelPlanner.tsx`)
+**Auth:** Requires super admin (validated via `is_super_admin()` RPC)
 
-**Minor updates:**
-- Add `address` to the `FuelStop` interface
-- Show address in the stop list instead of just `city, state`
-- Update loading skeleton text to "Fetching live truck stops..." when `isFetching` is true
-- Show a "Live" badge when `source === 'mapbox'`
+### 3. Admin UI: InfrastructureTab
 
-No structural changes needed -- the component already handles the response shape correctly.
+Add a "Database Management" card below the existing "Storage Usage" card with:
+- "Sync Official Truck Stop Data" button
+- Shows last sync timestamp and stop counts per brand
+- Loading spinner during sync
+- Toast notification on success/failure
 
-### File Changes
+### 4. Update `landstar-fuel-stops` Edge Function
 
-| File | Change |
+**Changes to existing function:**
+- Remove all Overpass code (~130 lines): `fetchOverpassStops`, `chunkRouteToBBoxes`, `BBox` interface, `OverpassStop` interface, `upsertStops`
+- Replace `queryLocalStops` to query `official_truck_stops` instead of `truck_stops`
+- Keep all existing logic: CORS, auth, EIA pricing, LCAPP matching, IFTA credits, Landstar scrape, interpolated fallback, caching
+
+**Modified flow:**
+1. Check `fuel_stops_cache` (6h TTL) -- unchanged
+2. Query `official_truck_stops` within bounding box (replaces `truck_stops` query)
+3. No more Overpass fetch step -- data is pre-populated by admin sync
+4. Enrich with EIA prices, LCAPP discounts, IFTA credits -- unchanged
+5. Filter within corridor, sort by distance -- unchanged
+6. Interpolated fallback if sparse -- unchanged
+7. Cache results -- unchanged
+
+### 5. Frontend: TripFuelPlanner.tsx
+
+**Updates to stop display:**
+- Show brand + store number: "Love's Travel Stop - Store #452"
+- Show full address line below the name
+- Update source badge: show brand icon/badge when source is 'official'
+- Add `address` and `store_number` to the `FuelStop` interface
+
+### File Changes Summary
+
+| File | Action |
 |------|--------|
-| Database migration | Alter `truck_stops`: drop `osm_id`, add `place_id` + `address` |
-| `supabase/functions/landstar-fuel-stops/index.ts` | Replace Overpass with Mapbox Search; simplify to 5-10 waypoint searches |
-| `src/components/driver/TripFuelPlanner.tsx` | Add `address` field display; update loading/source badges |
+| SQL migration | Create `official_truck_stops` table |
+| `supabase/functions/sync-official-truck-stops/index.ts` | New edge function |
+| `supabase/config.toml` | Add `[functions.sync-official-truck-stops]` entry |
+| `supabase/functions/landstar-fuel-stops/index.ts` | Remove Overpass, query `official_truck_stops` |
+| `src/components/superadmin/InfrastructureTab.tsx` | Add sync button card |
+| `src/components/driver/TripFuelPlanner.tsx` | Update stop display with brand/store# |
 
-### Secret Required
+### Technical Notes
 
-| Secret | Value |
-|--------|-------|
-| `MAPBOX_ACCESS_TOKEN` | User's Mapbox public access token (from mapbox.com account) |
+- No PostGIS extension needed -- uses the same bounding-box lat/lng filtering already in place
+- No external API keys required -- brand store locators are public endpoints
+- The sync function is designed to be run periodically (truck stops rarely move) -- once per month is sufficient
+- If a brand endpoint changes or blocks requests, the function gracefully skips that brand and reports the error
+- Existing `truck_stops` and `fuel_stops_cache` tables remain untouched for backward compatibility
 
