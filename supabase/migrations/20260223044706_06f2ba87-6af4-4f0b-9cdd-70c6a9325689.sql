@@ -1,0 +1,1 @@
+TRUNCATE TABLE public.official_truck_stops;
