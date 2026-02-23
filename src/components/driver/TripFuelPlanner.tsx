@@ -18,6 +18,9 @@ import { FuelPlannerMap } from './fuel-planner/FuelPlannerMap';
 interface FuelStop {
   id?: string;
   name: string;
+  brand?: string | null;
+  store_number?: string | null;
+  address?: string | null;
   chain: string | null;
   latitude: number;
   longitude: number;
@@ -444,12 +447,21 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
                             stop.lcapp_discount ? 'bg-primary' : 'bg-accent'
                           }`}
                         />
-                        <span className="font-medium truncate">{stop.name}</span>
+                        <span className="font-medium truncate">
+                          {stop.brand && stop.store_number
+                            ? `${stop.name} - Store #${stop.store_number}`
+                            : stop.name}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground pl-3.5">
-                        <span>{stop.city}, {stop.state}</span>
-                        {stop.distance_from_route !== undefined && (
-                          <span>· {stop.distance_from_route.toFixed(0)} mi off route</span>
+                      <div className="flex flex-col text-xs text-muted-foreground pl-3.5">
+                        <div className="flex items-center gap-2">
+                          <span>{stop.city}, {stop.state}</span>
+                          {stop.distance_from_route !== undefined && (
+                            <span>· {stop.distance_from_route.toFixed(0)} mi off route</span>
+                          )}
+                        </div>
+                        {stop.address && (
+                          <span className="truncate">{stop.address}</span>
                         )}
                       </div>
                     </div>

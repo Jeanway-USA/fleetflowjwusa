@@ -2703,6 +2703,51 @@ export type Database = {
         }
         Relationships: []
       }
+      official_truck_stops: {
+        Row: {
+          address: string | null
+          amenities: string[] | null
+          brand: string
+          city: string | null
+          created_at: string
+          id: string
+          latitude: number
+          longitude: number
+          name: string
+          state: string
+          store_number: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          amenities?: string[] | null
+          brand: string
+          city?: string | null
+          created_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          name: string
+          state: string
+          store_number: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          amenities?: string[] | null
+          brand?: string
+          city?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          name?: string
+          state?: string
+          store_number?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       org_storage_config: {
         Row: {
           connected_at: string | null
