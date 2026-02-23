@@ -3921,6 +3921,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      truck_stop_brand_counts: {
+        Args: never
+        Returns: {
+          brand: string
+          latest_sync: string
+          stop_count: number
+        }[]
+      }
     }
     Enums: {
       app_role: "owner" | "payroll_admin" | "dispatcher" | "safety" | "driver"
