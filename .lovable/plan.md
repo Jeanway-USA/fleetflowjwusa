@@ -1,56 +1,110 @@
 
 
-## Fix: Truck Stop Sync Timeout and 1000-Row Display Cap
+## Rewrite: Corporate-Only Truck Stop Sync (No More OSM/Overpass)
 
-### Problem 1: Frontend Shows Only 1000 Locations
-The `InfrastructureTab` stats query fetches all rows with `.select('brand, updated_at')` and counts them client-side. Supabase silently caps this at 1000 rows. The actual database likely has 3000+ stops from previous syncs.
+### Problem
+The Overpass API returned irrelevant POIs (schools, parks, restaurants) due to broad regex matching. All OSM-sourced data is unreliable for a commercial TMS.
 
-**Fix**: Use a server-side count query with `count: 'exact', head: true` and a separate brand-count RPC function.
+### Strategy
+Abandon Overpass entirely. Fetch exclusively from corporate sources:
 
-### Problem 2: Edge Function Timeout
-TA/Petro geocoding 356 unique city/state pairs at 1.1s each takes ~390 seconds. The edge function has a 300-second hard timeout and gets killed mid-process, causing the error.
+1. **Love's** -- Try the Sitecore locator endpoint (`GetNearbyStores`) that powers their website. If it returns data, great. If WAF-blocked, the fetcher returns empty gracefully.
+2. **Pilot/Flying J** -- Scrape all 50 US state directory pages from `locations.pilotflyingj.com/us/{state_code}` which contain structured JSON-LD with lat/lng, store numbers, addresses, and brand classification (Pilot vs Flying J vs One9).
+3. **TA/Petro** -- Keep the existing HTML directory parser at `ta-petro.com/location/all-locations/` with the static CITY_COORDS lookup for geocoding.
 
-**Fix**: Skip Nominatim geocoding entirely for TA/Petro. Instead, use a hardcoded US city coordinate lookup table for common truck stop cities, which resolves instantly. Any cities not in the table get skipped (filtered out as 0,0 coordinates).
+### Important Reality Check
+All three brands' official REST APIs (Love's developer portal, TA developer portal) require OAuth/API key registration. The "corporate locator APIs" we're targeting are the **public-facing locator infrastructure** that powers their consumer websites -- not authenticated developer APIs. This is the best available option without API keys.
 
 ---
 
 ### Changes
 
-#### 1. Edge Function (`supabase/functions/sync-official-truck-stops/index.ts`)
+#### 1. Edge Function Full Rewrite (`supabase/functions/sync-official-truck-stops/index.ts`)
 
-- **Remove** all Nominatim geocoding calls and the 1.1s delay loop
-- **Add** a static coordinate lookup map (~200 common US truck stop cities with lat/lng) built from known TA/Petro locations
-- Cities not in the map simply won't get coordinates and will be filtered out (acceptable tradeoff -- covers 90%+ of locations)
-- Add browser-style headers to all fetch calls
-- Add aggressive error logging (status codes + response body snippets)
-- Total runtime drops from ~6+ minutes to under 3 minutes
+**Remove entirely:**
+- All Overpass API code (`OVERPASS_URL`, `fetchFromOverpass`, `classifyBrand`, retry logic)
+- The `US_BBOX` constant
 
-#### 2. Frontend Stats Query (`src/components/superadmin/InfrastructureTab.tsx`)
+**Keep:**
+- `BROWSER_HEADERS` (updated with Referer header per user request)
+- `CITY_COORDS` static lookup
+- `StopRecord` interface
+- Auth check and CORS headers
+- Batch upsert logic
 
-- **Replace** the full-table fetch with two queries:
-  - `select('*', { count: 'exact', head: true })` for total count (no row limit issue)
-  - A grouped brand count query using an RPC or fetching just brand column with proper pagination
-- Alternatively, create a simple database function `truck_stop_brand_counts()` that returns `{ brand, count }` rows using SQL GROUP BY (bypasses the 1000 limit entirely)
+**New fetchers:**
 
-#### 3. New Database Function
+##### `fetchLoves()`
+- POST to `https://www.loves.com/api/sitecore/StoreLocator/GetNearbyStores`
+- Body: `latitude=39.8283&longitude=-98.5795&radius=5000&brandId=1` (center of US, huge radius)
+- Headers: browser spoofing + `Referer: https://www.loves.com/en/location-and-fuel-price-search`
+- Parse JSON response, map each location to `{ brand: "Love's", store_number, name, address, city, state, latitude, longitude }`
+- Aggressive error logging on failure (log status + first 500 chars of body)
 
-Create `truck_stop_brand_counts()`:
-```sql
-CREATE OR REPLACE FUNCTION truck_stop_brand_counts()
-RETURNS TABLE(brand text, stop_count bigint, latest_sync timestamptz)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
-AS $$
-  SELECT brand, count(*)::bigint, max(updated_at)
-  FROM official_truck_stops
-  GROUP BY brand;
-$$;
+##### `fetchPilot()`
+- Iterate over all 50 US state codes, fetch `https://locations.pilotflyingj.com/us/{state_code_lowercase}`
+- Extract JSON-LD (`application/ld+json`) from each HTML page -- contains structured location data with lat/lng, address, store name
+- Classify brand from name: "Flying J" / "Pilot" / "One9" / etc.
+- Extract store number from name pattern (e.g., "Pilot Travel Center #180")
+- Add 500ms delay between state fetches to be respectful
+- Total: ~50 requests over ~25 seconds
+
+##### `fetchTA()`
+- Existing TA/Petro HTML directory parser (unchanged logic)
+- Uses CITY_COORDS static lookup for geocoding
+- Already handles TA, Petro, TA Express brands
+
+**Main handler changes:**
+- **TRUNCATE before upsert**: Delete all existing rows from `official_truck_stops` before inserting fresh data (user requested "start fresh")
+- Execute all three fetchers with `Promise.allSettled()`
+- Merge successful results, filter out entries with lat=0/lng=0
+- Batch upsert with conflict on `(brand, store_number)`
+- Return per-brand counts
+
+#### 2. Database Cleanup
+- Run a migration to TRUNCATE the `official_truck_stops` table to start fresh
+- No schema changes needed -- table structure stays the same
+
+#### 3. Frontend (`InfrastructureTab.tsx`)
+- Already simplified from previous iteration -- no changes needed
+- The single "Sync" button and RPC-based stats display remain as-is
+
+---
+
+### Technical Details
+
+**Browser Spoofing Headers (all fetchers):**
 ```
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36
+Accept: application/json, text/plain, */*
+Accept-Language: en-US,en;q=0.9
+Referer: https://www.google.com/
+```
+
+**Error Logging Pattern (all fetchers):**
+```
+if (!res.ok) {
+  const body = await res.text().catch(() => '[unreadable]');
+  console.error(`[Brand] HTTP ${res.status} from ${url}`);
+  console.error(`[Brand] Body (500 chars): ${body.substring(0, 500)}`);
+}
+```
+
+**Pilot/FJ JSON-LD extraction:**
+The state directory pages at `locations.pilotflyingj.com/us/{state}` embed `<script type="application/ld+json">` blocks containing an array of location objects with `geo.latitude`, `geo.longitude`, `address`, and `name` fields. This is the same structured data Google uses for search results.
+
+**Expected Results:**
+- Love's: ~600 locations (if Sitecore endpoint responds) or 0 (if WAF-blocked)
+- Pilot/Flying J: ~800 locations from 50 state pages
+- TA/Petro: ~250 locations (limited by CITY_COORDS coverage)
+- Total runtime: ~60-90 seconds (well within 300s timeout)
+
+---
 
 ### Files Changed
 
 | File | Action |
 |------|--------|
-| `supabase/functions/sync-official-truck-stops/index.ts` | Edit -- replace Nominatim with static lookup, add headers/logging |
-| `src/components/superadmin/InfrastructureTab.tsx` | Edit -- use RPC for stats instead of full row fetch |
-| Database migration | New function `truck_stop_brand_counts()` |
+| `supabase/functions/sync-official-truck-stops/index.ts` | Full rewrite -- remove Overpass, add corporate fetchers |
+| Database migration | TRUNCATE `official_truck_stops` |
 
