@@ -1,65 +1,115 @@
 
 
-## Fix: Bounding Box Chunking for Complete Truck Stop Sync
+## Truck Stop Sync -- Grid Progress Map and Live ETA Tracker
 
-### Problem
-The current function queries the entire US in a single Overpass request per brand group. This hits Overpass's server-side timeout/memory limits, returning only ~100 locations instead of thousands.
+### Overview
 
-### Solution
-Split the US into 6 regional bounding boxes and use a combined regex-based name query (instead of per-brand queries) to fetch all major brands in one pass per region. This reduces total API calls from 3 (one per brand group) to 6 (one per region), while keeping each query small enough to succeed.
+Move the geographic chunking loop from the Edge Function to the frontend. The Edge Function becomes a simple single-region worker that accepts one bounding box, fetches from Overpass, upserts, and returns a count. The frontend orchestrates the 6 regions sequentially, rendering a live Leaflet map with color-coded rectangles and a progress bar with ETA.
 
-### Implementation Details
+### Architecture
 
-**File:** `supabase/functions/sync-official-truck-stops/index.ts`
-
-**1. Replace brand-based querying with region-based chunking**
-
-Define 6 US regional bounding boxes:
-- **Northeast** (37.0, -82.0, 47.5, -66.5)
-- **Southeast** (24.0, -92.0, 37.0, -75.0)
-- **Midwest** (36.0, -104.0, 49.5, -82.0)
-- **South Central** (24.0, -104.0, 37.0, -92.0)
-- **Northwest** (40.0, -125.0, 49.5, -104.0)
-- **Southwest** (24.0, -125.0, 40.0, -104.0)
-
-**2. Use a single regex query per region**
-
-Instead of separate brand queries, use one Overpass query per region that matches all brands via regex:
-```
-[out:json][timeout:180];
-node["amenity"="fuel"]["name"~"Pilot|Love|Loves|TA |TravelCenters|Flying J|Petro",i](BBOX);
-out body;
+```text
+Frontend (SyncMapModal)              Edge Function (simplified)
+  |                                    |
+  |-- Region 1 bbox ------------------>|-- Overpass query
+  |<-- { upserted: 245 } -------------|-- Upsert to DB
+  |   [delay 3s]                       |
+  |-- Region 2 bbox ------------------>|
+  |<-- { upserted: 180 } -------------|
+  |   ...                              |
+  |-- Region 6 bbox ------------------>|
+  |<-- { upserted: 310 } -------------|
+  |                                    |
+  | Calculate ETA, update map colors   |
 ```
 
-This captures all major brands in one call, reducing total API calls and improving coverage.
+### 1. Edge Function Simplification (`sync-official-truck-stops/index.ts`)
 
-**3. Sequential fetching with 5-second delays**
+Strip the server-side loop. The function now:
 
-Loop through regions sequentially with a 5-second delay between each to respect rate limits. Total runtime: ~30-60 seconds for all 6 regions.
+- Accepts `{ bbox: [minLat, minLon, maxLat, maxLon] }` from the request body
+- Builds a single Overpass query with that bbox: `node["amenity"="fuel"]["name"~"Pilot|Love|...",i](minLat,minLon,maxLat,maxLon);`
+- Classifies brands using the existing `classifyBrand()` logic
+- Upserts matching stops into `official_truck_stops`
+- Returns `{ upserted: number, total_in_database: number }`
+- No delays, no looping -- single request in, single response out
+- Auth check (super admin) remains unchanged
 
-**4. Brand classification from name/tags**
+### 2. New Component: `SyncMapModal` (`src/components/superadmin/SyncMapModal.tsx`)
 
-After fetching, classify each result into a brand based on the `brand` tag or by matching the `name` against known patterns:
-- Name contains "Pilot" -> brand "Pilot"
-- Name contains "Flying J" -> brand "Flying J"  
-- Name contains "Love" -> brand "Love's"
-- Name contains "TA " or "TravelCenters" -> brand "TA"
-- Name contains "Petro" -> brand "Petro"
+A Dialog-based modal opened from the Infrastructure tab when the user clicks "Sync Official Truck Stop Data".
 
-**5. Deduplicate by OSM node ID before upserting**
+**State:**
+- `regions`: Array of 6 region objects with `name`, `bbox` (as `[south, west, north, east]`), and `status` (`'pending' | 'fetching' | 'done' | 'error'`)
+- `currentIndex`: Which region is being fetched (-1 = not started)
+- `results`: Per-region upsert counts
+- `startTime`: Timestamp when sync began
+- `isRunning`: Boolean
 
-Since regions overlap slightly, deduplicate results by OSM node ID before upserting into the database.
+**Regions (same 6 as current edge function):**
+| Region | Bounds (S, W, N, E) |
+|--------|---------------------|
+| Northeast | 37.0, -82.0, 47.5, -66.5 |
+| Southeast | 24.0, -92.0, 37.0, -75.0 |
+| Midwest | 36.0, -104.0, 49.5, -82.0 |
+| South Central | 24.0, -104.0, 37.0, -92.0 |
+| Northwest | 40.0, -125.0, 49.5, -104.0 |
+| Southwest | 24.0, -125.0, 40.0, -104.0 |
 
-**6. Upsert all results at once**
+**`runSync` function:**
+1. Set `isRunning = true`, record `startTime`
+2. Loop through regions sequentially
+3. Set current region status to `'fetching'`
+4. `await supabase.functions.invoke('sync-official-truck-stops', { body: { bbox: region.bbox } })`
+5. On success: set status to `'done'`, store upsert count
+6. On error: set status to `'error'`
+7. `await delay(3000)` between calls (rate limiting)
+8. After loop: toast summary, refetch truck stop stats
 
-After all regions are fetched and deduplicated, upsert the full master array into `official_truck_stops` using the existing batch logic (200 rows per batch).
+**ETA calculation:**
+```
+elapsedMs = Date.now() - startTime
+avgMsPerChunk = elapsedMs / completedChunks
+etaMs = avgMsPerChunk * remainingChunks
+```
 
-### Expected Results
-- 700+ Pilot/Flying J locations
-- 600+ Love's locations  
-- 250+ TA/Petro locations
-- Total: 1,500+ official truck stops
+**UI Layout inside the Dialog (max-w-3xl):**
 
-### No Other Files Change
-The table schema, admin UI, config, and frontend all remain the same.
+- **Map** (h-72): Leaflet `MapContainer` fitted to US bounds `[[24, -125], [50, -66]]` with 6 `<Rectangle>` layers, color-coded:
+  - Gray (`#94a3b8`, opacity 0.2): Pending
+  - Yellow (`#eab308`, opacity 0.3) + dashed stroke: Currently fetching
+  - Green (`#22c55e`, opacity 0.3): Done
+  - Red (`#ef4444`, opacity 0.3): Error
+  - Each rectangle has a `<Popup>` or `<Tooltip>` showing region name and count
+
+- **Progress section** below map:
+  - Shadcn `<Progress />` bar driven by `(completedChunks / totalChunks) * 100`
+  - Text: "Fetching Region {n} of 6 -- {regionName}... Estimated Time Remaining: {eta}s"
+  - After completion: "Sync complete! {totalUpserted} stops synced across 6 regions."
+
+- **Start button**: "Begin Sync" button at the bottom, disabled while running
+
+### 3. InfrastructureTab Changes
+
+- Import `SyncMapModal`
+- Replace the inline `handleSync` with opening the modal: `setSyncModalOpen(true)`
+- Add `<SyncMapModal open={syncModalOpen} onOpenChange={setSyncModalOpen} onComplete={() => refetchStops()} />`
+- The existing stats card (brand counts, last synced) remains unchanged
+
+### File Changes Summary
+
+| File | Action |
+|------|--------|
+| `supabase/functions/sync-official-truck-stops/index.ts` | Rewrite -- accept single bbox, remove loop/delays |
+| `src/components/superadmin/SyncMapModal.tsx` | New -- map + progress modal |
+| `src/components/superadmin/InfrastructureTab.tsx` | Edit -- open modal instead of direct invoke |
+
+### Technical Notes
+
+- Uses `react-leaflet`'s `Rectangle` component (already available in the installed package)
+- Map tiles from OpenStreetMap (same as existing `FuelPlannerMap`)
+- No new dependencies required
+- The 3-second delay between chunks is enforced on the frontend, giving the Overpass API breathing room
+- Each edge function call is independent and fast (single region, ~5-15s)
+- If a region fails, the loop continues to the next -- partial syncs are fine since data is upserted
 
