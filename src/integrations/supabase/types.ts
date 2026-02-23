@@ -3105,6 +3105,7 @@ export type Database = {
       settlements: {
         Row: {
           cash_advances: number | null
+          cpp_benefits: number | null
           created_at: string
           driver_id: string
           driver_pay: number
@@ -3112,6 +3113,8 @@ export type Database = {
           fuel_advances: number | null
           gross_revenue: number
           id: string
+          insurance_liability: number | null
+          lcn_satellite_fees: number | null
           net_pay: number | null
           notes: string | null
           org_id: string | null
@@ -3119,11 +3122,15 @@ export type Database = {
           pdf_url: string | null
           period_end: string
           period_start: string
+          plates_permits: number | null
+          prepass_scale_fees: number | null
           status: string
+          trailer_rental: number | null
           updated_at: string
         }
         Insert: {
           cash_advances?: number | null
+          cpp_benefits?: number | null
           created_at?: string
           driver_id: string
           driver_pay?: number
@@ -3131,6 +3138,8 @@ export type Database = {
           fuel_advances?: number | null
           gross_revenue?: number
           id?: string
+          insurance_liability?: number | null
+          lcn_satellite_fees?: number | null
           net_pay?: number | null
           notes?: string | null
           org_id?: string | null
@@ -3138,11 +3147,15 @@ export type Database = {
           pdf_url?: string | null
           period_end: string
           period_start: string
+          plates_permits?: number | null
+          prepass_scale_fees?: number | null
           status?: string
+          trailer_rental?: number | null
           updated_at?: string
         }
         Update: {
           cash_advances?: number | null
+          cpp_benefits?: number | null
           created_at?: string
           driver_id?: string
           driver_pay?: number
@@ -3150,6 +3163,8 @@ export type Database = {
           fuel_advances?: number | null
           gross_revenue?: number
           id?: string
+          insurance_liability?: number | null
+          lcn_satellite_fees?: number | null
           net_pay?: number | null
           notes?: string | null
           org_id?: string | null
@@ -3157,7 +3172,10 @@ export type Database = {
           pdf_url?: string | null
           period_end?: string
           period_start?: string
+          plates_permits?: number | null
+          prepass_scale_fees?: number | null
           status?: string
+          trailer_rental?: number | null
           updated_at?: string
         }
         Relationships: [

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,10 +11,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Plus, FileText, Pencil, Trash2, Download, Loader2, Eye } from 'lucide-react';
+import { Plus, FileText, Pencil, Trash2, Loader2, Eye, Upload } from 'lucide-react';
 import { format, parseISO, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Separator } from '@/components/ui/separator';
 
 interface Settlement {
   id: string;
@@ -27,6 +28,12 @@ interface Settlement {
   cash_advances: number;
   escrow_deduction: number;
   other_deductions: number;
+  lcn_satellite_fees: number;
+  prepass_scale_fees: number;
+  insurance_liability: number;
+  trailer_rental: number;
+  plates_permits: number;
+  cpp_benefits: number;
   net_pay: number;
   status: string;
   pdf_url: string | null;
@@ -65,23 +72,47 @@ interface FleetLoad {
   status: string;
 }
 
+const DEDUCTION_FIELDS = [
+  'fuel_advances', 'cash_advances', 'escrow_deduction',
+  'lcn_satellite_fees', 'prepass_scale_fees', 'insurance_liability',
+  'trailer_rental', 'plates_permits', 'cpp_benefits', 'other_deductions',
+] as const;
+
+const emptyFormData: Partial<Settlement> = {
+  status: 'draft',
+  gross_revenue: 0,
+  driver_pay: 0,
+  fuel_advances: 0,
+  cash_advances: 0,
+  escrow_deduction: 0,
+  other_deductions: 0,
+  lcn_satellite_fees: 0,
+  prepass_scale_fees: 0,
+  insurance_liability: 0,
+  trailer_rental: 0,
+  plates_permits: 0,
+  cpp_benefits: 0,
+  net_pay: 0,
+};
+
+function calcTotalDeductions(data: Partial<Settlement>): number {
+  return DEDUCTION_FIELDS.reduce((sum, f) => sum + ((data[f] as number) || 0), 0);
+}
+
+function calcNetPay(data: Partial<Settlement>): number {
+  return (data.driver_pay || 0) - calcTotalDeductions(data);
+}
+
 export function SettlementsTab() {
   const queryClient = useQueryClient();
   const { orgId } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
   const [viewingSettlement, setViewingSettlement] = useState<Settlement | null>(null);
-  const [formData, setFormData] = useState<Partial<Settlement>>({
-    status: 'draft',
-    gross_revenue: 0,
-    driver_pay: 0,
-    fuel_advances: 0,
-    cash_advances: 0,
-    escrow_deduction: 0,
-    other_deductions: 0,
-    net_pay: 0,
-  });
+  const [formData, setFormData] = useState<Partial<Settlement>>({ ...emptyFormData });
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const { data: settlements = [], isLoading } = useQuery({
     queryKey: ['settlements'],
@@ -201,20 +232,12 @@ export function SettlementsTab() {
       setFormData(settlement);
     } else {
       setEditingSettlement(null);
-      // Default to last week's period
       const lastWeekStart = startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 });
       const lastWeekEnd = endOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 });
       setFormData({
-        status: 'draft',
+        ...emptyFormData,
         period_start: format(lastWeekStart, 'yyyy-MM-dd'),
         period_end: format(lastWeekEnd, 'yyyy-MM-dd'),
-        gross_revenue: 0,
-        driver_pay: 0,
-        fuel_advances: 0,
-        cash_advances: 0,
-        escrow_deduction: 0,
-        other_deductions: 0,
-        net_pay: 0,
       });
     }
     setDialogOpen(true);
@@ -225,6 +248,7 @@ export function SettlementsTab() {
     setEditingSettlement(null);
     setFormData({});
     setIsGenerating(false);
+    setIsImporting(false);
   };
 
   // Auto-generate settlement from loads
@@ -241,7 +265,6 @@ export function SettlementsTab() {
       const periodStart = parseISO(formData.period_start);
       const periodEnd = parseISO(formData.period_end);
 
-      // Find loads for this driver in the date range
       const driverLoads = loads.filter(load => {
         if (load.driver_id !== formData.driver_id) return false;
         if (!load.delivery_date) return false;
@@ -249,32 +272,22 @@ export function SettlementsTab() {
         return deliveryDate >= periodStart && deliveryDate <= periodEnd;
       });
 
-      // Calculate gross revenue
       const grossRevenue = driverLoads.reduce((sum, load) => sum + (load.net_revenue || 0), 0);
 
-      // Calculate driver pay based on pay type
       let driverPay = 0;
       if (driver) {
         if (driver.pay_type === 'percentage') {
           driverPay = grossRevenue * ((driver.pay_rate || 0) / 100);
         } else if (driver.pay_type === 'per_mile') {
-          driverPay = grossRevenue * 0.25; // Default 25% if per_mile
+          driverPay = grossRevenue * 0.25;
         } else {
           driverPay = driver.pay_rate || 0;
         }
       }
 
-      // Auto-pull fuel advances from expenses
-      const { data: fuelExpenses } = await supabase
-        .from('expenses')
-        .select('amount')
-        .eq('expense_type', 'fuel')
-        .gte('expense_date', formData.period_start)
-        .lte('expense_date', formData.period_end);
-
-      // Auto-pull cash advances (advance_taken from fleet_loads)
       const loadIds = driverLoads.map(l => l.id);
       let cashAdvancesTotal = 0;
+      let fuelAdvancesFromLoads = 0;
       if (loadIds.length > 0) {
         const { data: loadAdvances } = await supabase
           .from('fleet_loads')
@@ -283,27 +296,16 @@ export function SettlementsTab() {
         
         if (loadAdvances) {
           cashAdvancesTotal = loadAdvances.reduce((sum, l) => sum + (l.advance_taken || 0), 0);
-          const fuelAdvancesFromLoads = loadAdvances.reduce((sum, l) => sum + (l.fuel_advance || 0), 0);
-          // Use fuel advances from loads if available
-          if (fuelAdvancesFromLoads > 0) {
-            setFormData(prev => ({ ...prev, fuel_advances: fuelAdvancesFromLoads }));
-          }
+          fuelAdvancesFromLoads = loadAdvances.reduce((sum, l) => sum + (l.fuel_advance || 0), 0);
         }
       }
-
-      // Calculate net pay
-      const fuelAdv = formData.fuel_advances || 0;
-      const totalDeductions = fuelAdv + cashAdvancesTotal + 
-                              (formData.escrow_deduction || 0) + 
-                              (formData.other_deductions || 0);
-      const netPay = driverPay - totalDeductions;
 
       setFormData(prev => ({
         ...prev,
         gross_revenue: grossRevenue,
         driver_pay: driverPay,
         cash_advances: cashAdvancesTotal,
-        net_pay: netPay,
+        fuel_advances: fuelAdvancesFromLoads || prev.fuel_advances || 0,
       }));
 
       toast.success(`Found ${driverLoads.length} loads totaling ${formatCurrency(grossRevenue)}${cashAdvancesTotal > 0 ? ` with ${formatCurrency(cashAdvancesTotal)} in advances` : ''}`);
@@ -315,6 +317,93 @@ export function SettlementsTab() {
     }
   };
 
+  // Import Landstar PDF
+  const handleImportPDF = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      toast.error('Please select a PDF file');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke('parse-landstar-statement', {
+        body: { pdfBase64: base64 },
+      });
+
+      if (error) throw error;
+
+      // Map parsed expenses to settlement deduction fields
+      const expenses = data.expenses || [];
+      const mapped: Partial<Settlement> = {
+        fuel_advances: 0,
+        cash_advances: 0,
+        escrow_deduction: 0,
+        lcn_satellite_fees: 0,
+        prepass_scale_fees: 0,
+        insurance_liability: 0,
+        trailer_rental: 0,
+        plates_permits: 0,
+        cpp_benefits: 0,
+        other_deductions: 0,
+      };
+
+      for (const exp of expenses) {
+        if (exp.is_discount || exp.is_reimbursement) continue;
+        const amt = Math.abs(exp.amount || 0);
+        const type = (exp.expense_type || '').toLowerCase();
+
+        if (type === 'fuel' || type === 'def') {
+          mapped.fuel_advances = (mapped.fuel_advances || 0) + amt;
+        } else if (type === 'cash advance') {
+          mapped.cash_advances = (mapped.cash_advances || 0) + amt;
+        } else if (type === 'escrow payment') {
+          mapped.escrow_deduction = (mapped.escrow_deduction || 0) + amt;
+        } else if (type === 'lcn/satellite') {
+          mapped.lcn_satellite_fees = (mapped.lcn_satellite_fees || 0) + amt;
+        } else if (type === 'prepass/scale') {
+          mapped.prepass_scale_fees = (mapped.prepass_scale_fees || 0) + amt;
+        } else if (type === 'insurance') {
+          mapped.insurance_liability = (mapped.insurance_liability || 0) + amt;
+        } else if (type === 'trailer payment') {
+          mapped.trailer_rental = (mapped.trailer_rental || 0) + amt;
+        } else if (type === 'licensing/permits' || type === 'registration/plates') {
+          mapped.plates_permits = (mapped.plates_permits || 0) + amt;
+        } else if (type === 'cpp/benefits') {
+          mapped.cpp_benefits = (mapped.cpp_benefits || 0) + amt;
+        } else {
+          mapped.other_deductions = (mapped.other_deductions || 0) + amt;
+        }
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        ...mapped,
+        ...(data.period_start ? { period_start: data.period_start } : {}),
+        ...(data.period_end ? { period_end: data.period_end } : {}),
+      }));
+
+      toast.success(`Imported ${expenses.length} items from Landstar statement`);
+    } catch (error: any) {
+      console.error('PDF import error:', error);
+      toast.error(error.message || 'Failed to parse Landstar PDF');
+    } finally {
+      setIsImporting(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.driver_id || !formData.period_start || !formData.period_end) {
@@ -322,22 +411,12 @@ export function SettlementsTab() {
       return;
     }
 
-    // Calculate net pay
-    const totalDeductions = (formData.fuel_advances || 0) + 
-                            (formData.cash_advances || 0) + 
-                            (formData.escrow_deduction || 0) + 
-                            (formData.other_deductions || 0);
-    const netPay = (formData.driver_pay || 0) - totalDeductions;
+    const netPay = calcNetPay(formData);
 
     const settlementData = {
       ...formData,
       net_pay: netPay,
     };
-
-    if (!formData.driver_id || !formData.period_start || !formData.period_end) {
-      toast.error('Please select a driver and date range');
-      return;
-    }
 
     if (editingSettlement) {
       updateMutation.mutate({ id: editingSettlement.id, ...settlementData });
@@ -350,7 +429,6 @@ export function SettlementsTab() {
         org_id: orgId,
       });
       
-      // Create line items for each load
       if (result && formData.driver_id && formData.period_start && formData.period_end) {
         const periodStart = parseISO(formData.period_start);
         const periodEnd = parseISO(formData.period_end);
@@ -378,7 +456,32 @@ export function SettlementsTab() {
   };
 
   const revenueItems = lineItems.filter(item => item.category === 'revenue');
-  const deductionItems = lineItems.filter(item => item.category === 'deduction');
+
+  // Helper for deduction input
+  const DeductionInput = ({ field, label }: { field: keyof Settlement; label: string }) => (
+    <div className="space-y-1">
+      <Label htmlFor={field} className="text-xs">{label}</Label>
+      <Input
+        id={field}
+        type="number"
+        step="0.01"
+        value={(formData[field] as number) || ''}
+        onChange={(e) => setFormData({ ...formData, [field]: parseFloat(e.target.value) || 0 })}
+        className="h-8 text-sm"
+      />
+    </div>
+  );
+
+  // Ledger deduction row (only renders if non-zero)
+  const LedgerDeductionRow = ({ label, value, even }: { label: string; value: number; even?: boolean }) => {
+    if (!value || value === 0) return null;
+    return (
+      <div className={`flex justify-between items-center py-1.5 px-2 ${even ? 'bg-muted/40' : ''}`}>
+        <span className="text-sm">{label}</span>
+        <span className="text-sm font-mono text-destructive">-{formatCurrency(value)}</span>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -423,10 +526,7 @@ export function SettlementsTab() {
             </TableHeader>
             <TableBody>
               {settlements.map((settlement) => {
-                const totalDeductions = (settlement.fuel_advances || 0) + 
-                                       (settlement.cash_advances || 0) + 
-                                       (settlement.escrow_deduction || 0) + 
-                                       (settlement.other_deductions || 0);
+                const totalDeductions = calcTotalDeductions(settlement);
                 return (
                   <TableRow key={settlement.id}>
                     <TableCell className="font-medium">{getDriverName(settlement.driver_id)}</TableCell>
@@ -461,15 +561,15 @@ export function SettlementsTab() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingSettlement ? 'Edit Settlement' : 'Generate Settlement'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="driver_id">Driver *</Label>
-              <Select 
-                value={formData.driver_id || ''} 
+              <Select
+                value={formData.driver_id || ''}
                 onValueChange={(v) => setFormData({ ...formData, driver_id: v })}
               >
                 <SelectTrigger>
@@ -488,43 +588,62 @@ export function SettlementsTab() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="period_start">Period Start *</Label>
-                <Input 
-                  id="period_start" 
-                  type="date" 
-                  value={formData.period_start || ''} 
-                  onChange={(e) => setFormData({ ...formData, period_start: e.target.value })} 
-                  required 
+                <Input
+                  id="period_start"
+                  type="date"
+                  value={formData.period_start || ''}
+                  onChange={(e) => setFormData({ ...formData, period_start: e.target.value })}
+                  required
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="period_end">Period End *</Label>
-                <Input 
-                  id="period_end" 
-                  type="date" 
-                  value={formData.period_end || ''} 
-                  onChange={(e) => setFormData({ ...formData, period_end: e.target.value })} 
-                  required 
+                <Input
+                  id="period_end"
+                  type="date"
+                  value={formData.period_end || ''}
+                  onChange={(e) => setFormData({ ...formData, period_end: e.target.value })}
+                  required
                 />
               </div>
             </div>
 
             {!editingSettlement && (
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={generateSettlement} 
-                disabled={isGenerating}
-                className="w-full"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  'Auto-Generate from Loads'
-                )}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={generateSettlement}
+                  disabled={isGenerating}
+                  className="flex-1"
+                >
+                  {isGenerating ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating...</>
+                  ) : (
+                    'Auto-Generate from Loads'
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => pdfInputRef.current?.click()}
+                  disabled={isImporting}
+                  className="flex-1"
+                >
+                  {isImporting ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importing...</>
+                  ) : (
+                    <><Upload className="h-4 w-4 mr-2" />Import Landstar PDF</>
+                  )}
+                </Button>
+                <input
+                  ref={pdfInputRef}
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={handleImportPDF}
+                />
+              </div>
             )}
 
             <div className="border-t pt-4">
@@ -532,92 +651,62 @@ export function SettlementsTab() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="gross_revenue">Gross Revenue</Label>
-                  <Input 
-                    id="gross_revenue" 
-                    type="number" 
+                  <Input
+                    id="gross_revenue"
+                    type="number"
                     step="0.01"
-                    value={formData.gross_revenue || ''} 
-                    onChange={(e) => setFormData({ ...formData, gross_revenue: parseFloat(e.target.value) || 0 })} 
+                    value={formData.gross_revenue || ''}
+                    onChange={(e) => setFormData({ ...formData, gross_revenue: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="driver_pay">Driver Pay</Label>
-                  <Input 
-                    id="driver_pay" 
-                    type="number" 
+                  <Input
+                    id="driver_pay"
+                    type="number"
                     step="0.01"
-                    value={formData.driver_pay || ''} 
-                    onChange={(e) => setFormData({ ...formData, driver_pay: parseFloat(e.target.value) || 0 })} 
+                    value={formData.driver_pay || ''}
+                    onChange={(e) => setFormData({ ...formData, driver_pay: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
               </div>
             </div>
 
             <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">Deductions</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fuel_advances">Fuel Advances</Label>
-                  <Input 
-                    id="fuel_advances" 
-                    type="number" 
-                    step="0.01"
-                    value={formData.fuel_advances || ''} 
-                    onChange={(e) => setFormData({ ...formData, fuel_advances: parseFloat(e.target.value) || 0 })} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cash_advances">Cash Advances</Label>
-                  <Input 
-                    id="cash_advances" 
-                    type="number" 
-                    step="0.01"
-                    value={formData.cash_advances || ''} 
-                    onChange={(e) => setFormData({ ...formData, cash_advances: parseFloat(e.target.value) || 0 })} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="escrow_deduction">Escrow</Label>
-                  <Input 
-                    id="escrow_deduction" 
-                    type="number" 
-                    step="0.01"
-                    value={formData.escrow_deduction || ''} 
-                    onChange={(e) => setFormData({ ...formData, escrow_deduction: parseFloat(e.target.value) || 0 })} 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="other_deductions">Other Deductions</Label>
-                  <Input 
-                    id="other_deductions" 
-                    type="number" 
-                    step="0.01"
-                    value={formData.other_deductions || ''} 
-                    onChange={(e) => setFormData({ ...formData, other_deductions: parseFloat(e.target.value) || 0 })} 
-                  />
-                </div>
+              <h4 className="font-medium mb-1">Standard Deductions</h4>
+              <div className="grid grid-cols-3 gap-3">
+                <DeductionInput field="fuel_advances" label="Fuel Advances" />
+                <DeductionInput field="cash_advances" label="Cash Advances" />
+                <DeductionInput field="escrow_deduction" label="Escrow" />
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-1">Landstar BCO Deductions</h4>
+              <div className="grid grid-cols-3 gap-3">
+                <DeductionInput field="lcn_satellite_fees" label="LCN/Satellite" />
+                <DeductionInput field="prepass_scale_fees" label="PrePass/Scale" />
+                <DeductionInput field="insurance_liability" label="Insurance/Liability" />
+                <DeductionInput field="trailer_rental" label="Trailer Rental" />
+                <DeductionInput field="plates_permits" label="Plates/Permits" />
+                <DeductionInput field="cpp_benefits" label="CPP/Benefits" />
+                <DeductionInput field="other_deductions" label="Other Deductions" />
               </div>
             </div>
 
             <div className="border-t pt-4">
               <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
                 <span className="font-medium">Net Pay</span>
-                <span className="text-xl font-bold text-primary">
-                  {formatCurrency(
-                    (formData.driver_pay || 0) - 
-                    (formData.fuel_advances || 0) - 
-                    (formData.cash_advances || 0) - 
-                    (formData.escrow_deduction || 0) - 
-                    (formData.other_deductions || 0)
-                  )}
+                <span className="text-xl font-bold text-primary font-mono">
+                  {formatCurrency(calcNetPay(formData))}
                 </span>
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <Select 
-                value={formData.status || 'draft'} 
+              <Select
+                value={formData.status || 'draft'}
                 onValueChange={(v) => setFormData({ ...formData, status: v })}
               >
                 <SelectTrigger>
@@ -633,10 +722,10 @@ export function SettlementsTab() {
 
             <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>
-              <Textarea 
-                id="notes" 
-                value={formData.notes || ''} 
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })} 
+              <Textarea
+                id="notes"
+                value={formData.notes || ''}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 placeholder="Additional notes..."
               />
             </div>
@@ -651,73 +740,127 @@ export function SettlementsTab() {
         </DialogContent>
       </Dialog>
 
-      {/* View Settlement Sheet */}
+      {/* View Settlement — Professional Ledger Sheet */}
       <Sheet open={!!viewingSettlement} onOpenChange={(open) => !open && setViewingSettlement(null)}>
-        <SheetContent className="sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Settlement Details</SheetTitle>
-          </SheetHeader>
+        <SheetContent className="sm:max-w-xl overflow-y-auto p-0">
+          <div className="p-6">
+            <SheetHeader>
+              <SheetTitle className="text-base">Settlement Statement</SheetTitle>
+            </SheetHeader>
+          </div>
           {viewingSettlement && (
-            <div className="space-y-6 mt-6">
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Driver</p>
-                <p className="font-medium">{getDriverName(viewingSettlement.driver_id)}</p>
+            <div className="px-6 pb-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-lg font-bold">{getDriverName(viewingSettlement.driver_id)}</h3>
+                <StatusBadge status={viewingSettlement.status} />
               </div>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Period</p>
-                <p className="font-medium">
-                  {format(parseISO(viewingSettlement.period_start), 'MMMM d')} - {format(parseISO(viewingSettlement.period_end), 'MMMM d, yyyy')}
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                {format(parseISO(viewingSettlement.period_start), 'MMMM d')} – {format(parseISO(viewingSettlement.period_end), 'MMMM d, yyyy')}
+              </p>
 
-              {revenueItems.length > 0 && (
-                <div>
-                  <h4 className="font-medium mb-2">Revenue Items ({revenueItems.length})</h4>
-                  <div className="space-y-2">
-                    {revenueItems.map((item) => (
-                      <div key={item.id} className="flex justify-between text-sm p-2 bg-muted rounded">
-                        <span>{item.description}</span>
-                        <span className="font-medium text-primary">{formatCurrency(item.amount)}</span>
+              <Separator />
+
+              {/* Gross Revenue Section */}
+              <div className="mt-4 mb-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Gross Revenue</h4>
+                {revenueItems.length > 0 ? (
+                  <div className="space-y-0">
+                    {revenueItems.map((item, i) => (
+                      <div key={item.id} className={`flex justify-between items-center py-1.5 px-2 ${i % 2 === 0 ? 'bg-muted/40' : ''}`}>
+                        <span className="text-sm truncate mr-4">{item.description}</span>
+                        <span className="text-sm font-mono text-primary whitespace-nowrap">{formatCurrency(item.amount)}</span>
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <div className="flex justify-between items-center py-1.5 px-2 bg-muted/40">
+                    <span className="text-sm">Total Revenue</span>
+                    <span className="text-sm font-mono text-primary">{formatCurrency(viewingSettlement.gross_revenue)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center py-2 px-2 border-t mt-1">
+                  <span className="text-sm font-semibold">Subtotal — Revenue</span>
+                  <span className="text-sm font-bold font-mono text-primary">{formatCurrency(viewingSettlement.gross_revenue)}</span>
                 </div>
-              )}
-
-              <div className="border-t pt-4 space-y-3">
-                <div className="flex justify-between">
-                  <span>Gross Revenue</span>
-                  <span className="font-medium">{formatCurrency(viewingSettlement.gross_revenue)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Driver Pay</span>
-                  <span className="font-medium">{formatCurrency(viewingSettlement.driver_pay)}</span>
-                </div>
-                <div className="flex justify-between text-destructive">
-                  <span>Fuel Advances</span>
-                  <span>-{formatCurrency(viewingSettlement.fuel_advances)}</span>
-                </div>
-                <div className="flex justify-between text-destructive">
-                  <span>Cash Advances</span>
-                  <span>-{formatCurrency(viewingSettlement.cash_advances)}</span>
-                </div>
-                <div className="flex justify-between text-destructive">
-                  <span>Escrow</span>
-                  <span>-{formatCurrency(viewingSettlement.escrow_deduction)}</span>
-                </div>
-                <div className="flex justify-between text-destructive">
-                  <span>Other Deductions</span>
-                  <span>-{formatCurrency(viewingSettlement.other_deductions)}</span>
-                </div>
-                <div className="flex justify-between border-t pt-3">
-                  <span className="font-bold">Net Pay</span>
-                  <span className="font-bold text-xl text-primary">{formatCurrency(viewingSettlement.net_pay)}</span>
+                <div className="flex justify-between items-center py-1.5 px-2">
+                  <span className="text-sm">Driver Pay</span>
+                  <span className="text-sm font-mono font-medium">{formatCurrency(viewingSettlement.driver_pay)}</span>
                 </div>
               </div>
 
+              <Separator />
+
+              {/* Itemized Deductions Section */}
+              <div className="mt-4 mb-2">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Deductions</h4>
+                {(() => {
+                  const advances = [
+                    { label: 'Fuel Advances', value: viewingSettlement.fuel_advances },
+                    { label: 'Cash Advances', value: viewingSettlement.cash_advances },
+                    { label: 'Escrow', value: viewingSettlement.escrow_deduction },
+                  ].filter(d => d.value && d.value !== 0);
+
+                  const recurring = [
+                    { label: 'LCN/Satellite Fees', value: viewingSettlement.lcn_satellite_fees },
+                    { label: 'PrePass/Scale Fees', value: viewingSettlement.prepass_scale_fees },
+                    { label: 'Insurance/Liability', value: viewingSettlement.insurance_liability },
+                    { label: 'Trailer Rental', value: viewingSettlement.trailer_rental },
+                    { label: 'Plates/Permits', value: viewingSettlement.plates_permits },
+                    { label: 'CPP/Benefits', value: viewingSettlement.cpp_benefits },
+                  ].filter(d => d.value && d.value !== 0);
+
+                  const other = [
+                    { label: 'Other Deductions', value: viewingSettlement.other_deductions },
+                  ].filter(d => d.value && d.value !== 0);
+
+                  let idx = 0;
+                  const allDeductions = [...advances, ...recurring, ...other];
+
+                  if (allDeductions.length === 0) {
+                    return <p className="text-sm text-muted-foreground px-2 py-1">No deductions</p>;
+                  }
+
+                  return (
+                    <div className="space-y-0">
+                      {advances.length > 0 && (
+                        <>
+                          <p className="text-xs text-muted-foreground px-2 pt-1 pb-0.5">Advances</p>
+                          {advances.map(d => <LedgerDeductionRow key={d.label} label={d.label} value={d.value} even={(idx++) % 2 === 0} />)}
+                        </>
+                      )}
+                      {recurring.length > 0 && (
+                        <>
+                          <p className="text-xs text-muted-foreground px-2 pt-2 pb-0.5">Recurring Deductions</p>
+                          {recurring.map(d => <LedgerDeductionRow key={d.label} label={d.label} value={d.value} even={(idx++) % 2 === 0} />)}
+                        </>
+                      )}
+                      {other.length > 0 && (
+                        <>
+                          <p className="text-xs text-muted-foreground px-2 pt-2 pb-0.5">Other</p>
+                          {other.map(d => <LedgerDeductionRow key={d.label} label={d.label} value={d.value} even={(idx++) % 2 === 0} />)}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+                <div className="flex justify-between items-center py-2 px-2 border-t mt-1">
+                  <span className="text-sm font-semibold">Subtotal — Deductions</span>
+                  <span className="text-sm font-bold font-mono text-destructive">-{formatCurrency(calcTotalDeductions(viewingSettlement))}</span>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Net Pay */}
+              <div className="mt-4 border-t-2 border-b-2 border-foreground/20 py-3 px-2 flex justify-between items-center">
+                <span className="text-base font-bold">NET PAY</span>
+                <span className="text-xl font-bold font-mono text-primary">{formatCurrency(viewingSettlement.net_pay)}</span>
+              </div>
+
               {viewingSettlement.notes && (
-                <div className="border-t pt-4">
-                  <p className="text-sm text-muted-foreground mb-1">Notes</p>
+                <div className="mt-4">
+                  <p className="text-xs text-muted-foreground mb-1">Notes</p>
                   <p className="text-sm">{viewingSettlement.notes}</p>
                 </div>
               )}
