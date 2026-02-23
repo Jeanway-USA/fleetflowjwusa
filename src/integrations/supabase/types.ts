@@ -3802,27 +3802,17 @@ export type Database = {
           total_bytes: number
         }[]
       }
-      super_admin_update_org:
-        | {
-            Args: {
-              new_is_active?: boolean
-              new_tier?: string
-              new_trial_ends_at?: string
-              target_org_id: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              new_complimentary_ends_at?: string
-              new_is_active?: boolean
-              new_is_complimentary?: boolean
-              new_tier?: string
-              new_trial_ends_at?: string
-              target_org_id: string
-            }
-            Returns: undefined
-          }
+      super_admin_update_org: {
+        Args: {
+          new_complimentary_ends_at?: string
+          new_is_active?: boolean
+          new_is_complimentary?: boolean
+          new_tier?: string
+          new_trial_ends_at?: string
+          target_org_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "owner" | "payroll_admin" | "dispatcher" | "safety" | "driver"

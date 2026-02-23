@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.super_admin_update_org(uuid, text, boolean, timestamptz);
