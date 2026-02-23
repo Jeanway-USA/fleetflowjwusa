@@ -6,14 +6,11 @@ const corsHeaders = {
 };
 
 const BROWSER_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
   'Accept': 'application/json, text/plain, */*',
   'Accept-Language': 'en-US,en;q=0.9',
-  'Cache-Control': 'no-cache',
+  'Referer': 'https://www.google.com/',
 };
-
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
-const US_BBOX = '(24.5,-125.0,49.5,-66.0)';
 
 interface StopRecord {
   brand: string;
@@ -27,7 +24,7 @@ interface StopRecord {
   amenities: string[];
 }
 
-// ─── Static City Coordinate Lookup (replaces Nominatim geocoding) ─────
+// ─── Static City Coordinate Lookup (for TA/Petro geocoding) ─────
 const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
   "Birmingham|AL": { lat: 33.5207, lon: -86.8025 },
   "Mobile|AL": { lat: 30.6954, lon: -88.0399 },
@@ -213,13 +210,11 @@ const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
   "Cheyenne|WY": { lat: 41.1400, lon: -104.8202 },
   "Rawlins|WY": { lat: 41.7911, lon: -107.2387 },
   "Evanston|WY": { lat: 41.2683, lon: -110.9632 },
-  // Additional common truck stop cities
   "Bucksville|SC": { lat: 33.6918, lon: -79.0867 },
   "Carnesville|GA": { lat: 34.3701, lon: -83.2354 },
   "Kenly|NC": { lat: 35.5968, lon: -78.1247 },
   "Stony Creek|VA": { lat: 36.9043, lon: -77.3983 },
   "Snowville|VA": { lat: 37.0568, lon: -80.5553 },
-  "Knoxville|TN": { lat: 35.9606, lon: -83.9207 },
   "Lebanon|TN": { lat: 36.2081, lon: -86.2911 },
   "Mill Hall|PA": { lat: 41.1095, lon: -77.4856 },
   "Carlisle|PA": { lat: 40.2015, lon: -77.1886 },
@@ -248,158 +243,41 @@ const CITY_COORDS: Record<string, { lat: number; lon: number }> = {
   "Berea|OH": { lat: 41.3661, lon: -81.8543 },
   "Austinburg|OH": { lat: 41.7748, lon: -80.8654 },
   "Girard|OH": { lat: 41.1539, lon: -80.7006 },
-  "Mill Hall|PA": { lat: 41.1095, lon: -77.4856 },
-  "Snowville|VA": { lat: 37.0568, lon: -80.5553 },
+  "Fort Worth|TX": { lat: 32.7555, lon: -97.3308 },
+  "Lubbock|TX": { lat: 33.5779, lon: -101.8552 },
+  "Odessa|TX": { lat: 31.9454, lon: -102.3676 },
+  "Midland|TX": { lat: 31.9973, lon: -102.0779 },
+  "Abilene|TX": { lat: 32.4487, lon: -99.7331 },
+  "Tyler|TX": { lat: 32.3513, lon: -95.3011 },
+  "Denton|TX": { lat: 33.2148, lon: -97.1331 },
+  "Texarkana|TX": { lat: 33.4254, lon: -94.0477 },
+  "Corsicana|TX": { lat: 32.0954, lon: -96.4689 },
+  "Gainesville|TX": { lat: 33.6259, lon: -97.1336 },
+  "San Marcos|TX": { lat: 29.8833, lon: -97.9414 },
+  "New Braunfels|TX": { lat: 29.7030, lon: -98.1245 },
+  "Seguin|TX": { lat: 29.5688, lon: -97.9647 },
+  "Kerrville|TX": { lat: 30.0474, lon: -99.1404 },
+  "Junction|TX": { lat: 30.4894, lon: -99.7720 },
+  "Sonora|TX": { lat: 30.5669, lon: -100.6437 },
+  "Van Horn|TX": { lat: 31.0398, lon: -104.8307 },
+  "Pecos|TX": { lat: 31.4229, lon: -103.4932 },
+  "Big Spring|TX": { lat: 32.2504, lon: -101.4787 },
+  "Snyder|TX": { lat: 32.7179, lon: -100.9177 },
+  "Childress|TX": { lat: 34.4265, lon: -100.2040 },
+  "Shamrock|TX": { lat: 35.2140, lon: -100.2487 },
+  "Dumas|TX": { lat: 35.8628, lon: -101.9735 },
+  "Perryton|TX": { lat: 36.4003, lon: -100.8026 },
 };
 
-// ─── Overpass Fetcher (for Love's & Pilot/FJ) ────────────────────────
-async function fetchFromOverpass(brandRegex: string, label: string): Promise<StopRecord[]> {
-  console.log(`[${label}] Fetching from Overpass...`);
+const US_STATE_CODES = [
+  'al','ak','az','ar','ca','co','ct','de','fl','ga',
+  'hi','id','il','in','ia','ks','ky','la','me','md',
+  'ma','mi','mn','ms','mo','mt','ne','nv','nh','nj',
+  'nm','ny','nc','nd','oh','ok','or','pa','ri','sc',
+  'sd','tn','tx','ut','vt','va','wa','wv','wi','wy',
+];
 
-  const query = `[out:json][timeout:180];
-(
-  nwr["brand"~"${brandRegex}",i]${US_BBOX};
-  nwr["name"~"${brandRegex}",i]${US_BBOX};
-);
-out center;`;
-
-  for (let attempt = 0; attempt <= 2; attempt++) {
-    try {
-      const res = await fetch(OVERPASS_URL, {
-        method: 'POST',
-        headers: { ...BROWSER_HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `data=${encodeURIComponent(query)}`,
-        signal: AbortSignal.timeout(120000),
-      });
-
-      if (!res.ok) {
-        const errorBody = await res.text().catch(() => '[unreadable]');
-        console.error(`[${label}] Overpass HTTP ${res.status}`);
-        console.error(`[${label}] Response (first 500 chars): ${errorBody.substring(0, 500)}`);
-        if (errorBody.includes('cloudflare') || errorBody.includes('cf-') || errorBody.includes('challenge-platform')) {
-          console.error(`[${label}] WAF/Cloudflare block detected!`);
-        }
-        if (res.status === 429 || res.status === 504) {
-          const wait = (attempt + 1) * 15000;
-          console.warn(`[${label}] Retrying in ${wait / 1000}s...`);
-          await new Promise(r => setTimeout(r, wait));
-          continue;
-        }
-        if (attempt < 2) {
-          await new Promise(r => setTimeout(r, (attempt + 1) * 10000));
-          continue;
-        }
-        return [];
-      }
-
-      // Validate content type
-      const ct = res.headers.get('content-type') || '';
-      if (!ct.includes('json')) {
-        const text = await res.text().catch(() => '');
-        console.error(`[${label}] Overpass returned non-JSON content-type: ${ct}`);
-        console.error(`[${label}] Body (first 500 chars): ${text.substring(0, 500)}`);
-        if (attempt < 2) {
-          await new Promise(r => setTimeout(r, (attempt + 1) * 15000));
-          continue;
-        }
-        return [];
-      }
-
-      let data;
-      try {
-        data = await res.json();
-      } catch (parseErr) {
-        console.error(`[${label}] JSON parse failed: ${parseErr instanceof Error ? parseErr.message : parseErr}`);
-        return [];
-      }
-
-      const elements = data?.elements || [];
-      const stops: StopRecord[] = [];
-      const seen = new Set<string>();
-
-      for (const el of elements) {
-        const tags = el.tags;
-        if (!tags) continue;
-        const lat = el.lat ?? el.center?.lat;
-        const lon = el.lon ?? el.center?.lon;
-        if (!lat || !lon) continue;
-
-        const brand = classifyBrand(tags, label);
-        if (!brand) continue;
-
-        const city = tags['addr:city'] || '';
-        const state = (tags['addr:state'] || '').toUpperCase().slice(0, 2);
-        let storeNum = tags.ref || (city && state ? `${brand}-${city}-${state}` : `${brand}-${el.type}-${el.id}`);
-
-        const key = `${brand}-${storeNum}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        stops.push({
-          brand,
-          store_number: storeNum,
-          name: tags.name || `${brand} Travel Center`,
-          address: tags['addr:street'] || '',
-          city,
-          state,
-          latitude: lat,
-          longitude: lon,
-          amenities: ['Diesel', 'Parking'],
-        });
-      }
-
-      // Proximity dedup
-      stops.sort((a, b) => a.brand.localeCompare(b.brand) || a.latitude - b.latitude);
-      const deduped: StopRecord[] = [];
-      for (const stop of stops) {
-        const prev = deduped[deduped.length - 1];
-        if (prev && prev.brand === stop.brand &&
-            Math.abs(prev.latitude - stop.latitude) < 0.01 &&
-            Math.abs(prev.longitude - stop.longitude) < 0.01) continue;
-        deduped.push(stop);
-      }
-
-      console.log(`[${label}] Overpass: ${elements.length} elements → ${deduped.length} locations`);
-      return deduped;
-
-    } catch (err) {
-      console.error(`[${label}] Overpass attempt ${attempt} error:`, err instanceof Error ? err.message : err);
-      if (attempt < 2) {
-        await new Promise(r => setTimeout(r, (attempt + 1) * 10000));
-      }
-    }
-  }
-
-  console.error(`[${label}] All Overpass attempts failed`);
-  return [];
-}
-
-function classifyBrand(tags: Record<string, string>, context: string): string | null {
-  const combined = `${tags.brand || ''} ${tags.name || ''} ${tags.operator || ''}`.toLowerCase();
-  if (context.includes("Love")) {
-    if (combined.includes("love's") || combined.includes('loves')) return "Love's";
-    return null;
-  }
-  if (context.includes("Pilot")) {
-    if (combined.includes('flying j')) return 'Flying J';
-    if (combined.includes('pilot')) return 'Pilot';
-    return null;
-  }
-  return null;
-}
-
-// ─── Love's ──────────────────────────────────────────────────────────
-async function fetchLovesLocations(): Promise<StopRecord[]> {
-  return fetchFromOverpass("Love's|Loves", "Love's");
-}
-
-// ─── Pilot / Flying J ────────────────────────────────────────────────
-async function fetchPilotFlyingJLocations(): Promise<StopRecord[]> {
-  return fetchFromOverpass("Pilot|Flying J", "Pilot/FJ");
-}
-
-// ─── TA / Petro (Corporate HTML Directory + Static Geocoding) ────────
-const US_STATES: Record<string, string> = {
+const US_STATES_NAME_TO_CODE: Record<string, string> = {
   'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
   'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA',
   'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA',
@@ -413,23 +291,179 @@ const US_STATES: Record<string, string> = {
   'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC',
 };
 
-async function fetchTAPetroLocations(): Promise<StopRecord[]> {
+// ─── Love's Corporate Locator ────────────────────────────────────────
+async function fetchLoves(): Promise<StopRecord[]> {
+  console.log("[Love's] Fetching from Sitecore locator API...");
+  const stops: StopRecord[] = [];
+
+  try {
+    const res = await fetch('https://www.loves.com/api/sitecore/StoreLocator/GetNearbyStores', {
+      method: 'POST',
+      headers: {
+        ...BROWSER_HEADERS,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Referer': 'https://www.loves.com/en/location-and-fuel-price-search',
+        'Origin': 'https://www.loves.com',
+      },
+      body: 'latitude=39.8283&longitude=-98.5795&radius=5000&brandId=1',
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '[unreadable]');
+      console.error(`[Love's] HTTP ${res.status} from StoreLocator`);
+      console.error(`[Love's] Body (500 chars): ${body.substring(0, 500)}`);
+      return stops;
+    }
+
+    const data = await res.json();
+    const locations = Array.isArray(data) ? data : (data?.Stores || data?.stores || data?.locations || data?.results || []);
+
+    for (const loc of locations) {
+      const lat = loc.Latitude ?? loc.latitude ?? loc.lat ?? 0;
+      const lng = loc.Longitude ?? loc.longitude ?? loc.lng ?? loc.lon ?? 0;
+      const storeNum = String(loc.StoreNumber ?? loc.storeNumber ?? loc.store_number ?? loc.id ?? '');
+      const name = loc.Name ?? loc.name ?? loc.StoreName ?? `Love's #${storeNum}`;
+      const city = loc.City ?? loc.city ?? '';
+      const state = loc.State ?? loc.state ?? '';
+      const address = loc.Address1 ?? loc.address ?? loc.Address ?? '';
+
+      if (!storeNum || lat === 0 || lng === 0) continue;
+
+      stops.push({
+        brand: "Love's",
+        store_number: storeNum,
+        name: String(name),
+        address: String(address),
+        city: String(city),
+        state: String(state).toUpperCase().slice(0, 2),
+        latitude: Number(lat),
+        longitude: Number(lng),
+        amenities: ['Diesel', 'Parking'],
+      });
+    }
+
+    console.log(`[Love's] Parsed ${stops.length} locations from API`);
+  } catch (err) {
+    console.error("[Love's] Error:", err instanceof Error ? err.message : err);
+  }
+
+  return stops;
+}
+
+// ─── Pilot / Flying J (State Directory Pages with JSON-LD) ───────────
+async function fetchPilot(): Promise<StopRecord[]> {
+  console.log("[Pilot/FJ] Fetching from state directory pages...");
+  const stops: StopRecord[] = [];
+  const seen = new Set<string>();
+  let statesProcessed = 0;
+
+  for (const stateCode of US_STATE_CODES) {
+    try {
+      const url = `https://locations.pilotflyingj.com/us/${stateCode}`;
+      const res = await fetch(url, {
+        headers: {
+          ...BROWSER_HEADERS,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Referer': 'https://locations.pilotflyingj.com/',
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!res.ok) {
+        const body = await res.text().catch(() => '[unreadable]');
+        console.error(`[Pilot/FJ] HTTP ${res.status} from ${url}`);
+        console.error(`[Pilot/FJ] Body (500 chars): ${body.substring(0, 500)}`);
+        continue;
+      }
+
+      const html = await res.text();
+
+      // Extract JSON-LD blocks
+      const jsonLdRegex = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+      let match;
+      while ((match = jsonLdRegex.exec(html)) !== null) {
+        try {
+          const jsonData = JSON.parse(match[1]);
+          const items = Array.isArray(jsonData) ? jsonData : [jsonData];
+
+          for (const item of items) {
+            // Handle @graph arrays
+            const locations = item['@graph'] ? item['@graph'] : [item];
+            for (const loc of locations) {
+              if (!loc.geo && !loc.latitude) continue;
+
+              const lat = Number(loc.geo?.latitude ?? loc.latitude ?? 0);
+              const lng = Number(loc.geo?.longitude ?? loc.longitude ?? 0);
+              if (lat === 0 || lng === 0) continue;
+
+              const name = loc.name || '';
+              // Classify brand from name
+              let brand = 'Pilot';
+              const nameLower = name.toLowerCase();
+              if (nameLower.includes('flying j')) brand = 'Flying J';
+              else if (nameLower.includes('one9')) brand = 'One9';
+
+              // Extract store number from name pattern like "Pilot Travel Center #180"
+              const numMatch = name.match(/#(\d+)/);
+              const storeNum = numMatch ? numMatch[1] : `${brand}-${stateCode.toUpperCase()}-${lat.toFixed(3)}`;
+
+              const key = `${brand}-${storeNum}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+
+              const addr = loc.address || {};
+              stops.push({
+                brand,
+                store_number: storeNum,
+                name: String(name),
+                address: String(addr.streetAddress || ''),
+                city: String(addr.addressLocality || ''),
+                state: String(addr.addressRegion || stateCode).toUpperCase().slice(0, 2),
+                latitude: lat,
+                longitude: lng,
+                amenities: ['Diesel', 'Parking'],
+              });
+            }
+          }
+        } catch {
+          // JSON parse error for this block, skip
+        }
+      }
+
+      statesProcessed++;
+      // Be respectful - 500ms delay between state fetches
+      if (statesProcessed < US_STATE_CODES.length) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+    } catch (err) {
+      console.error(`[Pilot/FJ] Error for state ${stateCode}:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  console.log(`[Pilot/FJ] Processed ${statesProcessed}/${US_STATE_CODES.length} states, found ${stops.length} locations`);
+  return stops;
+}
+
+// ─── TA / Petro (Corporate HTML Directory + Static Geocoding) ────────
+async function fetchTA(): Promise<StopRecord[]> {
   console.log("[TA/Petro] Fetching from corporate directory...");
   const stops: StopRecord[] = [];
 
   try {
     const res = await fetch('https://www.ta-petro.com/location/all-locations/', {
-      headers: { ...BROWSER_HEADERS, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+      headers: {
+        ...BROWSER_HEADERS,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Referer': 'https://www.ta-petro.com/',
+      },
       signal: AbortSignal.timeout(30000),
     });
 
     if (!res.ok) {
-      const errorBody = await res.text().catch(() => '[unreadable]');
+      const body = await res.text().catch(() => '[unreadable]');
       console.error(`[TA/Petro] HTTP ${res.status}`);
-      console.error(`[TA/Petro] Response (first 500 chars): ${errorBody.substring(0, 500)}`);
-      if (errorBody.includes('cloudflare') || errorBody.includes('cf-')) {
-        console.error(`[TA/Petro] WAF/Cloudflare block detected!`);
-      }
+      console.error(`[TA/Petro] Body (500 chars): ${body.substring(0, 500)}`);
       return stops;
     }
 
@@ -439,7 +473,7 @@ async function fetchTAPetroLocations(): Promise<StopRecord[]> {
 
     const lines = html.split('\n');
     for (const line of lines) {
-      for (const [stateName, stateCode] of Object.entries(US_STATES)) {
+      for (const [stateName, stateCode] of Object.entries(US_STATES_NAME_TO_CODE)) {
         if (line.includes(`>${stateName}<`) || line.includes(`##### ${stateName}`)) {
           currentState = stateCode;
           break;
@@ -457,7 +491,6 @@ async function fetchTAPetroLocations(): Promise<StopRecord[]> {
         const urlState = urlMatch ? urlMatch[1].toUpperCase() : '';
         const finalState = urlState || currentState;
 
-        // Clean city name for lookup
         const cleanCity = cityName
           .replace(/^N\.\s*/, 'North ')
           .replace(/^S\.\s*/, 'South ')
@@ -468,7 +501,6 @@ async function fetchTAPetroLocations(): Promise<StopRecord[]> {
           .replace(/^St\.\s*/, 'Saint ')
           .replace(/\s*\(\d+\)$/, '');
 
-        // Static coordinate lookup (instant, no API calls)
         const coordKey = `${cleanCity}|${finalState}`;
         const coords = CITY_COORDS[coordKey];
 
@@ -493,7 +525,6 @@ async function fetchTAPetroLocations(): Promise<StopRecord[]> {
       const missingCities = [...new Set(withoutCoords.map(s => `${s.city}|${s.state}`))];
       console.log(`[TA/Petro] Missing cities (first 20): ${missingCities.slice(0, 20).join(', ')}`);
     }
-
   } catch (err) {
     console.error('[TA/Petro] Error:', err instanceof Error ? err.message : err);
   }
@@ -530,12 +561,25 @@ Deno.serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log('Starting truck stop data aggregation...');
+    console.log('Starting corporate-only truck stop sync...');
 
+    // Delete all existing data first (fresh start)
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { error: deleteError } = await supabase
+      .from('official_truck_stops')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // delete all rows
+    if (deleteError) {
+      console.warn('Delete existing rows warning:', deleteError.message);
+    } else {
+      console.log('Cleared existing truck stop data');
+    }
+
+    // Execute all three corporate fetchers concurrently
     const results = await Promise.allSettled([
-      fetchLovesLocations(),
-      fetchPilotFlyingJLocations(),
-      fetchTAPetroLocations(),
+      fetchLoves(),
+      fetchPilot(),
+      fetchTA(),
     ]);
 
     const brandLabels = ["Love's", "Pilot/Flying J", "TA/Petro"];
@@ -547,7 +591,7 @@ Deno.serve(async (req) => {
       if (result.status === 'fulfilled') {
         brandCounts[brandLabels[i]] = result.value.length;
         allStops = allStops.concat(result.value);
-        console.log(`${brandLabels[i]}: ${result.value.length} locations`);
+        console.log(`${brandLabels[i]}: ${result.value.length} locations fetched`);
       } else {
         brandCounts[brandLabels[i]] = 0;
         console.error(`${brandLabels[i]} FAILED:`, result.reason);
@@ -556,12 +600,10 @@ Deno.serve(async (req) => {
 
     // Filter stops missing coordinates
     const validStops = allStops.filter(s => s.latitude !== 0 && s.longitude !== 0);
-    console.log(`Total: ${allStops.length} fetched, ${validStops.length} with coordinates`);
+    console.log(`Total: ${allStops.length} fetched, ${validStops.length} with valid coordinates`);
 
     // Batch upsert
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     let upserted = 0;
-
     for (let i = 0; i < validStops.length; i += 200) {
       const batch = validStops.slice(i, i + 200).map(s => ({
         ...s,
