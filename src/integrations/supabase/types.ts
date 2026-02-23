@@ -2703,51 +2703,6 @@ export type Database = {
         }
         Relationships: []
       }
-      official_truck_stops: {
-        Row: {
-          address: string | null
-          amenities: string[] | null
-          brand: string
-          city: string | null
-          created_at: string
-          id: string
-          latitude: number
-          longitude: number
-          name: string
-          state: string
-          store_number: string
-          updated_at: string
-        }
-        Insert: {
-          address?: string | null
-          amenities?: string[] | null
-          brand: string
-          city?: string | null
-          created_at?: string
-          id?: string
-          latitude: number
-          longitude: number
-          name: string
-          state: string
-          store_number: string
-          updated_at?: string
-        }
-        Update: {
-          address?: string | null
-          amenities?: string[] | null
-          brand?: string
-          city?: string | null
-          created_at?: string
-          id?: string
-          latitude?: number
-          longitude?: number
-          name?: string
-          state?: string
-          store_number?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       org_storage_config: {
         Row: {
           connected_at: string | null
@@ -3902,14 +3857,6 @@ export type Database = {
         Returns: string
       }
       super_admin_reset_demo: { Args: never; Returns: undefined }
-      super_admin_storage_stats: {
-        Args: never
-        Returns: {
-          bucket_id: string
-          file_count: number
-          total_bytes: number
-        }[]
-      }
       super_admin_update_org: {
         Args: {
           new_complimentary_ends_at?: string
@@ -3920,14 +3867,6 @@ export type Database = {
           target_org_id: string
         }
         Returns: undefined
-      }
-      truck_stop_brand_counts: {
-        Args: never
-        Returns: {
-          brand: string
-          latest_sync: string
-          stop_count: number
-        }[]
       }
     }
     Enums: {

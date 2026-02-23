@@ -29,7 +29,6 @@ const LCAPP_PARTNERS: Record<string, { minDiscount: number; maxDiscount: number;
   "Buc-ee's": { minDiscount: 0.03, maxDiscount: 0.10, amenities: ['Parking', 'DEF', 'Food'] },
 };
 
-// Brand → LCAPP key mapping
 const BRAND_TO_LCAPP: Record<string, string> = {
   'pilot': 'Pilot/Flying J',
   'flying j': 'Pilot/Flying J',
@@ -164,24 +163,6 @@ function distanceToRouteSegment(
   return (2 * area) / dRoute;
 }
 
-function distanceToMultiSegmentRoute(
-  pointLat: number, pointLng: number,
-  originLat: number, originLng: number,
-  destLat: number, destLng: number,
-  waypoints?: Array<{ lat: number; lng: number }>
-): number {
-  if (!waypoints || waypoints.length === 0) {
-    return distanceToRouteSegment(pointLat, pointLng, originLat, originLng, destLat, destLng);
-  }
-  const points = [{ lat: originLat, lng: originLng }, ...waypoints, { lat: destLat, lng: destLng }];
-  let minDist = Infinity;
-  for (let i = 0; i < points.length - 1; i++) {
-    const d = distanceToRouteSegment(pointLat, pointLng, points[i].lat, points[i].lng, points[i + 1].lat, points[i + 1].lng);
-    if (d < minDist) minDist = d;
-  }
-  return minDist;
-}
-
 function distanceToPolyline(pointLat: number, pointLng: number, polyline: Array<[number, number]>): number {
   if (polyline.length < 2) {
     return polyline.length === 1 ? haversineDistance(pointLat, pointLng, polyline[0][0], polyline[0][1]) : Infinity;
@@ -194,19 +175,6 @@ function distanceToPolyline(pointLat: number, pointLng: number, polyline: Array<
     if (d < minDist) minDist = d;
   }
   return minDist;
-}
-
-function distanceFromRoute(
-  pointLat: number, pointLng: number,
-  originLat: number, originLng: number,
-  destLat: number, destLng: number,
-  waypoints?: Array<{ lat: number; lng: number }>,
-  routePolyline?: Array<[number, number]>
-): number {
-  if (routePolyline && routePolyline.length >= 2) {
-    return distanceToPolyline(pointLat, pointLng, routePolyline);
-  }
-  return distanceToMultiSegmentRoute(pointLat, pointLng, originLat, originLng, destLat, destLng, waypoints);
 }
 
 function sampleRoutePoints(polyline: Array<[number, number]>, intervalMiles: number): Array<[number, number]> {
@@ -224,81 +192,6 @@ function sampleRoutePoints(polyline: Array<[number, number]>, intervalMiles: num
   const last = polyline[polyline.length - 1];
   if (sampled[sampled.length - 1] !== last) sampled.push(last);
   return sampled;
-}
-
-// ===== Query official_truck_stops table =====
-async function queryOfficialStops(
-  supabase: any,
-  allLats: number[],
-  allLngs: number[],
-  corridorMiles: number
-): Promise<any[]> {
-  const bufferDeg = corridorMiles / 69;
-  const minLat = Math.min(...allLats) - bufferDeg;
-  const maxLat = Math.max(...allLats) + bufferDeg;
-  const minLng = Math.min(...allLngs) - (corridorMiles / 54);
-  const maxLng = Math.max(...allLngs) + (corridorMiles / 54);
-
-  const { data, error } = await supabase
-    .from('official_truck_stops')
-    .select('*')
-    .gte('latitude', minLat)
-    .lte('latitude', maxLat)
-    .gte('longitude', minLng)
-    .lte('longitude', maxLng)
-    .limit(500);
-
-  if (error) {
-    console.warn('official_truck_stops query error:', error.message);
-    return [];
-  }
-
-  return data || [];
-}
-
-// Generate interpolated truck stops along polyline to fill gaps
-function generateInterpolatedStops(
-  polyline: Array<[number, number]>,
-  dieselPrices: Record<string, number>,
-  now: string,
-  originLat: number,
-  originLng: number,
-  destLat: number,
-  destLng: number
-): any[] {
-  const sampled = sampleRoutePoints(polyline, 50);
-  const stops: any[] = [];
-  for (let i = 0; i < sampled.length; i++) {
-    const [lat, lng] = sampled[i];
-    const distToOrigin = haversineDistance(lat, lng, originLat, originLng);
-    const distToDest = haversineDistance(lat, lng, destLat, destLng);
-    if (distToOrigin < 20 || distToDest < 20) continue;
-    const state = lookupStateFromCoords(lat, lng);
-    const statePrice = dieselPrices[state] || FALLBACK_DIESEL_PRICES[state] || 3.55;
-    const iftaCredit = STATE_DIESEL_TAX[state] ?? 0;
-    stops.push({
-      name: `Truck Stop - Mile ${Math.round(distToOrigin)}`,
-      chain: null,
-      brand: null,
-      store_number: null,
-      address: null,
-      latitude: lat,
-      longitude: lng,
-      state,
-      city: `${state} Corridor`,
-      diesel_price: statePrice,
-      lcapp_discount: null,
-      net_price: statePrice,
-      ifta_tax_credit: iftaCredit,
-      amenities: ['Diesel', 'Parking', 'Restrooms'],
-      source: 'interpolated',
-      fetched_at: now,
-      distance_from_route: 0,
-      distance_from_origin: distToOrigin,
-    });
-  }
-  console.log(`Generated ${stops.length} interpolated stops`);
-  return stops;
 }
 
 function computeProjectedSavings(
@@ -393,6 +286,61 @@ async function fetchEIADieselPrices(): Promise<Record<string, number>> {
   }
 }
 
+// ===== Generate Estimated Fallback Stops Along Route =====
+const GENERIC_CHAINS = Object.keys(LCAPP_PARTNERS);
+
+function generateEstimatedStops(
+  polyline: Array<[number, number]>,
+  dieselPrices: Record<string, number>,
+  now: string,
+  originLat: number, originLng: number,
+  destLat: number, destLng: number
+): any[] {
+  const sampled = sampleRoutePoints(polyline, 75);
+  const stops: any[] = [];
+  let chainIdx = 0;
+
+  for (let i = 0; i < sampled.length; i++) {
+    const [lat, lng] = sampled[i];
+    const distToOrigin = haversineDistance(lat, lng, originLat, originLng);
+    const distToDest = haversineDistance(lat, lng, destLat, destLng);
+    // Skip points near origin/destination
+    if (distToOrigin < 20 || distToDest < 20) continue;
+
+    const state = lookupStateFromCoords(lat, lng);
+    const statePrice = dieselPrices[state] || FALLBACK_DIESEL_PRICES[state] || 3.55;
+    const iftaCredit = STATE_DIESEL_TAX[state] ?? 0;
+    const chainName = GENERIC_CHAINS[chainIdx % GENERIC_CHAINS.length];
+    const partner = LCAPP_PARTNERS[chainName];
+    const estimatedDiscount = 0.40;
+
+    stops.push({
+      name: `Travel Center - Mile ${Math.round(distToOrigin)}`,
+      chain: chainName,
+      brand: null,
+      store_number: null,
+      address: null,
+      latitude: lat,
+      longitude: lng,
+      state,
+      city: `${state} Corridor`,
+      diesel_price: statePrice,
+      lcapp_discount: estimatedDiscount,
+      net_price: parseFloat((statePrice - estimatedDiscount).toFixed(2)),
+      ifta_tax_credit: iftaCredit,
+      amenities: partner?.amenities || ['Diesel', 'Parking', 'Restrooms'],
+      source: 'estimated',
+      stop_type: 'estimated',
+      fetched_at: now,
+      distance_from_route: 0,
+      distance_from_origin: distToOrigin,
+    });
+    chainIdx++;
+  }
+  console.log(`Generated ${stops.length} estimated fallback stops along route`);
+  return stops;
+}
+
 // ===== Main Handler =====
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -470,7 +418,9 @@ Deno.serve(async (req) => {
           .map(stop => ({
             ...stop,
             ifta_tax_credit: STATE_DIESEL_TAX[stop.state?.toUpperCase()] ?? 0,
-            distance_from_route: distanceFromRoute(stop.latitude, stop.longitude, origin_lat, origin_lng, dest_lat, dest_lng, waypoints, route_polyline),
+            distance_from_route: route_polyline?.length >= 2
+              ? distanceToPolyline(stop.latitude, stop.longitude, route_polyline)
+              : haversineDistance(stop.latitude, stop.longitude, origin_lat, origin_lng),
             distance_from_origin: haversineDistance(origin_lat, origin_lng, stop.latitude, stop.longitude),
           }))
           .filter(stop => stop.distance_from_route <= corridor_miles)
@@ -479,7 +429,7 @@ Deno.serve(async (req) => {
         if (filtered.length > 0) {
           console.log(`Cache hit: ${filtered.length} stops within corridor`);
           return new Response(JSON.stringify({
-            fuel_stops: filtered, source: 'cache',
+            fuel_stops: filtered, source: filtered[0]?.source || 'cache',
             fetched_at: cachedStops[0]?.fetched_at,
             projected_savings: computeProjectedSavings(filtered, estimatedGallons),
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -487,107 +437,140 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ===== STEP 2: Query official_truck_stops table =====
-    const officialStops = await queryOfficialStops(supabase, allLats, allLngs, corridor_miles);
-    console.log(`Official truck stops: ${officialStops.length} in bounding box`);
-
-    // ===== STEP 3: Attempt Landstar scrape for LCAPP pricing =====
-    let landstarData: any[] | null = null;
+    // ===== STEP 2: Check Landstar credentials =====
     const { data: driverSettings } = await supabase
       .from('driver_settings')
       .select('landstar_username, landstar_password')
       .eq('driver_id', driver_id)
       .maybeSingle();
 
-    if (driverSettings?.landstar_username && driverSettings?.landstar_password) {
-      try {
-        const decryptedPassword = await decryptPassword(driverSettings.landstar_password);
-        landstarData = await attemptLandstarScrape(driverSettings.landstar_username, decryptedPassword);
-      } catch (e) {
-        console.warn('Landstar decrypt/scrape failed:', e);
-      }
-    }
+    const hasLandstarAuth = !!(driverSettings?.landstar_username && driverSettings?.landstar_password);
 
-    // ===== STEP 4: Fetch EIA diesel prices =====
+    // ===== STEP 3: Fetch EIA diesel prices =====
     const dieselPrices = await fetchEIADieselPrices();
 
-    // ===== STEP 5: Enrich official stops with pricing =====
-    const enrichedStops = officialStops.map((stop: any) => {
-      const state = (stop.state || '').toUpperCase();
-      const statePrice = dieselPrices[state] || FALLBACK_DIESEL_PRICES[state] || 3.55;
-      const iftaCredit = STATE_DIESEL_TAX[state] ?? 0;
+    let filteredStops: any[] = [];
+    let source = 'estimated';
 
-      // Check if this stop matches an LCAPP partner
-      const lcappKey = matchLCAPP(stop.name, stop.brand);
-      const partner = lcappKey ? LCAPP_PARTNERS[lcappKey] : null;
-      const avgDiscount = partner ? parseFloat(((partner.minDiscount + partner.maxDiscount) / 2).toFixed(2)) : 0;
-      const netPrice = parseFloat((statePrice - avgDiscount).toFixed(2));
+    // ===== MODE A: Landstar Auth — scrape real LCAPP data =====
+    if (hasLandstarAuth) {
+      console.log('Mode A: Landstar credentials found, attempting scrape...');
+      try {
+        const decryptedPassword = await decryptPassword(driverSettings!.landstar_password!);
+        const landstarData = await attemptLandstarScrape(driverSettings!.landstar_username!, decryptedPassword);
 
-      // Check if Landstar has a specific price for this stop
-      let landstarPrice: number | null = null;
-      let landstarDiscount: number | null = null;
-      if (landstarData) {
-        const match = landstarData.find((ls: any) =>
-          haversineDistance(stop.latitude, stop.longitude, parseFloat(ls.lat || ls.latitude), parseFloat(ls.lng || ls.longitude)) < 1
-        );
-        if (match) {
-          landstarPrice = parseFloat(match.diesel_price || match.price || 0);
-          landstarDiscount = parseFloat(match.lcapp_discount || match.discount || 0);
+        if (landstarData && landstarData.length > 0) {
+          console.log(`Landstar returned ${landstarData.length} stops, filtering to route corridor...`);
+
+          // Sample route every 50mi and match Landstar stops within 20mi of any sample point
+          const routePoly = route_polyline && route_polyline.length >= 2 ? route_polyline : null;
+          const samplePoints = routePoly
+            ? sampleRoutePoints(routePoly, 50)
+            : [[origin_lat, origin_lng], [dest_lat, dest_lng]] as Array<[number, number]>;
+
+          const matchedStops: any[] = [];
+          const seen = new Set<string>();
+
+          for (const ls of landstarData) {
+            const lat = parseFloat(ls.lat || ls.latitude || 0);
+            const lng = parseFloat(ls.lng || ls.longitude || 0);
+            if (!lat || !lng) continue;
+
+            // Check if within 20mi of any sample point
+            const nearRoute = samplePoints.some(([sLat, sLng]) => haversineDistance(lat, lng, sLat, sLng) <= 20);
+            if (!nearRoute) continue;
+
+            const key = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            const state = lookupStateFromCoords(lat, lng);
+            const statePrice = dieselPrices[state] || FALLBACK_DIESEL_PRICES[state] || 3.55;
+            const iftaCredit = STATE_DIESEL_TAX[state] ?? 0;
+            const lcappKey = matchLCAPP(ls.name || '', ls.brand || '');
+            const partner = lcappKey ? LCAPP_PARTNERS[lcappKey] : null;
+            const discount = parseFloat(ls.lcapp_discount || ls.discount || 0) ||
+              (partner ? parseFloat(((partner.minDiscount + partner.maxDiscount) / 2).toFixed(2)) : 0);
+            const dieselPrice = parseFloat(ls.diesel_price || ls.price || 0) || statePrice;
+
+            matchedStops.push({
+              name: ls.name || `${lcappKey || 'Truck Stop'}`,
+              chain: lcappKey || ls.brand || null,
+              brand: ls.brand || null,
+              store_number: ls.store_number || null,
+              address: ls.address || null,
+              latitude: lat,
+              longitude: lng,
+              state,
+              city: ls.city || `${state} Corridor`,
+              diesel_price: dieselPrice,
+              lcapp_discount: discount > 0 ? discount : null,
+              net_price: parseFloat((dieselPrice - discount).toFixed(2)),
+              ifta_tax_credit: iftaCredit,
+              amenities: partner?.amenities || ['Diesel', 'Parking'],
+              source: 'landstar',
+              stop_type: 'landstar',
+              fetched_at: now,
+              distance_from_route: routePoly ? distanceToPolyline(lat, lng, routePoly) : 0,
+              distance_from_origin: haversineDistance(origin_lat, origin_lng, lat, lng),
+            });
+          }
+
+          if (matchedStops.length > 0) {
+            filteredStops = matchedStops.sort((a, b) => a.distance_from_origin - b.distance_from_origin);
+            source = 'landstar';
+            console.log(`Mode A success: ${filteredStops.length} Landstar stops along route`);
+          }
         }
+      } catch (e) {
+        console.warn('Landstar scrape failed, falling back to estimated:', e);
       }
-
-      return {
-        name: stop.name,
-        brand: stop.brand,
-        store_number: stop.store_number,
-        address: stop.address,
-        chain: lcappKey || stop.brand || null,
-        latitude: stop.latitude,
-        longitude: stop.longitude,
-        state,
-        city: stop.city,
-        diesel_price: landstarPrice || statePrice,
-        lcapp_discount: landstarDiscount || (avgDiscount > 0 ? avgDiscount : null),
-        net_price: landstarPrice ? (landstarPrice - (landstarDiscount || 0)) : netPrice,
-        ifta_tax_credit: iftaCredit,
-        amenities: partner?.amenities || stop.amenities || ['Diesel', 'Parking'],
-        source: landstarPrice ? 'landstar' : 'official',
-        fetched_at: stop.updated_at || now,
-        distance_from_route: distanceFromRoute(
-          stop.latitude, stop.longitude,
-          origin_lat, origin_lng, dest_lat, dest_lng,
-          waypoints, route_polyline
-        ),
-        distance_from_origin: haversineDistance(origin_lat, origin_lng, stop.latitude, stop.longitude),
-      };
-    });
-
-    // ===== STEP 6: Filter within corridor =====
-    let filteredStops = enrichedStops
-      .filter((stop: any) => stop.distance_from_route <= corridor_miles)
-      .sort((a: any, b: any) => (a.distance_from_origin || 0) - (b.distance_from_origin || 0));
-
-    console.log(`Filtered to ${filteredStops.length} stops within ${corridor_miles}mi corridor (from ${enrichedStops.length} enriched)`);
-
-    // ===== STEP 7: Density-based interpolated fallback =====
-    const minExpectedStops = Math.max(3, Math.floor(tripMiles / 100));
-    let source = landstarData ? 'landstar' : 'official';
-    if (filteredStops.length < minExpectedStops && route_polyline && route_polyline.length >= 2) {
-      console.log(`Sparse: ${filteredStops.length}/${minExpectedStops}. Adding interpolated stops...`);
-      const interpolated = generateInterpolatedStops(route_polyline, dieselPrices, now, origin_lat, origin_lng, dest_lat, dest_lng);
-      const dedupedInterpolated = interpolated.filter(iStop =>
-        !filteredStops.some((rStop: any) =>
-          haversineDistance(iStop.latitude, iStop.longitude, rStop.latitude, rStop.longitude) < 15
-        )
-      );
-      filteredStops = [...filteredStops, ...dedupedInterpolated]
-        .sort((a: any, b: any) => (a.distance_from_origin || 0) - (b.distance_from_origin || 0));
-      if (filteredStops.length === 0) source = 'interpolated';
     }
 
-    // ===== STEP 8: Cache results =====
+    // ===== MODE B: Fallback — generate estimated stops along polyline =====
+    if (filteredStops.length === 0) {
+      console.log('Mode B: No Landstar data, generating estimated stops along route...');
+      const routePoly = route_polyline && route_polyline.length >= 2 ? route_polyline : null;
+
+      if (routePoly) {
+        filteredStops = generateEstimatedStops(routePoly, dieselPrices, now, origin_lat, origin_lng, dest_lat, dest_lng);
+      } else {
+        // No polyline — generate stops along straight line
+        const numStops = Math.max(2, Math.floor(tripMiles / 75));
+        for (let i = 1; i <= numStops; i++) {
+          const frac = i / (numStops + 1);
+          const lat = origin_lat + frac * (dest_lat - origin_lat);
+          const lng = origin_lng + frac * (dest_lng - origin_lng);
+          const state = lookupStateFromCoords(lat, lng);
+          const statePrice = dieselPrices[state] || FALLBACK_DIESEL_PRICES[state] || 3.55;
+          const iftaCredit = STATE_DIESEL_TAX[state] ?? 0;
+          const chainName = GENERIC_CHAINS[i % GENERIC_CHAINS.length];
+          const estimatedDiscount = 0.40;
+
+          filteredStops.push({
+            name: `Travel Center - Mile ${Math.round(frac * tripMiles)}`,
+            chain: chainName,
+            brand: null, store_number: null, address: null,
+            latitude: lat, longitude: lng,
+            state, city: `${state} Corridor`,
+            diesel_price: statePrice,
+            lcapp_discount: estimatedDiscount,
+            net_price: parseFloat((statePrice - estimatedDiscount).toFixed(2)),
+            ifta_tax_credit: iftaCredit,
+            amenities: LCAPP_PARTNERS[chainName]?.amenities || ['Diesel', 'Parking'],
+            source: 'estimated', stop_type: 'estimated',
+            fetched_at: now,
+            distance_from_route: 0,
+            distance_from_origin: frac * tripMiles,
+          });
+        }
+      }
+      source = 'estimated';
+    }
+
+    // ===== STEP 6: Cache results =====
     if (filteredStops.length > 0) {
-      const cacheStops = filteredStops.map(({ ifta_tax_credit, distance_from_route, distance_from_origin, ...rest }: any) => rest);
+      const cacheStops = filteredStops.map(({ ifta_tax_credit, distance_from_route, distance_from_origin, stop_type, ...rest }: any) => rest);
       const bufDeg2 = 2;
       await supabase.from('fuel_stops_cache').delete()
         .gte('latitude', Math.min(...allLats) - bufDeg2)
@@ -605,7 +588,6 @@ Deno.serve(async (req) => {
       fuel_stops: filteredStops,
       source,
       fetched_at: now,
-      total_available: officialStops.length,
       filtered_count: filteredStops.length,
       projected_savings,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

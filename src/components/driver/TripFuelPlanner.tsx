@@ -32,6 +32,7 @@ interface FuelStop {
   net_price: number | null;
   amenities: string[] | null;
   source: string;
+  stop_type?: 'landstar' | 'estimated';
   fetched_at: string;
   distance_from_route?: number;
   distance_from_origin?: number;
@@ -142,25 +143,10 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
         booked_miles: bookedMiles,
       };
 
-      // Estimate route distance from polyline
-      let polylineDistance = 0;
-      if (routePolyline && routePolyline.length > 1) {
-        for (let i = 1; i < routePolyline.length; i++) {
-          const [lat1, lng1] = routePolyline[i - 1];
-          const [lat2, lng2] = routePolyline[i];
-          const R = 3959;
-          const dLat = (lat2 - lat1) * Math.PI / 180;
-          const dLng = (lng2 - lng1) * Math.PI / 180;
-          const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-          polylineDistance += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        }
-      }
-
       console.log('[FuelPlanner] Invoking landstar-fuel-stops with payload:', {
         origin: `${payload.origin_lat},${payload.origin_lng}`,
         dest: `${payload.dest_lat},${payload.dest_lng}`,
         polylinePoints: routePolyline?.length ?? 0,
-        estimatedRouteMiles: Math.round(polylineDistance),
         waypoints: payload.waypoints.length,
         corridor_miles: payload.corridor_miles,
       });
@@ -194,6 +180,8 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
   });
 
   const fuelStops = fuelData?.fuel_stops || [];
+  const isEstimated = fuelData?.source === 'estimated';
+  const isLandstar = fuelData?.source === 'landstar';
   const tripMiles = bookedMiles || 500;
   const estimatedGallons = parseFloat((tripMiles / DEFAULT_MPG).toFixed(1));
 
@@ -302,9 +290,14 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
               {intermediateStops.length} stops
             </Badge>
           )}
-          {fuelData?.source === 'landstar' && (
+          {isLandstar && (
             <Badge variant="outline" className="text-xs border-primary/50 text-primary ml-1">
               LCAPP Live
+            </Badge>
+          )}
+          {isEstimated && (
+            <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 ml-1">
+              Estimated Prices
             </Badge>
           )}
         </div>
@@ -331,11 +324,11 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded-full bg-primary inline-block" />
-            LCAPP Partner
+            {isLandstar ? 'LCAPP Partner' : 'Fuel Stop'}
           </span>
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded-full bg-accent inline-block" />
-            Other Stop
+            {isEstimated ? 'Estimated Stop' : 'Other Stop'}
           </span>
           {geocodedStops.length > 0 && (
             <span className="flex items-center gap-1">
@@ -346,7 +339,6 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
           <span className="ml-auto">{fuelStops.length} stops found</span>
         </div>
 
-        {/* Cost Estimate Summary */}
         {/* Projected Savings from backend */}
         {fuelData?.projected_savings && fuelData.projected_savings.total_savings > 0 && (
           <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 space-y-1">
@@ -363,6 +355,9 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
               Best stop at ${fuelData.projected_savings.cheapest_net.toFixed(2)}/gal vs ${fuelData.projected_savings.avg_price.toFixed(2)} national avg
               {' '}(${fuelData.projected_savings.savings_per_gallon.toFixed(2)}/gal × ~{estimatedGallons} gal)
             </p>
+            {isEstimated && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">Based on estimated regional pricing</p>
+            )}
           </div>
         )}
 
@@ -387,7 +382,7 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
               <div className="flex items-center justify-between text-primary">
                 <span className="text-sm flex items-center gap-1">
                   <TrendingDown className="h-3.5 w-3.5" />
-                  LCAPP savings
+                  {isLandstar ? 'LCAPP savings' : 'Est. discount savings'}
                 </span>
                 <span className="text-sm font-semibold">
                   ~${costEstimate.potentialLcappSavings.toFixed(0)} on this trip
@@ -435,55 +430,63 @@ export function TripFuelPlanner({ driverId, origin, destination, bookedMiles, no
 
             {expanded && (
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {fuelStops.map((stop, i) => (
-                  <div
-                    key={`${stop.name}-${i}`}
-                    className="flex items-center justify-between p-2 rounded-md bg-muted/30 text-sm"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`w-2 h-2 rounded-full shrink-0 ${
-                            stop.lcapp_discount ? 'bg-primary' : 'bg-accent'
-                          }`}
-                        />
-                        <span className="font-medium truncate">
-                          {stop.brand && stop.store_number
-                            ? `${stop.name} - Store #${stop.store_number}`
-                            : stop.name}
-                        </span>
-                      </div>
-                      <div className="flex flex-col text-xs text-muted-foreground pl-3.5">
-                        <div className="flex items-center gap-2">
-                          <span>{stop.city}, {stop.state}</span>
-                          {stop.distance_from_route !== undefined && (
-                            <span>· {stop.distance_from_route.toFixed(0)} mi off route</span>
+                {fuelStops.map((stop, i) => {
+                  const stopIsLandstar = stop.stop_type === 'landstar' || stop.source === 'landstar';
+                  const stopIsEstimated = stop.stop_type === 'estimated' || stop.source === 'estimated';
+
+                  return (
+                    <div
+                      key={`${stop.name}-${i}`}
+                      className="flex items-center justify-between p-2 rounded-md bg-muted/30 text-sm"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${
+                              stopIsLandstar ? 'bg-primary' : stopIsEstimated ? 'bg-amber-500' : 'bg-accent'
+                            }`}
+                          />
+                          <span className="font-medium truncate">
+                            {stop.brand && stop.store_number
+                              ? `${stop.name} - Store #${stop.store_number}`
+                              : stop.name}
+                          </span>
+                        </div>
+                        <div className="flex flex-col text-xs text-muted-foreground pl-3.5">
+                          <div className="flex items-center gap-2">
+                            <span>{stop.city}, {stop.state}</span>
+                            {stop.distance_from_route !== undefined && stop.distance_from_route > 0 && (
+                              <span>· {stop.distance_from_route.toFixed(0)} mi off route</span>
+                            )}
+                          </div>
+                          {stopIsLandstar && (
+                            <span className="text-primary text-xs">Landstar Network Price</span>
+                          )}
+                          {stopIsEstimated && (
+                            <span className="text-amber-600 dark:text-amber-400 text-xs">Est. Generic Price</span>
                           )}
                         </div>
-                        {stop.address && (
-                          <span className="truncate">{stop.address}</span>
-                        )}
+                      </div>
+                      <div className="text-right shrink-0 ml-2">
+                        <p className="font-semibold">
+                          ${(stop.net_price || stop.diesel_price || 0).toFixed(2)}
+                        </p>
+                        <div className="flex flex-col items-end">
+                          {stop.lcapp_discount && stop.lcapp_discount > 0 && (
+                            <p className={`text-xs ${stopIsLandstar ? 'text-primary' : 'text-amber-600 dark:text-amber-400'}`}>
+                              -${stop.lcapp_discount.toFixed(2)} {stopIsLandstar ? 'LCAPP' : 'Est. Savings'}
+                            </p>
+                          )}
+                          {stop.ifta_tax_credit && stop.ifta_tax_credit > 0 && (
+                            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                              -${stop.ifta_tax_credit.toFixed(2)} IFTA ({stop.state})
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right shrink-0 ml-2">
-                      <p className="font-semibold">
-                        ${(stop.net_price || stop.diesel_price || 0).toFixed(2)}
-                      </p>
-                      <div className="flex flex-col items-end">
-                        {stop.lcapp_discount && stop.lcapp_discount > 0 && (
-                          <p className="text-xs text-primary">
-                            -${stop.lcapp_discount.toFixed(2)} LCAPP
-                          </p>
-                        )}
-                        {stop.ifta_tax_credit && stop.ifta_tax_credit > 0 && (
-                          <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                            -${stop.ifta_tax_credit.toFixed(2)} IFTA
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
