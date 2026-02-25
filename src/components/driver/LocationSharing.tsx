@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { MapPin, Navigation, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Update interval in milliseconds (10 minutes)
 const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
@@ -27,6 +28,21 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
   const lastUpdateTimeRef = useRef<number>(0);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  // Fetch user's org_id for RLS compliance
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-org', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('org_id')
+        .eq('user_id', user!.id)
+        .single();
+      return data;
+    },
+    enabled: !!user?.id,
+  });
 
   // Get current location status from database
   const { data: locationData, isLoading: isLoadingLocation } = useQuery({
@@ -50,6 +66,7 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
         driver_id: driverId,
         truck_id: truckId || null,
         load_id: loadId || null,
+        org_id: userProfile?.org_id || null,
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         heading: position.coords.heading,
