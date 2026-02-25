@@ -1,36 +1,47 @@
 
 
-## Fix: `fleet_loads_status_check` Constraint Missing Extended Statuses
+## Fix: "Failed to update location" -- Missing `org_id` in Upsert Payload
 
 ### Problem
-The database check constraint `fleet_loads_status_check` only allows 6 statuses:
-`pending, assigned, loading, in_transit, delivered, cancelled`
-
-But the Fleet Loads UI offers 9 statuses including `at_pickup`, `at_delivery`, and `unloading`. Selecting any of these three causes the Postgres error shown in the screenshot.
-
-### Root Cause
-The constraint was created in migration `20260119...` with only the original 6 statuses. When the extended statuses were added to the UI later, no migration was created to update the constraint.
+The `driver_locations` table has an RLS policy that requires `org_id = get_user_org_id(auth.uid())` on both SELECT and INSERT/UPDATE. However, the `LocationSharing` component's upsert payload does not include `org_id`. The row is inserted with `org_id = NULL`, which violates the RLS `WITH CHECK` condition, causing the mutation to fail.
 
 ### Fix
 
-**Single database migration** to drop and recreate the check constraint with all 9 statuses:
+**Edit `src/components/driver/LocationSharing.tsx`:**
 
-```sql
-ALTER TABLE public.fleet_loads DROP CONSTRAINT IF EXISTS fleet_loads_status_check;
+Before building the upsert payload, fetch the current user's `org_id` from `profiles` and include it in the payload. Since we already have access to the authenticated user context, we can query the org_id once.
 
-ALTER TABLE public.fleet_loads ADD CONSTRAINT fleet_loads_status_check
-CHECK (status IN (
-  'pending', 'assigned', 'at_pickup', 'loading',
-  'in_transit', 'at_delivery', 'unloading',
-  'delivered', 'cancelled'
-));
+Specifically:
+1. Import `useAuth` from the auth context
+2. Add a query to fetch the user's `org_id` from the `profiles` table
+3. Include `org_id` in the `locationPayload` object passed to the upsert
+
+The minimal change is to add `org_id` to the mutation payload:
+
+```typescript
+// In the component, add a query for org_id:
+const { user } = useAuth();
+
+const { data: profile } = useQuery({
+  queryKey: ['user-org', user?.id],
+  queryFn: async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('user_id', user?.id)
+      .single();
+    return data;
+  },
+  enabled: !!user?.id,
+});
+
+// Then in the locationPayload, add:
+org_id: profile?.org_id || null,
 ```
-
-No frontend code changes needed -- the UI already has the correct status options.
 
 ### Files Changed
 
 | File | Action |
 |------|--------|
-| Database migration | Update `fleet_loads_status_check` to include all 9 statuses |
+| `src/components/driver/LocationSharing.tsx` | Add org_id to upsert payload |
 
