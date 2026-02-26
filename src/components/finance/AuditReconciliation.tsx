@@ -52,7 +52,7 @@ export function AuditReconciliation({ loads, expenses }: AuditReconciliationProp
 
   // App YTD = sum of settlement (fallback net_revenue)
   const appYTD = useMemo(() => {
-    return ytdLoads.reduce((sum, l) => sum + (l.settlement ?? l.net_revenue ?? 0), 0);
+    return ytdLoads.reduce((sum, l) => sum + (l.net_revenue ?? 0), 0);
   }, [ytdLoads]);
 
   const landstarValue = parseFloat(landstarYTD) || 0;
@@ -61,7 +61,7 @@ export function AuditReconciliation({ loads, expenses }: AuditReconciliationProp
   const isMatched = Math.abs(variance) < 0.01;
 
   // Gap analysis
-  const loadsWithoutSettlement = ytdLoads.filter(l => !l.settlement && !l.net_revenue);
+  const loadsWithoutNetRevenue = ytdLoads.filter(l => !l.net_revenue);
   const nonDeliveredLoads = ytdLoads.filter(l => l.status !== 'delivered');
   const cardAdvanceExpenses = ytdExpenses.filter(e =>
     e.expense_type === 'Card Load' || e.expense_type === 'Cash Advance'
@@ -72,7 +72,7 @@ export function AuditReconciliation({ loads, expenses }: AuditReconciliationProp
   const tableRows = useMemo(() => {
     let cumulative = 0;
     return ytdLoads.map(l => {
-      const loadSettlement = l.settlement ?? l.net_revenue ?? 0;
+      const loadSettlement = l.net_revenue ?? 0;
       cumulative += loadSettlement;
       return { load: l, loadSettlement, cumulative };
     });
@@ -155,8 +155,8 @@ export function AuditReconciliation({ loads, expenses }: AuditReconciliationProp
           {/* Gap Analysis */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg border">
-              <p className="text-xs text-muted-foreground">Missing Settlement</p>
-              <p className="text-lg font-semibold">{loadsWithoutSettlement.length}</p>
+              <p className="text-xs text-muted-foreground">Missing Net Revenue</p>
+              <p className="text-lg font-semibold">{loadsWithoutNetRevenue.length}</p>
             </div>
             <div className="p-3 rounded-lg border">
               <p className="text-xs text-muted-foreground">Non-Delivered</p>
@@ -175,12 +175,11 @@ export function AuditReconciliation({ loads, expenses }: AuditReconciliationProp
           {/* Reconciliation Formula */}
           <div className="p-4 rounded-lg bg-muted/50 border font-mono text-xs space-y-1">
             <p>Landstar 1099  = Sum of (Tractor L/H % + FSC + Accessorials + Card Pre-Trips)</p>
-            <p>App Total      = Sum of fleet_loads.settlement (or net_revenue) = {formatCurrency(appYTD)}</p>
-            <p>Card Advances  = {formatCurrency(totalCardAdvances)}</p>
-            <p className="font-bold">Adjusted App   = {formatCurrency(appYTD + totalCardAdvances)}</p>
+            <p>App Total      = Sum of fleet_loads.net_revenue = {formatCurrency(appYTD)}</p>
+            <p>Card Advances  = {formatCurrency(totalCardAdvances)} (pre-payments, not additional revenue)</p>
             {landstarValue > 0 && (
-              <p className={`font-bold ${Math.abs(landstarValue - (appYTD + totalCardAdvances)) < 0.01 ? 'text-success' : 'text-destructive'}`}>
-                Remaining Gap  = {formatCurrency(landstarValue - (appYTD + totalCardAdvances))}
+              <p className={`font-bold ${isMatched ? 'text-success' : 'text-destructive'}`}>
+                Variance       = {formatCurrency(Math.abs(variance))} {variance > 0 ? '(under-reported)' : variance < 0 ? '(over-reported)' : '(matched)'}
               </p>
             )}
           </div>
@@ -204,14 +203,14 @@ export function AuditReconciliation({ loads, expenses }: AuditReconciliationProp
                       <TableHead className="text-right">FSC</TableHead>
                       <TableHead className="text-right">Accessorials</TableHead>
                       <TableHead className="text-right">Gross</TableHead>
-                      <TableHead className="text-right font-bold">Settlement</TableHead>
+                      <TableHead className="text-right font-bold">Net Revenue</TableHead>
                       <TableHead className="text-right font-bold">Cumulative</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {tableRows.map(({ load, loadSettlement, cumulative }) => {
-                      const isMissing = !load.settlement && !load.net_revenue;
+                      const isMissing = !load.net_revenue;
                       return (
                         <TableRow key={load.id} className={isMissing ? 'bg-warning/10' : ''}>
                           <TableCell className="whitespace-nowrap">{formatDate(load.pickup_date)}</TableCell>
