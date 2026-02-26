@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { calculateRevenue as calculateRevenueFn } from '@/lib/revenue-calculator';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -253,46 +254,29 @@ export default function FleetLoads() {
   };
 
   // Calculate revenue based on compensation package
-  const calculateRevenue = (data: any, accs: Accessorial[] = accessorials) => {
-    const rate = parseFloat(data.rate) || 0;
-    const fuelSurcharge = parseFloat(data.fuel_surcharge) || 0;
-    const lumper = parseFloat(data.lumper) || 0;
-    
-    // Calculate accessorials total from the new structure
+  const calculateRevenueLocal = (data: any, accs: Accessorial[] = accessorials) => {
     const accessorialsTotal = accs.reduce((sum, acc) => sum + (acc.amount * (acc.percentage / 100)), 0);
     
-    const truckPct = parseFloat(getSetting('truck_percentage', '65')) / 100;
-    const trailerPct = parseFloat(getSetting('trailer_percentage', '7')) / 100;
-    const advancePct = parseFloat(getSetting('advance_percentage', '30')) / 100;
-    const ownsTrailer = getSetting('owns_trailer', 'false') === 'true';
-    const isPowerOnly = data.is_power_only;
+    const result = calculateRevenueFn(
+      {
+        rate: parseFloat(data.rate) || 0,
+        fuel_surcharge: parseFloat(data.fuel_surcharge) || 0,
+        lumper: parseFloat(data.lumper) || 0,
+        advance_taken: parseFloat(data.advance_taken) || 0,
+        is_power_only: data.is_power_only,
+        start_miles: parseInt(data.start_miles) || null,
+        end_miles: parseInt(data.end_miles) || null,
+        accessorialsTotal,
+      },
+      {
+        truckPct: parseFloat(getSetting('truck_percentage', '65')) / 100,
+        trailerPct: parseFloat(getSetting('trailer_percentage', '7')) / 100,
+        advancePct: parseFloat(getSetting('advance_percentage', '30')) / 100,
+        ownsTrailer: getSetting('owns_trailer', 'false') === 'true',
+      }
+    );
 
-    const grossRevenue = rate + fuelSurcharge + accessorialsTotal;
-    // Advance available = full FSC + 30% of linehaul rate
-    const advanceAvailable = fuelSurcharge + (rate * advancePct);
-    const advanceTaken = parseFloat(data.advance_taken) || 0;
-    
-    // Truck % applies to linehaul only; FSC is 100% to driver; accessorials are already net
-    let truckRevenue = isPowerOnly
-      ? (rate * 0.70) + fuelSurcharge + accessorialsTotal
-      : (rate * truckPct) + fuelSurcharge + accessorialsTotal;
-    let trailerRevenue = isPowerOnly ? 0 : (ownsTrailer ? rate * trailerPct : 0);
-
-    const netRevenue = truckRevenue + trailerRevenue;
-    const settlement = netRevenue - advanceTaken - lumper;
-
-    return {
-      gross_revenue: grossRevenue,
-      advance_available: advanceAvailable,
-      truck_revenue: truckRevenue,
-      trailer_revenue: trailerRevenue,
-      net_revenue: netRevenue,
-      settlement: settlement,
-      actual_miles: ((parseInt(data.end_miles) || 0) - (parseInt(data.start_miles) || 0)) > 0 
-        ? (parseInt(data.end_miles) || 0) - (parseInt(data.start_miles) || 0) 
-        : null,
-      accessorials: accessorialsTotal,
-    };
+    return result;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -302,7 +286,7 @@ export default function FleetLoads() {
       return;
     }
 
-    const calculated = calculateRevenue(formData);
+    const calculated = calculateRevenueLocal(formData);
     const payload = {
       ...formData,
       ...calculated,
@@ -1013,19 +997,19 @@ export default function FleetLoads() {
                   <div className="grid grid-cols-4 gap-4 text-sm">
                     <div className="p-3 bg-muted rounded-lg">
                       <p className="text-muted-foreground">Gross Revenue</p>
-                      <p className="font-bold">{formatCurrency(calculateRevenue(formData).gross_revenue)}</p>
+                      <p className="font-bold">{formatCurrency(calculateRevenueLocal(formData).gross_revenue)}</p>
                     </div>
                     <div className="p-3 bg-muted rounded-lg">
                       <p className="text-muted-foreground">Truck ({formData.is_power_only ? '70' : getSetting('truck_percentage', '65')}%)</p>
-                      <p className="font-bold">{formatCurrency(calculateRevenue(formData).truck_revenue)}</p>
+                      <p className="font-bold">{formatCurrency(calculateRevenueLocal(formData).truck_revenue)}</p>
                     </div>
                     <div className="p-3 bg-muted rounded-lg">
                       <p className="text-muted-foreground">Trailer ({getSetting('trailer_percentage', '7')}%)</p>
-                      <p className="font-bold">{formatCurrency(calculateRevenue(formData).trailer_revenue)}</p>
+                      <p className="font-bold">{formatCurrency(calculateRevenueLocal(formData).trailer_revenue)}</p>
                     </div>
                     <div className="p-3 bg-primary/10 rounded-lg">
                       <p className="text-muted-foreground">Net Revenue</p>
-                      <p className="font-bold text-primary">{formatCurrency(calculateRevenue(formData).net_revenue)}</p>
+                      <p className="font-bold text-primary">{formatCurrency(calculateRevenueLocal(formData).net_revenue)}</p>
                     </div>
                   </div>
                 </div>
