@@ -1,0 +1,1 @@
+ALTER TABLE public.work_orders ALTER COLUMN org_id SET DEFAULT get_user_org_id(auth.uid());
