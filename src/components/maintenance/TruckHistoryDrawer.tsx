@@ -189,7 +189,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                               </div>
                               <p className="text-sm">{wo.description || wo.vendor || 'No description'}</p>
                               <p className="text-xs text-muted-foreground">
-                                {format(new Date(wo.entry_date), 'MMM d, yyyy')}
+                                {format(new Date((wo.estimated_completion || wo.entry_date) + 'T00:00:00'), 'MMM d, yyyy')}
                                 {wo.vendor && <> • {wo.vendor}</>}
                               </p>
                             </div>
