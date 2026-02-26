@@ -35,6 +35,7 @@ export function AuditReconciliation({ loads, expenses }: AuditReconciliationProp
     return loads
       .filter(l => {
         if (!l.pickup_date) return false;
+        if (l.status !== 'delivered') return false;
         const d = parseISO(l.pickup_date);
         return d.getFullYear() === yearNum;
       })
