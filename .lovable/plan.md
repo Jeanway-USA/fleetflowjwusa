@@ -1,34 +1,23 @@
 
 
-## Fix: Work Order Creation Fails Due to Missing `org_id`
+## Use `estimated_completion` for 120-Day Inspection Countdown
 
-### Problem
-The RLS policy on the `work_orders` table requires `org_id = get_user_org_id(auth.uid())` for inserts. However, the `useCreateWorkOrder` mutation in `src/hooks/useMaintenanceData.ts` does not include `org_id` in the insert payload. This causes every work order creation to be rejected with a row-level security violation.
+The 120-Day countdown currently starts from `entry_date` (when the work order was created). It should instead use `estimated_completion` (the actual completion/service date).
 
-### Root Cause
-The insert statement at line 866 of `useMaintenanceData.ts` omits the `org_id` field entirely. The column has no default that auto-populates from the authenticated user, so it inserts as `null`, which fails the RLS `with_check` condition.
+### Changes Required
 
-### Fix
+**File: `src/hooks/useMaintenanceData.ts`**
 
-**File: `src/hooks/useMaintenanceData.ts`** (lines 864-877)
+Three areas need updating:
 
-Add a call to `get_user_org_id` (or fetch it client-side) before inserting, and include `org_id` in the insert payload.
+1. **Work order completion** (line 952): Change `inspectionDate` from `workOrder.entry_date` to `workOrder.estimated_completion || workOrder.entry_date` (fallback if no estimated completion set). This affects both the `service_schedules.last_performed_date` and `trucks.last_120_inspection_date`.
 
-The simplest approach: use `supabase.rpc('get_user_org_id', { uid: user.id })` to fetch the org_id, then pass it in the insert. Alternatively, since other parts of the codebase likely use a profile lookup, we can query the user's org_id from their profile or use the SQL function directly in a database default.
+2. **Non-inspection schedule completion** (line 980): Same change for other service types — use `estimated_completion` with `entry_date` fallback.
 
-**Recommended approach -- set a column default on `org_id`** via a migration so every insert automatically gets the correct value without client-side changes:
+3. **Rewind/delete logic** (lines 512-602): The `fetchMostRecentMatchingWO` query and revert logic also need to select `estimated_completion`, use it as the date source, and sort by it. Specifically:
+   - Line 515: Add `estimated_completion` to the select
+   - Lines 555, 590, 599: Use `prev.estimated_completion || prev.entry_date` instead of `prev.entry_date`
+   - Line 518: Order by `estimated_completion` instead of `entry_date`
 
-```sql
-ALTER TABLE public.work_orders 
-ALTER COLUMN org_id SET DEFAULT get_user_org_id(auth.uid());
-```
-
-This is the cleanest fix: no client code changes needed, and it ensures `org_id` is always set correctly for any insert path (including future ones).
-
-### Changes Summary
-
-| What | Detail |
-|------|--------|
-| **Database migration** | Set default on `work_orders.org_id` to `get_user_org_id(auth.uid())` |
-| **No code changes needed** | The existing insert in `useMaintenanceData.ts` will automatically get the correct `org_id` from the column default |
+4. **Service History date display** (line 402): Change `date: wo.entry_date` to `date: wo.estimated_completion || wo.entry_date` and update the sort order query (line 366) to use `estimated_completion`.
 
