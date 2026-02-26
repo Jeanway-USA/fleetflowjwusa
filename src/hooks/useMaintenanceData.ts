@@ -363,7 +363,7 @@ export function useServiceHistory(searchQuery?: string) {
           trucks (unit_number)
         `)
         .eq('status', 'completed')
-        .order('entry_date', { ascending: false });
+        .order('estimated_completion', { ascending: false });
 
       if (searchQuery) {
         woQuery = woQuery.or(`description.ilike.%${searchQuery}%,service_type.ilike.%${searchQuery}%,vendor.ilike.%${searchQuery}%`);
@@ -394,12 +394,12 @@ export function useServiceHistory(searchQuery?: string) {
       const { data: logs, error: logsError } = await logsQuery;
       if (logsError) throw logsError;
 
-      // Combine and normalize - use entry_date for work orders (the date the work was done)
+      // Combine and normalize - use estimated_completion for work orders (the actual service date)
       const combined = [
         ...(workOrders?.map(wo => ({
           id: wo.id,
           truckId: wo.truck_id,
-          date: wo.entry_date, // Use entry_date as the service date
+          date: wo.estimated_completion || wo.entry_date, // Use estimated_completion as the service date
           unitNumber: (wo.trucks as any)?.unit_number || 'Unknown',
           serviceType: wo.service_type,
           serviceTypes: wo.service_types as string[] | null,
@@ -512,14 +512,15 @@ export function useDeleteCompletedWorkOrder() {
       const fetchMostRecentMatchingWO = async (matcher: (serviceType: string) => boolean) => {
         const { data } = await supabase
           .from('work_orders')
-          .select('entry_date, odometer_reading, service_type, service_types')
+          .select('entry_date, estimated_completion, odometer_reading, service_type, service_types')
           .eq('truck_id', truckId)
           .eq('status', 'completed')
-          .order('entry_date', { ascending: false })
+          .order('estimated_completion', { ascending: false })
           .limit(50);
 
         const rows = (data || []) as Array<{
           entry_date: string;
+          estimated_completion: string | null;
           odometer_reading: number | null;
           service_type: string;
           service_types: string[] | null;
@@ -546,13 +547,14 @@ export function useDeleteCompletedWorkOrder() {
           return;
         }
 
+        const effectiveDate = prev.estimated_completion || prev.entry_date;
         const odometerAtService =
-          prev.odometer_reading ?? (await getOdometerAtDate(prev.entry_date)) ?? null;
+          prev.odometer_reading ?? (await getOdometerAtDate(effectiveDate)) ?? null;
 
         await supabase
           .from('service_schedules')
           .update({
-            last_performed_date: prev.entry_date,
+            last_performed_date: effectiveDate,
             last_performed_miles: odometerAtService,
           })
           .eq('truck_id', truckId)
@@ -581,13 +583,14 @@ export function useDeleteCompletedWorkOrder() {
               .update({ last_120_inspection_date: null, last_120_inspection_miles: null })
               .eq('id', truckId);
           } else {
+            const effectiveInspDate = prevInspection.estimated_completion || prevInspection.entry_date;
             const odometerAtService =
-              prevInspection.odometer_reading ?? (await getOdometerAtDate(prevInspection.entry_date)) ?? null;
+              prevInspection.odometer_reading ?? (await getOdometerAtDate(effectiveInspDate)) ?? null;
 
             await supabase
               .from('service_schedules')
               .update({
-                last_performed_date: prevInspection.entry_date,
+                last_performed_date: effectiveInspDate,
                 last_performed_miles: odometerAtService,
               })
               .eq('truck_id', truckId)
@@ -596,7 +599,7 @@ export function useDeleteCompletedWorkOrder() {
             await supabase
               .from('trucks')
               .update({
-                last_120_inspection_date: prevInspection.entry_date,
+                last_120_inspection_date: effectiveInspDate,
                 last_120_inspection_miles: odometerAtService,
               })
               .eq('id', truckId);
@@ -902,7 +905,7 @@ export function useCompleteWorkOrder() {
       // First, get the work order to check its type and truck_id
       const { data: workOrder, error: fetchError } = await supabase
         .from('work_orders')
-        .select('truck_id, service_type, service_types, entry_date, odometer_reading')
+        .select('truck_id, service_type, service_types, entry_date, estimated_completion, odometer_reading')
         .eq('id', id)
         .single();
 
@@ -949,7 +952,7 @@ export function useCompleteWorkOrder() {
 
         if (type === 'inspection' || type.includes('inspection')) {
           // Update the 120-Day Inspection service schedule for this truck
-          const inspectionDate = workOrder.entry_date;
+          const inspectionDate = workOrder.estimated_completion || workOrder.entry_date;
           
           const { error: scheduleError } = await supabase
             .from('service_schedules')
@@ -977,7 +980,7 @@ export function useCompleteWorkOrder() {
           await supabase
             .from('service_schedules')
             .update({
-              last_performed_date: workOrder.entry_date,
+              last_performed_date: workOrder.estimated_completion || workOrder.entry_date,
               last_performed_miles: currentOdometer,
             })
             .eq('truck_id', workOrder.truck_id)
