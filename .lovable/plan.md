@@ -1,34 +1,34 @@
 
 
-## Analysis: Net Revenue Already Uses Per-Load Values
+## Fix: Work Order Creation Fails Due to Missing `org_id`
 
-After reviewing the code, the Finance page **already sums `net_revenue` directly from each load record** (line 365 of Finance.tsx):
+### Problem
+The RLS policy on the `work_orders` table requires `org_id = get_user_org_id(auth.uid())` for inserts. However, the `useCreateWorkOrder` mutation in `src/hooks/useMaintenanceData.ts` does not include `org_id` in the insert payload. This causes every work order creation to be rejected with a row-level security violation.
 
-```typescript
-netRevenue: acc.netRevenue + (load.net_revenue || 0),
-truckRevenue: acc.truckRevenue + (load.truck_revenue || 0),
+### Root Cause
+The insert statement at line 866 of `useMaintenanceData.ts` omits the `org_id` field entirely. The column has no default that auto-populates from the authenticated user, so it inserts as `null`, which fails the RLS `with_check` condition.
+
+### Fix
+
+**File: `src/hooks/useMaintenanceData.ts`** (lines 864-877)
+
+Add a call to `get_user_org_id` (or fetch it client-side) before inserting, and include `org_id` in the insert payload.
+
+The simplest approach: use `supabase.rpc('get_user_org_id', { uid: user.id })` to fetch the org_id, then pass it in the insert. Alternatively, since other parts of the codebase likely use a profile lookup, we can query the user's org_id from their profile or use the SQL function directly in a database default.
+
+**Recommended approach -- set a column default on `org_id`** via a migration so every insert automatically gets the correct value without client-side changes:
+
+```sql
+ALTER TABLE public.work_orders 
+ALTER COLUMN org_id SET DEFAULT get_user_org_id(auth.uid());
 ```
 
-It does NOT recalculate from gross. The values you see ($21,878.10) are the sum of each load's stored `net_revenue` field.
+This is the cleanest fix: no client code changes needed, and it ensures `org_id` is always set correctly for any insert path (including future ones).
 
-### Why the numbers may still look wrong
+### Changes Summary
 
-The revenue calculation formula was just fixed (applying 65% to linehaul only, not gross). However, **existing loads in the database still have `net_revenue` and `truck_revenue` values computed with the old formula** (65% of entire gross including FSC and accessorials). These stale values persist until each load is re-saved.
-
-### Proposed Fix
-
-**Bulk recalculate all existing loads** by triggering the corrected `calculateRevenue` logic on every load in the database. This can be done two ways:
-
-1. **Quick approach**: Add a "Recalculate All Loads" button on the Finance Settings tab that iterates through all loads and re-saves them with the corrected formula.
-
-2. **Automatic approach**: Run a one-time database function or edge function that recalculates `truck_revenue`, `trailer_revenue`, `net_revenue`, and `settlement` for all existing loads using the corrected formula (65% of linehaul only + 100% FSC + 100% accessorials).
-
-### Recommended: Option 1 — Recalculate Button
-
-| File | Action |
+| What | Detail |
 |------|--------|
-| `src/pages/FleetLoads.tsx` | Export `calculateRevenue` as a reusable utility (or extract to a shared lib) |
-| `src/pages/Finance.tsx` | Add a "Recalculate Revenue" button in the Settings tab that fetches all loads, runs the corrected formula, and batch-updates the stored values |
-
-This ensures every load's stored `net_revenue` reflects the corrected calculation, and the Finance page totals will then be accurate.
+| **Database migration** | Set default on `work_orders.org_id` to `get_user_org_id(auth.uid())` |
+| **No code changes needed** | The existing insert in `useMaintenanceData.ts` will automatically get the correct `org_id` from the column default |
 
