@@ -272,9 +272,11 @@ export default function FleetLoads() {
     const advanceAvailable = fuelSurcharge + (rate * advancePct);
     const advanceTaken = parseFloat(data.advance_taken) || 0;
     
-    // Power-only loads use 70% truck revenue and no trailer revenue
-    let truckRevenue = isPowerOnly ? grossRevenue * 0.70 : grossRevenue * truckPct;
-    let trailerRevenue = isPowerOnly ? 0 : (ownsTrailer ? grossRevenue * trailerPct : 0);
+    // Truck % applies to linehaul only; FSC is 100% to driver; accessorials are already net
+    let truckRevenue = isPowerOnly
+      ? (rate * 0.70) + fuelSurcharge + accessorialsTotal
+      : (rate * truckPct) + fuelSurcharge + accessorialsTotal;
+    let trailerRevenue = isPowerOnly ? 0 : (ownsTrailer ? rate * trailerPct : 0);
 
     const netRevenue = truckRevenue + trailerRevenue;
     const settlement = netRevenue - advanceTaken - lumper;
