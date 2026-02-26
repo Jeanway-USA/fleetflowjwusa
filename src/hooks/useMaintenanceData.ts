@@ -432,7 +432,7 @@ export function useUpdateCompletedWorkOrder() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, entry_date, vendor, final_cost, description, service_type, service_types }: {
+    mutationFn: async ({ id, entry_date, vendor, final_cost, description, service_type, service_types, estimated_completion }: {
       id: string;
       entry_date?: string;
       vendor?: string;
@@ -440,17 +440,22 @@ export function useUpdateCompletedWorkOrder() {
       description?: string;
       service_type?: string;
       service_types?: string[];
+      estimated_completion?: string;
     }) => {
+      const updatePayload: Record<string, unknown> = {
+        vendor,
+        final_cost,
+        description,
+        service_type,
+        service_types: service_types || [],
+      };
+      if (entry_date) {
+        updatePayload.entry_date = entry_date;
+        updatePayload.estimated_completion = estimated_completion ?? entry_date;
+      }
       const { data, error } = await supabase
         .from('work_orders')
-        .update({
-          entry_date,
-          vendor,
-          final_cost,
-          description,
-          service_type,
-          service_types: service_types || [],
-        })
+        .update(updatePayload)
         .eq('id', id)
         .select()
         .single();
@@ -668,9 +673,9 @@ export function usePMSchedule() {
       // Fetch completed work orders to find baseline work orders for each PM type
       const { data: completedWorkOrders, error: woError } = await supabase
         .from('work_orders')
-        .select('id, truck_id, service_type, service_types, entry_date')
+        .select('id, truck_id, service_type, service_types, entry_date, estimated_completion')
         .eq('status', 'completed')
-        .order('entry_date', { ascending: false });
+        .order('estimated_completion', { ascending: false });
 
       if (woError) throw woError;
 
@@ -695,7 +700,7 @@ export function usePMSchedule() {
       });
 
       // Index completed work orders by truck
-      const woByTruck = new Map<string, { id: string; service_type: string; service_types: string[] | null; entry_date: string }[]>();
+      const woByTruck = new Map<string, { id: string; service_type: string; service_types: string[] | null; entry_date: string; estimated_completion: string | null }[]>();
       completedWorkOrders?.forEach(wo => {
         if (!wo.truck_id) return;
         const arr = woByTruck.get(wo.truck_id) || [];
@@ -704,6 +709,7 @@ export function usePMSchedule() {
           service_type: wo.service_type || '',
           service_types: wo.service_types as string[] | null,
           entry_date: wo.entry_date,
+          estimated_completion: wo.estimated_completion as string | null,
         });
         woByTruck.set(wo.truck_id, arr);
       });
@@ -737,7 +743,7 @@ export function usePMSchedule() {
           return types.some(t => matcher(t.toLowerCase()));
         });
         return match
-          ? { workOrderId: match.id, date: match.entry_date }
+          ? { workOrderId: match.id, date: match.estimated_completion || match.entry_date }
           : { workOrderId: null, date: null };
       };
 

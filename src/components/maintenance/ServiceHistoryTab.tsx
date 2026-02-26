@@ -177,6 +177,7 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
       await updateWorkOrder.mutateAsync({
         id: editingItem.id,
         entry_date: editForm.entry_date,
+        estimated_completion: editForm.entry_date,
         vendor: editForm.vendor || undefined,
         final_cost: editForm.final_cost ? parseFloat(editForm.final_cost) : undefined,
         description: editForm.description || undefined,

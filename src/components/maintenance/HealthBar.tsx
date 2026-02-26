@@ -142,7 +142,7 @@ export function InspectionCountdown({
   className,
 }: InspectionCountdownProps) {
   const today = new Date();
-  const lastDate = lastInspectionDate ? new Date(lastInspectionDate) : null;
+  const lastDate = lastInspectionDate ? new Date(lastInspectionDate + 'T00:00:00') : null;
   
   let daysRemaining: number;
   if (!lastDate) {
