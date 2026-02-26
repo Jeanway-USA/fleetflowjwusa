@@ -17,6 +17,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, MapPin } from 'lucide-react';
 import { StatementUpload } from '@/components/finance/StatementUpload';
+import { AuditReconciliation } from '@/components/finance/AuditReconciliation';
 import { SettlementsTab } from '@/components/finance/SettlementsTab';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
 import { RevenueTab } from '@/components/finance/RevenueTab';
@@ -574,6 +575,7 @@ export default function Finance() {
         </TabsContent>
 
         <TabsContent value="expenses" className="mt-6">
+          <AuditReconciliation loads={loads} expenses={expenses} />
           <StatementUpload 
             existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination }))}
             trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
