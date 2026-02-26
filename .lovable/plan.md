@@ -1,54 +1,34 @@
 
 
-## Fix Revenue Calculation: Apply Truck % to Linehaul Only
+## Analysis: Net Revenue Already Uses Per-Load Values
 
-### Problem
-Currently in `calculateRevenue()` (FleetLoads.tsx line 276), the truck percentage (65%) is applied to the entire `grossRevenue` (rate + FSC + accessorials). This is incorrect.
+After reviewing the code, the Finance page **already sums `net_revenue` directly from each load record** (line 365 of Finance.tsx):
 
-The correct Landstar compensation structure is:
-- **Linehaul (rate)**: Driver gets 65% (truck %)
-- **Fuel Surcharge**: Driver gets 100%
-- **Accessorials**: Driver gets the net amount (already calculated as `amount * percentage / 100`)
-- **Trailer**: If owned, trailer % applies to linehaul only (not FSC/accessorials)
-
-### Current (Wrong)
-```
-grossRevenue = rate + fuelSurcharge + accessorialsTotal
-truckRevenue = grossRevenue * 0.65  // Wrong: applies 65% to FSC and accessorials too
-trailerRevenue = grossRevenue * 0.07
+```typescript
+netRevenue: acc.netRevenue + (load.net_revenue || 0),
+truckRevenue: acc.truckRevenue + (load.truck_revenue || 0),
 ```
 
-### Corrected
-```
-grossRevenue = rate + fuelSurcharge + accessorialsTotal  // unchanged
-truckRevenue = (rate * 0.65) + fuelSurcharge + accessorialsTotal
-trailerRevenue = ownsTrailer ? (rate * 0.07) : 0
-// Power-only: truckRevenue = (rate * 0.70) + fuelSurcharge + accessorialsTotal
-```
+It does NOT recalculate from gross. The values you see ($21,878.10) are the sum of each load's stored `net_revenue` field.
 
-### File Changes
+### Why the numbers may still look wrong
 
-| File | Change |
+The revenue calculation formula was just fixed (applying 65% to linehaul only, not gross). However, **existing loads in the database still have `net_revenue` and `truck_revenue` values computed with the old formula** (65% of entire gross including FSC and accessorials). These stale values persist until each load is re-saved.
+
+### Proposed Fix
+
+**Bulk recalculate all existing loads** by triggering the corrected `calculateRevenue` logic on every load in the database. This can be done two ways:
+
+1. **Quick approach**: Add a "Recalculate All Loads" button on the Finance Settings tab that iterates through all loads and re-saves them with the corrected formula.
+
+2. **Automatic approach**: Run a one-time database function or edge function that recalculates `truck_revenue`, `trailer_revenue`, `net_revenue`, and `settlement` for all existing loads using the corrected formula (65% of linehaul only + 100% FSC + 100% accessorials).
+
+### Recommended: Option 1 — Recalculate Button
+
+| File | Action |
 |------|--------|
-| `src/pages/FleetLoads.tsx` | Update `calculateRevenue()` lines 276-277 to apply truck/trailer % to linehaul only, then add FSC and accessorials at 100% |
+| `src/pages/FleetLoads.tsx` | Export `calculateRevenue` as a reusable utility (or extract to a shared lib) |
+| `src/pages/Finance.tsx` | Add a "Recalculate Revenue" button in the Settings tab that fetches all loads, runs the corrected formula, and batch-updates the stored values |
 
-### Specific Edit (lines 275-278)
-
-**Before:**
-```typescript
-// Power-only loads use 70% truck revenue and no trailer revenue
-let truckRevenue = isPowerOnly ? grossRevenue * 0.70 : grossRevenue * truckPct;
-let trailerRevenue = isPowerOnly ? 0 : (ownsTrailer ? grossRevenue * trailerPct : 0);
-```
-
-**After:**
-```typescript
-// Truck % applies to linehaul only; FSC is 100% to driver; accessorials are already net
-let truckRevenue = isPowerOnly
-  ? (rate * 0.70) + fuelSurcharge + accessorialsTotal
-  : (rate * truckPct) + fuelSurcharge + accessorialsTotal;
-let trailerRevenue = isPowerOnly ? 0 : (ownsTrailer ? rate * trailerPct : 0);
-```
-
-This ensures existing loads will recalculate correctly when saved, and the Revenue Preview in the load form will immediately reflect the corrected math. All downstream calculations (net revenue, settlement, Finance page totals, Audit Mode) flow from this function and will auto-correct.
+This ensures every load's stored `net_revenue` reflects the corrected calculation, and the Finance page totals will then be accurate.
 
