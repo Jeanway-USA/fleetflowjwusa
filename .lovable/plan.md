@@ -1,33 +1,54 @@
 
 
-## Filter Revenue Calculations to Delivered Loads Only
+## Fix Revenue Calculation: Apply Truck % to Linehaul Only
 
 ### Problem
-The Finance page summary cards (Net Revenue, Gross Revenue, Net Profit) and the P&L Summary include revenue from loads in all statuses -- including pending, assigned, in_transit, etc. Only loads with status `delivered` should contribute to revenue figures.
+Currently in `calculateRevenue()` (FleetLoads.tsx line 276), the truck percentage (65%) is applied to the entire `grossRevenue` (rate + FSC + accessorials). This is incorrect.
 
-### Fix
+The correct Landstar compensation structure is:
+- **Linehaul (rate)**: Driver gets 65% (truck %)
+- **Fuel Surcharge**: Driver gets 100%
+- **Accessorials**: Driver gets the net amount (already calculated as `amount * percentage / 100`)
+- **Trailer**: If owned, trailer % applies to linehaul only (not FSC/accessorials)
 
-**Edit `src/pages/Finance.tsx`:**
+### Current (Wrong)
+```
+grossRevenue = rate + fuelSurcharge + accessorialsTotal
+truckRevenue = grossRevenue * 0.65  // Wrong: applies 65% to FSC and accessorials too
+trailerRevenue = grossRevenue * 0.07
+```
 
-1. **Create a `deliveredLoads` subset** from `filteredLoads` that only includes loads where `status === 'delivered'`.
+### Corrected
+```
+grossRevenue = rate + fuelSurcharge + accessorialsTotal  // unchanged
+truckRevenue = (rate * 0.65) + fuelSurcharge + accessorialsTotal
+trailerRevenue = ownsTrailer ? (rate * 0.07) : 0
+// Power-only: truckRevenue = (rate * 0.70) + fuelSurcharge + accessorialsTotal
+```
 
-2. **Use `deliveredLoads` for `revenueTotals`** calculation (line 352) instead of `filteredLoads`. This ensures only delivered loads contribute to gross revenue, net revenue, truck revenue, settlement totals, and mile calculations.
+### File Changes
 
-3. **Update the load count display** in the summary card (line 518) -- the subtitle will naturally reflect only delivered loads since it reads from `revenueTotals.loadCount`.
+| File | Change |
+|------|--------|
+| `src/pages/FleetLoads.tsx` | Update `calculateRevenue()` lines 276-277 to apply truck/trailer % to linehaul only, then add FSC and accessorials at 100% |
 
-4. **Keep `filteredLoads` for non-revenue uses** like load expense lookups (line 378), the Revenue tab's load table, and audit reconciliation -- those should still show all loads.
+### Specific Edit (lines 275-278)
 
-5. **Update deadhead miles calculation** (lines 342-350) to also use only delivered loads, since revenue-per-mile metrics should be consistent.
+**Before:**
+```typescript
+// Power-only loads use 70% truck revenue and no trailer revenue
+let truckRevenue = isPowerOnly ? grossRevenue * 0.70 : grossRevenue * truckPct;
+let trailerRevenue = isPowerOnly ? 0 : (ownsTrailer ? grossRevenue * trailerPct : 0);
+```
 
-### Specific Changes
+**After:**
+```typescript
+// Truck % applies to linehaul only; FSC is 100% to driver; accessorials are already net
+let truckRevenue = isPowerOnly
+  ? (rate * 0.70) + fuelSurcharge + accessorialsTotal
+  : (rate * truckPct) + fuelSurcharge + accessorialsTotal;
+let trailerRevenue = isPowerOnly ? 0 : (ownsTrailer ? rate * trailerPct : 0);
+```
 
-| Location | Change |
-|----------|--------|
-| Line ~311 (after `filteredLoads`) | Add `const deliveredLoads = filteredLoads.filter((l: any) => l.status === 'delivered');` |
-| Line 342 (`sortedLoads`) | Change `filteredLoads` to `deliveredLoads` |
-| Line 352 (`revenueTotals`) | Change `filteredLoads.reduce` to `deliveredLoads.reduce` |
-| Lines 374-376 (mile calcs) | These derive from `revenueTotals` so they auto-correct |
-| Line 420-422 (profit calcs) | These derive from `revenueTotals` so they auto-correct |
-
-No database changes needed. The summary cards, P&L Summary tab, and all downstream calculations will automatically reflect only delivered load revenue.
+This ensures existing loads will recalculate correctly when saved, and the Revenue Preview in the load form will immediately reflect the corrected math. All downstream calculations (net revenue, settlement, Finance page totals, Audit Mode) flow from this function and will auto-correct.
 
