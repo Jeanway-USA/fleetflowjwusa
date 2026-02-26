@@ -308,6 +308,7 @@ export default function Finance() {
   };
 
   const filteredLoads = getFilteredLoads();
+  const deliveredLoads = filteredLoads.filter((l: any) => l.status === 'delivered');
   const filteredExpenses = getFilteredExpenses();
   const filteredPayrolls = getFilteredPayrolls();
   const filteredCommissions = getFilteredCommissions();
@@ -339,7 +340,7 @@ export default function Finance() {
   });
 
   // ===== CALCULATIONS =====
-  const sortedLoads = [...filteredLoads]
+  const sortedLoads = [...deliveredLoads]
     .filter((l: any) => l.pickup_date && l.start_miles != null && l.end_miles != null)
     .sort((a: any, b: any) => parseISO(a.pickup_date).getTime() - parseISO(b.pickup_date).getTime());
 
@@ -349,7 +350,7 @@ export default function Finance() {
     if (gap > 0) deadheadMiles += gap;
   }
 
-  const revenueTotals = filteredLoads.reduce((acc: any, load: any) => ({
+  const revenueTotals = deliveredLoads.reduce((acc: any, load: any) => ({
     loadCount: acc.loadCount + 1,
     bookedLinehaul: acc.bookedLinehaul + (load.rate || 0),
     bookedMiles: acc.bookedMiles + (load.booked_miles || 0),
