@@ -1,45 +1,22 @@
 
 
-## Add XLSX Parsing to Landstar Statement Import
+## Two Changes
 
-### Problem
-The import currently only accepts PDFs. The user wants to also accept `.xlsx` files exported from Landstar (Settlement Details and Freight Bill Details), which contain structured tabular data that can be parsed client-side without AI.
+### 1. Add Mass Delete Button to Manage Expenses (Finance.tsx)
 
-### Data Rules (from user)
-- **Negative Transaction Amt** = expense → import these
-- **Positive Transaction Amt** = revenue → **skip/ignore**
-- **Exception**: Items containing "REIMB" = reimbursement → keep, mark as `is_reimbursement: true`
+**Location**: Next to the existing "Edit X Selected" button (line 604-608)
 
-### Changes
+- Add a "Delete X Selected" button with destructive styling when `selectedExpenseIds.size > 0`
+- Add a `massDeleteExpensesMutation` that deletes all selected expense IDs via `supabase.from('expenses').delete().in('id', [...selectedExpenseIds])`
+- Show a `ConfirmDeleteDialog` before executing the mass delete
+- Add state `massDeleteDialogOpen` to control the confirmation dialog
+- Clear `selectedExpenseIds` after successful deletion
 
-**1. Install `xlsx` package** (SheetJS) for client-side Excel parsing.
+### 2. Editable Date Column in Statement Import Preview (StatementUpload.tsx)
 
-**2. New file: `src/lib/parse-landstar-xlsx.ts`**
-- Client-side parser that reads XLSX files and returns the same `ExtractedExpense[]` / `ParsedStatement` shape used by the PDF parser
-- Detects which format (Settlement Details vs Freight Bill Details) based on column headers
-- Maps descriptions to `expense_type` using the same mapping as the edge function:
-  - `CARD FEE` → "Card Fee"
-  - `CARD PRE-TRIP` → "Card Load"  
-  - `TRIP% ESCROW` → "Escrow Payment"
-  - `TRKSTP SCN` → "Trip Scanning"
-  - `DD FEE` → "Direct Deposit Fee"
-  - `PERMITS` → "Licensing/Permits"
-  - `PLATE` → "Registration/Plates"
-  - `BP OTA/NTTA/E470` → "Tolls"
-  - `PREPASS` → "PrePass/Scale"
-  - `LCN FEES` → "LCN/Satellite"
-  - `NTP TRUCK WARRANTY` → "Truck Warranty"
-  - `UNLADEN LIABILITY` → "Insurance"
-  - `CPP` → "CPP/Benefits"
-  - `CARD CONT. SPEC ADV` → "Cash Advance"
-  - `REIMB` → "Reimbursement" with `is_reimbursement: true` and positive amount
-- Filters out revenue rows (positive amount, no "REIMB" keyword)
-- Extracts Freight Bill # as `trip_number`, settlement date as `date`, tractor # as `unit_number`
+**Location**: The Date column in the extracted expenses table (line 584-592)
 
-**3. Update `src/components/finance/StatementUpload.tsx`**
-- Accept `.xlsx` and `.xls` in addition to `.pdf`
-- Update file type validation in `processFile`, `handleDrop`, and the `<input accept>` attribute
-- For XLSX files: parse client-side using the new parser (no edge function call needed)
-- For PDF files: continue using the existing edge function flow
-- Update drop zone text: "Drop Statement PDF or Excel file here" / "Supports Card Activity, Contractor Statements & Excel exports"
+- Make the date cell clickable/editable with a date `<Input type="date">` inline edit
+- When clicking the date, show an inline date input; on change, update the expense's `date` field in the `expenses` state
+- Use the same inline editing pattern as the Load Match column (click to edit, show input, click away to close)
 
