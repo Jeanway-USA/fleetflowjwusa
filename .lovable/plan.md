@@ -1,10 +1,13 @@
-## Fix Linehaul Revenue Card to Show Booked Linehaul
 
-The "Linehaul Revenue (65%)" card currently sums `truck_revenue` (rate after 65% split). The user wants it to show the raw **Booked Linehaul (rate after 65% split)** — the sum of `rate` from each load.
 
-### Changes
+## Fix Booked Linehaul to Show Post-65% Split
 
-**File: `src/components/finance/AuditReconciliation.tsx**`
+The "Booked Linehaul" card should display the sum of `truck_revenue` (linehaul after the 65% truck split), not the raw `rate`.
 
-1. Rename `totalTruckRevenue` to `totalLinehaul` and change from summing `l.truck_revenue` to summing `l.rate`.
-2. Update the card label from "Linehaul Revenue (65%)" to "Booked Linehaul".
+### Change
+
+**File: `src/components/finance/AuditReconciliation.tsx`**
+
+1. Change `totalLinehaul` calculation from summing `l.rate` back to summing `l.truck_revenue` — this is the linehaul after the 65% split is applied.
+2. Update card label to "Booked Linehaul (65%)" for clarity.
+
