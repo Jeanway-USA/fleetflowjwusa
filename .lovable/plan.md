@@ -1,24 +1,10 @@
+## Fix Linehaul Revenue Card to Show Booked Linehaul
 
-
-## Replace Gap Analysis Cards with Revenue Breakdown
-
-### Problem
-The middle section of the 1099 Audit Mode currently shows gap analysis cards (Missing Net Revenue, Non-Delivered, Card/Cash Advances, Total Loads). The user wants this replaced with a revenue component breakdown: Linehaul Revenue (after 65%), Fuel Surcharge, Accessorials, and Total Loads.
+The "Linehaul Revenue (65%)" card currently sums `truck_revenue` (rate after 65% split). The user wants it to show the raw **Booked Linehaul (rate after 65% split)** — the sum of `rate` from each load.
 
 ### Changes
 
-**File: `src/components/finance/AuditReconciliation.tsx`**
+**File: `src/components/finance/AuditReconciliation.tsx**`
 
-1. **Add computed totals** for the three revenue components from `ytdLoads`:
-   - `totalTruckRevenue` = sum of `l.truck_revenue` (this is the linehaul after the 65% split)
-   - `totalFSC` = sum of `l.fuel_surcharge`
-   - `totalAccessorials` = sum of `l.accessorials`
-
-2. **Replace the gap analysis grid** (lines 155-173) with four new cards:
-   - **Linehaul Revenue (65%)** — shows `totalTruckRevenue`
-   - **Fuel Surcharge** — shows `totalFSC`
-   - **Accessorials** — shows `totalAccessorials`
-   - **Total Loads (YTD)** — shows `ytdLoads.length` (stays the same)
-
-3. **Clean up unused variables**: Remove `loadsWithoutNetRevenue`, `nonDeliveredLoads`, `cardAdvanceExpenses`, `totalCardAdvances`, and the `ytdExpenses` memo (no longer needed). Also remove the `Expense` type import and `expenses` prop if no longer used elsewhere in the component. The reconciliation formula section can also drop the Card Advances line.
-
+1. Rename `totalTruckRevenue` to `totalLinehaul` and change from summing `l.truck_revenue` to summing `l.rate`.
+2. Update the card label from "Linehaul Revenue (65%)" to "Booked Linehaul".
