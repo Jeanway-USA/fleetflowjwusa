@@ -2,51 +2,17 @@ import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, Link, Unlink, Edit2, Check, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, FileSpreadsheet, FileScan, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { extractJurisdictionFromVendor } from '@/lib/us-states';
 import { parseLandstarXlsx } from '@/lib/parse-landstar-xlsx';
+import { detectFileType, reconcileDocuments, getFileTypeLabel } from '@/lib/settlement-reconciliation';
+import type { StagedFile, ReconciliationResult } from '@/lib/settlement-reconciliation';
+import { ReconciliationPreview } from './ReconciliationPreview';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStorageProvider } from '@/hooks/useStorageProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-interface ExtractedExpense {
-  date: string;
-  expense_type: string;
-  amount: number;
-  trip_number: string | null;
-  description: string;
-  vendor: string | null;
-  gallons: number | null;
-  is_discount: boolean;
-  is_reimbursement: boolean;
-}
-
-interface ParsedStatement {
-  statement_type: 'card_activity' | 'contractor';
-  period_start: string | null;
-  period_end: string | null;
-  unit_number: string | null;
-  expenses: ExtractedExpense[];
-}
-
-interface ExistingExpense {
-  id: string;
-  expense_date: string;
-  expense_type: string;
-  amount: number;
-  load_id: string | null;
-}
 
 interface FleetLoad {
   id: string;
@@ -60,6 +26,14 @@ interface Truck {
   unit_number: string;
 }
 
+interface ExistingExpense {
+  id: string;
+  expense_date: string;
+  expense_type: string;
+  amount: number;
+  load_id: string | null;
+}
+
 interface StatementUploadProps {
   existingLoads: FleetLoad[];
   trucks: Truck[];
@@ -68,26 +42,27 @@ interface StatementUploadProps {
   orgId: string | null;
 }
 
-interface ExpenseWithMatch extends ExtractedExpense {
-  selected: boolean;
-  matchedLoad: FleetLoad | null;
-  matchedTruck: Truck | null;
-  isDuplicate: boolean;
-  duplicateId: string | null;
-  jurisdiction: string | null;
-}
+const DOCUMENT_TYPES: StagedFile['type'][] = [
+  'settlement_xlsx',
+  'freight_bill_xlsx',
+  'card_activity_pdf',
+  'contractor_pdf',
+];
+
+const TYPE_ICONS: Record<string, React.ReactNode> = {
+  settlement_xlsx: <FileSpreadsheet className="h-4 w-4" />,
+  freight_bill_xlsx: <FileSpreadsheet className="h-4 w-4" />,
+  card_activity_pdf: <FileScan className="h-4 w-4" />,
+  contractor_pdf: <FileText className="h-4 w-4" />,
+};
 
 export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported, orgId }: StatementUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [statementData, setStatementData] = useState<ParsedStatement | null>(null);
-  const [expenses, setExpenses] = useState<ExpenseWithMatch[]>([]);
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
+  const [reconciliationResult, setReconciliationResult] = useState<ReconciliationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pendingFileRef = useRef<File | null>(null);
   const { user } = useAuth();
   const { upload: storageUpload } = useStorageProvider();
   const queryClient = useQueryClient();
@@ -97,10 +72,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       const fileExt = file.name.split('.').pop();
       const filePath = `statements/${Date.now()}.${fileExt}`;
       const { path, error: uploadError } = await storageUpload('documents', filePath, file);
-      if (uploadError || !path) {
-        console.error('[Statement] Failed to save to documents:', uploadError);
-        return;
-      }
+      if (uploadError || !path) return;
       await supabase.from('documents').insert({
         file_name: file.name,
         file_path: path,
@@ -111,51 +83,68 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
         org_id: orgId,
       });
       queryClient.invalidateQueries({ queryKey: ['all-documents'] });
-      console.log('[Statement] PDF saved to Documents tab');
     } catch (err) {
-      console.error('[Statement] Error saving PDF to documents:', err);
+      console.error('[Statement] Error saving to documents:', err);
     }
   };
 
-  const findMatchingLoad = (tripNumber: string | null): FleetLoad | null => {
-    if (!tripNumber) return null;
-    // Remove any letter prefix (e.g., "DLE 6065079" -> "6065079")
-    const numericId = tripNumber.replace(/^[A-Z]{3}\s*/i, '').trim();
-    
-    return existingLoads.find(load => {
-      if (!load.landstar_load_id) return false;
-      const loadNumericId = load.landstar_load_id.replace(/^[A-Z]{3}\s*/i, '').trim();
-      return loadNumericId === numericId || load.landstar_load_id === numericId;
-    }) || null;
+  const isExcelFile = (file: File) => {
+    const ext = file.name.toLowerCase();
+    return ext.endsWith('.xlsx') || ext.endsWith('.xls') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.type === 'application/vnd.ms-excel';
   };
 
-  const findMatchingTruck = (unitNumber: string | null): Truck | null => {
-    if (!unitNumber) return null;
-    const cleanUnit = unitNumber.replace(/\D/g, '');
-    return trucks.find(t => t.unit_number.includes(cleanUnit) || cleanUnit.includes(t.unit_number)) || null;
-  };
-
-  // Check if an expense already exists in the database and return its ID
-  const findDuplicateId = (expense: ExtractedExpense, matchedLoad: FleetLoad | null): string | null => {
-    const duplicate = existingExpenses.find(existing => {
-      const sameDate = existing.expense_date === expense.date;
-      const sameType = existing.expense_type === expense.expense_type;
-      const sameAmount = Math.abs(existing.amount - Math.abs(expense.amount)) < 0.01;
-      const sameLoad = matchedLoad?.id === existing.load_id;
-      
-      // If same date, type, amount, and load - likely a duplicate
-      if (sameDate && sameType && sameAmount && sameLoad) return true;
-      
-      // If same date, type, and amount (within small tolerance) - also likely a duplicate
-      if (sameDate && sameType && sameAmount) return true;
-      
-      return false;
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
-    return duplicate?.id || null;
   };
 
-  const checkIsDuplicate = (expense: ExtractedExpense, matchedLoad: FleetLoad | null): boolean => {
-    return findDuplicateId(expense, matchedLoad) !== null;
+  const addFiles = (files: File[]) => {
+    const validFiles = files.filter(f => {
+      const name = f.name.toLowerCase();
+      return name.endsWith('.pdf') || name.endsWith('.xlsx') || name.endsWith('.xls');
+    });
+
+    if (validFiles.length === 0) {
+      toast.error('Please upload PDF or Excel (.xlsx/.xls) files');
+      return;
+    }
+
+    const newStaged: StagedFile[] = validFiles.map(file => ({
+      file,
+      type: detectFileType(file),
+      status: 'pending',
+    }));
+
+    setStagedFiles(prev => {
+      // Replace files of same detected type, keep others
+      const updated = [...prev];
+      for (const ns of newStaged) {
+        const existingIdx = updated.findIndex(s => s.type === ns.type);
+        if (existingIdx >= 0) {
+          updated[existingIdx] = ns;
+        } else {
+          updated.push(ns);
+        }
+      }
+      return updated;
+    });
+
+    setReconciliationResult(null);
+    setError(null);
+    toast.success(`${validFiles.length} file(s) staged`);
+  };
+
+  const removeFile = (index: number) => {
+    setStagedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -168,296 +157,98 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     setIsDragging(false);
   }, []);
 
-  const convertFileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(',')[1];
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const isExcelFile = (file: File) => {
-    const ext = file.name.toLowerCase();
-    return ext.endsWith('.xlsx') || ext.endsWith('.xls') ||
-      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      file.type === 'application/vnd.ms-excel';
-  };
-
-  const processFile = async (file: File) => {
-    const isPdf = file.type.includes('pdf') || file.name.toLowerCase().endsWith('.pdf');
-    const isExcel = isExcelFile(file);
-
-    if (!isPdf && !isExcel) {
-      toast.error('Please upload a PDF or Excel (.xlsx/.xls) file');
-      return;
-    }
-
-    setIsProcessing(true);
-    setFileName(file.name);
-    setError(null);
-    setStatementData(null);
-    setExpenses([]);
-    pendingFileRef.current = file;
-
-    try {
-      let data: any;
-
-      if (isExcel) {
-        const buffer = await file.arrayBuffer();
-        data = parseLandstarXlsx(buffer);
-        console.log('Parsed XLSX data:', data);
-      } else {
-        const pdfBase64 = await convertFileToBase64(file);
-        
-        if (!pdfBase64 || pdfBase64.length < 100) {
-          throw new Error('Could not read PDF file.');
-        }
-
-        console.log('PDF base64 length:', pdfBase64.length);
-
-        const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-landstar-statement', {
-          body: { pdfBase64 },
-        });
-
-        if (fnError) {
-          throw new Error(fnError.message || 'Failed to parse statement');
-        }
-
-        if (fnData.error) {
-          throw new Error(fnData.error);
-        }
-
-        data = fnData;
-      }
-
-      console.log('Extracted statement data:', data);
-      setStatementData(data);
-
-      // Match truck from statement
-      const statementTruck = findMatchingTruck(data.unit_number);
-
-      // Process expenses and match with loads
-      const processedExpenses: ExpenseWithMatch[] = (data.expenses || []).map((exp: ExtractedExpense) => {
-        const matchedLoad = findMatchingLoad(exp.trip_number);
-        const duplicateId = findDuplicateId(exp, matchedLoad);
-        // Extract jurisdiction from vendor for fuel/DEF expenses
-        const isFuelType = ['Fuel', 'DEF'].includes(exp.expense_type);
-        const jurisdiction = isFuelType ? extractJurisdictionFromVendor(exp.vendor || exp.description) : null;
-        return {
-          ...exp,
-          is_reimbursement: exp.is_reimbursement || false,
-          selected: !duplicateId,
-          matchedLoad,
-          matchedTruck: exp.trip_number ? null : statementTruck,
-          isDuplicate: duplicateId !== null,
-          duplicateId,
-          jurisdiction,
-        };
-      });
-
-      setExpenses(processedExpenses);
-      
-      const matchedCount = processedExpenses.filter((e: ExpenseWithMatch) => e.matchedLoad).length;
-      const duplicateCount = processedExpenses.filter((e: ExpenseWithMatch) => e.isDuplicate).length;
-      
-      let message = `Extracted ${processedExpenses.length} expenses (${matchedCount} matched to loads)`;
-      if (duplicateCount > 0) {
-        message += ` - ${duplicateCount} potential duplicates detected`;
-      }
-      toast.success(message);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to process file';
-      setError(message);
-      toast.error(message);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    
-    const files = Array.from(e.dataTransfer.files);
-    const validFile = files.find(f => 
-      f.type === 'application/pdf' || isExcelFile(f) || f.name.toLowerCase().endsWith('.pdf')
-    );
-    
-    if (validFile) {
-      processFile(validFile);
-    } else {
-      toast.error('Please drop a PDF or Excel file');
-    }
-  }, [existingLoads, trucks]);
+    addFiles(Array.from(e.dataTransfer.files));
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      processFile(file);
+    if (e.target.files) {
+      addFiles(Array.from(e.target.files));
+      e.target.value = '';
     }
   };
 
-  const toggleExpense = (index: number) => {
-    setExpenses(prev => prev.map((exp, i) => 
-      i === index ? { ...exp, selected: !exp.selected } : exp
-    ));
-  };
+  const processDocuments = async () => {
+    if (stagedFiles.length === 0) return;
+    setIsProcessing(true);
+    setError(null);
 
-  const toggleAll = (selected: boolean) => {
-    setExpenses(prev => prev.map(exp => ({ ...exp, selected })));
-  };
+    const updatedFiles = [...stagedFiles];
 
-  const updateLoadMatch = (index: number, loadId: string | null) => {
-    const matchedLoad = loadId ? existingLoads.find(l => l.id === loadId) || null : null;
-    setExpenses(prev => prev.map((exp, i) => 
-      i === index ? { ...exp, matchedLoad } : exp
-    ));
-    setEditingIndex(null);
-    toast.success(matchedLoad ? `Linked to load ${matchedLoad.landstar_load_id}` : 'Load unlinked');
-  };
+    for (let i = 0; i < updatedFiles.length; i++) {
+      const sf = updatedFiles[i];
+      if (sf.status === 'parsed') continue;
 
-  const handleImport = async (importAll: boolean = false) => {
-    const toImport = importAll ? expenses : expenses.filter(e => e.selected);
-    
-    if (toImport.length === 0) {
-      toast.error('No expenses selected for import');
+      try {
+        const isExcel = isExcelFile(sf.file);
+        let data: any;
+
+        if (isExcel) {
+          const buffer = await sf.file.arrayBuffer();
+          data = parseLandstarXlsx(buffer);
+        } else {
+          const pdfBase64 = await convertFileToBase64(sf.file);
+          if (!pdfBase64 || pdfBase64.length < 100) throw new Error('Could not read PDF file.');
+          const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-landstar-statement', {
+            body: { pdfBase64 },
+          });
+          if (fnError) throw new Error(fnError.message || 'Failed to parse statement');
+          if (fnData.error) throw new Error(fnData.error);
+          data = fnData;
+        }
+
+        updatedFiles[i] = { ...sf, status: 'parsed', data };
+      } catch (err) {
+        updatedFiles[i] = { ...sf, status: 'error', error: err instanceof Error ? err.message : 'Parse failed' };
+      }
+    }
+
+    setStagedFiles(updatedFiles);
+
+    const parsedCount = updatedFiles.filter(f => f.status === 'parsed').length;
+    const errorCount = updatedFiles.filter(f => f.status === 'error').length;
+
+    if (parsedCount === 0) {
+      setError('All files failed to parse');
+      setIsProcessing(false);
       return;
     }
 
-    // Filter out expenses without valid dates
-    const validExpenses = toImport.filter(exp => {
-      if (!exp.date || exp.date.trim() === '') {
-        console.warn('Skipping expense without date:', exp);
-        return false;
-      }
-      // Validate date format (YYYY-MM-DD)
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(exp.date)) {
-        console.warn('Skipping expense with invalid date format:', exp);
-        return false;
-      }
-      return true;
-    });
+    // Reconcile
+    const result = reconcileDocuments(updatedFiles);
+    setReconciliationResult(result);
 
-    if (validExpenses.length === 0) {
-      toast.error('No expenses with valid dates to import');
-      return;
+    // Save files to documents
+    for (const sf of updatedFiles) {
+      if (sf.status === 'parsed') {
+        saveToDocuments(sf.file);
+      }
     }
 
-    if (validExpenses.length < toImport.length) {
-      toast.warning(`Skipping ${toImport.length - validExpenses.length} expenses without valid dates`);
+    const msg = `Processed ${parsedCount} file(s): ${result.expenses.length} expenses, ${result.earnings.length} earnings`;
+    if (errorCount > 0) {
+      toast.warning(`${msg} (${errorCount} file(s) failed)`);
+    } else {
+      toast.success(msg);
     }
-
-    setIsImporting(true);
-
-    try {
-      // Separate new expenses from duplicates that need to be updated
-      const newExpenses = validExpenses.filter(exp => !exp.duplicateId);
-      const duplicateExpenses = validExpenses.filter(exp => exp.duplicateId);
-
-      let insertedCount = 0;
-      let updatedCount = 0;
-
-      // Insert new expenses
-      if (newExpenses.length > 0) {
-        const expenseInserts = newExpenses.map(exp => ({
-          expense_date: exp.date,
-          expense_type: exp.is_reimbursement ? 'Reimbursement' : exp.expense_type,
-          amount: exp.is_reimbursement ? -Math.abs(exp.amount) : Math.abs(exp.amount),
-          description: exp.description,
-          vendor: exp.vendor,
-          gallons: exp.gallons,
-          load_id: exp.matchedLoad?.id || null,
-          truck_id: exp.matchedTruck?.id || null,
-          notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
-          jurisdiction: exp.jurisdiction,
-          org_id: orgId,
-        }));
-
-        const { error } = await supabase.from('expenses').insert(expenseInserts);
-        if (error) throw error;
-        insertedCount = newExpenses.length;
-      }
-
-      // Update duplicate expenses (overwrite existing)
-      for (const exp of duplicateExpenses) {
-        const updateData = {
-          expense_date: exp.date,
-          expense_type: exp.is_reimbursement ? 'Reimbursement' : exp.expense_type,
-          amount: exp.is_reimbursement ? -Math.abs(exp.amount) : Math.abs(exp.amount),
-          description: exp.description,
-          vendor: exp.vendor,
-          gallons: exp.gallons,
-          load_id: exp.matchedLoad?.id || null,
-          truck_id: exp.matchedTruck?.id || null,
-          notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
-          jurisdiction: exp.jurisdiction,
-          org_id: orgId,
-          updated_at: new Date().toISOString(),
-        };
-
-        const { error } = await supabase
-          .from('expenses')
-          .update(updateData)
-          .eq('id', exp.duplicateId!);
-        
-        if (error) throw error;
-        updatedCount++;
-      }
-
-      // Build success message
-      const messages: string[] = [];
-      if (insertedCount > 0) messages.push(`${insertedCount} new`);
-      if (updatedCount > 0) messages.push(`${updatedCount} updated`);
-      
-      toast.success(`Successfully imported: ${messages.join(', ')} expenses`);
-      // Save the PDF to documents tab
-      if (pendingFileRef.current) {
-        saveToDocuments(pendingFileRef.current);
-        pendingFileRef.current = null;
-      }
-      handleCancel();
-      onExpensesImported();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to import expenses';
-      toast.error(message);
-    } finally {
-      setIsImporting(false);
-    }
+    setIsProcessing(false);
   };
 
   const handleCancel = () => {
-    setStatementData(null);
-    setExpenses([]);
-    setFileName(null);
+    setStagedFiles([]);
+    setReconciliationResult(null);
     setError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+  const handleImported = () => {
+    handleCancel();
+    onExpensesImported();
   };
 
-  const selectedExpenses = expenses.filter(e => e.selected);
-  const selectedCount = selectedExpenses.length;
-  const duplicateCount = expenses.filter(e => e.isDuplicate).length;
-  const reimbursementCount = expenses.filter(e => e.is_reimbursement || e.is_discount).length;
-  
-  // Calculate totals: expenses are positive (cost), reimbursements/discounts subtract from total
-  const selectedExpensesTotal = selectedExpenses
-    .filter(e => !e.is_reimbursement && !e.is_discount)
-    .reduce((sum, e) => sum + Math.abs(e.amount), 0);
-  const selectedReimbursementsTotal = selectedExpenses
-    .filter(e => e.is_reimbursement || e.is_discount)
-    .reduce((sum, e) => sum + Math.abs(e.amount), 0);
-  const netTotal = selectedExpensesTotal - selectedReimbursementsTotal;
+  // Which types are staged?
+  const stagedTypes = new Set(stagedFiles.map(f => f.type));
 
   return (
     <Card className="mb-6">
@@ -467,47 +258,116 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
           Import from Landstar Statements
         </CardTitle>
         <CardDescription>
-          Upload Card Activity or Contractor Statements to automatically extract and import expenses
+          Upload multiple documents at once — we'll cross-reference and deduplicate before importing
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Drop Zone */}
-        {!statementData && (
-          <div
-            className={cn(
-              "border-2 border-dashed rounded-lg p-6 transition-all cursor-pointer text-center",
-              isDragging && "border-primary bg-primary/5",
-              isProcessing && "opacity-50 pointer-events-none",
-              !isDragging && !isProcessing && "hover:border-primary/50 hover:bg-muted/50"
-            )}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => !isProcessing && fileInputRef.current?.click()}
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="h-8 w-8 text-primary animate-spin mx-auto mb-2" />
-                <p className="text-sm font-medium">Processing {fileName}...</p>
-                <p className="text-xs text-muted-foreground">Extracting expenses...</p>
-              </>
-            ) : (
-              <>
-                <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm font-medium">Drop Statement PDF or Excel file here</p>
-                <p className="text-xs text-muted-foreground">Supports Card Activity, Contractor Statements & Excel exports</p>
-              </>
-            )}
-          </div>
-        )}
+        {/* Show dropzone + checklist when no reconciliation result */}
+        {!reconciliationResult && (
+          <>
+            {/* Multi-File Drop Zone */}
+            <div
+              className={cn(
+                'border-2 border-dashed rounded-lg p-6 transition-all cursor-pointer text-center',
+                isDragging && 'border-primary bg-primary/5',
+                isProcessing && 'opacity-50 pointer-events-none',
+                !isDragging && !isProcessing && 'hover:border-primary/50 hover:bg-muted/50'
+              )}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => !isProcessing && fileInputRef.current?.click()}
+            >
+              <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm font-medium">Drop statement files here (PDF & Excel)</p>
+              <p className="text-xs text-muted-foreground">
+                Supports Card Activity PDF, Contractor PDF, Settlement XLSX, Freight Bill XLSX
+              </p>
+            </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.xlsx,.xls"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.xlsx,.xls"
+              multiple
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+
+            {/* Document Checklist */}
+            {stagedFiles.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Document Checklist</p>
+                <div className="grid gap-2">
+                  {DOCUMENT_TYPES.map(type => {
+                    const staged = stagedFiles.find(f => f.type === type);
+                    const hasIt = !!staged;
+                    return (
+                      <div
+                        key={type}
+                        className={cn(
+                          'flex items-center justify-between rounded-lg border px-3 py-2 text-sm',
+                          hasIt ? 'border-success/40 bg-success/5' : 'border-border bg-muted/30'
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          {hasIt ? (
+                            <CheckCircle className="h-4 w-4 text-success" />
+                          ) : (
+                            <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
+                          )}
+                          <span className="flex items-center gap-1.5">
+                            {TYPE_ICONS[type]}
+                            {getFileTypeLabel(type)}
+                          </span>
+                        </div>
+                        {staged && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground truncate max-w-[160px]">
+                              {staged.file.name}
+                            </span>
+                            {staged.status === 'error' && (
+                              <Badge variant="destructive" className="text-xs">Error</Badge>
+                            )}
+                            {staged.status === 'parsed' && (
+                              <Badge className="text-xs bg-success/20 text-success border-success/30">Parsed</Badge>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFile(stagedFiles.indexOf(staged));
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Process Button */}
+                <div className="flex gap-2 justify-end">
+                  <Button variant="outline" onClick={handleCancel} disabled={isProcessing}>
+                    Clear All
+                  </Button>
+                  <Button
+                    onClick={processDocuments}
+                    disabled={isProcessing || stagedFiles.length === 0}
+                    className="gradient-gold text-primary-foreground"
+                  >
+                    {isProcessing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Process {stagedFiles.length} Document{stagedFiles.length !== 1 ? 's' : ''}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
 
         {/* Error Display */}
         {error && (
@@ -515,7 +375,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-destructive">Failed to parse document</p>
+                <p className="text-sm font-medium text-destructive">Failed to process documents</p>
                 <p className="text-xs text-muted-foreground mt-1">{error}</p>
               </div>
               <Button variant="ghost" size="icon" className="shrink-0" onClick={handleCancel}>
@@ -525,228 +385,32 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
           </div>
         )}
 
-        {/* Extracted Expenses Preview */}
-        {statementData && expenses.length > 0 && (
-          <div className="space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-success" />
-                <div>
-                  <p className="text-sm font-medium">
-                    Extracted {expenses.length} expenses from {fileName}
-                  </p>
+        {/* Reconciliation Preview */}
+        {reconciliationResult && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-success" />
+              <div>
+                <p className="text-sm font-medium">
+                  Reconciled {stagedFiles.filter(f => f.status === 'parsed').length} documents
+                </p>
+                {reconciliationResult.periodStart && (
                   <p className="text-xs text-muted-foreground">
-                    {statementData.statement_type === 'card_activity' ? 'Card Activity Statement' : 'Contractor Statement'}
-                    {statementData.period_start && ` • ${statementData.period_start} to ${statementData.period_end}`}
+                    Period: {reconciliationResult.periodStart} to {reconciliationResult.periodEnd}
+                    {reconciliationResult.unitNumber && ` • Unit ${reconciliationResult.unitNumber}`}
                   </p>
-                </div>
-              </div>
-              <Button variant="ghost" size="icon" onClick={handleCancel}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Expenses Table */}
-            <div className="border rounded-lg overflow-hidden max-h-96 overflow-y-auto">
-              <Table>
-                <TableHeader className="sticky top-0 bg-background">
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox 
-                        checked={selectedCount === expenses.length}
-                        onCheckedChange={(checked) => toggleAll(!!checked)}
-                      />
-                    </TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Load Match</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {expenses.map((expense, index) => (
-                    <TableRow 
-                      key={index}
-                      className={cn(
-                        (expense.is_discount || expense.is_reimbursement) && "bg-success/5",
-                        expense.isDuplicate && "bg-warning/10",
-                        !expense.selected && "opacity-50"
-                      )}
-                    >
-                      <TableCell>
-                        <Checkbox 
-                          checked={expense.selected}
-                          onCheckedChange={() => toggleExpense(index)}
-                        />
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="date"
-                            value={expense.date}
-                            onChange={(e) => {
-                              const newDate = e.target.value;
-                              setExpenses(prev => prev.map((exp, i) => 
-                                i === index ? { ...exp, date: newDate } : exp
-                              ));
-                            }}
-                            className="bg-transparent border-b border-dashed border-muted-foreground/40 hover:border-primary focus:border-primary focus:outline-none text-sm w-32 cursor-pointer"
-                          />
-                          {expense.isDuplicate && (
-                            <span title="Potential duplicate">
-                              <AlertTriangle className="h-3 w-3 text-warning" />
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {(expense.is_reimbursement || expense.is_discount) && (
-                            <TrendingUp className="h-3 w-3 text-success" />
-                          )}
-                          <Badge 
-                            variant={(expense.is_discount || expense.is_reimbursement) ? "secondary" : "outline"} 
-                            className={cn(
-                              "text-xs",
-                              (expense.is_reimbursement || expense.is_discount) && "bg-success/20 text-success border-success/30"
-                            )}
-                          >
-                            {expense.is_reimbursement ? 'Reimbursement' : expense.expense_type}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm max-w-48 truncate" title={expense.description}>
-                        {expense.vendor || expense.description}
-                        {expense.gallons && (
-                          <span className="text-xs text-muted-foreground ml-1">
-                            ({expense.gallons.toFixed(1)} gal)
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className={cn(
-                        "text-right font-mono text-sm font-medium",
-                        (expense.is_discount || expense.is_reimbursement) ? "text-success" : "text-destructive"
-                      )}>
-                        {(expense.is_discount || expense.is_reimbursement) ? '+' : '-'}{formatCurrency(Math.abs(expense.amount))}
-                      </TableCell>
-                      <TableCell className="min-w-[200px]">
-                        {editingIndex === index ? (
-                          <div className="flex items-center gap-1">
-                            <Select
-                              value={expense.matchedLoad?.id || 'none'}
-                              onValueChange={(value) => updateLoadMatch(index, value === 'none' ? null : value)}
-                            >
-                              <SelectTrigger className="h-7 text-xs w-[140px]">
-                                <SelectValue placeholder="Select load" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">
-                                  <span className="flex items-center gap-1">
-                                    <Unlink className="h-3 w-3" />
-                                    No link
-                                  </span>
-                                </SelectItem>
-                                {existingLoads.map(load => (
-                                  <SelectItem key={load.id} value={load.id}>
-                                    <span className="font-mono text-xs">{load.landstar_load_id}</span>
-                                    <span className="text-muted-foreground ml-1 text-xs truncate">
-                                      {load.origin?.split(',')[0]} → {load.destination?.split(',')[0]}
-                                    </span>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-6 w-6"
-                              onClick={() => setEditingIndex(null)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            {expense.matchedLoad ? (
-                              <div className="flex items-center gap-1 text-xs">
-                                <Link className="h-3 w-3 text-success" />
-                                <span className="text-success font-mono">{expense.matchedLoad.landstar_load_id}</span>
-                              </div>
-                            ) : expense.trip_number ? (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Unlink className="h-3 w-3" />
-                                <span className="font-mono">{expense.trip_number}</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 ml-1 opacity-50 hover:opacity-100"
-                              onClick={() => setEditingIndex(index)}
-                              title="Edit load match"
-                            >
-                              <Edit2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* Summary & Actions */}
-            <div className="flex items-center justify-between pt-2 border-t">
-              <div className="text-sm space-x-2">
-                <span className="text-muted-foreground">Selected: </span>
-                <span className="font-medium">{selectedCount}</span>
-                {duplicateCount > 0 && (
-                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    {duplicateCount} duplicates
-                  </Badge>
                 )}
-                {reimbursementCount > 0 && (
-                  <Badge variant="outline" className="text-xs text-success border-success/30">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    {reimbursementCount} refunds
-                  </Badge>
-                )}
-                <span className="text-muted-foreground ml-2">• Net: </span>
-                <span className={cn(
-                  "font-mono font-medium",
-                  netTotal >= 0 ? "text-destructive" : "text-success"
-                )}>
-                  {formatCurrency(netTotal)}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleCancel} disabled={isImporting}>
-                  Cancel
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => handleImport(false)} 
-                  disabled={selectedCount === 0 || isImporting}
-                >
-                  {isImporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Import Selected ({selectedCount})
-                </Button>
-                <Button 
-                  onClick={() => handleImport(true)} 
-                  disabled={isImporting}
-                  className="gradient-gold text-primary-foreground"
-                >
-                  {isImporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Import All ({expenses.length})
-                </Button>
               </div>
             </div>
+            <ReconciliationPreview
+              result={reconciliationResult}
+              existingLoads={existingLoads}
+              trucks={trucks}
+              existingExpenses={existingExpenses}
+              orgId={orgId}
+              onImported={handleImported}
+              onCancel={handleCancel}
+            />
           </div>
         )}
       </CardContent>
