@@ -9,6 +9,7 @@ import { Upload, FileText, Loader2, CheckCircle, AlertCircle, X, Link, Unlink, E
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
+import { parseLandstarXlsx } from '@/lib/parse-landstar-xlsx';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStorageProvider } from '@/hooks/useStorageProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -180,9 +181,19 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     });
   };
 
+  const isExcelFile = (file: File) => {
+    const ext = file.name.toLowerCase();
+    return ext.endsWith('.xlsx') || ext.endsWith('.xls') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.type === 'application/vnd.ms-excel';
+  };
+
   const processFile = async (file: File) => {
-    if (!file.type.includes('pdf')) {
-      toast.error('Please upload a PDF file');
+    const isPdf = file.type.includes('pdf') || file.name.toLowerCase().endsWith('.pdf');
+    const isExcel = isExcelFile(file);
+
+    if (!isPdf && !isExcel) {
+      toast.error('Please upload a PDF or Excel (.xlsx/.xls) file');
       return;
     }
 
@@ -194,24 +205,34 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     pendingFileRef.current = file;
 
     try {
-      const pdfBase64 = await convertFileToBase64(file);
-      
-      if (!pdfBase64 || pdfBase64.length < 100) {
-        throw new Error('Could not read PDF file.');
-      }
+      let data: any;
 
-      console.log('PDF base64 length:', pdfBase64.length);
+      if (isExcel) {
+        const buffer = await file.arrayBuffer();
+        data = parseLandstarXlsx(buffer);
+        console.log('Parsed XLSX data:', data);
+      } else {
+        const pdfBase64 = await convertFileToBase64(file);
+        
+        if (!pdfBase64 || pdfBase64.length < 100) {
+          throw new Error('Could not read PDF file.');
+        }
 
-      const { data, error: fnError } = await supabase.functions.invoke('parse-landstar-statement', {
-        body: { pdfBase64 },
-      });
+        console.log('PDF base64 length:', pdfBase64.length);
 
-      if (fnError) {
-        throw new Error(fnError.message || 'Failed to parse statement');
-      }
+        const { data: fnData, error: fnError } = await supabase.functions.invoke('parse-landstar-statement', {
+          body: { pdfBase64 },
+        });
 
-      if (data.error) {
-        throw new Error(data.error);
+        if (fnError) {
+          throw new Error(fnError.message || 'Failed to parse statement');
+        }
+
+        if (fnData.error) {
+          throw new Error(fnData.error);
+        }
+
+        data = fnData;
       }
 
       console.log('Extracted statement data:', data);
@@ -263,12 +284,14 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     setIsDragging(false);
     
     const files = Array.from(e.dataTransfer.files);
-    const pdfFile = files.find(f => f.type === 'application/pdf');
+    const validFile = files.find(f => 
+      f.type === 'application/pdf' || isExcelFile(f) || f.name.toLowerCase().endsWith('.pdf')
+    );
     
-    if (pdfFile) {
-      processFile(pdfFile);
+    if (validFile) {
+      processFile(validFile);
     } else {
-      toast.error('Please drop a PDF file');
+      toast.error('Please drop a PDF or Excel file');
     }
   }, [existingLoads, trucks]);
 
@@ -466,13 +489,13 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
               <>
                 <Loader2 className="h-8 w-8 text-primary animate-spin mx-auto mb-2" />
                 <p className="text-sm font-medium">Processing {fileName}...</p>
-                <p className="text-xs text-muted-foreground">Extracting expenses with AI</p>
+                <p className="text-xs text-muted-foreground">Extracting expenses...</p>
               </>
             ) : (
               <>
                 <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm font-medium">Drop Statement PDF here</p>
-                <p className="text-xs text-muted-foreground">Supports Card Activity & Contractor Statements</p>
+                <p className="text-sm font-medium">Drop Statement PDF or Excel file here</p>
+                <p className="text-xs text-muted-foreground">Supports Card Activity, Contractor Statements & Excel exports</p>
               </>
             )}
           </div>
@@ -481,7 +504,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf"
+          accept=".pdf,.xlsx,.xls"
           className="hidden"
           onChange={handleFileSelect}
         />
