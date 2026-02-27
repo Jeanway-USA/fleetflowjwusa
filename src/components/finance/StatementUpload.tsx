@@ -583,7 +583,17 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
                       </TableCell>
                       <TableCell className="text-sm">
                         <div className="flex items-center gap-1">
-                          {expense.date}
+                          <input
+                            type="date"
+                            value={expense.date}
+                            onChange={(e) => {
+                              const newDate = e.target.value;
+                              setExpenses(prev => prev.map((exp, i) => 
+                                i === index ? { ...exp, date: newDate } : exp
+                              ));
+                            }}
+                            className="bg-transparent border-b border-dashed border-muted-foreground/40 hover:border-primary focus:border-primary focus:outline-none text-sm w-32 cursor-pointer"
+                          />
                           {expense.isDuplicate && (
                             <span title="Potential duplicate">
                               <AlertTriangle className="h-3 w-3 text-warning" />
