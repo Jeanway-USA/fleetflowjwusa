@@ -27,6 +27,7 @@ export interface ExtractedExpense {
   gallons: number | null;
   is_discount: boolean;
   is_reimbursement: boolean;
+  is_advance: boolean;
 }
 
 export interface ReconciledExpense extends ExtractedExpense {
@@ -35,17 +36,10 @@ export interface ReconciledExpense extends ExtractedExpense {
   selected: boolean;
 }
 
-export interface ReconciledEarning {
-  date: string;
-  description: string;
-  amount: number;
-  trip_number: string | null;
-  sources: string[];
-}
-
 export interface ReconciliationResult {
-  earnings: ReconciledEarning[];
   expenses: ReconciledExpense[];
+  advances: ReconciledExpense[];
+  credits: ReconciledExpense[];
   periodStart: string | null;
   periodEnd: string | null;
   unitNumber: string | null;
@@ -63,6 +57,15 @@ export function getFileTypeLabel(type: StagedFile['type']): string {
   return FILE_TYPE_LABELS[type] || 'Unknown';
 }
 
+// Revenue patterns to ignore from contractor PDFs
+const REVENUE_IGNORE_PATTERNS: RegExp[] = [
+  /\bTRACTOR\s*L\/H\b/i,
+  /\bLINE\s*HAUL\b/i,
+  /\b1099\s*REVENUE\b/i,
+  /\bLINEHAUL\b/i,
+  /\bTRACTOR\s*LEASE\b/i,
+];
+
 /**
  * Detect document type from filename patterns
  */
@@ -78,7 +81,6 @@ export function detectFileType(file: File): StagedFile['type'] {
     if (/settlement/i.test(name) || /stl\s*detail/i.test(name)) {
       return 'settlement_xlsx';
     }
-    // Default: if it has "freight" it's freight bill, otherwise settlement
     if (/freight/i.test(name)) return 'freight_bill_xlsx';
     return 'settlement_xlsx';
   }
@@ -90,7 +92,6 @@ export function detectFileType(file: File): StagedFile['type'] {
     if (/contractor/i.test(name) || /bco/i.test(name) || /statement/i.test(name)) {
       return 'contractor_pdf';
     }
-    // Default PDF → contractor
     return 'contractor_pdf';
   }
 
@@ -100,12 +101,12 @@ export function detectFileType(file: File): StagedFile['type'] {
 /**
  * Main reconciliation engine.
  * Takes parsed results from multiple documents and merges/deduplicates them.
+ * Splits into 3 buckets: expenses, advances, credits.
  */
 export function reconcileDocuments(
   stagedFiles: StagedFile[]
 ): ReconciliationResult {
   const allExpenses: (ExtractedExpense & { source: string })[] = [];
-  const allEarnings: ReconciledEarning[] = [];
   let periodStart: string | null = null;
   let periodEnd: string | null = null;
   let unitNumber: string | null = null;
@@ -126,16 +127,11 @@ export function reconcileDocuments(
     }
 
     for (const exp of sf.data.expenses) {
-      // Revenue rows from contractor PDF (positive, non-reimbursement) → earnings
-      if (sf.type === 'contractor_pdf' && exp.amount > 0 && !exp.is_reimbursement) {
-        allEarnings.push({
-          date: exp.date,
-          description: exp.description,
-          amount: exp.amount,
-          trip_number: exp.trip_number,
-          sources: [sourceLabel],
-        });
-        continue;
+      // Skip revenue lines from contractor PDFs
+      if (sf.type === 'contractor_pdf' && !exp.is_reimbursement && !exp.is_advance && !exp.is_discount) {
+        if (REVENUE_IGNORE_PATTERNS.some(p => p.test(exp.description))) continue;
+        // Also skip positive amounts that aren't credits/advances/reimbursements
+        if (exp.amount > 0) continue;
       }
       allExpenses.push({ ...exp, source: sourceLabel });
     }
@@ -149,12 +145,10 @@ export function reconcileDocuments(
     const existing = deduped.get(key);
 
     if (existing) {
-      // Merge: add source, mark as merged
       if (!existing.sources.includes(item.source)) {
         existing.sources.push(item.source);
       }
       existing.merged = true;
-      // Prefer richer data (vendor, gallons, trip_number)
       if (!existing.vendor && item.vendor) existing.vendor = item.vendor;
       if (!existing.gallons && item.gallons) existing.gallons = item.gallons;
       if (!existing.trip_number && item.trip_number) existing.trip_number = item.trip_number;
@@ -169,9 +163,25 @@ export function reconcileDocuments(
     }
   }
 
+  // Split into 3 buckets
+  const expenses: ReconciledExpense[] = [];
+  const advances: ReconciledExpense[] = [];
+  const credits: ReconciledExpense[] = [];
+
+  for (const item of deduped.values()) {
+    if (item.is_advance) {
+      advances.push(item);
+    } else if (item.is_reimbursement || item.is_discount) {
+      credits.push(item);
+    } else {
+      expenses.push(item);
+    }
+  }
+
   return {
-    earnings: allEarnings,
-    expenses: Array.from(deduped.values()),
+    expenses,
+    advances,
+    credits,
     periodStart,
     periodEnd,
     unitNumber,

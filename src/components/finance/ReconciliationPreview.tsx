@@ -7,11 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Link, Unlink, Edit2, X, AlertTriangle, TrendingUp, Layers, CheckCircle } from 'lucide-react';
+import { Loader2, Link, Unlink, Edit2, X, AlertTriangle, TrendingUp, TrendingDown, Layers, CheckCircle, Banknote, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
-import type { ReconciliationResult, ReconciledExpense, ReconciledEarning } from '@/lib/settlement-reconciliation';
+import type { ReconciliationResult, ReconciledExpense } from '@/lib/settlement-reconciliation';
 
 interface FleetLoad {
   id: string;
@@ -51,6 +51,56 @@ interface ExpenseRow extends ReconciledExpense {
   jurisdiction: string | null;
 }
 
+function buildRows(
+  items: ReconciledExpense[],
+  existingLoads: FleetLoad[],
+  trucks: Truck[],
+  existingExpenses: ExistingExpense[],
+  unitNumber: string | null
+): ExpenseRow[] {
+  return items.map(exp => {
+    const matchedLoad = findMatchingLoad(exp.trip_number, existingLoads);
+    const duplicateId = findDuplicateId(exp, existingExpenses);
+    const isFuelType = ['Fuel', 'DEF'].includes(exp.expense_type);
+    const jurisdiction = isFuelType ? extractJurisdictionFromVendor(exp.vendor || exp.description) : null;
+    return {
+      ...exp,
+      selected: !duplicateId,
+      matchedLoad,
+      matchedTruck: findMatchingTruck(unitNumber, trucks),
+      isDuplicate: duplicateId !== null,
+      duplicateId,
+      jurisdiction,
+    };
+  });
+}
+
+function findMatchingLoad(tripNumber: string | null, existingLoads: FleetLoad[]): FleetLoad | null {
+  if (!tripNumber) return null;
+  const numericId = tripNumber.replace(/^[A-Z]{3}\s*/i, '').trim();
+  return existingLoads.find(load => {
+    if (!load.landstar_load_id) return false;
+    const loadNumericId = load.landstar_load_id.replace(/^[A-Z]{3}\s*/i, '').trim();
+    return loadNumericId === numericId || load.landstar_load_id === numericId;
+  }) || null;
+}
+
+function findMatchingTruck(unitNumber: string | null, trucks: Truck[]): Truck | null {
+  if (!unitNumber) return null;
+  const cleanUnit = unitNumber.replace(/\D/g, '');
+  return trucks.find(t => t.unit_number.includes(cleanUnit) || cleanUnit.includes(t.unit_number)) || null;
+}
+
+function findDuplicateId(expense: ReconciledExpense, existingExpenses: ExistingExpense[]): string | null {
+  const dup = existingExpenses.find(existing => {
+    const sameDate = existing.expense_date === expense.date;
+    const sameType = existing.expense_type === expense.expense_type;
+    const sameAmount = Math.abs(existing.amount - Math.abs(expense.amount)) < 0.01;
+    return sameDate && sameType && sameAmount;
+  });
+  return dup?.id || null;
+}
+
 export function ReconciliationPreview({
   result,
   existingLoads,
@@ -61,150 +111,133 @@ export function ReconciliationPreview({
   onCancel,
 }: ReconciliationPreviewProps) {
   const [isImporting, setIsImporting] = useState(false);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [selectedEarnings, setSelectedEarnings] = useState<Set<number>>(
-    () => new Set(result.earnings.map((_, i) => i))
+  const [editingIndex, setEditingIndex] = useState<{ tab: string; index: number } | null>(null);
+
+  const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>(() =>
+    buildRows(result.expenses, existingLoads, trucks, existingExpenses, result.unitNumber)
   );
-
-  // Build expense rows with load/truck matching and duplicate detection
-  const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>(() => {
-    return result.expenses.map(exp => {
-      const matchedLoad = findMatchingLoad(exp.trip_number);
-      const duplicateId = findDuplicateId(exp, matchedLoad);
-      const isFuelType = ['Fuel', 'DEF'].includes(exp.expense_type);
-      const jurisdiction = isFuelType ? extractJurisdictionFromVendor(exp.vendor || exp.description) : null;
-      return {
-        ...exp,
-        selected: !duplicateId,
-        matchedLoad,
-        matchedTruck: findMatchingTruck(result.unitNumber),
-        isDuplicate: duplicateId !== null,
-        duplicateId,
-        jurisdiction,
-      };
-    });
-  });
-
-  function findMatchingLoad(tripNumber: string | null): FleetLoad | null {
-    if (!tripNumber) return null;
-    const numericId = tripNumber.replace(/^[A-Z]{3}\s*/i, '').trim();
-    return existingLoads.find(load => {
-      if (!load.landstar_load_id) return false;
-      const loadNumericId = load.landstar_load_id.replace(/^[A-Z]{3}\s*/i, '').trim();
-      return loadNumericId === numericId || load.landstar_load_id === numericId;
-    }) || null;
-  }
-
-  function findMatchingTruck(unitNumber: string | null): Truck | null {
-    if (!unitNumber) return null;
-    const cleanUnit = unitNumber.replace(/\D/g, '');
-    return trucks.find(t => t.unit_number.includes(cleanUnit) || cleanUnit.includes(t.unit_number)) || null;
-  }
-
-  function findDuplicateId(expense: ReconciledExpense, matchedLoad: FleetLoad | null): string | null {
-    const dup = existingExpenses.find(existing => {
-      const sameDate = existing.expense_date === expense.date;
-      const sameType = existing.expense_type === expense.expense_type;
-      const sameAmount = Math.abs(existing.amount - Math.abs(expense.amount)) < 0.01;
-      return sameDate && sameType && sameAmount;
-    });
-    return dup?.id || null;
-  }
-
-  const toggleExpense = (index: number) => {
-    setExpenseRows(prev => prev.map((exp, i) => i === index ? { ...exp, selected: !exp.selected } : exp));
-  };
-
-  const toggleAllExpenses = (selected: boolean) => {
-    setExpenseRows(prev => prev.map(exp => ({ ...exp, selected })));
-  };
-
-  const updateLoadMatch = (index: number, loadId: string | null) => {
-    const matchedLoad = loadId ? existingLoads.find(l => l.id === loadId) || null : null;
-    setExpenseRows(prev => prev.map((exp, i) => i === index ? { ...exp, matchedLoad } : exp));
-    setEditingIndex(null);
-  };
-
-  const updateDate = (index: number, newDate: string) => {
-    setExpenseRows(prev => prev.map((exp, i) => i === index ? { ...exp, date: newDate } : exp));
-  };
+  const [advanceRows, setAdvanceRows] = useState<ExpenseRow[]>(() =>
+    buildRows(result.advances, existingLoads, trucks, existingExpenses, result.unitNumber)
+  );
+  const [creditRows, setCreditRows] = useState<ExpenseRow[]>(() =>
+    buildRows(result.credits, existingLoads, trucks, existingExpenses, result.unitNumber)
+  );
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 
+  // Totals
   const selectedExpenses = expenseRows.filter(e => e.selected);
-  const duplicateCount = expenseRows.filter(e => e.isDuplicate).length;
-  const mergedCount = expenseRows.filter(e => e.merged).length;
-  const reimbursementCount = expenseRows.filter(e => e.is_reimbursement || e.is_discount).length;
+  const selectedAdvances = advanceRows.filter(e => e.selected);
+  const selectedCredits = creditRows.filter(e => e.selected);
 
-  const expensesTotal = selectedExpenses
-    .filter(e => !e.is_reimbursement && !e.is_discount)
-    .reduce((sum, e) => sum + Math.abs(e.amount), 0);
-  const reimbursementsTotal = selectedExpenses
-    .filter(e => e.is_reimbursement || e.is_discount)
-    .reduce((sum, e) => sum + Math.abs(e.amount), 0);
-  const netTotal = expensesTotal - reimbursementsTotal;
+  const expensesTotal = selectedExpenses.reduce((sum, e) => sum + Math.abs(e.amount), 0);
+  const creditsTotal = selectedCredits.reduce((sum, e) => sum + Math.abs(e.amount), 0);
+  const advancesTotal = selectedAdvances.reduce((sum, e) => sum + Math.abs(e.amount), 0);
+  const netExpense = expensesTotal - creditsTotal;
 
-  const earningsTotal = result.earnings
-    .filter((_, i) => selectedEarnings.has(i))
-    .reduce((sum, e) => sum + e.amount, 0);
+  const mergedCount = [...expenseRows, ...advanceRows, ...creditRows].filter(e => e.merged).length;
+  const duplicateCount = [...expenseRows, ...advanceRows, ...creditRows].filter(e => e.isDuplicate).length;
+
+  const toggleRow = (
+    setter: React.Dispatch<React.SetStateAction<ExpenseRow[]>>,
+    index: number
+  ) => {
+    setter(prev => prev.map((r, i) => i === index ? { ...r, selected: !r.selected } : r));
+  };
+
+  const toggleAll = (
+    setter: React.Dispatch<React.SetStateAction<ExpenseRow[]>>,
+    selected: boolean
+  ) => {
+    setter(prev => prev.map(r => ({ ...r, selected })));
+  };
+
+  const updateLoadMatch = (
+    setter: React.Dispatch<React.SetStateAction<ExpenseRow[]>>,
+    index: number,
+    loadId: string | null
+  ) => {
+    const matchedLoad = loadId ? existingLoads.find(l => l.id === loadId) || null : null;
+    setter(prev => prev.map((r, i) => i === index ? { ...r, matchedLoad } : r));
+    setEditingIndex(null);
+  };
+
+  const updateDate = (
+    setter: React.Dispatch<React.SetStateAction<ExpenseRow[]>>,
+    index: number,
+    newDate: string
+  ) => {
+    setter(prev => prev.map((r, i) => i === index ? { ...r, date: newDate } : r));
+  };
 
   const handleImport = async () => {
-    const toImport = selectedExpenses;
-    if (toImport.length === 0) {
-      toast.error('No expenses selected for import');
+    const allSelected = [
+      ...selectedExpenses.map(e => ({ ...e, importType: 'expense' as const })),
+      ...selectedAdvances.map(e => ({ ...e, importType: 'advance' as const })),
+      ...selectedCredits.map(e => ({ ...e, importType: 'credit' as const })),
+    ];
+
+    if (allSelected.length === 0) {
+      toast.error('No items selected for import');
       return;
     }
 
-    const validExpenses = toImport.filter(exp => {
-      if (!exp.date || !/^\d{4}-\d{2}-\d{2}$/.test(exp.date)) return false;
-      return true;
-    });
-
-    if (validExpenses.length === 0) {
-      toast.error('No expenses with valid dates to import');
+    const validItems = allSelected.filter(exp => exp.date && /^\d{4}-\d{2}-\d{2}$/.test(exp.date));
+    if (validItems.length === 0) {
+      toast.error('No items with valid dates to import');
       return;
     }
 
     setIsImporting(true);
     try {
-      const newExpenses = validExpenses.filter(exp => !exp.duplicateId);
-      const duplicateExpenses = validExpenses.filter(exp => exp.duplicateId);
+      const newItems = validItems.filter(exp => !exp.duplicateId);
+      const dupeItems = validItems.filter(exp => exp.duplicateId);
       let insertedCount = 0;
       let updatedCount = 0;
 
-      if (newExpenses.length > 0) {
-        const inserts = newExpenses.map(exp => ({
+      if (newItems.length > 0) {
+        const inserts = newItems.map(exp => ({
           expense_date: exp.date,
-          expense_type: exp.is_reimbursement ? 'Reimbursement' : exp.expense_type,
-          amount: exp.is_reimbursement ? -Math.abs(exp.amount) : Math.abs(exp.amount),
+          expense_type: exp.importType === 'advance' ? 'Advance'
+            : exp.is_reimbursement ? 'Reimbursement'
+            : exp.expense_type,
+          amount: exp.importType === 'credit' ? -Math.abs(exp.amount) : Math.abs(exp.amount),
           description: exp.description,
           vendor: exp.vendor,
           gallons: exp.gallons,
           load_id: exp.matchedLoad?.id || null,
           truck_id: exp.matchedTruck?.id || null,
-          notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
+          notes: exp.importType === 'advance' ? 'Advance (Non-P&L)'
+            : exp.is_reimbursement ? 'Reimbursement/Refund'
+            : exp.is_discount ? 'Discount/Credit'
+            : null,
           jurisdiction: exp.jurisdiction,
           org_id: orgId,
         }));
         const { error } = await supabase.from('expenses').insert(inserts);
         if (error) throw error;
-        insertedCount = newExpenses.length;
+        insertedCount = newItems.length;
       }
 
-      for (const exp of duplicateExpenses) {
+      for (const exp of dupeItems) {
         const { error } = await supabase
           .from('expenses')
           .update({
             expense_date: exp.date,
-            expense_type: exp.is_reimbursement ? 'Reimbursement' : exp.expense_type,
-            amount: exp.is_reimbursement ? -Math.abs(exp.amount) : Math.abs(exp.amount),
+            expense_type: exp.importType === 'advance' ? 'Advance'
+              : exp.is_reimbursement ? 'Reimbursement'
+              : exp.expense_type,
+            amount: exp.importType === 'credit' ? -Math.abs(exp.amount) : Math.abs(exp.amount),
             description: exp.description,
             vendor: exp.vendor,
             gallons: exp.gallons,
             load_id: exp.matchedLoad?.id || null,
             truck_id: exp.matchedTruck?.id || null,
-            notes: exp.is_reimbursement ? 'Reimbursement/Refund' : (exp.is_discount ? 'Discount/Credit' : null),
+            notes: exp.importType === 'advance' ? 'Advance (Non-P&L)'
+              : exp.is_reimbursement ? 'Reimbursement/Refund'
+              : exp.is_discount ? 'Discount/Credit'
+              : null,
             jurisdiction: exp.jurisdiction,
             org_id: orgId,
             updated_at: new Date().toISOString(),
@@ -217,7 +250,7 @@ export function ReconciliationPreview({
       const msgs: string[] = [];
       if (insertedCount > 0) msgs.push(`${insertedCount} new`);
       if (updatedCount > 0) msgs.push(`${updatedCount} updated`);
-      toast.success(`Successfully imported: ${msgs.join(', ')} expenses`);
+      toast.success(`Successfully imported: ${msgs.join(', ')} items`);
       onImported();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to import');
@@ -225,6 +258,154 @@ export function ReconciliationPreview({
       setIsImporting(false);
     }
   };
+
+  const renderTable = (
+    rows: ExpenseRow[],
+    setter: React.Dispatch<React.SetStateAction<ExpenseRow[]>>,
+    tabKey: string,
+    colorClass: string
+  ) => (
+    <div className="border rounded-lg overflow-hidden max-h-96 overflow-y-auto">
+      <Table>
+        <TableHeader className="sticky top-0 bg-background z-10">
+          <TableRow>
+            <TableHead className="w-10">
+              <Checkbox
+                checked={rows.filter(r => r.selected).length === rows.length && rows.length > 0}
+                onCheckedChange={(checked) => toggleAll(setter, !!checked)}
+              />
+            </TableHead>
+            <TableHead>Date</TableHead>
+            <TableHead>Type</TableHead>
+            <TableHead>Description</TableHead>
+            <TableHead className="text-right">Amount</TableHead>
+            <TableHead>Source</TableHead>
+            <TableHead>Load Match</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-sm">
+                No items in this category
+              </TableCell>
+            </TableRow>
+          ) : rows.map((row, index) => (
+            <TableRow
+              key={index}
+              className={cn(
+                row.isDuplicate && 'bg-warning/10',
+                !row.selected && 'opacity-50'
+              )}
+            >
+              <TableCell>
+                <Checkbox checked={row.selected} onCheckedChange={() => toggleRow(setter, index)} />
+              </TableCell>
+              <TableCell className="text-sm">
+                <div className="flex items-center gap-1">
+                  <input
+                    type="date"
+                    value={row.date}
+                    onChange={(e) => updateDate(setter, index, e.target.value)}
+                    className="bg-transparent border-b border-dashed border-muted-foreground/40 hover:border-primary focus:border-primary focus:outline-none text-sm w-32 cursor-pointer"
+                  />
+                  {row.isDuplicate && (
+                    <span title="Potential duplicate">
+                      <AlertTriangle className="h-3 w-3 text-warning" />
+                    </span>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className="text-xs">
+                  {row.expense_type}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-sm max-w-40 truncate" title={row.description}>
+                {row.vendor || row.description}
+                {row.gallons && (
+                  <span className="text-xs text-muted-foreground ml-1">({row.gallons.toFixed(1)} gal)</span>
+                )}
+              </TableCell>
+              <TableCell className={cn('text-right font-mono text-sm font-medium', colorClass)}>
+                {colorClass.includes('success') ? '+' : '-'}{formatCurrency(Math.abs(row.amount))}
+              </TableCell>
+              <TableCell>
+                {row.merged ? (
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Badge className="text-xs bg-blue-500/20 text-blue-600 border-blue-300 dark:text-blue-400 cursor-help">
+                        Merged
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Cross-referenced from:</p>
+                      <ul className="text-xs list-disc pl-3">
+                        {row.sources.map((s, i) => <li key={i}>{s}</li>)}
+                      </ul>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <span className="text-xs text-muted-foreground">{row.sources[0]}</span>
+                )}
+              </TableCell>
+              <TableCell className="min-w-[180px]">
+                {editingIndex?.tab === tabKey && editingIndex?.index === index ? (
+                  <div className="flex items-center gap-1">
+                    <Select
+                      value={row.matchedLoad?.id || 'none'}
+                      onValueChange={(v) => updateLoadMatch(setter, index, v === 'none' ? null : v)}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-[140px]">
+                        <SelectValue placeholder="Select load" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          <span className="flex items-center gap-1"><Unlink className="h-3 w-3" /> No link</span>
+                        </SelectItem>
+                        {existingLoads.map(load => (
+                          <SelectItem key={load.id} value={load.id}>
+                            <span className="font-mono text-xs">{load.landstar_load_id}</span>
+                            <span className="text-muted-foreground ml-1 text-xs truncate">
+                              {load.origin?.split(',')[0]} → {load.destination?.split(',')[0]}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditingIndex(null)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    {row.matchedLoad ? (
+                      <div className="flex items-center gap-1 text-xs">
+                        <Link className="h-3 w-3 text-success" />
+                        <span className="text-success font-mono">{row.matchedLoad.landstar_load_id}</span>
+                      </div>
+                    ) : row.trip_number ? (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Unlink className="h-3 w-3" />
+                        <span className="font-mono">{row.trip_number}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 opacity-50 hover:opacity-100" onClick={() => setEditingIndex({ tab: tabKey, index })}>
+                      <Edit2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
+  const totalSelectedCount = selectedExpenses.length + selectedAdvances.length + selectedCredits.length;
 
   return (
     <TooltipProvider>
@@ -235,10 +416,16 @@ export function ReconciliationPreview({
             <Layers className="h-3 w-3" />
             {expenseRows.length} expenses
           </Badge>
-          {result.earnings.length > 0 && (
+          {advanceRows.length > 0 && (
+            <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300">
+              <Banknote className="h-3 w-3" />
+              {advanceRows.length} advances
+            </Badge>
+          )}
+          {creditRows.length > 0 && (
             <Badge variant="outline" className="gap-1 text-success border-success/30">
               <TrendingUp className="h-3 w-3" />
-              {result.earnings.length} earnings
+              {creditRows.length} credits
             </Badge>
           )}
           {mergedCount > 0 && (
@@ -255,260 +442,78 @@ export function ReconciliationPreview({
           )}
         </div>
 
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="rounded-lg border p-3 space-y-1">
+            <p className="text-xs text-muted-foreground">Total Expenses</p>
+            <p className="text-lg font-mono font-semibold text-destructive">{formatCurrency(expensesTotal)}</p>
+          </div>
+          <div className="rounded-lg border p-3 space-y-1">
+            <p className="text-xs text-muted-foreground">Credits / Discounts</p>
+            <p className="text-lg font-mono font-semibold text-success">{formatCurrency(creditsTotal)}</p>
+          </div>
+          <div className="rounded-lg border p-3 space-y-1">
+            <p className="text-xs text-muted-foreground">Net Expense Impact</p>
+            <p className={cn('text-lg font-mono font-semibold', netExpense >= 0 ? 'text-destructive' : 'text-success')}>
+              {formatCurrency(netExpense)}
+            </p>
+          </div>
+          <div className="rounded-lg border p-3 space-y-1 border-dashed">
+            <p className="text-xs text-muted-foreground">Advances Taken</p>
+            <p className="text-lg font-mono font-semibold text-amber-600">{formatCurrency(advancesTotal)}</p>
+            <p className="text-[10px] text-muted-foreground">Non-P&L</p>
+          </div>
+        </div>
+
         <Tabs defaultValue="expenses">
           <TabsList>
-            <TabsTrigger value="expenses">
-              Deductions / Expenses ({expenseRows.length})
+            <TabsTrigger value="expenses" className="gap-1">
+              <TrendingDown className="h-3 w-3" />
+              Actual Expenses ({expenseRows.length})
             </TabsTrigger>
-            <TabsTrigger value="earnings">
-              Earnings / Loads ({result.earnings.length})
+            <TabsTrigger value="advances" className="gap-1">
+              <Banknote className="h-3 w-3" />
+              Advances ({advanceRows.length})
+            </TabsTrigger>
+            <TabsTrigger value="credits" className="gap-1">
+              <CreditCard className="h-3 w-3" />
+              Credits ({creditRows.length})
             </TabsTrigger>
           </TabsList>
 
-          {/* === EXPENSES TAB === */}
           <TabsContent value="expenses">
-            <div className="border rounded-lg overflow-hidden max-h-96 overflow-y-auto">
-              <Table>
-                <TableHeader className="sticky top-0 bg-background z-10">
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={selectedExpenses.length === expenseRows.length}
-                        onCheckedChange={(checked) => toggleAllExpenses(!!checked)}
-                      />
-                    </TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Load Match</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {expenseRows.map((expense, index) => (
-                    <TableRow
-                      key={index}
-                      className={cn(
-                        (expense.is_discount || expense.is_reimbursement) && 'bg-success/5',
-                        expense.isDuplicate && 'bg-warning/10',
-                        !expense.selected && 'opacity-50'
-                      )}
-                    >
-                      <TableCell>
-                        <Checkbox checked={expense.selected} onCheckedChange={() => toggleExpense(index)} />
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="date"
-                            value={expense.date}
-                            onChange={(e) => updateDate(index, e.target.value)}
-                            className="bg-transparent border-b border-dashed border-muted-foreground/40 hover:border-primary focus:border-primary focus:outline-none text-sm w-32 cursor-pointer"
-                          />
-                          {expense.isDuplicate && (
-                            <span title="Potential duplicate">
-                              <AlertTriangle className="h-3 w-3 text-warning" />
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {(expense.is_reimbursement || expense.is_discount) && (
-                            <TrendingUp className="h-3 w-3 text-success" />
-                          )}
-                          <Badge
-                            variant={(expense.is_discount || expense.is_reimbursement) ? 'secondary' : 'outline'}
-                            className={cn(
-                              'text-xs',
-                              (expense.is_reimbursement || expense.is_discount) && 'bg-success/20 text-success border-success/30'
-                            )}
-                          >
-                            {expense.is_reimbursement ? 'Reimbursement' : expense.expense_type}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm max-w-40 truncate" title={expense.description}>
-                        {expense.vendor || expense.description}
-                        {expense.gallons && (
-                          <span className="text-xs text-muted-foreground ml-1">({expense.gallons.toFixed(1)} gal)</span>
-                        )}
-                      </TableCell>
-                      <TableCell className={cn(
-                        'text-right font-mono text-sm font-medium',
-                        (expense.is_discount || expense.is_reimbursement) ? 'text-success' : 'text-destructive'
-                      )}>
-                        {(expense.is_discount || expense.is_reimbursement) ? '+' : '-'}{formatCurrency(Math.abs(expense.amount))}
-                      </TableCell>
-                      <TableCell>
-                        {expense.merged ? (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Badge className="text-xs bg-blue-500/20 text-blue-600 border-blue-300 dark:text-blue-400 cursor-help">
-                                Merged
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs">Cross-referenced from:</p>
-                              <ul className="text-xs list-disc pl-3">
-                                {expense.sources.map((s, i) => <li key={i}>{s}</li>)}
-                              </ul>
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{expense.sources[0]}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="min-w-[180px]">
-                        {editingIndex === index ? (
-                          <div className="flex items-center gap-1">
-                            <Select
-                              value={expense.matchedLoad?.id || 'none'}
-                              onValueChange={(v) => updateLoadMatch(index, v === 'none' ? null : v)}
-                            >
-                              <SelectTrigger className="h-7 text-xs w-[140px]">
-                                <SelectValue placeholder="Select load" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">
-                                  <span className="flex items-center gap-1"><Unlink className="h-3 w-3" /> No link</span>
-                                </SelectItem>
-                                {existingLoads.map(load => (
-                                  <SelectItem key={load.id} value={load.id}>
-                                    <span className="font-mono text-xs">{load.landstar_load_id}</span>
-                                    <span className="text-muted-foreground ml-1 text-xs truncate">
-                                      {load.origin?.split(',')[0]} → {load.destination?.split(',')[0]}
-                                    </span>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditingIndex(null)}>
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            {expense.matchedLoad ? (
-                              <div className="flex items-center gap-1 text-xs">
-                                <Link className="h-3 w-3 text-success" />
-                                <span className="text-success font-mono">{expense.matchedLoad.landstar_load_id}</span>
-                              </div>
-                            ) : expense.trip_number ? (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Unlink className="h-3 w-3" />
-                                <span className="font-mono">{expense.trip_number}</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
-                            <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 opacity-50 hover:opacity-100" onClick={() => setEditingIndex(index)}>
-                              <Edit2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            {renderTable(expenseRows, setExpenseRows, 'expenses', 'text-destructive')}
           </TabsContent>
 
-          {/* === EARNINGS TAB === */}
-          <TabsContent value="earnings">
-            {result.earnings.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                No earnings data found. Upload a Contractor Statement PDF to see revenue lines.
-              </div>
-            ) : (
-              <div className="border rounded-lg overflow-hidden max-h-96 overflow-y-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background z-10">
-                    <TableRow>
-                      <TableHead className="w-10">
-                        <Checkbox
-                          checked={selectedEarnings.size === result.earnings.length}
-                          onCheckedChange={(checked) => {
-                            setSelectedEarnings(checked ? new Set(result.earnings.map((_, i) => i)) : new Set());
-                          }}
-                        />
-                      </TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Freight Bill #</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Source</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {result.earnings.map((earning, index) => (
-                      <TableRow key={index} className={cn(!selectedEarnings.has(index) && 'opacity-50')}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedEarnings.has(index)}
-                            onCheckedChange={() => {
-                              setSelectedEarnings(prev => {
-                                const next = new Set(prev);
-                                next.has(index) ? next.delete(index) : next.add(index);
-                                return next;
-                              });
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="text-sm">{earning.date}</TableCell>
-                        <TableCell className="text-sm max-w-48 truncate">{earning.description}</TableCell>
-                        <TableCell className="text-sm font-mono">{earning.trip_number || '—'}</TableCell>
-                        <TableCell className="text-right font-mono text-sm font-medium text-success">
-                          +{formatCurrency(earning.amount)}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {earning.sources.join(', ')}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+          <TabsContent value="advances">
+            {renderTable(advanceRows, setAdvanceRows, 'advances', 'text-amber-600')}
             <p className="text-xs text-muted-foreground mt-2">
-              Earnings are display-only for cross-reference. Only expenses are imported.
+              Advances are early access to funds (Non-P&L). They do not count toward your net expense total.
+            </p>
+          </TabsContent>
+
+          <TabsContent value="credits">
+            {renderTable(creditRows, setCreditRows, 'credits', 'text-success')}
+            <p className="text-xs text-muted-foreground mt-2">
+              Credits and reimbursements reduce your total expense burden.
             </p>
           </TabsContent>
         </Tabs>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-2 border-t">
-          <div className="text-sm space-x-2 flex flex-wrap items-center gap-1">
-            <span className="text-muted-foreground">Selected:</span>
-            <span className="font-medium">{selectedExpenses.length}</span>
-            {reimbursementCount > 0 && (
-              <Badge variant="outline" className="text-xs text-success border-success/30">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                {reimbursementCount} refunds
-              </Badge>
-            )}
-            <span className="text-muted-foreground">• Net:</span>
-            <span className={cn('font-mono font-medium', netTotal >= 0 ? 'text-destructive' : 'text-success')}>
-              {formatCurrency(netTotal)}
-            </span>
-            {earningsTotal > 0 && (
-              <>
-                <span className="text-muted-foreground">• Earnings:</span>
-                <span className="font-mono font-medium text-success">{formatCurrency(earningsTotal)}</span>
-              </>
-            )}
+          <div className="text-sm text-muted-foreground">
+            {totalSelectedCount} items selected
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onCancel} disabled={isImporting}>Cancel</Button>
             <Button
               onClick={handleImport}
-              disabled={selectedExpenses.length === 0 || isImporting}
+              disabled={totalSelectedCount === 0 || isImporting}
               className="gradient-gold text-primary-foreground"
             >
               {isImporting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Confirm & Import Data ({selectedExpenses.length})
+              Confirm & Import Data ({totalSelectedCount})
             </Button>
           </div>
         </div>
