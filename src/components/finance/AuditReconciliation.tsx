@@ -51,7 +51,7 @@ export function AuditReconciliation({ loads }: AuditReconciliationProps) {
   const isMatched = Math.abs(variance) < 0.01;
 
   // Revenue component breakdown
-  const totalTruckRevenue = useMemo(() => ytdLoads.reduce((s, l) => s + (l.truck_revenue ?? 0), 0), [ytdLoads]);
+  const totalLinehaul = useMemo(() => ytdLoads.reduce((s, l) => s + (l.rate ?? 0), 0), [ytdLoads]);
   const totalFSC = useMemo(() => ytdLoads.reduce((s, l) => s + (l.fuel_surcharge ?? 0), 0), [ytdLoads]);
   const totalAccessorials = useMemo(() => ytdLoads.reduce((s, l) => s + (l.accessorials ?? 0), 0), [ytdLoads]);
 
@@ -142,8 +142,8 @@ export function AuditReconciliation({ loads }: AuditReconciliationProps) {
           {/* Revenue Breakdown */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg border">
-              <p className="text-xs text-muted-foreground">Linehaul Revenue (65%)</p>
-              <p className="text-lg font-semibold">{formatCurrency(totalTruckRevenue)}</p>
+              <p className="text-xs text-muted-foreground">Booked Linehaul</p>
+              <p className="text-lg font-semibold">{formatCurrency(totalLinehaul)}</p>
             </div>
             <div className="p-3 rounded-lg border">
               <p className="text-xs text-muted-foreground">Fuel Surcharge</p>
