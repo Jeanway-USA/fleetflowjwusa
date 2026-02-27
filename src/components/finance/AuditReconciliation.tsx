@@ -51,7 +51,7 @@ export function AuditReconciliation({ loads }: AuditReconciliationProps) {
   const isMatched = Math.abs(variance) < 0.01;
 
   // Revenue component breakdown
-  const totalLinehaul = useMemo(() => ytdLoads.reduce((s, l) => s + (l.truck_revenue ?? 0), 0), [ytdLoads]);
+  const totalLinehaul = useMemo(() => ytdLoads.reduce((s, l) => s + ((l.rate ?? 0) * 0.65), 0), [ytdLoads]);
   const totalFSC = useMemo(() => ytdLoads.reduce((s, l) => s + (l.fuel_surcharge ?? 0), 0), [ytdLoads]);
   const totalAccessorials = useMemo(() => ytdLoads.reduce((s, l) => s + (l.accessorials ?? 0), 0), [ytdLoads]);
 
