@@ -10,6 +10,7 @@ interface ExtractedExpense {
   gallons: number | null;
   is_discount: boolean;
   is_reimbursement: boolean;
+  is_advance: boolean;
 }
 
 interface ParsedStatement {
@@ -20,10 +21,26 @@ interface ParsedStatement {
   expenses: ExtractedExpense[];
 }
 
+// Revenue patterns to skip entirely
+const REVENUE_IGNORE_PATTERNS: RegExp[] = [
+  /\bTRACTOR\s*L\/H\b/i,
+  /\bLINE\s*HAUL\b/i,
+  /\b1099\s*REVENUE\b/i,
+  /\bLINEHAUL\b/i,
+  /\bTRACTOR\s*LEASE\b/i,
+];
+
+// Advance patterns (non-P&L)
+const ADVANCE_PATTERNS: RegExp[] = [
+  /\bADVANCE\b/i,
+  /\bCARD PRE-TRIP\b/i,
+  /\bCARD CONT\.?\s*SPEC\s*ADV\b/i,
+];
+
 const EXPENSE_TYPE_MAP: [RegExp, string][] = [
   [/\bCARD FEE\b/i, 'Card Fee'],
-  [/\bCARD PRE-TRIP\b/i, 'Card Load'],
-  [/\bCARD CONT\.\s*SPEC ADV\b/i, 'Cash Advance'],
+  [/\bCARD PRE-TRIP\b/i, 'Advance'],
+  [/\bCARD CONT\.?\s*SPEC\s*ADV\b/i, 'Advance'],
   [/\bTRIP%?\s*ESCROW/i, 'Escrow Payment'],
   [/\bTRKSTP SCN\b/i, 'Trip Scanning'],
   [/\bDD FEE\b/i, 'Direct Deposit Fee'],
@@ -103,13 +120,18 @@ export function parseLandstarXlsx(buffer: ArrayBuffer): ParsedStatement {
     ).trim();
     if (!description) continue;
 
+    // Skip general revenue/income lines entirely
+    if (REVENUE_IGNORE_PATTERNS.some(p => p.test(description))) continue;
+
     const rawAmount = row['Transaction Amt'] ?? row['Transaction Amount'] ?? 0;
     const amount = parseAmount(rawAmount);
 
     const isReimb = /REIMB/i.test(description);
+    const isAdvance = ADVANCE_PATTERNS.some(p => p.test(description));
+    const isDiscount = /\bNATS\s*DISCOUNT\b/i.test(description) || /\bDISCOUNT\b/i.test(description);
 
-    // Skip revenue rows (positive amount, not a reimbursement)
-    if (amount >= 0 && !isReimb) continue;
+    // Skip revenue rows (positive amount, not a reimbursement/advance/discount)
+    if (amount >= 0 && !isReimb && !isAdvance && !isDiscount) continue;
 
     // Extract trip number
     const rawTrip = String(row['Freight Bill #'] || row['Freight Bill'] || '').trim();
@@ -144,14 +166,15 @@ export function parseLandstarXlsx(buffer: ArrayBuffer): ParsedStatement {
 
     expenses.push({
       date: date || new Date().toISOString().slice(0, 10),
-      expense_type: isReimb ? 'Reimbursement' : expenseType,
-      amount: isReimb ? Math.abs(amount) : Math.abs(amount),
+      expense_type: isAdvance ? 'Advance' : (isReimb ? 'Reimbursement' : expenseType),
+      amount: Math.abs(amount),
       trip_number: tripNumber,
       description,
       vendor: null,
       gallons: null,
-      is_discount: false,
+      is_discount: isDiscount,
       is_reimbursement: isReimb,
+      is_advance: isAdvance,
     });
   }
 

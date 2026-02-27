@@ -227,7 +227,8 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       }
     }
 
-    const msg = `Processed ${parsedCount} file(s): ${result.expenses.length} expenses, ${result.earnings.length} earnings`;
+    const totalItems = result.expenses.length + result.advances.length + result.credits.length;
+    const msg = `Processed ${parsedCount} file(s): ${totalItems} items (${result.expenses.length} expenses, ${result.advances.length} advances, ${result.credits.length} credits)`;
     if (errorCount > 0) {
       toast.warning(`${msg} (${errorCount} file(s) failed)`);
     } else {
