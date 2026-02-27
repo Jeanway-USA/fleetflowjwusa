@@ -14,14 +14,12 @@ import { Search, AlertTriangle, CheckCircle2, Calculator, ChevronDown, ChevronUp
 import type { Database } from '@/integrations/supabase/types';
 
 type FleetLoad = Database['public']['Tables']['fleet_loads']['Row'];
-type Expense = Database['public']['Tables']['expenses']['Row'];
 
 interface AuditReconciliationProps {
   loads: FleetLoad[];
-  expenses: Expense[];
 }
 
-export function AuditReconciliation({ loads, expenses }: AuditReconciliationProps) {
+export function AuditReconciliation({ loads }: AuditReconciliationProps) {
   const currentYear = new Date().getFullYear();
   const [auditEnabled, setAuditEnabled] = useState(false);
   const [landstarYTD, setLandstarYTD] = useState<string>('');
@@ -42,15 +40,7 @@ export function AuditReconciliation({ loads, expenses }: AuditReconciliationProp
       .sort((a, b) => parseISO(a.pickup_date!).getTime() - parseISO(b.pickup_date!).getTime());
   }, [loads, yearNum]);
 
-  // Filter expenses to selected year
-  const ytdExpenses = useMemo(() => {
-    return expenses.filter(e => {
-      if (!e.expense_date) return false;
-      return parseISO(e.expense_date).getFullYear() === yearNum;
-    });
-  }, [expenses, yearNum]);
-
-  // App YTD = sum of settlement (fallback net_revenue)
+  // App YTD = sum of net_revenue
   const appYTD = useMemo(() => {
     return ytdLoads.reduce((sum, l) => sum + (l.net_revenue ?? 0), 0);
   }, [ytdLoads]);
@@ -60,13 +50,10 @@ export function AuditReconciliation({ loads, expenses }: AuditReconciliationProp
   const variancePct = landstarValue > 0 ? (variance / landstarValue) * 100 : 0;
   const isMatched = Math.abs(variance) < 0.01;
 
-  // Gap analysis
-  const loadsWithoutNetRevenue = ytdLoads.filter(l => !l.net_revenue);
-  const nonDeliveredLoads = ytdLoads.filter(l => l.status !== 'delivered');
-  const cardAdvanceExpenses = ytdExpenses.filter(e =>
-    e.expense_type === 'Card Load' || e.expense_type === 'Cash Advance'
-  );
-  const totalCardAdvances = cardAdvanceExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+  // Revenue component breakdown
+  const totalTruckRevenue = useMemo(() => ytdLoads.reduce((s, l) => s + (l.truck_revenue ?? 0), 0), [ytdLoads]);
+  const totalFSC = useMemo(() => ytdLoads.reduce((s, l) => s + (l.fuel_surcharge ?? 0), 0), [ytdLoads]);
+  const totalAccessorials = useMemo(() => ytdLoads.reduce((s, l) => s + (l.accessorials ?? 0), 0), [ytdLoads]);
 
   // Running cumulative table
   const tableRows = useMemo(() => {
@@ -152,19 +139,19 @@ export function AuditReconciliation({ loads, expenses }: AuditReconciliationProp
             </div>
           )}
 
-          {/* Gap Analysis */}
+          {/* Revenue Breakdown */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg border">
-              <p className="text-xs text-muted-foreground">Missing Net Revenue</p>
-              <p className="text-lg font-semibold">{loadsWithoutNetRevenue.length}</p>
+              <p className="text-xs text-muted-foreground">Linehaul Revenue (65%)</p>
+              <p className="text-lg font-semibold">{formatCurrency(totalTruckRevenue)}</p>
             </div>
             <div className="p-3 rounded-lg border">
-              <p className="text-xs text-muted-foreground">Non-Delivered</p>
-              <p className="text-lg font-semibold">{nonDeliveredLoads.length}</p>
+              <p className="text-xs text-muted-foreground">Fuel Surcharge</p>
+              <p className="text-lg font-semibold">{formatCurrency(totalFSC)}</p>
             </div>
             <div className="p-3 rounded-lg border">
-              <p className="text-xs text-muted-foreground">Card/Cash Advances</p>
-              <p className="text-lg font-semibold">{formatCurrency(totalCardAdvances)}</p>
+              <p className="text-xs text-muted-foreground">Accessorials</p>
+              <p className="text-lg font-semibold">{formatCurrency(totalAccessorials)}</p>
             </div>
             <div className="p-3 rounded-lg border">
               <p className="text-xs text-muted-foreground">Total Loads (YTD)</p>
@@ -174,9 +161,8 @@ export function AuditReconciliation({ loads, expenses }: AuditReconciliationProp
 
           {/* Reconciliation Formula */}
           <div className="p-4 rounded-lg bg-muted/50 border font-mono text-xs space-y-1">
-            <p>Landstar 1099  = Sum of (Tractor L/H % + FSC + Accessorials + Card Pre-Trips)</p>
+            <p>Landstar 1099  = Sum of (Tractor L/H % + FSC + Accessorials)</p>
             <p>App Total      = Sum of fleet_loads.net_revenue = {formatCurrency(appYTD)}</p>
-            <p>Card Advances  = {formatCurrency(totalCardAdvances)} (pre-payments, not additional revenue)</p>
             {landstarValue > 0 && (
               <p className={`font-bold ${isMatched ? 'text-success' : 'text-destructive'}`}>
                 Variance       = {formatCurrency(Math.abs(variance))} {variance > 0 ? '(under-reported)' : variance < 0 ? '(over-reported)' : '(matched)'}

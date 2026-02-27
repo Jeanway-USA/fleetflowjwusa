@@ -576,7 +576,7 @@ export default function Finance() {
         </TabsContent>
 
         <TabsContent value="expenses" className="mt-6">
-          <AuditReconciliation loads={loads} expenses={expenses} />
+          <AuditReconciliation loads={loads} />
           <StatementUpload 
             existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination }))}
             trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
