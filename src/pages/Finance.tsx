@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, MapPin } from 'lucide-react';
 import { StatementUpload } from '@/components/finance/StatementUpload';
 import { AuditReconciliation } from '@/components/finance/AuditReconciliation';
+import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { SettlementsTab } from '@/components/finance/SettlementsTab';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
 import { RevenueTab } from '@/components/finance/RevenueTab';
@@ -55,6 +56,8 @@ export default function Finance() {
   const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
   const [massEditDialogOpen, setMassEditDialogOpen] = useState(false);
   const [massEditFormData, setMassEditFormData] = useState<Partial<ExpenseInsert>>({});
+  const [massDeleteDialogOpen, setMassDeleteDialogOpen] = useState(false);
+  const [isMassDeleting, setIsMassDeleting] = useState(false);
 
   type SortField = 'expense_date' | 'expense_type' | 'description' | 'amount' | 'gallons' | 'truck_id' | 'load_id';
   type SortDirection = 'asc' | 'desc';
@@ -176,6 +179,23 @@ export default function Finance() {
     },
     onError: (error) => toast.error(error.message),
   });
+
+  const handleMassDelete = async () => {
+    setIsMassDeleting(true);
+    try {
+      const ids = Array.from(selectedExpenseIds);
+      const { error } = await supabase.from('expenses').delete().in('id', ids);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast.success(`${ids.length} expenses deleted`);
+      setSelectedExpenseIds(new Set());
+      setMassDeleteDialogOpen(false);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete expenses');
+    } finally {
+      setIsMassDeleting(false);
+    }
+  };
 
   // ===== HELPERS =====
   const getSetting = (key: string, defaultValue: string = '0') => {
@@ -602,9 +622,14 @@ export default function Finance() {
                   </SelectContent>
                 </Select>
                 {selectedExpenseIds.size > 0 && (
-                  <Button variant="outline" onClick={() => { setMassEditFormData({}); setMassEditDialogOpen(true); }}>
-                    <CheckSquare className="h-4 w-4 mr-2" /> Edit {selectedExpenseIds.size} Selected
-                  </Button>
+                  <>
+                    <Button variant="outline" onClick={() => { setMassEditFormData({}); setMassEditDialogOpen(true); }}>
+                      <CheckSquare className="h-4 w-4 mr-2" /> Edit {selectedExpenseIds.size} Selected
+                    </Button>
+                    <Button variant="destructive" onClick={() => setMassDeleteDialogOpen(true)}>
+                      <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedExpenseIds.size} Selected
+                    </Button>
+                  </>
                 )}
                 <Button onClick={() => openExpenseDialog()} className="gradient-gold text-primary-foreground">
                   <Plus className="h-4 w-4 mr-2" /> Add Expense
@@ -911,6 +936,16 @@ export default function Finance() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Mass Delete Confirmation */}
+      <ConfirmDeleteDialog
+        open={massDeleteDialogOpen}
+        onOpenChange={setMassDeleteDialogOpen}
+        onConfirm={handleMassDelete}
+        title={`Delete ${selectedExpenseIds.size} Expenses`}
+        description={`Are you sure you want to delete ${selectedExpenseIds.size} selected expenses? This action cannot be undone.`}
+        isDeleting={isMassDeleting}
+      />
     </>
   );
 }
