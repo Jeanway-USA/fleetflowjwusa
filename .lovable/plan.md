@@ -1,27 +1,47 @@
 
 
-## Fix: Advances Misclassified from PDF Sources + Ensure Proper Import
+## Update Finance Page Expenses Tab for New Settlement Categories
 
 ### Problem
-The PDF edge function (`parse-landstar-statement`) doesn't return `is_advance: true` on its expenses. Items like "Cash Advance", "Card Pre-Trip", and "Direct-Deposit Bank" parsed from Card Activity PDFs arrive without the advance flag, so the reconciliation engine puts them in the "Actual Expenses" bucket instead of "Advances".
+The Expenses tab sums ALL records from the `expenses` table into one total, including Advances (which are non-P&L) and Credits (which offset expenses). The statement parser now correctly categorizes these, but the Finance page doesn't account for the distinction.
 
 ### Changes
 
-**1. `supabase/functions/parse-landstar-statement/index.ts` — Add `is_advance` to edge function**
-- Add `is_advance: boolean` to the `ExtractedExpense` interface
-- Update the AI prompt to instruct it to set `is_advance: true` for Cash Advance, Card Pre-Trip, Card Load, CARD CONT SPEC ADV, and Direct-Deposit items (both fee and bank transfer)
-- Update the JSON schema example in the prompt to include `is_advance`
+**`src/pages/Finance.tsx`**
 
-**2. `src/lib/settlement-reconciliation.ts` — Add fallback advance detection**
-- After collecting all expenses from all sources, apply advance detection patterns to any item that doesn't already have `is_advance: true`
-- Patterns: `/\bCASH\s*ADVANCE\b/i`, `/\bADVANCE\b/i`, `/\bCARD PRE-TRIP\b/i`, `/\bCARD CONT.*SPEC\s*ADV\b/i`, `/\bDIRECT.?DEPOSIT\b/i`, `/\bDD\s*FEE\b/i`, `/\bCARD\s*LOAD\b/i`
-- This ensures even if the PDF parser omits the flag, the reconciliation engine catches it
+1. **Add 'Advance' to `expenseTypes` array** so it appears in dropdowns and breakdowns
 
-**3. `src/components/finance/ReconciliationPreview.tsx` — Ensure only expenses + credits are counted in totals**
-- Already correct: advances are excluded from `netExpense` calculation
-- No changes needed here
+2. **Update expense categorization constants** — define which types are advances vs credits:
+   - Advances: `expense_type === 'Advance'` or `notes` contains 'Advance (Non-P&L)'
+   - Credits: `expense_type` in `['Reimbursement', 'Fuel Discount']` or `amount < 0`
+
+3. **Split `getFilteredExpenses` results into 3 groups**:
+   - `actualExpenses` — true P&L expenses (exclude advances and credits)
+   - `advanceExpenses` — advance-type records (display-only, not in totals)
+   - `creditExpenses` — reimbursements/discounts (offset from expenses)
+
+4. **Update `totalExpenses` calculation** (line ~439):
+   - Only sum actual expenses (not advances)
+   - Subtract credits to get net expense impact
+   - Current: `totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total`
+   - New: same but exclude advances from standalone/loadLinked totals, and subtract credits
+
+5. **Update Summary Cards** (lines 530-562):
+   - "Total Expenses" card shows net expense (actual expenses minus credits)
+   - Add a small note showing advances separately
+
+6. **Update Expense Table display** (lines 658-694):
+   - Add visual indicators: Advance rows get amber badge, Credit rows get green styling
+   - Show "Advance (Non-P&L)" badge next to advance-type rows
+
+7. **Update Expense Breakdown Card** (lines 700-771):
+   - Add a third section: "Advances (Non-P&L)" showing advance totals neutrally
+   - Update "GRAND TOTAL EXPENSES" to show:
+     - Actual Expenses: $X
+     - Credits/Discounts: -$Y  
+     - Net Expense Impact: $(X-Y)
+     - Advances Taken: $Z (neutral, not in total)
 
 ### Files Modified
-- `supabase/functions/parse-landstar-statement/index.ts`
-- `src/lib/settlement-reconciliation.ts`
+- `src/pages/Finance.tsx`
 
