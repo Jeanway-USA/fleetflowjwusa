@@ -66,6 +66,19 @@ const REVENUE_IGNORE_PATTERNS: RegExp[] = [
   /\bTRACTOR\s*LEASE\b/i,
 ];
 
+// Recurring expense types that should not be aggressively deduped
+const RECURRING_EXPENSE_TYPES = new Set([
+  'Licensing/Permits',
+  'Card Fee',
+  'Direct Deposit Fee',
+  'CPP/Benefits',
+  'LCN/Satellite',
+  'Truck Warranty',
+  'PrePass/Scale',
+  'Trip Scanning',
+  'Insurance',
+]);
+
 // Fallback advance detection patterns — catches items from PDF sources missing is_advance
 const ADVANCE_FALLBACK_PATTERNS: RegExp[] = [
   /\bCASH\s*ADVANCE\b/i,
@@ -153,12 +166,33 @@ export function reconcileDocuments(
     }
   }
 
-  // Deduplicate expenses by (date, expense_type, amount)
+  // Assign unique keys per source: same-source duplicates get counter suffixes
+  const taggedExpenses: (typeof allExpenses[number] & { dedupKey: string })[] = [];
+  const sourceGroups = new Map<string, typeof allExpenses>();
+  for (const item of allExpenses) {
+    const group = sourceGroups.get(item.source) || [];
+    group.push(item);
+    sourceGroups.set(item.source, group);
+  }
+
+  for (const [, items] of sourceGroups) {
+    const counters = new Map<string, number>();
+    for (const item of items) {
+      const baseKey = `${item.date}_${item.expense_type}_${Math.abs(item.amount).toFixed(2)}`;
+      const count = (counters.get(baseKey) || 0) + 1;
+      counters.set(baseKey, count);
+      // For recurring types, include source in key so cross-document items don't merge
+      const sourceSegment = RECURRING_EXPENSE_TYPES.has(item.expense_type) ? `_${item.source}` : '';
+      const dedupKey = `${baseKey}${sourceSegment}_${count}`;
+      taggedExpenses.push({ ...item, dedupKey });
+    }
+  }
+
+  // Deduplicate: only items with the exact same dedupKey merge (cross-document non-recurring)
   const deduped = new Map<string, ReconciledExpense>();
 
-  for (const item of allExpenses) {
-    const key = `${item.date}_${item.expense_type}_${Math.abs(item.amount).toFixed(2)}`;
-    const existing = deduped.get(key);
+  for (const item of taggedExpenses) {
+    const existing = deduped.get(item.dedupKey);
 
     if (existing) {
       if (!existing.sources.includes(item.source)) {
@@ -170,7 +204,7 @@ export function reconcileDocuments(
       if (!existing.trip_number && item.trip_number) existing.trip_number = item.trip_number;
       if (!existing.description && item.description) existing.description = item.description;
     } else {
-      deduped.set(key, {
+      deduped.set(item.dedupKey, {
         ...item,
         merged: false,
         sources: [item.source],
