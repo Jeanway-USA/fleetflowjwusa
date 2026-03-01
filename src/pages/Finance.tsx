@@ -15,7 +15,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, MapPin } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, MapPin, Banknote } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { StatementUpload } from '@/components/finance/StatementUpload';
 import { AuditReconciliation } from '@/components/finance/AuditReconciliation';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
@@ -40,10 +41,30 @@ const expenseTypes = [
   'Fuel', 'DEF', 'Fuel Discount', 'Reimbursement', 'Truck Payment', 'Trailer Payment',
   'Licensing/Permits', 'Registration/Plates', 'Insurance', 'LCN/Satellite', 'Maintenance',
   'Cell Phone', 'Trip Scanning', 'Card Load', 'Card Fee', 'Cash Advance', 'Direct Deposit Fee',
+  'Advance', 'Direct Deposit',
   'Escrow Payment', 'Truck Warranty', 'CPP/Benefits', 'IFTA', 'PrePass/Scale', 'Tolls', 'Parking', 'Misc'
 ];
 
 const GALLONS_EXPENSE_TYPES = ['Fuel', 'DEF'];
+
+// Advance types are non-P&L (early access to funds, not true expenses)
+const ADVANCE_EXPENSE_TYPES = ['Advance', 'Cash Advance', 'Card Load', 'Direct Deposit'];
+
+// Credit types offset expenses (money coming back)
+const CREDIT_EXPENSE_TYPES = ['Reimbursement', 'Fuel Discount'];
+
+const isAdvanceExpense = (expense: Expense): boolean => {
+  return ADVANCE_EXPENSE_TYPES.includes(expense.expense_type) ||
+    (expense.notes?.includes('Advance (Non-P&L)') ?? false);
+};
+
+const isCreditExpense = (expense: Expense): boolean => {
+  return CREDIT_EXPENSE_TYPES.includes(expense.expense_type) || expense.amount < 0;
+};
+
+const isActualExpense = (expense: Expense): boolean => {
+  return !isAdvanceExpense(expense) && !isCreditExpense(expense);
+};
 
 export default function Finance() {
   const queryClient = useQueryClient();
@@ -408,19 +429,28 @@ export default function Finance() {
   const standaloneExpenses = filteredExpenses.filter((e: Expense) => !e.load_id);
   const loadLinkedExpenses = filteredExpenses.filter((e: Expense) => e.load_id && loadIds.includes(e.load_id));
 
-  const standaloneExpenseTotals = standaloneExpenses.reduce((acc: any, exp: Expense) => {
+  // Split into actual / advance / credit buckets
+  const actualStandaloneExpenses = standaloneExpenses.filter(isActualExpense);
+  const advanceExpenses = filteredExpenses.filter(isAdvanceExpense);
+  const creditExpenses = filteredExpenses.filter(isCreditExpense);
+  const actualLoadLinkedExpenses = loadLinkedExpenses.filter(isActualExpense);
+
+  const standaloneExpenseTotals = actualStandaloneExpenses.reduce((acc: any, exp: Expense) => {
     acc.total += Number(exp.amount) || 0;
     acc.byType[exp.expense_type] = (acc.byType[exp.expense_type] || 0) + (Number(exp.amount) || 0);
     if (exp.gallons) acc.gallonsByType[exp.expense_type] = (acc.gallonsByType[exp.expense_type] || 0) + (Number(exp.gallons) || 0);
     return acc;
   }, { total: 0, byType: {}, gallonsByType: {} });
 
-  const loadLinkedExpenseTotals = loadLinkedExpenses.reduce((acc: any, exp: Expense) => {
+  const loadLinkedExpenseTotals = actualLoadLinkedExpenses.reduce((acc: any, exp: Expense) => {
     acc.total += Number(exp.amount) || 0;
     acc.byType[exp.expense_type] = (acc.byType[exp.expense_type] || 0) + (Number(exp.amount) || 0);
     if (exp.gallons) acc.gallonsByType[exp.expense_type] = (acc.gallonsByType[exp.expense_type] || 0) + (Number(exp.gallons) || 0);
     return acc;
   }, { total: 0, byType: {}, gallonsByType: {} });
+
+  const advancesTotal = advanceExpenses.reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
+  const creditsTotal = creditExpenses.reduce((sum, e) => sum + Math.abs(Number(e.amount) || 0), 0);
 
   const payrollTotals = filteredPayrolls.reduce((acc: any, p: DriverPayroll) => ({
     count: acc.count + 1,
@@ -436,7 +466,8 @@ export default function Finance() {
     amount: acc.amount + (c.commission_amount || 0),
   }), { count: 0, amount: 0 });
 
-  const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total;
+  const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total - creditsTotal;
+  const grossExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total;
   const totalPayroll = payrollTotals.netPay;
   const totalRevenueWithCommissions = revenueTotals.netRevenue + commissionTotals.amount;
   const netProfit = totalRevenueWithCommissions - totalExpenses - totalPayroll;
@@ -493,9 +524,6 @@ export default function Finance() {
     return sortDirection === 'asc' ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
   };
 
-  const isRefundExpense = (expense: Expense) => {
-    return expense.amount < 0 || expense.expense_type === 'Reimbursement' || expense.expense_type === 'Fuel Discount';
-  };
 
   return (
     <>
@@ -541,12 +569,19 @@ export default function Finance() {
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+            <CardTitle className="text-sm font-medium">Net Expenses</CardTitle>
             <TrendingDown className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">{formatCurrency(totalExpenses + totalPayroll)}</div>
-            <p className="text-xs text-muted-foreground">Operating + Payroll</p>
+            <p className="text-xs text-muted-foreground">
+              Operating + Payroll {creditsTotal > 0 && <span className="text-success">· Credits: -{formatCurrency(creditsTotal)}</span>}
+            </p>
+            {advancesTotal > 0 && (
+              <p className="text-xs text-amber-500 mt-1 flex items-center gap-1">
+                <Banknote className="h-3 w-3" /> Advances: {formatCurrency(advancesTotal)} (non-P&L)
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card className="card-elevated">
@@ -660,21 +695,24 @@ export default function Finance() {
                       <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No expenses for this period</TableCell></TableRow>
                     ) : (
                       sortedFilteredExpenses.map((expense) => {
-                        const isRefund = isRefundExpense(expense);
+                        const isRefund = isCreditExpense(expense);
+                        const isAdvance = isAdvanceExpense(expense);
                         const absAmount = Math.abs(Number(expense.amount));
                         return (
-                          <TableRow key={expense.id} className={selectedExpenseIds.has(expense.id) ? 'bg-primary/5' : ''}>
+                          <TableRow key={expense.id} className={`${selectedExpenseIds.has(expense.id) ? 'bg-primary/5' : ''} ${isAdvance ? 'opacity-70' : ''}`}>
                             <TableCell><Checkbox checked={selectedExpenseIds.has(expense.id)} onCheckedChange={() => toggleExpenseSelection(expense.id)} /></TableCell>
                             <TableCell>{expense.expense_date ? format(parseISO(expense.expense_date), 'MM/dd/yyyy') : '-'}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 {isRefund && <TrendingUp className="h-4 w-4 text-success" />}
-                                <span className={isRefund ? 'text-success font-medium' : ''}>{expense.expense_type}</span>
+                                {isAdvance && <Banknote className="h-4 w-4 text-warning" />}
+                                <span className={isRefund ? 'text-success font-medium' : isAdvance ? 'text-warning font-medium' : ''}>{expense.expense_type}</span>
+                                {isAdvance && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-warning/30 text-warning">Non-P&L</Badge>}
                               </div>
                             </TableCell>
                             <TableCell>{expense.description || '-'}</TableCell>
                             <TableCell>
-                              <span className={`font-medium ${isRefund ? 'text-success' : 'text-destructive'}`}>
+                              <span className={`font-medium ${isRefund ? 'text-success' : isAdvance ? 'text-warning' : 'text-destructive'}`}>
                                 {isRefund ? '+' : '-'}{formatCurrency(absAmount)}
                               </span>
                             </TableCell>
@@ -761,11 +799,74 @@ export default function Finance() {
                   </Table>
                 </div>
               </div>
-              <div className="mt-6 p-4 bg-muted rounded-lg">
+
+              {/* Credits & Advances summary */}
+              {(creditsTotal > 0 || advancesTotal > 0) && (
+                <div className="grid md:grid-cols-2 gap-6 mt-6">
+                  {creditsTotal > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-3 text-success">Credits & Reimbursements</h4>
+                      <Table>
+                        <TableHeader><TableRow><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                          {creditExpenses.map((e) => (
+                            <TableRow key={e.id}>
+                              <TableCell className="text-success">{e.expense_type}</TableCell>
+                              <TableCell className="text-right text-success">+{formatCurrency(Math.abs(Number(e.amount)))}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-success/10">
+                            <TableCell className="font-bold">Total Credits</TableCell>
+                            <TableCell className="text-right font-bold text-success">+{formatCurrency(creditsTotal)}</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                  {advancesTotal > 0 && (
+                    <div>
+                      <h4 className="font-semibold mb-3 text-warning">Advances (Non-P&L)</h4>
+                      <Table>
+                        <TableHeader><TableRow><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                          {advanceExpenses.map((e) => (
+                            <TableRow key={e.id}>
+                              <TableCell className="text-warning">{e.expense_type}</TableCell>
+                              <TableCell className="text-right text-warning">{formatCurrency(Math.abs(Number(e.amount)))}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-warning/10">
+                            <TableCell className="font-bold">Total Advances</TableCell>
+                            <TableCell className="text-right font-bold text-warning">{formatCurrency(advancesTotal)}</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-6 p-4 bg-muted rounded-lg space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-lg">GRAND TOTAL EXPENSES</span>
+                  <span className="text-sm text-muted-foreground">Actual Expenses</span>
+                  <span className="font-medium text-destructive">{formatCurrency(grossExpenses)}</span>
+                </div>
+                {creditsTotal > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Credits / Discounts</span>
+                    <span className="font-medium text-success">-{formatCurrency(creditsTotal)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center border-t border-border pt-2">
+                  <span className="font-bold text-lg">NET EXPENSE IMPACT</span>
                   <span className="font-bold text-2xl text-destructive">{formatCurrency(totalExpenses)}</span>
                 </div>
+                {advancesTotal > 0 && (
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-sm text-warning flex items-center gap-1"><Banknote className="h-3 w-3" /> Advances Taken (neutral)</span>
+                    <span className="text-sm text-warning">{formatCurrency(advancesTotal)}</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
