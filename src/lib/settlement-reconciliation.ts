@@ -79,13 +79,10 @@ const RECURRING_EXPENSE_TYPES = new Set([
   'Insurance',
 ]);
 
-// Fallback advance detection patterns — catches items from PDF sources missing is_advance
+// Fallback advance detection patterns — only Pre-Trip patterns (contractor statement is authoritative)
 const ADVANCE_FALLBACK_PATTERNS: RegExp[] = [
-  /\bCASH\s*ADVANCE\b/i,
   /\bCARD\s*PRE-TRIP\b/i,
-  /\bCARD\s*CONT\.?\s*SPEC\s*ADV\b/i,
-  /\bCARD\s*LOAD\b/i,
-  /\bDIRECT.?DEPOSIT\s*BANK\b/i,
+  /\bPRE-TRIP\b/i,
 ];
 
 /**
@@ -128,7 +125,7 @@ export function detectFileType(file: File): StagedFile['type'] {
 export function reconcileDocuments(
   stagedFiles: StagedFile[]
 ): ReconciliationResult {
-  const allExpenses: (ExtractedExpense & { source: string })[] = [];
+  const allExpenses: (ExtractedExpense & { source: string; sourceType: StagedFile['type'] })[] = [];
   let periodStart: string | null = null;
   let periodEnd: string | null = null;
   let unitNumber: string | null = null;
@@ -155,7 +152,7 @@ export function reconcileDocuments(
         // Also skip positive amounts that aren't credits/advances/reimbursements
         if (exp.amount > 0) continue;
       }
-      allExpenses.push({ ...exp, source: sourceLabel });
+      allExpenses.push({ ...exp, source: sourceLabel, sourceType: sf.type });
     }
   }
 
@@ -213,6 +210,9 @@ export function reconcileDocuments(
     }
   }
 
+  // Pre-Trip pattern for advance qualification
+  const PRE_TRIP_PATTERN = /\bPRE-TRIP\b/i;
+
   // Split into 3 buckets
   const expenses: ReconciledExpense[] = [];
   const advances: ReconciledExpense[] = [];
@@ -220,7 +220,14 @@ export function reconcileDocuments(
 
   for (const item of deduped.values()) {
     if (item.is_advance) {
-      advances.push(item);
+      // Only keep advances from contractor PDF that match Pre-Trip AND have a trip number
+      const isContractor = (item as any).sourceType === 'contractor_pdf';
+      const isPreTrip = PRE_TRIP_PATTERN.test(item.description);
+      const hasTrip = !!item.trip_number;
+      if (isContractor && isPreTrip && hasTrip) {
+        advances.push(item);
+      }
+      // All other advances are dropped (duplicates of contractor statement)
     } else if (item.is_reimbursement || item.is_discount) {
       credits.push(item);
     } else {
