@@ -1,47 +1,27 @@
 
 
-## Update Finance Page Expenses Tab for New Settlement Categories
+## Prevent False Deduplication of Recurring Weekly Expenses
 
 ### Problem
-The Expenses tab sums ALL records from the `expenses` table into one total, including Advances (which are non-P&L) and Credits (which offset expenses). The statement parser now correctly categorizes these, but the Finance page doesn't account for the distinction.
+The dedup key is `${date}_${expense_type}_${amount}`. When the same recurring expense (e.g., "Card Fee" $2.50) appears multiple times on the same date from the same source document, or when multiple line items share the same date/type/amount but are distinct charges, they get incorrectly merged into one.
 
-### Changes
+### Root Cause
+Recurring charges like Card Fee, DD Fee, Prepass, LCN Fees, etc. appear on every weekly statement with potentially the same amount. If two such charges land on the same date (or two documents report the same-looking charge that is actually two separate transactions), the engine treats them as duplicates.
 
-**`src/pages/Finance.tsx`**
+### Solution
 
-1. **Add 'Advance' to `expenseTypes` array** so it appears in dropdowns and breakdowns
+**`src/lib/settlement-reconciliation.ts`**
 
-2. **Update expense categorization constants** — define which types are advances vs credits:
-   - Advances: `expense_type === 'Advance'` or `notes` contains 'Advance (Non-P&L)'
-   - Credits: `expense_type` in `['Reimbursement', 'Fuel Discount']` or `amount < 0`
+1. Define a `RECURRING_EXPENSE_TYPES` set containing expense types that are expected to recur and should not be aggressively deduped:
+   - `Licensing/Permits`, `Card Fee`, `Direct Deposit Fee`, `CPP/Benefits`, `LCN/Satellite`, `Truck Warranty`, `PrePass/Scale`, `Trip Scanning`, `Insurance`
 
-3. **Split `getFilteredExpenses` results into 3 groups**:
-   - `actualExpenses` — true P&L expenses (exclude advances and credits)
-   - `advanceExpenses` — advance-type records (display-only, not in totals)
-   - `creditExpenses` — reimbursements/discounts (offset from expenses)
+2. Update the dedup key logic:
+   - For recurring expense types: append the **source label** to the key so the same charge from the same document is kept, and only cross-document matches (same date + type + amount) are merged
+   - For non-recurring types: keep existing behavior (merge across sources)
+   - Additionally, for ALL types: if the same key appears multiple times from the **same source**, treat each occurrence as distinct by appending a counter
 
-4. **Update `totalExpenses` calculation** (line ~439):
-   - Only sum actual expenses (not advances)
-   - Subtract credits to get net expense impact
-   - Current: `totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total`
-   - New: same but exclude advances from standalone/loadLinked totals, and subtract credits
-
-5. **Update Summary Cards** (lines 530-562):
-   - "Total Expenses" card shows net expense (actual expenses minus credits)
-   - Add a small note showing advances separately
-
-6. **Update Expense Table display** (lines 658-694):
-   - Add visual indicators: Advance rows get amber badge, Credit rows get green styling
-   - Show "Advance (Non-P&L)" badge next to advance-type rows
-
-7. **Update Expense Breakdown Card** (lines 700-771):
-   - Add a third section: "Advances (Non-P&L)" showing advance totals neutrally
-   - Update "GRAND TOTAL EXPENSES" to show:
-     - Actual Expenses: $X
-     - Credits/Discounts: -$Y  
-     - Net Expense Impact: $(X-Y)
-     - Advances Taken: $Z (neutral, not in total)
+3. Implementation: before the dedup loop, group items by source. Within each source, if multiple items share the same `date_type_amount` key, append an index suffix to make each unique. Then run dedup across sources as before — this way cross-document matches still merge, but same-document duplicates are preserved.
 
 ### Files Modified
-- `src/pages/Finance.tsx`
+- `src/lib/settlement-reconciliation.ts`
 
