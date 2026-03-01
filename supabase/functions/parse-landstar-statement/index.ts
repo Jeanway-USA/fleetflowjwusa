@@ -31,6 +31,7 @@ interface ExtractedExpense {
   gallons: number | null;
   is_discount: boolean;
   is_reimbursement: boolean;
+  is_advance: boolean;
 }
 
 interface ParsedStatement {
@@ -127,6 +128,13 @@ EXPENSE TYPE MAPPING - Use these exact expense_type values:
 - Cell Phone → "Cell Phone"
 - Any other expenses → "Misc"
 
+ADVANCES (NON-P&L) - These are NOT true expenses, they are early access to funds:
+- Cash Advance → "Cash Advance" — mark is_advance: true
+- Card Pre-Trip, Card Load → "Card Load" — mark is_advance: true
+- CARD CONT. SPEC ADV, CARD CONT SPEC ADV → "Advance" — mark is_advance: true
+- Direct-Deposit Bank, Direct Deposit (the bank transfer, not the fee) → "Direct Deposit" — mark is_advance: true
+- Direct-Deposit Fee, DD Fee → "Direct Deposit Fee" — mark is_advance: false (this IS a real fee/expense)
+
 REIMBURSEMENTS & CREDITS - These are REVENUE (money coming back):
 - Look for keywords: "REIMB", "REIMBURSEMENT", "REFUND", "CREDIT", "ADJUSTMENT CR", "REBATE"
 - Mark these with is_reimbursement: true
@@ -167,7 +175,8 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
       "vendor": "Vendor/location name if available, or null",
       "gallons": number or null (for fuel/DEF only),
       "is_discount": true/false (true if this is a fuel discount or similar credit),
-      "is_reimbursement": true/false (true if this is a reimbursement, refund, or money returned)
+      "is_reimbursement": true/false (true if this is a reimbursement, refund, or money returned),
+      "is_advance": true/false (true if this is a cash advance, card pre-trip/load, SPEC ADV, or direct-deposit bank transfer — NOT for DD Fee which is a real expense)
     }
   ]
 }
@@ -180,7 +189,9 @@ IMPORTANT:
 - Reimbursements (REIMB, REFUND, CREDIT, REBATE) should have positive amounts and is_reimbursement: true
 - Include the original description for reference
 - If the document has multiple pages, process all of them
-- Group related items (like fuel purchase + NATS discount) as separate line items`;
+- Group related items (like fuel purchase + NATS discount) as separate line items
+- Advances (Cash Advance, Card Pre-Trip, Card Load, SPEC ADV, Direct-Deposit Bank) must have is_advance: true
+- Direct-Deposit Fee / DD Fee is a REAL expense (is_advance: false) — do not confuse with Direct-Deposit Bank transfers`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
