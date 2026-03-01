@@ -66,6 +66,15 @@ const REVENUE_IGNORE_PATTERNS: RegExp[] = [
   /\bTRACTOR\s*LEASE\b/i,
 ];
 
+// Fallback advance detection patterns — catches items from PDF sources missing is_advance
+const ADVANCE_FALLBACK_PATTERNS: RegExp[] = [
+  /\bCASH\s*ADVANCE\b/i,
+  /\bCARD\s*PRE-TRIP\b/i,
+  /\bCARD\s*CONT\.?\s*SPEC\s*ADV\b/i,
+  /\bCARD\s*LOAD\b/i,
+  /\bDIRECT.?DEPOSIT\s*BANK\b/i,
+];
+
 /**
  * Detect document type from filename patterns
  */
@@ -134,6 +143,13 @@ export function reconcileDocuments(
         if (exp.amount > 0) continue;
       }
       allExpenses.push({ ...exp, source: sourceLabel });
+    }
+  }
+
+  // Fallback: apply advance detection for items missing the flag (e.g. from PDF sources)
+  for (const item of allExpenses) {
+    if (!item.is_advance && ADVANCE_FALLBACK_PATTERNS.some(p => p.test(item.description))) {
+      item.is_advance = true;
     }
   }
 
