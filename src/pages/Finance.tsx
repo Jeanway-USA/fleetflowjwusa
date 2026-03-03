@@ -26,7 +26,7 @@ import { RevenueTab } from '@/components/finance/RevenueTab';
 import { PayrollTab } from '@/components/finance/PayrollTab';
 import { CommissionsTab } from '@/components/finance/CommissionsTab';
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
-import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval } from 'date-fns';
+import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
@@ -69,7 +69,10 @@ const isActualExpense = (expense: Expense): boolean => {
 export default function Finance() {
   const queryClient = useQueryClient();
   const { orgId } = useAuth();
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('2026-Q1');
+  // Default to current month
+  const now = new Date();
+  const defaultPeriod = `${now.getFullYear()}-${now.getMonth() + 1}`;
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(defaultPeriod);
   const [selectedTruck, setSelectedTruck] = useState<string>('all');
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -79,6 +82,9 @@ export default function Finance() {
   const [massEditFormData, setMassEditFormData] = useState<Partial<ExpenseInsert>>({});
   const [massDeleteDialogOpen, setMassDeleteDialogOpen] = useState(false);
   const [isMassDeleting, setIsMassDeleting] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [expensePage, setExpensePage] = useState(0);
+  const EXPENSES_PER_PAGE = 50;
 
   type SortField = 'expense_date' | 'expense_type' | 'description' | 'amount' | 'gallons' | 'truck_id' | 'load_id';
   type SortDirection = 'asc' | 'desc';
@@ -531,14 +537,36 @@ export default function Finance() {
 
       {/* Period and Truck Selector */}
       <div className="flex flex-wrap gap-4 mb-6">
-        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+        <Select value={selectedPeriod} onValueChange={(v) => { setSelectedPeriod(v); setExpensePage(0); }}>
           <SelectTrigger className="w-48"><SelectValue placeholder="Select period" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Time</SelectItem>
-            <SelectItem value="2026-Q1">Q1 2026</SelectItem>
-            <SelectItem value="2026-1">January 2026</SelectItem>
-            <SelectItem value="2026-2">February 2026</SelectItem>
-            <SelectItem value="2026-3">March 2026</SelectItem>
+            {(() => {
+              // Dynamically generate periods from data
+              const dates: Date[] = [];
+              expenses.forEach(e => { if (e.expense_date) dates.push(parseISO(e.expense_date)); });
+              loads.forEach((l: any) => { if (l.pickup_date) dates.push(parseISO(l.pickup_date)); });
+              if (dates.length === 0) dates.push(new Date());
+              const minDate = startOfMonth(new Date(Math.min(...dates.map(d => d.getTime()))));
+              const maxDate = startOfMonth(new Date(Math.max(...dates.map(d => d.getTime()), Date.now())));
+              
+              const periods: { value: string; label: string }[] = [];
+              // Quarters
+              let qStart = startOfQuarter(minDate);
+              const qEnd = startOfQuarter(maxDate);
+              while (qStart <= qEnd) {
+                const q = Math.floor(qStart.getMonth() / 3) + 1;
+                periods.push({ value: `${qStart.getFullYear()}-Q${q}`, label: `Q${q} ${qStart.getFullYear()}` });
+                qStart = addMonths(qStart, 3);
+              }
+              // Months
+              let mStart = new Date(minDate);
+              while (mStart <= maxDate) {
+                periods.push({ value: `${mStart.getFullYear()}-${mStart.getMonth() + 1}`, label: format(mStart, 'MMMM yyyy') });
+                mStart = addMonths(mStart, 1);
+              }
+              return periods.map(p => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>);
+            })()}
           </SelectContent>
         </Select>
         <Select value={selectedTruck} onValueChange={setSelectedTruck}>
@@ -694,7 +722,7 @@ export default function Finance() {
                     {sortedFilteredExpenses.length === 0 ? (
                       <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No expenses for this period</TableCell></TableRow>
                     ) : (
-                      sortedFilteredExpenses.map((expense) => {
+                      sortedFilteredExpenses.slice(expensePage * EXPENSES_PER_PAGE, (expensePage + 1) * EXPENSES_PER_PAGE).map((expense) => {
                         const isRefund = isCreditExpense(expense);
                         const isAdvance = isAdvanceExpense(expense);
                         const absAmount = Math.abs(Number(expense.amount));
@@ -722,7 +750,7 @@ export default function Finance() {
                             <TableCell>
                               <div className="flex gap-2">
                                 <Button size="icon" variant="ghost" onClick={() => openExpenseDialog(expense)}><Pencil className="h-4 w-4" /></Button>
-                                <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteExpenseMutation.mutate(expense.id)}><Trash2 className="h-4 w-4" /></Button>
+                                <Button size="icon" variant="ghost" className="text-destructive" onClick={() => setDeleteConfirmId(expense.id)}><Trash2 className="h-4 w-4" /></Button>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -732,6 +760,18 @@ export default function Finance() {
                   </TableBody>
                 </Table>
               </div>
+              {/* Pagination Controls */}
+              {sortedFilteredExpenses.length > EXPENSES_PER_PAGE && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {expensePage * EXPENSES_PER_PAGE + 1}–{Math.min((expensePage + 1) * EXPENSES_PER_PAGE, sortedFilteredExpenses.length)} of {sortedFilteredExpenses.length}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={expensePage === 0} onClick={() => setExpensePage(p => p - 1)}>Previous</Button>
+                    <Button variant="outline" size="sm" disabled={(expensePage + 1) * EXPENSES_PER_PAGE >= sortedFilteredExpenses.length} onClick={() => setExpensePage(p => p + 1)}>Next</Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1046,6 +1086,21 @@ export default function Finance() {
         title={`Delete ${selectedExpenseIds.size} Expenses`}
         description={`Are you sure you want to delete ${selectedExpenseIds.size} selected expenses? This action cannot be undone.`}
         isDeleting={isMassDeleting}
+      />
+
+      {/* Single Delete Confirmation */}
+      <ConfirmDeleteDialog
+        open={!!deleteConfirmId}
+        onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}
+        onConfirm={() => {
+          if (deleteConfirmId) {
+            deleteExpenseMutation.mutate(deleteConfirmId);
+            setDeleteConfirmId(null);
+          }
+        }}
+        title="Delete Expense"
+        description="Are you sure you want to delete this expense? This action cannot be undone."
+        isDeleting={deleteExpenseMutation.isPending}
       />
     </>
   );
