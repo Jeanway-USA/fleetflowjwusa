@@ -194,7 +194,7 @@ export function AppSidebar() {
             {filteredItems.map((item) => (
               <SidebarMenuItem key={item.path}>
                 <SidebarMenuButton
-                  isActive={location.pathname === item.path}
+                  isActive={location.pathname === item.path || location.pathname.startsWith(item.path + '/')}
                   onClick={() => {
                     if (isDashboardGroup && actuallyIsOwner && pathToRole[item.path]) {
                       handleDashboardSwitch(item.path, pathToRole[item.path]);

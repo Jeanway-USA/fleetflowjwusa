@@ -1,12 +1,61 @@
 import { ReactNode, useEffect } from 'react';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DemoControls } from '@/components/demo/DemoControls';
 import { useTheme } from '@/contexts/ThemeContext';
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+
+const ROUTE_LABELS: Record<string, string> = {
+  '/executive-dashboard': 'Executive Dashboard',
+  '/dispatcher-dashboard': 'Dispatcher Dashboard',
+  '/driver-dashboard': 'Driver Dashboard',
+  '/trucks': 'Trucks',
+  '/trailers': 'Trailers',
+  '/drivers': 'Drivers',
+  '/fleet-loads': 'Fleet Loads',
+  '/agency-loads': 'Agency Loads',
+  '/finance': 'Finance & P/L',
+  '/insights': 'Company Insights',
+  '/ifta': 'IFTA Reporting',
+  '/crm': 'CRM',
+  '/maintenance': 'Maintenance',
+  '/documents': 'Documents',
+  '/safety': 'Safety',
+  '/incidents': 'Incidents',
+  '/driver-performance': 'Driver Performance',
+  '/settings': 'Settings',
+  '/driver-stats': 'My Stats',
+  '/driver-settings': 'My Settings',
+  '/super-admin': 'Super Admin',
+};
+
+const ROUTE_GROUPS: Record<string, { label: string; path: string }> = {
+  '/trucks': { label: 'Fleet', path: '/trucks' },
+  '/trailers': { label: 'Fleet', path: '/trucks' },
+  '/drivers': { label: 'Fleet', path: '/drivers' },
+  '/fleet-loads': { label: 'Loads', path: '/fleet-loads' },
+  '/agency-loads': { label: 'Loads', path: '/fleet-loads' },
+  '/finance': { label: 'Finance', path: '/finance' },
+  '/insights': { label: 'Finance', path: '/finance' },
+  '/ifta': { label: 'Finance', path: '/finance' },
+  '/crm': { label: 'Operations', path: '/crm' },
+  '/maintenance': { label: 'Operations', path: '/maintenance' },
+  '/documents': { label: 'Operations', path: '/documents' },
+  '/safety': { label: 'Operations', path: '/safety' },
+  '/incidents': { label: 'Operations', path: '/incidents' },
+  '/driver-performance': { label: 'Operations', path: '/driver-performance' },
+};
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -44,59 +93,114 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar />
-        <main className="flex-1 flex flex-col min-h-screen">
-          {simulatedOrgId && (
-            <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <span className="font-medium text-amber-700 dark:text-amber-300">Simulating: {simulatedOrgName}</span>
-              </div>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 text-xs border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
-                onClick={() => {
-                  clearOrgSimulation();
-                  navigate('/super-admin');
-                }}
-              >
-                Exit Simulation
-              </Button>
-            </div>
-          )}
-          {isDemoMode && (
-            <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-primary" />
-                <span className="font-medium">You're in Demo Mode</span>
-                <span className="text-muted-foreground hidden sm:inline">— exploring with sample data</span>
-              </div>
-              <Button
-                size="sm"
-                className="h-7 text-xs gradient-gold text-primary-foreground"
-                onClick={async () => {
-                  await signOut();
-                  navigate('/');
-                }}
-              >
-                Start Your Beta Account
-              </Button>
-            </div>
-          )}
-          <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex h-14 items-center gap-4 px-4 lg:px-6">
-              <SidebarTrigger className="lg:hidden" />
-              <div className="flex-1" />
-            </div>
-          </header>
-          <div className="flex-1 p-4 lg:p-6 animate-fade-in">
-            {children}
-          </div>
-        </main>
-        {isDemoMode && <DemoControls />}
-      </div>
+      <DashboardLayoutInner isDemoMode={isDemoMode} signOut={signOut} simulatedOrgId={simulatedOrgId} simulatedOrgName={simulatedOrgName} clearOrgSimulation={clearOrgSimulation} navigate={navigate}>
+        {children}
+      </DashboardLayoutInner>
     </SidebarProvider>
+  );
+}
+
+function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, simulatedOrgName, clearOrgSimulation, navigate }: {
+  children: ReactNode;
+  isDemoMode: boolean;
+  signOut: () => Promise<void>;
+  simulatedOrgId: string | null;
+  simulatedOrgName: string | null;
+  clearOrgSimulation: () => void;
+  navigate: (path: string) => void;
+}) {
+  const { toggleSidebar } = useSidebar();
+  const location = useLocation();
+
+  // Keyboard shortcut: Ctrl/Cmd + B to toggle sidebar
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault();
+        toggleSidebar();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [toggleSidebar]);
+
+  // Breadcrumb generation
+  const pathSegment = '/' + location.pathname.split('/')[1];
+  const pageLabel = ROUTE_LABELS[pathSegment] || ROUTE_LABELS[location.pathname];
+  const group = ROUTE_GROUPS[pathSegment];
+
+  return (
+    <div className="min-h-screen flex w-full bg-background">
+      <AppSidebar />
+      <main className="flex-1 flex flex-col min-h-screen">
+        {simulatedOrgId && (
+          <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <span className="font-medium text-amber-700 dark:text-amber-300">Simulating: {simulatedOrgName}</span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+              onClick={() => {
+                clearOrgSimulation();
+                navigate('/super-admin');
+              }}
+            >
+              Exit Simulation
+            </Button>
+          </div>
+        )}
+        {isDemoMode && (
+          <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-primary" />
+              <span className="font-medium">You're in Demo Mode</span>
+              <span className="text-muted-foreground hidden sm:inline">— exploring with sample data</span>
+            </div>
+            <Button
+              size="sm"
+              className="h-7 text-xs gradient-gold text-primary-foreground"
+              onClick={async () => {
+                await signOut();
+                navigate('/');
+              }}
+            >
+              Start Your Beta Account
+            </Button>
+          </div>
+        )}
+        <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex h-14 items-center gap-4 px-4 lg:px-6">
+            <SidebarTrigger className="lg:hidden" />
+            {pageLabel && (
+              <Breadcrumb>
+                <BreadcrumbList>
+                  {group && (
+                    <>
+                      <BreadcrumbItem>
+                        <BreadcrumbLink asChild>
+                          <Link to={group.path}>{group.label}</Link>
+                        </BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator />
+                    </>
+                  )}
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>{pageLabel}</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+            )}
+            <div className="flex-1" />
+          </div>
+        </header>
+        <div className="flex-1 p-4 lg:p-6 animate-fade-in">
+          {children}
+        </div>
+      </main>
+      {isDemoMode && <DemoControls />}
+    </div>
   );
 }

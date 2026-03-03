@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ActiveLoadCard } from '@/components/driver/ActiveLoadCard';
@@ -13,12 +13,23 @@ import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
 import { LocationSharing } from '@/components/driver/LocationSharing';
 import { DriverNotifications } from '@/components/driver/DriverNotifications';
 import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
-import { Loader2, Sun, Moon, AlertTriangle } from 'lucide-react';
+import { Loader2, Sun, Moon, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboard(_, _ref) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const currentHour = new Date().getHours();
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening';
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['driver-for-user'] });
+    await queryClient.invalidateQueries({ queryKey: ['driver-active-loads'] });
+    await queryClient.invalidateQueries({ queryKey: ['driver-truck'] });
+    setTimeout(() => setIsRefreshing(false), 600);
+  }, [queryClient]);
 
   // Get driver record for current user
   const { data: driver, isLoading: driverLoading } = useQuery({
@@ -110,6 +121,9 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
             {greeting}, {driver.first_name}
           </h1>
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
             <DriverNotifications driverId={driver.id} />
             <span className="text-sm text-muted-foreground">
               {format(new Date(), 'EEE, MMM d')}
