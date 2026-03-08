@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
               <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e5e5;">
               
               <p style="margin: 0; color: #9a9a9a; font-size: 12px; line-height: 1.6;">
-                This invitation was sent by an administrator at JeanWay USA. If you have questions, please contact your administrator.
+                This invitation was sent by an administrator at Fleet Flow TMS. If you have questions, please contact your administrator.
               </p>
             </td>
           </tr>
