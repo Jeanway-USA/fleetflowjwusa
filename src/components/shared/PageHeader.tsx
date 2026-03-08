@@ -11,9 +11,10 @@ interface PageHeaderProps {
     onClick: () => void;
   };
   children?: ReactNode;
+  hideNotifications?: boolean;
 }
 
-export function PageHeader({ title, description, action, children }: PageHeaderProps) {
+export function PageHeader({ title, description, action, children, hideNotifications }: PageHeaderProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
       <div>
@@ -21,7 +22,7 @@ export function PageHeader({ title, description, action, children }: PageHeaderP
         {description && <p className="text-muted-foreground mt-1">{description}</p>}
       </div>
       <div className="flex items-center gap-2">
-        <NotificationCenter />
+        {!hideNotifications && <NotificationCenter />}
         {children}
         {action && (
           <Button onClick={action.onClick} className="gradient-gold text-primary-foreground">
