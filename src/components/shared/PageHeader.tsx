@@ -22,7 +22,7 @@ export function PageHeader({ title, description, action, children, hideNotificat
         {description && <p className="text-muted-foreground mt-1">{description}</p>}
       </div>
       <div className="flex items-center gap-2">
-        <NotificationCenter />
+        {!hideNotifications && <NotificationCenter />}
         {children}
         {action && (
           <Button onClick={action.onClick} className="gradient-gold text-primary-foreground">

@@ -17,14 +17,7 @@ interface Notification {
   createdAt: string;
 }
 
-const INITIAL_NOTIFICATIONS: Notification[] = [
-  { id: '1', title: 'Load #4821 Delivered', message: 'Load delivered at Dallas, TX facility on time.', category: 'loads', isRead: false, createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString() },
-  { id: '2', title: 'PM Due: Truck 301', message: 'Oil change due in 1,200 miles.', category: 'maintenance', isRead: false, createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString() },
-  { id: '3', title: 'New Rate Confirmation', message: 'Rate con uploaded for Load #4835.', category: 'loads', isRead: false, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString() },
-  { id: '4', title: 'Tire Pressure Alert', message: 'Truck 105 rear left tire below threshold.', category: 'maintenance', isRead: true, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString() },
-  { id: '5', title: 'System Update', message: 'IFTA reporting module updated to v2.4.', category: 'system', isRead: true, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString() },
-  { id: '6', title: 'Backup Complete', message: 'Nightly data backup completed successfully.', category: 'system', isRead: false, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString() },
-];
+const INITIAL_NOTIFICATIONS: Notification[] = [];
 
 const CATEGORY_ICON: Record<NotificationCategory, React.ElementType> = {
   loads: Package,

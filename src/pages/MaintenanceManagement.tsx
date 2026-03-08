@@ -40,6 +40,7 @@ export default function MaintenanceManagement() {
       <PageHeader 
         title="Maintenance Management" 
         description="Fleet maintenance tracking, work orders, and preventive maintenance schedules"
+        hideNotifications
       >
         <div className="flex items-center gap-2">
           <Sheet>
