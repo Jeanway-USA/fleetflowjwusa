@@ -15,6 +15,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
+import { CommandPalette } from '@/components/shared/CommandPalette';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/executive-dashboard': 'Executive Dashboard',
@@ -201,6 +202,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
         </div>
       </main>
       {isDemoMode && <DemoControls />}
+      <CommandPalette />
     </div>
   );
 }
