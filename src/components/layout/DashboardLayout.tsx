@@ -15,6 +15,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
+import { CommandPalette } from '@/components/shared/CommandPalette';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/executive-dashboard': 'Executive Dashboard',
