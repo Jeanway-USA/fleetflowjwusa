@@ -1,17 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { CheckCircle2, Truck, Users, Package, Crown, ArrowLeft, ArrowRight } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
-interface TierCard {
+interface TierMeta {
   id: string;
   name: string;
   tagline: string;
-  price: string;
-  period: string;
   icon: React.ElementType;
   heroFeature: string;
   features: string[];
@@ -19,13 +19,11 @@ interface TierCard {
   popular?: boolean;
 }
 
-const TIERS: TierCard[] = [
-  {
+const TIER_META: Record<string, TierMeta> = {
+  solo_bco: {
     id: 'solo_bco',
     name: 'Solo BCO',
     tagline: 'Owner-Operator Power Pack',
-    price: '$49',
-    period: '/mo',
     icon: Truck,
     heroFeature: 'Per-Load Profit/Loss Snapshot',
     features: [
@@ -39,12 +37,10 @@ const TIERS: TierCard[] = [
     ],
     upgradeNote: 'Upgrade to Fleet when adding your 2nd truck',
   },
-  {
+  fleet_owner: {
     id: 'fleet_owner',
     name: 'Fleet Owner',
     tagline: 'The Scalability Suite',
-    price: '$149',
-    period: '/mo',
     icon: Users,
     heroFeature: 'Automated Driver Settlements',
     popular: true,
@@ -62,12 +58,10 @@ const TIERS: TierCard[] = [
     ],
     upgradeNote: 'Upgrade to All-in-One when you start brokering',
   },
-  {
+  agency: {
     id: 'agency',
     name: 'Agency',
     tagline: 'Brokerage & Coordination Hub',
-    price: '$99',
-    period: '/mo',
     icon: Package,
     heroFeature: 'Commission Calculator & Agent Dashboard',
     features: [
@@ -81,27 +75,26 @@ const TIERS: TierCard[] = [
     ],
     upgradeNote: 'Upgrade to All-in-One when running your own trucks',
   },
-];
-
-const ALL_IN_ONE: TierCard = {
-  id: 'all_in_one',
-  name: 'All-in-One',
-  tagline: 'The Enterprise Hybrid',
-  price: '$199',
-  period: '/mo',
-  icon: Crown,
-  heroFeature: 'Unified Brokerage + Carrier Command Center',
-  popular: true,
-  features: [
-    'Everything in Fleet Owner',
-    'Everything in Agency',
-    'Toggle between Brokerage & Carrier views',
-    'Cross-business-unit reporting',
-    'Unlimited users & trucks',
-    'Priority support',
-  ],
-  upgradeNote: 'The ultimate plan for Mega-BCOs',
+  all_in_one: {
+    id: 'all_in_one',
+    name: 'All-in-One',
+    tagline: 'The Enterprise Hybrid',
+    icon: Crown,
+    heroFeature: 'Unified Brokerage + Carrier Command Center',
+    popular: true,
+    features: [
+      'Everything in Fleet Owner',
+      'Everything in Agency',
+      'Toggle between Brokerage & Carrier views',
+      'Cross-business-unit reporting',
+      'Unlimited users & trucks',
+      'Priority support',
+    ],
+    upgradeNote: 'The ultimate plan for Mega-BCOs',
+  },
 };
+
+const BASE_TIERS = ['solo_bco', 'fleet_owner', 'agency'];
 
 const COMPARISON_FEATURES = [
   { name: 'Load Logging', solo: true, fleet: true, agency: true, all: true },
@@ -120,11 +113,41 @@ const COMPARISON_FEATURES = [
   { name: 'Brokerage View Toggle', solo: false, fleet: false, agency: false, all: true },
 ];
 
+interface PlanPrices {
+  [tier: string]: { monthly: number; annual: number };
+}
+
 export default function Pricing() {
   const navigate = useNavigate();
   const [showAllInOne, setShowAllInOne] = useState(false);
+  const [isAnnual, setIsAnnual] = useState(false);
+  const [prices, setPrices] = useState<PlanPrices | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const displayedTiers = showAllInOne ? [...TIERS, ALL_IN_ONE] : TIERS;
+  useEffect(() => {
+    supabase
+      .from('subscription_plans')
+      .select('tier, base_price_monthly, base_price_annual')
+      .eq('is_active', true)
+      .then(({ data }) => {
+        if (data) {
+          const map: PlanPrices = {};
+          data.forEach((p) => {
+            map[p.tier] = { monthly: Number(p.base_price_monthly), annual: Number(p.base_price_annual) };
+          });
+          setPrices(map);
+        }
+        setLoading(false);
+      });
+  }, []);
+
+  const displayedTierKeys = showAllInOne ? [...BASE_TIERS, 'all_in_one'] : BASE_TIERS;
+
+  const formatPrice = (tier: string) => {
+    if (!prices?.[tier]) return '—';
+    const val = isAnnual ? prices[tier].annual : prices[tier].monthly;
+    return `$${val}`;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -145,60 +168,77 @@ export default function Pricing() {
           <h1 className="text-4xl font-extrabold mb-3">Simple, Transparent Pricing</h1>
           <p className="text-lg text-muted-foreground mb-6">Start with a 14-day free trial. No credit card required.</p>
           
-          <div className="flex items-center justify-center gap-3">
-            <Label htmlFor="all-in-one-toggle" className="text-sm text-muted-foreground">Show All-in-One Plan</Label>
-            <Switch id="all-in-one-toggle" checked={showAllInOne} onCheckedChange={setShowAllInOne} />
+          <div className="flex items-center justify-center gap-6 flex-wrap">
+            <div className="flex items-center gap-3">
+              <Label htmlFor="billing-toggle" className={`text-sm ${!isAnnual ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}>Monthly</Label>
+              <Switch id="billing-toggle" checked={isAnnual} onCheckedChange={setIsAnnual} />
+              <Label htmlFor="billing-toggle" className={`text-sm ${isAnnual ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}>Annual</Label>
+            </div>
+            <div className="flex items-center gap-3">
+              <Label htmlFor="all-in-one-toggle" className="text-sm text-muted-foreground">Show All-in-One Plan</Label>
+              <Switch id="all-in-one-toggle" checked={showAllInOne} onCheckedChange={setShowAllInOne} />
+            </div>
           </div>
         </div>
 
         {/* Tier Cards */}
         <div className={`grid gap-8 mb-20 ${showAllInOne ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-3'}`}>
-          {displayedTiers.map((tier) => (
-            <Card 
-              key={tier.id} 
-              className={`relative flex flex-col ${tier.popular ? 'border-primary ring-2 ring-primary/20' : 'border-border'}`}
-            >
-              {tier.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full gradient-gold text-primary-foreground text-xs font-semibold">
-                  Most Popular
-                </div>
-              )}
-              <CardHeader className="text-center pb-4">
-                <div className="mx-auto w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-                  <tier.icon className="h-6 w-6 text-primary" />
-                </div>
-                <CardTitle className="text-xl">{tier.name}</CardTitle>
-                <CardDescription>{tier.tagline}</CardDescription>
-                <div className="mt-4">
-                  <span className="text-4xl font-extrabold">{tier.price}</span>
-                  <span className="text-muted-foreground">{tier.period}</span>
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col">
-                <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 mb-4">
-                  <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Hero Feature</p>
-                  <p className="text-sm font-medium">{tier.heroFeature}</p>
-                </div>
-                <ul className="space-y-2 flex-1 mb-6">
-                  {tier.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm">
-                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <p className="text-xs text-muted-foreground italic mb-4">{tier.upgradeNote}</p>
-                <Button 
-                  className={`w-full ${tier.popular ? 'gradient-gold text-primary-foreground glow-gold' : ''}`}
-                  variant={tier.popular ? 'default' : 'outline'}
-                  onClick={() => navigate(`/auth?tier=${tier.id}`)}
-                >
-                  Start 14-Day Beta Trial
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+          {displayedTierKeys.map((tierKey) => {
+            const tier = TIER_META[tierKey];
+            if (!tier) return null;
+            return (
+              <Card 
+                key={tier.id} 
+                className={`relative flex flex-col ${tier.popular ? 'border-primary ring-2 ring-primary/20' : 'border-border'}`}
+              >
+                {tier.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full gradient-gold text-primary-foreground text-xs font-semibold">
+                    Most Popular
+                  </div>
+                )}
+                <CardHeader className="text-center pb-4">
+                  <div className="mx-auto w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+                    <tier.icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <CardTitle className="text-xl">{tier.name}</CardTitle>
+                  <CardDescription>{tier.tagline}</CardDescription>
+                  <div className="mt-4">
+                    {loading ? (
+                      <Skeleton className="h-10 w-24 mx-auto" />
+                    ) : (
+                      <>
+                        <span className="text-4xl font-extrabold">{formatPrice(tierKey)}</span>
+                        <span className="text-muted-foreground">{isAnnual ? '/yr' : '/mo'}</span>
+                      </>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col">
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 mb-4">
+                    <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Hero Feature</p>
+                    <p className="text-sm font-medium">{tier.heroFeature}</p>
+                  </div>
+                  <ul className="space-y-2 flex-1 mb-6">
+                    {tier.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-sm">
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-muted-foreground italic mb-4">{tier.upgradeNote}</p>
+                  <Button 
+                    className={`w-full ${tier.popular ? 'gradient-gold text-primary-foreground glow-gold' : ''}`}
+                    variant={tier.popular ? 'default' : 'outline'}
+                    onClick={() => navigate(`/auth?tier=${tier.id}`)}
+                  >
+                    Start 14-Day Beta Trial
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Comparison Table */}
