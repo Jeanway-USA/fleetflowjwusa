@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -74,6 +75,7 @@ export default function Finance() {
   const defaultPeriod = `${now.getFullYear()}-${now.getMonth() + 1}`;
   const [selectedPeriod, setSelectedPeriod] = useState<string>(defaultPeriod);
   const [selectedTruck, setSelectedTruck] = useState<string>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseFormData, setExpenseFormData] = useState<Partial<ExpenseInsert>>({});
@@ -486,6 +488,14 @@ export default function Finance() {
     setExpenseDialogOpen(true);
   };
   const closeExpenseDialog = () => { setExpenseDialogOpen(false); setEditingExpense(null); setExpenseFormData({}); };
+
+  // Auto-open dialog from command palette quick action
+  useEffect(() => {
+    if (searchParams.get('action') === 'new-expense') {
+      openExpenseDialog();
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   const handleExpenseSubmit = (e: React.FormEvent) => {
     e.preventDefault();

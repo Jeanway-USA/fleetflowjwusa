@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,9 +16,18 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Plus, Wrench, Calendar, History } from 'lucide-react';
 
 export default function MaintenanceManagement() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [newWorkOrderOpen, setNewWorkOrderOpen] = useState(false);
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
   const [truckDrawerOpen, setTruckDrawerOpen] = useState(false);
+
+  // Auto-open sheet from command palette quick action
+  useEffect(() => {
+    if (searchParams.get('action') === 'new-work-order') {
+      setNewWorkOrderOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   const handleViewTruck = (truckId: string) => {
     setSelectedTruckId(truckId);

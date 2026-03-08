@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,6 +51,7 @@ export default function FleetLoads() {
   const { hasRole, isAdmin, orgId } = useAuth();
   const isDriverOnly = hasRole('driver') && !isAdmin;
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLoad, setEditingLoad] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
@@ -219,6 +221,14 @@ export default function FleetLoads() {
     }
     setDialogOpen(true);
   };
+
+  // Auto-open dialog from command palette quick action
+  useEffect(() => {
+    if (searchParams.get('action') === 'new-load') {
+      openDialog();
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   const closeDialog = () => {
     setDialogOpen(false);
