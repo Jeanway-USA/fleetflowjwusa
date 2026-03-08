@@ -15,6 +15,7 @@ import { TruckStatusGrid } from '@/components/dispatcher/TruckStatusGrid';
 import { DispatcherAlerts } from '@/components/dispatcher/DispatcherAlerts';
 import { FleetMapView } from '@/components/dispatcher/FleetMapView';
 import { DriverAssignmentPanel } from '@/components/dispatcher/DriverAssignmentPanel';
+import { FleetTimelineScheduler } from '@/components/dispatcher/FleetTimelineScheduler';
 
 
 export default function DispatcherDashboard() {
@@ -186,6 +187,9 @@ export default function DispatcherDashboard() {
             <DispatcherAlerts />
           </div>
         </div>
+
+        {/* Fleet Timeline Scheduler */}
+        <FleetTimelineScheduler />
 
         {/* Active Loads - Full Width */}
         <ActiveLoadsBoard />
