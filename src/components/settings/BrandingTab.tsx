@@ -129,7 +129,7 @@ export function BrandingTab() {
     try {
       const path = type === 'logo' ? logoUrl : bannerUrl;
       if (path) {
-        await storageRemove('branding-assets', path);
+        await supabase.storage.from('branding-assets').remove([path]);
       }
       const updateCol = type === 'logo' ? 'logo_url' : 'banner_url';
       await supabase
