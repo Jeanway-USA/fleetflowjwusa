@@ -836,7 +836,21 @@ export default function IFTA() {
         hasFuelPurchases={filteredFuelPurchases.length > 0}
         hasIFTARecords={iftaRecords.length > 0}
         hasJurisdictionData={jurisdictionStates.size > 0}
+        onAuditData={runAudit}
+        auditLoading={auditLoading}
       />
+
+      {auditAlerts.length > 0 && (
+        <div className="space-y-2 mb-6">
+          {auditAlerts.map(alert => (
+            <Alert key={alert.id} variant="destructive" className="bg-destructive/5">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle className="text-sm">{alert.type}</AlertTitle>
+              <AlertDescription className="text-xs">{alert.message}</AlertDescription>
+            </Alert>
+          ))}
+        </div>
+      )}
 
       <Tabs defaultValue="fuel" className="w-full">
         <TabsList>
