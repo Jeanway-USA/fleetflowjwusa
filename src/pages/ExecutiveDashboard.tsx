@@ -691,7 +691,12 @@ export default function ExecutiveDashboard() {
             title="Executive Dashboard"
             description="Financial and operational health at a glance"
           />
-          <PeriodSelector value={period} onChange={setPeriod} />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowReport(true)} className="gap-2">
+              <FileText className="h-4 w-4" /> Generate EOW Report
+            </Button>
+            <PeriodSelector value={period} onChange={setPeriod} />
+          </div>
         </div>
 
         {/* Row 1: Critical Alerts Banner */}
