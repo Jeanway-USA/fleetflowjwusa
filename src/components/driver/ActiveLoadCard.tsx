@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route } from 'lucide-react';
+import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route, Link2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { LoadRouteMap } from './LoadRouteMap';
 import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
@@ -55,6 +55,7 @@ interface Load {
   empty_miles?: number | null;
   notes: string | null;
   landstar_load_id: string | null;
+  tracking_id?: string | null;
   load_accessorials?: { amount: number }[];
 }
 
@@ -253,6 +254,20 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
 
           {/* Action Buttons */}
           <div className="flex gap-2 pt-2">
+            {load.tracking_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={async () => {
+                  const url = `${window.location.origin}/track?tracking_id=${load.tracking_id}`;
+                  await navigator.clipboard.writeText(url);
+                  toast.success('Tracking link copied!');
+                }}
+              >
+                <Link2 className="h-4 w-4" />
+              </Button>
+            )}
             <Button 
               variant="outline" 
               size="sm" 

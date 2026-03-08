@@ -43,6 +43,7 @@ const Landing = lazy(() => import("./pages/Landing"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const SuperAdminDashboard = lazy(() => import("./pages/SuperAdminDashboard"));
+const PublicLoadTracker = lazy(() => import("./pages/PublicLoadTracker"));
 
 const queryClient = new QueryClient();
 
@@ -72,6 +73,7 @@ const App = () => {
                     <Route path="/pending-access" element={<PendingAccess />} />
                     <Route path="/landing" element={<Navigate to="/" replace />} />
                     <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/track" element={<PublicLoadTracker />} />
                     <Route path="/onboarding" element={<Onboarding />} />
 
                     {/* Dashboard routes */}

@@ -1,0 +1,1 @@
+ALTER TABLE public.fleet_loads ADD COLUMN tracking_id UUID DEFAULT gen_random_uuid() UNIQUE;

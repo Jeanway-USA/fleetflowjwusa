@@ -27,3 +27,6 @@ verify_jwt = false
 [functions.google-drive-auth]
 verify_jwt = false
 
+[functions.public-load-tracker]
+verify_jwt = false
+
