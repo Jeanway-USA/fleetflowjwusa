@@ -61,6 +61,7 @@ const App = () => {
           <Sonner />
           <BrowserRouter>
             <AuthProvider>
+              <BrandColorInjector />
               <ErrorBoundary>
                 <Suspense fallback={<LoadingFallback />}>
                   <Routes>

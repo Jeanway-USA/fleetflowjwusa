@@ -174,6 +174,19 @@ export function BrandingTab() {
             ))}
           </div>
 
+          {/* Custom color picker */}
+          <div className="flex items-center gap-3">
+            <Label className="text-sm whitespace-nowrap">Custom Color</Label>
+            <input
+              type="color"
+              value={hslToHex(selectedColor)}
+              onChange={(e) => setSelectedColor(hexToHsl(e.target.value))}
+              disabled={isDemoMode}
+              className="h-10 w-14 rounded-md border border-border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <span className="text-xs text-muted-foreground font-mono">{hslToHex(selectedColor)}</span>
+          </div>
+
           {/* Live preview */}
           <div className="p-4 rounded-lg border border-border bg-muted/30">
             <p className="text-sm text-muted-foreground mb-2">Preview</p>

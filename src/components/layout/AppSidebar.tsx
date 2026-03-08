@@ -161,13 +161,15 @@ function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, current
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl } = useAuth();
+  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl, logoUrl } = useAuth();
   const { theme } = useTheme();
   const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(user?.email || '');
   const actuallyIsOwner = roles.includes('owner');
   const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
+  const { url: signedLogoUrl } = useSignedUrl('branding-assets', logoUrl || null);
   const defaultBannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
-  const bannerSrc = signedBannerUrl || defaultBannerSrc;
+  // Prefer org logo, then org banner, then default
+  const bannerSrc = signedLogoUrl || signedBannerUrl || defaultBannerSrc;
   const currentPath = location.pathname;
 
   const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
