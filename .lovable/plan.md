@@ -1,66 +1,56 @@
 
 
-## QoL Improvements Across All Areas
+## Public Load Tracker
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Overview
+Create a public-facing load tracking page accessible without authentication. Uses a unique `tracking_id` (UUID) on each load, served via a backend function that bypasses auth to return only safe, non-sensitive data.
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+### Database Changes
+1. **Add `tracking_id` column** to `fleet_loads`:
+   - `tracking_id UUID DEFAULT gen_random_uuid() UNIQUE`
+   - Auto-populated for all existing and new loads
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+### Backend Function: `public-load-tracker`
+A new edge function that accepts `?tracking_id=<uuid>` and returns:
+- Load: origin city/state, destination city/state, status, pickup_date, delivery_date
+- Organization: name, logo_url, primary_color
+- Driver location: latitude, longitude, updated_at (only if `is_sharing = true`)
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+Uses the service role key to bypass RLS. Returns only non-sensitive fields (no rates, driver names, financial data).
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+### New Page: `src/pages/PublicLoadTracker.tsx`
+- **Route**: `/track?tracking_id=<uuid>` (public, no auth)
+- **Layout**: Standalone page (no sidebar/header), not wrapped in ProtectedRoute
+- **UI Components**:
+  - Org logo at top (fetched from edge function response), fallback to app name
+  - Brand color applied via inline CSS variable
+  - Load number and route (city, state only)
+  - **3-step progress bar**: Dispatched → In Transit → Delivered (using simple styled divs, not the Progress component)
+  - **ExpandableMap** showing the route polyline plus a truck marker if live GPS is available
+  - "Last updated" timestamp for location freshness
+  - Graceful states: loading spinner, "tracking not found", "load delivered"
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+### ActiveLoadCard.tsx Changes
+- Add a "Share Tracking" button (Link icon) next to "Load Details"
+- On click: constructs URL `${window.location.origin}/track?tracking_id=${load.tracking_id}` and copies to clipboard via `navigator.clipboard.writeText()`
+- Shows toast confirmation "Tracking link copied!"
+- Only visible when `load.tracking_id` exists
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+### App.tsx Changes
+- Add lazy import for PublicLoadTracker
+- Add `<Route path="/track" element={<PublicLoadTracker />} />` in the public routes section (alongside `/auth`, `/pricing`)
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+### Files Modified/Created
+| File | Action |
+|---|---|
+| Migration | Add `tracking_id` column to `fleet_loads` |
+| `supabase/functions/public-load-tracker/index.ts` | New edge function for public data access |
+| `src/pages/PublicLoadTracker.tsx` | New public tracking page |
+| `src/App.tsx` | Add `/track` public route |
+| `src/components/driver/ActiveLoadCard.tsx` | Add "Share Tracking" button |
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
-
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
-
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
-
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
-
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
-
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
-
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+### Security
+- Edge function returns only: origin/destination (city+state), status, dates, org name/logo, and GPS coords (if sharing)
+- No financial data, driver PII, or internal IDs exposed
+- `tracking_id` is a random UUID — not guessable from load IDs
 
