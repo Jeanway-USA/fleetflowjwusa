@@ -740,7 +740,7 @@ export default function ExecutiveDashboard() {
       </div>
 
       <Dialog open={showReport} onOpenChange={setShowReport}>
-        <DialogContent className="max-w-4xl h-[90vh] overflow-auto p-0">
+        <DialogContent className="max-w-[100vw] w-full h-[100vh] max-h-[100vh] overflow-y-auto p-0 rounded-none border-none [&>button]:hidden">
           <PrintableExecutiveSummary
             kpiData={kpiData}
             fleetStatus={fleetStatus}
