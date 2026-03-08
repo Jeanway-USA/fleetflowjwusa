@@ -11,8 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
-import jwBannerLight from '@/assets/JW_Banner.png';
-import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string()
