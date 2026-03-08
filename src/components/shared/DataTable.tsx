@@ -117,13 +117,12 @@ export function DataTable<T extends { id: string }>({
     [columns, columnVisibility]
   );
 
+  const showSelection = selectable && onSelectionChange;
+
   const computedWidths = useMemo(() => {
-    const totalCols = visibleColumns.length + (showSelection ? 1 : 0);
-    const fixedWidthCols = visibleColumns.filter(c => c.width);
-    const remainingCols = visibleColumns.length - fixedWidthCols.length;
-    const defaultWidth = remainingCols > 0 ? `${100 / totalCols}%` : undefined;
+    const defaultWidth = `${100 / visibleColumns.length}%`;
     return visibleColumns.map(col => col.width || defaultWidth);
-  }, [visibleColumns, showSelection]);
+  }, [visibleColumns]);
 
   const rowVirtualizer = useVirtualizer({
     count: data.length,
@@ -174,8 +173,6 @@ export function DataTable<T extends { id: string }>({
   const clearSelection = useCallback(() => {
     onSelectionChange?.(new Set());
   }, [onSelectionChange]);
-
-  const showSelection = selectable && onSelectionChange;
 
   if (loading) {
     return (
