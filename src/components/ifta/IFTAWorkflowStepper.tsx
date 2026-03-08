@@ -41,7 +41,7 @@ export function IFTAWorkflowStepper({ hasFuelPurchases, hasIFTARecords, hasJuris
 
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg border bg-card p-3 mb-6">
-      {steps.map((step, i) => (
+      <div className="flex items-center gap-2 flex-1">
         <div key={step.label} className="flex items-center gap-2 flex-1">
           <div className={cn(
             'flex items-center justify-center rounded-full h-7 w-7 shrink-0 text-xs font-bold transition-colors',
