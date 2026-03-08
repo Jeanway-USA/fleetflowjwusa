@@ -1,0 +1,1 @@
+ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS dot_number text, ADD COLUMN IF NOT EXISTS mc_number text;

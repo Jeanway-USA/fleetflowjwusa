@@ -2766,10 +2766,12 @@ export type Database = {
           banner_url: string | null
           complimentary_ends_at: string | null
           created_at: string
+          dot_number: string | null
           id: string
           is_active: boolean
           is_complimentary: boolean
           logo_url: string | null
+          mc_number: string | null
           name: string
           primary_color: string | null
           subscription_tier: string
@@ -2781,10 +2783,12 @@ export type Database = {
           banner_url?: string | null
           complimentary_ends_at?: string | null
           created_at?: string
+          dot_number?: string | null
           id?: string
           is_active?: boolean
           is_complimentary?: boolean
           logo_url?: string | null
+          mc_number?: string | null
           name: string
           primary_color?: string | null
           subscription_tier?: string
@@ -2796,10 +2800,12 @@ export type Database = {
           banner_url?: string | null
           complimentary_ends_at?: string | null
           created_at?: string
+          dot_number?: string | null
           id?: string
           is_active?: boolean
           is_complimentary?: boolean
           logo_url?: string | null
+          mc_number?: string | null
           name?: string
           primary_color?: string | null
           subscription_tier?: string
