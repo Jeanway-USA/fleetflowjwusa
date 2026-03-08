@@ -238,9 +238,9 @@ export function DataTable<T extends { id: string }>({
       >
         <table className="w-full caption-bottom" style={{ tableLayout: 'auto' }}>
           <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background" style={{ display: 'block' }}>
-            <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
+            <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'auto', width: '100%' }}>
               {visibleColumns.map((col, i) => (
-                <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground")} style={{ height: `${rowHeight}px` }}>
+                <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground")} style={{ height: `${rowHeight}px`, width: col.width }}>
                     <div className="flex items-center h-full">{col.header}</div>
                   </th>
               ))}
