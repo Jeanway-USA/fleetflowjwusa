@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Palette, ImageIcon, Upload, X } from 'lucide-react';
-import { useStorageProvider, useProviderSignedUrl } from '@/hooks/useStorageProvider';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 const COLOR_PRESETS = [
   { name: 'Gold', hsl: '45 80% 45%', dark: '45 80% 50%' },
@@ -61,7 +61,6 @@ function hexToHsl(hex: string): string {
 
 export function BrandingTab() {
   const { orgId, isDemoMode, refreshOrgData, primaryColor, logoUrl, bannerUrl } = useAuth();
-  const { upload: storageUpload, remove: storageRemove } = useStorageProvider();
   const [selectedColor, setSelectedColor] = useState(primaryColor || '45 80% 45%');
   const [isSavingColor, setIsSavingColor] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -69,8 +68,8 @@ export function BrandingTab() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
-  const { url: signedLogoUrl } = useProviderSignedUrl('branding-assets', logoUrl || null);
-  const { url: signedBannerUrl } = useProviderSignedUrl('branding-assets', bannerUrl || null);
+  const { url: signedLogoUrl } = useSignedUrl('branding-assets', logoUrl || null);
+  const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
 
   const handleSaveColor = async () => {
     if (!orgId) return;
@@ -102,9 +101,12 @@ export function BrandingTab() {
       const ext = file.name.split('.').pop() || 'png';
       const filePath = `${orgId}/${type}.${ext}`;
 
-      // Upload through storage provider
-      const { path, error: uploadError } = await storageUpload('branding-assets', filePath, file);
-      if (uploadError || !path) throw uploadError || new Error('Upload failed');
+      // Upload directly to built-in storage (not through provider)
+      const { error: uploadError } = await supabase.storage
+        .from('branding-assets')
+        .upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const path = filePath;
 
       const updateCol = type === 'logo' ? 'logo_url' : 'banner_url';
       const { error: dbError } = await supabase
@@ -127,7 +129,7 @@ export function BrandingTab() {
     try {
       const path = type === 'logo' ? logoUrl : bannerUrl;
       if (path) {
-        await storageRemove('branding-assets', path);
+        await supabase.storage.from('branding-assets').remove([path]);
       }
       const updateCol = type === 'logo' ? 'logo_url' : 'banner_url';
       await supabase
