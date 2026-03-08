@@ -221,6 +221,17 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
           activeLoadNumber={activeLoad?.landstar_load_id}
         />
       </div>
+
+      {/* Geofence Arrival Drawer */}
+      {activeLoad && (
+        <GeofenceArrivalDrawer
+          open={!!showGeofenceDrawer}
+          onOpenChange={(open) => { if (!open) dismissGeofence(); }}
+          loadId={activeLoad.id}
+          distanceMiles={distanceMiles}
+          onConfirmed={refetchLoads}
+        />
+      )}
     </>
   );
 });
