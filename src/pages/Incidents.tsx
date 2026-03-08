@@ -15,7 +15,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, AlertTriangle, Eye, Pencil, Trash2, FileWarning, Car, Users, Camera } from 'lucide-react';
+import { Plus, AlertTriangle, Eye, Pencil, Trash2, FileWarning, Car, Users, Camera, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format, parseISO } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 
@@ -296,18 +297,26 @@ export default function Incidents() {
               { key: 'location_description', header: 'Location', render: (i: Incident) => <span className="max-w-[200px] truncate block">{i.location_description || '-'}</span> },
               { key: 'estimated_damage', header: 'Damage Est.', render: (i: Incident) => formatCurrencyValue(i.estimated_damage) },
               { key: 'status', header: 'Status', render: (i: Incident) => <StatusBadge status={i.status} /> },
-              { key: 'actions', header: 'Actions', render: (incident: Incident) => (
-                <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => setViewingIncident(incident)}>
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={() => openDialog(incident)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(incident.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+              { key: 'actions', header: '', render: (incident: Incident) => (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setViewingIncident(incident)}>
+                      <Eye className="mr-2 h-4 w-4" /> View Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openDialog(incident)}>
+                      <Pencil className="mr-2 h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(incident.id)}>
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )},
             ]}
             data={incidents}

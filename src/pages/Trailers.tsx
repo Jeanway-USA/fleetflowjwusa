@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, User, AlertTriangle, CheckCircle, Clock, History, Container } from 'lucide-react';
+import { Pencil, Trash2, FileText, User, AlertTriangle, CheckCircle, Clock, History, Container, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { differenceInDays, format } from 'date-fns';
 import { TrailerAssignmentHistory } from '@/components/trailers/TrailerAssignmentHistory';
 
@@ -278,19 +279,27 @@ export default function Trailers() {
     },
     {
       key: 'actions',
-      header: 'Actions',
+      header: '',
       render: (trailer: TrailerWithDriver) => (
-        <div className="flex gap-2">
-          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); setViewingTrailer(trailer); }} title="View details">
-            <FileText className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" onClick={(e) => { e.stopPropagation(); openDialog(trailer); }} title="Edit trailer">
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button size="icon" variant="ghost" className="text-destructive" onClick={(e) => { e.stopPropagation(); deleteWithUndo(trailer); }} title="Delete trailer">
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setViewingTrailer(trailer)}>
+              <FileText className="mr-2 h-4 w-4" /> View Details
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openDialog(trailer)}>
+              <Pencil className="mr-2 h-4 w-4" /> Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(trailer)}>
+              <Trash2 className="mr-2 h-4 w-4" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
     },
   ];

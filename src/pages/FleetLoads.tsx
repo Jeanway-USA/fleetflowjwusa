@@ -21,7 +21,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 
 // Accessorial types commonly used in trucking
@@ -603,15 +604,23 @@ export default function FleetLoads() {
                   : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : '-')
               },
               { key: 'status', header: 'Status', render: (load: any) => <StatusBadge status={load.status} /> },
-              { key: 'actions', header: 'Actions', render: (load: any) => (
-                <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => openDialog(load)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+              { key: 'actions', header: '', render: (load: any) => (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openDialog(load)}>
+                      <Pencil className="mr-2 h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )},
             ]}
             data={filteredLoads}
