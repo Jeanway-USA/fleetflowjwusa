@@ -604,15 +604,23 @@ export default function FleetLoads() {
                   : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : '-')
               },
               { key: 'status', header: 'Status', render: (load: any) => <StatusBadge status={load.status} /> },
-              { key: 'actions', header: 'Actions', render: (load: any) => (
-                <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => openDialog(load)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+              { key: 'actions', header: '', render: (load: any) => (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openDialog(load)}>
+                      <Pencil className="mr-2 h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )},
             ]}
             data={filteredLoads}
