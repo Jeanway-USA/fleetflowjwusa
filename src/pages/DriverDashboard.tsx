@@ -6,6 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ActiveLoadCard } from '@/components/driver/ActiveLoadCard';
 import { TripFuelPlanner } from '@/components/driver/TripFuelPlanner';
+import { GeofenceArrivalDrawer } from '@/components/driver/GeofenceArrivalDrawer';
+import { useGeofenceStatus } from '@/hooks/useGeofenceStatus';
 import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
 import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
 import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
