@@ -62,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [orgLoading, setOrgLoading] = useState(true);
+  const [orgIsActive, setOrgIsActive] = useState(true);
   const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(() => localStorage.getItem('simulatedOrgId'));
   const [simulatedOrgName, setSimulatedOrgName] = useState<string | null>(() => localStorage.getItem('simulatedOrgName'));
   const [simulatedOrgTier, setSimulatedOrgTier] = useState<string | null>(() => localStorage.getItem('simulatedOrgTier'));
