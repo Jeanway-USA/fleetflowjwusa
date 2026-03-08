@@ -55,6 +55,14 @@ function AlertList({ alerts, emptyMessage }: { alerts: AlertItem[]; emptyMessage
 }
 
 export default function Safety() {
+  const [workOrderOpen, setWorkOrderOpen] = useState(false);
+  const [workOrderInitialData, setWorkOrderInitialData] = useState<WorkOrderInitialData | undefined>();
+
+  const handleConvertToWorkOrder = (data: { truck_id: string; description: string }) => {
+    setWorkOrderInitialData({ truck_id: data.truck_id, description: data.description, service_types: ['repair'] });
+    setWorkOrderOpen(true);
+  };
+
   const { data: trucks = [] } = useQuery({
     queryKey: ['trucks'],
     queryFn: async () => {
