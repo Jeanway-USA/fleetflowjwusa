@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import { NotificationCenter } from '@/components/shared/NotificationCenter';
 
 interface PageHeaderProps {
   title: string;
