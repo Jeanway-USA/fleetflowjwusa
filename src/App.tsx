@@ -73,6 +73,7 @@ const App = () => {
                     <Route path="/pending-access" element={<PendingAccess />} />
                     <Route path="/landing" element={<Navigate to="/" replace />} />
                     <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/track" element={<PublicLoadTracker />} />
                     <Route path="/onboarding" element={<Onboarding />} />
 
                     {/* Dashboard routes */}

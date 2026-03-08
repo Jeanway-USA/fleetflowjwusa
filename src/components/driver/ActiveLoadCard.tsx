@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route } from 'lucide-react';
+import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route, Link2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { LoadRouteMap } from './LoadRouteMap';
 import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
