@@ -163,7 +163,7 @@ export default function PublicLoadTracker() {
           <CardContent className="py-4 space-y-3">
             <div className="flex items-start gap-3">
               <div className="flex flex-col items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                <div className="w-3 h-3 rounded-full bg-success" />
                 <div className="w-0.5 h-8 bg-muted" />
                 <div className="w-3 h-3 rounded-full bg-destructive" />
               </div>
