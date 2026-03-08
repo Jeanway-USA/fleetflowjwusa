@@ -99,6 +99,10 @@ export default function MaintenanceManagement() {
                   <PreventiveMaintenanceTab onViewTruck={handleViewTruck} />
                 </TabsContent>
 
+                <TabsContent value="predictive" className="mt-0">
+                  <PredictiveServiceCalendar />
+                </TabsContent>
+
                 <TabsContent value="history" className="mt-0">
                   <ServiceHistoryTab onViewTruck={handleViewTruck} />
                 </TabsContent>
