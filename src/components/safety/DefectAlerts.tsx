@@ -5,7 +5,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Truck, User, Clock } from 'lucide-react';
 
-export function DefectAlerts() {
+interface DefectAlertsProps {
+  onConvertToWorkOrder?: (data: { truck_id: string; description: string }) => void;
+}
+
+export function DefectAlerts({ onConvertToWorkOrder }: DefectAlertsProps) {
   const { data: defectInspections = [], isLoading } = useQuery({
     queryKey: ['defect-inspections'],
     queryFn: async () => {

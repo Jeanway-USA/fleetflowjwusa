@@ -15,9 +15,16 @@ import { Loader2, Plus, DollarSign, ChevronDown, X, Check, Search, Truck } from 
 import { cn } from '@/lib/utils';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
+export interface WorkOrderInitialData {
+  truck_id?: string;
+  description?: string;
+  service_types?: string[];
+}
+
 interface NewWorkOrderSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialData?: WorkOrderInitialData;
 }
 
 interface ServiceType {
