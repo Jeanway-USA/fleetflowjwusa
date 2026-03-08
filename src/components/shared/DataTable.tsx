@@ -147,7 +147,7 @@ export function DataTable<T extends { id: string }>({
           </TooltipProvider>
         </div>
         <div className="rounded-lg border border-border">
-          <table className="w-full caption-bottom" style={{ tableLayout: 'fixed' }}>
+          <table className="w-full caption-bottom" style={{ tableLayout: 'auto' }}>
             <thead className="[&_tr]:border-b">
               <tr className="border-b transition-colors bg-muted/50">
                 {visibleColumns.map((col, i) => (
