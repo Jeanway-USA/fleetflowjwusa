@@ -9,8 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { Loader2, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
-import jwBannerLight from '@/assets/JW_Banner.png';
-import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
