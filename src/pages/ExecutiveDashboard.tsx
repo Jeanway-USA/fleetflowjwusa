@@ -738,6 +738,20 @@ export default function ExecutiveDashboard() {
           <QuickInsights insights={insights} isLoading={isLoading} />
         </div>
       </div>
+
+      <Dialog open={showReport} onOpenChange={setShowReport}>
+        <DialogContent className="max-w-4xl h-[90vh] overflow-auto p-0">
+          <PrintableExecutiveSummary
+            kpiData={kpiData}
+            fleetStatus={fleetStatus}
+            driverAvailability={driverAvailability}
+            operationalData={operationalData}
+            topPerformers={topPerformers}
+            period={period}
+            onClose={() => setShowReport(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
