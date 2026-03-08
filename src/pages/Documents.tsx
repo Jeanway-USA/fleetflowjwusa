@@ -208,6 +208,7 @@ export default function Documents() {
               data={filteredDocuments} 
               loading={isLoading} 
               emptyMessage="No documents uploaded yet"
+              tableId="documents"
             />
           </CardContent>
         </Card>
