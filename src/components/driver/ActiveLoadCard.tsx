@@ -254,6 +254,20 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
 
           {/* Action Buttons */}
           <div className="flex gap-2 pt-2">
+            {load.tracking_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={async () => {
+                  const url = `${window.location.origin}/track?tracking_id=${load.tracking_id}`;
+                  await navigator.clipboard.writeText(url);
+                  toast.success('Tracking link copied!');
+                }}
+              >
+                <Link2 className="h-4 w-4" />
+              </Button>
+            )}
             <Button 
               variant="outline" 
               size="sm" 
