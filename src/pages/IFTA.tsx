@@ -72,6 +72,8 @@ export default function IFTA() {
   const [fuelFormData, setFuelFormData] = useState<Partial<FuelPurchase>>({});
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [printSummaryOpen, setPrintSummaryOpen] = useState(false);
+  const [auditAlerts, setAuditAlerts] = useState<{ id: string; type: string; message: string }[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   const { data: trucks = [] } = useQuery({
     queryKey: ['trucks'],
