@@ -1503,6 +1503,7 @@ export type Database = {
           settlement: number | null
           start_miles: number | null
           status: string
+          tracking_id: string | null
           trailer_id: string | null
           trailer_revenue: number | null
           truck_id: string | null
@@ -1541,6 +1542,7 @@ export type Database = {
           settlement?: number | null
           start_miles?: number | null
           status?: string
+          tracking_id?: string | null
           trailer_id?: string | null
           trailer_revenue?: number | null
           truck_id?: string | null
@@ -1579,6 +1581,7 @@ export type Database = {
           settlement?: number | null
           start_miles?: number | null
           status?: string
+          tracking_id?: string | null
           trailer_id?: string | null
           trailer_revenue?: number | null
           truck_id?: string | null
