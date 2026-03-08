@@ -11,7 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Plus, FileText, Pencil, Trash2, Loader2, Eye, Upload } from 'lucide-react';
+import { Plus, FileText, Pencil, Trash2, Loader2, Eye, Upload, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format, parseISO, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
