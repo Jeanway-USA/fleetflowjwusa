@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, subWeeks, subMonths, subQuarters, subYears, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { FileText } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PeriodSelector, TimePeriod } from '@/components/executive/PeriodSelector';
@@ -16,6 +17,9 @@ import { FleetStatusCard } from '@/components/executive/FleetStatusCard';
 import { DriverAvailabilityCard } from '@/components/executive/DriverAvailabilityCard';
 import { CriticalAlertsBar, CriticalAlert } from '@/components/executive/CriticalAlertsBar';
 import { PendingActionsCard, PendingAction } from '@/components/executive/PendingActionsCard';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { PrintableExecutiveSummary } from '@/components/executive/PrintableExecutiveSummary';
 
 function getDateRange(period: TimePeriod) {
   const now = new Date();
