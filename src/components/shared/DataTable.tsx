@@ -236,7 +236,7 @@ export function DataTable<T extends { id: string }>({
         className="rounded-lg border border-border overflow-auto"
         style={{ maxHeight: 600 }}
       >
-        <table className="w-full caption-bottom" style={{ tableLayout: 'fixed' }}>
+        <table className="w-full caption-bottom" style={{ tableLayout: 'auto' }}>
           <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background" style={{ display: 'block' }}>
             <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
               {visibleColumns.map((col, i) => (
