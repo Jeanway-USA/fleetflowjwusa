@@ -29,6 +29,7 @@ interface Column<T> {
   key: keyof T | string;
   header: string;
   render?: (item: T) => React.ReactNode;
+  width?: string;
 }
 
 interface DataTableProps<T> {
