@@ -101,9 +101,12 @@ export function BrandingTab() {
       const ext = file.name.split('.').pop() || 'png';
       const filePath = `${orgId}/${type}.${ext}`;
 
-      // Upload through storage provider
-      const { path, error: uploadError } = await storageUpload('branding-assets', filePath, file);
-      if (uploadError || !path) throw uploadError || new Error('Upload failed');
+      // Upload directly to built-in storage (not through provider)
+      const { error: uploadError } = await supabase.storage
+        .from('branding-assets')
+        .upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const path = filePath;
 
       const updateCol = type === 'logo' ? 'logo_url' : 'banner_url';
       const { error: dbError } = await supabase
