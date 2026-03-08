@@ -29,6 +29,11 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
     return <Navigate to="/auth" replace />;
   }
 
+  // Organization deactivated — block access
+  if (orgId && !orgIsActive) {
+    return <Navigate to="/account-deactivated" replace />;
+  }
+
   // Check if user has at least one of the allowed roles
   const hasAccess = allowedRoles.some(role => hasRole(role));
   if (!hasAccess) {

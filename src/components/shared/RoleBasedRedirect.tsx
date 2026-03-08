@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import Landing from '@/pages/Landing';
 
 export function RoleBasedRedirect() {
-  const { user, loading, rolesLoading, orgLoading, hasRole, subscriptionTier, orgId } = useAuth();
+  const { user, loading, rolesLoading, orgLoading, hasRole, subscriptionTier, orgId, orgIsActive } = useAuth();
 
   if (loading || rolesLoading || orgLoading) {
     return (

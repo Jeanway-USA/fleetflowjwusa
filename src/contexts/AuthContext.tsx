@@ -315,6 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasSafetyAccess,
       orgId: simulatedOrgId || orgId,
       orgName: simulatedOrgName || orgName,
+      orgIsActive,
       subscriptionTier: (simulatedOrgTier as SubscriptionTier) || subscriptionTier,
       primaryColor,
       logoUrl,
