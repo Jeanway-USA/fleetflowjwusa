@@ -12,6 +12,8 @@ interface IFTAWorkflowStepperProps {
   hasFuelPurchases: boolean;
   hasIFTARecords: boolean;
   hasJurisdictionData: boolean;
+  onAuditData?: () => void;
+  auditLoading?: boolean;
 }
 
 export function IFTAWorkflowStepper({ hasFuelPurchases, hasIFTARecords, hasJurisdictionData }: IFTAWorkflowStepperProps) {
