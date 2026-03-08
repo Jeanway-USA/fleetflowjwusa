@@ -88,7 +88,7 @@ export function PrintableExecutiveSummary({
   const generatedAt = format(new Date(), 'MMM d, yyyy h:mm a');
 
   return (
-    <div className="print-report bg-white text-black min-h-full">
+    <div className="print-report bg-white text-black h-auto">
       {/* Toolbar — hidden on print */}
       <div className="print:hidden sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
         <span className="text-sm text-gray-500">End-of-Week Report Preview</span>
