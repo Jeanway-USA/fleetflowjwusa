@@ -3,7 +3,8 @@ import { usePMNotifications, useMarkPMNotificationRead, useDismissPMNotification
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Clock, CheckCircle, X, Bell, BellOff, Truck } from 'lucide-react';
+import { AlertTriangle, Clock, CheckCircle, X, Bell, BellOff, Truck, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
