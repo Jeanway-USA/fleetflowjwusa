@@ -7,7 +7,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
-import { Search, Eye, Edit2, Trash2 } from 'lucide-react';
+import { Search, Eye, Edit2, Trash2, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   useUnifiedContacts,
   useContactMutations,
