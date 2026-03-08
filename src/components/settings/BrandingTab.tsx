@@ -68,8 +68,8 @@ export function BrandingTab() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
-  const { url: signedLogoUrl } = useProviderSignedUrl('branding-assets', logoUrl || null);
-  const { url: signedBannerUrl } = useProviderSignedUrl('branding-assets', bannerUrl || null);
+  const { url: signedLogoUrl } = useSignedUrl('branding-assets', logoUrl || null);
+  const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
 
   const handleSaveColor = async () => {
     if (!orgId) return;
