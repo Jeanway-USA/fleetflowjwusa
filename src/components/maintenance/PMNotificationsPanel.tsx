@@ -13,6 +13,7 @@ interface PMNotificationsPanelProps {
 }
 
 export function PMNotificationsPanel({ onViewTruck }: PMNotificationsPanelProps) {
+  const navigate = useNavigate();
   const { data: notifications, isLoading } = usePMNotifications();
   const markRead = useMarkPMNotificationRead();
   const dismiss = useDismissPMNotification();
