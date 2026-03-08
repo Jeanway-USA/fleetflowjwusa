@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
             <td style="padding: 40px;">
               <h2 style="margin: 0 0 16px; color: #1a1a1a; font-size: 24px; font-weight: 600;">You're Invited!</h2>
               <p style="margin: 0 0 24px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-                You've been invited to join the <strong>JeanWay USA Fleet Management System</strong> as a <strong style="color: #D97706;">${roleLabels[role]}</strong>.
+                You've been invited to join <strong>Fleet Flow TMS</strong> as a <strong style="color: #D97706;">${roleLabels[role]}</strong>.
               </p>
               
               <p style="margin: 0 0 32px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
