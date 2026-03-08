@@ -268,28 +268,34 @@ export default function Drivers() {
                       <StatusBadge status={driver.status} />
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    {isOwner && (
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        onClick={() => navigate(`/driver-view/${driver.id}`)} 
-                        title="View driver dashboard"
-                        className="text-primary"
-                      >
-                        <Eye className="h-4 w-4" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
                       </Button>
-                    )}
-                    <Button size="icon" variant="ghost" onClick={() => setSelectedDriver(driver)}>
-                      <FileText className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" onClick={() => openDialog(driver)} title="Edit driver">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteWithUndo(driver)} title="Delete driver">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {isOwner && (
+                        <DropdownMenuItem onClick={() => navigate(`/driver-view/${driver.id}`)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Dashboard
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => setSelectedDriver(driver)}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Documents
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openDialog(driver)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(driver)}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
