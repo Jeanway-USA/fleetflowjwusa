@@ -338,16 +338,14 @@ export default function FleetLoads() {
     
     const parts = address.split(',').map(p => p.trim());
     
-    // Extract city and state from address
-    // Look for state abbreviation pattern (2 uppercase letters followed by space and zip or end)
+    // Look for a part containing a 2-letter state abbreviation followed by a zip code
     for (let i = parts.length - 1; i >= 0; i--) {
       const part = parts[i].trim();
-      const stateMatch = part.match(/\b([A-Z]{2})\s*(\d{5})?/);
+      // Match state + optional ZIP+4 (e.g. "KY 42240-4455" or "GA 30474" or just "GA")
+      const stateMatch = part.match(/\b([A-Z]{2})\s*(\d{5}(-\d{4})?)?\b/);
       if (stateMatch) {
-        // Found state, get the city (usually the part before or the previous part)
-        const stateWithZip = stateMatch[0];
-        const beforeState = part.replace(stateWithZip, '').trim();
-        const city = beforeState || (i > 0 ? parts[i - 1].trim() : '');
+        // The city is the part immediately before the state part
+        const city = i > 0 ? parts[i - 1].trim() : '';
         return { city, state: stateMatch[1], full: address };
       }
     }
