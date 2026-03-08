@@ -284,7 +284,7 @@ export function DataTable<T extends { id: string }>({
         >
           <table className="w-full caption-bottom" style={{ tableLayout: 'fixed' }}>
             <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background" style={{ display: 'block' }}>
-              <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'auto', width: '100%' }}>
+              <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
                 {showSelection && (
                   <th className={cn(thClass, "w-10 text-center")} style={{ width: '40px' }}>
                     <div className="flex items-center justify-center h-full">
