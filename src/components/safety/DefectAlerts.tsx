@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, subDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, Truck, User, Clock } from 'lucide-react';
+import { AlertTriangle, Truck, User, Clock, Wrench } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface DefectAlertsProps {
   onConvertToWorkOrder?: (data: { truck_id: string; description: string }) => void;
