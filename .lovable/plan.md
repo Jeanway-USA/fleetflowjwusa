@@ -1,66 +1,61 @@
 
 
-## QoL Improvements Across All Areas
+## Plan: DriverComplianceHub + IFTA Audit Data Button
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### 1. Database Migration — Add `mvr_expiry` to `drivers`
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+The drivers table already has `license_expiry`, `medical_card_expiry`, and `hazmat_expiry`, but no MVR (Motor Vehicle Record) date. Add a nullable `mvr_expiry date` column.
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+```sql
+ALTER TABLE public.drivers ADD COLUMN mvr_expiry date;
+```
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+### 2. Create `DriverComplianceHub` Component
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+**File: `src/components/safety/DriverComplianceHub.tsx`**
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+- Query `drivers` table selecting `id, first_name, last_name, status, license_expiry, medical_card_expiry, mvr_expiry`
+- Render using the existing `DataTable` component with columns: Driver Name, CDL Expiry, Medical Card Expiry, Annual MVR Expiry
+- Each date cell uses a color-coded `Badge`:
+  - **Green** (`bg-success/10 text-success`): valid (> 30 days out)
+  - **Yellow** (`bg-warning/10 text-warning`): expiring within 30 days
+  - **Red** (`bg-destructive/10 text-destructive`): expired
+  - **Gray**: no date set
+- Wrap in a `Card` with header "Driver Compliance Hub"
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+### 3. Integrate into Safety Page
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+**File: `src/pages/Safety.tsx`**
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+- Import and render `<DriverComplianceHub />` below the incident trends chart and above the two-column section
+- Full-width card
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+### 4. Add "Audit Data" Button to IFTAWorkflowStepper
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+**File: `src/components/ifta/IFTAWorkflowStepper.tsx`**
 
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
+- Add new props: `onAuditData?: () => void`, `auditLoading?: boolean`
+- Render a small "Audit Data" button (outline variant, `Search` icon) at the right end of the stepper bar
+- Clicking it calls `onAuditData`
 
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
+### 5. IFTA Audit Logic + Alert List
 
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
+**File: `src/pages/IFTA.tsx`**
 
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
+- Add `auditAlerts` state and `runAudit` function
+- `runAudit` scans `quarterDeliveredLoads` (already fetched) and checks:
+  1. **Missing intermediate stops**: loads with `notes` that have no `=== INTERMEDIATE STOPS ===` section and `booked_miles > 500` (long-haul likely multi-state)
+  2. **Missing fuel purchases**: loads with no matching `fuel_purchases` record (by cross-referencing `load_id` in `expenses`)
+- Results stored as an alert array, rendered in an `Alert` component below the stepper when non-empty
+- Pass `onAuditData={runAudit}` and `auditLoading` to `IFTAWorkflowStepper`
 
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
+### Files
 
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+| File | Action |
+|---|---|
+| Migration | Add `mvr_expiry date` column to `drivers` |
+| `src/components/safety/DriverComplianceHub.tsx` | Create — compliance data table |
+| `src/pages/Safety.tsx` | Edit — add DriverComplianceHub |
+| `src/components/ifta/IFTAWorkflowStepper.tsx` | Edit — add Audit Data button |
+| `src/pages/IFTA.tsx` | Edit — add audit logic + alert rendering |
 
