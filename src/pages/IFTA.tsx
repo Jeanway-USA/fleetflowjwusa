@@ -671,6 +671,52 @@ export default function IFTA() {
     }
   };
 
+  // --- IFTA Audit Logic ---
+  const runAudit = async () => {
+    setAuditLoading(true);
+    const alerts: { id: string; type: string; message: string }[] = [];
+
+    for (const load of quarterDeliveredLoads) {
+      // Check missing intermediate stops on long-haul loads
+      if ((load.booked_miles || 0) > 500) {
+        const hasStops = load.notes?.includes('=== INTERMEDIATE STOPS ===');
+        if (!hasStops) {
+          alerts.push({
+            id: `stops-${load.id}`,
+            type: 'Missing Stops',
+            message: `Load ${load.origin} → ${load.destination} (${load.booked_miles}mi) has no intermediate stops recorded`,
+          });
+        }
+      }
+
+      // Check missing fuel purchases
+      const hasFuel = filteredFuelPurchases.some(fp => {
+        // Cross-reference by truck and date proximity
+        if (!load.truck_id || fp.truck_id !== load.truck_id) return false;
+        if (!load.delivery_date || !fp.purchase_date) return false;
+        const loadDate = parseISO(load.delivery_date);
+        const fuelDate = parseISO(fp.purchase_date);
+        const diff = Math.abs(loadDate.getTime() - fuelDate.getTime()) / (1000 * 60 * 60 * 24);
+        return diff <= 7;
+      });
+      if (!hasFuel && load.truck_id) {
+        alerts.push({
+          id: `fuel-${load.id}`,
+          type: 'Missing Fuel',
+          message: `No fuel purchase found near load ${load.origin} → ${load.destination} (delivered ${load.delivery_date})`,
+        });
+      }
+    }
+
+    setAuditAlerts(alerts);
+    setAuditLoading(false);
+    if (alerts.length === 0) {
+      toast.success('Audit complete — no issues found');
+    } else {
+      toast.warning(`Audit found ${alerts.length} issue(s)`);
+    }
+  };
+
   return (
     <>
       <TooltipProvider>
