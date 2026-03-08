@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
-  Loader2, ArrowLeft, ArrowRight, CheckCircle2, Building2, Truck, Trailer,
+  Loader2, ArrowLeft, ArrowRight, CheckCircle2, Building2, Truck, Container,
   Users, Plus, X, SkipForward, Upload, ImageIcon,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
