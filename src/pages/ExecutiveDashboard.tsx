@@ -57,6 +57,7 @@ function getDateRange(period: TimePeriod) {
 
 export default function ExecutiveDashboard() {
   const [period, setPeriod] = useState<TimePeriod>('month');
+  const [showReport, setShowReport] = useState(false);
   const dateRange = useMemo(() => getDateRange(period), [period]);
 
   // Fetch KPI data
