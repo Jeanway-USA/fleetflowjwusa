@@ -1,66 +1,47 @@
 
 
-## QoL Improvements Across All Areas
+## Plan: Generate EOW Report — Printable Executive Summary
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### 1. Create `PrintableExecutiveSummary` Component
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+**File: `src/components/executive/PrintableExecutiveSummary.tsx`**
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+A print-optimized, black-and-white summary that receives the already-fetched dashboard data as props (no extra queries needed).
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+**Props:** `kpiData`, `fleetStatus`, `driverAvailability`, `topPerformers`, `operationalData`, `period`
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+**Layout (forced light theme via inline styles / `print:` utilities):**
+- White background, black text, no dark mode classes
+- Company header with date range and generation timestamp
+- **Section 1 — Revenue KPIs**: 4-column grid showing Gross Revenue, Net Revenue, Operating Profit, Margin with period-over-period change
+- **Section 2 — Fleet Status**: Simple table row — Hauling / Available / Maintenance / OOS counts
+- **Section 3 — Driver Availability**: Table row — On Load / Available / Off Duty / Credential Issues
+- **Section 4 — Operational Metrics**: Total Loads, Total Miles, Rev/Mile, Fleet Utilization, Empty Miles %
+- **Section 5 — Top Performers**: Driver name + stats, Truck unit + stats
+- Footer: "Generated via FleetFlow" + timestamp
+- A "Print Report" button (`window.print()`) and "Close" button at the top — hidden via `print:hidden`
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+### 2. Add Print Styles
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+Add a `@media print` block to `src/index.css`:
+- Hide everything except the printable summary (using a `print-report` class on the modal content)
+- Force white background, black text
+- Remove shadows, borders become thin gray lines
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+### 3. Wire into ExecutiveDashboard
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+**File: `src/pages/ExecutiveDashboard.tsx`**
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+- Add `showReport` state
+- Add "Generate EOW Report" button (outline variant, `FileText` icon) next to the `PeriodSelector`
+- Render `PrintableExecutiveSummary` inside a full-screen `Dialog` (using existing dialog component with `className="max-w-4xl h-[90vh] overflow-auto"`)
+- Pass all existing data variables as props — no new queries
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+### Files
 
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
-
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
-
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
-
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+| File | Action |
+|---|---|
+| `src/components/executive/PrintableExecutiveSummary.tsx` | Create — print-optimized report |
+| `src/index.css` | Edit — add `@media print` rules |
+| `src/pages/ExecutiveDashboard.tsx` | Edit — add button + dialog |
 
