@@ -23,6 +23,11 @@ export function RoleBasedRedirect() {
     return <Navigate to="/onboarding" replace />;
   }
 
+  // Organization deactivated — redirect to deactivation page
+  if (!orgIsActive) {
+    return <Navigate to="/account-deactivated" replace />;
+  }
+
   // Owner routing — tier-aware
   if (hasRole('owner')) {
     switch (subscriptionTier) {
