@@ -6,6 +6,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ActiveLoadCard } from '@/components/driver/ActiveLoadCard';
 import { TripFuelPlanner } from '@/components/driver/TripFuelPlanner';
+import { GeofenceArrivalDrawer } from '@/components/driver/GeofenceArrivalDrawer';
+import { useGeofenceStatus } from '@/hooks/useGeofenceStatus';
 import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
 import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
 import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
@@ -77,9 +79,38 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
     enabled: !!driver?.id,
   });
 
+  // Get driver's current GPS position for geofencing
+  const { data: driverLocation } = useQuery({
+    queryKey: ['driver-location', driver?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_locations')
+        .select('latitude, longitude, is_sharing')
+        .eq('driver_id', driver!.id)
+        .eq('is_sharing', true)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!driver?.id,
+    refetchInterval: 30_000, // re-check every 30s
+  });
+
   const isLoading = driverLoading || loadsLoading;
   const activeLoad = activeLoads.find(l => l.status === 'in_transit' || l.status === 'loading') || activeLoads[0];
   const nextLoad = activeLoads.find(l => l.id !== activeLoad?.id);
+
+  const driverCoords = driverLocation
+    ? { lat: driverLocation.latitude, lng: driverLocation.longitude }
+    : null;
+
+  const { isNearDestination, distanceMiles, dismiss: dismissGeofence } = useGeofenceStatus(
+    driverCoords,
+    activeLoad?.status === 'in_transit' ? activeLoad.destination : null,
+    activeLoad?.id ?? null,
+  );
+
+  const showGeofenceDrawer = isNearDestination && activeLoad?.status === 'in_transit';
 
   if (isLoading) {
     return (
@@ -190,6 +221,17 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
           activeLoadNumber={activeLoad?.landstar_load_id}
         />
       </div>
+
+      {/* Geofence Arrival Drawer */}
+      {activeLoad && (
+        <GeofenceArrivalDrawer
+          open={!!showGeofenceDrawer}
+          onOpenChange={(open) => { if (!open) dismissGeofence(); }}
+          loadId={activeLoad.id}
+          distanceMiles={distanceMiles}
+          onConfirmed={refetchLoads}
+        />
+      )}
     </>
   );
 });
