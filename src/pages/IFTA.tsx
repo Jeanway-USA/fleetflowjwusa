@@ -19,6 +19,7 @@ import { format, parseISO } from 'date-fns';
 import { US_STATES } from '@/lib/us-states';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { STATE_DIESEL_TAX_RATES } from '@/lib/ifta-tax-rates';
 import { JurisdictionMap } from '@/components/ifta/JurisdictionMap';
 import { UnsyncedExpenses } from '@/components/ifta/UnsyncedExpenses';
