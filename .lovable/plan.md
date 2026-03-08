@@ -1,66 +1,78 @@
 
 
-## QoL Improvements Across All Areas
+## Fix: EOW Report printing as 3 pages instead of 1
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Root Cause
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+The `visibility: hidden` / `visibility: visible` approach keeps all DOM elements in the layout flow — the dialog overlay, backdrop, and the full-screen modal container all occupy space even though they're invisible. The browser's print engine sees the full viewport height of all these stacked elements and paginates accordingly.
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+### Fix
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+Two changes in `src/index.css` print styles:
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+1. Use `display: none` on `body > *` instead of `visibility: hidden` — this removes non-report elements from flow entirely
+2. Reset the `.print-report` to be a static block with no min-height, removing the full-viewport sizing that the dialog forces
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+Updated `@media print` block:
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+```css
+@media print {
+  body > * {
+    display: none !important;
+  }
+  .print-report {
+    display: block !important;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    background: white !important;
+    color: black !important;
+    margin: 0;
+    padding: 0;
+  }
+  .print-report,
+  .print-report * {
+    visibility: visible;
+  }
+  /* Ensure the dialog portal ancestor chain is visible */
+  [data-radix-portal],
+  [data-radix-portal] > *,
+  [role="dialog"] {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+}
+```
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+Also in `PrintableExecutiveSummary.tsx`, change `min-h-full` to `h-auto` on the outer div to avoid the container stretching to the dialog's full viewport height:
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+```tsx
+<div className="print-report bg-white text-black h-auto">
+```
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+### Files
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
-
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
-
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
-
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
-
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+| File | Action |
+|---|---|
+| `src/index.css` | Edit — rewrite `@media print` block |
+| `src/components/executive/PrintableExecutiveSummary.tsx` | Edit — change `min-h-full` to `h-auto` |
 
