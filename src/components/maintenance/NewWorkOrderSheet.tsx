@@ -53,7 +53,7 @@ const GENERIC_SERVICE_TYPES: ServiceType[] = [
   { value: 'other', label: 'Other' },
 ];
 
-export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps) {
+export function NewWorkOrderSheet({ open, onOpenChange, initialData }: NewWorkOrderSheetProps) {
   const { data: trucks } = useTrucks();
   const { data: pmProfiles } = useManufacturerPMProfiles();
   const createWorkOrder = useCreateWorkOrder();
