@@ -273,7 +273,7 @@ export function DataTable<T extends { id: string }>({
                   }}
                 >
                   {visibleColumns.map((col, j) => (
-                    <td key={j} className={cn(tdClass, "align-middle")}>
+                    <td key={j} className={cn(tdClass, "align-middle")} style={{ height: 'inherit' }}>
                       {col.render
                         ? col.render(item)
                         : String(item[col.key as keyof T] ?? '-')}
