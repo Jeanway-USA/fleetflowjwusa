@@ -165,9 +165,8 @@ export function AppSidebar() {
   const actuallyIsOwner = roles.includes('owner');
   const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
   const { url: signedLogoUrl } = useSignedUrl('branding-assets', logoUrl || null);
-  const defaultBannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
-  // Prefer org banner, then org logo, then default
-  const bannerSrc = signedBannerUrl || signedLogoUrl || defaultBannerSrc;
+  const hasOrgBranding = !!(signedBannerUrl || signedLogoUrl);
+  const bannerSrc = signedBannerUrl || signedLogoUrl || null;
   const currentPath = location.pathname;
 
   const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
