@@ -331,7 +331,7 @@ export function DataTable<T extends { id: string }>({
                       height: `${virtualRow.size}px`,
                       transform: `translateY(${virtualRow.start}px)`,
                       display: 'table',
-                      tableLayout: 'auto',
+                      tableLayout: 'fixed',
                     }}
                   >
                     {showSelection && (
