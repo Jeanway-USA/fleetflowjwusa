@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 
 type Theme = 'light' | 'dark';
 
@@ -11,9 +11,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// Map of CSS variables to update when brand color changes
-const COLOR_VARS_LIGHT = ['--primary', '--accent', '--ring', '--sidebar-primary', '--sidebar-ring'];
-const COLOR_VARS_DARK = ['--primary', '--accent', '--ring', '--sidebar-primary', '--sidebar-ring'];
+const BRAND_VARS = ['--primary', '--accent', '--ring', '--sidebar-primary', '--sidebar-ring'];
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
@@ -27,13 +25,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement;
-    
     if (theme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
-    
     localStorage.setItem('jeanway-theme', theme);
   }, [theme]);
 
@@ -41,28 +37,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  const applyBrandColor = (hsl: string | null) => {
+  const applyBrandColor = useCallback((hsl: string | null) => {
     const root = document.documentElement;
-    if (!hsl) return; // keep defaults
 
-    // For dark mode we slightly bump lightness
-    const parts = hsl.split(' ');
-    let darkHsl = hsl;
-    if (parts.length === 3) {
-      const lightness = parseInt(parts[2]);
-      darkHsl = `${parts[0]} ${parts[1]} ${Math.min(lightness + 5, 60)}%`;
-      // Make sure light version also has %
-      if (!parts[2].includes('%')) hsl = `${parts[0]} ${parts[1]} ${parts[2]}%`;
+    if (!hsl) {
+      // Reset to defaults — remove inline overrides
+      BRAND_VARS.forEach(v => root.style.removeProperty(v));
+      return;
     }
 
-    COLOR_VARS_LIGHT.forEach(v => root.style.setProperty(v, hsl!));
-    // We set both; the dark class selector overrides in CSS,
-    // but inline styles override both, so this effectively works
-    // We need to apply the dark variant too
-    // A simpler approach: just set the vars. The dark/light distinction
-    // is already handled by the CSS cascade, but inline styles win.
-    // So we just apply the correct one based on current theme.
-  };
+    // Normalize: ensure "45 80% 45%" format (with %)
+    const parts = hsl.trim().split(/\s+/);
+    if (parts.length !== 3) return;
+
+    const h = parts[0];
+    const s = parts[1].endsWith('%') ? parts[1] : `${parts[1]}%`;
+    const lRaw = parseInt(parts[2]);
+    const lLight = `${lRaw}%`;
+
+    // For dark mode bump lightness by 5 (capped at 60%)
+    const lDark = `${Math.min(lRaw + 5, 60)}%`;
+
+    const isDark = document.documentElement.classList.contains('dark');
+    const value = `${h} ${s} ${isDark ? lDark : lLight}`;
+
+    BRAND_VARS.forEach(v => root.style.setProperty(v, value));
+  }, []);
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, applyBrandColor }}>
