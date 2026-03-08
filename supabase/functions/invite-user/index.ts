@@ -160,8 +160,8 @@ Deno.serve(async (req) => {
           <!-- Header -->
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); border-radius: 12px 12px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">JeanWay USA</h1>
-              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">Fleet Management System</p>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">Fleet Flow TMS</h1>
+              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">by JeanWayUSA</p>
             </td>
           </tr>
           
