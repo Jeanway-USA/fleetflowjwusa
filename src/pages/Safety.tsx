@@ -188,7 +188,7 @@ export default function Safety() {
       <PageHeader title="Safety Dashboard" description="Monitor inspections, compliance, incidents, and alerts" />
 
       {/* Defect Alerts Banner */}
-      <DefectAlerts />
+      <DefectAlerts onConvertToWorkOrder={handleConvertToWorkOrder} />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4 mb-6">
