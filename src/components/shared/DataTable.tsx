@@ -272,11 +272,11 @@ export function DataTable<T extends { id: string }>({
                     height: `${virtualRow.size}px`,
                     transform: `translateY(${virtualRow.start}px)`,
                     display: 'table',
-                    tableLayout: 'fixed',
+                    tableLayout: 'auto',
                   }}
                 >
                   {visibleColumns.map((col, j) => (
-                    <td key={j} className={cn(tdClass)} style={{ height: `${virtualRow.size}px` }}>
+                    <td key={j} className={cn(tdClass)} style={{ height: `${virtualRow.size}px`, width: col.width }}>
                       <div className="flex items-center h-full">
                         {col.render
                           ? col.render(item)
