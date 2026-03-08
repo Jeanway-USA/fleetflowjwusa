@@ -1,58 +1,66 @@
 
 
-## Fix Vertical Centering + Add Table Options Everywhere
+## QoL Improvements Across All Areas
 
-### Problem 1: Vertical Centering
-The `height: inherit` approach on `<td>` isn't reliably centering content. The issue: virtualized rows use `display: table` with absolute positioning, and `height: inherit` doesn't propagate consistently. Fix: use explicit `line-height` matching the row height instead, which guarantees vertical centering without relying on cell height inheritance.
+### 1. Dynamic Period Selector (Finance)
+The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
 
-### Problem 2: Missing Table Options
-Currently only 4 pages use `DataTable` (Trucks, Trailers, Documents, AgencyLoads). Several major pages use raw `<Table>` components and lack density toggle, column visibility, and CSV export.
+**File:** `src/pages/Finance.tsx`
+- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
+- Auto-generate monthly and quarterly period options from that range up to the current date
+- Default to the current month instead of a hardcoded quarter
 
----
+### 2. Expense Table Pagination / Virtualization (Finance)
+The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
 
-### Changes
+**File:** `src/pages/Finance.tsx`
+- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
+- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
 
-**1. `src/components/shared/DataTable.tsx`** — Fix centering
-- Remove `style={{ height: 'inherit' }}` from td/th
-- Instead, add `line-height` to td cells that matches the row height, ensuring true vertical centering
-- For compact: cells get `leading-[32px]`, standard: `leading-[48px]` — but since cells have padding, use flexbox: wrap cell content in a flex container with `items-center` and explicit `min-h` matching row height
+### 3. Breadcrumb Navigation in Header (Overall UX)
+The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
 
-Actually, simplest fix: change the td approach to use `display: flex; align-items: center` with the row height, since `vertical-align: middle` doesn't work reliably with absolute-positioned table rows.
+**Files:** `src/components/layout/DashboardLayout.tsx`
+- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
+- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
+- Display in the header alongside the sidebar trigger
 
-**2. Add `tableId` + `exportFilename` to existing DataTable usages:**
-- `src/pages/Trucks.tsx` — add `exportFilename="trucks"`
-- `src/pages/Trailers.tsx` — add `exportFilename="trailers"`
-- `src/pages/Documents.tsx` — add `exportFilename="documents"`
-- `src/pages/AgencyLoads.tsx` — add `exportFilename="agency-loads"`
+### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
+Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
 
-**3. Convert major raw-Table pages to DataTable:**
+**File:** `src/components/layout/DashboardLayout.tsx`
+- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
 
-| Page | Current | Action |
-|---|---|---|
-| `src/pages/FleetLoads.tsx` | Raw `<Table>` with 12 columns + totals row | Convert to `DataTable` with `tableId="fleet-loads"` + `exportFilename="fleet-loads"`. Keep totals row as a separate summary below the table. |
-| `src/pages/Incidents.tsx` | Raw `<Table>` | Convert to `DataTable` with `tableId="incidents"` + `exportFilename="incidents"` |
-| `src/pages/CRM.tsx` | Raw `<Table>` | Convert to `DataTable` with `tableId="crm-contacts"` + `exportFilename="crm-contacts"` |
+### 5. Confirm Before Single Expense Delete (Finance)
+Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
 
-**4. Pages NOT converted** (specialized layouts with totals rows, P&L formatting, nested sub-tables):
-- Finance tabs (Settlements, Payroll, Revenue, P&L) — deeply nested in tab components with custom footers
-- IFTA — complex multi-tab with jurisdiction maps
-- CompanyInsights, SuperAdmin — dashboard summary tables
-- Maintenance tabs — inline status dropdowns, complete buttons
+**File:** `src/pages/Finance.tsx`
+- Add a `deleteConfirmId` state
+- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
 
-These use the raw `<Table>` component intentionally for their specialized layouts. Converting them would require significant restructuring of each component.
+### 6. Pull-to-Refresh on Driver Dashboard (Driver)
+The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
 
----
+**File:** `src/pages/DriverDashboard.tsx`
+- Add a `RefreshCw` icon button next to the date display
+- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
+
+### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
+The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
+
+**File:** `src/pages/DispatcherDashboard.tsx`
+- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
+
+### 8. Sidebar Active State on Nested Routes (Overall UX)
+The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
+
+**File:** `src/components/layout/AppSidebar.tsx`
+- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
 
 ### Files Modified
-
-| File | Action |
-|---|---|
-| `src/components/shared/DataTable.tsx` | Fix vertical centering with flex-based cell alignment |
-| `src/pages/Trucks.tsx` | Add `exportFilename` |
-| `src/pages/Trailers.tsx` | Add `exportFilename` |
-| `src/pages/Documents.tsx` | Add `exportFilename` |
-| `src/pages/AgencyLoads.tsx` | Add `exportFilename` |
-| `src/pages/FleetLoads.tsx` | Convert main table to `DataTable` |
-| `src/pages/Incidents.tsx` | Convert main table to `DataTable` |
-| `src/pages/CRM.tsx` | Convert main table to `DataTable` |
+- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
+- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
+- `src/pages/DriverDashboard.tsx` (refresh button)
+- `src/pages/DispatcherDashboard.tsx` (responsive grid)
+- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
 

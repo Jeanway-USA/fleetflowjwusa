@@ -7,6 +7,7 @@ import { calculateRevenue as calculateRevenueFn } from '@/lib/revenue-calculator
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { DataTable } from '@/components/shared/DataTable';
 import { ExpensesList } from '@/components/shared/ExpensesList';
 import { RateConfirmationUpload } from '@/components/loads/RateConfirmationUpload';
 import DriverLoadsView from '@/components/driver/DriverLoadsView';
@@ -19,7 +20,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History } from 'lucide-react';
 import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
@@ -573,99 +573,65 @@ export default function FleetLoads() {
 
       {/* Loads Table */}
       <Card className="card-elevated">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Landstar ID</TableHead>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Origin</TableHead>
-                  <TableHead>Destination</TableHead>
-                  <TableHead className="text-right">Rate</TableHead>
-                  <TableHead className="text-right">FSC</TableHead>
-                  <TableHead className="text-right">Accessorials</TableHead>
-                  <TableHead className="text-right">Net Revenue</TableHead>
-                  <TableHead className="text-right">Miles</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Loading...</TableCell>
-                  </TableRow>
-                ) : filteredLoads.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">No loads yet</TableCell>
-                  </TableRow>
-                ) : (
-                  filteredLoads.map((load: any) => (
-                    <TableRow key={load.id}>
-                      <TableCell>{formatDate(load.pickup_date)}</TableCell>
-                      <TableCell className="font-mono">{load.landstar_load_id || '-'}</TableCell>
-                      <TableCell className="font-mono text-xs">{load.agency_code || '-'}</TableCell>
-                      <TableCell className="max-w-[120px] md:max-w-[200px]">
-                        {(() => {
-                          const addr = formatAddressDisplay(load.origin);
-                          return typeof addr === 'string' ? addr : (
-                            <div className="truncate" title={addr.full}>
-                              <span className="hidden md:inline">{addr.full}</span>
-                              <span className="md:hidden">{addr.city}{addr.state ? `, ${addr.state}` : ''}</span>
-                            </div>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell className="max-w-[120px] md:max-w-[200px]">
-                        {(() => {
-                          const addr = formatAddressDisplay(load.destination);
-                          return typeof addr === 'string' ? addr : (
-                            <div className="truncate" title={addr.full}>
-                              <span className="hidden md:inline">{addr.full}</span>
-                              <span className="md:hidden">{addr.city}{addr.state ? `, ${addr.state}` : ''}</span>
-                            </div>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell className="text-right">{formatCurrency(load.rate)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(load.fuel_surcharge)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(getLoadAccessorialsTotal(load.id))}</TableCell>
-                      <TableCell className="text-right font-medium text-success">{formatCurrency(load.net_revenue)}</TableCell>
-                      <TableCell className="text-right">
-                        {(load.actual_miles && load.actual_miles > 0) 
-                          ? load.actual_miles.toLocaleString() 
-                          : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : '-')}
-                      </TableCell>
-                      <TableCell><StatusBadge status={load.status} /></TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => openDialog(load)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-                {filteredLoads.length > 0 && (
-                  <TableRow className="bg-muted/50 font-medium">
-                    <TableCell colSpan={5}>Totals ({totals.loads} loads)</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.rate)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.fuelSurcharge)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(totals.accessorials)}</TableCell>
-                    <TableCell className="text-right text-success">{formatCurrency(totals.netRevenue)}</TableCell>
-                    <TableCell className="text-right">{totals.actualMiles.toLocaleString()}</TableCell>
-                    <TableCell colSpan={2}></TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+        <CardContent className="pt-6">
+          <DataTable
+            columns={[
+              { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
+              { key: 'landstar_load_id', header: 'Landstar ID', render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
+              { key: 'agency_code', header: 'Agent', render: (load: any) => <span className="font-mono text-xs">{load.agency_code || '-'}</span> },
+              { key: 'origin', header: 'Origin', render: (load: any) => {
+                const addr = formatAddressDisplay(load.origin);
+                return typeof addr === 'string' ? addr : (
+                  <div className="truncate max-w-[200px]" title={addr.full}>
+                    {addr.city}{addr.state ? `, ${addr.state}` : ''}
+                  </div>
+                );
+              }},
+              { key: 'destination', header: 'Destination', render: (load: any) => {
+                const addr = formatAddressDisplay(load.destination);
+                return typeof addr === 'string' ? addr : (
+                  <div className="truncate max-w-[200px]" title={addr.full}>
+                    {addr.city}{addr.state ? `, ${addr.state}` : ''}
+                  </div>
+                );
+              }},
+              { key: 'rate', header: 'Rate', render: (load: any) => <span className="text-right">{formatCurrency(load.rate)}</span> },
+              { key: 'fuel_surcharge', header: 'FSC', render: (load: any) => formatCurrency(load.fuel_surcharge) },
+              { key: 'accessorials_total', header: 'Accessorials', render: (load: any) => formatCurrency(getLoadAccessorialsTotal(load.id)) },
+              { key: 'net_revenue', header: 'Net Revenue', render: (load: any) => <span className="font-medium text-success">{formatCurrency(load.net_revenue)}</span> },
+              { key: 'miles', header: 'Miles', render: (load: any) => 
+                (load.actual_miles && load.actual_miles > 0) 
+                  ? load.actual_miles.toLocaleString() 
+                  : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : '-')
+              },
+              { key: 'status', header: 'Status', render: (load: any) => <StatusBadge status={load.status} /> },
+              { key: 'actions', header: 'Actions', render: (load: any) => (
+                <div className="flex gap-1">
+                  <Button size="icon" variant="ghost" onClick={() => openDialog(load)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )},
+            ]}
+            data={filteredLoads}
+            loading={isLoading}
+            emptyMessage="No loads yet"
+            tableId="fleet-loads"
+            exportFilename="fleet-loads"
+          />
+          {filteredLoads.length > 0 && (
+            <div className="flex items-center gap-4 px-4 py-3 mt-2 rounded-lg bg-muted/50 text-sm font-medium border border-border">
+              <span>Totals ({totals.loads} loads)</span>
+              <span className="ml-auto">Rate: {formatCurrency(totals.rate)}</span>
+              <span>FSC: {formatCurrency(totals.fuelSurcharge)}</span>
+              <span>Acc: {formatCurrency(totals.accessorials)}</span>
+              <span className="text-success">Net: {formatCurrency(totals.netRevenue)}</span>
+              <span>{totals.actualMiles.toLocaleString()} mi</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 

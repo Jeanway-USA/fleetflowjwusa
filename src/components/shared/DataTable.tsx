@@ -239,7 +239,9 @@ export function DataTable<T extends { id: string }>({
           <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background" style={{ display: 'block' }}>
             <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
               {visibleColumns.map((col, i) => (
-                <th key={i} className={cn(thClass, "text-left align-middle font-semibold text-muted-foreground")} style={{ height: 'inherit' }}>{col.header}</th>
+                <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground")} style={{ height: `${rowHeight}px` }}>
+                    <div className="flex items-center h-full">{col.header}</div>
+                  </th>
               ))}
             </tr>
           </thead>
@@ -273,10 +275,12 @@ export function DataTable<T extends { id: string }>({
                   }}
                 >
                   {visibleColumns.map((col, j) => (
-                    <td key={j} className={cn(tdClass, "align-middle")} style={{ height: 'inherit' }}>
-                      {col.render
-                        ? col.render(item)
-                        : String(item[col.key as keyof T] ?? '-')}
+                    <td key={j} className={cn(tdClass)} style={{ height: `${virtualRow.size}px` }}>
+                      <div className="flex items-center h-full">
+                        {col.render
+                          ? col.render(item)
+                          : String(item[col.key as keyof T] ?? '-')}
+                      </div>
                     </td>
                   ))}
                 </tr>

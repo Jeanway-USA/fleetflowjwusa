@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 import { PageHeader } from '@/components/shared/PageHeader';
+import { DataTable } from '@/components/shared/DataTable';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
@@ -286,62 +286,36 @@ export default function Incidents() {
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Driver</TableHead>
-                  <TableHead>Truck</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Damage Est.</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8">Loading...</TableCell>
-                  </TableRow>
-                ) : incidents.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      No incidents reported
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  incidents.map(incident => (
-                    <TableRow key={incident.id}>
-                      <TableCell>{format(parseISO(incident.incident_date), 'MM/dd/yyyy')}</TableCell>
-                      <TableCell className="capitalize">{incident.incident_type.replace('_', ' ')}</TableCell>
-                      <TableCell>{getSeverityBadge(incident.severity)}</TableCell>
-                      <TableCell>{getDriverName(incident.driver_id)}</TableCell>
-                      <TableCell>{getTruckName(incident.truck_id)}</TableCell>
-                      <TableCell className="max-w-[200px] truncate">{incident.location_description || '-'}</TableCell>
-                      <TableCell>{formatCurrencyValue(incident.estimated_damage)}</TableCell>
-                      <TableCell><StatusBadge status={incident.status} /></TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => setViewingIncident(incident)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => openDialog(incident)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(incident.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            columns={[
+              { key: 'incident_date', header: 'Date', render: (i: Incident) => format(parseISO(i.incident_date), 'MM/dd/yyyy') },
+              { key: 'incident_type', header: 'Type', render: (i: Incident) => <span className="capitalize">{i.incident_type.replace('_', ' ')}</span> },
+              { key: 'severity', header: 'Severity', render: (i: Incident) => getSeverityBadge(i.severity) },
+              { key: 'driver_id', header: 'Driver', render: (i: Incident) => getDriverName(i.driver_id) },
+              { key: 'truck_id', header: 'Truck', render: (i: Incident) => getTruckName(i.truck_id) },
+              { key: 'location_description', header: 'Location', render: (i: Incident) => <span className="max-w-[200px] truncate block">{i.location_description || '-'}</span> },
+              { key: 'estimated_damage', header: 'Damage Est.', render: (i: Incident) => formatCurrencyValue(i.estimated_damage) },
+              { key: 'status', header: 'Status', render: (i: Incident) => <StatusBadge status={i.status} /> },
+              { key: 'actions', header: 'Actions', render: (incident: Incident) => (
+                <div className="flex gap-1">
+                  <Button size="icon" variant="ghost" onClick={() => setViewingIncident(incident)}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => openDialog(incident)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="text-destructive" onClick={() => deleteMutation.mutate(incident.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )},
+            ]}
+            data={incidents}
+            loading={isLoading}
+            emptyMessage="No incidents reported"
+            tableId="incidents"
+            exportFilename="incidents"
+          />
         </CardContent>
       </Card>
 

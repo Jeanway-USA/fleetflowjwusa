@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
+import { DataTable } from '@/components/shared/DataTable';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
@@ -123,99 +123,76 @@ export default function CRM() {
         </div>
 
         {/* Contacts Table */}
-        {isLoading ? (
-          <div className="text-center py-12 text-muted-foreground">Loading contacts...</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            {search ? 'No contacts match your search.' : 'No contacts yet. Add your first contact to get started.'}
-          </div>
-        ) : (
-          <div className="border border-border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Company</TableHead>
-                  <TableHead className="hidden md:table-cell">Contact</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="hidden lg:table-cell">Phone</TableHead>
-                  <TableHead className="hidden lg:table-cell">Location</TableHead>
-                  <TableHead className="hidden md:table-cell">Details</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((contact) => {
-                  const subType = getSubTypeLabel(contact);
-                  return (
-                    <TableRow key={`${contact.source}-${contact.id}`} className="cursor-pointer hover:bg-muted/50" onClick={() => setDetailContact(contact)}>
-                      <TableCell>
-                        <div className="font-medium">{contact.company_name}</div>
-                        {contact.agent_code && (
-                          <span className="text-xs text-muted-foreground">Code: {contact.agent_code}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                        {contact.contact_name || '—'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <Badge variant="outline" className={`text-xs capitalize w-fit ${TYPE_COLORS[contact.contact_type] || ''}`}>
-                            {contact.contact_type}
-                          </Badge>
-                          {subType && (
-                            <span className="text-[10px] text-muted-foreground">{subType}</span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                        {contact.phone || '—'}
-                      </TableCell>
-                      <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                        {[contact.city, contact.state].filter(Boolean).join(', ') || contact.service_area || '—'}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div className="flex flex-wrap gap-1">
-                          {contact.source === 'facility' && contact.appointment_required && (
-                            <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Appt Req</Badge>
-                          )}
-                          {contact.agent_status === 'unsafe' && (
-                            <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/20">Unsafe</Badge>
-                          )}
-                          {contact.agent_status === 'safe' && contact.source === 'resource' && (
-                            <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/20">Safe</Badge>
-                          )}
-                          {(contact.tags || []).slice(0, 2).map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
-                          ))}
-                          {(contact.tags || []).length > 2 && (
-                            <Badge variant="secondary" className="text-[10px]">+{contact.tags!.length - 2}</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDetailContact(contact)}>
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                          {canEdit && (
-                            <>
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(contact)}>
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteTarget(contact)}>
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        <DataTable
+          columns={[
+            { key: 'company_name', header: 'Company', render: (contact: UnifiedContact) => (
+              <div>
+                <div className="font-medium">{contact.company_name}</div>
+                {contact.agent_code && (
+                  <span className="text-xs text-muted-foreground">Code: {contact.agent_code}</span>
+                )}
+              </div>
+            )},
+            { key: 'contact_name', header: 'Contact', render: (contact: UnifiedContact) => contact.contact_name || '—' },
+            { key: 'contact_type', header: 'Type', render: (contact: UnifiedContact) => {
+              const subType = getSubTypeLabel(contact);
+              return (
+                <div className="flex flex-col gap-1">
+                  <Badge variant="outline" className={`text-xs capitalize w-fit ${TYPE_COLORS[contact.contact_type] || ''}`}>
+                    {contact.contact_type}
+                  </Badge>
+                  {subType && <span className="text-[10px] text-muted-foreground">{subType}</span>}
+                </div>
+              );
+            }},
+            { key: 'phone', header: 'Phone', render: (contact: UnifiedContact) => contact.phone || '—' },
+            { key: 'location', header: 'Location', render: (contact: UnifiedContact) => 
+              [contact.city, contact.state].filter(Boolean).join(', ') || contact.service_area || '—'
+            },
+            { key: 'details', header: 'Details', render: (contact: UnifiedContact) => (
+              <div className="flex flex-wrap gap-1">
+                {contact.source === 'facility' && contact.appointment_required && (
+                  <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Appt Req</Badge>
+                )}
+                {contact.agent_status === 'unsafe' && (
+                  <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/20">Unsafe</Badge>
+                )}
+                {contact.agent_status === 'safe' && contact.source === 'resource' && (
+                  <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/20">Safe</Badge>
+                )}
+                {(contact.tags || []).slice(0, 2).map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
+                ))}
+                {(contact.tags || []).length > 2 && (
+                  <Badge variant="secondary" className="text-[10px]">+{contact.tags!.length - 2}</Badge>
+                )}
+              </div>
+            )},
+            { key: 'actions', header: 'Actions', render: (contact: UnifiedContact) => (
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setDetailContact(contact); }}>
+                  <Eye className="h-3.5 w-3.5" />
+                </Button>
+                {canEdit && (
+                  <>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleEdit(contact); }}>
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteTarget(contact); }}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            )},
+          ]}
+          data={filtered}
+          loading={isLoading}
+          emptyMessage={search ? 'No contacts match your search.' : 'No contacts yet. Add your first contact to get started.'}
+          onRowClick={(contact) => setDetailContact(contact)}
+          tableId="crm-contacts"
+          exportFilename="crm-contacts"
+        />
       </div>
 
       {/* Dialogs */}

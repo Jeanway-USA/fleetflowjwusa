@@ -125,7 +125,7 @@ export default function AgencyLoads() {
   return (
     <>
       <PageHeader title="Agency Loads" description="Manage brokerage and agency loads" action={{ label: 'Add Load', onClick: () => openDialog() }} />
-      <DataTable columns={columns} data={loads} loading={isLoading} emptyMessage="No agency loads yet" tableId="agency-loads" />
+      <DataTable columns={columns} data={loads} loading={isLoading} emptyMessage="No agency loads yet" tableId="agency-loads" exportFilename="agency-loads" />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
