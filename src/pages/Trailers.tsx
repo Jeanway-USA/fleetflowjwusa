@@ -298,7 +298,7 @@ export default function Trailers() {
   return (
     <>
       <PageHeader title="Trailers" description="Manage your fleet trailers" action={{ label: 'Add Trailer', onClick: () => openDialog() }} />
-      <DataTable columns={columns} data={trailers} loading={isLoading} emptyMessage="No trailers registered yet" tableId="trailers" />
+      <DataTable columns={columns} data={trailers} loading={isLoading} emptyMessage="No trailers registered yet" tableId="trailers" exportFilename="trailers" />
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

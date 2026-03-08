@@ -305,7 +305,7 @@ export default function Trucks() {
   return (
     <>
       <PageHeader title="Trucks" description="Manage your fleet vehicles" action={{ label: 'Add Truck', onClick: () => openDialog() }} />
-      <DataTable columns={columns} data={trucks} loading={isLoading} emptyMessage="No trucks registered yet" tableId="trucks" />
+      <DataTable columns={columns} data={trucks} loading={isLoading} emptyMessage="No trucks registered yet" tableId="trucks" exportFilename="trucks" />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
