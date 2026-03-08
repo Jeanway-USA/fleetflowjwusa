@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -29,22 +31,45 @@ const PRIORITIES = [
   { value: 'medium', label: 'Medium - Should be addressed soon' },
   { value: 'high', label: 'High - Needs attention quickly' },
   { value: 'critical', label: 'Critical - Safety concern, needs immediate attention' },
-];
+] as const;
+
+const maintenanceRequestSchema = z.object({
+  issueType: z.string().min(1, 'Please select an issue type'),
+  priority: z.enum(['low', 'medium', 'high', 'critical']),
+  description: z
+    .string()
+    .trim()
+    .min(10, 'Description must be at least 10 characters')
+    .max(1000, 'Description must be less than 1000 characters'),
+});
+
+type MaintenanceRequestValues = z.infer<typeof maintenanceRequestSchema>;
 
 export function MaintenanceRequestForm({ driverId, truckId, onComplete }: MaintenanceRequestFormProps) {
   const queryClient = useQueryClient();
-  const [issueType, setIssueType] = useState('');
-  const [priority, setPriority] = useState('medium');
-  const [description, setDescription] = useState('');
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<MaintenanceRequestValues>({
+    resolver: zodResolver(maintenanceRequestSchema),
+    defaultValues: {
+      issueType: '',
+      priority: 'medium',
+      description: '',
+    },
+  });
 
   const submitMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (data: MaintenanceRequestValues) => {
       const { error } = await supabase.from('maintenance_requests').insert({
         driver_id: driverId,
         truck_id: truckId,
-        issue_type: issueType,
-        priority,
-        description,
+        issue_type: data.issueType,
+        priority: data.priority,
+        description: data.description,
         status: 'submitted',
       });
       if (error) throw error;
@@ -59,49 +84,62 @@ export function MaintenanceRequestForm({ driverId, truckId, onComplete }: Mainte
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!issueType || !description.trim()) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-    submitMutation.mutate();
+  const onSubmit = (data: MaintenanceRequestValues) => {
+    submitMutation.mutate(data);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {/* Issue Type */}
       <div className="space-y-2">
-        <Label htmlFor="issueType">Issue Type *</Label>
-        <Select value={issueType} onValueChange={setIssueType}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select issue type" />
-          </SelectTrigger>
-          <SelectContent>
-            {ISSUE_TYPES.map((type) => (
-              <SelectItem key={type.value} value={type.value}>
-                {type.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label>Issue Type *</Label>
+        <Controller
+          name="issueType"
+          control={control}
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select issue type" />
+              </SelectTrigger>
+              <SelectContent>
+                {ISSUE_TYPES.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        {errors.issueType && (
+          <p className="text-sm text-destructive">{errors.issueType.message}</p>
+        )}
       </div>
 
       {/* Priority */}
       <div className="space-y-2">
-        <Label htmlFor="priority">Priority</Label>
-        <Select value={priority} onValueChange={setPriority}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PRIORITIES.map((p) => (
-              <SelectItem key={p.value} value={p.value}>
-                {p.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label>Priority</Label>
+        <Controller
+          name="priority"
+          control={control}
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PRIORITIES.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        {errors.priority && (
+          <p className="text-sm text-destructive">{errors.priority.message}</p>
+        )}
       </div>
 
       {/* Description */}
@@ -110,11 +148,12 @@ export function MaintenanceRequestForm({ driverId, truckId, onComplete }: Mainte
         <Textarea
           id="description"
           placeholder="Describe the issue in detail. Include location, symptoms, when it started..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
           rows={4}
-          required
+          {...register('description')}
         />
+        {errors.description && (
+          <p className="text-sm text-destructive">{errors.description.message}</p>
+        )}
       </div>
 
       {/* Submit Button */}
