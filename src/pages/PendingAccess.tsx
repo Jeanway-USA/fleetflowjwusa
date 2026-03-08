@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogOut, Clock } from 'lucide-react';
-import bannerLogo from '@/assets/JW_Banner.png';
+
 
 export default function PendingAccess() {
   const { user, signOut, loading } = useAuth();
