@@ -78,7 +78,20 @@ export function DataTable<T extends { id: string }>({
   }
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
+    <div className="space-y-2">
+      {exportFilename && data.length > 0 && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportToCsv(columns, data, exportFilename)}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
+      )}
+      <div className="rounded-lg border border-border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
