@@ -73,6 +73,18 @@ export function NewWorkOrderSheet({ open, onOpenChange, initialData }: NewWorkOr
     is_reimbursable: false,
   });
 
+  // Pre-populate from initialData when sheet opens
+  useEffect(() => {
+    if (open && initialData) {
+      setFormData(prev => ({
+        ...prev,
+        truck_id: initialData.truck_id || prev.truck_id,
+        description: initialData.description || prev.description,
+        service_types: initialData.service_types || prev.service_types,
+      }));
+    }
+  }, [open, initialData]);
+
   // Find selected truck
   const selectedTruck = useMemo(() => {
     return trucks?.find(t => t.id === formData.truck_id);
