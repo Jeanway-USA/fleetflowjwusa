@@ -1,8 +1,16 @@
-import { useRef } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
 interface Column<T> {
@@ -18,6 +26,7 @@ interface DataTableProps<T> {
   emptyMessage?: string;
   onRowClick?: (item: T) => void;
   exportFilename?: string;
+  tableId?: string;
 }
 
 function exportToCsv<T extends { id: string }>(columns: Column<T>[], data: T[], filename: string) {
@@ -38,6 +47,10 @@ function exportToCsv<T extends { id: string }>(columns: Column<T>[], data: T[], 
 
 const ROW_HEIGHT = 48;
 
+function getStorageKey(tableId: string) {
+  return `datatable-view-${tableId}`;
+}
+
 export function DataTable<T extends { id: string }>({ 
   columns, 
   data, 
@@ -45,8 +58,30 @@ export function DataTable<T extends { id: string }>({
   emptyMessage = "No data found",
   onRowClick,
   exportFilename,
+  tableId,
 }: DataTableProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
+    if (tableId) {
+      try {
+        const saved = localStorage.getItem(getStorageKey(tableId));
+        if (saved) return JSON.parse(saved);
+      } catch { /* ignore */ }
+    }
+    return {};
+  });
+
+  useEffect(() => {
+    if (tableId) {
+      localStorage.setItem(getStorageKey(tableId), JSON.stringify(columnVisibility));
+    }
+  }, [columnVisibility, tableId]);
+
+  const visibleColumns = useMemo(
+    () => columns.filter(col => columnVisibility[String(col.key)] !== false),
+    [columns, columnVisibility]
+  );
 
   const rowVirtualizer = useVirtualizer({
     count: data.length,
@@ -55,13 +90,24 @@ export function DataTable<T extends { id: string }>({
     overscan: 15,
   });
 
+  const toggleColumn = (key: string) => {
+    setColumnVisibility(prev => ({
+      ...prev,
+      [key]: prev[key] === false ? true : false,
+    }));
+  };
+
+  const resetVisibility = () => setColumnVisibility({});
+
+  const hasToolbar = exportFilename || tableId;
+
   if (loading) {
     return (
       <div className="rounded-lg border border-border">
         <table className="w-full caption-bottom text-sm" style={{ tableLayout: 'fixed' }}>
           <thead className="[&_tr]:border-b">
             <tr className="border-b transition-colors bg-muted/50">
-              {columns.map((col, i) => (
+              {visibleColumns.map((col, i) => (
                 <th key={i} className="h-12 px-4 text-left align-middle font-semibold text-muted-foreground">{col.header}</th>
               ))}
             </tr>
@@ -69,7 +115,7 @@ export function DataTable<T extends { id: string }>({
           <tbody>
             {[1, 2, 3].map((i) => (
               <tr key={i} className="border-b">
-                {columns.map((_, j) => (
+                {visibleColumns.map((_, j) => (
                   <td key={j} className="p-4 align-middle">
                     <Skeleton className="h-4 w-full" />
                   </td>
@@ -92,16 +138,45 @@ export function DataTable<T extends { id: string }>({
 
   return (
     <div className="space-y-2">
-      {exportFilename && data.length > 0 && (
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => exportToCsv(columns, data, exportFilename)}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </Button>
+      {hasToolbar && (
+        <div className="flex justify-end gap-2">
+          {tableId && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <SlidersHorizontal className="mr-2 h-4 w-4" />
+                  View
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {columns.map((col) => (
+                  <DropdownMenuCheckboxItem
+                    key={String(col.key)}
+                    checked={columnVisibility[String(col.key)] !== false}
+                    onCheckedChange={() => toggleColumn(String(col.key))}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    {col.header}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={resetVisibility}>
+                  <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                  Reset to default
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {exportFilename && data.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToCsv(visibleColumns, data, exportFilename)}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export CSV
+            </Button>
+          )}
         </div>
       )}
       <div
@@ -112,7 +187,7 @@ export function DataTable<T extends { id: string }>({
         <table className="w-full caption-bottom text-sm" style={{ tableLayout: 'fixed' }}>
           <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background" style={{ display: 'block' }}>
             <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
-              {columns.map((col, i) => (
+              {visibleColumns.map((col, i) => (
                 <th key={i} className="h-12 px-4 text-left align-middle font-semibold text-muted-foreground">{col.header}</th>
               ))}
             </tr>
@@ -146,7 +221,7 @@ export function DataTable<T extends { id: string }>({
                     tableLayout: 'fixed',
                   }}
                 >
-                  {columns.map((col, j) => (
+                  {visibleColumns.map((col, j) => (
                     <td key={j} className="p-4 align-middle">
                       {col.render
                         ? col.render(item)
