@@ -10,6 +10,7 @@ import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { RoleBasedRedirect } from "@/components/shared/RoleBasedRedirect";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 import { SuperAdminGuard } from "@/components/shared/SuperAdminGuard";
+import { BrandColorInjector } from "@/components/shared/BrandColorInjector";
 import { Loader2 } from "lucide-react";
 
 // Lazy-loaded pages
