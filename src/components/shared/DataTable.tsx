@@ -1,7 +1,9 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Column<T> {
   key: keyof T | string;
@@ -34,6 +36,8 @@ function exportToCsv<T extends { id: string }>(columns: Column<T>[], data: T[], 
   URL.revokeObjectURL(url);
 }
 
+const ROW_HEIGHT = 48;
+
 export function DataTable<T extends { id: string }>({ 
   columns, 
   data, 
@@ -42,29 +46,38 @@ export function DataTable<T extends { id: string }>({
   onRowClick,
   exportFilename,
 }: DataTableProps<T>) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: data.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 15,
+  });
+
   if (loading) {
     return (
       <div className="rounded-lg border border-border">
-        <Table>
-          <TableHeader>
-            <TableRow>
+        <table className="w-full caption-bottom text-sm" style={{ tableLayout: 'fixed' }}>
+          <thead className="[&_tr]:border-b">
+            <tr className="border-b transition-colors bg-muted/50">
               {columns.map((col, i) => (
-                <TableHead key={i}>{col.header}</TableHead>
+                <th key={i} className="h-12 px-4 text-left align-middle font-semibold text-muted-foreground">{col.header}</th>
               ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+            </tr>
+          </thead>
+          <tbody>
             {[1, 2, 3].map((i) => (
-              <TableRow key={i}>
+              <tr key={i} className="border-b">
                 {columns.map((_, j) => (
-                  <TableCell key={j}>
+                  <td key={j} className="p-4 align-middle">
                     <Skeleton className="h-4 w-full" />
-                  </TableCell>
+                  </td>
                 ))}
-              </TableRow>
+              </tr>
             ))}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
     );
   }
@@ -91,33 +104,60 @@ export function DataTable<T extends { id: string }>({
           </Button>
         </div>
       )}
-      <div className="rounded-lg border border-border overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/50">
-            {columns.map((col, i) => (
-              <TableHead key={i} className="font-semibold">{col.header}</TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((item) => (
-            <TableRow 
-              key={item.id} 
-              onClick={() => onRowClick?.(item)}
-              className={onRowClick ? "cursor-pointer hover:bg-muted/50" : ""}
-            >
-              {columns.map((col, j) => (
-                <TableCell key={j}>
-                  {col.render 
-                    ? col.render(item) 
-                    : String(item[col.key as keyof T] ?? '-')}
-                </TableCell>
+      <div
+        ref={scrollRef}
+        className="rounded-lg border border-border overflow-auto"
+        style={{ maxHeight: 600 }}
+      >
+        <table className="w-full caption-bottom text-sm" style={{ tableLayout: 'fixed' }}>
+          <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background">
+            <tr className="border-b transition-colors bg-muted/50">
+              {columns.map((col, i) => (
+                <th key={i} className="h-12 px-4 text-left align-middle font-semibold text-muted-foreground">{col.header}</th>
               ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+            </tr>
+          </thead>
+          <tbody
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              position: 'relative',
+              display: 'block',
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const item = data[virtualRow.index];
+              return (
+                <tr
+                  key={item.id}
+                  data-index={virtualRow.index}
+                  onClick={() => onRowClick?.(item)}
+                  className={cn(
+                    "border-b transition-colors hover:bg-muted/50",
+                    onRowClick && "cursor-pointer"
+                  )}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                    display: 'table',
+                    tableLayout: 'fixed',
+                  }}
+                >
+                  {columns.map((col, j) => (
+                    <td key={j} className="p-4 align-middle">
+                      {col.render
+                        ? col.render(item)
+                        : String(item[col.key as keyof T] ?? '-')}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );
