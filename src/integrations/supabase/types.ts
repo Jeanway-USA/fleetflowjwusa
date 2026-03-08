@@ -1240,6 +1240,7 @@ export type Database = {
           license_expiry: string | null
           license_number: string | null
           medical_card_expiry: string | null
+          mvr_expiry: string | null
           org_id: string
           pay_rate: number | null
           pay_type: string | null
@@ -1263,6 +1264,7 @@ export type Database = {
           license_expiry?: string | null
           license_number?: string | null
           medical_card_expiry?: string | null
+          mvr_expiry?: string | null
           org_id: string
           pay_rate?: number | null
           pay_type?: string | null
@@ -1286,6 +1288,7 @@ export type Database = {
           license_expiry?: string | null
           license_number?: string | null
           medical_card_expiry?: string | null
+          mvr_expiry?: string | null
           org_id?: string
           pay_rate?: number | null
           pay_type?: string | null

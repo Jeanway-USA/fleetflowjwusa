@@ -14,11 +14,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles, RefreshCw, TrendingDown, RotateCcw, Printer } from 'lucide-react';
+import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles, RefreshCw, TrendingDown, RotateCcw, Printer, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { US_STATES } from '@/lib/us-states';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { STATE_DIESEL_TAX_RATES } from '@/lib/ifta-tax-rates';
 import { JurisdictionMap } from '@/components/ifta/JurisdictionMap';
 import { UnsyncedExpenses } from '@/components/ifta/UnsyncedExpenses';
@@ -71,6 +72,8 @@ export default function IFTA() {
   const [fuelFormData, setFuelFormData] = useState<Partial<FuelPurchase>>({});
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [printSummaryOpen, setPrintSummaryOpen] = useState(false);
+  const [auditAlerts, setAuditAlerts] = useState<{ id: string; type: string; message: string }[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   const { data: trucks = [] } = useQuery({
     queryKey: ['trucks'],
@@ -668,6 +671,52 @@ export default function IFTA() {
     }
   };
 
+  // --- IFTA Audit Logic ---
+  const runAudit = async () => {
+    setAuditLoading(true);
+    const alerts: { id: string; type: string; message: string }[] = [];
+
+    for (const load of quarterDeliveredLoads) {
+      // Check missing intermediate stops on long-haul loads
+      if ((load.booked_miles || 0) > 500) {
+        const hasStops = load.notes?.includes('=== INTERMEDIATE STOPS ===');
+        if (!hasStops) {
+          alerts.push({
+            id: `stops-${load.id}`,
+            type: 'Missing Stops',
+            message: `Load ${load.origin} → ${load.destination} (${load.booked_miles}mi) has no intermediate stops recorded`,
+          });
+        }
+      }
+
+      // Check missing fuel purchases
+      const hasFuel = filteredFuelPurchases.some(fp => {
+        // Cross-reference by truck and date proximity
+        if (!load.truck_id || fp.truck_id !== load.truck_id) return false;
+        if (!load.delivery_date || !fp.purchase_date) return false;
+        const loadDate = parseISO(load.delivery_date);
+        const fuelDate = parseISO(fp.purchase_date);
+        const diff = Math.abs(loadDate.getTime() - fuelDate.getTime()) / (1000 * 60 * 60 * 24);
+        return diff <= 7;
+      });
+      if (!hasFuel && load.truck_id) {
+        alerts.push({
+          id: `fuel-${load.id}`,
+          type: 'Missing Fuel',
+          message: `No fuel purchase found near load ${load.origin} → ${load.destination} (delivered ${load.delivery_date})`,
+        });
+      }
+    }
+
+    setAuditAlerts(alerts);
+    setAuditLoading(false);
+    if (alerts.length === 0) {
+      toast.success('Audit complete — no issues found');
+    } else {
+      toast.warning(`Audit found ${alerts.length} issue(s)`);
+    }
+  };
+
   return (
     <>
       <TooltipProvider>
@@ -787,7 +836,21 @@ export default function IFTA() {
         hasFuelPurchases={filteredFuelPurchases.length > 0}
         hasIFTARecords={iftaRecords.length > 0}
         hasJurisdictionData={jurisdictionStates.size > 0}
+        onAuditData={runAudit}
+        auditLoading={auditLoading}
       />
+
+      {auditAlerts.length > 0 && (
+        <div className="space-y-2 mb-6">
+          {auditAlerts.map(alert => (
+            <Alert key={alert.id} variant="destructive" className="bg-destructive/5">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle className="text-sm">{alert.type}</AlertTitle>
+              <AlertDescription className="text-xs">{alert.message}</AlertDescription>
+            </Alert>
+          ))}
+        </div>
+      )}
 
       <Tabs defaultValue="fuel" className="w-full">
         <TabsList>
