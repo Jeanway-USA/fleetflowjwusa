@@ -21,6 +21,14 @@ export default function MaintenanceManagement() {
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
   const [truckDrawerOpen, setTruckDrawerOpen] = useState(false);
 
+  // Auto-open sheet from command palette quick action
+  useEffect(() => {
+    if (searchParams.get('action') === 'new-work-order') {
+      setNewWorkOrderOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
+
   const handleViewTruck = (truckId: string) => {
     setSelectedTruckId(truckId);
     setTruckDrawerOpen(true);

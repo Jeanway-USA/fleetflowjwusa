@@ -222,6 +222,14 @@ export default function FleetLoads() {
     setDialogOpen(true);
   };
 
+  // Auto-open dialog from command palette quick action
+  useEffect(() => {
+    if (searchParams.get('action') === 'new-load') {
+      openDialog();
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
+
   const closeDialog = () => {
     setDialogOpen(false);
     setEditingLoad(null);

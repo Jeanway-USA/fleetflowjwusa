@@ -489,6 +489,14 @@ export default function Finance() {
   };
   const closeExpenseDialog = () => { setExpenseDialogOpen(false); setEditingExpense(null); setExpenseFormData({}); };
 
+  // Auto-open dialog from command palette quick action
+  useEffect(() => {
+    if (searchParams.get('action') === 'new-expense') {
+      openExpenseDialog();
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
+
   const handleExpenseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!expenseFormData.expense_type || !expenseFormData.amount) { toast.error('Please fill in required fields'); return; }
