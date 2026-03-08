@@ -61,7 +61,6 @@ function hexToHsl(hex: string): string {
 
 export function BrandingTab() {
   const { orgId, isDemoMode, refreshOrgData, primaryColor, logoUrl, bannerUrl } = useAuth();
-  const { upload: storageUpload, remove: storageRemove } = useStorageProvider();
   const [selectedColor, setSelectedColor] = useState(primaryColor || '45 80% 45%');
   const [isSavingColor, setIsSavingColor] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
