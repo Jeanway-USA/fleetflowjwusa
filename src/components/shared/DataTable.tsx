@@ -117,6 +117,14 @@ export function DataTable<T extends { id: string }>({
     [columns, columnVisibility]
   );
 
+  const computedWidths = useMemo(() => {
+    const totalCols = visibleColumns.length + (showSelection ? 1 : 0);
+    const fixedWidthCols = visibleColumns.filter(c => c.width);
+    const remainingCols = visibleColumns.length - fixedWidthCols.length;
+    const defaultWidth = remainingCols > 0 ? `${100 / totalCols}%` : undefined;
+    return visibleColumns.map(col => col.width || defaultWidth);
+  }, [visibleColumns, showSelection]);
+
   const rowVirtualizer = useVirtualizer({
     count: data.length,
     getScrollElement: () => scrollRef.current,
