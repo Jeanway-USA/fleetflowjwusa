@@ -117,6 +117,13 @@ export function DataTable<T extends { id: string }>({
     [columns, columnVisibility]
   );
 
+  const showSelection = selectable && onSelectionChange;
+
+  const computedWidths = useMemo(() => {
+    const defaultWidth = `${100 / visibleColumns.length}%`;
+    return visibleColumns.map(col => col.width || defaultWidth);
+  }, [visibleColumns]);
+
   const rowVirtualizer = useVirtualizer({
     count: data.length,
     getScrollElement: () => scrollRef.current,
@@ -167,8 +174,6 @@ export function DataTable<T extends { id: string }>({
     onSelectionChange?.(new Set());
   }, [onSelectionChange]);
 
-  const showSelection = selectable && onSelectionChange;
-
   if (loading) {
     return (
       <div className="space-y-2">
@@ -185,7 +190,7 @@ export function DataTable<T extends { id: string }>({
           </TooltipProvider>
         </div>
         <div className="rounded-lg border border-border">
-          <table className="w-full caption-bottom" style={{ tableLayout: 'auto' }}>
+          <table className="w-full caption-bottom" style={{ tableLayout: 'fixed' }}>
             <thead className="[&_tr]:border-b">
               <tr className="border-b transition-colors bg-muted/50">
                 {showSelection && <th className={cn(thClass, "w-10")} />}
@@ -277,9 +282,9 @@ export function DataTable<T extends { id: string }>({
           className="rounded-lg border border-border overflow-auto"
           style={{ maxHeight: 600 }}
         >
-          <table className="w-full caption-bottom" style={{ tableLayout: 'auto' }}>
+          <table className="w-full caption-bottom" style={{ tableLayout: 'fixed' }}>
             <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background" style={{ display: 'block' }}>
-              <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'auto', width: '100%' }}>
+              <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
                 {showSelection && (
                   <th className={cn(thClass, "w-10 text-center")} style={{ width: '40px' }}>
                     <div className="flex items-center justify-center h-full">
@@ -292,7 +297,7 @@ export function DataTable<T extends { id: string }>({
                   </th>
                 )}
                 {visibleColumns.map((col, i) => (
-                  <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground")} style={{ height: `${rowHeight}px`, width: col.width }}>
+                  <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground")} style={{ height: `${rowHeight}px`, width: computedWidths[i] }}>
                     <div className="flex items-center h-full">{col.header}</div>
                   </th>
                 ))}
@@ -326,7 +331,7 @@ export function DataTable<T extends { id: string }>({
                       height: `${virtualRow.size}px`,
                       transform: `translateY(${virtualRow.start}px)`,
                       display: 'table',
-                      tableLayout: 'auto',
+                      tableLayout: 'fixed',
                     }}
                   >
                     {showSelection && (
@@ -341,7 +346,7 @@ export function DataTable<T extends { id: string }>({
                       </td>
                     )}
                     {visibleColumns.map((col, j) => (
-                      <td key={j} className={cn(tdClass)} style={{ height: `${virtualRow.size}px`, width: col.width }}>
+                      <td key={j} className={cn(tdClass)} style={{ height: `${virtualRow.size}px`, width: computedWidths[j] }}>
                         <div className="flex items-center h-full">
                           {col.render
                             ? col.render(item)
