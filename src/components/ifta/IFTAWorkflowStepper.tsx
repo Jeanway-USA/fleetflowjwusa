@@ -42,34 +42,48 @@ export function IFTAWorkflowStepper({ hasFuelPurchases, hasIFTARecords, hasJuris
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg border bg-card p-3 mb-6">
       <div className="flex items-center gap-2 flex-1">
-        <div key={step.label} className="flex items-center gap-2 flex-1">
-          <div className={cn(
-            'flex items-center justify-center rounded-full h-7 w-7 shrink-0 text-xs font-bold transition-colors',
-            step.completed
-              ? 'bg-success text-success-foreground'
-              : 'bg-muted text-muted-foreground'
-          )}>
-            {step.completed ? <Check className="h-3.5 w-3.5" /> : i + 1}
-          </div>
-          <div className="min-w-0">
-            <p className={cn(
-              'text-sm font-medium leading-tight truncate',
-              step.completed ? 'text-foreground' : 'text-muted-foreground'
-            )}>
-              {step.label}
-            </p>
-            <p className="text-[11px] text-muted-foreground leading-tight truncate hidden sm:block">
-              {step.description}
-            </p>
-          </div>
-          {i < steps.length - 1 && (
+        {steps.map((step, i) => (
+          <div key={step.label} className="flex items-center gap-2 flex-1">
             <div className={cn(
-              'h-px flex-1 mx-2',
-              step.completed ? 'bg-success/40' : 'bg-border'
-            )} />
-          )}
-        </div>
-      ))}
+              'flex items-center justify-center rounded-full h-7 w-7 shrink-0 text-xs font-bold transition-colors',
+              step.completed
+                ? 'bg-success text-success-foreground'
+                : 'bg-muted text-muted-foreground'
+            )}>
+              {step.completed ? <Check className="h-3.5 w-3.5" /> : i + 1}
+            </div>
+            <div className="min-w-0">
+              <p className={cn(
+                'text-sm font-medium leading-tight truncate',
+                step.completed ? 'text-foreground' : 'text-muted-foreground'
+              )}>
+                {step.label}
+              </p>
+              <p className="text-[11px] text-muted-foreground leading-tight truncate hidden sm:block">
+                {step.description}
+              </p>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={cn(
+                'h-px flex-1 mx-2',
+                step.completed ? 'bg-success/40' : 'bg-border'
+              )} />
+            )}
+          </div>
+        ))}
+      </div>
+      {onAuditData && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-1.5 shrink-0 ml-2"
+          onClick={onAuditData}
+          disabled={auditLoading}
+        >
+          {auditLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+          Audit Data
+        </Button>
+      )}
     </div>
   );
 }
