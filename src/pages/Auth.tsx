@@ -30,7 +30,7 @@ export default function Auth() {
   const { theme } = useTheme();
   const navigate = useNavigate();
   
-  const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
+  
 
   // Redirect if already logged in (only after auth state is resolved)
   useEffect(() => {
