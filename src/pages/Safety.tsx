@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -7,6 +8,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DefectAlerts } from '@/components/safety/DefectAlerts';
 import { InspectionHistory } from '@/components/safety/InspectionHistory';
+import { NewWorkOrderSheet, WorkOrderInitialData } from '@/components/maintenance/NewWorkOrderSheet';
 import { AlertTriangle, CheckCircle, Clock, Truck, Shield, Flame, CreditCard, User, ClipboardCheck, FileWarning, TrendingUp } from 'lucide-react';
 import { format, addDays, isBefore, parseISO, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
