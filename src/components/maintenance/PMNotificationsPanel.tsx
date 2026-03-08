@@ -116,6 +116,19 @@ export function PMNotificationsPanel({ onViewTruck }: PMNotificationsPanelProps)
         )}
       </div>
 
+      {/* Predictive Calendar Link */}
+      <div className="px-4 py-2 border-b">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 text-xs h-8"
+          onClick={() => navigate('/maintenance?tab=predictive')}
+        >
+          <TrendingUp className="h-3.5 w-3.5" />
+          View Predictive Service Calendar
+        </Button>
+      </div>
+
       {/* Notifications List */}
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-2">
