@@ -175,22 +175,47 @@
 
 /* Print styles for EOW Report */
 @media print {
-  body * {
-    visibility: hidden;
+  body > * {
+    display: none !important;
+  }
+  .print-report {
+    display: block !important;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    background: white !important;
+    color: black !important;
+    margin: 0;
+    padding: 0;
   }
   .print-report,
   .print-report * {
     visibility: visible;
   }
-  .print-report {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    background: white !important;
-    color: black !important;
+  /* Ensure the dialog portal ancestor chain is visible */
+  [data-radix-portal],
+  [data-radix-portal] > *,
+  [role="dialog"] {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
   }
-  .print\\:hidden {
+  .print\:hidden {
     display: none !important;
   }
 }
