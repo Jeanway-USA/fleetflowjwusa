@@ -12,8 +12,9 @@ import { ServiceHistoryTab } from '@/components/maintenance/ServiceHistoryTab';
 import { NewWorkOrderSheet } from '@/components/maintenance/NewWorkOrderSheet';
 import { TruckHistoryDrawer } from '@/components/maintenance/TruckHistoryDrawer';
 import { PMNotificationsPanel, PMNotificationsBell } from '@/components/maintenance/PMNotificationsPanel';
+import { PredictiveServiceCalendar } from '@/components/maintenance/PredictiveServiceCalendar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Plus, Wrench, Calendar, History } from 'lucide-react';
+import { Plus, Wrench, Calendar, History, TrendingUp } from 'lucide-react';
 
 export default function MaintenanceManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
