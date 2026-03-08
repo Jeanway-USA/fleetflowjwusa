@@ -54,17 +54,19 @@ Deno.serve(async (req) => {
     if (load.org_id) {
       const { data } = await supabase
         .from("organizations")
-        .select("name, logo_url, primary_color")
+        .select("name, logo_url, banner_url, primary_color")
         .eq("id", load.org_id)
         .maybeSingle();
       if (data) {
-        // Generate signed URL for logo if it's a storage path (not a full URL)
-        if (data.logo_url && !data.logo_url.startsWith('http')) {
-          const { data: signedData } = await supabase.storage
-            .from('branding-assets')
-            .createSignedUrl(data.logo_url, 3600);
-          if (signedData) {
-            data.logo_url = signedData.signedUrl;
+        // Generate signed URLs for branding assets stored as private paths
+        for (const col of ['banner_url', 'logo_url'] as const) {
+          if (data[col] && !data[col].startsWith('http')) {
+            const { data: signedData } = await supabase.storage
+              .from('branding-assets')
+              .createSignedUrl(data[col], 3600);
+            if (signedData) {
+              (data as any)[col] = signedData.signedUrl;
+            }
           }
         }
         org = data;
@@ -118,6 +120,7 @@ Deno.serve(async (req) => {
           ? {
               name: org.name,
               logo_url: org.logo_url,
+              banner_url: org.banner_url,
               primary_color: org.primary_color,
             }
           : null,
