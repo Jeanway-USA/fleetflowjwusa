@@ -95,12 +95,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOrgId(profile.org_id);
       const { data: orgData } = await supabase
         .from('organizations')
-        .select('name, subscription_tier, primary_color, logo_url, banner_url')
+        .select('name, subscription_tier, primary_color, logo_url, banner_url, is_active')
         .eq('id', profile.org_id)
         .single();
 
       if (orgData) {
         setOrgName(orgData.name);
+        setOrgIsActive(orgData.is_active !== false);
         setSubscriptionTier((orgData.subscription_tier as SubscriptionTier) || 'solo_bco');
         setPrimaryColor(orgData.primary_color || null);
         setLogoUrl(orgData.logo_url || null);
