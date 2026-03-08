@@ -1,66 +1,40 @@
 
 
-## QoL Improvements Across All Areas
+## Plan: DataTable Column Visibility & Save View
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Overview
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+Enhance the existing custom `DataTable` with a column visibility toggle dropdown and localStorage persistence — without migrating to `@tanstack/react-table` (which would be a large rewrite). The current component uses a simple `Column[]` interface with `@tanstack/react-virtual` for virtualization. We'll add visibility state on top of this.
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+### Changes
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+**File: `src/components/shared/DataTable.tsx`**
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+1. **New prop: `tableId?: string`** — used as the localStorage key. When provided, enables the Save View feature. Consumers pass a unique string like `"trucks"` or `"trailers"`.
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+2. **Column visibility state** — `useState<Record<string, boolean>>` mapping `col.key` → visible (default all `true`). On mount, if `tableId` is set, read saved state from `localStorage` key `datatable-view-${tableId}`.
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+3. **"View" dropdown** — Render a `DropdownMenu` button (with `SlidersHorizontal` icon) in the toolbar next to Export CSV. Inside: a `DropdownMenuCheckboxItem` for each column, toggling visibility. At the bottom: a `DropdownMenuSeparator` + "Reset to default" item that restores all columns visible.
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+4. **Filter visible columns** — Derive `visibleColumns = columns.filter(c => visibility[c.key] !== false)` and use it for rendering the thead, tbody cells, loading skeleton, and CSV export.
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+5. **Auto-save to localStorage** — `useEffect` that writes `JSON.stringify(columnVisibility)` to localStorage whenever it changes (debounce not needed, it's tiny).
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+**Consumer updates (no changes required)** — The feature is opt-in via `tableId`. Existing usages without `tableId` behave identically to today.
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+**Recommended consumer additions (optional, same message):**
+- `Trucks.tsx`: add `tableId="trucks"`
+- `Trailers.tsx`: add `tableId="trailers"`  
+- `Documents.tsx`: add `tableId="documents"`
+- `AgencyLoads.tsx`: add `tableId="agency-loads"`
 
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
+### Files
 
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
-
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
-
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+| File | Action |
+|---|---|
+| `src/components/shared/DataTable.tsx` | Edit — add visibility state, View dropdown, localStorage persistence |
+| `src/pages/Trucks.tsx` | Edit — add `tableId="trucks"` prop |
+| `src/pages/Trailers.tsx` | Edit — add `tableId="trailers"` prop |
+| `src/pages/Documents.tsx` | Edit — add `tableId="documents"` prop |
+| `src/pages/AgencyLoads.tsx` | Edit — add `tableId="agency-loads"` prop |
 
