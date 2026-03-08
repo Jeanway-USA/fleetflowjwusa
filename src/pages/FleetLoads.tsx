@@ -580,7 +580,7 @@ export default function FleetLoads() {
               { key: 'origin', header: 'Origin', render: (load: any) => {
                 const addr = formatAddressDisplay(load.origin);
                 return typeof addr === 'string' ? addr : (
-                  <div className="truncate max-w-[200px]" title={addr.full}>
+                  <div title={addr.full}>
                     {addr.city}{addr.state ? `, ${addr.state}` : ''}
                   </div>
                 );
@@ -588,7 +588,7 @@ export default function FleetLoads() {
               { key: 'destination', header: 'Destination', render: (load: any) => {
                 const addr = formatAddressDisplay(load.destination);
                 return typeof addr === 'string' ? addr : (
-                  <div className="truncate max-w-[200px]" title={addr.full}>
+                  <div title={addr.full}>
                     {addr.city}{addr.state ? `, ${addr.state}` : ''}
                   </div>
                 );
