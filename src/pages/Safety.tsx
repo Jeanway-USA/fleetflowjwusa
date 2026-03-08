@@ -364,6 +364,13 @@ export default function Safety() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Work Order Sheet for DVIR conversion */}
+      <NewWorkOrderSheet
+        open={workOrderOpen}
+        onOpenChange={setWorkOrderOpen}
+        initialData={workOrderInitialData}
+      />
     </>
   );
 }
