@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles, RefreshCw, TrendingDown, RotateCcw, Printer } from 'lucide-react';
+import { Plus, Download, Fuel, Route, DollarSign, Calculator, Pencil, Trash2, MapPin, Link2, Loader2, Sparkles, RefreshCw, TrendingDown, RotateCcw, Printer, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { US_STATES } from '@/lib/us-states';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';

@@ -264,6 +264,9 @@ export default function Safety() {
         </Card>
       )}
 
+      {/* Driver Compliance Hub */}
+      <DriverComplianceHub />
+
       {/* Two-column: Inspection History + Compliance Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* DVIR / Inspection History */}
