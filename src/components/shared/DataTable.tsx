@@ -297,7 +297,7 @@ export function DataTable<T extends { id: string }>({
                   </th>
                 )}
                 {visibleColumns.map((col, i) => (
-                  <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground")} style={{ height: `${rowHeight}px`, width: col.width }}>
+                  <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground")} style={{ height: `${rowHeight}px`, width: computedWidths[i] }}>
                     <div className="flex items-center h-full">{col.header}</div>
                   </th>
                 ))}
