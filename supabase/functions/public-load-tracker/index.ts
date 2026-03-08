@@ -57,7 +57,18 @@ Deno.serve(async (req) => {
         .select("name, logo_url, primary_color")
         .eq("id", load.org_id)
         .maybeSingle();
-      org = data;
+      if (data) {
+        // Generate signed URL for logo if it's a storage path (not a full URL)
+        if (data.logo_url && !data.logo_url.startsWith('http')) {
+          const { data: signedData } = await supabase.storage
+            .from('branding-assets')
+            .createSignedUrl(data.logo_url, 3600);
+          if (signedData) {
+            data.logo_url = signedData.signedUrl;
+          }
+        }
+        org = data;
+      }
     }
 
     // Fetch driver location if sharing
