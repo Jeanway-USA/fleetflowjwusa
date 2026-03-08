@@ -57,7 +57,7 @@ export default function Onboarding() {
 
   const [orgId, setOrgId] = useState<string | null>(null);
 
-  const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
+  
   const totalSteps = 3;
   const progress = (step / totalSteps) * 100;
   const stepLabels = ['Organization', 'Fleet Setup', 'Invite Team'];
