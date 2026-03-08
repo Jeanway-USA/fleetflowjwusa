@@ -577,6 +577,21 @@ export default function FleetLoads() {
             columns={[
               { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
               { key: 'landstar_load_id', header: 'Landstar ID', render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
+              { key: 'tracking_id', header: 'Tracking ID', render: (load: any) => 
+                load.tracking_id ? (
+                  <span 
+                    className="font-mono text-xs cursor-pointer hover:text-primary truncate max-w-[120px] inline-block"
+                    title="Click to copy tracking link"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(`${window.location.origin}/track?tracking_id=${load.tracking_id}`);
+                      toast.success('Tracking link copied!');
+                    }}
+                  >
+                    {load.tracking_id.slice(0, 8)}…
+                  </span>
+                ) : <span className="text-muted-foreground">-</span>
+              },
               { key: 'agency_code', header: 'Agent', render: (load: any) => <span className="font-mono text-xs">{load.agency_code || '-'}</span> },
               { key: 'origin', header: 'Origin', render: (load: any) => {
                 const addr = formatAddressDisplay(load.origin);
