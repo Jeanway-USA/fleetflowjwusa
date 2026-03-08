@@ -20,9 +20,9 @@ const DENSITY_STORAGE_KEY = 'datatable-density';
 
 function getDensityConfig(density: Density) {
   if (density === 'compact') {
-    return { rowHeight: 32, thClass: 'h-8 px-3 text-xs', tdClass: 'px-3 py-1 text-xs' };
+    return { rowHeight: 32, thClass: 'h-8 px-3 text-xs', tdClass: 'px-3 text-xs' };
   }
-  return { rowHeight: 48, thClass: 'h-12 px-4 text-sm', tdClass: 'p-4 text-sm' };
+  return { rowHeight: 48, thClass: 'h-12 px-4 text-sm', tdClass: 'px-4 text-sm' };
 }
 
 interface Column<T> {
