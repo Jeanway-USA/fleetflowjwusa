@@ -15,8 +15,6 @@ import {
   Users, Plus, X, SkipForward, Upload, ImageIcon,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import jwBannerLight from '@/assets/JW_Banner.png';
-import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 
 const TRAILER_TYPES = ['Dry Van', 'Reefer', 'Flatbed', 'Step Deck', 'Lowboy', 'Tanker', 'Hopper', 'Other'];
 const INVITE_ROLES = [
