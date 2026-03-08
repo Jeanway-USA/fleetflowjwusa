@@ -134,12 +134,8 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <img 
-            src={bannerSrc} 
-            alt="JeanWay USA" 
-            className="h-24 object-contain mb-2"
-          />
-          <p className="text-muted-foreground mt-1">Fleet Management System</p>
+          <h1 className="text-3xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
+          <p className="text-xs text-muted-foreground mt-1">by JeanWayUSA</p>
         </div>
 
         <Card className="border-border bg-card">

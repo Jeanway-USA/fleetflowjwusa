@@ -227,7 +227,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t border-border bg-card/50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">© 2026 FleetFlow TMS. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">© 2026 Fleet Flow TMS by JeanWayUSA. All rights reserved.</p>
           <div className="flex gap-6 text-sm text-muted-foreground">
             <button onClick={() => navigate('/pricing')} className="hover:text-foreground transition-colors">Pricing</button>
             <button onClick={() => navigate('/auth')} className="hover:text-foreground transition-colors">Sign In</button>

@@ -226,7 +226,10 @@ export default function Onboarding() {
       {/* Header */}
       <div className="border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-center">
-          <img src={bannerSrc} alt="FleetFlow TMS" className="h-16 object-contain" />
+          <div className="text-center">
+            <h1 className="text-2xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">by JeanWayUSA</p>
+          </div>
         </div>
       </div>
 

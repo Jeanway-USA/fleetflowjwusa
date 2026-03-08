@@ -275,7 +275,7 @@ export default function Pricing() {
       {/* Footer */}
       <footer className="border-t border-border bg-card/50 py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm text-muted-foreground">© 2026 FleetFlow TMS. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">© 2026 Fleet Flow TMS by JeanWayUSA. All rights reserved.</p>
         </div>
       </footer>
     </div>
