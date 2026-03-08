@@ -55,6 +55,7 @@ interface Load {
   empty_miles?: number | null;
   notes: string | null;
   landstar_load_id: string | null;
+  tracking_id?: string | null;
   load_accessorials?: { amount: number }[];
 }
 
