@@ -1,66 +1,64 @@
 
 
-## QoL Improvements Across All Areas
+## Remove JeanWay USA Branding, Replace with "Fleet Flow TMS by JeanWayUSA" Text
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Overview
+Remove all JW_Banner/JW_Icon image imports and replace them with a styled text logo "Fleet Flow TMS" with a "by JeanWayUSA" subtitle. Keep the email addresses and super admin checks unchanged (those are functional, not branding).
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+### Changes
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+**1. `src/components/layout/AppSidebar.tsx`**
+- Remove `jwBannerLight` and `jwBannerDark` imports (lines 28-29)
+- Update `defaultBannerSrc` logic (line 170) — instead of falling back to JW images, fall back to `null`
+- Replace the `<img>` tag at line 293 with a text-based logo component:
+  - If `signedBannerUrl || signedLogoUrl` exists → show org banner image as before
+  - Otherwise → show styled text: "Fleet Flow TMS" in bold gradient-gold + smaller "by JeanWayUSA" below
+- Update alt text from "JeanWay USA" to "Fleet Flow TMS"
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+**2. `src/pages/Auth.tsx`**
+- Remove `jwBannerLight`/`jwBannerDark` imports
+- Replace all `<img src={bannerSrc} alt="JeanWay USA" ...>` with a styled text block: "Fleet Flow TMS" heading + "by JeanWayUSA" subtitle
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+**3. `src/pages/ResetPassword.tsx`**
+- Same treatment as Auth.tsx — remove image imports, replace all 3 `<img>` instances with text logo
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+**4. `src/pages/Onboarding.tsx`**
+- Remove `jwBannerLight`/`jwBannerDark` imports
+- Replace the `<img>` banner with styled text logo
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+**5. `src/pages/PendingAccess.tsx`**
+- Remove `bannerLogo` import
+- Replace `<img>` with text logo
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+**6. `src/pages/Landing.tsx`**
+- Already uses text "FleetFlow TMS" — update to "Fleet Flow TMS" with "by JeanWayUSA" styling
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+**7. `src/pages/Pricing.tsx`**
+- Update text "FleetFlow TMS" to "Fleet Flow TMS by JeanWayUSA"
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+**8. `src/index.css`**
+- Update comment from "JeanWay USA Design System" to "Fleet Flow TMS Design System"
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+**9. `supabase/functions/invite-user/index.ts`**
+- Update email branding from "JeanWay USA" to "Fleet Flow TMS by JeanWayUSA" in HTML template, subject line, and from name
 
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
+**10. `src/pages/AccountDeactivated.tsx`**
+- Update support email domain if referenced
 
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
+### Text Logo Component Pattern
+Reused across all pages — a simple inline block:
+```tsx
+<div className="text-center">
+  <h1 className="text-2xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
+  <p className="text-xs text-muted-foreground mt-0.5">by JeanWayUSA</p>
+</div>
+```
 
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
+Sized appropriately per context (sidebar uses smaller text, auth pages use larger).
 
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
-
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+### Files NOT Changed
+- `src/assets/JW_Banner.png` etc. — left in place (no harm, will be unused)
+- Super admin email lists — functional, not branding
+- `src/contexts/ThemeContext.tsx` — localStorage key `jeanway-theme` is internal, not user-facing
+- Migration SQL files — historical, not editable
 
