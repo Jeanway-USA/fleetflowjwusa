@@ -346,7 +346,7 @@ export function DataTable<T extends { id: string }>({
                       </td>
                     )}
                     {visibleColumns.map((col, j) => (
-                      <td key={j} className={cn(tdClass)} style={{ height: `${virtualRow.size}px`, width: col.width }}>
+                      <td key={j} className={cn(tdClass)} style={{ height: `${virtualRow.size}px`, width: computedWidths[j] }}>
                         <div className="flex items-center h-full">
                           {col.render
                             ? col.render(item)
