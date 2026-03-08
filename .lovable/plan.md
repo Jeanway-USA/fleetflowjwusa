@@ -1,66 +1,40 @@
 
 
-## QoL Improvements Across All Areas
+## Deactivated Organization Gate
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Problem
+When an org's `is_active` is set to `false` in the super admin dashboard, users can still access the TMS. There's no gate or dedicated page informing them.
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+### Solution
+1. **Track `is_active` in AuthContext** — fetch and expose `orgIsActive` from the `organizations` table (already queried, just not stored).
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+2. **Create `/account-deactivated` page** — a full-screen page (no sidebar) showing:
+   - Clear message that the organization has been deactivated
+   - Explanation of possible reasons (non-payment, admin action, trial expiry)
+   - Three action buttons:
+     - **Delete My Account** — calls a new self-delete variant of the `delete-user` edge function (current one blocks self-deletion; we'll add a `delete-own-account` function or a `selfDelete` flag)
+     - **Contact Support** — mailto link or info
+     - **Reactivate Subscription** — navigates to `/pricing` or a contact form
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+3. **Gate in `RoleBasedRedirect`** — after confirming user has an org, check `orgIsActive`. If `false`, redirect to `/account-deactivated`.
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+4. **Gate in `ProtectedRoute`** — same check so direct URL access is also blocked.
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
-
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
-
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
-
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
-
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
-
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
-
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
-
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
-
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
+5. **New edge function `delete-own-account`** — allows an authenticated user to delete their own auth account, profile, and roles (the existing `delete-user` explicitly prevents self-deletion).
 
 ### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+| File | Change |
+|---|---|
+| `src/contexts/AuthContext.tsx` | Store and expose `orgIsActive` from the org query |
+| `src/pages/AccountDeactivated.tsx` | New full-screen deactivated page with actions |
+| `src/components/shared/RoleBasedRedirect.tsx` | Redirect to `/account-deactivated` when `!orgIsActive` |
+| `src/components/shared/ProtectedRoute.tsx` | Redirect to `/account-deactivated` when `!orgIsActive` |
+| `src/App.tsx` | Add `/account-deactivated` route |
+| `supabase/functions/delete-own-account/index.ts` | New edge function for self-account-deletion |
+
+### Technical Details
+- `fetchOrgData` already queries `organizations` — just add `is_active` to the select and store it in state
+- The deactivated page will use the existing `signOut` from AuthContext
+- `delete-own-account` edge function: validates JWT, deletes `user_roles`, `profiles`, then `auth.admin.deleteUser(uid)` for the requesting user's own ID
+- No database migration needed
 
