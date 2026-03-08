@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useMemo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Download, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { Download, SlidersHorizontal, RotateCcw, Rows3, AlignJustify } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -11,7 +11,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+
+type Density = 'standard' | 'compact';
+
+const DENSITY_STORAGE_KEY = 'datatable-density';
+
+function getDensityConfig(density: Density) {
+  if (density === 'compact') {
+    return { rowHeight: 32, thClass: 'h-8 px-3 text-xs', tdClass: 'px-3 py-1 text-xs' };
+  }
+  return { rowHeight: 48, thClass: 'h-12 px-4 text-sm', tdClass: 'p-4 text-sm' };
+}
 
 interface Column<T> {
   key: keyof T | string;
@@ -45,8 +57,6 @@ function exportToCsv<T extends { id: string }>(columns: Column<T>[], data: T[], 
   URL.revokeObjectURL(url);
 }
 
-const ROW_HEIGHT = 48;
-
 function getStorageKey(tableId: string) {
   return `datatable-view-${tableId}`;
 }
@@ -61,6 +71,20 @@ export function DataTable<T extends { id: string }>({
   tableId,
 }: DataTableProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const [density, setDensity] = useState<Density>(() => {
+    try {
+      const saved = localStorage.getItem(DENSITY_STORAGE_KEY);
+      if (saved === 'compact' || saved === 'standard') return saved;
+    } catch { /* ignore */ }
+    return 'standard';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(DENSITY_STORAGE_KEY, density);
+  }, [density]);
+
+  const { rowHeight, thClass, tdClass } = getDensityConfig(density);
 
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
     if (tableId) {
@@ -86,9 +110,14 @@ export function DataTable<T extends { id: string }>({
   const rowVirtualizer = useVirtualizer({
     count: data.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => rowHeight,
     overscan: 15,
   });
+
+  // Force virtualizer to recalculate when density changes
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [density, rowVirtualizer]);
 
   const toggleColumn = (key: string) => {
     setColumnVisibility(prev => ({
@@ -99,31 +128,45 @@ export function DataTable<T extends { id: string }>({
 
   const resetVisibility = () => setColumnVisibility({});
 
-  const hasToolbar = exportFilename || tableId;
+  const toggleDensity = () => setDensity(prev => prev === 'standard' ? 'compact' : 'standard');
 
   if (loading) {
     return (
-      <div className="rounded-lg border border-border">
-        <table className="w-full caption-bottom text-sm" style={{ tableLayout: 'fixed' }}>
-          <thead className="[&_tr]:border-b">
-            <tr className="border-b transition-colors bg-muted/50">
-              {visibleColumns.map((col, i) => (
-                <th key={i} className="h-12 px-4 text-left align-middle font-semibold text-muted-foreground">{col.header}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {[1, 2, 3].map((i) => (
-              <tr key={i} className="border-b">
-                {visibleColumns.map((_, j) => (
-                  <td key={j} className="p-4 align-middle">
-                    <Skeleton className="h-4 w-full" />
-                  </td>
+      <div className="space-y-2">
+        <div className="flex justify-end gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={toggleDensity}>
+                  {density === 'compact' ? <Rows3 className="h-4 w-4" /> : <AlignJustify className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{density === 'compact' ? 'Standard density' : 'Compact density'}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        <div className="rounded-lg border border-border">
+          <table className="w-full caption-bottom" style={{ tableLayout: 'fixed' }}>
+            <thead className="[&_tr]:border-b">
+              <tr className="border-b transition-colors bg-muted/50">
+                {visibleColumns.map((col, i) => (
+                  <th key={i} className={cn(thClass, "text-left align-middle font-semibold text-muted-foreground")}>{col.header}</th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {[1, 2, 3].map((i) => (
+                <tr key={i} className="border-b">
+                  {visibleColumns.map((_, j) => (
+                    <td key={j} className={cn(tdClass, "align-middle")}>
+                      <Skeleton className="h-4 w-full" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   }
@@ -138,57 +181,65 @@ export function DataTable<T extends { id: string }>({
 
   return (
     <div className="space-y-2">
-      {hasToolbar && (
-        <div className="flex justify-end gap-2">
-          {tableId && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <SlidersHorizontal className="mr-2 h-4 w-4" />
-                  View
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                {columns.map((col) => (
-                  <DropdownMenuCheckboxItem
-                    key={String(col.key)}
-                    checked={columnVisibility[String(col.key)] !== false}
-                    onCheckedChange={() => toggleColumn(String(col.key))}
-                    onSelect={(e) => e.preventDefault()}
-                  >
-                    {col.header}
-                  </DropdownMenuCheckboxItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={resetVisibility}>
-                  <RotateCcw className="mr-2 h-3.5 w-3.5" />
-                  Reset to default
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {exportFilename && data.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportToCsv(visibleColumns, data, exportFilename)}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
-          )}
-        </div>
-      )}
+      <div className="flex justify-end gap-2">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant={density === 'compact' ? 'secondary' : 'outline'} size="sm" onClick={toggleDensity}>
+                {density === 'compact' ? <Rows3 className="h-4 w-4" /> : <AlignJustify className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{density === 'compact' ? 'Standard density' : 'Compact density'}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        {tableId && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <SlidersHorizontal className="mr-2 h-4 w-4" />
+                View
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {columns.map((col) => (
+                <DropdownMenuCheckboxItem
+                  key={String(col.key)}
+                  checked={columnVisibility[String(col.key)] !== false}
+                  onCheckedChange={() => toggleColumn(String(col.key))}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {col.header}
+                </DropdownMenuCheckboxItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={resetVisibility}>
+                <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                Reset to default
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {exportFilename && data.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportToCsv(visibleColumns, data, exportFilename)}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+        )}
+      </div>
       <div
         ref={scrollRef}
         className="rounded-lg border border-border overflow-auto"
         style={{ maxHeight: 600 }}
       >
-        <table className="w-full caption-bottom text-sm" style={{ tableLayout: 'fixed' }}>
+        <table className="w-full caption-bottom" style={{ tableLayout: 'fixed' }}>
           <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background" style={{ display: 'block' }}>
             <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
               {visibleColumns.map((col, i) => (
-                <th key={i} className="h-12 px-4 text-left align-middle font-semibold text-muted-foreground">{col.header}</th>
+                <th key={i} className={cn(thClass, "text-left align-middle font-semibold text-muted-foreground")}>{col.header}</th>
               ))}
             </tr>
           </thead>
@@ -222,7 +273,7 @@ export function DataTable<T extends { id: string }>({
                   }}
                 >
                   {visibleColumns.map((col, j) => (
-                    <td key={j} className="p-4 align-middle">
+                    <td key={j} className={cn(tdClass, "align-middle")}>
                       {col.render
                         ? col.render(item)
                         : String(item[col.key as keyof T] ?? '-')}
