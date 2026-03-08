@@ -80,6 +80,10 @@ export default function MaintenanceManagement() {
                   <Calendar className="h-4 w-4" />
                   PM Schedule
                 </TabsTrigger>
+                <TabsTrigger value="predictive" className="gap-2 px-4">
+                  <TrendingUp className="h-4 w-4" />
+                  Predictive
+                </TabsTrigger>
                 <TabsTrigger value="history" className="gap-2 px-4">
                   <History className="h-4 w-4" />
                   Service History
