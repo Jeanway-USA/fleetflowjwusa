@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import { NotificationCenter } from '@/components/shared/NotificationCenter';
 
 interface PageHeaderProps {
   title: string;
@@ -20,6 +21,7 @@ export function PageHeader({ title, description, action, children }: PageHeaderP
         {description && <p className="text-muted-foreground mt-1">{description}</p>}
       </div>
       <div className="flex items-center gap-2">
+        <NotificationCenter />
         {children}
         {action && (
           <Button onClick={action.onClick} className="gradient-gold text-primary-foreground">
