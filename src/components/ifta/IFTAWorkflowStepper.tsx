@@ -17,7 +17,7 @@ interface IFTAWorkflowStepperProps {
   auditLoading?: boolean;
 }
 
-export function IFTAWorkflowStepper({ hasFuelPurchases, hasIFTARecords, hasJurisdictionData }: IFTAWorkflowStepperProps) {
+export function IFTAWorkflowStepper({ hasFuelPurchases, hasIFTARecords, hasJurisdictionData, onAuditData, auditLoading }: IFTAWorkflowStepperProps) {
   const steps: Step[] = [
     {
       label: 'Sync Fuel',
