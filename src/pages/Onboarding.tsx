@@ -393,7 +393,7 @@ export default function Onboarding() {
                 {/* Trailer Section */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Trailer className="h-4 w-4 text-primary" /> Trailer
+                    <Container className="h-4 w-4 text-primary" /> Trailer
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <div className="space-y-1">
