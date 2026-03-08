@@ -27,7 +27,7 @@ export default function Auth() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const { signIn, signUp, user, loading: authLoading } = useAuth();
-  const { theme } = useTheme();
+  
   const navigate = useNavigate();
   
   

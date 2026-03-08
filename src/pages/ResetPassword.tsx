@@ -18,7 +18,7 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
-  const { theme } = useTheme();
+  
   const navigate = useNavigate();
   
   
