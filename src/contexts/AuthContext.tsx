@@ -16,6 +16,7 @@ interface AuthContextType {
   simulatedRole: AppRole | null;
   orgId: string | null;
   orgName: string | null;
+  orgIsActive: boolean;
   subscriptionTier: SubscriptionTier;
   primaryColor: string | null;
   logoUrl: string | null;
