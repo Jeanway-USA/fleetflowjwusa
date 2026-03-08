@@ -168,8 +168,8 @@ export function AppSidebar() {
   const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
   const { url: signedLogoUrl } = useSignedUrl('branding-assets', logoUrl || null);
   const defaultBannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
-  // Prefer org logo, then org banner, then default
-  const bannerSrc = signedLogoUrl || signedBannerUrl || defaultBannerSrc;
+  // Prefer org banner, then org logo, then default
+  const bannerSrc = signedBannerUrl || signedLogoUrl || defaultBannerSrc;
   const currentPath = location.pathname;
 
   const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
