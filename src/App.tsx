@@ -43,6 +43,7 @@ const Landing = lazy(() => import("./pages/Landing"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const SuperAdminDashboard = lazy(() => import("./pages/SuperAdminDashboard"));
+const PublicLoadTracker = lazy(() => import("./pages/PublicLoadTracker"));
 
 const queryClient = new QueryClient();
 
