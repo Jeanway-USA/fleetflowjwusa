@@ -3,7 +3,8 @@ import { usePMNotifications, useMarkPMNotificationRead, useDismissPMNotification
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Clock, CheckCircle, X, Bell, BellOff, Truck } from 'lucide-react';
+import { AlertTriangle, Clock, CheckCircle, X, Bell, BellOff, Truck, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -12,6 +13,7 @@ interface PMNotificationsPanelProps {
 }
 
 export function PMNotificationsPanel({ onViewTruck }: PMNotificationsPanelProps) {
+  const navigate = useNavigate();
   const { data: notifications, isLoading } = usePMNotifications();
   const markRead = useMarkPMNotificationRead();
   const dismiss = useDismissPMNotification();
@@ -112,6 +114,19 @@ export function PMNotificationsPanel({ onViewTruck }: PMNotificationsPanelProps)
             Mark all read
           </Button>
         )}
+      </div>
+
+      {/* Predictive Calendar Link */}
+      <div className="px-4 py-2 border-b">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 text-xs h-8"
+          onClick={() => navigate('/maintenance?tab=predictive')}
+        >
+          <TrendingUp className="h-3.5 w-3.5" />
+          View Predictive Service Calendar
+        </Button>
       </div>
 
       {/* Notifications List */}

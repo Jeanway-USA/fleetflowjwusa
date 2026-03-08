@@ -12,8 +12,9 @@ import { ServiceHistoryTab } from '@/components/maintenance/ServiceHistoryTab';
 import { NewWorkOrderSheet } from '@/components/maintenance/NewWorkOrderSheet';
 import { TruckHistoryDrawer } from '@/components/maintenance/TruckHistoryDrawer';
 import { PMNotificationsPanel, PMNotificationsBell } from '@/components/maintenance/PMNotificationsPanel';
+import { PredictiveServiceCalendar } from '@/components/maintenance/PredictiveServiceCalendar';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Plus, Wrench, Calendar, History } from 'lucide-react';
+import { Plus, Wrench, Calendar, History, TrendingUp } from 'lucide-react';
 
 export default function MaintenanceManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -79,6 +80,10 @@ export default function MaintenanceManagement() {
                   <Calendar className="h-4 w-4" />
                   PM Schedule
                 </TabsTrigger>
+                <TabsTrigger value="predictive" className="gap-2 px-4">
+                  <TrendingUp className="h-4 w-4" />
+                  Predictive
+                </TabsTrigger>
                 <TabsTrigger value="history" className="gap-2 px-4">
                   <History className="h-4 w-4" />
                   Service History
@@ -92,6 +97,10 @@ export default function MaintenanceManagement() {
 
                 <TabsContent value="pm" className="mt-0">
                   <PreventiveMaintenanceTab onViewTruck={handleViewTruck} />
+                </TabsContent>
+
+                <TabsContent value="predictive" className="mt-0">
+                  <PredictiveServiceCalendar />
                 </TabsContent>
 
                 <TabsContent value="history" className="mt-0">

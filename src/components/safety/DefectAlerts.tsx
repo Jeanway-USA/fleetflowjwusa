@@ -3,9 +3,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, subDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, Truck, User, Clock } from 'lucide-react';
+import { AlertTriangle, Truck, User, Clock, Wrench } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
-export function DefectAlerts() {
+interface DefectAlertsProps {
+  onConvertToWorkOrder?: (data: { truck_id: string; description: string }) => void;
+}
+
+export function DefectAlerts({ onConvertToWorkOrder }: DefectAlertsProps) {
   const { data: defectInspections = [], isLoading } = useQuery({
     queryKey: ['defect-inspections'],
     queryFn: async () => {
@@ -54,6 +59,20 @@ export function DefectAlerts() {
                 {format(new Date(inspection.inspection_date), 'MMM d, yyyy h:mm a')}
               </span>
             </div>
+            {onConvertToWorkOrder && inspection.trucks && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 gap-1.5"
+                onClick={() => onConvertToWorkOrder({
+                  truck_id: inspection.truck_id,
+                  description: `DVIR Defect (${inspection.inspection_type === 'pre_trip' ? 'Pre-Trip' : 'Post-Trip'} - ${inspection.drivers ? `${inspection.drivers.first_name} ${inspection.drivers.last_name}` : 'Unknown Driver'}): ${inspection.defect_notes || 'No details provided'}`,
+                })}
+              >
+                <Wrench className="h-3 w-3" />
+                Convert to Work Order
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       ))}

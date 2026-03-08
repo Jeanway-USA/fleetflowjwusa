@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,16 @@ import { Loader2, Plus, DollarSign, ChevronDown, X, Check, Search, Truck } from 
 import { cn } from '@/lib/utils';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
+export interface WorkOrderInitialData {
+  truck_id?: string;
+  description?: string;
+  service_types?: string[];
+}
+
 interface NewWorkOrderSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialData?: WorkOrderInitialData;
 }
 
 interface ServiceType {
@@ -46,7 +53,7 @@ const GENERIC_SERVICE_TYPES: ServiceType[] = [
   { value: 'other', label: 'Other' },
 ];
 
-export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps) {
+export function NewWorkOrderSheet({ open, onOpenChange, initialData }: NewWorkOrderSheetProps) {
   const { data: trucks } = useTrucks();
   const { data: pmProfiles } = useManufacturerPMProfiles();
   const createWorkOrder = useCreateWorkOrder();
@@ -65,6 +72,18 @@ export function NewWorkOrderSheet({ open, onOpenChange }: NewWorkOrderSheetProps
     description: '',
     is_reimbursable: false,
   });
+
+  // Pre-populate from initialData when sheet opens
+  useEffect(() => {
+    if (open && initialData) {
+      setFormData(prev => ({
+        ...prev,
+        truck_id: initialData.truck_id || prev.truck_id,
+        description: initialData.description || prev.description,
+        service_types: initialData.service_types || prev.service_types,
+      }));
+    }
+  }, [open, initialData]);
 
   // Find selected truck
   const selectedTruck = useMemo(() => {

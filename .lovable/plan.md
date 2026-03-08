@@ -1,57 +1,66 @@
 
 
-## Plan: Predictive Service Calendar + DVIR-to-Work-Order Conversion
+## QoL Improvements Across All Areas
 
-### Feature 1: Predictive Service Calendar
+### 1. Dynamic Period Selector (Finance)
+The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
 
-**Concept**: Calculate average daily mileage per truck from `fleet_loads` delivery history, then project when each PM threshold will be reached.
+**File:** `src/pages/Finance.tsx`
+- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
+- Auto-generate monthly and quarterly period options from that range up to the current date
+- Default to the current month instead of a hardcoded quarter
 
-**New file: `src/components/maintenance/PredictiveServiceCalendar.tsx`**
-- Query `fleet_loads` for each truck to compute avg daily mileage: `(sum of actual_miles) / (days between first and last delivery)`
-- Query `service_schedules` + `manufacturer_pm_profiles` to get current miles-since-service and interval thresholds
-- For each service: `remaining_miles = interval - miles_since_service`, then `projected_date = today + (remaining_miles / avg_daily_miles)`
-- Render a calendar-style grid (next 90 days) with colored markers per truck/service
-- Include a list view fallback showing truck, service name, projected date, and confidence indicator (based on data quality)
+### 2. Expense Table Pagination / Virtualization (Finance)
+The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
 
-**Integration in PMNotificationsPanel**: Add a "Predictive Calendar" link/button at the top of the panel that navigates or toggles to this view.
+**File:** `src/pages/Finance.tsx`
+- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
+- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
 
-**Integration in MaintenanceManagement.tsx**: Add as a sub-tab or section within the PM Schedule tab, toggled via a "Predictive View" button.
+### 3. Breadcrumb Navigation in Header (Overall UX)
+The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
 
-### Feature 2: DefectAlerts "Convert to Work Order"
+**Files:** `src/components/layout/DashboardLayout.tsx`
+- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
+- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
+- Display in the header alongside the sidebar trigger
 
-**Changes to `src/components/maintenance/NewWorkOrderSheet.tsx`**:
-- Add optional `initialData` prop: `{ truck_id?: string; description?: string; service_types?: string[] }`
-- When `initialData` is provided, pre-populate `formData` state on open via a `useEffect`
+### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
+Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
 
-**Changes to `src/components/safety/DefectAlerts.tsx`**:
-- Add a "Convert to Work Order" button on each alert
-- Accept an `onConvertToWorkOrder` callback prop that passes `{ truck_id, description }` from the inspection
+**File:** `src/components/layout/DashboardLayout.tsx`
+- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
 
-**Changes to `src/pages/Safety.tsx`**:
-- Add state for `NewWorkOrderSheet` (open + initialData)
-- Pass `onConvertToWorkOrder` to `DefectAlerts`, which opens the sheet with pre-populated data
+### 5. Confirm Before Single Expense Delete (Finance)
+Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
 
-### Files Modified/Created
+**File:** `src/pages/Finance.tsx`
+- Add a `deleteConfirmId` state
+- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
 
-| File | Action |
-|---|---|
-| `src/components/maintenance/PredictiveServiceCalendar.tsx` | Create — calendar view with mileage projections |
-| `src/components/maintenance/PMNotificationsPanel.tsx` | Edit — add link to predictive calendar |
-| `src/pages/MaintenanceManagement.tsx` | Edit — integrate predictive calendar + handle defect work order flow |
-| `src/components/maintenance/NewWorkOrderSheet.tsx` | Edit — accept optional `initialData` prop for pre-population |
-| `src/components/safety/DefectAlerts.tsx` | Edit — add "Convert to Work Order" button with callback |
-| `src/pages/Safety.tsx` | Edit — wire up DefectAlerts callback to NewWorkOrderSheet |
+### 6. Pull-to-Refresh on Driver Dashboard (Driver)
+The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
 
-### Data Flow
+**File:** `src/pages/DriverDashboard.tsx`
+- Add a `RefreshCw` icon button next to the date display
+- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
 
-```text
-DefectAlerts → onConvertToWorkOrder({ truck_id, description })
-  → Safety.tsx sets initialData + opens NewWorkOrderSheet
-  → Sheet pre-fills truck + description from DVIR
+### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
+The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
 
-PredictiveServiceCalendar:
-  fleet_loads (delivered) → avg_daily_miles per truck
-  service_schedules → remaining_miles per service
-  projected_date = today + remaining_miles / avg_daily_miles
-```
+**File:** `src/pages/DispatcherDashboard.tsx`
+- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
+
+### 8. Sidebar Active State on Nested Routes (Overall UX)
+The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
+
+**File:** `src/components/layout/AppSidebar.tsx`
+- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
+
+### Files Modified
+- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
+- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
+- `src/pages/DriverDashboard.tsx` (refresh button)
+- `src/pages/DispatcherDashboard.tsx` (responsive grid)
+- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
 
