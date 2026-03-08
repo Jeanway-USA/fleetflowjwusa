@@ -93,7 +93,7 @@ export function PrintableExecutiveSummary({
       <div className="print:hidden sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
         <span className="text-sm text-gray-500">End-of-Week Report Preview</span>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2 border-gray-300 text-black hover:bg-gray-100">
+          <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2 bg-white border-gray-400 text-black hover:bg-gray-100">
             <Printer className="h-4 w-4" /> Print Report
           </Button>
           <Button variant="ghost" size="icon" onClick={onClose} className="text-black hover:bg-gray-100">
