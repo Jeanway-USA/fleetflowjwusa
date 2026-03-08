@@ -51,6 +51,7 @@ export default function FleetLoads() {
   const { hasRole, isAdmin, orgId } = useAuth();
   const isDriverOnly = hasRole('driver') && !isAdmin;
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLoad, setEditingLoad] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});

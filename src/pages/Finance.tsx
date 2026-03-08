@@ -75,6 +75,7 @@ export default function Finance() {
   const defaultPeriod = `${now.getFullYear()}-${now.getMonth() + 1}`;
   const [selectedPeriod, setSelectedPeriod] = useState<string>(defaultPeriod);
   const [selectedTruck, setSelectedTruck] = useState<string>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseFormData, setExpenseFormData] = useState<Partial<ExpenseInsert>>({});

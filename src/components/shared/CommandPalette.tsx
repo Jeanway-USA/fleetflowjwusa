@@ -58,9 +58,9 @@ const NAV_ITEMS: PaletteItem[] = [
 ];
 
 const QUICK_ACTIONS: PaletteItem[] = [
-  { label: 'New Load', icon: Plus, path: '/fleet-loads', roles: ['owner', 'dispatcher'], feature: 'loads' },
-  { label: 'Upload Expense Report', icon: Upload, path: '/finance', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
-  { label: 'New Maintenance Request', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'], feature: 'maintenance_full' },
+  { label: 'New Load', icon: Plus, path: '/fleet-loads?action=new-load', roles: ['owner', 'dispatcher'], feature: 'loads' },
+  { label: 'Upload Expense Report', icon: Upload, path: '/finance?action=new-expense', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
+  { label: 'New Maintenance Request', icon: Wrench, path: '/maintenance?action=new-work-order', roles: ['owner', 'safety'], feature: 'maintenance_full' },
 ];
 
 export function CommandPalette() {

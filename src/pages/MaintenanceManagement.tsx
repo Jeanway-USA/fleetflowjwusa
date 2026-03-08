@@ -16,6 +16,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Plus, Wrench, Calendar, History } from 'lucide-react';
 
 export default function MaintenanceManagement() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [newWorkOrderOpen, setNewWorkOrderOpen] = useState(false);
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
   const [truckDrawerOpen, setTruckDrawerOpen] = useState(false);
