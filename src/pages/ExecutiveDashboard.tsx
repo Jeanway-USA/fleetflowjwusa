@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, subWeeks, subMonths, subQuarters, subYears, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { FileText } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PeriodSelector, TimePeriod } from '@/components/executive/PeriodSelector';
@@ -16,6 +17,9 @@ import { FleetStatusCard } from '@/components/executive/FleetStatusCard';
 import { DriverAvailabilityCard } from '@/components/executive/DriverAvailabilityCard';
 import { CriticalAlertsBar, CriticalAlert } from '@/components/executive/CriticalAlertsBar';
 import { PendingActionsCard, PendingAction } from '@/components/executive/PendingActionsCard';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { PrintableExecutiveSummary } from '@/components/executive/PrintableExecutiveSummary';
 
 function getDateRange(period: TimePeriod) {
   const now = new Date();
@@ -53,6 +57,7 @@ function getDateRange(period: TimePeriod) {
 
 export default function ExecutiveDashboard() {
   const [period, setPeriod] = useState<TimePeriod>('month');
+  const [showReport, setShowReport] = useState(false);
   const dateRange = useMemo(() => getDateRange(period), [period]);
 
   // Fetch KPI data
@@ -686,7 +691,12 @@ export default function ExecutiveDashboard() {
             title="Executive Dashboard"
             description="Financial and operational health at a glance"
           />
-          <PeriodSelector value={period} onChange={setPeriod} />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowReport(true)} className="gap-2">
+              <FileText className="h-4 w-4" /> Generate EOW Report
+            </Button>
+            <PeriodSelector value={period} onChange={setPeriod} />
+          </div>
         </div>
 
         {/* Row 1: Critical Alerts Banner */}
@@ -728,6 +738,20 @@ export default function ExecutiveDashboard() {
           <QuickInsights insights={insights} isLoading={isLoading} />
         </div>
       </div>
+
+      <Dialog open={showReport} onOpenChange={setShowReport}>
+        <DialogContent className="max-w-4xl h-[90vh] overflow-auto p-0">
+          <PrintableExecutiveSummary
+            kpiData={kpiData}
+            fleetStatus={fleetStatus}
+            driverAvailability={driverAvailability}
+            operationalData={operationalData}
+            topPerformers={topPerformers}
+            period={period}
+            onClose={() => setShowReport(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
