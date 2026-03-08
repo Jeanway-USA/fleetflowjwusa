@@ -16,6 +16,7 @@ interface AuthContextType {
   simulatedRole: AppRole | null;
   orgId: string | null;
   orgName: string | null;
+  orgIsActive: boolean;
   subscriptionTier: SubscriptionTier;
   primaryColor: string | null;
   logoUrl: string | null;
@@ -61,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [orgLoading, setOrgLoading] = useState(true);
+  const [orgIsActive, setOrgIsActive] = useState(true);
   const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(() => localStorage.getItem('simulatedOrgId'));
   const [simulatedOrgName, setSimulatedOrgName] = useState<string | null>(() => localStorage.getItem('simulatedOrgName'));
   const [simulatedOrgTier, setSimulatedOrgTier] = useState<string | null>(() => localStorage.getItem('simulatedOrgTier'));
@@ -93,12 +95,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOrgId(profile.org_id);
       const { data: orgData } = await supabase
         .from('organizations')
-        .select('name, subscription_tier, primary_color, logo_url, banner_url')
+        .select('name, subscription_tier, primary_color, logo_url, banner_url, is_active')
         .eq('id', profile.org_id)
         .single();
 
       if (orgData) {
         setOrgName(orgData.name);
+        setOrgIsActive(orgData.is_active !== false);
         setSubscriptionTier((orgData.subscription_tier as SubscriptionTier) || 'solo_bco');
         setPrimaryColor(orgData.primary_color || null);
         setLogoUrl(orgData.logo_url || null);
@@ -312,6 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasSafetyAccess,
       orgId: simulatedOrgId || orgId,
       orgName: simulatedOrgName || orgName,
+      orgIsActive,
       subscriptionTier: (simulatedOrgTier as SubscriptionTier) || subscriptionTier,
       primaryColor,
       logoUrl,

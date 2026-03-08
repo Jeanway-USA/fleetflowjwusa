@@ -44,6 +44,7 @@ const Pricing = lazy(() => import("./pages/Pricing"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const SuperAdminDashboard = lazy(() => import("./pages/SuperAdminDashboard"));
 const PublicLoadTracker = lazy(() => import("./pages/PublicLoadTracker"));
+const AccountDeactivated = lazy(() => import("./pages/AccountDeactivated"));
 
 const queryClient = new QueryClient();
 
@@ -75,6 +76,7 @@ const App = () => {
                     <Route path="/pricing" element={<Pricing />} />
                     <Route path="/track" element={<PublicLoadTracker />} />
                     <Route path="/onboarding" element={<Onboarding />} />
+                    <Route path="/account-deactivated" element={<AccountDeactivated />} />
 
                     {/* Dashboard routes */}
                     <Route path="/executive-dashboard" element={

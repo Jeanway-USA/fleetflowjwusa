@@ -15,7 +15,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles, requiredFeature }: ProtectedRouteProps) {
-  const { user, loading, rolesLoading, hasRole } = useAuth();
+  const { user, loading, rolesLoading, hasRole, orgIsActive, orgId } = useAuth();
 
   if (loading || rolesLoading) {
     return (
@@ -27,6 +27,11 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Organization deactivated — block access
+  if (orgId && !orgIsActive) {
+    return <Navigate to="/account-deactivated" replace />;
   }
 
   // Check if user has at least one of the allowed roles
