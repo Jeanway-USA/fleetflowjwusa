@@ -58,6 +58,20 @@ export function DefectAlerts({ onConvertToWorkOrder }: DefectAlertsProps) {
                 {format(new Date(inspection.inspection_date), 'MMM d, yyyy h:mm a')}
               </span>
             </div>
+            {onConvertToWorkOrder && inspection.trucks && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 gap-1.5"
+                onClick={() => onConvertToWorkOrder({
+                  truck_id: inspection.truck_id,
+                  description: `DVIR Defect (${inspection.inspection_type === 'pre_trip' ? 'Pre-Trip' : 'Post-Trip'} - ${inspection.drivers ? `${inspection.drivers.first_name} ${inspection.drivers.last_name}` : 'Unknown Driver'}): ${inspection.defect_notes || 'No details provided'}`,
+                })}
+              >
+                <Wrench className="h-3 w-3" />
+                Convert to Work Order
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       ))}
