@@ -188,6 +188,9 @@ export default function DispatcherDashboard() {
           </div>
         </div>
 
+        {/* Fleet Timeline Scheduler */}
+        <FleetTimelineScheduler />
+
         {/* Active Loads - Full Width */}
         <ActiveLoadsBoard />
 
