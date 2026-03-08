@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Palette, ImageIcon, Upload, X } from 'lucide-react';
-import { useStorageProvider, useProviderSignedUrl } from '@/hooks/useStorageProvider';
+import { useSignedUrl } from '@/hooks/useSignedUrl';
 
 const COLOR_PRESETS = [
   { name: 'Gold', hsl: '45 80% 45%', dark: '45 80% 50%' },
