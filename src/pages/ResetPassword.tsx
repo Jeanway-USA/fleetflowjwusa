@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useTheme } from '@/contexts/ThemeContext';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,8 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { Loader2, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
-import jwBannerLight from '@/assets/JW_Banner.png';
-import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
@@ -20,10 +18,10 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
-  const { theme } = useTheme();
+  
   const navigate = useNavigate();
   
-  const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
+  
 
   useEffect(() => {
     // Listen for password recovery event
@@ -80,12 +78,8 @@ export default function ResetPassword() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
-            <img 
-              src={bannerSrc} 
-              alt="JeanWay USA" 
-              className="h-24 object-contain mb-2"
-            />
-            <p className="text-muted-foreground mt-1">Fleet Management System</p>
+            <h1 className="text-3xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
+            <p className="text-xs text-muted-foreground mt-1">by JeanWayUSA</p>
           </div>
 
           <Card className="border-border bg-card">
@@ -115,12 +109,8 @@ export default function ResetPassword() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
-            <img 
-              src={bannerSrc} 
-              alt="JeanWay USA" 
-              className="h-24 object-contain mb-2"
-            />
-            <p className="text-muted-foreground mt-1">Fleet Management System</p>
+            <h1 className="text-3xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
+            <p className="text-xs text-muted-foreground mt-1">by JeanWayUSA</p>
           </div>
 
           <Card className="border-border bg-card">
@@ -140,12 +130,8 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <img 
-            src={bannerSrc} 
-            alt="JeanWay USA" 
-            className="h-24 object-contain mb-2"
-          />
-          <p className="text-muted-foreground mt-1">Fleet Management System</p>
+          <h1 className="text-3xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
+          <p className="text-xs text-muted-foreground mt-1">by JeanWayUSA</p>
         </div>
 
         <Card className="border-border bg-card">

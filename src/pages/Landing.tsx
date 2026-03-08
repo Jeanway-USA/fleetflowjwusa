@@ -72,7 +72,10 @@ export default function Landing() {
       {/* Nav */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gradient-gold">FleetFlow TMS</h1>
+          <div>
+            <span className="text-xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
+            <span className="text-[10px] text-muted-foreground ml-1.5">by JeanWayUSA</span>
+          </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate('/pricing')}>Pricing</Button>
             <Button variant="outline" onClick={() => navigate('/auth')}>Sign In</Button>
@@ -207,7 +210,7 @@ export default function Landing() {
         <div className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-12">
           <h3 className="text-3xl font-bold mb-3">Ready to Take Control?</h3>
           <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
-            Join hundreds of Landstar BCOs and agents already using FleetFlow to maximize profit and minimize headaches.
+            Join hundreds of Landstar BCOs and agents already using Fleet Flow TMS to maximize profit and minimize headaches.
           </p>
           <Button 
             size="lg" 
@@ -224,7 +227,7 @@ export default function Landing() {
       {/* Footer */}
       <footer className="border-t border-border bg-card/50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">© 2026 FleetFlow TMS. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">© 2026 Fleet Flow TMS by JeanWayUSA. All rights reserved.</p>
           <div className="flex gap-6 text-sm text-muted-foreground">
             <button onClick={() => navigate('/pricing')} className="hover:text-foreground transition-colors">Pricing</button>
             <button onClick={() => navigate('/auth')} className="hover:text-foreground transition-colors">Sign In</button>

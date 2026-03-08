@@ -156,7 +156,8 @@ export default function Pricing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <button onClick={() => navigate('/landing')} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-xl font-bold text-gradient-gold">FleetFlow TMS</span>
+            <span className="text-xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
+            <span className="text-[10px] text-muted-foreground ml-1.5">by JeanWayUSA</span>
           </button>
           <Button variant="outline" onClick={() => navigate('/auth')}>Sign In</Button>
         </div>
@@ -274,7 +275,7 @@ export default function Pricing() {
       {/* Footer */}
       <footer className="border-t border-border bg-card/50 py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm text-muted-foreground">© 2026 FleetFlow TMS. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">© 2026 Fleet Flow TMS by JeanWayUSA. All rights reserved.</p>
         </div>
       </footer>
     </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
+
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
-import jwBannerLight from '@/assets/JW_Banner.png';
-import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string()
@@ -29,10 +27,10 @@ export default function Auth() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const { signIn, signUp, user, loading: authLoading } = useAuth();
-  const { theme } = useTheme();
+  
   const navigate = useNavigate();
   
-  const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
+  
 
   // Redirect if already logged in (only after auth state is resolved)
   useEffect(() => {
@@ -152,12 +150,8 @@ export default function Auth() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
-            <img 
-              src={bannerSrc} 
-              alt="JeanWay USA" 
-              className="h-24 object-contain mb-2"
-            />
-            <p className="text-muted-foreground mt-1">Fleet Management System</p>
+            <h1 className="text-3xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
+            <p className="text-xs text-muted-foreground mt-1">by JeanWayUSA</p>
           </div>
 
           <Card className="border-border bg-card">
@@ -251,12 +245,8 @@ export default function Auth() {
 
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <img 
-            src={bannerSrc} 
-            alt="JeanWay USA" 
-            className="h-24 object-contain mb-2"
-          />
-          <p className="text-muted-foreground mt-1">Fleet Management System</p>
+          <h1 className="text-3xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
+          <p className="text-xs text-muted-foreground mt-1">by JeanWayUSA</p>
         </div>
 
         <Card className="border-border bg-card">

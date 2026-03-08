@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogOut, Clock } from 'lucide-react';
-import bannerLogo from '@/assets/JW_Banner.png';
+
 
 export default function PendingAccess() {
   const { user, signOut, loading } = useAuth();
@@ -36,11 +36,10 @@ export default function PendingAccess() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center">
-            <img 
-              src={bannerLogo} 
-              alt="JW Trucking" 
-              className="h-12 object-contain"
-            />
+            <div className="text-center">
+              <span className="text-2xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
+              <p className="text-xs text-muted-foreground mt-0.5">by JeanWayUSA</p>
+            </div>
           </div>
           <div className="flex justify-center">
             <div className="rounded-full bg-muted p-3">

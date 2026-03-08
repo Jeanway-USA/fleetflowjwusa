@@ -160,8 +160,8 @@ Deno.serve(async (req) => {
           <!-- Header -->
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); border-radius: 12px 12px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">JeanWay USA</h1>
-              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">Fleet Management System</p>
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">Fleet Flow TMS</h1>
+              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">by JeanWayUSA</p>
             </td>
           </tr>
           
@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
             <td style="padding: 40px;">
               <h2 style="margin: 0 0 16px; color: #1a1a1a; font-size: 24px; font-weight: 600;">You're Invited!</h2>
               <p style="margin: 0 0 24px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-                You've been invited to join the <strong>JeanWay USA Fleet Management System</strong> as a <strong style="color: #D97706;">${roleLabels[role]}</strong>.
+                You've been invited to join <strong>Fleet Flow TMS</strong> as a <strong style="color: #D97706;">${roleLabels[role]}</strong>.
               </p>
               
               <p style="margin: 0 0 32px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
               <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e5e5;">
               
               <p style="margin: 0; color: #9a9a9a; font-size: 12px; line-height: 1.6;">
-                This invitation was sent by an administrator at JeanWay USA. If you have questions, please contact your administrator.
+                This invitation was sent by an administrator at Fleet Flow TMS. If you have questions, please contact your administrator.
               </p>
             </td>
           </tr>
@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
           <tr>
             <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 12px 12px; text-align: center;">
               <p style="margin: 0; color: #9a9a9a; font-size: 12px;">
-                © ${new Date().getFullYear()} JeanWay USA. All rights reserved.
+                © ${new Date().getFullYear()} Fleet Flow TMS by JeanWayUSA. All rights reserved.
               </p>
             </td>
           </tr>
@@ -220,9 +220,9 @@ Deno.serve(async (req) => {
 
     try {
       const emailResponse = await resend.emails.send({
-        from: 'JeanWay USA <no-reply@jeanwayusa.com>',
+        from: 'Fleet Flow TMS <no-reply@jeanwayusa.com>',
         to: [email],
-        subject: `You're invited to join JeanWay USA Fleet Management`,
+        subject: `You're invited to join Fleet Flow TMS`,
         html: emailHtml,
       });
 

@@ -25,8 +25,6 @@ import {
   ChevronRight,
   LucideIcon
 } from 'lucide-react';
-import jwBannerLight from '@/assets/JW_Banner.png';
-import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import type { SubscriptionTier } from '@/contexts/AuthContext';
@@ -167,9 +165,8 @@ export function AppSidebar() {
   const actuallyIsOwner = roles.includes('owner');
   const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
   const { url: signedLogoUrl } = useSignedUrl('branding-assets', logoUrl || null);
-  const defaultBannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
-  // Prefer org banner, then org logo, then default
-  const bannerSrc = signedBannerUrl || signedLogoUrl || defaultBannerSrc;
+  const hasOrgBranding = !!(signedBannerUrl || signedLogoUrl);
+  const bannerSrc = signedBannerUrl || signedLogoUrl || null;
   const currentPath = location.pathname;
 
   const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
@@ -290,7 +287,14 @@ export function AppSidebar() {
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border p-4 space-y-2">
         <div className="flex items-center justify-center">
-          <img src={bannerSrc} alt="JeanWay USA - Gets You There" className="h-12 w-auto object-contain" />
+          {bannerSrc ? (
+            <img src={bannerSrc} alt="Company Logo" className="h-12 w-auto object-contain" />
+          ) : (
+            <div className="text-center">
+              <span className="text-lg font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
+              <p className="text-[10px] text-muted-foreground -mt-0.5">by JeanWayUSA</p>
+            </div>
+          )}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

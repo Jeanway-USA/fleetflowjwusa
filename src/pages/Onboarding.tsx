@@ -15,8 +15,6 @@ import {
   Users, Plus, X, SkipForward, Upload, ImageIcon,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import jwBannerLight from '@/assets/JW_Banner.png';
-import jwBannerDark from '@/assets/JW_Banner_Dark.png';
 
 const TRAILER_TYPES = ['Dry Van', 'Reefer', 'Flatbed', 'Step Deck', 'Lowboy', 'Tanker', 'Hopper', 'Other'];
 const INVITE_ROLES = [
@@ -59,7 +57,7 @@ export default function Onboarding() {
 
   const [orgId, setOrgId] = useState<string | null>(null);
 
-  const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
+  
   const totalSteps = 3;
   const progress = (step / totalSteps) * 100;
   const stepLabels = ['Organization', 'Fleet Setup', 'Invite Team'];
@@ -228,7 +226,10 @@ export default function Onboarding() {
       {/* Header */}
       <div className="border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-center">
-          <img src={bannerSrc} alt="FleetFlow TMS" className="h-16 object-contain" />
+          <div className="text-center">
+            <h1 className="text-2xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">by JeanWayUSA</p>
+          </div>
         </div>
       </div>
 
