@@ -1,66 +1,54 @@
 
 
-## QoL Improvements Across All Areas
+## Redesign Onboarding Wizard
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Overview
+Replace the current 3-step onboarding (Company / Plan / First Load) with a new 3-step wizard: **Organization Profile**, **Fleet Setup**, and **Invite Team**. The plan selection tier is removed from onboarding (defaults to `solo_bco` via the existing `create_onboarding_org` RPC). On completion, users redirect to the Dispatcher Dashboard.
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+### Database Migration
+Add `dot_number` and `mc_number` columns to the `organizations` table so they persist (currently they were only local state and never saved):
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+```sql
+ALTER TABLE public.organizations
+  ADD COLUMN IF NOT EXISTS dot_number text,
+  ADD COLUMN IF NOT EXISTS mc_number text;
+```
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+### Step 1: Organization Profile
+- Company Name (required), DOT Number (optional), MC Number (optional) — same as before
+- **Logo Upload**: File input that uploads to `branding-assets` bucket via `supabase.storage`, then saves the path to `organizations.logo_url`
+- Calls `create_onboarding_org` RPC to create org, then updates org with DOT/MC/logo_url
+- Advances to Step 2
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+### Step 2: Fleet Setup
+- Quick-add form for **one Truck**: Unit Number (required), Make, Model, Year, VIN
+- Quick-add form for **one Trailer**: Unit Number (required), Trailer Type (dropdown: dry_van, reefer, flatbed, etc.), Make, Year
+- Inserts into `trucks` and `trailers` tables with the new `org_id`
+- **Skip** button available
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+### Step 3: Invite Team
+- Dynamic list of email + role pairs (add/remove rows)
+- Role select from: dispatcher, payroll_admin, safety, driver
+- On submit, calls the existing `invite-user` edge function for each entry
+- **Skip** button available
+- On complete/skip: calls `refreshOrgData()` + `refreshRoles()`, fires confetti, redirects to `/dispatcher`
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
-
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
-
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
-
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
-
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
-
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
-
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
-
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
+### UI Design
+- Full-screen layout with centered card, same banner header as current
+- Stepper indicator at top with 3 labeled steps and progress bar (reuse existing pattern)
+- Each step is a Card with icon header, form fields, and Back/Skip/Continue buttons
+- Uses existing shadcn/ui components: Card, Input, Label, Select, Button, Progress
 
 ### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+| File | Action |
+|---|---|
+| `src/pages/Onboarding.tsx` | Full rewrite with new 3-step wizard |
+| Database migration | Add `dot_number`, `mc_number` to `organizations` |
+
+### Notes
+- The `invite-user` edge function already exists and handles auth invites + role pre-assignment + email via Resend
+- Truck insert requires `org_id` (not null) and `unit_number` — all other fields optional
+- Trailer insert requires `unit_number` and `trailer_type` — `org_id` is nullable but we'll set it
+- Logo upload uses direct `supabase.storage.from('branding-assets')` (same pattern as BrandingTab)
+- No new edge functions needed
 
