@@ -118,6 +118,7 @@ export function DataTable<T extends { id: string }>({
           ))}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }
