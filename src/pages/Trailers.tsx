@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, User, AlertTriangle, CheckCircle, Clock, History, Container } from 'lucide-react';
+import { Pencil, Trash2, FileText, User, AlertTriangle, CheckCircle, Clock, History, Container, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { differenceInDays, format } from 'date-fns';
 import { TrailerAssignmentHistory } from '@/components/trailers/TrailerAssignmentHistory';
 
