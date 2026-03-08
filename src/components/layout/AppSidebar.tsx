@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   ChevronsUpDown,
   Plus,
+  ChevronRight,
   LucideIcon
 } from 'lucide-react';
 import jwBannerLight from '@/assets/JW_Banner.png';
@@ -31,19 +32,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { SubscriptionTier } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
 } from '@/components/ui/sidebar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -61,11 +62,9 @@ interface NavItem {
   icon: LucideIcon;
   path: string;
   roles: AppRole[];
-  /** Feature key for tier gating. If undefined, always shown when role matches. */
   feature?: string;
 }
 
-// Maps tier to the set of feature keys it unlocks
 const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
   solo_bco: new Set([
     'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
@@ -94,42 +93,92 @@ const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
 
 const SUPER_ADMIN_EMAILS = ['andrew@jeanwayusa.com', 'siadrak@jeanwayusa.com'];
 
+const STORAGE_KEY = 'sidebar-groups';
+
+function loadGroupState(): Record<string, boolean> {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveGroupState(state: Record<string, boolean>) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+// --- Collapsible nav group sub-component ---
+
+interface CollapsibleNavGroupProps {
+  groupKey: string;
+  label: string;
+  items: NavItem[];
+  isOpen: boolean;
+  onToggle: (key: string, open: boolean) => void;
+  currentPath: string;
+  onNavigate: (path: string) => void;
+}
+
+function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, currentPath, onNavigate }: CollapsibleNavGroupProps) {
+  if (items.length === 0) return null;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={(open) => onToggle(groupKey, open)}>
+      <SidebarGroup className="py-0">
+        <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors group">
+          <span>{label}</span>
+          <ChevronRight className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-90" />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {items.map((item) => {
+                const active = currentPath === item.path || currentPath.startsWith(item.path + '/');
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton
+                      isActive={active}
+                      onClick={() => onNavigate(item.path)}
+                      className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </CollapsibleContent>
+      </SidebarGroup>
+    </Collapsible>
+  );
+}
+
+// --- Main sidebar ---
+
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl } = useAuth();
   const { theme } = useTheme();
   const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(user?.email || '');
-  
-  // Check if user is actually an owner (not simulated)
   const actuallyIsOwner = roles.includes('owner');
-  
-  // Dynamic banner: use org's custom banner if available, otherwise defaults
   const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
-  
-  // Use dark banner on light backgrounds, light banner on dark backgrounds
   const defaultBannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
   const bannerSrc = signedBannerUrl || defaultBannerSrc;
+  const currentPath = location.pathname;
 
-  const handleSignOut = async () => {
-    // Navigate immediately so the user sees the auth screen even if sign-out takes a moment.
-    navigate('/');
-    await signOut();
-  };
+  const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
 
-  const handleDashboardSwitch = (path: string, role: 'owner' | 'dispatcher' | 'driver') => {
-    if (actuallyIsOwner) {
-      // For owners, set simulation mode when switching to non-owner dashboards
-      if (role === 'owner') {
-        setSimulatedRole(null); // Exit simulation
-      } else {
-        setSimulatedRole(role);
-      }
-    }
-    navigate(path);
-  };
+  const filterByRoleAndTier = useCallback((items: NavItem[]) => items.filter(item => {
+    const roleMatch = item.roles.some(role => hasRole(role));
+    const tierMatch = !item.feature || tierFeatures.has(item.feature);
+    return roleMatch && tierMatch;
+  }), [hasRole, tierFeatures]);
 
-  // Dashboard items - owners can see all, others only see their own
+  // --- Dashboard items (non-collapsible) ---
   const dashboardNavItems: NavItem[] = actuallyIsOwner ? [
     { title: 'Executive View', icon: Crown, path: '/executive-dashboard', roles: ['owner'] },
     { title: 'Dispatcher View', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['owner'] },
@@ -139,93 +188,108 @@ export function AppSidebar() {
     { title: 'My Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['driver'] },
   ];
 
-  // Map paths to roles for simulation
   const pathToRole: Record<string, 'owner' | 'dispatcher' | 'driver'> = {
     '/executive-dashboard': 'owner',
     '/dispatcher-dashboard': 'dispatcher',
     '/driver-dashboard': 'driver',
   };
 
-  const fleetNavItems: NavItem[] = [
+  // --- 3 collapsible groups ---
+  const operationsItems: NavItem[] = [
     { title: 'Trucks', icon: Truck, path: '/trucks', roles: ['owner', 'dispatcher', 'safety'], feature: 'trucks' },
     { title: 'Trailers', icon: Container, path: '/trailers', roles: ['owner', 'dispatcher', 'safety'], feature: 'trailers' },
     { title: 'Drivers', icon: Users, path: '/drivers', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety'], feature: 'drivers' },
-  ];
-
-  const loadsNavItems: NavItem[] = [
     { title: 'Fleet Loads', icon: Package, path: '/fleet-loads', roles: ['owner', 'dispatcher', 'safety', 'driver'], feature: 'loads' },
     { title: 'Agency Loads', icon: Building2, path: '/agency-loads', roles: ['owner', 'dispatcher'], feature: 'agency_loads' },
+    { title: 'CRM', icon: Contact, path: '/crm', roles: ['owner', 'dispatcher', 'safety', 'driver'], feature: 'crm' },
+    { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'], feature: 'maintenance_full' },
   ];
 
-  const financeNavItems: NavItem[] = [
+  const safetyItems: NavItem[] = [
+    { title: 'Safety', icon: Shield, path: '/safety', roles: ['owner', 'safety'], feature: 'safety' },
+    { title: 'Incidents', icon: AlertTriangle, path: '/incidents', roles: ['owner', 'safety', 'dispatcher'], feature: 'incidents' },
+    { title: 'Driver Performance', icon: Award, path: '/driver-performance', roles: ['owner', 'safety', 'dispatcher'], feature: 'driver_performance' },
+    { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'], feature: 'documents' },
+  ];
+
+  const backOfficeItems: NavItem[] = [
     { title: 'Finance & P/L', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
     { title: 'Company Insights', icon: BarChart3, path: '/insights', roles: ['owner', 'payroll_admin'], feature: 'insights' },
     { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta' },
   ];
 
-  const operationsNavItems: NavItem[] = [
-    { title: 'CRM', icon: Contact, path: '/crm', roles: ['owner', 'dispatcher', 'safety', 'driver'], feature: 'crm' },
-    { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'], feature: 'maintenance_full' },
-    { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'], feature: 'documents' },
-    { title: 'Safety', icon: Shield, path: '/safety', roles: ['owner', 'safety'], feature: 'safety' },
-    { title: 'Incidents', icon: AlertTriangle, path: '/incidents', roles: ['owner', 'safety', 'dispatcher'], feature: 'incidents' },
-    { title: 'Driver Performance', icon: Award, path: '/driver-performance', roles: ['owner', 'safety', 'dispatcher'], feature: 'driver_performance' },
-  ];
+  const filteredOps = useMemo(() => filterByRoleAndTier(operationsItems), [filterByRoleAndTier]);
+  const filteredSafety = useMemo(() => filterByRoleAndTier(safetyItems), [filterByRoleAndTier]);
+  const filteredBackOffice = useMemo(() => filterByRoleAndTier(backOfficeItems), [filterByRoleAndTier]);
 
-  const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
+  // Settings goes in back office only for owners
+  const backOfficeWithSettings = useMemo(() => {
+    if (actuallyIsOwner && !isSimulating) {
+      return [...filteredBackOffice, { title: 'Settings', icon: Settings, path: '/settings', roles: ['owner'] as AppRole[], feature: undefined }];
+    }
+    return filteredBackOffice;
+  }, [filteredBackOffice, actuallyIsOwner, isSimulating]);
 
-  const filterByRoleAndTier = (items: NavItem[]) => items.filter(item => {
-    const roleMatch = item.roles.some(role => hasRole(role));
-    const tierMatch = !item.feature || tierFeatures.has(item.feature);
-    return roleMatch && tierMatch;
+  const collapsibleGroups = useMemo(() => [
+    { key: 'operations', label: 'Operations', items: filteredOps },
+    { key: 'safety', label: 'Safety & Compliance', items: filteredSafety },
+    { key: 'backoffice', label: 'Back Office', items: backOfficeWithSettings },
+  ], [filteredOps, filteredSafety, backOfficeWithSettings]);
+
+  // --- Collapsible state with localStorage + auto-expand ---
+  const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>(() => {
+    const saved = loadGroupState();
+    const defaults: Record<string, boolean> = { operations: true, safety: true, backoffice: true };
+    return { ...defaults, ...saved };
   });
 
-  const renderNavGroup = (label: string, items: NavItem[], isDashboardGroup: boolean = false) => {
-    const filteredItems = isDashboardGroup && actuallyIsOwner 
-      ? items // Show all dashboard items for actual owners
-      : filterByRoleAndTier(items);
-    if (filteredItems.length === 0) return null;
+  // Auto-expand group containing the active route
+  useEffect(() => {
+    for (const group of collapsibleGroups) {
+      const hasActive = group.items.some(item => currentPath === item.path || currentPath.startsWith(item.path + '/'));
+      if (hasActive && !groupOpen[group.key]) {
+        setGroupOpen(prev => {
+          const next = { ...prev, [group.key]: true };
+          saveGroupState(next);
+          return next;
+        });
+        break;
+      }
+    }
+  }, [currentPath, collapsibleGroups]);
 
-    return (
-      <SidebarGroup>
-        <SidebarGroupLabel className="text-muted-foreground uppercase text-xs tracking-wider">{label}</SidebarGroupLabel>
-        <SidebarGroupContent>
-          <SidebarMenu>
-            {filteredItems.map((item) => (
-              <SidebarMenuItem key={item.path}>
-                <SidebarMenuButton
-                  isActive={location.pathname === item.path || location.pathname.startsWith(item.path + '/')}
-                  onClick={() => {
-                    if (isDashboardGroup && actuallyIsOwner && pathToRole[item.path]) {
-                      handleDashboardSwitch(item.path, pathToRole[item.path]);
-                    } else {
-                      navigate(item.path);
-                    }
-                  }}
-                  className="hover:bg-sidebar-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
-                >
-                  <item.icon className="h-4 w-4" />
-                  <span>{item.title}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
-    );
+  const handleToggle = useCallback((key: string, open: boolean) => {
+    setGroupOpen(prev => {
+      const next = { ...prev, [key]: open };
+      saveGroupState(next);
+      return next;
+    });
+  }, []);
+
+  const handleSignOut = async () => {
+    navigate('/');
+    await signOut();
   };
+
+  const handleDashboardSwitch = (path: string, role: 'owner' | 'dispatcher' | 'driver') => {
+    if (actuallyIsOwner) {
+      if (role === 'owner') {
+        setSimulatedRole(null);
+      } else {
+        setSimulatedRole(role);
+      }
+    }
+    navigate(path);
+  };
+
+  const filteredDashboards = actuallyIsOwner ? dashboardNavItems : dashboardNavItems.filter(item => item.roles.some(r => hasRole(r)));
 
   return (
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border p-4 space-y-2">
         <div className="flex items-center justify-center">
-          <img 
-            src={bannerSrc} 
-            alt="JeanWay USA - Gets You There" 
-            className="h-12 w-auto object-contain"
-          />
+          <img src={bannerSrc} alt="JeanWay USA - Gets You There" className="h-12 w-auto object-contain" />
         </div>
-        {/* Workspace Switcher Placeholder */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="w-full flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-1.5 text-xs hover:bg-muted/50 transition-colors">
@@ -256,13 +320,9 @@ export function AppSidebar() {
                 Viewing as: {simulatedRole?.replace('_', ' ')}
               </span>
               <Button 
-                variant="ghost" 
-                size="sm" 
+                variant="ghost" size="sm"
                 className="h-6 px-2 text-xs text-warning hover:bg-warning/20"
-                onClick={() => {
-                  setSimulatedRole(null);
-                  navigate('/executive-dashboard');
-                }}
+                onClick={() => { setSimulatedRole(null); navigate('/executive-dashboard'); }}
               >
                 Exit
               </Button>
@@ -270,94 +330,92 @@ export function AppSidebar() {
           </div>
         )}
 
-        {(() => {
-          const groups = [
-            { label: actuallyIsOwner ? 'Dashboards' : 'Main', items: dashboardNavItems, isDashboard: true },
-            { label: 'Fleet', items: fleetNavItems, isDashboard: false },
-            { label: 'Loads', items: loadsNavItems, isDashboard: false },
-            { label: 'Finance', items: financeNavItems, isDashboard: false },
-            { label: 'Operations', items: operationsNavItems, isDashboard: false },
-          ];
-          
-          const visibleGroups = groups.filter(g => 
-            g.isDashboard && actuallyIsOwner 
-              ? g.items.length > 0 
-              : filterByRoleAndTier(g.items).length > 0
-          );
-          
-          return visibleGroups.map((group, index) => (
-            <div key={group.label}>
-              {index > 0 && <SidebarSeparator />}
-              {renderNavGroup(group.label, group.items, group.isDashboard)}
+        {/* Dashboards — non-collapsible */}
+        {filteredDashboards.length > 0 && (
+          <SidebarGroup className="py-0 mt-1">
+            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {actuallyIsOwner ? 'Dashboards' : 'Main'}
             </div>
-          ));
-        })()}
-        
-        {actuallyIsOwner && !isSimulating && (
-          <>
-            <SidebarSeparator />
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-muted-foreground uppercase text-xs tracking-wider">Admin</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton isActive={location.pathname === '/settings'} onClick={() => navigate('/settings')} className="hover:bg-sidebar-accent">
-                      <Settings className="h-4 w-4" />
-                      <span>Settings</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </>
-        )}
-        
-        {hasRole('driver') && (
-          <>
-            <SidebarSeparator />
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-muted-foreground uppercase text-xs tracking-wider">My Account</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton isActive={location.pathname === '/driver-stats'} onClick={() => navigate('/driver-stats')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary">
-                      <BarChart className="h-4 w-4" />
-                      <span>My Stats</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton isActive={location.pathname === '/driver-settings'} onClick={() => navigate('/driver-settings')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary">
-                      <Settings className="h-4 w-4" />
-                      <span>My Settings</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {filteredDashboards.map((item) => {
+                  const active = currentPath === item.path || currentPath.startsWith(item.path + '/');
+                  return (
+                    <SidebarMenuItem key={item.path}>
+                      <SidebarMenuButton
+                        isActive={active}
+                        onClick={() => {
+                          if (actuallyIsOwner && pathToRole[item.path]) {
+                            handleDashboardSwitch(item.path, pathToRole[item.path]);
+                          } else {
+                            navigate(item.path);
+                          }
+                        }}
+                        className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary"
+                      >
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
 
+        {/* 3 collapsible groups */}
+        {collapsibleGroups.map((group) => (
+          <CollapsibleNavGroup
+            key={group.key}
+            groupKey={group.key}
+            label={group.label}
+            items={group.items}
+            isOpen={groupOpen[group.key] ?? true}
+            onToggle={handleToggle}
+            currentPath={currentPath}
+            onNavigate={(path) => navigate(path)}
+          />
+        ))}
+
+        {/* Driver account section */}
+        {hasRole('driver') && (
+          <SidebarGroup className="py-0">
+            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">My Account</div>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton isActive={currentPath === '/driver-stats'} onClick={() => navigate('/driver-stats')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
+                    <BarChart className="h-4 w-4" />
+                    <span>My Stats</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton isActive={currentPath === '/driver-settings'} onClick={() => navigate('/driver-settings')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
+                    <Settings className="h-4 w-4" />
+                    <span>My Settings</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* Super Admin */}
         {isSuperAdmin && (
-          <>
-            <SidebarSeparator />
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-muted-foreground uppercase text-xs tracking-wider">System</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={location.pathname === '/super-admin'}
-                      onClick={() => navigate('/super-admin')}
-                      className="hover:bg-sidebar-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
-                    >
-                      <ShieldCheck className="h-4 w-4" />
-                      <span>Super Admin</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </>
+          <SidebarGroup className="py-0">
+            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">System</div>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton isActive={currentPath === '/super-admin'} onClick={() => navigate('/super-admin')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
+                    <ShieldCheck className="h-4 w-4" />
+                    <span>Super Admin</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
       </SidebarContent>
 
