@@ -190,7 +190,7 @@ export function DataTable<T extends { id: string }>({
           </TooltipProvider>
         </div>
         <div className="rounded-lg border border-border">
-          <table className="w-full caption-bottom" style={{ tableLayout: 'auto' }}>
+          <table className="w-full caption-bottom" style={{ tableLayout: 'fixed' }}>
             <thead className="[&_tr]:border-b">
               <tr className="border-b transition-colors bg-muted/50">
                 {showSelection && <th className={cn(thClass, "w-10")} />}
