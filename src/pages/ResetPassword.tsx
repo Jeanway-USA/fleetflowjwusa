@@ -21,7 +21,7 @@ export default function ResetPassword() {
   const { theme } = useTheme();
   const navigate = useNavigate();
   
-  const bannerSrc = theme === 'dark' ? jwBannerLight : jwBannerDark;
+  
 
   useEffect(() => {
     // Listen for password recovery event
