@@ -18,6 +18,7 @@ interface TrackingData {
   org: {
     name: string;
     logo_url: string | null;
+    banner_url: string | null;
     primary_color: string | null;
   } | null;
   location: {

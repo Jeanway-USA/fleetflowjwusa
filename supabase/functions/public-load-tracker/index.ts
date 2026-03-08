@@ -120,6 +120,7 @@ Deno.serve(async (req) => {
           ? {
               name: org.name,
               logo_url: org.logo_url,
+              banner_url: org.banner_url,
               primary_color: org.primary_color,
             }
           : null,
