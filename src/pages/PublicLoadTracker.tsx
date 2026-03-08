@@ -101,9 +101,9 @@ export default function PublicLoadTracker() {
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         {/* Org Header */}
         <div className="text-center space-y-2">
-          {data.org?.logo_url ? (
+          {(data.org?.banner_url || data.org?.logo_url) ? (
             <img
-              src={data.org.logo_url}
+              src={data.org.banner_url || data.org.logo_url!}
               alt={data.org.name || 'Company'}
               className="h-12 mx-auto object-contain"
             />
