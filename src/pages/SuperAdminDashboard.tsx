@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -10,7 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
-import { Building2, Users, TrendingUp, Shield, Eye } from 'lucide-react';
+import { Building2, Users, TrendingUp, Shield, Eye, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { OrgDetailSheet } from '@/components/superadmin/OrgDetailSheet';
 import { AuditLogDetailSheet } from '@/components/superadmin/AuditLogDetailSheet';
@@ -40,6 +42,21 @@ export default function SuperAdminDashboard() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [logSheetOpen, setLogSheetOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const purgeEmptyOrgs = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('auto_cleanup_empty_orgs' as any);
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['super-admin-organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['super-admin-dashboard'] });
+      toast.success(`Purged ${count} empty organization${count !== 1 ? 's' : ''}`);
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to purge'),
+  });
 
   const { data: dashboardData, isLoading: dashLoading } = useQuery({
     queryKey: ['super-admin-dashboard'],
@@ -143,7 +160,19 @@ export default function SuperAdminDashboard() {
         {/* Tab 2: Organizations */}
         <TabsContent value="organizations">
           <Card>
-            <CardHeader><CardTitle>All Organizations</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>All Organizations</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={purgeEmptyOrgs.isPending}
+                onClick={() => purgeEmptyOrgs.mutate()}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {purgeEmptyOrgs.isPending ? 'Purging…' : 'Purge Empty Orgs'}
+              </Button>
+            </CardHeader>
             <CardContent>
               {orgsLoading ? (
                 <div className="space-y-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
