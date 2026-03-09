@@ -225,10 +225,22 @@ export default function Onboarding() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="border-b border-border bg-card/80 backdrop-blur-sm">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-center">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="w-20" />
           <div className="text-center">
             <h1 className="text-2xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
             <p className="text-xs text-muted-foreground mt-0.5">by JeanWayUSA</p>
+          </div>
+          <div className="w-20 flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={async () => { await signOut(); navigate('/'); }}
+            >
+              <LogOut className="mr-1.5 h-4 w-4" />
+              Sign Out
+            </Button>
           </div>
         </div>
       </div>
