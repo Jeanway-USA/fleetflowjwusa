@@ -25,7 +25,7 @@ const INVITE_ROLES = [
 ];
 
 export default function Onboarding() {
-  const { refreshOrgData, refreshRoles } = useAuth();
+  const { signOut, refreshOrgData, refreshRoles } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
 
