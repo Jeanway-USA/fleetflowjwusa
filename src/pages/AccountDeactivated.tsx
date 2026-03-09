@@ -103,7 +103,7 @@ export default function AccountDeactivated() {
             <Button
               variant="ghost"
               className="w-full text-muted-foreground"
-              onClick={signOut}
+              onClick={handleSignOut}
             >
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out
