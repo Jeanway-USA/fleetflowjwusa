@@ -51,7 +51,19 @@ export function BillingTab() {
         .eq('id', orgId)
         .single();
       if (error) throw error;
-      return data;
+      return data as unknown as {
+        name: string;
+        subscription_tier: string;
+        trial_ends_at: string | null;
+        is_active: boolean;
+        created_at: string;
+        is_complimentary: boolean | null;
+        complimentary_ends_at: string | null;
+        stripe_customer_id: string | null;
+        stripe_subscription_id: string | null;
+        subscription_status: string | null;
+        subscription_period_end: string | null;
+      };
     },
     enabled: !!orgId,
   });
