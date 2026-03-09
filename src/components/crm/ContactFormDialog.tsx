@@ -297,20 +297,25 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
             </div>
           )}
 
-          {!isAgent && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              </div>
-              {!isFacility && (
-                <div className="space-y-2">
-                  <Label>Website</Label>
-                  <Input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
-                </div>
-              )}
+          {isAgent && (
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>
           )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+            {!isFacility && (
+              <div className="space-y-2">
+                <Label>Website</Label>
+                <Input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
+              </div>
+            )}
+          </div>
 
           {/* Address fields */}
           {isRoadside ? (
