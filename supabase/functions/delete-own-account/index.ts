@@ -41,6 +41,27 @@ Deno.serve(async (req) => {
     const userId = data.user.id;
     console.log('Self-deleting account for user:', userId);
 
+    // Nullify references in load_status_logs
+    const { error: logError } = await supabaseAdmin
+      .from('load_status_logs')
+      .update({ changed_by: null })
+      .eq('changed_by', userId);
+    if (logError) console.log('Error clearing load_status_logs:', logError.message);
+
+    // Nullify driver user_id references
+    const { error: driverError } = await supabaseAdmin
+      .from('drivers')
+      .update({ user_id: null })
+      .eq('user_id', userId);
+    if (driverError) console.log('Error clearing drivers:', driverError.message);
+
+    // Nullify document uploaded_by references
+    const { error: docError } = await supabaseAdmin
+      .from('documents')
+      .update({ uploaded_by: null })
+      .eq('uploaded_by', userId);
+    if (docError) console.log('Error clearing documents:', docError.message);
+
     // Delete user roles
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
