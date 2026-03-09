@@ -135,22 +135,19 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
       <AppSidebar />
       <main className="flex-1 flex flex-col min-h-screen">
         {simulatedOrgId && (
-          <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <span className="font-medium text-amber-700 dark:text-amber-300">Simulating: {simulatedOrgName}</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
-              onClick={() => {
-                clearOrgSimulation();
-                navigate('/super-admin');
-              }}
-            >
-              Exit Simulation
-            </Button>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => { clearOrgSimulation(); navigate('/super-admin'); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { clearOrgSimulation(); navigate('/super-admin'); } }}
+            className="sticky top-0 z-50 bg-destructive text-destructive-foreground px-4 py-2 flex items-center justify-center gap-3 text-sm cursor-pointer hover:bg-destructive/90 transition-colors"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive-foreground/75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-destructive-foreground" />
+            </span>
+            <ShieldAlert className="h-4 w-4" />
+            <span className="font-semibold">Viewing as {simulatedOrgName} — Click to Exit</span>
           </div>
         )}
         {isDemoMode && (

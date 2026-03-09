@@ -103,7 +103,7 @@ export function OrgActionsDropdown({ org }: OrgActionsDropdownProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
           <DropdownMenuItem onClick={handleSimulate}>
-            <Eye className="h-4 w-4 mr-2" /> Simulate
+            <Eye className="h-4 w-4 mr-2" /> Impersonate Org
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setPlanOpen(true)}>
             <Gift className="h-4 w-4 mr-2" /> Manage Plan Access
