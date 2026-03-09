@@ -332,11 +332,11 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                               config={{
                                 revenue: {
                                   label: "Revenue",
-                                  color: "hsl(142 76% 36%)",
+                                  color: "hsl(var(--chart-1))",
                                 },
                                 cost: {
                                   label: "Cost",
-                                  color: "hsl(0 84% 60%)",
+                                  color: "hsl(var(--chart-2))",
                                 },
                               }}
                               className="h-[300px] w-full"
@@ -356,11 +356,10 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                                   />
                                   <ChartTooltip 
                                     content={<ChartTooltipContent />}
-                                    formatter={(value: number) => `$${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
                                   />
                                   <Legend />
-                                  <Bar dataKey="revenue" fill="hsl(142 76% 36%)" name="Revenue" radius={[4, 4, 0, 0]} />
-                                  <Bar dataKey="cost" fill="hsl(0 84% 60%)" name="Cost" radius={[4, 4, 0, 0]} />
+                                  <Bar dataKey="revenue" fill="hsl(var(--chart-1))" name="Revenue" radius={[4, 4, 0, 0]} />
+                                  <Bar dataKey="cost" fill="hsl(var(--chart-2))" name="Cost" radius={[4, 4, 0, 0]} />
                                 </BarChart>
                               </ResponsiveContainer>
                             </ChartContainer>
