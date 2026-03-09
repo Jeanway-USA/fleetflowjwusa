@@ -1116,3 +1116,81 @@ export function useTruckHistory(truckId: string | null) {
     },
   });
 }
+
+export function useTruckProfitability(truckId: string | null) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['truck-profitability', truckId],
+    queryFn: async () => {
+      if (!truckId) return null;
+
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      const ninetyDaysAgoStr = ninetyDaysAgo.toISOString().split('T')[0];
+
+      const [{ data: loads, error: loadsError }, { data: workOrders, error: woError }, { data: expenses, error: expensesError }] = await Promise.all([
+        supabase
+          .from('fleet_loads')
+          .select('gross_revenue, delivery_date')
+          .eq('truck_id', truckId)
+          .eq('status', 'delivered')
+          .gte('delivery_date', ninetyDaysAgoStr),
+        supabase
+          .from('work_orders')
+          .select('final_cost, estimated_completion')
+          .eq('truck_id', truckId)
+          .eq('status', 'completed')
+          .gte('estimated_completion', ninetyDaysAgoStr)
+          .not('final_cost', 'is', null),
+        supabase
+          .from('expenses')
+          .select('amount, expense_date')
+          .eq('truck_id', truckId)
+          .gte('expense_date', ninetyDaysAgoStr),
+      ]);
+
+      if (loadsError) throw loadsError;
+      if (woError) throw woError;
+      if (expensesError) throw expensesError;
+
+      const totalRevenue = (loads || []).reduce((sum, load) => sum + (load.gross_revenue || 0), 0);
+      const totalMaintenanceCost = (workOrders || []).reduce((sum, wo) => sum + (wo.final_cost || 0), 0);
+      const totalExpenses = (expenses || []).reduce((sum, exp) => sum + (exp.amount || 0), 0);
+      const totalCost = totalMaintenanceCost + totalExpenses;
+      const netProfit = totalRevenue - totalCost;
+      const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+      const monthlyMap = new Map<string, { revenue: number; cost: number }>();
+
+      (loads || []).forEach(load => {
+        if (load.delivery_date) {
+          const month = load.delivery_date.substring(0, 7);
+          const existing = monthlyMap.get(month) || { revenue: 0, cost: 0 };
+          monthlyMap.set(month, { ...existing, revenue: existing.revenue + (load.gross_revenue || 0) });
+        }
+      });
+      (workOrders || []).forEach(wo => {
+        if (wo.estimated_completion) {
+          const month = wo.estimated_completion.substring(0, 7);
+          const existing = monthlyMap.get(month) || { revenue: 0, cost: 0 };
+          monthlyMap.set(month, { ...existing, cost: existing.cost + (wo.final_cost || 0) });
+        }
+      });
+      (expenses || []).forEach(exp => {
+        if (exp.expense_date) {
+          const month = exp.expense_date.substring(0, 7);
+          const existing = monthlyMap.get(month) || { revenue: 0, cost: 0 };
+          monthlyMap.set(month, { ...existing, cost: existing.cost + (exp.amount || 0) });
+        }
+      });
+
+      const chartData = Array.from(monthlyMap.entries())
+        .map(([month, values]) => ({ month, revenue: values.revenue, cost: values.cost }))
+        .sort((a, b) => a.month.localeCompare(b.month));
+
+      return { totalRevenue, totalCost, netProfit, profitMargin, chartData };
+    },
+    enabled: !!truckId,
+  });
+
+  return { data, isLoading };
+}

@@ -1,15 +1,18 @@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { useTruckHistory } from '@/hooks/useMaintenanceData';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTruckHistory, useTruckProfitability } from '@/hooks/useMaintenanceData';
 import { calculateWearPartHealth } from '@/lib/truck-maintenance-profiles';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Truck, DollarSign, Wrench, Calendar, FileText, Activity } from 'lucide-react';
+import { Truck, DollarSign, Wrench, Calendar, FileText, Activity, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 interface TruckHistoryDrawerProps {
   truckId: string | null;
@@ -31,6 +34,7 @@ function getHealthTextColor(pct: number) {
 
 export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistoryDrawerProps) {
   const { data, isLoading } = useTruckHistory(truckId);
+  const { data: profitability, isLoading: isProfitabilityLoading } = useTruckProfitability(truckId);
 
   const wearParts = data?.truck
     ? calculateWearPartHealth(
@@ -76,8 +80,15 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
             <Skeleton className="h-24 w-full" />
           </div>
         ) : data ? (
-          <ScrollArea className="h-[calc(100vh-140px)] pr-4">
-            <div className="space-y-6 py-6">
+          <Tabs defaultValue="history" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="history">History</TabsTrigger>
+              <TabsTrigger value="profitability">Unit P&L</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="history" className="mt-0">
+              <ScrollArea className="h-[calc(100vh-200px)] pr-4">
+                <div className="space-y-6 py-6">
               {/* Stats Cards */}
               <div className="grid grid-cols-2 gap-3">
                 <Card>
@@ -249,8 +260,130 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                   <p className="text-muted-foreground">No maintenance history for this truck.</p>
                 </div>
               )}
-            </div>
-          </ScrollArea>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="profitability" className="mt-0">
+              <ScrollArea className="h-[calc(100vh-200px)] pr-4">
+                <div className="space-y-6 py-6">
+                  {isProfitabilityLoading ? (
+                    <>
+                      <Skeleton className="h-32 w-full" />
+                      <Skeleton className="h-64 w-full" />
+                    </>
+                  ) : profitability ? (
+                    <>
+                      {/* Metric Cards */}
+                      <div className="grid grid-cols-1 gap-4">
+                        <Card>
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                              <TrendingUp className="h-4 w-4" />
+                              <span className="text-xs">90-Day Gross Revenue</span>
+                            </div>
+                            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                              ${profitability.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                              <TrendingDown className="h-4 w-4" />
+                              <span className="text-xs">90-Day Total Cost</span>
+                            </div>
+                            <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">
+                              ${profitability.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
+                          </CardContent>
+                        </Card>
+
+                        <Card>
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                              <Activity className="h-4 w-4" />
+                              <span className="text-xs">Net Profit Margin</span>
+                            </div>
+                            <p className={cn(
+                              "text-2xl font-bold",
+                              profitability.profitMargin >= 0 
+                                ? "text-emerald-600 dark:text-emerald-400" 
+                                : "text-rose-600 dark:text-rose-400"
+                            )}>
+                              {profitability.profitMargin.toFixed(1)}%
+                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Net: ${profitability.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      {/* Chart */}
+                      {profitability.chartData.length > 0 ? (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-sm">Revenue vs Cost Trends (90 Days)</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <ChartContainer
+                              config={{
+                                revenue: {
+                                  label: "Revenue",
+                                  color: "hsl(var(--chart-1))",
+                                },
+                                cost: {
+                                  label: "Cost",
+                                  color: "hsl(var(--chart-2))",
+                                },
+                              }}
+                              className="h-[300px] w-full"
+                            >
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={profitability.chartData}>
+                                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                  <XAxis 
+                                    dataKey="month" 
+                                    tickFormatter={(value) => {
+                                      const [year, month] = value.split('-');
+                                      return `${month}/${year.slice(2)}`;
+                                    }}
+                                  />
+                                  <YAxis 
+                                    tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                                  />
+                                  <ChartTooltip 
+                                    content={<ChartTooltipContent />}
+                                  />
+                                  <Legend />
+                                  <Bar dataKey="revenue" fill="hsl(var(--chart-1))" name="Revenue" radius={[4, 4, 0, 0]} />
+                                  <Bar dataKey="cost" fill="hsl(var(--chart-2))" name="Cost" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </ChartContainer>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <Card>
+                          <CardContent className="p-6 text-center">
+                            <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <p className="text-muted-foreground">No financial data for the last 90 days.</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No profitability data available.</p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
         ) : null}
       </SheetContent>
     </Sheet>
