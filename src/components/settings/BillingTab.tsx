@@ -218,6 +218,18 @@ export function BillingTab() {
                 </p>
               </div>
             </div>
+          ) : hasStripeSubscription && subscriptionStatus === 'trialing' ? (
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+              <div>
+                <p className="font-medium">Trial Active</p>
+                <p className="text-sm text-muted-foreground">
+                  {subscriptionPeriodEnd
+                    ? `${Math.max(0, differenceInDays(subscriptionPeriodEnd, new Date()))} days remaining · Trial ends ${format(subscriptionPeriodEnd, 'MMM d, yyyy')}`
+                    : 'Your trial is active. Add payment details to continue after trial.'}
+                </p>
+              </div>
+            </div>
           ) : hasStripeSubscription && subscriptionStatus === 'active' ? (
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
