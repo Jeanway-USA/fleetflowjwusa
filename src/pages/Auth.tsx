@@ -120,8 +120,8 @@ export default function Auth() {
     }
 
     setFormLoading(false);
-    toast.success('Account created! Let\'s set up your company.');
-    navigate('/onboarding');
+    toast.success('Account created! Welcome aboard.');
+    navigate('/');
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
