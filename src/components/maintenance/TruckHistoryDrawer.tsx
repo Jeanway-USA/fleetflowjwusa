@@ -34,6 +34,7 @@ function getHealthTextColor(pct: number) {
 
 export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistoryDrawerProps) {
   const { data, isLoading } = useTruckHistory(truckId);
+  const { data: profitability, isLoading: isProfitabilityLoading } = useTruckProfitability(truckId);
 
   const wearParts = data?.truck
     ? calculateWearPartHealth(
