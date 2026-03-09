@@ -244,7 +244,11 @@ export default function Drivers() {
 
   return (
     <>
-      <PageHeader title="Drivers" description="Manage your drivers" action={{ label: 'Add Driver', onClick: () => openDialog() }} />
+      <PageHeader title="Drivers" description="Manage your drivers" action={{ label: 'Add Driver', onClick: () => openDialog() }}>
+        <Button variant="outline" onClick={() => setCsvImportOpen(true)}>
+          <FileSpreadsheet className="h-4 w-4 mr-2" /> Import CSV
+        </Button>
+      </PageHeader>
 
       {drivers.length === 0 ? (
         <EmptyState
