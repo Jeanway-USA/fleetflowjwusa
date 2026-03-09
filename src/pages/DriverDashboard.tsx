@@ -15,6 +15,7 @@ import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
 import { LocationSharing } from '@/components/driver/LocationSharing';
 import { DriverNotifications } from '@/components/driver/DriverNotifications';
 import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
+import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
 import { Loader2, Sun, Moon, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -212,6 +213,9 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
 
         {/* Monthly Bonus Goal */}
         <MonthlyBonusWidget driverId={driver.id} />
+
+        {/* Driver Leaderboard */}
+        <DriverLeaderboard readOnly />
 
         {/* Unified Driver Requests */}
         <DriverRequestsCard 
