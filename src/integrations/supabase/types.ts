@@ -2774,6 +2774,10 @@ export type Database = {
           mc_number: string | null
           name: string
           primary_color: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_period_end: string | null
+          subscription_status: string | null
           subscription_tier: string
           trial_ends_at: string | null
           updated_at: string
@@ -2791,6 +2795,10 @@ export type Database = {
           mc_number?: string | null
           name: string
           primary_color?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_period_end?: string | null
+          subscription_status?: string | null
           subscription_tier?: string
           trial_ends_at?: string | null
           updated_at?: string
@@ -2808,6 +2816,10 @@ export type Database = {
           mc_number?: string | null
           name?: string
           primary_color?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_period_end?: string | null
+          subscription_status?: string | null
           subscription_tier?: string
           trial_ends_at?: string | null
           updated_at?: string

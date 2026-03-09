@@ -45,6 +45,7 @@ const Onboarding = lazy(() => import("./pages/Onboarding"));
 const SuperAdminDashboard = lazy(() => import("./pages/SuperAdminDashboard"));
 const PublicLoadTracker = lazy(() => import("./pages/PublicLoadTracker"));
 const AccountDeactivated = lazy(() => import("./pages/AccountDeactivated"));
+const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,7 @@ const App = () => {
                     <Route path="/track" element={<PublicLoadTracker />} />
                     <Route path="/onboarding" element={<Onboarding />} />
                     <Route path="/account-deactivated" element={<AccountDeactivated />} />
+                    <Route path="/checkout-success" element={<CheckoutSuccess />} />
 
                     {/* Dashboard routes */}
                     <Route path="/executive-dashboard" element={
