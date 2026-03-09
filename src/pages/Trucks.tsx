@@ -73,6 +73,19 @@ export default function Trucks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTruck, setEditingTruck] = useState<TruckWithDriver | null>(null);
   const [formData, setFormData] = useState<Partial<TruckInsert>>({});
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
+
+  const truckFields = [
+    { key: 'unit_number', label: 'Unit Number', required: true },
+    { key: 'make', label: 'Make' },
+    { key: 'model', label: 'Model' },
+    { key: 'year', label: 'Year' },
+    { key: 'vin', label: 'VIN' },
+    { key: 'license_plate', label: 'License Plate' },
+    { key: 'license_plate_state', label: 'License Plate State' },
+    { key: 'status', label: 'Status' },
+    { key: 'purchase_mileage', label: 'Purchase Mileage' },
+  ];
 
   const { data: trucks = [], isLoading } = useQuery({
     queryKey: ['trucks'],
