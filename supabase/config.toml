@@ -42,3 +42,6 @@ verify_jwt = false
 [functions.create-portal-session]
 verify_jwt = false
 
+[functions.email-load-status]
+verify_jwt = false
+
