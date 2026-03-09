@@ -309,8 +309,8 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                             <p className={cn(
                               "text-2xl font-bold",
                               profitability.profitMargin >= 0 
-                                ? "text-green-600 dark:text-green-400" 
-                                : "text-red-600 dark:text-red-400"
+                                ? "text-emerald-600 dark:text-emerald-400" 
+                                : "text-rose-600 dark:text-rose-400"
                             )}>
                               {profitability.profitMargin.toFixed(1)}%
                             </p>
