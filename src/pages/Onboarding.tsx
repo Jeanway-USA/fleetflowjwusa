@@ -199,7 +199,7 @@ export default function Onboarding() {
 
       confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
       toast.success('Welcome aboard! 🚀');
-      setTimeout(() => navigate('/dispatcher'), 1500);
+      setTimeout(() => navigate('/fleet-loads'), 1500);
     } catch {
       toast.error('Something went wrong. Please try again.');
     } finally {
