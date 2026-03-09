@@ -286,6 +286,11 @@ export default function SuperAdminDashboard() {
         <TabsContent value="billing">
           <BillingPromotionsTab />
         </TabsContent>
+
+        {/* Tab 7: Feedback */}
+        <TabsContent value="feedback">
+          <FeedbackTab />
+        </TabsContent>
       </Tabs>
 
       <OrgDetailSheet org={selectedOrg} open={sheetOpen} onOpenChange={setSheetOpen} />
