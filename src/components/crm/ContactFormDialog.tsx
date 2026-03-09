@@ -151,6 +151,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
         dock_info: form.dock_info || null,
         appointment_required: form.appointment_required,
         notes: form.notes || null,
+        org_id: orgId,
       };
       if (isEditing && editContact) {
         await updateFacility.mutateAsync({ id: editContact.id, ...facilityPayload });
