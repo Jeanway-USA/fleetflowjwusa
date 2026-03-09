@@ -191,6 +191,9 @@ export default function DispatcherDashboard() {
         {/* Fleet Timeline Scheduler */}
         <FleetTimelineScheduler />
 
+        {/* Driver Leaderboard */}
+        <DriverLeaderboard />
+
         {/* Active Loads - Full Width */}
         <ActiveLoadsBoard />
 

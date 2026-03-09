@@ -214,6 +214,9 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
         {/* Monthly Bonus Goal */}
         <MonthlyBonusWidget driverId={driver.id} />
 
+        {/* Driver Leaderboard */}
+        <DriverLeaderboard readOnly />
+
         {/* Unified Driver Requests */}
         <DriverRequestsCard 
           driverId={driver.id}
