@@ -42,6 +42,21 @@ export default function SuperAdminDashboard() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
   const [logSheetOpen, setLogSheetOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const purgeEmptyOrgs = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('auto_cleanup_empty_orgs' as any);
+      if (error) throw error;
+      return data as number;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['super-admin-organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['super-admin-dashboard'] });
+      toast.success(`Purged ${count} empty organization${count !== 1 ? 's' : ''}`);
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to purge'),
+  });
 
   const { data: dashboardData, isLoading: dashLoading } = useQuery({
     queryKey: ['super-admin-dashboard'],
