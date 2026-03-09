@@ -20,6 +20,7 @@ export interface WorkOrder {
   odometer_reading: number | null;
   notes: string | null;
   completed_at: string | null;
+  days_down: number | null;
   created_at: string;
   updated_at: string;
   trucks?: {
