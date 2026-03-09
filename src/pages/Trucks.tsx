@@ -17,7 +17,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock, Truck as TruckIcon, MoreHorizontal } from 'lucide-react';
+import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock, Truck as TruckIcon, MoreHorizontal, FileSpreadsheet } from 'lucide-react';
+import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { addDays, differenceInDays, format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
@@ -72,6 +73,19 @@ export default function Trucks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTruck, setEditingTruck] = useState<TruckWithDriver | null>(null);
   const [formData, setFormData] = useState<Partial<TruckInsert>>({});
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
+
+  const truckFields = [
+    { key: 'unit_number', label: 'Unit Number', required: true },
+    { key: 'make', label: 'Make' },
+    { key: 'model', label: 'Model' },
+    { key: 'year', label: 'Year' },
+    { key: 'vin', label: 'VIN' },
+    { key: 'license_plate', label: 'License Plate' },
+    { key: 'license_plate_state', label: 'License Plate State' },
+    { key: 'status', label: 'Status' },
+    { key: 'purchase_mileage', label: 'Purchase Mileage' },
+  ];
 
   const { data: trucks = [], isLoading } = useQuery({
     queryKey: ['trucks'],
@@ -313,7 +327,11 @@ export default function Trucks() {
 
   return (
     <>
-      <PageHeader title="Trucks" description="Manage your fleet vehicles" action={{ label: 'Add Truck', onClick: () => openDialog() }} />
+      <PageHeader title="Trucks" description="Manage your fleet vehicles" action={{ label: 'Add Truck', onClick: () => openDialog() }}>
+        <Button variant="outline" onClick={() => setCsvImportOpen(true)}>
+          <FileSpreadsheet className="h-4 w-4 mr-2" /> Import CSV
+        </Button>
+      </PageHeader>
       <DataTable columns={columns} data={trucks} loading={isLoading} emptyMessage="No trucks registered yet" tableId="trucks" exportFilename="trucks" />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -471,6 +489,15 @@ export default function Trucks() {
           )}
         </DialogContent>
       </Dialog>
+
+      <CSVImportDialog
+        open={csvImportOpen}
+        onOpenChange={setCsvImportOpen}
+        tableName="trucks"
+        fields={truckFields}
+        queryKey={['trucks']}
+        title="Import Trucks from CSV"
+      />
     </>
   );
 }

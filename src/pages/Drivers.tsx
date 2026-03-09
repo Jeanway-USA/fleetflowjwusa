@@ -20,7 +20,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off, Eye, MoreHorizontal } from 'lucide-react';
+import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off, Eye, MoreHorizontal, FileSpreadsheet } from 'lucide-react';
+import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +64,21 @@ export default function Drivers() {
   const [formData, setFormData] = useState<any>({});
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
+
+  const driverFields = [
+    { key: 'first_name', label: 'First Name', required: true },
+    { key: 'last_name', label: 'Last Name', required: true },
+    { key: 'email', label: 'Email' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'license_number', label: 'CDL / License Number' },
+    { key: 'license_expiry', label: 'License Expiry' },
+    { key: 'medical_card_expiry', label: 'Medical Card Expiry' },
+    { key: 'hire_date', label: 'Hire Date' },
+    { key: 'status', label: 'Status' },
+    { key: 'pay_type', label: 'Pay Type' },
+    { key: 'pay_rate', label: 'Pay Rate' },
+  ];
 
   const { data: drivers = [], isLoading } = useQuery({
     queryKey: ['drivers'],
@@ -228,7 +244,11 @@ export default function Drivers() {
 
   return (
     <>
-      <PageHeader title="Drivers" description="Manage your drivers" action={{ label: 'Add Driver', onClick: () => openDialog() }} />
+      <PageHeader title="Drivers" description="Manage your drivers" action={{ label: 'Add Driver', onClick: () => openDialog() }}>
+        <Button variant="outline" onClick={() => setCsvImportOpen(true)}>
+          <FileSpreadsheet className="h-4 w-4 mr-2" /> Import CSV
+        </Button>
+      </PageHeader>
 
       {drivers.length === 0 ? (
         <EmptyState
@@ -579,6 +599,15 @@ export default function Drivers() {
           )}
         </DialogContent>
       </Dialog>
+
+      <CSVImportDialog
+        open={csvImportOpen}
+        onOpenChange={setCsvImportOpen}
+        tableName="drivers"
+        fields={driverFields}
+        queryKey={['drivers']}
+        title="Import Drivers from CSV"
+      />
     </>
   );
 }
