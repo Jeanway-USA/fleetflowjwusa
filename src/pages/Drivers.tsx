@@ -64,6 +64,21 @@ export default function Drivers() {
   const [formData, setFormData] = useState<any>({});
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
+
+  const driverFields = [
+    { key: 'first_name', label: 'First Name', required: true },
+    { key: 'last_name', label: 'Last Name', required: true },
+    { key: 'email', label: 'Email' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'license_number', label: 'CDL / License Number' },
+    { key: 'license_expiry', label: 'License Expiry' },
+    { key: 'medical_card_expiry', label: 'Medical Card Expiry' },
+    { key: 'hire_date', label: 'Hire Date' },
+    { key: 'status', label: 'Status' },
+    { key: 'pay_type', label: 'Pay Type' },
+    { key: 'pay_rate', label: 'Pay Rate' },
+  ];
 
   const { data: drivers = [], isLoading } = useQuery({
     queryKey: ['drivers'],
