@@ -194,6 +194,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
         agent_status: null,
         notes: form.notes || null,
         tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        org_id: orgId,
       };
       if (isEditing && editContact) {
         await updateContact.mutateAsync({ id: editContact.id, ...crmPayload });
