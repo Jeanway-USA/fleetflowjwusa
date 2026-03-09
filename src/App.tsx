@@ -78,6 +78,7 @@ const App = () => {
                     <Route path="/track" element={<PublicLoadTracker />} />
                     <Route path="/onboarding" element={<Onboarding />} />
                     <Route path="/account-deactivated" element={<AccountDeactivated />} />
+                    <Route path="/checkout-success" element={<CheckoutSuccess />} />
 
                     {/* Dashboard routes */}
                     <Route path="/executive-dashboard" element={
