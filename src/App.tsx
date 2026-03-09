@@ -45,6 +45,7 @@ const Onboarding = lazy(() => import("./pages/Onboarding"));
 const SuperAdminDashboard = lazy(() => import("./pages/SuperAdminDashboard"));
 const PublicLoadTracker = lazy(() => import("./pages/PublicLoadTracker"));
 const AccountDeactivated = lazy(() => import("./pages/AccountDeactivated"));
+const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 
 const queryClient = new QueryClient();
 

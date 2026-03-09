@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle2, Truck, Users, Package, Crown, ArrowLeft, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Truck, Users, Package, Crown, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface TierMeta {
   id: string;
@@ -119,10 +121,12 @@ interface PlanPrices {
 
 export default function Pricing() {
   const navigate = useNavigate();
+  const { user, orgId } = useAuth();
   const [showAllInOne, setShowAllInOne] = useState(false);
   const [isAnnual, setIsAnnual] = useState(false);
   const [prices, setPrices] = useState<PlanPrices | null>(null);
   const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
@@ -149,17 +153,64 @@ export default function Pricing() {
     return `$${val}`;
   };
 
+  const handleSubscribe = async (tierId: string) => {
+    // If user is not logged in, redirect to auth with tier param
+    if (!user || !orgId) {
+      navigate(`/auth?tier=${tierId}`);
+      return;
+    }
+
+    // User is logged in - create checkout session
+    setCheckoutLoading(tierId);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
+      if (!accessToken) {
+        toast.error('Please sign in to subscribe');
+        navigate('/auth');
+        return;
+      }
+
+      const response = await supabase.functions.invoke('create-checkout-session', {
+        body: { tier: tierId, isAnnual },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to create checkout session');
+      }
+
+      const { url } = response.data;
+      if (url) {
+        window.location.href = url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to start checkout');
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <button onClick={() => navigate('/landing')} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+          <button onClick={() => navigate('/')} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" />
             <span className="text-xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
             <span className="text-[10px] text-muted-foreground ml-1.5">by JeanWayUSA</span>
           </button>
-          <Button variant="outline" onClick={() => navigate('/auth')}>Sign In</Button>
+          {user ? (
+            <Button variant="outline" onClick={() => navigate('/settings?tab=billing')}>
+              My Billing
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => navigate('/auth')}>Sign In</Button>
+          )}
         </div>
       </header>
 
@@ -187,6 +238,7 @@ export default function Pricing() {
           {displayedTierKeys.map((tierKey) => {
             const tier = TIER_META[tierKey];
             if (!tier) return null;
+            const isLoading = checkoutLoading === tierKey;
             return (
               <Card 
                 key={tier.id} 
@@ -231,10 +283,20 @@ export default function Pricing() {
                   <Button 
                     className={`w-full ${tier.popular ? 'gradient-gold text-primary-foreground glow-gold' : ''}`}
                     variant={tier.popular ? 'default' : 'outline'}
-                    onClick={() => navigate(`/auth?tier=${tier.id}`)}
+                    onClick={() => handleSubscribe(tier.id)}
+                    disabled={isLoading}
                   >
-                    Start 14-Day Beta Trial
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        {user ? 'Subscribe Now' : 'Start 14-Day Beta Trial'}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
+                    )}
                   </Button>
                 </CardContent>
               </Card>
