@@ -918,6 +918,9 @@ export function useCompleteWorkOrder() {
 
       if (fetchError) throw fetchError;
 
+      // Calculate days down
+      const daysDown = differenceInDays(new Date(), new Date(workOrder.entry_date));
+
       // Complete the work order
       const { data, error } = await supabase
         .from('work_orders')
@@ -927,6 +930,7 @@ export function useCompleteWorkOrder() {
           invoice_url,
           notes,
           completed_at: new Date().toISOString(),
+          days_down: daysDown,
         })
         .eq('id', id)
         .select()
