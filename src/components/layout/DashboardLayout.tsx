@@ -201,6 +201,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
       </main>
       {isDemoMode && <DemoControls />}
       <CommandPalette />
+      <BetaFeedbackWidget />
     </div>
   );
 }
