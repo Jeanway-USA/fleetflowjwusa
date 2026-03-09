@@ -293,7 +293,7 @@ export default function Pricing() {
                       </>
                     ) : (
                       <>
-                        {user ? 'Subscribe Now' : 'Start 14-Day Beta Trial'}
+                        Start 14-Day Trial
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     )}
