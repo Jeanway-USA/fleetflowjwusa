@@ -119,13 +119,13 @@ export function CSVImportDialog({ open, onOpenChange, tableName, fields, queryKe
   const validCount = mappedRows.filter(isRowValid).length;
 
   const handleImport = async () => {
-    if (!profile?.org_id) {
+    if (!orgId) {
       toast.error('Organization not found');
       return;
     }
     const validRows = mappedRows.filter(isRowValid).map(row => ({
       ...row,
-      org_id: profile.org_id,
+      org_id: orgId,
     }));
     if (!validRows.length) {
       toast.error('No valid rows to import');
