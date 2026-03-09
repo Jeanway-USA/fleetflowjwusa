@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTruckHistory, useTruckProfitability } from '@/hooks/useMaintenanceData';
 import { calculateWearPartHealth } from '@/lib/truck-maintenance-profiles';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Truck, DollarSign, Wrench, Calendar, FileText, Activity, TrendingUp, TrendingDown } from 'lucide-react';
+import { Truck, DollarSign, Wrench, Calendar, FileText, Activity, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -320,6 +320,39 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                           </CardContent>
                         </Card>
                       </div>
+
+                      {/* True Cost of Maintenance */}
+                      {(profitability.totalMaintenanceCost > 0 || profitability.totalDaysDown > 0) && (
+                        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-950/20">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                              True Cost of Maintenance (90 Days)
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Parts & Labor</span>
+                              <span>${profitability.totalMaintenanceCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">
+                                Est. Lost Revenue ({profitability.totalDaysDown}d × ${profitability.avgDailyRevenue.toLocaleString()}/day)
+                              </span>
+                              <span className="text-rose-600 dark:text-rose-400">
+                                ${profitability.estimatedLostRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <Separator />
+                            <div className="flex justify-between text-sm font-bold">
+                              <span>True Cost</span>
+                              <span className="text-rose-600 dark:text-rose-400">
+                                ${(profitability.totalMaintenanceCost + profitability.estimatedLostRevenue).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
 
                       {/* Chart */}
                       {profitability.chartData.length > 0 ? (

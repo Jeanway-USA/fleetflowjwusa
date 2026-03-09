@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useCompleteWorkOrder, WorkOrder } from '@/hooks/useMaintenanceData';
 import { toast } from 'sonner';
-import { Loader2, Upload, CheckCircle } from 'lucide-react';
+import { Loader2, Upload, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { differenceInDays } from 'date-fns';
 
 interface CompleteJobModalProps {
   workOrder: WorkOrder | null;
@@ -97,6 +98,16 @@ export function CompleteJobModal({ workOrder, open, onOpenChange }: CompleteJobM
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
+          {workOrder?.created_at && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted text-sm">
+              <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Days Down:</span>
+              <span className="font-semibold">
+                {differenceInDays(new Date(), new Date(workOrder.entry_date))} days
+              </span>
+            </div>
+          )}
+
           <div className="grid gap-2">
             <Label htmlFor="finalCost">Final Cost *</Label>
             <div className="relative">

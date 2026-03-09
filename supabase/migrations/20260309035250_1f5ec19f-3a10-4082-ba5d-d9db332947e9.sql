@@ -1,0 +1,1 @@
+ALTER TABLE public.work_orders ADD COLUMN days_down integer;

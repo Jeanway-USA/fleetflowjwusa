@@ -20,6 +20,7 @@ export interface WorkOrder {
   odometer_reading: number | null;
   notes: string | null;
   completed_at: string | null;
+  days_down: number | null;
   created_at: string;
   updated_at: string;
   trucks?: {
@@ -917,6 +918,9 @@ export function useCompleteWorkOrder() {
 
       if (fetchError) throw fetchError;
 
+      // Calculate days down
+      const daysDown = differenceInDays(new Date(), new Date(workOrder.entry_date));
+
       // Complete the work order
       const { data, error } = await supabase
         .from('work_orders')
@@ -926,6 +930,7 @@ export function useCompleteWorkOrder() {
           invoice_url,
           notes,
           completed_at: new Date().toISOString(),
+          days_down: daysDown,
         })
         .eq('id', id)
         .select()
@@ -1127,7 +1132,7 @@ export function useTruckProfitability(truckId: string | null) {
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
       const ninetyDaysAgoStr = ninetyDaysAgo.toISOString().split('T')[0];
 
-      const [{ data: loads, error: loadsError }, { data: workOrders, error: woError }, { data: expenses, error: expensesError }] = await Promise.all([
+      const [{ data: loads, error: loadsError }, { data: workOrders, error: woError }, { data: expenses, error: expensesError }, { data: dailyRevSetting }] = await Promise.all([
         supabase
           .from('fleet_loads')
           .select('gross_revenue, delivery_date')
@@ -1136,7 +1141,7 @@ export function useTruckProfitability(truckId: string | null) {
           .gte('delivery_date', ninetyDaysAgoStr),
         supabase
           .from('work_orders')
-          .select('final_cost, estimated_completion')
+          .select('final_cost, estimated_completion, days_down')
           .eq('truck_id', truckId)
           .eq('status', 'completed')
           .gte('estimated_completion', ninetyDaysAgoStr)
@@ -1146,14 +1151,22 @@ export function useTruckProfitability(truckId: string | null) {
           .select('amount, expense_date')
           .eq('truck_id', truckId)
           .gte('expense_date', ninetyDaysAgoStr),
+        supabase
+          .from('company_settings')
+          .select('setting_value')
+          .eq('setting_key', 'avg_daily_truck_revenue')
+          .maybeSingle(),
       ]);
 
       if (loadsError) throw loadsError;
       if (woError) throw woError;
       if (expensesError) throw expensesError;
 
+      const avgDailyRevenue = parseFloat(dailyRevSetting?.setting_value || '1000');
       const totalRevenue = (loads || []).reduce((sum, load) => sum + (load.gross_revenue || 0), 0);
       const totalMaintenanceCost = (workOrders || []).reduce((sum, wo) => sum + (wo.final_cost || 0), 0);
+      const totalDaysDown = (workOrders || []).reduce((sum, wo) => sum + (wo.days_down || 0), 0);
+      const estimatedLostRevenue = totalDaysDown * avgDailyRevenue;
       const totalExpenses = (expenses || []).reduce((sum, exp) => sum + (exp.amount || 0), 0);
       const totalCost = totalMaintenanceCost + totalExpenses;
       const netProfit = totalRevenue - totalCost;
@@ -1187,7 +1200,7 @@ export function useTruckProfitability(truckId: string | null) {
         .map(([month, values]) => ({ month, revenue: values.revenue, cost: values.cost }))
         .sort((a, b) => a.month.localeCompare(b.month));
 
-      return { totalRevenue, totalCost, netProfit, profitMargin, chartData };
+      return { totalRevenue, totalCost, netProfit, profitMargin, chartData, totalMaintenanceCost, totalDaysDown, estimatedLostRevenue, avgDailyRevenue };
     },
     enabled: !!truckId,
   });

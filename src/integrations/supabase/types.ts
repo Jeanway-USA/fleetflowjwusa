@@ -3614,6 +3614,7 @@ export type Database = {
           completed_at: string | null
           cost_estimate: number | null
           created_at: string
+          days_down: number | null
           description: string | null
           entry_date: string
           estimated_completion: string | null
@@ -3635,6 +3636,7 @@ export type Database = {
           completed_at?: string | null
           cost_estimate?: number | null
           created_at?: string
+          days_down?: number | null
           description?: string | null
           entry_date?: string
           estimated_completion?: string | null
@@ -3656,6 +3658,7 @@ export type Database = {
           completed_at?: string | null
           cost_estimate?: number | null
           created_at?: string
+          days_down?: number | null
           description?: string | null
           entry_date?: string
           estimated_completion?: string | null
