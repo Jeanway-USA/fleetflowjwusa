@@ -489,6 +489,15 @@ export default function Trucks() {
           )}
         </DialogContent>
       </Dialog>
+
+      <CSVImportDialog
+        open={csvImportOpen}
+        onOpenChange={setCsvImportOpen}
+        tableName="trucks"
+        fields={truckFields}
+        queryKey={['trucks']}
+        title="Import Trucks from CSV"
+      />
     </>
   );
 }

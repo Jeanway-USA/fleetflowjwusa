@@ -599,6 +599,15 @@ export default function Drivers() {
           )}
         </DialogContent>
       </Dialog>
+
+      <CSVImportDialog
+        open={csvImportOpen}
+        onOpenChange={setCsvImportOpen}
+        tableName="drivers"
+        fields={driverFields}
+        queryKey={['drivers']}
+        title="Import Drivers from CSV"
+      />
     </>
   );
 }
