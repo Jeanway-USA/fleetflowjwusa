@@ -1477,6 +1477,7 @@ export type Database = {
           advance_available: number | null
           advance_taken: number | null
           agency_code: string | null
+          auto_email_updates: boolean
           booked_miles: number | null
           created_at: string
           delivery_date: string | null
@@ -1516,6 +1517,7 @@ export type Database = {
           advance_available?: number | null
           advance_taken?: number | null
           agency_code?: string | null
+          auto_email_updates?: boolean
           booked_miles?: number | null
           created_at?: string
           delivery_date?: string | null
@@ -1555,6 +1557,7 @@ export type Database = {
           advance_available?: number | null
           advance_taken?: number | null
           agency_code?: string | null
+          auto_email_updates?: boolean
           booked_miles?: number | null
           created_at?: string
           delivery_date?: string | null

@@ -20,8 +20,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 
@@ -716,6 +717,21 @@ export default function FleetLoads() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                {/* Auto Email Updates Toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">Auto Email Updates</p>
+                      <p className="text-xs text-muted-foreground">Send status emails to the agent when this load's status changes</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={formData.auto_email_updates ?? true}
+                    onCheckedChange={(checked) => setFormData({ ...formData, auto_email_updates: checked })}
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
