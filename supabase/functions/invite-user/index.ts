@@ -108,37 +108,71 @@ Deno.serve(async (req) => {
       driver: 'Driver',
     };
 
-    // Invite the user via Supabase Auth
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      data: {
-        invited_role: role,
-      },
-    });
+    // Get the requesting user's org_id
+    const { data: reqProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('org_id')
+      .eq('user_id', requestingUser.id)
+      .single();
 
-    if (inviteError) {
-      console.error('Supabase invite error:', inviteError.message);
-      // Check if user already exists
-      if (inviteError.message.includes('already been registered')) {
-        return new Response(JSON.stringify({ error: 'User is already registered' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+    const orgId = reqProfile?.org_id;
+
+    // Check if user already exists in auth
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email === email);
+
+    let targetUserId: string | null = null;
+
+    if (existingUser) {
+      targetUserId = existingUser.id;
+      console.log('User already exists, assigning role to existing user:', targetUserId);
+
+      // Link their profile to this org if not already linked
+      if (orgId) {
+        await supabaseAdmin
+          .from('profiles')
+          .update({ org_id: orgId })
+          .eq('user_id', targetUserId)
+          .is('org_id', null);
       }
-      throw inviteError;
+    } else {
+      // Invite the user via Supabase Auth
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        data: {
+          invited_role: role,
+        },
+      });
+
+      if (inviteError) {
+        console.error('Supabase invite error:', inviteError.message);
+        throw inviteError;
+      }
+
+      targetUserId = inviteData.user?.id ?? null;
+      console.log('User invited via Supabase:', targetUserId);
+
+      // Link profile to org
+      if (targetUserId && orgId) {
+        await supabaseAdmin
+          .from('profiles')
+          .update({ org_id: orgId })
+          .eq('user_id', targetUserId);
+      }
     }
 
-    console.log('User invited via Supabase:', inviteData.user?.id);
-
-    // Pre-assign the role for when they accept
-    if (inviteData.user) {
+    // Assign role (upsert to avoid duplicates)
+    if (targetUserId) {
       const { error: roleError } = await supabaseAdmin
         .from('user_roles')
-        .insert({ user_id: inviteData.user.id, role });
+        .upsert(
+          { user_id: targetUserId, role, org_id: orgId },
+          { onConflict: 'user_id,role' }
+        );
       
       if (roleError) {
         console.error('Error assigning role:', roleError.message);
       } else {
-        console.log('Role pre-assigned:', role);
+        console.log('Role assigned:', role);
       }
     }
 
