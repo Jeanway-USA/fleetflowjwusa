@@ -3886,7 +3886,7 @@ export type Database = {
           new_complimentary_ends_at?: string
           new_is_active?: boolean
           new_is_complimentary?: boolean
-          new_tier?: string
+          new_subscription_tier?: string
           new_trial_ends_at?: string
           target_org_id: string
         }
