@@ -327,7 +327,11 @@ export default function Trucks() {
 
   return (
     <>
-      <PageHeader title="Trucks" description="Manage your fleet vehicles" action={{ label: 'Add Truck', onClick: () => openDialog() }} />
+      <PageHeader title="Trucks" description="Manage your fleet vehicles" action={{ label: 'Add Truck', onClick: () => openDialog() }}>
+        <Button variant="outline" onClick={() => setCsvImportOpen(true)}>
+          <FileSpreadsheet className="h-4 w-4 mr-2" /> Import CSV
+        </Button>
+      </PageHeader>
       <DataTable columns={columns} data={trucks} loading={isLoading} emptyMessage="No trucks registered yet" tableId="trucks" exportFilename="trucks" />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
