@@ -31,7 +31,7 @@ type Step = 'upload' | 'map' | 'preview';
 
 export function CSVImportDialog({ open, onOpenChange, tableName, fields, queryKey, title }: CSVImportDialogProps) {
   const queryClient = useQueryClient();
-  const { profile } = useAuth();
+  const { orgId } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>('upload');
