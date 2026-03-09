@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import {
   Loader2, ArrowLeft, ArrowRight, CheckCircle2, Building2, Truck, Container,
-  Users, Plus, X, SkipForward, Upload, ImageIcon,
+  Users, Plus, X, SkipForward, Upload, ImageIcon, LogOut,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
