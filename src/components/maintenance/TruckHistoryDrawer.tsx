@@ -1,15 +1,18 @@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { useTruckHistory } from '@/hooks/useMaintenanceData';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTruckHistory, useTruckProfitability } from '@/hooks/useMaintenanceData';
 import { calculateWearPartHealth } from '@/lib/truck-maintenance-profiles';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Truck, DollarSign, Wrench, Calendar, FileText, Activity } from 'lucide-react';
+import { Truck, DollarSign, Wrench, Calendar, FileText, Activity, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 interface TruckHistoryDrawerProps {
   truckId: string | null;
