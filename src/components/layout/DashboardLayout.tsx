@@ -16,6 +16,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { CommandPalette } from '@/components/shared/CommandPalette';
+import { BetaFeedbackWidget } from '@/components/shared/BetaFeedbackWidget';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/executive-dashboard': 'Executive Dashboard',
@@ -200,6 +201,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
       </main>
       {isDemoMode && <DemoControls />}
       <CommandPalette />
+      <BetaFeedbackWidget />
     </div>
   );
 }
