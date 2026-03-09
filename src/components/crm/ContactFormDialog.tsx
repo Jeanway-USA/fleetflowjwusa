@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +52,7 @@ function getFormType(contact: UnifiedContact): string {
 }
 
 export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFormDialogProps) {
+  const { orgId } = useAuth();
   const { createContact, updateContact } = useContactMutations();
   const { createResource, updateResource } = useResourceMutations();
   const { createFacility, updateFacility } = useFacilityMutations();
@@ -149,6 +151,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
         dock_info: form.dock_info || null,
         appointment_required: form.appointment_required,
         notes: form.notes || null,
+        org_id: orgId,
       };
       if (isEditing && editContact) {
         await updateFacility.mutateAsync({ id: editContact.id, ...facilityPayload });
@@ -168,6 +171,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
         agent_code: isAgent ? (form.agent_code || null) : null,
         agent_status: isAgent ? form.agent_status : null,
         notes: form.notes || null,
+        org_id: orgId,
       };
       if (isEditing && editContact) {
         await updateResource.mutateAsync({ id: editContact.id, ...resourcePayload });
@@ -190,6 +194,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
         agent_status: null,
         notes: form.notes || null,
         tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        org_id: orgId,
       };
       if (isEditing && editContact) {
         await updateContact.mutateAsync({ id: editContact.id, ...crmPayload });
