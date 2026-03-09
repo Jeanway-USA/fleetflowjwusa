@@ -16,6 +16,7 @@ import { CompanyHealthScore } from '@/components/executive/CompanyHealthScore';
 import { FleetStatusCard } from '@/components/executive/FleetStatusCard';
 import { DriverAvailabilityCard } from '@/components/executive/DriverAvailabilityCard';
 import { CriticalAlertsBar, CriticalAlert } from '@/components/executive/CriticalAlertsBar';
+import { MorningBriefingWidget } from '@/components/executive/MorningBriefingWidget';
 import { PendingActionsCard, PendingAction } from '@/components/executive/PendingActionsCard';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
