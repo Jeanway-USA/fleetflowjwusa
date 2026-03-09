@@ -1200,7 +1200,7 @@ export function useTruckProfitability(truckId: string | null) {
         .map(([month, values]) => ({ month, revenue: values.revenue, cost: values.cost }))
         .sort((a, b) => a.month.localeCompare(b.month));
 
-      return { totalRevenue, totalCost, netProfit, profitMargin, chartData };
+      return { totalRevenue, totalCost, netProfit, profitMargin, chartData, totalMaintenanceCost, totalDaysDown, estimatedLostRevenue, avgDailyRevenue };
     },
     enabled: !!truckId,
   });
