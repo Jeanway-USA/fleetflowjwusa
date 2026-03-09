@@ -719,6 +719,21 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
+                {/* Auto Email Updates Toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">Auto Email Updates</p>
+                      <p className="text-xs text-muted-foreground">Send status emails to the agent when this load's status changes</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={formData.auto_email_updates ?? true}
+                    onCheckedChange={(checked) => setFormData({ ...formData, auto_email_updates: checked })}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="origin">Origin (Full Address) *</Label>
