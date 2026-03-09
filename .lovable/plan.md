@@ -1,66 +1,103 @@
 
+## Enhance TruckHistoryDrawer with Unit Profitability Tab
 
-## QoL Improvements Across All Areas
+### Problem
+The TruckHistoryDrawer currently shows maintenance history and component health, but lacks financial performance insights for individual trucks. Fleet managers need to understand which trucks are profitable and which are draining resources.
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Solution Overview
+Add a "Unit P&L" tab to TruckHistoryDrawer.tsx that shows truck-specific profitability metrics over the last 90 days.
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+### Technical Implementation
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+**1. Database Query Strategy**
+- Query `fleet_loads` table filtering by `truck_id` and `status = 'delivered'` for last 90 days to get revenue
+- Query `work_orders` table filtering by `truck_id` and `status = 'completed'` for last 90 days to get maintenance costs
+- Query `expenses` table filtering by `truck_id` for last 90 days to get operational costs
+- Group by month for chart data
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+**2. UI Components**
+- Add new "Unit P&L" tab to existing Tabs component in TruckHistoryDrawer
+- Three large metric cards showing:
+  - 90-Day Gross Revenue (sum of delivered loads' gross_revenue)
+  - 90-Day Total Cost (sum of work orders' final_cost + expenses' amount)
+  - Net Profit Margin % ((Revenue - Cost) / Revenue * 100)
+- Bar chart using recharts comparing Revenue vs Cost by month
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+**3. Data Hook**
+Create `useTruckProfitability` hook in `useMaintenanceData.ts` that:
+- Fetches the 90-day data for the specific truck
+- Calculates totals and month-over-month breakdowns
+- Returns formatted data for metrics and chart
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+**4. Component Structure**
+```tsx
+<TabsContent value="profitability">
+  <div className="space-y-6">
+    {/* Three metric cards in grid */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <ProfitabilityMetricCard title="90-Day Gross Revenue" value={revenue} />
+      <ProfitabilityMetricCard title="90-Day Total Cost" value={cost} />
+      <ProfitabilityMetricCard title="Net Profit Margin" value={marginPct} />
+    </div>
+    
+    {/* Monthly chart */}
+    <Card>
+      <CardHeader>
+        <CardTitle>Revenue vs Cost Trends (90 Days)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer>
+          <BarChart data={monthlyData}>
+            <Bar dataKey="revenue" name="Revenue" fill="#22c55e" />
+            <Bar dataKey="cost" name="Cost" fill="#ef4444" />
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  </div>
+</TabsContent>
+```
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+### Files to Modify
+| File | Change |
+|---|---|
+| `src/components/maintenance/TruckHistoryDrawer.tsx` | Add "Unit P&L" tab with profitability metrics and chart |
+| `src/hooks/useMaintenanceData.ts` | Add `useTruckProfitability` hook for 90-day financial data |
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+### Query Logic
+```sql
+-- Revenue from delivered loads (last 90 days)
+SELECT 
+  DATE_TRUNC('month', delivery_date) as month,
+  SUM(gross_revenue) as revenue
+FROM fleet_loads 
+WHERE truck_id = $1 
+  AND status = 'delivered' 
+  AND delivery_date >= NOW() - INTERVAL '90 days'
+GROUP BY month
+ORDER BY month;
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+-- Costs from work orders + expenses (last 90 days)  
+SELECT 
+  DATE_TRUNC('month', estimated_completion) as month,
+  SUM(final_cost) as maintenance_cost
+FROM work_orders 
+WHERE truck_id = $1 
+  AND status = 'completed' 
+  AND estimated_completion >= NOW() - INTERVAL '90 days'
+GROUP BY month
+UNION ALL
+SELECT 
+  DATE_TRUNC('month', expense_date) as month,
+  SUM(amount) as expense_cost
+FROM expenses 
+WHERE truck_id = $1 
+  AND expense_date >= NOW() - INTERVAL '90 days'
+GROUP BY month;
+```
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
-
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
-
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
-
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
-
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
-
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
-
+### Benefits
+- Fleet managers can identify underperforming trucks
+- Data-driven decisions on truck retention vs disposal
+- Month-over-month trend analysis for operational adjustments
+- Consistent with existing revenue recognition standards (delivered loads only)
