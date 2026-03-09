@@ -51,6 +51,7 @@ function getFormType(contact: UnifiedContact): string {
 }
 
 export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFormDialogProps) {
+  const { orgId } = useAuth();
   const { createContact, updateContact } = useContactMutations();
   const { createResource, updateResource } = useResourceMutations();
   const { createFacility, updateFacility } = useFacilityMutations();
