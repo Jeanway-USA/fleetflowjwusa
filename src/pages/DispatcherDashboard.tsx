@@ -16,6 +16,7 @@ import { DispatcherAlerts } from '@/components/dispatcher/DispatcherAlerts';
 import { FleetMapView } from '@/components/dispatcher/FleetMapView';
 import { DriverAssignmentPanel } from '@/components/dispatcher/DriverAssignmentPanel';
 import { FleetTimelineScheduler } from '@/components/dispatcher/FleetTimelineScheduler';
+import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
 
 
 export default function DispatcherDashboard() {
