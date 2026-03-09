@@ -171,6 +171,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
         agent_code: isAgent ? (form.agent_code || null) : null,
         agent_status: isAgent ? form.agent_status : null,
         notes: form.notes || null,
+        org_id: orgId,
       };
       if (isEditing && editContact) {
         await updateResource.mutateAsync({ id: editContact.id, ...resourcePayload });
