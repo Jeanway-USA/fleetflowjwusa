@@ -699,6 +699,9 @@ export default function ExecutiveDashboard() {
           </div>
         </div>
 
+        {/* Morning Briefing */}
+        <MorningBriefingWidget />
+
         {/* Row 1: Critical Alerts Banner */}
         <CriticalAlertsBar alerts={criticalAlerts} isLoading={alertsLoading} />
 
