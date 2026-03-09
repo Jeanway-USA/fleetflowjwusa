@@ -30,13 +30,19 @@ export default function AccountDeactivated() {
       }
 
       toast.success('Your account has been deleted.');
-      await signOut();
+      localStorage.clear();
+      navigate('/');
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete account');
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
     }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
   };
 
   return (
@@ -97,7 +103,7 @@ export default function AccountDeactivated() {
             <Button
               variant="ghost"
               className="w-full text-muted-foreground"
-              onClick={signOut}
+              onClick={handleSignOut}
             >
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out
