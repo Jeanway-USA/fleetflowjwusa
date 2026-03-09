@@ -160,7 +160,19 @@ export default function SuperAdminDashboard() {
         {/* Tab 2: Organizations */}
         <TabsContent value="organizations">
           <Card>
-            <CardHeader><CardTitle>All Organizations</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>All Organizations</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={purgeEmptyOrgs.isPending}
+                onClick={() => purgeEmptyOrgs.mutate()}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {purgeEmptyOrgs.isPending ? 'Purging…' : 'Purge Empty Orgs'}
+              </Button>
+            </CardHeader>
             <CardContent>
               {orgsLoading ? (
                 <div className="space-y-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
