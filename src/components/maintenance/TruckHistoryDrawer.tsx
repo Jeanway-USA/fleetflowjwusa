@@ -282,7 +282,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                               <TrendingUp className="h-4 w-4" />
                               <span className="text-xs">90-Day Gross Revenue</span>
                             </div>
-                            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                               ${profitability.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </p>
                           </CardContent>
@@ -294,7 +294,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                               <TrendingDown className="h-4 w-4" />
                               <span className="text-xs">90-Day Total Cost</span>
                             </div>
-                            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                            <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">
                               ${profitability.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </p>
                           </CardContent>
