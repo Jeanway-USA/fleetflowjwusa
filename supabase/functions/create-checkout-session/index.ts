@@ -68,7 +68,7 @@ serve(async (req) => {
     // Fetch price from subscription_plans table
     const { data: plan, error: planError } = await supabaseAdmin
       .from("subscription_plans")
-      .select("tier, base_price_monthly, base_price_annual, name")
+      .select("tier, base_price_monthly, base_price_annual")
       .eq("tier", tier)
       .eq("is_active", true)
       .single();
