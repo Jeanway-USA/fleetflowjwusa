@@ -1,66 +1,88 @@
 
+## Automated Status Update Emails Feature
 
-## QoL Improvements Across All Areas
+### Overview
+Add `auto_email_updates` boolean to `fleet_loads`, expose it in the UI with a toggle, then create an edge function (`email-load-status`) triggered by the existing `trigger_log_load_status_change` database trigger.
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+---
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+### 1. Database Migration
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+```sql
+ALTER TABLE public.fleet_loads
+  ADD COLUMN IF NOT EXISTS auto_email_updates boolean NOT NULL DEFAULT true;
+```
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+No new trigger needed — the existing `trigger_log_load_status_change` already fires on every `fleet_loads` status update and writes to `load_status_logs`. The edge function will be invoked via a **Supabase Database Webhook** watching `load_status_logs` inserts.
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+---
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+### 2. UI Changes — `src/pages/FleetLoads.tsx`
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+In the **Load Details** tab (after the status select), add a row with a Switch + label:
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+```
+[ Auto Email Updates ]  [ Toggle Switch ]
+```
+- Default `true` for new loads (`formData.auto_email_updates ?? true`)
+- Persisted in `formData.auto_email_updates`
+- Import `Switch` from `@/components/ui/switch`
+- Import `Mail` from `lucide-react`
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+---
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+### 3. Edge Function — `supabase/functions/email-load-status/index.ts`
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+**Trigger**: Database webhook on `INSERT` into `load_status_logs` → calls this function with the new row as JSON payload.
 
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
+**Function logic**:
+1. Parse the webhook payload → get `load_id`, `new_status`
+2. Fetch load from `fleet_loads` (select `id`, `landstar_load_id`, `tracking_id`, `origin`, `destination`, `driver_id`, `org_id`, `agency_code`, `auto_email_updates`)
+3. If `auto_email_updates` is false → return 200 immediately (no-op)
+4. Fetch agent email by matching `agency_code` → `company_resources.agent_code` (type = `load_agent`) for the org. Also check `crm_contacts` by `agent_code`.
+5. If no email found → return 200 (no-op, agent not in CRM)
+6. Fetch driver location from `driver_locations` (lat/lng, optional)
+7. Build tracking URL: `https://fleetflowjwusa.lovable.app/track?tracking_id={tracking_id}`
+8. Send HTML email via Resend (reuse `RESEND_API_KEY` secret already configured)
 
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
+**Email HTML**: Clean, branded, professional. Sections:
+- Header with gold gradient (same as invite-user template style)
+- "Load #[landstar_load_id or id]" status update
+- Route: Origin → Destination
+- Current Status badge
+- Driver Location (if sharing)
+- Tracking Link button
+- Footer
 
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
+**config.toml entry**:
+```toml
+[functions.email-load-status]
+verify_jwt = false
+```
 
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
+---
 
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
+### Agent Email Lookup Logic
 
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+The `agency_code` (3-char, e.g. `JNS`) on a load maps to `company_resources.agent_code`. The function checks:
+1. `company_resources` where `agent_code = load.agency_code AND org_id = load.org_id` → use `.email`
+2. Fallback: `crm_contacts` where `agent_code = load.agency_code AND org_id = load.org_id` → use `.email`
+3. If both null → skip sending
 
+---
+
+### Files
+
+| File | Action |
+|------|--------|
+| DB migration | Add `auto_email_updates boolean DEFAULT true` to `fleet_loads` |
+| `src/pages/FleetLoads.tsx` | Add Switch toggle in Load Details tab + include in form payload |
+| `supabase/functions/email-load-status/index.ts` | New edge function |
+| `supabase/config.toml` | Add `[functions.email-load-status]` entry |
+
+### Webhook Setup Note
+After deploying the edge function, the user needs to create a **Database Webhook** in the Lovable Cloud backend:
+- Table: `load_status_logs`, Event: `INSERT`
+- Webhook URL: `https://iwivgqsihxicyptaoewm.supabase.co/functions/v1/email-load-status`
+
+This will be noted in the implementation with clear instructions.
