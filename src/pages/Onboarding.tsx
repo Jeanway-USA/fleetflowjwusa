@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import {
   Loader2, ArrowLeft, ArrowRight, CheckCircle2, Building2, Truck, Container,
-  Users, Plus, X, SkipForward, Upload, ImageIcon,
+  Users, Plus, X, SkipForward, Upload, ImageIcon, LogOut,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -25,7 +25,7 @@ const INVITE_ROLES = [
 ];
 
 export default function Onboarding() {
-  const { refreshOrgData, refreshRoles } = useAuth();
+  const { signOut, refreshOrgData, refreshRoles } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
 
@@ -225,10 +225,22 @@ export default function Onboarding() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="border-b border-border bg-card/80 backdrop-blur-sm">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-center">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="w-20" />
           <div className="text-center">
             <h1 className="text-2xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
             <p className="text-xs text-muted-foreground mt-0.5">by JeanWayUSA</p>
+          </div>
+          <div className="w-20 flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={async () => { await signOut(); navigate('/'); }}
+            >
+              <LogOut className="mr-1.5 h-4 w-4" />
+              Sign Out
+            </Button>
           </div>
         </div>
       </div>
