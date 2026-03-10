@@ -7,7 +7,6 @@ const corsHeaders = {
 };
 
 const DEMO_EMAIL = "demo@fleetflow-tms.com";
-const DEMO_PASSWORD = "DemoUser2026!Secure";
 const DEMO_ORG_NAME = "Demo Trucking Co.";
 
 serve(async (req) => {
