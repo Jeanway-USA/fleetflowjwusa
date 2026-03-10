@@ -3767,6 +3767,7 @@ export type Database = {
           hire_date: string | null
           id: string | null
           last_name: string | null
+          org_id: string | null
           phone: string | null
           status: string | null
           updated_at: string | null
@@ -3782,6 +3783,7 @@ export type Database = {
           hire_date?: string | null
           id?: string | null
           last_name?: string | null
+          org_id?: string | null
           phone?: string | null
           status?: string | null
           updated_at?: string | null
@@ -3797,12 +3799,28 @@ export type Database = {
           hire_date?: string | null
           id?: string | null
           last_name?: string | null
+          org_id?: string | null
           phone?: string | null
           status?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "drivers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drivers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       super_admin_audit_logs: {
         Row: {
