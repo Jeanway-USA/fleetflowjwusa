@@ -381,10 +381,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Missing required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-
     console.log(`Fuel stops: driver=${driver_id}, route=(${origin_lat},${origin_lng})->(${dest_lat},${dest_lng}), corridor=${corridor_miles}mi, polyline=${route_polyline?.length ?? 0}pts`);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // IDOR protection: verify caller is authorized for this driver
+    const { data: callerProfile } = await supabase
+      .from('profiles').select('org_id').eq('user_id', user.id).single();
+    const { data: targetDriver } = await supabase
+      .from('drivers').select('org_id').eq('id', driver_id).maybeSingle();
+
+    if (!callerProfile?.org_id || !targetDriver || targetDriver.org_id !== callerProfile.org_id) {
+      return new Response(JSON.stringify({ error: 'Access denied' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const tripMiles = booked_miles || haversineDistance(origin_lat, origin_lng, dest_lat, dest_lng);
     const estimatedGallons = tripMiles / 6.5;
     const now = new Date().toISOString();
