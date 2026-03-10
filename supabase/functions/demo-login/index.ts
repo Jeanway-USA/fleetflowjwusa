@@ -17,6 +17,13 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const DEMO_PASSWORD = Deno.env.get("DEMO_USER_PASSWORD");
+    if (!DEMO_PASSWORD) {
+      return new Response(
+        JSON.stringify({ error: "Demo login not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
