@@ -239,6 +239,28 @@ export default function CRM() {
         description={`Are you sure you want to delete "${deleteTarget?.company_name}"? This action cannot be undone.`}
         isDeleting={isDeleting}
       />
+      <ConfirmDeleteDialog
+        open={massDeleteOpen}
+        onOpenChange={setMassDeleteOpen}
+        onConfirm={async () => {
+          setBulkUpdating(true);
+          try {
+            // CRM contacts only (not resources/facilities from unified view) - delete from crm_contacts
+            const { error } = await supabase.from('crm_contacts').delete().in('id', [...selectedIds]);
+            if (error) throw error;
+            // Also try resources and facilities tables for any selected unified contacts
+            await supabase.from('company_resources').delete().in('id', [...selectedIds]);
+            await supabase.from('facilities').delete().in('id', [...selectedIds]);
+            toast.success(`${selectedIds.size} contact(s) deleted`);
+            setSelectedIds(new Set());
+            setMassDeleteOpen(false);
+          } catch (e: any) { toast.error(e.message); }
+          finally { setBulkUpdating(false); }
+        }}
+        title="Delete Selected Contacts"
+        description={`Are you sure you want to delete ${selectedIds.size} contact(s)? This action cannot be undone.`}
+        isDeleting={bulkUpdating}
+      />
     </>
   );
 }

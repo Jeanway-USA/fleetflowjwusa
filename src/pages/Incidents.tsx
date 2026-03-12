@@ -330,6 +330,64 @@ export default function Incidents() {
             emptyMessage="No incidents reported"
             tableId="incidents"
             exportFilename="incidents"
+            onRowDoubleClick={(incident) => openDialog(incident)}
+            selectable
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            bulkActions={(ids) => (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
+                  <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
+                  <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+                </Button>
+              </>
+            )}
+          />
+          <ConfirmDeleteDialog
+            open={massDeleteOpen}
+            onOpenChange={setMassDeleteOpen}
+            onConfirm={async () => {
+              setBulkUpdating(true);
+              try {
+                const { error } = await supabase.from('incidents').delete().in('id', [...selectedIds]);
+                if (error) throw error;
+                queryClient.invalidateQueries({ queryKey: ['incidents'] });
+                toast.success(`${selectedIds.size} incident(s) deleted`);
+                setSelectedIds(new Set());
+                setMassDeleteOpen(false);
+              } catch (e: any) { toast.error(e.message); }
+              finally { setBulkUpdating(false); }
+            }}
+            title="Delete Selected Incidents"
+            description={`Are you sure you want to delete ${selectedIds.size} incident(s)? This action cannot be undone.`}
+            isDeleting={bulkUpdating}
+          />
+          <BulkStatusEditDialog
+            open={massEditOpen}
+            onOpenChange={setMassEditOpen}
+            onConfirm={async (status) => {
+              setBulkUpdating(true);
+              try {
+                const { error } = await supabase.from('incidents').update({ status }).in('id', [...selectedIds]);
+                if (error) throw error;
+                queryClient.invalidateQueries({ queryKey: ['incidents'] });
+                toast.success(`${selectedIds.size} incident(s) updated`);
+                setSelectedIds(new Set());
+                setMassEditOpen(false);
+              } catch (e: any) { toast.error(e.message); }
+              finally { setBulkUpdating(false); }
+            }}
+            count={selectedIds.size}
+            entityName="incidents"
+            isUpdating={bulkUpdating}
+            statusOptions={[
+              { value: 'reported', label: 'Reported' },
+              { value: 'under_review', label: 'Under Review' },
+              { value: 'resolved', label: 'Resolved' },
+              { value: 'closed', label: 'Closed' },
+            ]}
           />
         </CardContent>
       </Card>
