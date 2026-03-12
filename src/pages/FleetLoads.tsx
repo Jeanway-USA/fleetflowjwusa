@@ -822,7 +822,7 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="pickup_date">Pickup Date</Label>
                     <Input 
@@ -843,6 +843,18 @@ export default function FleetLoads() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="pickup_time_type">Pickup Time Type</Label>
+                    <Select value={formData.pickup_time_type || 'appointment'} onValueChange={(v) => setFormData({ ...formData, pickup_time_type: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="appointment">Strict Appointment</SelectItem>
+                        <SelectItem value="window">Open Window</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
                     <Label htmlFor="delivery_date">Delivery Date</Label>
                     <Input 
                       id="delivery_date" 
@@ -860,6 +872,16 @@ export default function FleetLoads() {
                       onChange={(e) => setFormData({ ...formData, delivery_time: e.target.value })} 
                       placeholder="2:00 PM"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="delivery_time_type">Delivery Time Type</Label>
+                    <Select value={formData.delivery_time_type || 'appointment'} onValueChange={(v) => setFormData({ ...formData, delivery_time_type: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="appointment">Strict Appointment</SelectItem>
+                        <SelectItem value="window">Open Window</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
