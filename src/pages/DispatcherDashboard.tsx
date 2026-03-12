@@ -17,6 +17,7 @@ import { FleetMapView } from '@/components/dispatcher/FleetMapView';
 import { DriverAssignmentPanel } from '@/components/dispatcher/DriverAssignmentPanel';
 import { FleetTimelineScheduler } from '@/components/dispatcher/FleetTimelineScheduler';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 
 export default function DispatcherDashboard() {
