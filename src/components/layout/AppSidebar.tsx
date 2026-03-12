@@ -89,7 +89,7 @@ const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
   ]),
 };
 
-const SUPER_ADMIN_EMAILS = ['andrew@jeanwayusa.com', 'siadrak@jeanwayusa.com'];
+// Super admin check moved to server-side RPC via useAuth()
 
 const STORAGE_KEY = 'sidebar-groups';
 
