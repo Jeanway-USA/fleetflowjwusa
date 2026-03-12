@@ -168,7 +168,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
 
       {showAddForm && (
         <div className="p-4 border rounded-lg bg-muted/30 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Type</Label>
               <Select value={formData.expense_type} onValueChange={(v) => setFormData({ ...formData, expense_type: v })}>
