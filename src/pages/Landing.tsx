@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   Truck, DollarSign, Shield, BarChart3, Users, Package, 
-  ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play
+  ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone
 } from 'lucide-react';
 
 const TIERS = [
@@ -264,23 +264,26 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Feature Highlights */}
+      {/* Four Pillars */}
       <section className="bg-card/50 border-y border-border py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h3 className="text-3xl font-bold text-center mb-12">Everything You Need to Succeed</h3>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="text-center mb-12">
+            <h3 className="text-3xl font-bold mb-3">Built for the Way You Work</h3>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Four core capabilities designed around how Landstar BCOs actually run their business.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {[
-              { icon: DollarSign, title: 'Per-Load P&L', desc: 'Know your true profit on every load — fuel, tolls, fees included.' },
-              { icon: Fuel, title: 'IFTA Automation', desc: 'Auto-calculate fuel tax by jurisdiction. Print-ready quarterly reports.' },
-              { icon: Wrench, title: 'Maintenance Tracker', desc: 'Oil changes, tire rotations, 120-day inspections — never miss one.' },
-              { icon: MapPin, title: 'GPS Fleet Tracking', desc: 'Real-time driver locations on a live map with route history.' },
-              { icon: BarChart3, title: 'Fleet Analytics', desc: 'Cost-per-mile, revenue trends, and driver performance scorecards.' },
-              { icon: FileText, title: 'Document Vault', desc: 'BOLs, rate confirmations, and compliance docs — all in one place.' },
+              { icon: FileText, title: 'Automated Statement Parsing', desc: 'Upload your Landstar settlement PDF and watch it auto-map every line item — revenue, deductions, and advances — in seconds.', accent: 'bg-primary/10 text-primary' },
+              { icon: Fuel, title: 'Fuel & Card Advance Tracking', desc: 'Track fuel purchases, Comdata advances, and per-load expenses so you always know your true cost-per-mile.', accent: 'bg-emerald-500/10 text-emerald-500' },
+              { icon: Package, title: 'Active Load Dispatching', desc: 'Assign drivers, update statuses, and monitor pickups & deliveries from a single real-time board.', accent: 'bg-blue-500/10 text-blue-500' },
+              { icon: Smartphone, title: 'Driver Mobile Access', desc: 'Drivers get their own dashboard for BOL uploads, DVIR forms, and live trip updates — right from their phone.', accent: 'bg-purple-500/10 text-purple-500' },
             ].map((f) => (
-              <div key={f.title} className="p-6 rounded-lg border border-border bg-card hover:border-primary/30 transition-colors">
-                <f.icon className="h-8 w-8 text-primary mb-3" />
-                <h4 className="font-semibold mb-1">{f.title}</h4>
-                <p className="text-sm text-muted-foreground">{f.desc}</p>
+              <div key={f.title} className="p-8 rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-primary/30">
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-6 ${f.accent}`}>
+                  <f.icon className="w-6 h-6" />
+                </div>
+                <h4 className="text-lg font-semibold mb-2">{f.title}</h4>
+                <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
