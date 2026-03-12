@@ -18,6 +18,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock, Truck as TruckIcon, MoreHorizontal, FileSpreadsheet } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
+import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { addDays, differenceInDays, format } from 'date-fns';
