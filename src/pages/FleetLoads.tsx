@@ -583,12 +583,7 @@ export default function FleetLoads() {
         <CardContent className="pt-6">
           <DataTable
             columns={[
-              { key: 'pickup_date', header: 'Date', render: (load: any) => (
-                <div className="flex items-center gap-2">
-                  <span>{formatDate(load.pickup_date)}</span>
-                  {load.pickup_time && <span className="text-xs text-muted-foreground">{load.pickup_time}</span>}
-                </div>
-              ) },
+              { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
               { key: 'landstar_load_id', header: 'Landstar ID', render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
               { key: 'tracking_id', header: 'Tracking ID', hiddenOnMobile: true, render: (load: any) => 
                 load.tracking_id ? (
