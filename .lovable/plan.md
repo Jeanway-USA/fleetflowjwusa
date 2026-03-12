@@ -1,66 +1,41 @@
 
 
-## QoL Improvements Across All Areas
+## Plan: Actionable Empty States for Data Tables
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Current State
+- `EmptyState.tsx` already exists with icon, title, description, and action button support
+- `DataTable` shows a plain `<p>` tag when empty — no icon, no action button
+- `Drivers.tsx` already uses `EmptyState` directly (doesn't use `DataTable`)
+- Pages using `DataTable` (Trucks, FleetLoads, Trailers, etc.) only pass a string `emptyMessage`
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+### Changes
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+**1. `src/components/shared/DataTable.tsx`** — Add rich empty state props
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+Add optional props to the `DataTableProps` interface:
+- `emptyIcon?: LucideIcon`
+- `emptyAction?: { label: string; onClick: () => void }`
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+Update the empty state render block (lines 237-241) to use the `EmptyState` component when data is empty, passing `emptyMessage` as the title and the new optional props.
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+**2. `src/pages/Trucks.tsx`** — Pass empty state config to DataTable
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+Add `emptyIcon={Truck}` and `emptyAction={{ label: 'Add First Truck', onClick: openAddDialog }}` to the DataTable usage.
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+**3. `src/pages/FleetLoads.tsx`** — Pass empty state config to DataTable
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+Add `emptyIcon={Package}` (or similar) and `emptyAction={{ label: 'Add First Load', onClick: openAddDialog }}`. Update `emptyMessage` to be more descriptive.
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+**4. `src/pages/Drivers.tsx`** — Already handled
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+This page already renders `EmptyState` with icon and action. No changes needed.
 
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
+**5. Other DataTable consumers** — Update copy for these pages with better messages:
+- `Trailers.tsx`: Add icon and action
+- `AgencyLoads.tsx`: Add icon
+- `Incidents.tsx`: Add icon
+- `Documents.tsx`: Add icon and action
 
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
-
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
-
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+### Summary
+The main work is adding two optional props to `DataTable` and wiring the `EmptyState` component into its empty render path. Then each page passes contextual icon/action/copy. Approximately 6-8 files touched with small prop additions.
 
