@@ -325,7 +325,7 @@ const CompanyInsights = () => {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center">
