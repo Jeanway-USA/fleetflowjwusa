@@ -46,6 +46,20 @@ serve(async (req) => {
     const userEmail = claimsData.claims.email as string;
     logStep("User authenticated", { userId, email: userEmail });
 
+    // Verify user has 'owner' role before allowing subscription changes
+    const { data: roleData } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "owner")
+      .maybeSingle();
+    if (!roleData) {
+      return new Response(JSON.stringify({ error: "Only owners can manage subscriptions" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403,
+      });
+    }
+    logStep("Owner role verified");
     // Get user's org_id from profiles
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
