@@ -1,66 +1,117 @@
 
 
-## QoL Improvements Across All Areas
+## Plan: Comprehensive Mobile-Responsiveness Pass
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+This is a large cross-cutting change touching ~20 files. The approach is to make surgical, mobile-first Tailwind adjustments without altering any business logic or data.
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+---
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+### Task 1: Global Layout & Navigation
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+**`src/components/layout/DashboardLayout.tsx`**
+- Line 198: Change `p-4 lg:p-6` to `p-2 sm:p-4 lg:p-6` for tighter mobile padding
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+**`src/components/shared/PageHeader.tsx`**
+- Already uses `flex-col sm:flex-row` — looks good. Add `items-start sm:items-center` to the outer div for better mobile alignment of title vs actions.
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+**`src/components/layout/AppSidebar.tsx`**
+- No changes needed — the Sidebar component already handles mobile overlay via the SidebarProvider. The SidebarTrigger is `lg:hidden` and sticky in the header.
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+---
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+### Task 2: Responsive Grids — Dashboards & KPI Cards
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+**`src/pages/DispatcherDashboard.tsx`**
+- Stats grid (line 158): `grid-cols-2 lg:grid-cols-4` — already good, keeps 2-col on mobile.
+- Map/Assignment/Alerts row (line 175): Change `md:grid-cols-2 lg:grid-cols-3` to `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` (explicit mobile single-col).
+- Driver/Truck status grid (line ~210): Change `md:grid-cols-2` to `grid-cols-1 md:grid-cols-2`.
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+**`src/pages/ExecutiveDashboard.tsx`**
+- Health + KPI row (line 710): Already `grid-cols-1 lg:grid-cols-5` — good.
+- Fleet/Driver status (line 720): Already `grid-cols-1 md:grid-cols-2` — good.
+- Operations+Costs (line 729): Already `grid-cols-1 lg:grid-cols-2` — good.
+- Actions/Performers/Insights (line 735): Already `grid-cols-1 lg:grid-cols-3` — good.
+- Header row (line 690): Needs fix — `PageHeader` and the button/period selector are inside a `flex-col sm:flex-row` div, but `PageHeader` itself adds another flex wrapper. Flatten so buttons stack below title on mobile.
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+**`src/components/executive/RevenueKPICards.tsx`**
+- Line 119: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-5` — already responsive.
 
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
+**`src/components/executive/TopPerformerCards.tsx`**
+- Line 78: `grid-cols-1 md:grid-cols-2` — already responsive.
 
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
+**`src/pages/DriverDashboard.tsx`**
+- GPS+Pay row (line 201): `md:grid-cols-2` — add explicit `grid-cols-1` prefix.
+- Already well-structured for mobile with `max-w-4xl mx-auto`.
 
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
+**`src/components/executive/PrintableExecutiveSummary.tsx`**
+- Print-specific grids (`grid-cols-4`, `grid-cols-3`) — add `grid-cols-2 sm:grid-cols-4` etc. for screen responsiveness of the print preview.
 
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
+**`src/pages/CompanyInsights.tsx`**
+- Line 243: `md:grid-cols-2` → `grid-cols-1 md:grid-cols-2`
+- Line 328: `md:grid-cols-4` → `grid-cols-2 md:grid-cols-4`
+- Line 416: `md:grid-cols-3` → `grid-cols-1 sm:grid-cols-3`
 
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
+**`src/pages/AgencyLoads.tsx`**
+- Form grids (lines 217, 236, 246, 256, 266): All `grid-cols-2` — change to `grid-cols-1 sm:grid-cols-2` so form fields stack on mobile.
 
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+**`src/pages/Landing.tsx`**
+- Stats grid (line 136): `grid-cols-2 md:grid-cols-4` — already good.
+- Features grid (line 189): `sm:grid-cols-2 lg:grid-cols-3` — already good.
+
+---
+
+### Task 3: Modals, Dialogs, and Sheets
+
+**`src/components/ui/dialog.tsx`** (global fix)
+- Line 39: Add `max-h-[85vh] overflow-y-auto` to the base DialogContent class. Also add `w-[95vw] sm:w-full` to ensure mobile dialogs don't bleed off-screen.
+
+**`src/components/ui/sheet.tsx`**
+- Line 45 (right variant): Already `w-3/4 sm:max-w-sm` — update to `w-full sm:max-w-sm` so mobile sheets take full width.
+- Line 43 (left variant): Same change — `w-full sm:max-w-sm`.
+
+**Individual dialog consumers** (e.g., `Trucks.tsx` line 412 `max-w-lg`, `SettlementsTab.tsx` line 573 `max-w-2xl`): These will inherit the base mobile fix from dialog.tsx. No individual changes needed.
+
+---
+
+### Task 4: Touch Targets & Driver Forms
+
+**`src/components/ui/input.tsx`**
+- Line 12: Already `h-10`. Change to `h-11 sm:h-10` for larger touch targets on mobile.
+
+**`src/components/ui/button.tsx`**
+- Check default size height. If it's `h-10`, change to `h-11 sm:h-10` for default variant.
+
+**`src/components/driver/SignaturePad.tsx`**
+- Canvas (line 108-119): Already uses `w-full` with `touch-none` — canvas scales correctly. The fixed `width={400} height={150}` is the internal resolution, not display size. No change needed — it already works responsively.
+
+**`src/components/driver/PhotoCapture.tsx`**
+- Photo grid (line 98): `grid-cols-3` — change to `grid-cols-2 sm:grid-cols-3` for larger thumbnails on mobile.
+
+**`src/components/driver/DVIRForm.tsx`**
+- Inspection item checkboxes: Ensure touch targets are adequate. Add `min-h-[44px]` to checkbox row wrappers.
+
+**`src/components/shared/ExpensesList.tsx`**
+- Form grids (lines 171, 193, 230): `grid-cols-2` → `grid-cols-1 sm:grid-cols-2`.
+
+---
+
+### Files Modified Summary
+
+| File | Change |
+|------|--------|
+| `DashboardLayout.tsx` | Mobile padding |
+| `PageHeader.tsx` | Mobile alignment |
+| `dialog.tsx` | Global mobile-safe sizing + scroll |
+| `sheet.tsx` | Full-width on mobile |
+| `input.tsx` | Touch target height |
+| `button.tsx` | Touch target height |
+| `DispatcherDashboard.tsx` | Grid responsiveness |
+| `ExecutiveDashboard.tsx` | Header layout fix |
+| `DriverDashboard.tsx` | Explicit grid-cols-1 |
+| `CompanyInsights.tsx` | Grid responsiveness |
+| `AgencyLoads.tsx` | Form grid stacking |
+| `PrintableExecutiveSummary.tsx` | Grid responsiveness |
+| `PhotoCapture.tsx` | Photo grid columns |
+| `DVIRForm.tsx` | Touch target sizing |
+| `ExpensesList.tsx` | Form grid stacking |
 
