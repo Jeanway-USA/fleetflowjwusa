@@ -21,6 +21,7 @@ import {
   Clock,
   Package
 } from 'lucide-react';
+import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { getRelativeTimestamp } from './RelativeTimestamp';
 
 // Status progression for drivers
