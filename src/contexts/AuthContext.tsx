@@ -44,6 +44,7 @@ interface AuthContextType {
   simulatedOrgId: string | null;
   simulatedOrgName: string | null;
   clearOrgSimulation: () => void;
+  isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
