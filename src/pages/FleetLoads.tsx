@@ -61,6 +61,10 @@ export default function FleetLoads() {
   const [formData, setFormData] = useState<any>({});
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [accessorials, setAccessorials] = useState<Accessorial[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [massEditOpen, setMassEditOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   // Fetch settings for calculations
   const { data: settings = [] } = useQuery({
