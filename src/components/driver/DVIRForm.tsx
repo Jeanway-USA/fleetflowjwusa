@@ -91,7 +91,7 @@ export function DVIRForm({ type, driverId, truckId, onComplete }: DVIRFormProps)
           placeholder="Enter miles"
           value={odometer}
           onChange={(e) => setOdometer(e.target.value)}
-          className="text-lg"
+          className="text-lg text-base"
         />
       </div>
 
