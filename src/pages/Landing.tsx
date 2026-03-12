@@ -260,8 +260,14 @@ export default function Landing() {
                 </div>
               </div>
               <div className="mb-5">
-                <span className="text-2xl font-bold text-muted-foreground line-through">$49</span>
-                <span className="text-sm text-muted-foreground">/mo</span>
+                {pricesLoading ? (
+                  <Skeleton className="h-8 w-20" />
+                ) : (
+                  <>
+                    <span className="text-2xl font-bold text-muted-foreground line-through">${prices['solo_bco'] ?? '—'}</span>
+                    <span className="text-sm text-muted-foreground">/mo</span>
+                  </>
+                )}
               </div>
               <ul className="space-y-2 mb-6">
                 {['Per-load profit/loss', 'IFTA fuel tax automation', 'Maintenance reminders', 'Digital document storage'].map((f) => (
