@@ -99,6 +99,10 @@ export default function Trailers() {
   const [editingTrailer, setEditingTrailer] = useState<TrailerWithDriver | null>(null);
   const [formData, setFormData] = useState<Partial<TrailerInsert>>({});
   const [viewingTrailer, setViewingTrailer] = useState<TrailerWithDriver | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [massEditOpen, setMassEditOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const { data: trailers = [], isLoading } = useQuery({
     queryKey: ['trailers'],
