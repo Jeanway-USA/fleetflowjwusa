@@ -364,7 +364,49 @@ export default function Trucks() {
           <FileSpreadsheet className="h-4 w-4 mr-2" /> Import CSV
         </Button>
       </PageHeader>
-      <DataTable columns={columns} data={trucks} loading={isLoading} emptyMessage="No trucks registered yet" tableId="trucks" exportFilename="trucks" />
+      <DataTable
+        columns={columns}
+        data={trucks}
+        loading={isLoading}
+        emptyMessage="No trucks registered yet"
+        tableId="trucks"
+        exportFilename="trucks"
+        onRowDoubleClick={(truck) => openDialog(truck)}
+        selectable
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        bulkActions={(ids) => (
+          <>
+            <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
+              <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
+              <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+            </Button>
+          </>
+        )}
+      />
+      <ConfirmDeleteDialog
+        open={massDeleteOpen}
+        onOpenChange={setMassDeleteOpen}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected Trucks"
+        description={`Are you sure you want to delete ${selectedIds.size} truck(s)? This action cannot be undone.`}
+        isDeleting={bulkUpdating}
+      />
+      <BulkStatusEditDialog
+        open={massEditOpen}
+        onOpenChange={setMassEditOpen}
+        onConfirm={handleBulkStatusUpdate}
+        count={selectedIds.size}
+        entityName="trucks"
+        isUpdating={bulkUpdating}
+        statusOptions={[
+          { value: 'active', label: 'Active' },
+          { value: 'down', label: 'Down' },
+          { value: 'out_of_service', label: 'Out of Service' },
+        ]}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
