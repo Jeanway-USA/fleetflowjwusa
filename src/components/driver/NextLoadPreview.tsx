@@ -2,12 +2,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, Calendar, MapPin } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 
 interface Load {
   id: string;
   origin: string;
   destination: string;
   pickup_date: string | null;
+  pickup_time?: string | null;
+  pickup_time_type?: string | null;
   status: string;
   booked_miles: number | null;
   landstar_load_id: string | null;
