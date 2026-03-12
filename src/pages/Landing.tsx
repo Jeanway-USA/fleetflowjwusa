@@ -232,11 +232,11 @@ export default function Landing() {
 
       {/* Stats */}
       <section className="border-y border-border bg-card/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {STATS.map((stat) => (
               <div key={stat.label} className="text-center">
-                <div className="text-3xl font-bold text-gradient-gold">{stat.value}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-gradient-gold">{stat.value}</div>
                 <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
               </div>
             ))}
