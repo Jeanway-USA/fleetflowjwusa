@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { CommandPalette } from '@/components/shared/CommandPalette';
 import { BetaFeedbackWidget } from '@/components/shared/BetaFeedbackWidget';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/executive-dashboard': 'Executive Dashboard',
@@ -196,7 +197,9 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
           </div>
         </header>
         <div className="flex-1 p-2 sm:p-4 lg:p-6 animate-fade-in">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
       </main>
       {isDemoMode && <DemoControls />}

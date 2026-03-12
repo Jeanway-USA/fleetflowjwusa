@@ -16,6 +16,7 @@ import { LocationSharing } from '@/components/driver/LocationSharing';
 import { DriverNotifications } from '@/components/driver/DriverNotifications';
 import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { Loader2, Sun, Moon, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -172,23 +173,27 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
         )}
 
         {/* Active Load Card */}
-        <ActiveLoadCard 
-          load={activeLoad} 
-          payRate={driver.pay_rate} 
-          payType={driver.pay_type}
-          driverId={driver.id}
-          onStatusUpdate={refetchLoads}
-        />
+        <ErrorBoundary compact>
+          <ActiveLoadCard 
+            load={activeLoad} 
+            payRate={driver.pay_rate} 
+            payType={driver.pay_type}
+            driverId={driver.id}
+            onStatusUpdate={refetchLoads}
+          />
+        </ErrorBoundary>
 
         {/* Fuel Trip Planner - shows when there's an active/upcoming load */}
         {activeLoad && (
-          <TripFuelPlanner
-            driverId={driver.id}
-            origin={activeLoad.origin}
-            destination={activeLoad.destination}
-            bookedMiles={activeLoad.booked_miles}
-            notes={activeLoad.notes}
-          />
+          <ErrorBoundary compact>
+            <TripFuelPlanner
+              driverId={driver.id}
+              origin={activeLoad.origin}
+              destination={activeLoad.destination}
+              bookedMiles={activeLoad.booked_miles}
+              notes={activeLoad.notes}
+            />
+          </ErrorBoundary>
         )}
 
         {/* Next Load Preview */}
@@ -199,16 +204,20 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
 
         {/* GPS + Pay in one row on larger screens */}
         <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
-          <LocationSharing 
-            driverId={driver.id}
-            truckId={assignedTruck?.id}
-            loadId={activeLoad?.id}
-          />
-          <DriverPayWidget 
-            driverId={driver.id} 
-            payRate={driver.pay_rate} 
-            payType={driver.pay_type} 
-          />
+          <ErrorBoundary compact>
+            <LocationSharing 
+              driverId={driver.id}
+              truckId={assignedTruck?.id}
+              loadId={activeLoad?.id}
+            />
+          </ErrorBoundary>
+          <ErrorBoundary compact>
+            <DriverPayWidget 
+              driverId={driver.id} 
+              payRate={driver.pay_rate} 
+              payType={driver.pay_type} 
+            />
+          </ErrorBoundary>
         </div>
 
         {/* Monthly Bonus Goal */}
@@ -218,12 +227,14 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
         <DriverLeaderboard readOnly />
 
         {/* Unified Driver Requests */}
-        <DriverRequestsCard 
-          driverId={driver.id}
-          truckId={assignedTruck?.id}
-          activeLoadId={activeLoad?.id}
-          activeLoadNumber={activeLoad?.landstar_load_id}
-        />
+        <ErrorBoundary compact>
+          <DriverRequestsCard 
+            driverId={driver.id}
+            truckId={assignedTruck?.id}
+            activeLoadId={activeLoad?.id}
+            activeLoadNumber={activeLoad?.landstar_load_id}
+          />
+        </ErrorBoundary>
       </div>
 
       {/* Geofence Arrival Drawer */}

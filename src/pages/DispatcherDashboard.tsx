@@ -17,6 +17,7 @@ import { FleetMapView } from '@/components/dispatcher/FleetMapView';
 import { DriverAssignmentPanel } from '@/components/dispatcher/DriverAssignmentPanel';
 import { FleetTimelineScheduler } from '@/components/dispatcher/FleetTimelineScheduler';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 
 export default function DispatcherDashboard() {
@@ -175,12 +176,16 @@ export default function DispatcherDashboard() {
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {/* Map - Square, takes 1 column */}
           <div>
-            <FleetMapView />
+            <ErrorBoundary compact>
+              <FleetMapView />
+            </ErrorBoundary>
           </div>
 
           {/* Driver Assignment Panel */}
           <div>
-            <DriverAssignmentPanel />
+            <ErrorBoundary compact>
+              <DriverAssignmentPanel />
+            </ErrorBoundary>
           </div>
 
           {/* Alerts */}
@@ -190,13 +195,19 @@ export default function DispatcherDashboard() {
         </div>
 
         {/* Fleet Timeline Scheduler */}
-        <FleetTimelineScheduler />
+        <ErrorBoundary compact>
+          <FleetTimelineScheduler />
+        </ErrorBoundary>
 
         {/* Driver Leaderboard */}
-        <DriverLeaderboard />
+        <ErrorBoundary compact>
+          <DriverLeaderboard />
+        </ErrorBoundary>
 
         {/* Active Loads - Full Width */}
-        <ActiveLoadsBoard />
+        <ErrorBoundary compact>
+          <ActiveLoadsBoard />
+        </ErrorBoundary>
 
         {/* Upcoming Pickups - Full Width */}
         <UpcomingPickups />
