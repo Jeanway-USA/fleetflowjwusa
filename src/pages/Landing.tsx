@@ -124,11 +124,11 @@ export default function Landing() {
                 <Truck className="h-4 w-4" />
                 Built for Landstar BCOs & Agents
               </div>
-              <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold tracking-tight mb-6 leading-[1.1] text-white">
+              <h1 className="text-3xl sm:text-5xl lg:text-[3.5rem] font-extrabold tracking-tight mb-6 leading-[1.1] text-white">
                 Master Your Fleet's{' '}
                 <span className="text-gradient-gold">Finances & Dispatch.</span>
               </h1>
-              <p className="text-lg text-[hsl(0_0%_65%)] mb-8 max-w-xl leading-relaxed">
+              <p className="text-base sm:text-lg text-[hsl(0_0%_65%)] mb-8 max-w-xl leading-relaxed">
                 The all-in-one platform built specifically for Landstar BCOs to track expenses, manage card advances, and streamline dispatching.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
