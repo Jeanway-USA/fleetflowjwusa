@@ -1,66 +1,45 @@
 
 
-## QoL Improvements Across All Areas
+## Plan: High-Converting Pricing Section on Homepage
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Overview
+Replace the existing "Tiers Preview" section (lines 247-283) with a proper pricing section featuring three cards: Solo BCO and Fleet Owner as faded "Coming Soon" cards flanking a prominent center "Open Beta" card that's 100% free with a "Limited Time" badge.
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+### Changes — `src/pages/Landing.tsx`
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+**Replace lines 247-283** (the current Tiers Preview section) with:
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+**Section heading**: "Simple, Transparent Pricing" with subheading "Start free during our Open Beta. Premium tiers coming soon."
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+**Three-card grid** (`md:grid-cols-3`, items-center for vertical centering so the center card stands out):
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+1. **Solo BCO** (left) — faded style (`opacity-60`), "Coming Soon" badge at top
+   - Price: "$49/mo" with strikethrough or muted
+   - 4-5 key features (from existing TIERS data)
+   - Disabled/muted button: "Coming Soon"
+   - Subtle border, no glow
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+2. **Open Beta** (center, prominent) — full opacity, scaled up slightly (`md:scale-105`), gold border glow
+   - "Limited Time" badge (gold, pill-shaped, top-right or above title)
+   - Price: "$0" with "/forever during beta" subtitle
+   - Icon: Truck
+   - Features: All Solo BCO features + "Priority feature requests", "Early adopter perks"
+   - CTA: "Start Free" button with `gradient-gold pulse-glow-gold` styling
+   - Card has `border-primary/50` and subtle gold shadow
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+3. **Fleet Owner** (right) — faded style (`opacity-60`), "Coming Soon" badge
+   - Price: "$149/mo" muted
+   - 4-5 key features
+   - Disabled/muted button: "Coming Soon"
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+**Below the cards**: "Compare All Features" link button to `/pricing` (kept from current)
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+### Badge component
+Use the existing `Badge` import or inline a styled pill div for "Limited Time" and "Coming Soon" labels.
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+### Imports to add
+- `Badge` from `@/components/ui/badge`
+- `Star` or `Sparkles` from lucide-react (for the beta card icon, optional)
 
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
-
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
-
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
-
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+### No other files change
 
