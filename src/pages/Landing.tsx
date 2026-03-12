@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   Truck, DollarSign, Shield, BarChart3, Users, Package, 
-  ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone
+  ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone, Menu
 } from 'lucide-react';
 
 const TIERS = [
@@ -43,6 +44,7 @@ const STATS = [
 export default function Landing() {
   const navigate = useNavigate();
   const [demoLoading, setDemoLoading] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleDemoLogin = async () => {
     setDemoLoading(true);
@@ -68,7 +70,7 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 sm:pb-0">
       {/* Nav */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -76,13 +78,29 @@ export default function Landing() {
             <span className="text-xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
             <span className="text-[10px] text-muted-foreground ml-1.5">by JeanWayUSA</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate('/pricing')}>Pricing</Button>
             <Button variant="outline" onClick={() => navigate('/auth')}>Sign In</Button>
             <Button className="gradient-gold text-primary-foreground" onClick={() => navigate('/auth')}>
               Start Free Trial
             </Button>
           </div>
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="sm:hidden">
+                <Menu className="h-6 w-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-72">
+              <nav className="flex flex-col gap-4 mt-8">
+                <Button variant="ghost" className="justify-start" onClick={() => { setMenuOpen(false); navigate('/pricing'); }}>Pricing</Button>
+                <Button variant="outline" className="justify-start" onClick={() => { setMenuOpen(false); navigate('/auth'); }}>Sign In</Button>
+                <Button className="gradient-gold text-primary-foreground" onClick={() => { setMenuOpen(false); navigate('/auth'); }}>
+                  Start Free Trial
+                </Button>
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
       </header>
 
@@ -98,7 +116,7 @@ export default function Landing() {
           background: 'radial-gradient(ellipse 80% 60% at 70% 50%, hsl(45 80% 50% / 0.08) 0%, transparent 70%)',
         }} />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 lg:py-28 relative">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left column */}
             <div>
@@ -106,11 +124,11 @@ export default function Landing() {
                 <Truck className="h-4 w-4" />
                 Built for Landstar BCOs & Agents
               </div>
-              <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold tracking-tight mb-6 leading-[1.1] text-white">
+              <h1 className="text-3xl sm:text-5xl lg:text-[3.5rem] font-extrabold tracking-tight mb-6 leading-[1.1] text-white">
                 Master Your Fleet's{' '}
                 <span className="text-gradient-gold">Finances & Dispatch.</span>
               </h1>
-              <p className="text-lg text-[hsl(0_0%_65%)] mb-8 max-w-xl leading-relaxed">
+              <p className="text-base sm:text-lg text-[hsl(0_0%_65%)] mb-8 max-w-xl leading-relaxed">
                 The all-in-one platform built specifically for Landstar BCOs to track expenses, manage card advances, and streamline dispatching.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
@@ -214,11 +232,11 @@ export default function Landing() {
 
       {/* Stats */}
       <section className="border-y border-border bg-card/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {STATS.map((stat) => (
               <div key={stat.label} className="text-center">
-                <div className="text-3xl font-bold text-gradient-gold">{stat.value}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-gradient-gold">{stat.value}</div>
                 <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
               </div>
             ))}
@@ -227,10 +245,10 @@ export default function Landing() {
       </section>
 
       {/* Tiers Preview */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
         <div className="text-center mb-12">
-          <h3 className="text-3xl font-bold mb-3">A Plan for Every Stage of Growth</h3>
-          <p className="text-muted-foreground text-lg">Start solo. Scale to a fleet. Grow into an agency.</p>
+          <h3 className="text-2xl sm:text-3xl font-bold mb-3">A Plan for Every Stage of Growth</h3>
+          <p className="text-muted-foreground text-base sm:text-lg">Start solo. Scale to a fleet. Grow into an agency.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
           {TIERS.map((tier) => (
@@ -265,11 +283,11 @@ export default function Landing() {
       </section>
 
       {/* Four Pillars */}
-      <section className="bg-card/50 border-y border-border py-20">
+      <section className="bg-card/50 border-y border-border py-12 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h3 className="text-3xl font-bold mb-3">Built for the Way You Work</h3>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Four core capabilities designed around how Landstar BCOs actually run their business.</p>
+            <h3 className="text-2xl sm:text-3xl font-bold mb-3">Built for the Way You Work</h3>
+            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">Four core capabilities designed around how Landstar BCOs actually run their business.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {[
@@ -278,7 +296,7 @@ export default function Landing() {
               { icon: Package, title: 'Active Load Dispatching', desc: 'Assign drivers, update statuses, and monitor pickups & deliveries from a single real-time board.', accent: 'bg-blue-500/10 text-blue-500' },
               { icon: Smartphone, title: 'Driver Mobile Access', desc: 'Drivers get their own dashboard for BOL uploads, DVIR forms, and live trip updates — right from their phone.', accent: 'bg-purple-500/10 text-purple-500' },
             ].map((f) => (
-              <div key={f.title} className="p-8 rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-primary/30">
+              <div key={f.title} className="p-5 sm:p-8 rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-primary/30">
                 <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-6 ${f.accent}`}>
                   <f.icon className="w-6 h-6" />
                 </div>
@@ -291,10 +309,10 @@ export default function Landing() {
       </section>
 
       {/* CTA */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-12">
-          <h3 className="text-3xl font-bold mb-3">Ready to Take Control?</h3>
-          <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
+        <div className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-6 sm:p-12">
+          <h3 className="text-2xl sm:text-3xl font-bold mb-3">Ready to Take Control?</h3>
+          <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto">
             Join hundreds of Landstar BCOs and agents already using Fleet Flow TMS to maximize profit and minimize headaches.
           </p>
           <Button 
@@ -319,6 +337,17 @@ export default function Landing() {
           </div>
         </div>
       </footer>
+
+      {/* Sticky mobile CTA */}
+      <div className="fixed bottom-0 left-0 right-0 p-3 bg-background/80 backdrop-blur-md border-t border-border sm:hidden z-50">
+        <Button 
+          className="w-full gradient-gold text-primary-foreground"
+          onClick={() => navigate('/auth')}
+        >
+          Join BCO Beta
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
