@@ -192,9 +192,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    // supabaseAdmin already created above during webhook secret validation
 
     const resend = new Resend(resendApiKey);
 
