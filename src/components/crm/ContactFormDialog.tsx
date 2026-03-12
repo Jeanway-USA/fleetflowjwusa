@@ -136,75 +136,79 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const target = getTargetTable();
+    try {
+      const target = getTargetTable();
 
-    if (target === 'facility') {
-      const facilityPayload = {
-        name: form.company_name,
-        facility_type: isFacility && !isEditing ? (formType === 'receiver' ? 'receiver' : form.facility_type) : form.facility_type,
-        address: form.address,
-        city: form.city || null,
-        state: form.state || null,
-        zip: form.zip || null,
-        contact_name: form.contact_name || null,
-        contact_phone: form.phone || null,
-        contact_email: form.email || null,
-        operating_hours: form.operating_hours || null,
-        dock_info: form.dock_info || null,
-        appointment_required: form.appointment_required,
-        notes: form.notes || null,
-        org_id: orgId,
-      };
-      if (isEditing && editContact) {
-        await updateFacility.mutateAsync({ id: editContact.id, ...facilityPayload });
+      if (target === 'facility') {
+        const facilityPayload = {
+          name: form.company_name,
+          facility_type: isFacility && !isEditing ? (formType === 'receiver' ? 'receiver' : form.facility_type) : form.facility_type,
+          address: form.address,
+          city: form.city || null,
+          state: form.state || null,
+          zip: form.zip || null,
+          contact_name: form.contact_name || null,
+          contact_phone: form.phone || null,
+          contact_email: form.email || null,
+          operating_hours: form.operating_hours || null,
+          dock_info: form.dock_info || null,
+          appointment_required: form.appointment_required,
+          notes: form.notes || null,
+          org_id: orgId,
+        };
+        if (isEditing && editContact) {
+          await updateFacility.mutateAsync({ id: editContact.id, ...facilityPayload });
+        } else {
+          await createFacility.mutateAsync(facilityPayload);
+        }
+      } else if (target === 'resource') {
+        const resourceType = isAgent ? 'load_agent' : formType.replace('vendor-', '');
+        const resourcePayload = {
+          resource_type: resourceType,
+          name: isAgent ? (form.agent_code || form.company_name) : form.company_name,
+          phone: form.phone || null,
+          email: form.email || null,
+          website: form.website || null,
+          address: isRoadside ? null : (form.address || null),
+          service_area: isRoadside ? (form.service_area || null) : null,
+          agent_code: isAgent ? (form.agent_code || null) : null,
+          agent_status: isAgent ? form.agent_status : null,
+          notes: form.notes || null,
+          org_id: orgId,
+        };
+        if (isEditing && editContact) {
+          await updateResource.mutateAsync({ id: editContact.id, ...resourcePayload });
+        } else {
+          await createResource.mutateAsync(resourcePayload);
+        }
       } else {
-        await createFacility.mutateAsync(facilityPayload);
+        const crmPayload = {
+          contact_type: isBroker ? 'broker' : 'vendor',
+          company_name: form.company_name,
+          contact_name: form.contact_name || null,
+          phone: form.phone || null,
+          email: form.email || null,
+          address: form.address || null,
+          city: form.city || null,
+          state: form.state || null,
+          website: form.website || null,
+          agent_code: null,
+          agent_status: null,
+          notes: form.notes || null,
+          tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+          org_id: orgId,
+        };
+        if (isEditing && editContact) {
+          await updateContact.mutateAsync({ id: editContact.id, ...crmPayload });
+        } else {
+          await createContact.mutateAsync(crmPayload);
+        }
       }
-    } else if (target === 'resource') {
-      const resourceType = isAgent ? 'load_agent' : formType.replace('vendor-', '');
-      const resourcePayload = {
-        resource_type: resourceType,
-        name: isAgent ? (form.agent_code || form.company_name) : form.company_name,
-        phone: form.phone || null,
-        email: form.email || null,
-        website: form.website || null,
-        address: isRoadside ? null : (form.address || null),
-        service_area: isRoadside ? (form.service_area || null) : null,
-        agent_code: isAgent ? (form.agent_code || null) : null,
-        agent_status: isAgent ? form.agent_status : null,
-        notes: form.notes || null,
-        org_id: orgId,
-      };
-      if (isEditing && editContact) {
-        await updateResource.mutateAsync({ id: editContact.id, ...resourcePayload });
-      } else {
-        await createResource.mutateAsync(resourcePayload);
-      }
-    } else {
-      // CRM contact (broker or vendor-other)
-      const crmPayload = {
-        contact_type: isBroker ? 'broker' : 'vendor',
-        company_name: form.company_name,
-        contact_name: form.contact_name || null,
-        phone: form.phone || null,
-        email: form.email || null,
-        address: form.address || null,
-        city: form.city || null,
-        state: form.state || null,
-        website: form.website || null,
-        agent_code: null,
-        agent_status: null,
-        notes: form.notes || null,
-        tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
-        org_id: orgId,
-      };
-      if (isEditing && editContact) {
-        await updateContact.mutateAsync({ id: editContact.id, ...crmPayload });
-      } else {
-        await createContact.mutateAsync(crmPayload);
-      }
+      toast.success(isEditing ? 'Contact updated' : 'Contact added');
+      onOpenChange(false);
+    } catch (error: any) {
+      toast.error('Failed to save contact', { description: error.message });
     }
-    onOpenChange(false);
   };
 
   const isLoading = createContact.isPending || updateContact.isPending ||
