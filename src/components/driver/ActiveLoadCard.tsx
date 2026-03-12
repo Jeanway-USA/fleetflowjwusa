@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route, Link2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { LoadRouteMap } from './LoadRouteMap';
 import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
 import { supabase } from '@/integrations/supabase/client';
