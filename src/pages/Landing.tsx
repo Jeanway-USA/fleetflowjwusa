@@ -415,13 +415,46 @@ export default function Landing() {
       </section>
       </RevealOnScroll>
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-card/50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">© 2026 Fleet Flow TMS by JeanWayUSA. All rights reserved.</p>
-          <div className="flex gap-6 text-sm text-muted-foreground">
-            <button onClick={() => navigate('/pricing')} className="hover:text-foreground transition-colors">Pricing</button>
-            <button onClick={() => navigate('/auth')} className="hover:text-foreground transition-colors">Sign In</button>
+      <footer className="bg-[hsl(240_20%_4%)] border-t border-border pt-12 pb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-10">
+            {/* Brand */}
+            <div className="col-span-2 md:col-span-1">
+              <span className="text-lg font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
+              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">The all-in-one platform built for Landstar BCOs to track finances, dispatch loads, and grow profitably.</p>
+            </div>
+            {/* Product */}
+            <div>
+              <h5 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wider">Product</h5>
+              <ul className="space-y-2.5">
+                {['Loads', 'IFTA', 'Maintenance', 'Dispatch', 'Driver App'].map((item) => (
+                  <li key={item}>
+                    <button onClick={() => navigate('/auth')} className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">{item}</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* Company */}
+            <div>
+              <h5 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wider">Company</h5>
+              <ul className="space-y-2.5">
+                <li><button onClick={() => navigate('/pricing')} className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Pricing</button></li>
+                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">About</button></li>
+                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Contact</button></li>
+              </ul>
+            </div>
+            {/* Legal */}
+            <div>
+              <h5 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wider">Legal</h5>
+              <ul className="space-y-2.5">
+                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Privacy Policy</button></li>
+                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Terms of Service</button></li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t border-border pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <p className="text-xs text-muted-foreground">© 2026 Fleet Flow TMS by JeanWayUSA. All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">Built for Landstar BCOs & Agents</p>
           </div>
         </div>
       </footer>
