@@ -1247,9 +1247,9 @@ export default function IFTA() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeFuelDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">
+              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={createFuelMutation.isPending || updateFuelMutation.isPending}>
                 {editingFuel ? 'Update' : 'Add'} Purchase
-              </Button>
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>

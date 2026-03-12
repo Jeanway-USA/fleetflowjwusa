@@ -421,9 +421,9 @@ export function TeamManagementTab() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground" disabled={isEditing}>
-                {isEditing ? 'Saving...' : 'Save Changes'}
-              </Button>
+              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={isEditing}>
+                Save Changes
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>

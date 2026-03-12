@@ -742,9 +742,9 @@ export function SettlementsTab() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">
+              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={createMutation.isPending || updateMutation.isPending}>
                 {editingSettlement ? 'Save Changes' : 'Create Settlement'}
-              </Button>
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>

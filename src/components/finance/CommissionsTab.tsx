@@ -221,9 +221,9 @@ export function CommissionsTab({ filteredCommissions, commissionTotals, commissi
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">
+              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={createMutation.isPending || updateMutation.isPending}>
                 {editing ? 'Save Changes' : 'Add Commission'}
-              </Button>
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>

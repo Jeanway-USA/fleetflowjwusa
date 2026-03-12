@@ -283,9 +283,9 @@ export default function AgencyLoads() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">
+              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={createMutation.isPending || updateMutation.isPending}>
                 {editingLoad ? 'Save Changes' : 'Add Load'}
-              </Button>
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>

@@ -254,9 +254,9 @@ export function PayrollTab({ filteredPayrolls, payrollTotals, payrollsLoading, d
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">
+              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={createMutation.isPending || updateMutation.isPending}>
                 {editing ? 'Save Changes' : 'Add Payroll'}
-              </Button>
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>

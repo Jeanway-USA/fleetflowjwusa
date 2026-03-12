@@ -402,9 +402,9 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Saving...' : isEditing ? 'Update' : 'Add Contact'}
-            </Button>
+            <LoadingButton type="submit" loading={isLoading}>
+              {isEditing ? 'Update' : 'Add Contact'}
+            </LoadingButton>
           </div>
         </form>
       </DialogContent>
