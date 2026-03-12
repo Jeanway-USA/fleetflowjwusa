@@ -421,7 +421,7 @@ export function PostTripForm({ driverId, truckId, onComplete }: PostTripFormProp
             <div className="space-y-2">
               <Label>Defect Photos ({photos.length}/5)</Label>
               {photos.length > 0 && (
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {photos.map((photo, index) => (
                     <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
                       <img 
