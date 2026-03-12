@@ -701,10 +701,14 @@ export default function ExecutiveDashboard() {
         </div>
 
         {/* Morning Briefing */}
-        <MorningBriefingWidget />
+        <ErrorBoundary compact>
+          <MorningBriefingWidget />
+        </ErrorBoundary>
 
         {/* Row 1: Critical Alerts Banner */}
-        <CriticalAlertsBar alerts={criticalAlerts} isLoading={alertsLoading} />
+        <ErrorBoundary compact>
+          <CriticalAlertsBar alerts={criticalAlerts} isLoading={alertsLoading} />
+        </ErrorBoundary>
 
         {/* Row 2: Health Score + KPI Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
