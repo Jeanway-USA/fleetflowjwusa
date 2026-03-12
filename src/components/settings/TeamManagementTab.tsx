@@ -377,7 +377,7 @@ export function TeamManagementTab() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">Assign Role</Button>
+              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={assignRoleMutation.isPending}>Assign Role</LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>
