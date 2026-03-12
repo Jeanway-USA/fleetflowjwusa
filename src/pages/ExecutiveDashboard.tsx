@@ -722,17 +722,27 @@ export default function ExecutiveDashboard() {
 
         {/* Row 3: Fleet & Driver Status */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FleetStatusCard data={fleetStatus} isLoading={fleetLoading} />
-          <DriverAvailabilityCard data={driverAvailability} isLoading={driverLoading} />
+          <ErrorBoundary compact>
+            <FleetStatusCard data={fleetStatus} isLoading={fleetLoading} />
+          </ErrorBoundary>
+          <ErrorBoundary compact>
+            <DriverAvailabilityCard data={driverAvailability} isLoading={driverLoading} />
+          </ErrorBoundary>
         </div>
 
         {/* Row 4: Revenue Trends Chart */}
-        <RevenueTrendsChart data={trendsData} isLoading={trendsLoading} />
+        <ErrorBoundary compact>
+          <RevenueTrendsChart data={trendsData} isLoading={trendsLoading} />
+        </ErrorBoundary>
 
         {/* Row 5: Operations + Costs */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <OperationalMetrics data={operationalData} isLoading={operationalLoading} />
-          <CostBreakdownChart data={costBreakdown} isLoading={costLoading} />
+          <ErrorBoundary compact>
+            <OperationalMetrics data={operationalData} isLoading={operationalLoading} />
+          </ErrorBoundary>
+          <ErrorBoundary compact>
+            <CostBreakdownChart data={costBreakdown} isLoading={costLoading} />
+          </ErrorBoundary>
         </div>
 
         {/* Row 6: Actions + Performers + Insights */}

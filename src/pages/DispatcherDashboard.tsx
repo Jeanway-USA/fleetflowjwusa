@@ -195,13 +195,19 @@ export default function DispatcherDashboard() {
         </div>
 
         {/* Fleet Timeline Scheduler */}
-        <FleetTimelineScheduler />
+        <ErrorBoundary compact>
+          <FleetTimelineScheduler />
+        </ErrorBoundary>
 
         {/* Driver Leaderboard */}
-        <DriverLeaderboard />
+        <ErrorBoundary compact>
+          <DriverLeaderboard />
+        </ErrorBoundary>
 
         {/* Active Loads - Full Width */}
-        <ActiveLoadsBoard />
+        <ErrorBoundary compact>
+          <ActiveLoadsBoard />
+        </ErrorBoundary>
 
         {/* Upcoming Pickups - Full Width */}
         <UpcomingPickups />

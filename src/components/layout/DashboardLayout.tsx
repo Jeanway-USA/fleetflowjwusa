@@ -197,7 +197,9 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
           </div>
         </header>
         <div className="flex-1 p-2 sm:p-4 lg:p-6 animate-fade-in">
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
       </main>
       {isDemoMode && <DemoControls />}

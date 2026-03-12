@@ -227,12 +227,14 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
         <DriverLeaderboard readOnly />
 
         {/* Unified Driver Requests */}
-        <DriverRequestsCard 
-          driverId={driver.id}
-          truckId={assignedTruck?.id}
-          activeLoadId={activeLoad?.id}
-          activeLoadNumber={activeLoad?.landstar_load_id}
-        />
+        <ErrorBoundary compact>
+          <DriverRequestsCard 
+            driverId={driver.id}
+            truckId={assignedTruck?.id}
+            activeLoadId={activeLoad?.id}
+            activeLoadNumber={activeLoad?.landstar_load_id}
+          />
+        </ErrorBoundary>
       </div>
 
       {/* Geofence Arrival Drawer */}
