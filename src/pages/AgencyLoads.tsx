@@ -233,7 +233,7 @@ export default function AgencyLoads() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="broker_name">Broker Name</Label>
                 <Input id="broker_name" value={formData.broker_name || ''} onChange={(e) => setFormData({ ...formData, broker_name: e.target.value })} />
