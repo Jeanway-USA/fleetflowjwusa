@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
@@ -22,6 +23,23 @@ export default function Landing() {
   const navigate = useNavigate();
   const [demoLoading, setDemoLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [pricesLoading, setPricesLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from('subscription_plans')
+      .select('tier, base_price_monthly')
+      .eq('is_active', true)
+      .then(({ data }) => {
+        if (data) {
+          const map: Record<string, number> = {};
+          data.forEach((p) => { map[p.tier] = Number(p.base_price_monthly); });
+          setPrices(map);
+        }
+        setPricesLoading(false);
+      });
+  }, []);
 
   const handleDemoLogin = async () => {
     setDemoLoading(true);
@@ -242,8 +260,14 @@ export default function Landing() {
                 </div>
               </div>
               <div className="mb-5">
-                <span className="text-2xl font-bold text-muted-foreground line-through">$49</span>
-                <span className="text-sm text-muted-foreground">/mo</span>
+                {pricesLoading ? (
+                  <Skeleton className="h-8 w-20" />
+                ) : (
+                  <>
+                    <span className="text-2xl font-bold text-muted-foreground line-through">${prices['solo_bco'] ?? '—'}</span>
+                    <span className="text-sm text-muted-foreground">/mo</span>
+                  </>
+                )}
               </div>
               <ul className="space-y-2 mb-6">
                 {['Per-load profit/loss', 'IFTA fuel tax automation', 'Maintenance reminders', 'Digital document storage'].map((f) => (
@@ -313,8 +337,14 @@ export default function Landing() {
                 </div>
               </div>
               <div className="mb-5">
-                <span className="text-2xl font-bold text-muted-foreground line-through">$149</span>
-                <span className="text-sm text-muted-foreground">/mo</span>
+                {pricesLoading ? (
+                  <Skeleton className="h-8 w-20" />
+                ) : (
+                  <>
+                    <span className="text-2xl font-bold text-muted-foreground line-through">${prices['fleet_owner'] ?? '—'}</span>
+                    <span className="text-sm text-muted-foreground">/mo</span>
+                  </>
+                )}
               </div>
               <ul className="space-y-2 mb-6">
                 {['Driver settlements & payroll', 'Fleet-wide analytics', 'Real-time GPS tracking', 'Cost-per-mile reporting'].map((f) => (
