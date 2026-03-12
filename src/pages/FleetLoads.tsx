@@ -599,7 +599,7 @@ export default function FleetLoads() {
                   </span>
                 ) : <span className="text-muted-foreground">-</span>
               },
-              { key: 'agency_code', header: 'Agent', render: (load: any) => <span className="font-mono text-xs">{load.agency_code || '-'}</span> },
+              { key: 'agency_code', header: 'Agent', hiddenOnMobile: true, render: (load: any) => <span className="font-mono text-xs">{load.agency_code || '-'}</span> },
               { key: 'origin', header: 'Origin', render: (load: any) => {
                 const addr = formatAddressDisplay(load.origin);
                 return typeof addr === 'string' ? addr : (
