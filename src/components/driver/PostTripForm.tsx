@@ -421,7 +421,7 @@ export function PostTripForm({ driverId, truckId, onComplete }: PostTripFormProp
             <div className="space-y-2">
               <Label>Defect Photos ({photos.length}/5)</Label>
               {photos.length > 0 && (
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {photos.map((photo, index) => (
                     <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
                       <img 
@@ -433,10 +433,10 @@ export function PostTripForm({ driverId, truckId, onComplete }: PostTripFormProp
                         type="button"
                         variant="destructive"
                         size="icon"
-                        className="absolute top-1 right-1 h-5 w-5"
+                        className="absolute top-1 right-1 h-7 w-7"
                         onClick={() => removePhoto(index)}
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
@@ -446,10 +446,10 @@ export function PostTripForm({ driverId, truckId, onComplete }: PostTripFormProp
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-12"
                 >
-                  <Camera className="h-4 w-4 mr-2" />
+                  <Camera className="h-5 w-5 mr-2" />
                   Add Photo
                 </Button>
               )}

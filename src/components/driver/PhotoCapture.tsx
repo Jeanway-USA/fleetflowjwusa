@@ -120,22 +120,20 @@ export function PhotoCapture({ onPhotosCaptured, disabled, maxPhotos = 5 }: Phot
 
       {/* Add Photo Button */}
       {photos.length < maxPhotos && (
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Button
             type="button"
             variant="outline"
-            size="sm"
             onClick={() => inputRef.current?.click()}
             disabled={disabled || uploading}
-            className="flex-1"
+            className="w-full h-12"
           >
-            <Camera className="h-4 w-4 mr-2" />
+            <Camera className="h-5 w-5 mr-2" />
             Take Photo
           </Button>
           <Button
             type="button"
             variant="outline"
-            size="sm"
             onClick={() => {
               if (inputRef.current) {
                 inputRef.current.removeAttribute('capture');
@@ -143,9 +141,9 @@ export function PhotoCapture({ onPhotosCaptured, disabled, maxPhotos = 5 }: Phot
               }
             }}
             disabled={disabled || uploading}
-            className="flex-1"
+            className="w-full h-12"
           >
-            <ImageIcon className="h-4 w-4 mr-2" />
+            <ImageIcon className="h-5 w-5 mr-2" />
             Gallery
           </Button>
         </div>

@@ -91,16 +91,16 @@ export function DVIRForm({ type, driverId, truckId, onComplete }: DVIRFormProps)
           placeholder="Enter miles"
           value={odometer}
           onChange={(e) => setOdometer(e.target.value)}
-          className="text-lg"
+          className="text-lg text-base"
         />
       </div>
 
       {/* Inspection Checklist */}
       <div className="space-y-3">
         <Label>Inspection Checklist</Label>
-        <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto border rounded-lg p-3">
+        <div className="grid grid-cols-1 gap-2 max-h-none sm:max-h-48 sm:overflow-y-auto border rounded-lg p-3">
           {INSPECTION_ITEMS.map((item) => (
-            <div key={item.id} className="flex items-center space-x-3 min-h-[44px]">
+            <div key={item.id} className="flex items-center space-x-3 min-h-[48px]">
               <Checkbox
                 id={item.id}
                 checked={checkedItems[item.id]}

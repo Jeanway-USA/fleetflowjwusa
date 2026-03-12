@@ -1,66 +1,66 @@
 
 
-## Plan: Optimize Driver-Facing Components for Mobile
+## QoL Improvements Across All Areas
 
-### Changes
+### 1. Dynamic Period Selector (Finance)
+The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
 
-**1. `src/components/driver/DVIRForm.tsx`**
-- Line 94: Add `text-base` class to odometer Input for larger touch-friendly text on mobile
-- Line 101: Remove `max-h-48` on checklist container — let it show all items without scrolling on mobile (`max-h-none sm:max-h-48 sm:overflow-y-auto`), since scrolling inside a scroll is bad UX on phones
-- Line 103: Increase `min-h-[44px]` to `min-h-[48px]` for 48px touch targets on checklist items
-- Line 168-184: Submit button already `w-full h-12` — good
+**File:** `src/pages/Finance.tsx`
+- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
+- Auto-generate monthly and quarterly period options from that range up to the current date
+- Default to the current month instead of a hardcoded quarter
 
-**2. `src/components/driver/PostTripForm.tsx`**
-- Line 424: Photo grid `grid-cols-4` → `grid-cols-2 sm:grid-cols-4` (photos too tiny on phone at 4-col)
-- Line 432-439: Increase delete button from `h-5 w-5` to `h-7 w-7` for better touch target
-- Line 446-454: "Add Photo" button — change from `size="sm"` to `className="w-full h-12"` for prominent block-level tap target
+### 2. Expense Table Pagination / Virtualization (Finance)
+The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
 
-**3. `src/components/driver/SignaturePad.tsx`**
-- Line 108-111: Canvas already has `w-full` and `touch-none` — good for width. Add `aspect-[8/3]` class and remove fixed `height={150}` so it scales proportionally. Use a ResizeObserver to set canvas internal dimensions dynamically.
-- Line 122-143: Make buttons `w-full` stacked vertically on mobile: change `flex gap-2` to `flex flex-col sm:flex-row gap-2`, and remove `size="sm"` to use default (larger) size.
+**File:** `src/pages/Finance.tsx`
+- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
+- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
 
-**4. `src/components/driver/PhotoCapture.tsx`**
-- Line 123: Change button container from `flex gap-2` to `flex flex-col sm:flex-row gap-2` so Take Photo / Gallery stack as full-width blocks on mobile
-- Line 127-128: Remove `size="sm"` and add `h-12 w-full` for prominent 48px touch targets
-- Line 138-148: Same for Gallery button
+### 3. Breadcrumb Navigation in Header (Overall UX)
+The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
 
-### Implementation Details
+**Files:** `src/components/layout/DashboardLayout.tsx`
+- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
+- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
+- Display in the header alongside the sidebar trigger
 
-**SignaturePad canvas resize** — Add a `useEffect` with `ResizeObserver` to dynamically set `canvas.width` based on container width, maintaining a consistent aspect ratio. This prevents blurry signatures on high-DPI mobile screens.
+### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
+Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
 
-```typescript
-useEffect(() => {
-  const canvas = canvasRef.current;
-  if (!canvas) return;
-  const container = canvas.parentElement;
-  if (!container) return;
-  
-  const observer = new ResizeObserver((entries) => {
-    const { width } = entries[0].contentRect;
-    canvas.width = width * (window.devicePixelRatio || 1);
-    canvas.height = (width * 3 / 8) * (window.devicePixelRatio || 1);
-    // Re-init context after resize
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-  });
-  observer.observe(container);
-  return () => observer.disconnect();
-}, []);
-```
+**File:** `src/components/layout/DashboardLayout.tsx`
+- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+
+### 5. Confirm Before Single Expense Delete (Finance)
+Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+
+**File:** `src/pages/Finance.tsx`
+- Add a `deleteConfirmId` state
+- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+
+### 6. Pull-to-Refresh on Driver Dashboard (Driver)
+The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+
+**File:** `src/pages/DriverDashboard.tsx`
+- Add a `RefreshCw` icon button next to the date display
+- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
+
+### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
+The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
+
+**File:** `src/pages/DispatcherDashboard.tsx`
+- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
+
+### 8. Sidebar Active State on Nested Routes (Overall UX)
+The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
+
+**File:** `src/components/layout/AppSidebar.tsx`
+- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
 
 ### Files Modified
-| File | Change |
-|------|--------|
-| `DVIRForm.tsx` | Remove nested scroll, increase touch targets |
-| `PostTripForm.tsx` | Photo grid 2-col mobile, larger buttons |
-| `SignaturePad.tsx` | Dynamic canvas resize, stacked full-width buttons |
-| `PhotoCapture.tsx` | Full-width stacked buttons on mobile |
+- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
+- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
+- `src/pages/DriverDashboard.tsx` (refresh button)
+- `src/pages/DispatcherDashboard.tsx` (responsive grid)
+- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
 
