@@ -78,13 +78,29 @@ export default function Landing() {
             <span className="text-xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
             <span className="text-[10px] text-muted-foreground ml-1.5">by JeanWayUSA</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate('/pricing')}>Pricing</Button>
             <Button variant="outline" onClick={() => navigate('/auth')}>Sign In</Button>
             <Button className="gradient-gold text-primary-foreground" onClick={() => navigate('/auth')}>
               Start Free Trial
             </Button>
           </div>
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="sm:hidden">
+                <Menu className="h-6 w-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-72">
+              <nav className="flex flex-col gap-4 mt-8">
+                <Button variant="ghost" className="justify-start" onClick={() => { setMenuOpen(false); navigate('/pricing'); }}>Pricing</Button>
+                <Button variant="outline" className="justify-start" onClick={() => { setMenuOpen(false); navigate('/auth'); }}>Sign In</Button>
+                <Button className="gradient-gold text-primary-foreground" onClick={() => { setMenuOpen(false); navigate('/auth'); }}>
+                  Start Free Trial
+                </Button>
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
       </header>
 
