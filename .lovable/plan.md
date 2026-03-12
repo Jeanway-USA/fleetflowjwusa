@@ -1,66 +1,54 @@
 
 
-## QoL Improvements Across All Areas
+## Plan: Fix Dialog & Sheet Scrolling for Mobile
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Problem
+The current `dialog.tsx` puts `overflow-y-auto` on the entire `DialogPrimitive.Content`, which means the header (with close button) and footer (with action buttons) scroll away with the content. On mobile, users can't reach the submit button or close the dialog if content is long. Same issue exists for sheets.
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+### Solution
+Restructure the base Dialog and Sheet components to use a **flex column layout** with a scrollable middle section, and make headers/footers sticky. Also add `pb-safe` padding for mobile keyboard handling.
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+---
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+### Changes
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+**1. `src/components/ui/dialog.tsx`**
+- Change DialogContent from `overflow-y-auto` on the outer wrapper to a flex column layout
+- Move `overflow-y-auto` off the Content wrapper (keep `max-h-[85vh]`)
+- Add `flex flex-col` to the Content wrapper
+- Make the close button use `sticky top-0` positioning with a background
+- Update `DialogHeader` to include `sticky top-0 z-10 bg-background` and bottom border
+- Update `DialogFooter` to include `sticky bottom-0 z-10 bg-background` and top border with padding
+- Add a scrollable body wrapper concept — since we can't add a wrapper around `{children}`, the approach is: keep `overflow-y-auto` on the Content but make header/footer sticky within it
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+Refined approach (simpler, no breaking changes):
+- Keep `overflow-y-auto max-h-[85vh]` on DialogContent
+- Make `DialogHeader` sticky: add `sticky top-0 z-10 bg-background pb-4 border-b mb-4`
+- Make `DialogFooter` sticky: add `sticky bottom-0 z-10 bg-background pt-4 border-t mt-4`
+- Add `p-4 sm:p-6` with reduced top/bottom padding since header/footer handle their own spacing
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+**2. `src/components/ui/sheet.tsx`**
+- Add `overflow-y-auto` to the base SheetContent (so individual consumers don't need it)
+- Make `SheetHeader` sticky: `sticky top-0 z-10 bg-background pb-4`
+- Make `SheetFooter` sticky: `sticky bottom-0 z-10 bg-background pt-4`
+- Ensure close button stays visible by adjusting its z-index
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+**3. High-traffic consumers cleanup**
+- `NewWorkOrderSheet.tsx` (line 263): Remove redundant `overflow-y-auto` from className since it's now in base
+- `ContactDetailSheet.tsx` (line 35): Same cleanup
+- `ContactFormDialog.tsx` (line 214): Remove redundant `max-h-[90vh] overflow-y-auto` since base handles it
+- `ProofOfDeliveryDialog.tsx` (line 204): Remove redundant `max-h-[95vh] overflow-y-auto`
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
-
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
-
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
-
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
-
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
-
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
+---
 
 ### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+
+| File | Change |
+|------|--------|
+| `dialog.tsx` | Sticky header/footer, flex layout |
+| `sheet.tsx` | Base overflow-y-auto, sticky header/footer |
+| `NewWorkOrderSheet.tsx` | Remove redundant overflow class |
+| `ContactDetailSheet.tsx` | Remove redundant overflow class |
+| `ContactFormDialog.tsx` | Remove redundant overflow/max-h classes |
+| `ProofOfDeliveryDialog.tsx` | Remove redundant overflow/max-h classes |
 
