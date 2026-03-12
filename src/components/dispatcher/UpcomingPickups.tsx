@@ -50,6 +50,8 @@ export function UpcomingPickups() {
           destination,
           status,
           pickup_date,
+          pickup_time,
+          pickup_time_type,
           driver_id,
           truck_id,
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
