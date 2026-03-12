@@ -1,66 +1,47 @@
 
 
-## QoL Improvements Across All Areas
+## Plan: Redesign Landing Page Hero Section
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Overview
+Replace the current centered-text hero with a modern two-column layout featuring a dark gradient background, updated copy, a floating dashboard mockup on the right, and a pulsing/glowing CTA button.
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+### Changes (1 file)
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+**`src/pages/Landing.tsx`** — Replace the Hero section (lines 89-131):
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+1. **Background**: Dark gradient with subtle dot pattern overlay using CSS pseudo-elements via inline styles and tailwind classes (`bg-[#0a0a0f]` with radial gradient overlay)
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+2. **Layout**: Two-column grid (`lg:grid-cols-2`) — left side has text content, right side has the dashboard mockup
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+3. **Left column**:
+   - Keep the "Built for Landstar BCOs & Agents" badge
+   - Headline: `Master Your Fleet's Finances & Dispatch.` with gold gradient on key words
+   - Subheadline: `The all-in-one platform built specifically for Landstar BCOs to track expenses, manage card advances, and streamline dispatching.`
+   - CTA: "Join Free BCO Beta" with `ArrowRight` icon, pulsing glow animation
+   - Keep the "Try Demo" button as secondary
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+4. **Right column — Floating dashboard mockup**:
+   - A stylized card with a fake dashboard UI (mini stat cards, a chart placeholder, sidebar hint) built with divs/CSS
+   - Perspective transform (`rotate-y`, `rotate-x`) for a 3D floating effect
+   - Subtle shadow and border glow in gold
+   - Floating animation via CSS keyframe (`animate-float`)
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+5. **CTA button animation**: Add a `@keyframes pulse-glow` animation in the component using Tailwind's `animate-` utility plus a custom class that pulses the `box-shadow` on the gold button. On hover, intensify the glow.
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+**`src/index.css`** — Add two new utility animations:
+- `animate-float`: gentle up/down float (translateY 0 → -10px → 0, 6s infinite)
+- `pulse-glow-gold`: pulsing box-shadow on the CTA (2s infinite)
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+### Dashboard Mockup (pure CSS/JSX)
+A card containing:
+- A mini sidebar strip (dark with 4-5 icon dots)
+- A top bar with fake search input
+- 3 small KPI cards (Revenue, Loads, Miles) with placeholder numbers
+- A faux chart area (gradient bar or simple SVG line)
+- All in muted dark colors with gold accent highlights
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+This avoids needing an image asset — it's a self-contained JSX component that looks like a real dashboard screenshot.
 
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
-
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
-
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
-
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+### No other sections change
+The rest of the page (Stats, Tiers, Features, CTA, Footer) remains untouched.
 
