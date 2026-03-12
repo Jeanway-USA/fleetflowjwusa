@@ -75,9 +75,9 @@ export default function Landing() {
             <span className="text-[10px] text-muted-foreground ml-1.5">by JeanWayUSA</span>
           </div>
           <div className="hidden sm:flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate('/pricing')}>Pricing</Button>
-            <Button variant="outline" onClick={() => navigate('/auth')}>Sign In</Button>
-            <Button className="gradient-gold text-primary-foreground" onClick={() => navigate('/auth')}>
+            <Button variant="ghost" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/pricing')}>Pricing</Button>
+            <Button variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/auth')}>Sign In</Button>
+            <Button className="gradient-gold text-primary-foreground active:scale-[0.97] transition-transform" onClick={() => navigate('/auth')}>
               Start Free Trial
             </Button>
           </div>
