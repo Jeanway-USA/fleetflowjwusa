@@ -206,8 +206,19 @@ export default function CRM() {
           loading={isLoading}
           emptyMessage={search ? 'No contacts match your search.' : 'No contacts yet. Add your first contact to get started.'}
           onRowClick={(contact) => setDetailContact(contact)}
+          onRowDoubleClick={(contact) => setDetailContact(contact)}
           tableId="crm-contacts"
           exportFilename="crm-contacts"
+          selectable={canEdit}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+          bulkActions={canEdit ? (ids) => (
+            <>
+              <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
+                <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+              </Button>
+            </>
+          ) : undefined}
         />
       </div>
 
