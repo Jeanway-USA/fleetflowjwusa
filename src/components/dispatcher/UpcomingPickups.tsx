@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar, MapPin, AlertTriangle, Clock, User, Truck } from 'lucide-react';
 import { format, formatDistanceToNow, addHours, isBefore } from 'date-fns';
+import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { useNavigate } from 'react-router-dom';
 
 interface UpcomingLoad {
