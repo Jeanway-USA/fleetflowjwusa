@@ -173,13 +173,15 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
         )}
 
         {/* Active Load Card */}
-        <ActiveLoadCard 
-          load={activeLoad} 
-          payRate={driver.pay_rate} 
-          payType={driver.pay_type}
-          driverId={driver.id}
-          onStatusUpdate={refetchLoads}
-        />
+        <ErrorBoundary compact>
+          <ActiveLoadCard 
+            load={activeLoad} 
+            payRate={driver.pay_rate} 
+            payType={driver.pay_type}
+            driverId={driver.id}
+            onStatusUpdate={refetchLoads}
+          />
+        </ErrorBoundary>
 
         {/* Fuel Trip Planner - shows when there's an active/upcoming load */}
         {activeLoad && (
