@@ -16,6 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { Plus, AlertTriangle, Eye, Pencil, Trash2, FileWarning, Car, Users, Camera, MoreHorizontal } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
+import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format, parseISO } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -78,6 +80,10 @@ export default function Incidents() {
     injuries_reported: false,
     estimated_damage: 0,
   });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [massEditOpen, setMassEditOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const { data: incidents = [], isLoading } = useQuery({
     queryKey: ['incidents'],
@@ -292,10 +298,10 @@ export default function Incidents() {
               { key: 'incident_date', header: 'Date', render: (i: Incident) => format(parseISO(i.incident_date), 'MM/dd/yyyy') },
               { key: 'incident_type', header: 'Type', render: (i: Incident) => <span className="capitalize">{i.incident_type.replace('_', ' ')}</span> },
               { key: 'severity', header: 'Severity', render: (i: Incident) => getSeverityBadge(i.severity) },
-              { key: 'driver_id', header: 'Driver', render: (i: Incident) => getDriverName(i.driver_id) },
-              { key: 'truck_id', header: 'Truck', render: (i: Incident) => getTruckName(i.truck_id) },
-              { key: 'location_description', header: 'Location', render: (i: Incident) => <span className="max-w-[200px] truncate block">{i.location_description || '-'}</span> },
-              { key: 'estimated_damage', header: 'Damage Est.', render: (i: Incident) => formatCurrencyValue(i.estimated_damage) },
+              { key: 'driver_id', header: 'Driver', hiddenOnMobile: true, render: (i: Incident) => getDriverName(i.driver_id) },
+              { key: 'truck_id', header: 'Truck', hiddenOnMobile: true, render: (i: Incident) => getTruckName(i.truck_id) },
+              { key: 'location_description', header: 'Location', hiddenOnMobile: true, render: (i: Incident) => <span className="max-w-[200px] truncate block">{i.location_description || '-'}</span> },
+              { key: 'estimated_damage', header: 'Damage Est.', hiddenOnMobile: true, render: (i: Incident) => formatCurrencyValue(i.estimated_damage) },
               { key: 'status', header: 'Status', render: (i: Incident) => <StatusBadge status={i.status} /> },
               { key: 'actions', header: '', render: (incident: Incident) => (
                 <DropdownMenu>
@@ -324,6 +330,64 @@ export default function Incidents() {
             emptyMessage="No incidents reported"
             tableId="incidents"
             exportFilename="incidents"
+            onRowDoubleClick={(incident) => openDialog(incident)}
+            selectable
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            bulkActions={(ids) => (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
+                  <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
+                  <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+                </Button>
+              </>
+            )}
+          />
+          <ConfirmDeleteDialog
+            open={massDeleteOpen}
+            onOpenChange={setMassDeleteOpen}
+            onConfirm={async () => {
+              setBulkUpdating(true);
+              try {
+                const { error } = await supabase.from('incidents').delete().in('id', [...selectedIds]);
+                if (error) throw error;
+                queryClient.invalidateQueries({ queryKey: ['incidents'] });
+                toast.success(`${selectedIds.size} incident(s) deleted`);
+                setSelectedIds(new Set());
+                setMassDeleteOpen(false);
+              } catch (e: any) { toast.error(e.message); }
+              finally { setBulkUpdating(false); }
+            }}
+            title="Delete Selected Incidents"
+            description={`Are you sure you want to delete ${selectedIds.size} incident(s)? This action cannot be undone.`}
+            isDeleting={bulkUpdating}
+          />
+          <BulkStatusEditDialog
+            open={massEditOpen}
+            onOpenChange={setMassEditOpen}
+            onConfirm={async (status) => {
+              setBulkUpdating(true);
+              try {
+                const { error } = await supabase.from('incidents').update({ status }).in('id', [...selectedIds]);
+                if (error) throw error;
+                queryClient.invalidateQueries({ queryKey: ['incidents'] });
+                toast.success(`${selectedIds.size} incident(s) updated`);
+                setSelectedIds(new Set());
+                setMassEditOpen(false);
+              } catch (e: any) { toast.error(e.message); }
+              finally { setBulkUpdating(false); }
+            }}
+            count={selectedIds.size}
+            entityName="incidents"
+            isUpdating={bulkUpdating}
+            statusOptions={[
+              { value: 'reported', label: 'Reported' },
+              { value: 'under_review', label: 'Under Review' },
+              { value: 'resolved', label: 'Resolved' },
+              { value: 'closed', label: 'Closed' },
+            ]}
           />
         </CardContent>
       </Card>

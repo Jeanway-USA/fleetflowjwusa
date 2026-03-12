@@ -7,7 +7,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
-import { Search, Eye, Edit2, Trash2, MoreHorizontal } from 'lucide-react';
+import { Search, Eye, Edit2, Trash2, MoreHorizontal, Pencil } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   useUnifiedContacts,
@@ -49,6 +51,9 @@ export default function CRM() {
   const [editContact, setEditContact] = useState<UnifiedContact | null>(null);
   const [detailContact, setDetailContact] = useState<UnifiedContact | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UnifiedContact | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const { data: contacts, isLoading } = useUnifiedContacts(typeFilter);
   const { deleteContact: deleteCRMMutation } = useContactMutations();
@@ -134,7 +139,7 @@ export default function CRM() {
                 )}
               </div>
             )},
-            { key: 'contact_name', header: 'Contact', render: (contact: UnifiedContact) => contact.contact_name || '—' },
+            { key: 'contact_name', header: 'Contact', hiddenOnMobile: true, render: (contact: UnifiedContact) => contact.contact_name || '—' },
             { key: 'contact_type', header: 'Type', render: (contact: UnifiedContact) => {
               const subType = getSubTypeLabel(contact);
               return (
@@ -146,11 +151,11 @@ export default function CRM() {
                 </div>
               );
             }},
-            { key: 'phone', header: 'Phone', render: (contact: UnifiedContact) => contact.phone || '—' },
-            { key: 'location', header: 'Location', render: (contact: UnifiedContact) => 
+            { key: 'phone', header: 'Phone', hiddenOnMobile: true, render: (contact: UnifiedContact) => contact.phone || '—' },
+            { key: 'location', header: 'Location', hiddenOnMobile: true, render: (contact: UnifiedContact) => 
               [contact.city, contact.state].filter(Boolean).join(', ') || contact.service_area || '—'
             },
-            { key: 'details', header: 'Details', render: (contact: UnifiedContact) => (
+            { key: 'details', header: 'Details', hiddenOnMobile: true, render: (contact: UnifiedContact) => (
               <div className="flex flex-wrap gap-1">
                 {contact.source === 'facility' && contact.appointment_required && (
                   <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Appt Req</Badge>
@@ -201,8 +206,19 @@ export default function CRM() {
           loading={isLoading}
           emptyMessage={search ? 'No contacts match your search.' : 'No contacts yet. Add your first contact to get started.'}
           onRowClick={(contact) => setDetailContact(contact)}
+          onRowDoubleClick={(contact) => setDetailContact(contact)}
           tableId="crm-contacts"
           exportFilename="crm-contacts"
+          selectable={canEdit}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+          bulkActions={canEdit ? (ids) => (
+            <>
+              <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
+                <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+              </Button>
+            </>
+          ) : undefined}
         />
       </div>
 
@@ -222,6 +238,28 @@ export default function CRM() {
         title="Delete Contact"
         description={`Are you sure you want to delete "${deleteTarget?.company_name}"? This action cannot be undone.`}
         isDeleting={isDeleting}
+      />
+      <ConfirmDeleteDialog
+        open={massDeleteOpen}
+        onOpenChange={setMassDeleteOpen}
+        onConfirm={async () => {
+          setBulkUpdating(true);
+          try {
+            // CRM contacts only (not resources/facilities from unified view) - delete from crm_contacts
+            const { error } = await supabase.from('crm_contacts').delete().in('id', [...selectedIds]);
+            if (error) throw error;
+            // Also try resources and facilities tables for any selected unified contacts
+            await supabase.from('company_resources').delete().in('id', [...selectedIds]);
+            await supabase.from('facilities').delete().in('id', [...selectedIds]);
+            toast.success(`${selectedIds.size} contact(s) deleted`);
+            setSelectedIds(new Set());
+            setMassDeleteOpen(false);
+          } catch (e: any) { toast.error(e.message); }
+          finally { setBulkUpdating(false); }
+        }}
+        title="Delete Selected Contacts"
+        description={`Are you sure you want to delete ${selectedIds.size} contact(s)? This action cannot be undone.`}
+        isDeleting={bulkUpdating}
       />
     </>
   );

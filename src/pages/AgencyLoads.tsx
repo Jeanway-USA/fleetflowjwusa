@@ -13,6 +13,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { Pencil, Trash2, MoreHorizontal } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
+import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -24,6 +26,10 @@ export default function AgencyLoads() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLoad, setEditingLoad] = useState<AgencyLoad | null>(null);
   const [formData, setFormData] = useState<Partial<AgencyLoadInsert>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [massEditOpen, setMassEditOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const { data: loads = [], isLoading } = useQuery({
     queryKey: ['agency_loads'],
@@ -100,11 +106,11 @@ export default function AgencyLoads() {
   const columns = [
     { key: 'load_reference', header: 'Reference', render: (l: AgencyLoad) => l.load_reference || '-' },
     { key: 'broker_name', header: 'Broker' },
-    { key: 'carrier_name', header: 'Carrier' },
+    { key: 'carrier_name', header: 'Carrier', hiddenOnMobile: true },
     { key: 'origin', header: 'Origin' },
     { key: 'destination', header: 'Destination' },
-    { key: 'broker_rate', header: 'Broker Rate', render: (l: AgencyLoad) => `$${l.broker_rate?.toFixed(2) || '0.00'}` },
-    { key: 'carrier_rate', header: 'Carrier Rate', render: (l: AgencyLoad) => `$${l.carrier_rate?.toFixed(2) || '0.00'}` },
+    { key: 'broker_rate', header: 'Broker Rate', hiddenOnMobile: true, render: (l: AgencyLoad) => `$${l.broker_rate?.toFixed(2) || '0.00'}` },
+    { key: 'carrier_rate', header: 'Carrier Rate', hiddenOnMobile: true, render: (l: AgencyLoad) => `$${l.carrier_rate?.toFixed(2) || '0.00'}` },
     { key: 'margin', header: 'Margin', render: (l: AgencyLoad) => <span className={Number(l.margin) >= 0 ? 'text-success' : 'text-destructive'}>${l.margin?.toFixed(2) || '0.00'}</span> },
     { key: 'status', header: 'Status', render: (l: AgencyLoad) => <StatusBadge status={l.status} /> },
     {
@@ -134,7 +140,73 @@ export default function AgencyLoads() {
   return (
     <>
       <PageHeader title="Agency Loads" description="Manage brokerage and agency loads" action={{ label: 'Add Load', onClick: () => openDialog() }} />
-      <DataTable columns={columns} data={loads} loading={isLoading} emptyMessage="No agency loads yet" tableId="agency-loads" exportFilename="agency-loads" />
+      <DataTable
+        columns={columns}
+        data={loads}
+        loading={isLoading}
+        emptyMessage="No agency loads yet"
+        tableId="agency-loads"
+        exportFilename="agency-loads"
+        onRowDoubleClick={(load) => openDialog(load)}
+        selectable
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        bulkActions={(ids) => (
+          <>
+            <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
+              <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
+              <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+            </Button>
+          </>
+        )}
+      />
+      <ConfirmDeleteDialog
+        open={massDeleteOpen}
+        onOpenChange={setMassDeleteOpen}
+        onConfirm={async () => {
+          setBulkUpdating(true);
+          try {
+            const { error } = await supabase.from('agency_loads').delete().in('id', [...selectedIds]);
+            if (error) throw error;
+            queryClient.invalidateQueries({ queryKey: ['agency_loads'] });
+            toast.success(`${selectedIds.size} load(s) deleted`);
+            setSelectedIds(new Set());
+            setMassDeleteOpen(false);
+          } catch (e: any) { toast.error(e.message); }
+          finally { setBulkUpdating(false); }
+        }}
+        title="Delete Selected Loads"
+        description={`Are you sure you want to delete ${selectedIds.size} load(s)? This action cannot be undone.`}
+        isDeleting={bulkUpdating}
+      />
+      <BulkStatusEditDialog
+        open={massEditOpen}
+        onOpenChange={setMassEditOpen}
+        onConfirm={async (status) => {
+          setBulkUpdating(true);
+          try {
+            const { error } = await supabase.from('agency_loads').update({ status }).in('id', [...selectedIds]);
+            if (error) throw error;
+            queryClient.invalidateQueries({ queryKey: ['agency_loads'] });
+            toast.success(`${selectedIds.size} load(s) updated`);
+            setSelectedIds(new Set());
+            setMassEditOpen(false);
+          } catch (e: any) { toast.error(e.message); }
+          finally { setBulkUpdating(false); }
+        }}
+        count={selectedIds.size}
+        entityName="loads"
+        isUpdating={bulkUpdating}
+        statusOptions={[
+          { value: 'pending', label: 'Pending' },
+          { value: 'booked', label: 'Booked' },
+          { value: 'in_transit', label: 'In Transit' },
+          { value: 'delivered', label: 'Delivered' },
+          { value: 'cancelled', label: 'Cancelled' },
+        ]}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">

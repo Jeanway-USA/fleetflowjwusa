@@ -17,6 +17,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { Pencil, Trash2, FileText, User, AlertTriangle, CheckCircle, Clock, History, Container, MoreHorizontal } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
+import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { differenceInDays, format } from 'date-fns';
 import { TrailerAssignmentHistory } from '@/components/trailers/TrailerAssignmentHistory';
@@ -97,6 +99,10 @@ export default function Trailers() {
   const [editingTrailer, setEditingTrailer] = useState<TrailerWithDriver | null>(null);
   const [formData, setFormData] = useState<Partial<TrailerInsert>>({});
   const [viewingTrailer, setViewingTrailer] = useState<TrailerWithDriver | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [massEditOpen, setMassEditOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const { data: trailers = [], isLoading } = useQuery({
     queryKey: ['trailers'],
@@ -199,6 +205,32 @@ export default function Trailers() {
     setDialogOpen(true);
   };
 
+  const handleBulkDelete = async () => {
+    setBulkUpdating(true);
+    try {
+      const { error } = await supabase.from('trailers').delete().in('id', [...selectedIds]);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['trailers'] });
+      toast.success(`${selectedIds.size} trailer(s) deleted`);
+      setSelectedIds(new Set());
+      setMassDeleteOpen(false);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkUpdating(false); }
+  };
+
+  const handleBulkStatusUpdate = async (status: string) => {
+    setBulkUpdating(true);
+    try {
+      const { error } = await supabase.from('trailers').update({ status }).in('id', [...selectedIds]);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['trailers'] });
+      toast.success(`${selectedIds.size} trailer(s) updated`);
+      setSelectedIds(new Set());
+      setMassEditOpen(false);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkUpdating(false); }
+  };
+
   const closeDialog = () => {
     setDialogOpen(false);
     setEditingTrailer(null);
@@ -221,7 +253,8 @@ export default function Trailers() {
   const columns = [
     { key: 'unit_number', header: 'Unit #' },
     { key: 'trailer_type', header: 'Type' },
-    { key: 'make', header: 'Make' },
+    { key: 'make', header: 'Make', hiddenOnMobile: true },
+    { key: 'year', header: 'Year', hiddenOnMobile: true },
     { key: 'year', header: 'Year' },
     { key: 'status', header: 'Status', render: (trailer: TrailerWithDriver) => <StatusBadge status={trailer.status} /> },
     { 
@@ -307,7 +340,49 @@ export default function Trailers() {
   return (
     <>
       <PageHeader title="Trailers" description="Manage your fleet trailers" action={{ label: 'Add Trailer', onClick: () => openDialog() }} />
-      <DataTable columns={columns} data={trailers} loading={isLoading} emptyMessage="No trailers registered yet" tableId="trailers" exportFilename="trailers" />
+      <DataTable
+        columns={columns}
+        data={trailers}
+        loading={isLoading}
+        emptyMessage="No trailers registered yet"
+        tableId="trailers"
+        exportFilename="trailers"
+        onRowDoubleClick={(trailer) => openDialog(trailer)}
+        selectable
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        bulkActions={(ids) => (
+          <>
+            <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
+              <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
+              <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+            </Button>
+          </>
+        )}
+      />
+      <ConfirmDeleteDialog
+        open={massDeleteOpen}
+        onOpenChange={setMassDeleteOpen}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected Trailers"
+        description={`Are you sure you want to delete ${selectedIds.size} trailer(s)? This action cannot be undone.`}
+        isDeleting={bulkUpdating}
+      />
+      <BulkStatusEditDialog
+        open={massEditOpen}
+        onOpenChange={setMassEditOpen}
+        onConfirm={handleBulkStatusUpdate}
+        count={selectedIds.size}
+        entityName="trailers"
+        isUpdating={bulkUpdating}
+        statusOptions={[
+          { value: 'active', label: 'Active' },
+          { value: 'in_shop', label: 'In Shop' },
+          { value: 'out_of_service', label: 'Out of Service' },
+        ]}
+      />
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

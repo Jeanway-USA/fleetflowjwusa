@@ -18,6 +18,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock, Truck as TruckIcon, MoreHorizontal, FileSpreadsheet } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
+import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { addDays, differenceInDays, format } from 'date-fns';
@@ -231,9 +233,9 @@ export default function Trucks() {
 
   const columns = [
     { key: 'unit_number', header: 'Unit #' },
-    { key: 'make', header: 'Make' },
-    { key: 'model', header: 'Model' },
-    { key: 'year', header: 'Year' },
+    { key: 'make', header: 'Make', hiddenOnMobile: true },
+    { key: 'model', header: 'Model', hiddenOnMobile: true },
+    { key: 'year', header: 'Year', hiddenOnMobile: true },
     { 
       key: 'current_driver', 
       header: 'Current Driver',
@@ -324,6 +326,36 @@ export default function Trucks() {
   ];
 
   const [viewingTruck, setViewingTruck] = useState<TruckWithDriver | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [massEditOpen, setMassEditOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+
+  const handleBulkDelete = async () => {
+    setBulkUpdating(true);
+    try {
+      const { error } = await supabase.from('trucks').delete().in('id', [...selectedIds]);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['trucks'] });
+      toast.success(`${selectedIds.size} truck(s) deleted`);
+      setSelectedIds(new Set());
+      setMassDeleteOpen(false);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkUpdating(false); }
+  };
+
+  const handleBulkStatusUpdate = async (status: string) => {
+    setBulkUpdating(true);
+    try {
+      const { error } = await supabase.from('trucks').update({ status }).in('id', [...selectedIds]);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['trucks'] });
+      toast.success(`${selectedIds.size} truck(s) updated`);
+      setSelectedIds(new Set());
+      setMassEditOpen(false);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkUpdating(false); }
+  };
 
   return (
     <>
@@ -332,7 +364,49 @@ export default function Trucks() {
           <FileSpreadsheet className="h-4 w-4 mr-2" /> Import CSV
         </Button>
       </PageHeader>
-      <DataTable columns={columns} data={trucks} loading={isLoading} emptyMessage="No trucks registered yet" tableId="trucks" exportFilename="trucks" />
+      <DataTable
+        columns={columns}
+        data={trucks}
+        loading={isLoading}
+        emptyMessage="No trucks registered yet"
+        tableId="trucks"
+        exportFilename="trucks"
+        onRowDoubleClick={(truck) => openDialog(truck)}
+        selectable
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        bulkActions={(ids) => (
+          <>
+            <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
+              <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
+              <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+            </Button>
+          </>
+        )}
+      />
+      <ConfirmDeleteDialog
+        open={massDeleteOpen}
+        onOpenChange={setMassDeleteOpen}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected Trucks"
+        description={`Are you sure you want to delete ${selectedIds.size} truck(s)? This action cannot be undone.`}
+        isDeleting={bulkUpdating}
+      />
+      <BulkStatusEditDialog
+        open={massEditOpen}
+        onOpenChange={setMassEditOpen}
+        onConfirm={handleBulkStatusUpdate}
+        count={selectedIds.size}
+        entityName="trucks"
+        isUpdating={bulkUpdating}
+        statusOptions={[
+          { value: 'active', label: 'Active' },
+          { value: 'down', label: 'Down' },
+          { value: 'out_of_service', label: 'Out of Service' },
+        ]}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">

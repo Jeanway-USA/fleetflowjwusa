@@ -23,6 +23,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
+import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 
@@ -59,6 +61,10 @@ export default function FleetLoads() {
   const [formData, setFormData] = useState<any>({});
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [accessorials, setAccessorials] = useState<Accessorial[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [massEditOpen, setMassEditOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   // Fetch settings for calculations
   const { data: settings = [] } = useQuery({
@@ -578,7 +584,7 @@ export default function FleetLoads() {
             columns={[
               { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
               { key: 'landstar_load_id', header: 'Landstar ID', render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
-              { key: 'tracking_id', header: 'Tracking ID', render: (load: any) => 
+              { key: 'tracking_id', header: 'Tracking ID', hiddenOnMobile: true, render: (load: any) => 
                 load.tracking_id ? (
                   <span 
                     className="font-mono text-xs cursor-pointer hover:text-primary truncate max-w-[120px] inline-block"
@@ -593,7 +599,7 @@ export default function FleetLoads() {
                   </span>
                 ) : <span className="text-muted-foreground">-</span>
               },
-              { key: 'agency_code', header: 'Agent', render: (load: any) => <span className="font-mono text-xs">{load.agency_code || '-'}</span> },
+              { key: 'agency_code', header: 'Agent', hiddenOnMobile: true, render: (load: any) => <span className="font-mono text-xs">{load.agency_code || '-'}</span> },
               { key: 'origin', header: 'Origin', render: (load: any) => {
                 const addr = formatAddressDisplay(load.origin);
                 return typeof addr === 'string' ? addr : (
@@ -611,10 +617,10 @@ export default function FleetLoads() {
                 );
               }},
               { key: 'rate', header: 'Rate', render: (load: any) => <span className="text-right">{formatCurrency(load.rate)}</span> },
-              { key: 'fuel_surcharge', header: 'FSC', render: (load: any) => formatCurrency(load.fuel_surcharge) },
-              { key: 'accessorials_total', header: 'Accessorials', render: (load: any) => formatCurrency(getLoadAccessorialsTotal(load.id)) },
+              { key: 'fuel_surcharge', header: 'FSC', hiddenOnMobile: true, render: (load: any) => formatCurrency(load.fuel_surcharge) },
+              { key: 'accessorials_total', header: 'Accessorials', hiddenOnMobile: true, render: (load: any) => formatCurrency(getLoadAccessorialsTotal(load.id)) },
               { key: 'net_revenue', header: 'Net Revenue', render: (load: any) => <span className="font-medium text-success">{formatCurrency(load.net_revenue)}</span> },
-              { key: 'miles', header: 'Miles', render: (load: any) => 
+              { key: 'miles', header: 'Miles', hiddenOnMobile: true, render: (load: any) => 
                 (load.actual_miles && load.actual_miles > 0) 
                   ? load.actual_miles.toLocaleString() 
                   : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : '-')
@@ -644,6 +650,65 @@ export default function FleetLoads() {
             emptyMessage="No loads yet"
             tableId="fleet-loads"
             exportFilename="fleet-loads"
+            onRowDoubleClick={(load) => openDialog(load)}
+            selectable
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            bulkActions={(ids) => (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
+                  <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
+                  <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+                </Button>
+              </>
+            )}
+          />
+          <ConfirmDeleteDialog
+            open={massDeleteOpen}
+            onOpenChange={setMassDeleteOpen}
+            onConfirm={async () => {
+              setBulkUpdating(true);
+              try {
+                const { error } = await supabase.from('fleet_loads').delete().in('id', [...selectedIds]);
+                if (error) throw error;
+                queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
+                toast.success(`${selectedIds.size} load(s) deleted`);
+                setSelectedIds(new Set());
+                setMassDeleteOpen(false);
+              } catch (e: any) { toast.error(e.message); }
+              finally { setBulkUpdating(false); }
+            }}
+            title="Delete Selected Loads"
+            description={`Are you sure you want to delete ${selectedIds.size} load(s)? This action cannot be undone.`}
+            isDeleting={bulkUpdating}
+          />
+          <BulkStatusEditDialog
+            open={massEditOpen}
+            onOpenChange={setMassEditOpen}
+            onConfirm={async (status) => {
+              setBulkUpdating(true);
+              try {
+                const { error } = await supabase.from('fleet_loads').update({ status }).in('id', [...selectedIds]);
+                if (error) throw error;
+                queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
+                toast.success(`${selectedIds.size} load(s) updated`);
+                setSelectedIds(new Set());
+                setMassEditOpen(false);
+              } catch (e: any) { toast.error(e.message); }
+              finally { setBulkUpdating(false); }
+            }}
+            count={selectedIds.size}
+            entityName="loads"
+            isUpdating={bulkUpdating}
+            statusOptions={[
+              { value: 'pending', label: 'Pending' },
+              { value: 'assigned', label: 'Assigned' },
+              { value: 'in_transit', label: 'In Transit' },
+              { value: 'delivered', label: 'Delivered' },
+              { value: 'cancelled', label: 'Cancelled' },
+            ]}
           />
           {filteredLoads.length > 0 && (
             <div className="flex items-center gap-4 px-4 py-3 mt-2 rounded-lg bg-muted/50 text-sm font-medium border border-border">
