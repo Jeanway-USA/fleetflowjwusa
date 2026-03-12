@@ -45,6 +45,9 @@ interface DataTableProps<T> {
   onRowDoubleClick?: (item: T) => void;
   exportFilename?: string;
   tableId?: string;
+  emptyIcon?: LucideIcon;
+  emptyDescription?: string;
+  emptyAction?: { label: string; onClick: () => void };
   selectable?: boolean;
   selectedIds?: Set<string>;
   onSelectionChange?: (ids: Set<string>) => void;
