@@ -353,6 +353,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       simulatedOrgId,
       simulatedOrgName,
       clearOrgSimulation,
+      isSuperAdmin,
     }}>
       {children}
     </AuthContext.Provider>
