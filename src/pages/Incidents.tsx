@@ -301,7 +301,7 @@ export default function Incidents() {
               { key: 'driver_id', header: 'Driver', hiddenOnMobile: true, render: (i: Incident) => getDriverName(i.driver_id) },
               { key: 'truck_id', header: 'Truck', hiddenOnMobile: true, render: (i: Incident) => getTruckName(i.truck_id) },
               { key: 'location_description', header: 'Location', hiddenOnMobile: true, render: (i: Incident) => <span className="max-w-[200px] truncate block">{i.location_description || '-'}</span> },
-              { key: 'estimated_damage', header: 'Damage Est.', render: (i: Incident) => formatCurrencyValue(i.estimated_damage) },
+              { key: 'estimated_damage', header: 'Damage Est.', hiddenOnMobile: true, render: (i: Incident) => formatCurrencyValue(i.estimated_damage) },
               { key: 'status', header: 'Status', render: (i: Incident) => <StatusBadge status={i.status} /> },
               { key: 'actions', header: '', render: (incident: Incident) => (
                 <DropdownMenu>
