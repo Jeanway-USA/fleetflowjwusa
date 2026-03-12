@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/shared/LoadingButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -282,9 +283,9 @@ export default function AgencyLoads() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">
+              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={createMutation.isPending || updateMutation.isPending}>
                 {editingLoad ? 'Save Changes' : 'Add Load'}
-              </Button>
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>

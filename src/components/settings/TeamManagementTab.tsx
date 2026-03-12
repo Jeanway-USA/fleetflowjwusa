@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { DataTable } from '@/components/shared/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/shared/LoadingButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -376,7 +377,7 @@ export function TeamManagementTab() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">Assign Role</Button>
+              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={assignRoleMutation.isPending}>Assign Role</LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -420,9 +421,9 @@ export function TeamManagementTab() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground" disabled={isEditing}>
-                {isEditing ? 'Saving...' : 'Save Changes'}
-              </Button>
+              <LoadingButton type="submit" className="gradient-gold text-primary-foreground" loading={isEditing}>
+                Save Changes
+              </LoadingButton>
             </DialogFooter>
           </form>
         </DialogContent>
