@@ -586,7 +586,7 @@ export default function FleetLoads() {
               { key: 'pickup_date', header: 'Date', render: (load: any) => (
                 <div className="flex items-center gap-2">
                   <span>{formatDate(load.pickup_date)}</span>
-                  {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="compact" />}
+                  {load.pickup_time && <span className="text-xs text-muted-foreground">{load.pickup_time}</span>}
                 </div>
               ) },
               { key: 'landstar_load_id', header: 'Landstar ID', render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
