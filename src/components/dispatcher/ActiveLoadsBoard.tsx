@@ -122,6 +122,8 @@ export function ActiveLoadsBoard() {
           empty_miles,
           notes,
           agency_code,
+          pickup_time_type,
+          delivery_time_type,
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
           truck:trucks!fleet_loads_truck_id_fkey(unit_number),
           load_accessorials(amount)
