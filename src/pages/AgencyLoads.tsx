@@ -214,7 +214,7 @@ export default function AgencyLoads() {
             <DialogTitle>{editingLoad ? 'Edit Agency Load' : 'Add New Agency Load'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="load_reference">Load Reference</Label>
                 <Input id="load_reference" value={formData.load_reference || ''} onChange={(e) => setFormData({ ...formData, load_reference: e.target.value })} placeholder="REF-12345" />
