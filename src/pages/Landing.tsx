@@ -11,6 +11,7 @@ import {
   Truck, DollarSign, Shield, BarChart3, Users, Package, 
   ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone, Menu, Sparkles, Clock
 } from 'lucide-react';
+import RevealOnScroll from '@/components/shared/RevealOnScroll';
 
 const STATS = [
   { label: 'Loads Managed', value: '50K+' },
@@ -74,9 +75,9 @@ export default function Landing() {
             <span className="text-[10px] text-muted-foreground ml-1.5">by JeanWayUSA</span>
           </div>
           <div className="hidden sm:flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate('/pricing')}>Pricing</Button>
-            <Button variant="outline" onClick={() => navigate('/auth')}>Sign In</Button>
-            <Button className="gradient-gold text-primary-foreground" onClick={() => navigate('/auth')}>
+            <Button variant="ghost" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/pricing')}>Pricing</Button>
+            <Button variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/auth')}>Sign In</Button>
+            <Button className="gradient-gold text-primary-foreground active:scale-[0.97] transition-transform" onClick={() => navigate('/auth')}>
               Start Free Trial
             </Button>
           </div>
@@ -129,7 +130,7 @@ export default function Landing() {
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
                   size="lg" 
-                  className="gradient-gold text-primary-foreground text-lg px-8 pulse-glow-gold hover:scale-105 transition-transform"
+                  className="gradient-gold text-primary-foreground text-lg px-8 pulse-glow-gold hover:scale-105 active:scale-[0.97] transition-transform"
                   onClick={() => navigate('/auth')}
                 >
                   Join Free BCO Beta
@@ -138,7 +139,7 @@ export default function Landing() {
                 <Button 
                   size="lg" 
                   variant="outline"
-                  className="text-lg px-8 border-[hsl(0_0%_25%)] text-white hover:bg-[hsl(0_0%_15%)]"
+                  className="text-lg px-8 border-[hsl(0_0%_25%)] text-white hover:bg-[hsl(0_0%_15%)] active:scale-[0.97] transition-transform"
                   onClick={handleDemoLogin}
                   disabled={demoLoading}
                 >
@@ -225,7 +226,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Stats */}
+      <RevealOnScroll>
       <section className="border-y border-border bg-card/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
@@ -238,8 +239,9 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      </RevealOnScroll>
 
-      {/* Pricing */}
+      <RevealOnScroll>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
         <div className="text-center mb-12">
           <h3 className="text-2xl sm:text-3xl font-bold mb-3">Simple, Transparent Pricing</h3>
@@ -277,7 +279,7 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-              <Button variant="outline" className="w-full" disabled>Coming Soon</Button>
+              <Button variant="outline" className="w-full active:scale-[0.97] transition-transform" disabled>Coming Soon</Button>
             </CardContent>
           </Card>
 
@@ -312,7 +314,7 @@ export default function Landing() {
                 ))}
               </ul>
               <Button 
-                className="w-full gradient-gold text-primary-foreground text-base pulse-glow-gold hover:scale-[1.02] transition-transform"
+                className="w-full gradient-gold text-primary-foreground text-base pulse-glow-gold hover:scale-[1.02] active:scale-[0.97] transition-transform"
                 size="lg"
                 onClick={() => navigate('/auth')}
               >
@@ -354,18 +356,19 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-              <Button variant="outline" className="w-full" disabled>Coming Soon</Button>
+              <Button variant="outline" className="w-full active:scale-[0.97] transition-transform" disabled>Coming Soon</Button>
             </CardContent>
           </Card>
         </div>
         <div className="text-center mt-8">
-          <Button variant="outline" size="lg" onClick={() => navigate('/pricing')}>
+          <Button variant="outline" size="lg" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/pricing')}>
             Compare All Features <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
       </section>
+      </RevealOnScroll>
 
-      {/* Four Pillars */}
+      <RevealOnScroll>
       <section className="bg-card/50 border-y border-border py-12 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -379,7 +382,7 @@ export default function Landing() {
               { icon: Package, title: 'Active Load Dispatching', desc: 'Assign drivers, update statuses, and monitor pickups & deliveries from a single real-time board.', accent: 'bg-blue-500/10 text-blue-500' },
               { icon: Smartphone, title: 'Driver Mobile Access', desc: 'Drivers get their own dashboard for BOL uploads, DVIR forms, and live trip updates — right from their phone.', accent: 'bg-purple-500/10 text-purple-500' },
             ].map((f) => (
-              <div key={f.title} className="p-5 sm:p-8 rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-primary/30">
+              <div key={f.title} className="p-5 sm:p-8 rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 active:scale-[0.98]">
                 <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-6 ${f.accent}`}>
                   <f.icon className="w-6 h-6" />
                 </div>
@@ -390,8 +393,9 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      </RevealOnScroll>
 
-      {/* CTA */}
+      <RevealOnScroll>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
         <div className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-6 sm:p-12">
           <h3 className="text-2xl sm:text-3xl font-bold mb-3">Ready to Take Control?</h3>
@@ -400,7 +404,7 @@ export default function Landing() {
           </p>
           <Button 
             size="lg" 
-            className="gradient-gold text-primary-foreground text-lg px-10 glow-gold"
+            className="gradient-gold text-primary-foreground text-lg px-10 glow-gold active:scale-[0.97] transition-transform"
             onClick={() => navigate('/auth')}
           >
             Start Your 14-Day Free Trial
@@ -409,14 +413,48 @@ export default function Landing() {
           <p className="text-xs text-muted-foreground mt-4">No credit card required</p>
         </div>
       </section>
+      </RevealOnScroll>
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-card/50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">© 2026 Fleet Flow TMS by JeanWayUSA. All rights reserved.</p>
-          <div className="flex gap-6 text-sm text-muted-foreground">
-            <button onClick={() => navigate('/pricing')} className="hover:text-foreground transition-colors">Pricing</button>
-            <button onClick={() => navigate('/auth')} className="hover:text-foreground transition-colors">Sign In</button>
+      <footer className="bg-[hsl(240_20%_4%)] border-t border-border pt-12 pb-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-10">
+            {/* Brand */}
+            <div className="col-span-2 md:col-span-1">
+              <span className="text-lg font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
+              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">The all-in-one platform built for Landstar BCOs to track finances, dispatch loads, and grow profitably.</p>
+            </div>
+            {/* Product */}
+            <div>
+              <h5 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wider">Product</h5>
+              <ul className="space-y-2.5">
+                {['Loads', 'IFTA', 'Maintenance', 'Dispatch', 'Driver App'].map((item) => (
+                  <li key={item}>
+                    <button onClick={() => navigate('/auth')} className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">{item}</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* Company */}
+            <div>
+              <h5 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wider">Company</h5>
+              <ul className="space-y-2.5">
+                <li><button onClick={() => navigate('/pricing')} className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Pricing</button></li>
+                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">About</button></li>
+                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Contact</button></li>
+              </ul>
+            </div>
+            {/* Legal */}
+            <div>
+              <h5 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wider">Legal</h5>
+              <ul className="space-y-2.5">
+                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Privacy Policy</button></li>
+                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Terms of Service</button></li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t border-border pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <p className="text-xs text-muted-foreground">© 2026 Fleet Flow TMS by JeanWayUSA. All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">Built for Landstar BCOs & Agents</p>
           </div>
         </div>
       </footer>
