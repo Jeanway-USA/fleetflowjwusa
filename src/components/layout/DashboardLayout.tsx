@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { CommandPalette } from '@/components/shared/CommandPalette';
 import { BetaFeedbackWidget } from '@/components/shared/BetaFeedbackWidget';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/executive-dashboard': 'Executive Dashboard',
