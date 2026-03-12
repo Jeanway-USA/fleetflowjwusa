@@ -361,11 +361,12 @@ export default function Landing() {
           </Card>
         </div>
         <div className="text-center mt-8">
-          <Button variant="outline" size="lg" onClick={() => navigate('/pricing')}>
+          <Button variant="outline" size="lg" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/pricing')}>
             Compare All Features <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
       </section>
+      </RevealOnScroll>
 
       {/* Four Pillars */}
       <section className="bg-card/50 border-y border-border py-12 sm:py-20">
