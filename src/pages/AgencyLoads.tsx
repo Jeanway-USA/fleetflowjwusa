@@ -106,11 +106,11 @@ export default function AgencyLoads() {
   const columns = [
     { key: 'load_reference', header: 'Reference', render: (l: AgencyLoad) => l.load_reference || '-' },
     { key: 'broker_name', header: 'Broker' },
-    { key: 'carrier_name', header: 'Carrier' },
+    { key: 'carrier_name', header: 'Carrier', hiddenOnMobile: true },
     { key: 'origin', header: 'Origin' },
     { key: 'destination', header: 'Destination' },
-    { key: 'broker_rate', header: 'Broker Rate', render: (l: AgencyLoad) => `$${l.broker_rate?.toFixed(2) || '0.00'}` },
-    { key: 'carrier_rate', header: 'Carrier Rate', render: (l: AgencyLoad) => `$${l.carrier_rate?.toFixed(2) || '0.00'}` },
+    { key: 'broker_rate', header: 'Broker Rate', hiddenOnMobile: true, render: (l: AgencyLoad) => `$${l.broker_rate?.toFixed(2) || '0.00'}` },
+    { key: 'carrier_rate', header: 'Carrier Rate', hiddenOnMobile: true, render: (l: AgencyLoad) => `$${l.carrier_rate?.toFixed(2) || '0.00'}` },
     { key: 'margin', header: 'Margin', render: (l: AgencyLoad) => <span className={Number(l.margin) >= 0 ? 'text-success' : 'text-destructive'}>${l.margin?.toFixed(2) || '0.00'}</span> },
     { key: 'status', header: 'Status', render: (l: AgencyLoad) => <StatusBadge status={l.status} /> },
     {
