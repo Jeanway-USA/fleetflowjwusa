@@ -80,6 +80,10 @@ export default function Incidents() {
     injuries_reported: false,
     estimated_damage: 0,
   });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [massEditOpen, setMassEditOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const { data: incidents = [], isLoading } = useQuery({
     queryKey: ['incidents'],
