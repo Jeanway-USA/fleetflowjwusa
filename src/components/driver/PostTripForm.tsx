@@ -433,10 +433,10 @@ export function PostTripForm({ driverId, truckId, onComplete }: PostTripFormProp
                         type="button"
                         variant="destructive"
                         size="icon"
-                        className="absolute top-1 right-1 h-5 w-5"
+                        className="absolute top-1 right-1 h-7 w-7"
                         onClick={() => removePhoto(index)}
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-4 w-4" />
                       </Button>
                     </div>
                   ))}
