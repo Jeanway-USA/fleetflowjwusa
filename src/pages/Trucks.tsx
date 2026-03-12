@@ -233,9 +233,9 @@ export default function Trucks() {
 
   const columns = [
     { key: 'unit_number', header: 'Unit #' },
-    { key: 'make', header: 'Make' },
-    { key: 'model', header: 'Model' },
-    { key: 'year', header: 'Year' },
+    { key: 'make', header: 'Make', hiddenOnMobile: true },
+    { key: 'model', header: 'Model', hiddenOnMobile: true },
+    { key: 'year', header: 'Year', hiddenOnMobile: true },
     { 
       key: 'current_driver', 
       header: 'Current Driver',

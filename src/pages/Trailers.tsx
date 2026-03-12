@@ -310,7 +310,49 @@ export default function Trailers() {
   return (
     <>
       <PageHeader title="Trailers" description="Manage your fleet trailers" action={{ label: 'Add Trailer', onClick: () => openDialog() }} />
-      <DataTable columns={columns} data={trailers} loading={isLoading} emptyMessage="No trailers registered yet" tableId="trailers" exportFilename="trailers" />
+      <DataTable
+        columns={columns}
+        data={trailers}
+        loading={isLoading}
+        emptyMessage="No trailers registered yet"
+        tableId="trailers"
+        exportFilename="trailers"
+        onRowDoubleClick={(trailer) => openDialog(trailer)}
+        selectable
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        bulkActions={(ids) => (
+          <>
+            <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
+              <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
+              <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+            </Button>
+          </>
+        )}
+      />
+      <ConfirmDeleteDialog
+        open={massDeleteOpen}
+        onOpenChange={setMassDeleteOpen}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected Trailers"
+        description={`Are you sure you want to delete ${selectedIds.size} trailer(s)? This action cannot be undone.`}
+        isDeleting={bulkUpdating}
+      />
+      <BulkStatusEditDialog
+        open={massEditOpen}
+        onOpenChange={setMassEditOpen}
+        onConfirm={handleBulkStatusUpdate}
+        count={selectedIds.size}
+        entityName="trailers"
+        isUpdating={bulkUpdating}
+        statusOptions={[
+          { value: 'active', label: 'Active' },
+          { value: 'in_shop', label: 'In Shop' },
+          { value: 'out_of_service', label: 'Out of Service' },
+        ]}
+      />
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
