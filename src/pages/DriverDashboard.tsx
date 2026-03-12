@@ -185,13 +185,15 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
 
         {/* Fuel Trip Planner - shows when there's an active/upcoming load */}
         {activeLoad && (
-          <TripFuelPlanner
-            driverId={driver.id}
-            origin={activeLoad.origin}
-            destination={activeLoad.destination}
-            bookedMiles={activeLoad.booked_miles}
-            notes={activeLoad.notes}
-          />
+          <ErrorBoundary compact>
+            <TripFuelPlanner
+              driverId={driver.id}
+              origin={activeLoad.origin}
+              destination={activeLoad.destination}
+              bookedMiles={activeLoad.booked_miles}
+              notes={activeLoad.notes}
+            />
+          </ErrorBoundary>
         )}
 
         {/* Next Load Preview */}
