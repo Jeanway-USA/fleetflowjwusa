@@ -345,6 +345,9 @@ export default function Trailers() {
         data={trailers}
         loading={isLoading}
         emptyMessage="No trailers registered yet"
+        emptyDescription="Add your first trailer to manage your trailer fleet."
+        emptyIcon={Container}
+        emptyAction={{ label: 'Add First Trailer', onClick: () => openDialog() }}
         tableId="trailers"
         exportFilename="trailers"
         onRowDoubleClick={(trailer) => openDialog(trailer)}

@@ -14,6 +14,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { LucideIcon } from 'lucide-react';
 
 type Density = 'standard' | 'compact';
 
@@ -43,6 +45,9 @@ interface DataTableProps<T> {
   onRowDoubleClick?: (item: T) => void;
   exportFilename?: string;
   tableId?: string;
+  emptyIcon?: LucideIcon;
+  emptyDescription?: string;
+  emptyAction?: { label: string; onClick: () => void };
   selectable?: boolean;
   selectedIds?: Set<string>;
   onSelectionChange?: (ids: Set<string>) => void;
@@ -78,6 +83,9 @@ export function DataTable<T extends { id: string }>({
   onRowDoubleClick,
   exportFilename,
   tableId,
+  emptyIcon,
+  emptyDescription,
+  emptyAction,
   selectable,
   selectedIds,
   onSelectionChange,
@@ -235,8 +243,13 @@ export function DataTable<T extends { id: string }>({
 
   if (data.length === 0) {
     return (
-      <div className="rounded-lg border border-border p-12 text-center">
-        <p className="text-muted-foreground">{emptyMessage}</p>
+      <div className="rounded-lg border border-border">
+        <EmptyState
+          icon={emptyIcon}
+          title={emptyMessage}
+          description={emptyDescription}
+          action={emptyAction}
+        />
       </div>
     );
   }
