@@ -130,7 +130,7 @@ export default function Landing() {
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
                   size="lg" 
-                  className="gradient-gold text-primary-foreground text-lg px-8 pulse-glow-gold hover:scale-105 transition-transform"
+                  className="gradient-gold text-primary-foreground text-lg px-8 pulse-glow-gold hover:scale-105 active:scale-[0.97] transition-transform"
                   onClick={() => navigate('/auth')}
                 >
                   Join Free BCO Beta
@@ -139,7 +139,7 @@ export default function Landing() {
                 <Button 
                   size="lg" 
                   variant="outline"
-                  className="text-lg px-8 border-[hsl(0_0%_25%)] text-white hover:bg-[hsl(0_0%_15%)]"
+                  className="text-lg px-8 border-[hsl(0_0%_25%)] text-white hover:bg-[hsl(0_0%_15%)] active:scale-[0.97] transition-transform"
                   onClick={handleDemoLogin}
                   disabled={demoLoading}
                 >
