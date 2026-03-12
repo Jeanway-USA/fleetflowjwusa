@@ -63,9 +63,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [orgLoading, setOrgLoading] = useState(true);
   const [orgIsActive, setOrgIsActive] = useState(true);
-  const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(() => localStorage.getItem('simulatedOrgId'));
-  const [simulatedOrgName, setSimulatedOrgName] = useState<string | null>(() => localStorage.getItem('simulatedOrgName'));
-  const [simulatedOrgTier, setSimulatedOrgTier] = useState<string | null>(() => localStorage.getItem('simulatedOrgTier'));
+  const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(null);
+  const [simulatedOrgName, setSimulatedOrgName] = useState<string | null>(null);
+  const [simulatedOrgTier, setSimulatedOrgTier] = useState<string | null>(null);
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase
@@ -132,16 +132,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSimulatedOrgTier(null);
   }, []);
 
-  // Listen for simulatedOrgChanged events from other components
+  // Listen for simulatedOrgChanged events - only super admins can simulate orgs
+  const SUPER_ADMIN_EMAILS = ["andrew@jeanwayusa.com", "siadrak@jeanwayusa.com", "hr@jeanwayusa.com"];
+  const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(user?.email || '');
+
   useEffect(() => {
     const handler = () => {
+      if (!isSuperAdmin) {
+        // Non-super-admins: clear any simulated state
+        localStorage.removeItem('simulatedOrgId');
+        localStorage.removeItem('simulatedOrgName');
+        localStorage.removeItem('simulatedOrgTier');
+        setSimulatedOrgId(null);
+        setSimulatedOrgName(null);
+        setSimulatedOrgTier(null);
+        return;
+      }
       setSimulatedOrgId(localStorage.getItem('simulatedOrgId'));
       setSimulatedOrgName(localStorage.getItem('simulatedOrgName'));
       setSimulatedOrgTier(localStorage.getItem('simulatedOrgTier'));
     };
     window.addEventListener('simulatedOrgChanged', handler);
     return () => window.removeEventListener('simulatedOrgChanged', handler);
-  }, []);
+  }, [isSuperAdmin]);
 
   useEffect(() => {
     // Set up auth state listener first
