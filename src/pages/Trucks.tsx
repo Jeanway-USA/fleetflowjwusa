@@ -369,6 +369,9 @@ export default function Trucks() {
         data={trucks}
         loading={isLoading}
         emptyMessage="No trucks registered yet"
+        emptyDescription="Add your first truck to start managing your fleet."
+        emptyIcon={TruckIcon}
+        emptyAction={{ label: 'Add First Truck', onClick: () => openDialog() }}
         tableId="trucks"
         exportFilename="trucks"
         onRowDoubleClick={(truck) => openDialog(truck)}

@@ -208,6 +208,8 @@ export default function Documents() {
               data={filteredDocuments} 
               loading={isLoading} 
               emptyMessage="No documents uploaded yet"
+              emptyDescription="Upload BOLs, PODs, receipts, and other files to get started."
+              emptyIcon={FolderOpen}
               tableId="documents"
               exportFilename="documents"
             />

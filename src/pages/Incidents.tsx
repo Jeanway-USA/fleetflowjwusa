@@ -328,6 +328,8 @@ export default function Incidents() {
             data={incidents}
             loading={isLoading}
             emptyMessage="No incidents reported"
+            emptyDescription="No incidents on record — that's a good thing!"
+            emptyIcon={FileWarning}
             tableId="incidents"
             exportFilename="incidents"
             onRowDoubleClick={(incident) => openDialog(incident)}

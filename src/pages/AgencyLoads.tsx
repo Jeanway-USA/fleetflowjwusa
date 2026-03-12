@@ -145,6 +145,9 @@ export default function AgencyLoads() {
         data={loads}
         loading={isLoading}
         emptyMessage="No agency loads yet"
+        emptyDescription="Add your first brokerage load to start tracking margins."
+        emptyIcon={Briefcase}
+        emptyAction={{ label: 'Add First Load', onClick: () => openDialog() }}
         tableId="agency-loads"
         exportFilename="agency-loads"
         onRowDoubleClick={(load) => openDialog(load)}

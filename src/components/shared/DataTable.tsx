@@ -243,8 +243,13 @@ export function DataTable<T extends { id: string }>({
 
   if (data.length === 0) {
     return (
-      <div className="rounded-lg border border-border p-12 text-center">
-        <p className="text-muted-foreground">{emptyMessage}</p>
+      <div className="rounded-lg border border-border">
+        <EmptyState
+          icon={emptyIcon}
+          title={emptyMessage}
+          description={emptyDescription}
+          action={emptyAction}
+        />
       </div>
     );
   }

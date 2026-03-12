@@ -649,6 +649,9 @@ export default function FleetLoads() {
             data={filteredLoads}
             loading={isLoading}
             emptyMessage="No loads yet"
+            emptyDescription="Create your first load to start tracking revenue and miles."
+            emptyIcon={Truck}
+            emptyAction={{ label: 'Add First Load', onClick: () => openDialog() }}
             tableId="fleet-loads"
             exportFilename="fleet-loads"
             onRowDoubleClick={(load) => openDialog(load)}
