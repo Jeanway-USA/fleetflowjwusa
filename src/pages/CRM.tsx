@@ -139,7 +139,7 @@ export default function CRM() {
                 )}
               </div>
             )},
-            { key: 'contact_name', header: 'Contact', render: (contact: UnifiedContact) => contact.contact_name || '—' },
+            { key: 'contact_name', header: 'Contact', hiddenOnMobile: true, render: (contact: UnifiedContact) => contact.contact_name || '—' },
             { key: 'contact_type', header: 'Type', render: (contact: UnifiedContact) => {
               const subType = getSubTypeLabel(contact);
               return (
