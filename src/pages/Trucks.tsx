@@ -326,6 +326,36 @@ export default function Trucks() {
   ];
 
   const [viewingTruck, setViewingTruck] = useState<TruckWithDriver | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [massEditOpen, setMassEditOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+
+  const handleBulkDelete = async () => {
+    setBulkUpdating(true);
+    try {
+      const { error } = await supabase.from('trucks').delete().in('id', [...selectedIds]);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['trucks'] });
+      toast.success(`${selectedIds.size} truck(s) deleted`);
+      setSelectedIds(new Set());
+      setMassDeleteOpen(false);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkUpdating(false); }
+  };
+
+  const handleBulkStatusUpdate = async (status: string) => {
+    setBulkUpdating(true);
+    try {
+      const { error } = await supabase.from('trucks').update({ status }).in('id', [...selectedIds]);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['trucks'] });
+      toast.success(`${selectedIds.size} truck(s) updated`);
+      setSelectedIds(new Set());
+      setMassEditOpen(false);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkUpdating(false); }
+  };
 
   return (
     <>
