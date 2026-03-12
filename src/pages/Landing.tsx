@@ -44,6 +44,7 @@ const STATS = [
 export default function Landing() {
   const navigate = useNavigate();
   const [demoLoading, setDemoLoading] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handleDemoLogin = async () => {
     setDemoLoading(true);
