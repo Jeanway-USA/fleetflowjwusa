@@ -90,7 +90,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
               <ScrollArea className="h-[calc(100vh-200px)] pr-4">
                 <div className="space-y-6 py-6">
               {/* Stats Cards */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
