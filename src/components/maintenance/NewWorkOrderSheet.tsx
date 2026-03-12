@@ -260,7 +260,7 @@ export function NewWorkOrderSheet({ open, onOpenChange, initialData }: NewWorkOr
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-lg">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
