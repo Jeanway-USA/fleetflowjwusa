@@ -23,6 +23,23 @@ export default function Landing() {
   const navigate = useNavigate();
   const [demoLoading, setDemoLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [pricesLoading, setPricesLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from('subscription_plans')
+      .select('tier, base_price_monthly')
+      .eq('is_active', true)
+      .then(({ data }) => {
+        if (data) {
+          const map: Record<string, number> = {};
+          data.forEach((p) => { map[p.tier] = Number(p.base_price_monthly); });
+          setPrices(map);
+        }
+        setPricesLoading(false);
+      });
+  }, []);
 
   const handleDemoLogin = async () => {
     setDemoLoading(true);
