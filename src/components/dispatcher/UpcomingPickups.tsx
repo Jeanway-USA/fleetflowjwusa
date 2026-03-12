@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar, MapPin, AlertTriangle, Clock, User, Truck } from 'lucide-react';
 import { format, formatDistanceToNow, addHours, isBefore } from 'date-fns';
+import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { useNavigate } from 'react-router-dom';
 
 interface UpcomingLoad {
@@ -15,6 +16,8 @@ interface UpcomingLoad {
   destination: string;
   status: string;
   pickup_date: string | null;
+  pickup_time: string | null;
+  pickup_time_type: string | null;
   driver_id: string | null;
   truck_id: string | null;
   driver: { first_name: string; last_name: string } | null;
@@ -47,6 +50,8 @@ export function UpcomingPickups() {
           destination,
           status,
           pickup_date,
+          pickup_time,
+          pickup_time_type,
           driver_id,
           truck_id,
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
@@ -137,7 +142,7 @@ export function UpcomingPickups() {
                 </div>
                 
                 {load.pickup_date && (
-                  <div className="flex items-center gap-1 mt-2 text-xs">
+                  <div className="flex items-center gap-1 mt-2 text-xs flex-wrap">
                     <Clock className={`h-3 w-3 ${isUrgent(load) ? 'text-destructive' : 'text-muted-foreground'}`} />
                     <span className={isUrgent(load) ? 'text-destructive font-medium' : 'text-muted-foreground'}>
                       {formatDistanceToNow(parsePickupDate(load.pickup_date), { addSuffix: true })}
@@ -145,6 +150,7 @@ export function UpcomingPickups() {
                     <span className="text-muted-foreground">
                       ({format(parsePickupDate(load.pickup_date), 'MMM d, h:mm a')})
                     </span>
+                    {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="compact" />}
                   </div>
                 )}
 

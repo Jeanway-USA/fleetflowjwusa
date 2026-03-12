@@ -23,6 +23,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail } from 'lucide-react';
+import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -582,7 +583,12 @@ export default function FleetLoads() {
         <CardContent className="pt-6">
           <DataTable
             columns={[
-              { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
+              { key: 'pickup_date', header: 'Date', render: (load: any) => (
+                <div className="flex items-center gap-2">
+                  <span>{formatDate(load.pickup_date)}</span>
+                  {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="compact" />}
+                </div>
+              ) },
               { key: 'landstar_load_id', header: 'Landstar ID', render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
               { key: 'tracking_id', header: 'Tracking ID', hiddenOnMobile: true, render: (load: any) => 
                 load.tracking_id ? (
@@ -822,7 +828,7 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="pickup_date">Pickup Date</Label>
                     <Input 
@@ -843,6 +849,18 @@ export default function FleetLoads() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="pickup_time_type">Pickup Time Type</Label>
+                    <Select value={formData.pickup_time_type || 'appointment'} onValueChange={(v) => setFormData({ ...formData, pickup_time_type: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="appointment">Strict Appointment</SelectItem>
+                        <SelectItem value="window">Open Window</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
                     <Label htmlFor="delivery_date">Delivery Date</Label>
                     <Input 
                       id="delivery_date" 
@@ -860,6 +878,16 @@ export default function FleetLoads() {
                       onChange={(e) => setFormData({ ...formData, delivery_time: e.target.value })} 
                       placeholder="2:00 PM"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="delivery_time_type">Delivery Time Type</Label>
+                    <Select value={formData.delivery_time_type || 'appointment'} onValueChange={(v) => setFormData({ ...formData, delivery_time_type: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="appointment">Strict Appointment</SelectItem>
+                        <SelectItem value="window">Open Window</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

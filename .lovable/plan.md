@@ -1,58 +1,66 @@
 
 
-## Plan: Pickup/Delivery Time Type (Appointment vs Open Window)
+## QoL Improvements Across All Areas
 
-### Task 1: Database Migration
+### 1. Dynamic Period Selector (Finance)
+The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
 
-Add two columns to `fleet_loads`:
-```sql
-ALTER TABLE public.fleet_loads
-  ADD COLUMN pickup_time_type text NOT NULL DEFAULT 'appointment',
-  ADD COLUMN delivery_time_type text NOT NULL DEFAULT 'appointment';
-```
+**File:** `src/pages/Finance.tsx`
+- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
+- Auto-generate monthly and quarterly period options from that range up to the current date
+- Default to the current month instead of a hardcoded quarter
 
-Both default to `'appointment'` so existing loads display unchanged.
+### 2. Expense Table Pagination / Virtualization (Finance)
+The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
 
-### Task 2: Shared Time Type Badge Component
+**File:** `src/pages/Finance.tsx`
+- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
+- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
 
-Create `src/components/shared/TimeTypeBadge.tsx` — a reusable component used across all views:
-- **Appointment**: Orange badge with `Clock` icon, text "Appt: [Time]"
-- **Window**: Green badge with `CalendarRange` icon, text "Window: [Time]"
-- Accepts `timeType`, `time`, and optional `variant` (compact for cards, full for forms)
-- Includes tooltip on window type: "Open Window means you can arrive any time after the listed start time during normal facility hours."
-- Falls back to plain time display when `timeType` is null/undefined
+### 3. Breadcrumb Navigation in Header (Overall UX)
+The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
 
-### Task 3: Fleet Loads Form (FleetLoads.tsx)
+**Files:** `src/components/layout/DashboardLayout.tsx`
+- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
+- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
+- Display in the header alongside the sidebar trigger
 
-In the load create/edit dialog, next to the pickup time and delivery time inputs (lines 825-863), add a `Select` for each:
-- Options: "Strict Appointment" / "Open Window"
-- Store as `pickup_time_type` and `delivery_time_type` in formData
-- Default to `'appointment'`
-- Also update `handleRateConfirmationData` to pass through these fields if present
+### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
+Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
 
-In the DataTable columns, update the `pickup_date` column render to include the `TimeTypeBadge` showing the time type alongside the date.
+**File:** `src/components/layout/DashboardLayout.tsx`
+- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
 
-### Task 4: Dispatch Dashboard
+### 5. Confirm Before Single Expense Delete (Finance)
+Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
 
-**ActiveLoadsBoard.tsx**: In the load card time display area (around line 200+), add `TimeTypeBadge` for pickup/delivery times. Update the query `select` to include `pickup_time_type, delivery_time_type`.
+**File:** `src/pages/Finance.tsx`
+- Add a `deleteConfirmId` state
+- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
 
-**UpcomingPickups.tsx**: In the pickup time display (lines 139-148), add `TimeTypeBadge` for pickup time type. Update the query to fetch `pickup_time_type`. Update the `UpcomingLoad` interface.
+### 6. Pull-to-Refresh on Driver Dashboard (Driver)
+The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
 
-### Task 5: Driver Dashboard
+**File:** `src/pages/DriverDashboard.tsx`
+- Add a `RefreshCw` icon button next to the date display
+- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
 
-**ActiveLoadCard.tsx**: In the date/time section (lines showing pickup/delivery times), replace plain time text with `TimeTypeBadge`. For appointments: bold "🚨 STRICT APPT: [Time]". For windows: "🟢 OPEN WINDOW: starts at [Time]". Update `Load` interface to include `pickup_time_type` and `delivery_time_type`.
+### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
+The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
 
-**NextLoadPreview.tsx**: Add time type indicator next to the pickup date display.
+**File:** `src/pages/DispatcherDashboard.tsx`
+- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
 
-**DriverLoadsView.tsx**: Update the load cards to show `TimeTypeBadge` for time displays. Update the query to fetch the new columns.
+### 8. Sidebar Active State on Nested Routes (Overall UX)
+The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
+
+**File:** `src/components/layout/AppSidebar.tsx`
+- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
 
 ### Files Modified
-- `supabase/migrations/` — new migration for `pickup_time_type` and `delivery_time_type` columns
-- `src/components/shared/TimeTypeBadge.tsx` — new shared component
-- `src/pages/FleetLoads.tsx` — form inputs + table column
-- `src/components/dispatcher/ActiveLoadsBoard.tsx` — query + display
-- `src/components/dispatcher/UpcomingPickups.tsx` — query + display
-- `src/components/driver/ActiveLoadCard.tsx` — display with driver-specific styling
-- `src/components/driver/NextLoadPreview.tsx` — display
-- `src/components/driver/DriverLoadsView.tsx` — query + display
+- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
+- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
+- `src/pages/DriverDashboard.tsx` (refresh button)
+- `src/pages/DispatcherDashboard.tsx` (responsive grid)
+- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
 
