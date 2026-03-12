@@ -227,7 +227,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
           </div>
 
           {GALLONS_EXPENSE_TYPES.includes(formData.expense_type) && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Vendor</Label>
                 <Input 

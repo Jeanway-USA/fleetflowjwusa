@@ -198,7 +198,7 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
         <DocumentScanButton driverId={driver.id} />
 
         {/* GPS + Pay in one row on larger screens */}
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
           <LocationSharing 
             driverId={driver.id}
             truckId={assignedTruck?.id}

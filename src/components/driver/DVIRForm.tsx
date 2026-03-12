@@ -100,7 +100,7 @@ export function DVIRForm({ type, driverId, truckId, onComplete }: DVIRFormProps)
         <Label>Inspection Checklist</Label>
         <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto border rounded-lg p-3">
           {INSPECTION_ITEMS.map((item) => (
-            <div key={item.id} className="flex items-center space-x-3">
+            <div key={item.id} className="flex items-center space-x-3 min-h-[44px]">
               <Checkbox
                 id={item.id}
                 checked={checkedItems[item.id]}

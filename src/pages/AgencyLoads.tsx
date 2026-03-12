@@ -263,7 +263,7 @@ export default function AgencyLoads() {
                 <Input id="delivery_date" type="date" value={formData.delivery_date || ''} onChange={(e) => setFormData({ ...formData, delivery_date: e.target.value })} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="broker_rate">Broker Rate ($)</Label>
                 <Input id="broker_rate" type="number" step="0.01" value={formData.broker_rate || ''} onChange={(e) => setFormData({ ...formData, broker_rate: parseFloat(e.target.value) || 0 })} />

@@ -185,7 +185,7 @@ export function PrintableExecutiveSummary({
         {/* Section 4: Operational Metrics */}
         <section>
           <h2 className="text-sm font-bold uppercase tracking-widest border-b border-gray-400 pb-1 mb-3">Operational Metrics</h2>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
               { label: 'Loads Completed', value: fmtNumber(operationalData?.totalLoads ?? 0) },
               { label: 'Miles Driven', value: `${fmtNumber(operationalData?.totalMiles ?? 0)} mi` },

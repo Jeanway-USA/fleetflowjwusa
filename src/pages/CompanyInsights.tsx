@@ -413,7 +413,7 @@ const CompanyInsights = () => {
             </Card>
 
             {/* Agency Summary */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center">
