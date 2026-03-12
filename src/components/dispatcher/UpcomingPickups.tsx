@@ -15,6 +15,8 @@ interface UpcomingLoad {
   destination: string;
   status: string;
   pickup_date: string | null;
+  pickup_time: string | null;
+  pickup_time_type: string | null;
   driver_id: string | null;
   truck_id: string | null;
   driver: { first_name: string; last_name: string } | null;
