@@ -298,9 +298,9 @@ export default function Incidents() {
               { key: 'incident_date', header: 'Date', render: (i: Incident) => format(parseISO(i.incident_date), 'MM/dd/yyyy') },
               { key: 'incident_type', header: 'Type', render: (i: Incident) => <span className="capitalize">{i.incident_type.replace('_', ' ')}</span> },
               { key: 'severity', header: 'Severity', render: (i: Incident) => getSeverityBadge(i.severity) },
-              { key: 'driver_id', header: 'Driver', render: (i: Incident) => getDriverName(i.driver_id) },
-              { key: 'truck_id', header: 'Truck', render: (i: Incident) => getTruckName(i.truck_id) },
-              { key: 'location_description', header: 'Location', render: (i: Incident) => <span className="max-w-[200px] truncate block">{i.location_description || '-'}</span> },
+              { key: 'driver_id', header: 'Driver', hiddenOnMobile: true, render: (i: Incident) => getDriverName(i.driver_id) },
+              { key: 'truck_id', header: 'Truck', hiddenOnMobile: true, render: (i: Incident) => getTruckName(i.truck_id) },
+              { key: 'location_description', header: 'Location', hiddenOnMobile: true, render: (i: Incident) => <span className="max-w-[200px] truncate block">{i.location_description || '-'}</span> },
               { key: 'estimated_damage', header: 'Damage Est.', render: (i: Incident) => formatCurrencyValue(i.estimated_damage) },
               { key: 'status', header: 'Status', render: (i: Incident) => <StatusBadge status={i.status} /> },
               { key: 'actions', header: '', render: (incident: Incident) => (
