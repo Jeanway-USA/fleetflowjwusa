@@ -214,7 +214,7 @@ export default function AgencyLoads() {
             <DialogTitle>{editingLoad ? 'Edit Agency Load' : 'Add New Agency Load'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="load_reference">Load Reference</Label>
                 <Input id="load_reference" value={formData.load_reference || ''} onChange={(e) => setFormData({ ...formData, load_reference: e.target.value })} placeholder="REF-12345" />
@@ -233,7 +233,7 @@ export default function AgencyLoads() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="broker_name">Broker Name</Label>
                 <Input id="broker_name" value={formData.broker_name || ''} onChange={(e) => setFormData({ ...formData, broker_name: e.target.value })} />
@@ -243,7 +243,7 @@ export default function AgencyLoads() {
                 <Input id="carrier_name" value={formData.carrier_name || ''} onChange={(e) => setFormData({ ...formData, carrier_name: e.target.value })} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="origin">Origin *</Label>
                 <Input id="origin" value={formData.origin || ''} onChange={(e) => setFormData({ ...formData, origin: e.target.value })} placeholder="City, State" required />
@@ -253,7 +253,7 @@ export default function AgencyLoads() {
                 <Input id="destination" value={formData.destination || ''} onChange={(e) => setFormData({ ...formData, destination: e.target.value })} placeholder="City, State" required />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="pickup_date">Pickup Date</Label>
                 <Input id="pickup_date" type="date" value={formData.pickup_date || ''} onChange={(e) => setFormData({ ...formData, pickup_date: e.target.value })} />
@@ -263,7 +263,7 @@ export default function AgencyLoads() {
                 <Input id="delivery_date" type="date" value={formData.delivery_date || ''} onChange={(e) => setFormData({ ...formData, delivery_date: e.target.value })} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="broker_rate">Broker Rate ($)</Label>
                 <Input id="broker_rate" type="number" step="0.01" value={formData.broker_rate || ''} onChange={(e) => setFormData({ ...formData, broker_rate: parseFloat(e.target.value) || 0 })} />

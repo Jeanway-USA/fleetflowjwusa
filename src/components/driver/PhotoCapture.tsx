@@ -95,7 +95,7 @@ export function PhotoCapture({ onPhotosCaptured, disabled, maxPhotos = 5 }: Phot
 
       {/* Photo Grid */}
       {photos.length > 0 && (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {photos.map((photo, index) => (
             <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
               <img 

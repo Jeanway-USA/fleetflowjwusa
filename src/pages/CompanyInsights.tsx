@@ -240,7 +240,7 @@ const CompanyInsights = () => {
 
           {/* Fleet & Driver Reports */}
           <TabsContent value="fleet-driver" className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
               {/* Truck Leaderboard */}
               <Card>
                 <CardHeader>
@@ -325,7 +325,7 @@ const CompanyInsights = () => {
             </div>
 
             {/* Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center">
@@ -413,7 +413,7 @@ const CompanyInsights = () => {
             </Card>
 
             {/* Agency Summary */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center">

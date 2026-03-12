@@ -195,7 +195,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
             <div className="flex-1" />
           </div>
         </header>
-        <div className="flex-1 p-4 lg:p-6 animate-fade-in">
+        <div className="flex-1 p-2 sm:p-4 lg:p-6 animate-fade-in">
           {children}
         </div>
       </main>
