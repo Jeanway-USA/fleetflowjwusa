@@ -395,7 +395,7 @@ export default function Landing() {
       </section>
       </RevealOnScroll>
 
-      {/* CTA */}
+      <RevealOnScroll>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
         <div className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-6 sm:p-12">
           <h3 className="text-2xl sm:text-3xl font-bold mb-3">Ready to Take Control?</h3>
@@ -404,7 +404,7 @@ export default function Landing() {
           </p>
           <Button 
             size="lg" 
-            className="gradient-gold text-primary-foreground text-lg px-10 glow-gold"
+            className="gradient-gold text-primary-foreground text-lg px-10 glow-gold active:scale-[0.97] transition-transform"
             onClick={() => navigate('/auth')}
           >
             Start Your 14-Day Free Trial
@@ -413,6 +413,7 @@ export default function Landing() {
           <p className="text-xs text-muted-foreground mt-4">No credit card required</p>
         </div>
       </section>
+      </RevealOnScroll>
 
       {/* Footer */}
       <footer className="border-t border-border bg-card/50 py-8">
