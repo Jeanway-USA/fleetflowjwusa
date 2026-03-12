@@ -337,8 +337,15 @@ export default function Landing() {
                 </div>
               </div>
               <div className="mb-5">
-                <span className="text-2xl font-bold text-muted-foreground line-through">$149</span>
-                <span className="text-sm text-muted-foreground">/mo</span>
+                {pricesLoading ? (
+                  <Skeleton className="h-8 w-20" />
+                ) : (
+                  <>
+                    <span className="text-2xl font-bold text-muted-foreground line-through">${prices['fleet_owner'] ?? '—'}</span>
+                    <span className="text-sm text-muted-foreground">/mo</span>
+                  </>
+                )}
+              </div>
               </div>
               <ul className="space-y-2 mb-6">
                 {['Driver settlements & payroll', 'Fleet-wide analytics', 'Real-time GPS tracking', 'Cost-per-mile reporting'].map((f) => (
