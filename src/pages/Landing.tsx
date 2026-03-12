@@ -346,7 +346,6 @@ export default function Landing() {
                   </>
                 )}
               </div>
-              </div>
               <ul className="space-y-2 mb-6">
                 {['Driver settlements & payroll', 'Fleet-wide analytics', 'Real-time GPS tracking', 'Cost-per-mile reporting'].map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
