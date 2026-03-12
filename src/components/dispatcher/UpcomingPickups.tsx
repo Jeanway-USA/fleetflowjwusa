@@ -142,7 +142,7 @@ export function UpcomingPickups() {
                 </div>
                 
                 {load.pickup_date && (
-                  <div className="flex items-center gap-1 mt-2 text-xs">
+                  <div className="flex items-center gap-1 mt-2 text-xs flex-wrap">
                     <Clock className={`h-3 w-3 ${isUrgent(load) ? 'text-destructive' : 'text-muted-foreground'}`} />
                     <span className={isUrgent(load) ? 'text-destructive font-medium' : 'text-muted-foreground'}>
                       {formatDistanceToNow(parsePickupDate(load.pickup_date), { addSuffix: true })}
@@ -150,6 +150,7 @@ export function UpcomingPickups() {
                     <span className="text-muted-foreground">
                       ({format(parsePickupDate(load.pickup_date), 'MMM d, h:mm a')})
                     </span>
+                    {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="compact" />}
                   </div>
                 )}
 

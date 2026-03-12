@@ -241,8 +241,18 @@ export function ActiveLoadsBoard() {
                     </div>
                     {(load.pickup_date || load.delivery_date) && (
                       <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border text-xs text-muted-foreground">
-                        {load.pickup_date && <span>Pickup: {format(new Date(load.pickup_date), 'MMM d')}</span>}
-                        {load.delivery_date && <span>Delivery: {format(new Date(load.delivery_date), 'MMM d')}</span>}
+                        {load.pickup_date && (
+                          <span className="inline-flex items-center gap-1">
+                            Pickup: {format(new Date(load.pickup_date), 'MMM d')}
+                            {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="compact" />}
+                          </span>
+                        )}
+                        {load.delivery_date && (
+                          <span className="inline-flex items-center gap-1">
+                            Delivery: {format(new Date(load.delivery_date), 'MMM d')}
+                            {load.delivery_time && <TimeTypeBadge timeType={load.delivery_time_type} time={load.delivery_time} variant="compact" />}
+                          </span>
+                        )}
                         {load.rate && <span className="ml-auto font-medium text-foreground">${load.rate.toLocaleString()}</span>}
                       </div>
                     )}
