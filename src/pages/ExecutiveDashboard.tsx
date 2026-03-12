@@ -21,6 +21,7 @@ import { PendingActionsCard, PendingAction } from '@/components/executive/Pendin
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { PrintableExecutiveSummary } from '@/components/executive/PrintableExecutiveSummary';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 function getDateRange(period: TimePeriod) {
   const now = new Date();
