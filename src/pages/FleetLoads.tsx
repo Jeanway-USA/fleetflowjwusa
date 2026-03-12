@@ -617,8 +617,8 @@ export default function FleetLoads() {
                 );
               }},
               { key: 'rate', header: 'Rate', render: (load: any) => <span className="text-right">{formatCurrency(load.rate)}</span> },
-              { key: 'fuel_surcharge', header: 'FSC', render: (load: any) => formatCurrency(load.fuel_surcharge) },
-              { key: 'accessorials_total', header: 'Accessorials', render: (load: any) => formatCurrency(getLoadAccessorialsTotal(load.id)) },
+              { key: 'fuel_surcharge', header: 'FSC', hiddenOnMobile: true, render: (load: any) => formatCurrency(load.fuel_surcharge) },
+              { key: 'accessorials_total', header: 'Accessorials', hiddenOnMobile: true, render: (load: any) => formatCurrency(getLoadAccessorialsTotal(load.id)) },
               { key: 'net_revenue', header: 'Net Revenue', render: (load: any) => <span className="font-medium text-success">{formatCurrency(load.net_revenue)}</span> },
               { key: 'miles', header: 'Miles', render: (load: any) => 
                 (load.actual_miles && load.actual_miles > 0) 
