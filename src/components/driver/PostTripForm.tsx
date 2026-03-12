@@ -446,10 +446,10 @@ export function PostTripForm({ driverId, truckId, onComplete }: PostTripFormProp
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   onClick={() => fileInputRef.current?.click()}
+                  className="w-full h-12"
                 >
-                  <Camera className="h-4 w-4 mr-2" />
+                  <Camera className="h-5 w-5 mr-2" />
                   Add Photo
                 </Button>
               )}

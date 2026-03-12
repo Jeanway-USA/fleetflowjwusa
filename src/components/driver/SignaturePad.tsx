@@ -15,19 +15,34 @@ export function SignaturePad({ onSignatureCapture, disabled }: SignaturePadProps
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const container = canvas.parentElement;
+    if (!container) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const initCanvas = (width: number) => {
+      const dpr = window.devicePixelRatio || 1;
+      const height = width * 3 / 8;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.scale(dpr, dpr);
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, width, height);
+      }
+    };
 
-    // Set up canvas
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    // Fill with white background
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const observer = new ResizeObserver((entries) => {
+      const { width } = entries[0].contentRect;
+      if (width > 0) initCanvas(width);
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
   }, []);
 
   const getCoordinates = (e: React.MouseEvent | React.TouchEvent) => {
@@ -41,13 +56,13 @@ export function SignaturePad({ onSignatureCapture, disabled }: SignaturePadProps
     if ('touches' in e) {
       const touch = e.touches[0];
       return {
-        x: (touch.clientX - rect.left) * scaleX,
-        y: (touch.clientY - rect.top) * scaleY,
+        x: (touch.clientX - rect.left) * scaleX / (window.devicePixelRatio || 1),
+        y: (touch.clientY - rect.top) * scaleY / (window.devicePixelRatio || 1),
       };
     } else {
       return {
-        x: (e.clientX - rect.left) * scaleX,
-        y: (e.clientY - rect.top) * scaleY,
+        x: (e.clientX - rect.left) * scaleX / (window.devicePixelRatio || 1),
+        y: (e.clientY - rect.top) * scaleY / (window.devicePixelRatio || 1),
       };
     }
   };
@@ -88,8 +103,9 @@ export function SignaturePad({ onSignatureCapture, disabled }: SignaturePadProps
     const ctx = canvas?.getContext('2d');
     if (!ctx || !canvas) return;
 
+    const dpr = window.devicePixelRatio || 1;
     ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
     setHasSignature(false);
   };
 
@@ -107,9 +123,7 @@ export function SignaturePad({ onSignatureCapture, disabled }: SignaturePadProps
       <div className="border rounded-lg overflow-hidden bg-white">
         <canvas
           ref={canvasRef}
-          width={400}
-          height={150}
-          className="w-full touch-none cursor-crosshair"
+          className="w-full touch-none cursor-crosshair aspect-[8/3]"
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
@@ -119,23 +133,22 @@ export function SignaturePad({ onSignatureCapture, disabled }: SignaturePadProps
           onTouchEnd={stopDrawing}
         />
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <Button
           type="button"
           variant="outline"
-          size="sm"
           onClick={clearSignature}
           disabled={disabled || !hasSignature}
+          className="w-full sm:w-auto"
         >
           <Eraser className="h-4 w-4 mr-1" />
           Clear
         </Button>
         <Button
           type="button"
-          size="sm"
           onClick={confirmSignature}
           disabled={disabled || !hasSignature}
-          className="gradient-gold text-primary-foreground"
+          className="gradient-gold text-primary-foreground w-full sm:w-auto"
         >
           <Check className="h-4 w-4 mr-1" />
           Confirm Signature
