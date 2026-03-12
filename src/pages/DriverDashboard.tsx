@@ -204,16 +204,20 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
 
         {/* GPS + Pay in one row on larger screens */}
         <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
-          <LocationSharing 
-            driverId={driver.id}
-            truckId={assignedTruck?.id}
-            loadId={activeLoad?.id}
-          />
-          <DriverPayWidget 
-            driverId={driver.id} 
-            payRate={driver.pay_rate} 
-            payType={driver.pay_type} 
-          />
+          <ErrorBoundary compact>
+            <LocationSharing 
+              driverId={driver.id}
+              truckId={assignedTruck?.id}
+              loadId={activeLoad?.id}
+            />
+          </ErrorBoundary>
+          <ErrorBoundary compact>
+            <DriverPayWidget 
+              driverId={driver.id} 
+              payRate={driver.pay_rate} 
+              payType={driver.pay_type} 
+            />
+          </ErrorBoundary>
         </div>
 
         {/* Monthly Bonus Goal */}
