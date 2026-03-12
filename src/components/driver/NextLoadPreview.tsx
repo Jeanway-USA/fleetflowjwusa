@@ -65,6 +65,9 @@ export function NextLoadPreview({ load }: NextLoadPreviewProps) {
               ? format(parseISO(load.pickup_date), 'EEE, MMM d')
               : 'Date TBD'
             }
+            {load.pickup_time && (
+              <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="compact" />
+            )}
           </div>
           {load.booked_miles && (
             <span>{load.booked_miles.toLocaleString()} mi</span>

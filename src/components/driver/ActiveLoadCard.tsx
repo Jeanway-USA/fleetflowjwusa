@@ -221,22 +221,31 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
           </div>
 
           {/* Date & Time */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4 shrink-0" />
-            {load.status === 'delivered' ? (
-              <span className="text-success font-medium">
-                {getRelativeTimestamp(load.delivery_date, null)}
-              </span>
-            ) : load.status === 'in_transit' ? (
-              <span>
-                Delivery: {formatDate(load.delivery_date)}
-                {load.delivery_time && <span className="ml-1 text-foreground font-medium">@ {load.delivery_time}</span>}
-              </span>
-            ) : (
-              <span>
-                Pickup: {formatDate(load.pickup_date)}
-                {load.pickup_time && <span className="ml-1 text-foreground font-medium">@ {load.pickup_time}</span>}
-              </span>
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 shrink-0" />
+              {load.status === 'delivered' ? (
+                <span className="text-success font-medium">
+                  {getRelativeTimestamp(load.delivery_date, null)}
+                </span>
+              ) : load.status === 'in_transit' ? (
+                <span>
+                  Delivery: {formatDate(load.delivery_date)}
+                </span>
+              ) : (
+                <span>
+                  Pickup: {formatDate(load.pickup_date)}
+                </span>
+              )}
+            </div>
+            {load.status !== 'delivered' && (
+              <div className="pl-6">
+                {load.status === 'in_transit' ? (
+                  load.delivery_time && <TimeTypeBadge timeType={load.delivery_time_type} time={load.delivery_time} variant="driver" />
+                ) : (
+                  load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="driver" />
+                )}
+              </div>
             )}
           </div>
 
