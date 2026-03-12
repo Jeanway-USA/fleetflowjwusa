@@ -1,66 +1,62 @@
 
 
-## QoL Improvements Across All Areas
+## Plan: Error Boundaries Across Layouts and Dashboards
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Changes
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+**1. `src/components/shared/ErrorBoundary.tsx`** — Upgrade with Try Again + compact widget mode
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+- Add a `resetErrorBoundary` method that sets `hasError: false`
+- Add a "Try Again" button that calls it
+- Add an `AlertCircle` icon to the fallback
+- Accept an optional `fallbackClassName` prop so widget-level boundaries render compact (no `min-h-[60vh]`)
+- The compact variant shows a small inline card instead of a centered page-level crash screen
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+**2. `src/components/layout/DashboardLayout.tsx`** — Wrap `{children}` (line 198-199)
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+- Import `ErrorBoundary` and wrap the `{children}` slot so page-level crashes preserve the sidebar/header shell
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+**3. `src/pages/DispatcherDashboard.tsx`** — Wrap heavy widgets
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+Wrap these in individual `<ErrorBoundary>` instances:
+- `<FleetMapView />` (line 178)
+- `<DriverAssignmentPanel />` (line 183)
+- `<FleetTimelineScheduler />` (line 193)
+- `<ActiveLoadsBoard />` (line 199)
+- `<DriverLeaderboard />` (line 196)
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+**4. `src/pages/DriverDashboard.tsx`** — Wrap heavy widgets
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+- `<ActiveLoadCard />` (line 175)
+- `<TripFuelPlanner />` (line 185)
+- `<LocationSharing />` + `<DriverPayWidget />` grid (lines 201-212)
+- `<DriverRequestsCard />` (line 221)
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+**5. `src/pages/ExecutiveDashboard.tsx`** — Wrap heavy widgets
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+- `<MorningBriefingWidget />` (line 704)
+- `<CriticalAlertsBar />` (line 707)
+- `<RevenueTrendsChart />` (line 726)
+- `<OperationalMetrics />` + `<CostBreakdownChart />` grid contents (lines 730-731)
+- `<FleetStatusCard />` + `<DriverAvailabilityCard />` grid contents (lines 721-722)
 
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
+### Implementation Details
 
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
+The updated `ErrorBoundary` will accept an optional `compact` prop. When true, it renders a small inline alert card instead of a full-page crash screen — appropriate for individual widgets. The "Try Again" button resets internal state, causing React to re-mount the child tree.
 
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
-
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
-
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
+```typescript
+// Usage in dashboard pages:
+<ErrorBoundary compact>
+  <FleetMapView />
+</ErrorBoundary>
+```
 
 ### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+| File | Change |
+|------|--------|
+| `ErrorBoundary.tsx` | Add Try Again button, AlertCircle icon, compact mode |
+| `DashboardLayout.tsx` | Wrap children in ErrorBoundary |
+| `DispatcherDashboard.tsx` | Wrap 5 heavy widgets |
+| `DriverDashboard.tsx` | Wrap 4 heavy widgets |
+| `ExecutiveDashboard.tsx` | Wrap 6 heavy widgets |
 
