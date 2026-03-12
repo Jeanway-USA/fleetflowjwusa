@@ -32,7 +32,7 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-lg">
         <SheetHeader className="pb-4">
           <div className="flex items-start justify-between gap-2">
             <div>
