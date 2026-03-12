@@ -51,6 +51,9 @@ export default function CRM() {
   const [editContact, setEditContact] = useState<UnifiedContact | null>(null);
   const [detailContact, setDetailContact] = useState<UnifiedContact | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UnifiedContact | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const { data: contacts, isLoading } = useUnifiedContacts(typeFilter);
   const { deleteContact: deleteCRMMutation } = useContactMutations();
