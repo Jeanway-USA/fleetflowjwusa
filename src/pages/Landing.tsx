@@ -356,7 +356,7 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-              <Button variant="outline" className="w-full" disabled>Coming Soon</Button>
+              <Button variant="outline" className="w-full active:scale-[0.97] transition-transform" disabled>Coming Soon</Button>
             </CardContent>
           </Card>
         </div>
