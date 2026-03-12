@@ -382,7 +382,7 @@ export default function Landing() {
               { icon: Package, title: 'Active Load Dispatching', desc: 'Assign drivers, update statuses, and monitor pickups & deliveries from a single real-time board.', accent: 'bg-blue-500/10 text-blue-500' },
               { icon: Smartphone, title: 'Driver Mobile Access', desc: 'Drivers get their own dashboard for BOL uploads, DVIR forms, and live trip updates — right from their phone.', accent: 'bg-purple-500/10 text-purple-500' },
             ].map((f) => (
-              <div key={f.title} className="p-5 sm:p-8 rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-primary/30">
+              <div key={f.title} className="p-5 sm:p-8 rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 active:scale-[0.98]">
                 <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-6 ${f.accent}`}>
                   <f.icon className="w-6 h-6" />
                 </div>
