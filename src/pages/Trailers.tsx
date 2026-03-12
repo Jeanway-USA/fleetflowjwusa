@@ -205,6 +205,32 @@ export default function Trailers() {
     setDialogOpen(true);
   };
 
+  const handleBulkDelete = async () => {
+    setBulkUpdating(true);
+    try {
+      const { error } = await supabase.from('trailers').delete().in('id', [...selectedIds]);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['trailers'] });
+      toast.success(`${selectedIds.size} trailer(s) deleted`);
+      setSelectedIds(new Set());
+      setMassDeleteOpen(false);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkUpdating(false); }
+  };
+
+  const handleBulkStatusUpdate = async (status: string) => {
+    setBulkUpdating(true);
+    try {
+      const { error } = await supabase.from('trailers').update({ status }).in('id', [...selectedIds]);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['trailers'] });
+      toast.success(`${selectedIds.size} trailer(s) updated`);
+      setSelectedIds(new Set());
+      setMassEditOpen(false);
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkUpdating(false); }
+  };
+
   const closeDialog = () => {
     setDialogOpen(false);
     setEditingTrailer(null);
