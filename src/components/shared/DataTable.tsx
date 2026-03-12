@@ -31,6 +31,7 @@ interface Column<T> {
   header: string;
   render?: (item: T) => React.ReactNode;
   width?: string;
+  hiddenOnMobile?: boolean;
 }
 
 interface DataTableProps<T> {
@@ -39,6 +40,7 @@ interface DataTableProps<T> {
   loading?: boolean;
   emptyMessage?: string;
   onRowClick?: (item: T) => void;
+  onRowDoubleClick?: (item: T) => void;
   exportFilename?: string;
   tableId?: string;
   selectable?: boolean;
@@ -73,6 +75,7 @@ export function DataTable<T extends { id: string }>({
   loading, 
   emptyMessage = "No data found",
   onRowClick,
+  onRowDoubleClick,
   exportFilename,
   tableId,
   selectable,
@@ -81,6 +84,7 @@ export function DataTable<T extends { id: string }>({
   bulkActions,
 }: DataTableProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastTapRef = useRef<{ time: number; id: string }>({ time: 0, id: '' });
 
   const [density, setDensity] = useState<Density>(() => {
     try {
@@ -174,6 +178,18 @@ export function DataTable<T extends { id: string }>({
     onSelectionChange?.(new Set());
   }, [onSelectionChange]);
 
+  // Double-tap handler for touch devices
+  const handleTouchEnd = useCallback((item: T) => {
+    if (!onRowDoubleClick) return;
+    const now = Date.now();
+    if (now - lastTapRef.current.time < 300 && lastTapRef.current.id === (item as any).id) {
+      onRowDoubleClick(item);
+      lastTapRef.current = { time: 0, id: '' };
+    } else {
+      lastTapRef.current = { time: now, id: (item as any).id };
+    }
+  }, [onRowDoubleClick]);
+
   if (loading) {
     return (
       <div className="space-y-2">
@@ -190,12 +206,12 @@ export function DataTable<T extends { id: string }>({
           </TooltipProvider>
         </div>
         <div className="rounded-lg border border-border">
-          <table className="w-full caption-bottom" style={{ tableLayout: 'fixed' }}>
+          <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
             <thead className="[&_tr]:border-b">
               <tr className="border-b transition-colors bg-muted/50">
                 {showSelection && <th className={cn(thClass, "w-10")} />}
                 {visibleColumns.map((col, i) => (
-                  <th key={i} className={cn(thClass, "text-left align-middle font-semibold text-muted-foreground")}>{col.header}</th>
+                  <th key={i} className={cn(thClass, "text-left align-middle font-semibold text-muted-foreground", col.hiddenOnMobile && "hidden md:table-cell")}>{col.header}</th>
                 ))}
               </tr>
             </thead>
@@ -203,8 +219,8 @@ export function DataTable<T extends { id: string }>({
               {[1, 2, 3].map((i) => (
                 <tr key={i} className="border-b">
                   {showSelection && <td className={cn(tdClass, "w-10")}><Skeleton className="h-4 w-4" /></td>}
-                  {visibleColumns.map((_, j) => (
-                    <td key={j} className={cn(tdClass, "align-middle")}>
+                  {visibleColumns.map((col, j) => (
+                    <td key={j} className={cn(tdClass, "align-middle", col.hiddenOnMobile && "hidden md:table-cell")}>
                       <Skeleton className="h-4 w-full" />
                     </td>
                   ))}
@@ -282,7 +298,7 @@ export function DataTable<T extends { id: string }>({
           className="rounded-lg border border-border overflow-auto"
           style={{ maxHeight: 600 }}
         >
-          <table className="w-full caption-bottom" style={{ tableLayout: 'fixed' }}>
+          <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
             <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background" style={{ display: 'block' }}>
               <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
                 {showSelection && (
@@ -297,7 +313,7 @@ export function DataTable<T extends { id: string }>({
                   </th>
                 )}
                 {visibleColumns.map((col, i) => (
-                  <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground")} style={{ height: `${rowHeight}px`, width: computedWidths[i] }}>
+                  <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground", col.hiddenOnMobile && "hidden md:table-cell")} style={{ height: `${rowHeight}px`, width: computedWidths[i] }}>
                     <div className="flex items-center h-full">{col.header}</div>
                   </th>
                 ))}
@@ -318,9 +334,11 @@ export function DataTable<T extends { id: string }>({
                     key={item.id}
                     data-index={virtualRow.index}
                     onClick={() => onRowClick?.(item)}
+                    onDoubleClick={() => onRowDoubleClick?.(item)}
+                    onTouchEnd={() => handleTouchEnd(item)}
                     className={cn(
                       "border-b transition-colors hover:bg-muted/50",
-                      onRowClick && "cursor-pointer",
+                      (onRowClick || onRowDoubleClick) && "cursor-pointer",
                       isSelected && "bg-primary/5"
                     )}
                     style={{
@@ -346,7 +364,7 @@ export function DataTable<T extends { id: string }>({
                       </td>
                     )}
                     {visibleColumns.map((col, j) => (
-                      <td key={j} className={cn(tdClass)} style={{ height: `${virtualRow.size}px`, width: computedWidths[j] }}>
+                      <td key={j} className={cn(tdClass, col.hiddenOnMobile && "hidden md:table-cell")} style={{ height: `${virtualRow.size}px`, width: computedWidths[j] }}>
                         <div className="flex items-center h-full">
                           {col.render
                             ? col.render(item)
