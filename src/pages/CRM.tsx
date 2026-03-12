@@ -7,7 +7,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
-import { Search, Eye, Edit2, Trash2, MoreHorizontal } from 'lucide-react';
+import { Search, Eye, Edit2, Trash2, MoreHorizontal, Pencil } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   useUnifiedContacts,
