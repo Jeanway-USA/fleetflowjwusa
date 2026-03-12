@@ -26,6 +26,10 @@ export default function AgencyLoads() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLoad, setEditingLoad] = useState<AgencyLoad | null>(null);
   const [formData, setFormData] = useState<Partial<AgencyLoadInsert>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [massDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [massEditOpen, setMassEditOpen] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   const { data: loads = [], isLoading } = useQuery({
     queryKey: ['agency_loads'],
