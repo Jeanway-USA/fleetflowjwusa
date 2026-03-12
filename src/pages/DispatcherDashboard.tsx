@@ -176,12 +176,16 @@ export default function DispatcherDashboard() {
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {/* Map - Square, takes 1 column */}
           <div>
-            <FleetMapView />
+            <ErrorBoundary compact>
+              <FleetMapView />
+            </ErrorBoundary>
           </div>
 
           {/* Driver Assignment Panel */}
           <div>
-            <DriverAssignmentPanel />
+            <ErrorBoundary compact>
+              <DriverAssignmentPanel />
+            </ErrorBoundary>
           </div>
 
           {/* Alerts */}
