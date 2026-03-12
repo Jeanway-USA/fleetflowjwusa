@@ -44,6 +44,7 @@ interface AuthContextType {
   simulatedOrgId: string | null;
   simulatedOrgName: string | null;
   clearOrgSimulation: () => void;
+  isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -352,6 +353,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       simulatedOrgId,
       simulatedOrgName,
       clearOrgSimulation,
+      isSuperAdmin,
     }}>
       {children}
     </AuthContext.Provider>

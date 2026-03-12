@@ -89,7 +89,7 @@ const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
   ]),
 };
 
-const SUPER_ADMIN_EMAILS = ['andrew@jeanwayusa.com', 'siadrak@jeanwayusa.com'];
+// Super admin check moved to server-side RPC via useAuth()
 
 const STORAGE_KEY = 'sidebar-groups';
 
@@ -159,9 +159,8 @@ function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, current
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl, logoUrl } = useAuth();
+  const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl, logoUrl, isSuperAdmin } = useAuth();
   const { theme } = useTheme();
-  const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(user?.email || '');
   const actuallyIsOwner = roles.includes('owner');
   const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
   const { url: signedLogoUrl } = useSignedUrl('branding-assets', logoUrl || null);
