@@ -337,6 +337,17 @@ export default function Landing() {
           </div>
         </div>
       </footer>
+
+      {/* Sticky mobile CTA */}
+      <div className="fixed bottom-0 left-0 right-0 p-3 bg-background/80 backdrop-blur-md border-t border-border sm:hidden z-50">
+        <Button 
+          className="w-full gradient-gold text-primary-foreground"
+          onClick={() => navigate('/auth')}
+        >
+          Join BCO Beta
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
