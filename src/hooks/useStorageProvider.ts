@@ -101,15 +101,21 @@ export async function getFileUrl(
 ): Promise<string | null> {
   if (!fileRef) return null;
 
-  // Google Drive files always need proxy
+  // Google Drive files: fetch a short-lived signed URL via proxy instead of leaking JWT in URL
   if (fileRef.startsWith('gdrive:')) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return null;
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      // Return a proxy download URL with auth
-      return `${supabaseUrl}/functions/v1/storage-proxy?action=download&fileRef=${encodeURIComponent(fileRef)}&token=${session.access_token}`;
+      const resp = await fetch(
+        `${supabaseUrl}/functions/v1/storage-proxy?action=signed-url&fileRef=${encodeURIComponent(fileRef)}`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      );
+
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      return data.url;
     } catch {
       return null;
     }

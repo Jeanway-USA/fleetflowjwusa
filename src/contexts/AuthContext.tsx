@@ -63,9 +63,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
   const [orgLoading, setOrgLoading] = useState(true);
   const [orgIsActive, setOrgIsActive] = useState(true);
-  const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(() => localStorage.getItem('simulatedOrgId'));
-  const [simulatedOrgName, setSimulatedOrgName] = useState<string | null>(() => localStorage.getItem('simulatedOrgName'));
-  const [simulatedOrgTier, setSimulatedOrgTier] = useState<string | null>(() => localStorage.getItem('simulatedOrgTier'));
+  const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(null);
+  const [simulatedOrgName, setSimulatedOrgName] = useState<string | null>(null);
+  const [simulatedOrgTier, setSimulatedOrgTier] = useState<string | null>(null);
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase

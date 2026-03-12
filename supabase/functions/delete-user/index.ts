@@ -97,6 +97,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Verify both users belong to the same organization
+    const { data: ownerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('org_id')
+      .eq('user_id', requestingUser.id)
+      .single();
+
+    const { data: targetProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('org_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (!ownerProfile?.org_id || !targetProfile?.org_id || ownerProfile.org_id !== targetProfile.org_id) {
+      console.log('Cross-org deletion attempt blocked:', requestingUser.id, '->', userId);
+      return new Response(JSON.stringify({ error: 'Cannot delete users outside your organization' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     console.log('Attempting to delete user:', userId);
 
     // Delete user role first
