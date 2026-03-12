@@ -115,7 +115,7 @@ export function PrintableExecutiveSummary({
         {/* Section 1: Revenue KPIs */}
         <section>
           <h2 className="text-sm font-bold uppercase tracking-widest border-b border-gray-400 pb-1 mb-3">Revenue Overview</h2>
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
               { label: 'Gross Revenue', value: fmtCurrency(kpiData?.grossRevenue ?? 0), change: changeLabel(kpiData?.grossRevenue ?? 0, kpiData?.prevGrossRevenue ?? 0) },
               { label: 'Net Revenue', value: fmtCurrency(kpiData?.netRevenue ?? 0), change: changeLabel(kpiData?.netRevenue ?? 0, kpiData?.prevNetRevenue ?? 0) },
