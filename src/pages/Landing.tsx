@@ -11,6 +11,7 @@ import {
   Truck, DollarSign, Shield, BarChart3, Users, Package, 
   ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone, Menu, Sparkles, Clock
 } from 'lucide-react';
+import RevealOnScroll from '@/components/shared/RevealOnScroll';
 
 const STATS = [
   { label: 'Loads Managed', value: '50K+' },
