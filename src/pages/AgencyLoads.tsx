@@ -243,7 +243,7 @@ export default function AgencyLoads() {
                 <Input id="carrier_name" value={formData.carrier_name || ''} onChange={(e) => setFormData({ ...formData, carrier_name: e.target.value })} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="origin">Origin *</Label>
                 <Input id="origin" value={formData.origin || ''} onChange={(e) => setFormData({ ...formData, origin: e.target.value })} placeholder="City, State" required />
