@@ -146,6 +146,24 @@
   .card-elevated {
     @apply bg-card border border-border rounded-lg shadow-lg;
   }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .pulse-glow-gold {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: perspective(1000px) rotateY(-8deg) rotateX(4deg) translateY(0px); }
+  50% { transform: perspective(1000px) rotateY(-8deg) rotateX(4deg) translateY(-12px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 15px hsl(45 80% 50% / 0.3), 0 0 30px hsl(45 80% 50% / 0.1); }
+  50% { box-shadow: 0 0 25px hsl(45 80% 50% / 0.5), 0 0 50px hsl(45 80% 50% / 0.2); }
 }
 
 /* Leaflet map marker styles */
