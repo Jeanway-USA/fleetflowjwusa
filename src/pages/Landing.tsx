@@ -116,7 +116,7 @@ export default function Landing() {
           background: 'radial-gradient(ellipse 80% 60% at 70% 50%, hsl(45 80% 50% / 0.08) 0%, transparent 70%)',
         }} />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 lg:py-28 relative">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left column */}
             <div>
