@@ -151,11 +151,11 @@ export default function CRM() {
                 </div>
               );
             }},
-            { key: 'phone', header: 'Phone', render: (contact: UnifiedContact) => contact.phone || '—' },
-            { key: 'location', header: 'Location', render: (contact: UnifiedContact) => 
+            { key: 'phone', header: 'Phone', hiddenOnMobile: true, render: (contact: UnifiedContact) => contact.phone || '—' },
+            { key: 'location', header: 'Location', hiddenOnMobile: true, render: (contact: UnifiedContact) => 
               [contact.city, contact.state].filter(Boolean).join(', ') || contact.service_area || '—'
             },
-            { key: 'details', header: 'Details', render: (contact: UnifiedContact) => (
+            { key: 'details', header: 'Details', hiddenOnMobile: true, render: (contact: UnifiedContact) => (
               <div className="flex flex-wrap gap-1">
                 {contact.source === 'facility' && contact.appointment_required && (
                   <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Appt Req</Badge>
