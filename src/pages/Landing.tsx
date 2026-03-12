@@ -314,7 +314,7 @@ export default function Landing() {
                 ))}
               </ul>
               <Button 
-                className="w-full gradient-gold text-primary-foreground text-base pulse-glow-gold hover:scale-[1.02] transition-transform"
+                className="w-full gradient-gold text-primary-foreground text-base pulse-glow-gold hover:scale-[1.02] active:scale-[0.97] transition-transform"
                 size="lg"
                 onClick={() => navigate('/auth')}
               >
