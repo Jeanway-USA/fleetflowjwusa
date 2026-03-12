@@ -245,36 +245,112 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Tiers Preview */}
+      {/* Pricing */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
         <div className="text-center mb-12">
-          <h3 className="text-2xl sm:text-3xl font-bold mb-3">A Plan for Every Stage of Growth</h3>
-          <p className="text-muted-foreground text-base sm:text-lg">Start solo. Scale to a fleet. Grow into an agency.</p>
+          <h3 className="text-2xl sm:text-3xl font-bold mb-3">Simple, Transparent Pricing</h3>
+          <p className="text-muted-foreground text-base sm:text-lg">Start free during our Open Beta. Premium tiers coming soon.</p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8">
-          {TIERS.map((tier) => (
-            <Card key={tier.name} className="border-border hover:border-primary/50 transition-colors">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${tier.color} flex items-center justify-center`}>
-                    <tier.icon className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold">{tier.name}</h4>
-                    <p className="text-xs text-muted-foreground">{tier.tagline}</p>
-                  </div>
+        <div className="grid md:grid-cols-3 gap-6 items-center max-w-5xl mx-auto">
+          {/* Solo BCO — Coming Soon */}
+          <Card className="border-border opacity-60 relative overflow-hidden">
+            <CardContent className="p-6">
+              <Badge variant="secondary" className="mb-4"><Clock className="h-3 w-3 mr-1" />Coming Soon</Badge>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                  <Truck className="h-5 w-5 text-white" />
                 </div>
-                <ul className="space-y-2">
-                  {tier.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm">
-                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ))}
+                <div>
+                  <h4 className="font-bold">Solo BCO</h4>
+                  <p className="text-xs text-muted-foreground">The Owner-Operator Pack</p>
+                </div>
+              </div>
+              <div className="mb-5">
+                <span className="text-2xl font-bold text-muted-foreground line-through">$49</span>
+                <span className="text-sm text-muted-foreground">/mo</span>
+              </div>
+              <ul className="space-y-2 mb-6">
+                {['Per-load profit/loss', 'IFTA fuel tax automation', 'Maintenance reminders', 'Digital document storage'].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Button variant="outline" className="w-full" disabled>Coming Soon</Button>
+            </CardContent>
+          </Card>
+
+          {/* Open Beta — Featured */}
+          <Card className="border-primary/50 shadow-lg shadow-primary/10 md:scale-105 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 gradient-gold" />
+            <CardContent className="p-6 sm:p-8">
+              <div className="flex items-center justify-between mb-4">
+                <Badge className="gradient-gold text-primary-foreground border-0">
+                  <Sparkles className="h-3 w-3 mr-1" />Limited Time
+                </Badge>
+              </div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-lg gradient-gold flex items-center justify-center">
+                  <Truck className="h-6 w-6 text-primary-foreground" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-bold">Open Beta</h4>
+                  <p className="text-xs text-muted-foreground">Full access, zero cost</p>
+                </div>
+              </div>
+              <div className="mb-5">
+                <span className="text-4xl font-extrabold text-gradient-gold">$0</span>
+                <span className="text-sm text-muted-foreground ml-1">/ forever during beta</span>
+              </div>
+              <ul className="space-y-2 mb-6">
+                {['Per-load profit/loss', 'IFTA fuel tax automation', 'Maintenance reminders', 'Digital document storage', 'Priority feature requests', 'Early adopter perks'].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Button 
+                className="w-full gradient-gold text-primary-foreground text-base pulse-glow-gold hover:scale-[1.02] transition-transform"
+                size="lg"
+                onClick={() => navigate('/auth')}
+              >
+                Start Free
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <p className="text-xs text-muted-foreground text-center mt-3">No credit card required</p>
+            </CardContent>
+          </Card>
+
+          {/* Fleet Owner — Coming Soon */}
+          <Card className="border-border opacity-60 relative overflow-hidden">
+            <CardContent className="p-6">
+              <Badge variant="secondary" className="mb-4"><Clock className="h-3 w-3 mr-1" />Coming Soon</Badge>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-bold">Fleet Owner</h4>
+                  <p className="text-xs text-muted-foreground">The Scalability Suite</p>
+                </div>
+              </div>
+              <div className="mb-5">
+                <span className="text-2xl font-bold text-muted-foreground line-through">$149</span>
+                <span className="text-sm text-muted-foreground">/mo</span>
+              </div>
+              <ul className="space-y-2 mb-6">
+                {['Driver settlements & payroll', 'Fleet-wide analytics', 'Real-time GPS tracking', 'Cost-per-mile reporting'].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Button variant="outline" className="w-full" disabled>Coming Soon</Button>
+            </CardContent>
+          </Card>
         </div>
         <div className="text-center mt-8">
           <Button variant="outline" size="lg" onClick={() => navigate('/pricing')}>
