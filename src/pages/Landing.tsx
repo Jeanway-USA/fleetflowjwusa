@@ -283,11 +283,11 @@ export default function Landing() {
       </section>
 
       {/* Four Pillars */}
-      <section className="bg-card/50 border-y border-border py-20">
+      <section className="bg-card/50 border-y border-border py-12 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h3 className="text-3xl font-bold mb-3">Built for the Way You Work</h3>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Four core capabilities designed around how Landstar BCOs actually run their business.</p>
+            <h3 className="text-2xl sm:text-3xl font-bold mb-3">Built for the Way You Work</h3>
+            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">Four core capabilities designed around how Landstar BCOs actually run their business.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {[
