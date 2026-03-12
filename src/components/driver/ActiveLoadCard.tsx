@@ -47,8 +47,10 @@ interface Load {
   destination: string;
   pickup_date: string | null;
   pickup_time: string | null;
+  pickup_time_type: string | null;
   delivery_date: string | null;
   delivery_time: string | null;
+  delivery_time_type: string | null;
   status: string;
   rate: number | null;
   booked_miles: number | null;
