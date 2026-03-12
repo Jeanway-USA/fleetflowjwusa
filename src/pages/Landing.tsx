@@ -309,10 +309,10 @@ export default function Landing() {
       </section>
 
       {/* CTA */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-12">
-          <h3 className="text-3xl font-bold mb-3">Ready to Take Control?</h3>
-          <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
+        <div className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-6 sm:p-12">
+          <h3 className="text-2xl sm:text-3xl font-bold mb-3">Ready to Take Control?</h3>
+          <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto">
             Join hundreds of Landstar BCOs and agents already using Fleet Flow TMS to maximize profit and minimize headaches.
           </p>
           <Button 
