@@ -163,11 +163,10 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const resendApiKey = Deno.env.get('RESEND_API_KEY')!;
 
-    // Validate that the caller is using the service role key (sent by the DB trigger)
-    const authHeader = req.headers.get('Authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token || token !== supabaseServiceKey) {
-      console.warn('Unauthorized call to email-load-status');
+    // Validate webhook secret from the DB trigger (stored in internal_config table)
+    const webhookSecret = req.headers.get('x-webhook-secret');
+    if (!webhookSecret) {
+      console.warn('Missing x-webhook-secret header');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -177,6 +176,23 @@ Deno.serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // Read the expected secret from internal_config (RLS-protected, only service role can read)
+    const { data: configRow, error: configError } = await supabaseAdmin
+      .from('internal_config')
+      .select('value')
+      .eq('key', 'email_webhook_secret')
+      .single();
+
+    if (configError || !configRow || webhookSecret !== configRow.value) {
+      console.warn('Invalid webhook secret');
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // supabaseAdmin already created above during webhook secret validation
 
     const resend = new Resend(resendApiKey);
 
