@@ -223,7 +223,8 @@ export default function Trailers() {
   const columns = [
     { key: 'unit_number', header: 'Unit #' },
     { key: 'trailer_type', header: 'Type' },
-    { key: 'make', header: 'Make' },
+    { key: 'make', header: 'Make', hiddenOnMobile: true },
+    { key: 'year', header: 'Year', hiddenOnMobile: true },
     { key: 'year', header: 'Year' },
     { key: 'status', header: 'Status', render: (trailer: TrailerWithDriver) => <StatusBadge status={trailer.status} /> },
     { 
