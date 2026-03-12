@@ -584,7 +584,7 @@ export default function FleetLoads() {
           <DataTable
             columns={[
               { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
-              { key: 'landstar_load_id', header: 'Landstar ID', render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
+              { key: 'landstar_load_id', header: 'Landstar ID', hiddenOnMobile: true, render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
               { key: 'tracking_id', header: 'Tracking ID', hiddenOnMobile: true, render: (load: any) => 
                 load.tracking_id ? (
                   <span 
