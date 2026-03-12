@@ -11,30 +11,6 @@ import {
   ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone, Menu, Sparkles, Clock
 } from 'lucide-react';
 
-const TIERS = [
-  {
-    name: 'Solo BCO',
-    tagline: 'The Owner-Operator Power Pack',
-    icon: Truck,
-    features: ['Per-load profit/loss', 'IFTA fuel tax automation', 'Maintenance reminders', 'Digital document storage'],
-    color: 'from-blue-500 to-blue-600',
-  },
-  {
-    name: 'Fleet Owner',
-    tagline: 'The Scalability Suite',
-    icon: Users,
-    features: ['Driver settlements & payroll', 'Fleet-wide analytics', 'Real-time GPS tracking', 'Cost-per-mile reporting'],
-    color: 'from-primary to-accent',
-  },
-  {
-    name: 'Agency',
-    tagline: 'The Brokerage Hub',
-    icon: Package,
-    features: ['Agent dashboard', 'Commission tracking', 'Carrier vetting', 'Shipper CRM'],
-    color: 'from-emerald-500 to-emerald-600',
-  },
-];
-
 const STATS = [
   { label: 'Loads Managed', value: '50K+' },
   { label: 'BCOs Served', value: '500+' },
