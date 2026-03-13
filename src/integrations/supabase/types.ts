@@ -3984,11 +3984,13 @@ export type Database = {
       has_safety_access: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      super_admin_end_beta: { Args: never; Returns: number }
       super_admin_get_owner_email: {
         Args: { target_org_id: string }
         Returns: string
       }
       super_admin_reset_demo: { Args: never; Returns: undefined }
+      super_admin_resume_beta: { Args: never; Returns: number }
       super_admin_update_org: {
         Args: {
           new_complimentary_ends_at?: string
