@@ -3,7 +3,7 @@ import { SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sid
 import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { AlertTriangle, ShieldAlert, Sparkles } from 'lucide-react';
+import { AlertTriangle, CircleHelp, ShieldAlert, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DemoControls } from '@/components/demo/DemoControls';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -19,6 +19,9 @@ import {
 import { CommandPalette } from '@/components/shared/CommandPalette';
 import { BetaFeedbackWidget } from '@/components/shared/BetaFeedbackWidget';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { ProductTour } from '@/components/shared/ProductTour';
+import { useProductTour } from '@/hooks/useProductTour';
+import { getTourForRoute } from '@/lib/tour-steps';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/executive-dashboard': 'Executive Dashboard',
@@ -116,6 +119,8 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
   const { toggleSidebar } = useSidebar();
   const location = useLocation();
   const { tier } = useSubscriptionTier();
+  const tourDef = getTourForRoute(location.pathname);
+  const tour = useProductTour({ tourId: tourDef?.id || 'none', totalSteps: tourDef?.steps.length || 0 });
 
   // Keyboard shortcut: Ctrl/Cmd + B to toggle sidebar
   useEffect(() => {
@@ -202,6 +207,12 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
               </div>
             )}
             <div className="flex-1" />
+            {tourDef && (
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7 text-muted-foreground" onClick={tour.startTour}>
+                <CircleHelp className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Take a Tour</span>
+              </Button>
+            )}
           </div>
         </header>
         <div className="flex-1 p-2 sm:p-4 lg:p-6 animate-fade-in">
@@ -213,6 +224,16 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
       {isDemoMode && <DemoControls />}
       <CommandPalette />
       <BetaFeedbackWidget />
+      {tourDef && (
+        <ProductTour
+          steps={tourDef.steps}
+          currentStep={tour.currentStep}
+          isActive={tour.isActive}
+          onNext={tour.nextStep}
+          onPrev={tour.prevStep}
+          onSkip={tour.skipTour}
+        />
+      )}
     </div>
   );
 }

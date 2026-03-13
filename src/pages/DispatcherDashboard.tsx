@@ -175,7 +175,7 @@ export default function DispatcherDashboard() {
         {/* Map + Assignment Panel Row */}
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {/* Map - Square, takes 1 column */}
-          <div>
+          <div data-tour="fleet-map">
             <ErrorBoundary compact>
               <FleetMapView />
             </ErrorBoundary>
@@ -205,15 +205,17 @@ export default function DispatcherDashboard() {
         </ErrorBoundary>
 
         {/* Active Loads - Full Width */}
-        <ErrorBoundary compact>
-          <ActiveLoadsBoard />
-        </ErrorBoundary>
+        <div data-tour="active-loads">
+          <ErrorBoundary compact>
+            <ActiveLoadsBoard />
+          </ErrorBoundary>
+        </div>
 
         {/* Upcoming Pickups - Full Width */}
         <UpcomingPickups />
 
         {/* Fleet Status Grid */}
-        <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        <div data-tour="driver-status" className="grid gap-6 grid-cols-1 md:grid-cols-2">
           <DriverStatusGrid />
           <TruckStatusGrid />
         </div>
