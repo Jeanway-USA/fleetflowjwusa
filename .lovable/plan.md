@@ -1,66 +1,65 @@
 
 
-## QoL Improvements Across All Areas
+## Plan: Open Beta Auto-Activation + Beta Member Badge
 
-### 1. Dynamic Period Selector (Finance)
-The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
+### Problem
+New users signing up during the open beta should automatically get `subscription_status = 'active'` and `subscription_tier = 'open_beta'` without hitting any payment screens. They also need a visible "Beta Member" badge in the dashboard header.
 
-**File:** `src/pages/Finance.tsx`
-- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
-- Auto-generate monthly and quarterly period options from that range up to the current date
-- Default to the current month instead of a hardcoded quarter
+### Changes
 
-### 2. Expense Table Pagination / Virtualization (Finance)
-The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
+#### 1. Database Migration — Add `open_beta` tier support and auto-set status
 
-**File:** `src/pages/Finance.tsx`
-- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
-- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
+Update the `create_onboarding_org` function to set `subscription_status = 'active'` on the newly created org (currently defaults to `'trialing'`). Change the default tier parameter to `'open_beta'`.
 
-### 3. Breadcrumb Navigation in Header (Overall UX)
-The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
+```sql
+CREATE OR REPLACE FUNCTION public.create_onboarding_org(_name text, _tier text DEFAULT 'open_beta')
+  RETURNS uuid ...
+AS $$
+  ...
+  INSERT INTO public.organizations (name, subscription_tier, subscription_status)
+  VALUES (_name, _tier, 'active')
+  RETURNING id INTO _org_id;
+  ...
+$$;
+```
 
-**Files:** `src/components/layout/DashboardLayout.tsx`
-- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
-- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
-- Display in the header alongside the sidebar trigger
+#### 2. `src/hooks/useSubscriptionTier.ts` — Add `open_beta` tier
 
-### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
-Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
+Add `open_beta` to the `SubscriptionTier` type union and `TIER_FEATURES` map. Give it the same features as `solo_bco` (or all features, since it's beta — will match solo_bco for now).
 
-**File:** `src/components/layout/DashboardLayout.tsx`
-- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
+#### 3. `src/contexts/AuthContext.tsx` — Add `open_beta` to `SubscriptionTier` type
 
-### 5. Confirm Before Single Expense Delete (Finance)
-Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
+Update the type: `'solo_bco' | 'fleet_owner' | 'agency' | 'all_in_one' | 'open_beta'`
 
-**File:** `src/pages/Finance.tsx`
-- Add a `deleteConfirmId` state
-- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
+#### 4. `src/pages/Onboarding.tsx` — Remove plan selection, pass no tier (uses new default)
 
-### 6. Pull-to-Refresh on Driver Dashboard (Driver)
-The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
+The onboarding call already doesn't pass `_tier`, so it will use the new default `'open_beta'`. No change needed here unless there's a plan selection step — the current 3 steps are Org → Fleet → Invite, so no payment gate exists. No changes needed.
 
-**File:** `src/pages/DriverDashboard.tsx`
-- Add a `RefreshCw` icon button next to the date display
-- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
+#### 5. `src/components/layout/DashboardLayout.tsx` — Add Beta Member badge
 
-### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
-The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
+In the dashboard header (line ~175-197), add a "Beta Member" badge next to the breadcrumb when the user's `subscriptionTier === 'open_beta'`. Style it with a gold gradient and sparkle icon.
 
-**File:** `src/pages/DispatcherDashboard.tsx`
-- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
+```tsx
+import { Sparkles } from 'lucide-react';
+import { useSubscriptionTier } from '@/hooks/useSubscriptionTier';
 
-### 8. Sidebar Active State on Nested Routes (Overall UX)
-The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
+// In header, after breadcrumb:
+{tier === 'open_beta' && (
+  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/15 to-yellow-500/15 border border-amber-500/30">
+    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+    <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">Beta Member</span>
+  </div>
+)}
+```
 
-**File:** `src/components/layout/AppSidebar.tsx`
-- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
+#### 6. `src/pages/Pricing.tsx` — Skip checkout for open_beta users
 
-### Files Modified
-- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
-- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
-- `src/pages/DriverDashboard.tsx` (refresh button)
-- `src/pages/DispatcherDashboard.tsx` (responsive grid)
-- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
+If user's current tier is `open_beta`, show messaging that they already have full access during beta instead of showing checkout buttons.
+
+### Files to edit
+- **Migration**: Update `create_onboarding_org` function (set `subscription_status = 'active'`, default tier to `'open_beta'`)
+- `src/contexts/AuthContext.tsx` — Add `'open_beta'` to `SubscriptionTier` type
+- `src/hooks/useSubscriptionTier.ts` — Add `open_beta` tier features
+- `src/components/layout/DashboardLayout.tsx` — Add Beta Member badge in header
+- `src/pages/Pricing.tsx` — Show "You have beta access" instead of checkout buttons
 
