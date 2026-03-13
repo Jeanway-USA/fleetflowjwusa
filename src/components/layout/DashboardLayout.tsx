@@ -1,9 +1,11 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { AlertTriangle, CircleHelp, ShieldAlert, Sparkles } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { WelcomeBetaModal } from '@/components/shared/WelcomeBetaModal';
 import { Button } from '@/components/ui/button';
 import { DemoControls } from '@/components/demo/DemoControls';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -121,6 +123,23 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
   const { tier } = useSubscriptionTier();
   const tourDef = getTourForRoute(location.pathname);
   const tour = useProductTour({ tourId: tourDef?.id || 'none', totalSteps: tourDef?.steps.length || 0 });
+  const [showWelcome, setShowWelcome] = useState(false);
+  const { user } = useAuth();
+
+  // Check if user has completed onboarding tour
+  useEffect(() => {
+    if (!user || isDemoMode) return;
+    supabase
+      .from('profiles')
+      .select('has_completed_onboarding_tour')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data && !(data as any).has_completed_onboarding_tour) {
+          setShowWelcome(true);
+        }
+      });
+  }, [user, isDemoMode]);
 
   // Keyboard shortcut: Ctrl/Cmd + B to toggle sidebar
   useEffect(() => {
@@ -232,6 +251,14 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
           onNext={tour.nextStep}
           onPrev={tour.prevStep}
           onSkip={tour.skipTour}
+        />
+      )}
+      {user && (
+        <WelcomeBetaModal
+          open={showWelcome}
+          userId={user.id}
+          onStartTour={tour.startTour}
+          onClose={() => setShowWelcome(false)}
         />
       )}
     </div>
