@@ -324,7 +324,7 @@ export function AppSidebar() {
         </DropdownMenu>
       </SidebarHeader>
 
-      <SidebarContent className="px-2">
+      <SidebarContent className="px-2" data-tour="sidebar-nav">
         {/* Simulation Mode Banner */}
         {isSimulating && actuallyIsOwner && (
           <div className="mx-2 mt-2 mb-1 p-2 rounded-md bg-warning/10 border border-warning/30">
