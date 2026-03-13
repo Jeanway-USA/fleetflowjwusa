@@ -14,10 +14,10 @@ import {
 import RevealOnScroll from '@/components/shared/RevealOnScroll';
 
 const STATS = [
-  { label: 'Loads Managed', value: '50K+' },
-  { label: 'BCOs Served', value: '500+' },
-  { label: 'IFTA Hours Saved', value: '10K+' },
-  { label: 'Uptime', value: '99.9%' },
+  { label: 'Cost to You', value: '$0' },
+  { label: 'Built for Landstar', value: '100%' },
+  { label: 'Features Included', value: 'All' },
+  { label: 'Setup Time', value: '< 5 min' },
 ];
 
 export default function Landing() {
@@ -78,7 +78,7 @@ export default function Landing() {
             <Button variant="ghost" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/pricing')}>Pricing</Button>
             <Button variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/auth')}>Sign In</Button>
             <Button className="gradient-gold text-primary-foreground active:scale-[0.97] transition-transform" onClick={() => navigate('/auth')}>
-              Start Free Trial
+              Join Free Beta
             </Button>
           </div>
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -92,7 +92,7 @@ export default function Landing() {
                 <Button variant="ghost" className="justify-start" onClick={() => { setMenuOpen(false); navigate('/pricing'); }}>Pricing</Button>
                 <Button variant="outline" className="justify-start" onClick={() => { setMenuOpen(false); navigate('/auth'); }}>Sign In</Button>
                 <Button className="gradient-gold text-primary-foreground" onClick={() => { setMenuOpen(false); navigate('/auth'); }}>
-                  Start Free Trial
+                  Join Free Beta
                 </Button>
               </nav>
             </SheetContent>
