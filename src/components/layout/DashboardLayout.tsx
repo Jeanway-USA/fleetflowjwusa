@@ -253,6 +253,14 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
           onSkip={tour.skipTour}
         />
       )}
+      {user && (
+        <WelcomeBetaModal
+          open={showWelcome}
+          userId={user.id}
+          onStartTour={tour.startTour}
+          onClose={() => setShowWelcome(false)}
+        />
+      )}
     </div>
   );
 }
