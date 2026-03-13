@@ -397,20 +397,24 @@ export default function Landing() {
 
       <RevealOnScroll>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
-        <div className="text-center rounded-2xl border border-primary/20 bg-primary/5 p-6 sm:p-12">
-          <h3 className="text-2xl sm:text-3xl font-bold mb-3">Ready to Take Control?</h3>
-          <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto">
-            Join hundreds of Landstar BCOs and agents already using Fleet Flow TMS to maximize profit and minimize headaches.
-          </p>
-          <Button 
-            size="lg" 
-            className="gradient-gold text-primary-foreground text-lg px-10 glow-gold active:scale-[0.97] transition-transform"
-            onClick={() => navigate('/auth')}
-          >
-            Start Your 14-Day Free Trial
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
-          <p className="text-xs text-muted-foreground mt-4">No credit card required</p>
+        <div className="text-center rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 sm:p-12 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.08),transparent_70%)]" />
+          <div className="relative z-10">
+            <span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary mb-4 border border-primary/30 rounded-full px-4 py-1 bg-primary/10">Open Beta</span>
+            <h3 className="text-2xl sm:text-3xl font-bold mb-3">Join the Open Beta</h3>
+            <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto">
+              Be among the first Landstar BCOs to experience Fleet Flow TMS. Full platform access, zero cost during the beta period.
+            </p>
+            <Button 
+              size="lg" 
+              className="gradient-gold text-primary-foreground text-lg px-10 pulse-glow-gold active:scale-[0.97] transition-transform"
+              onClick={() => navigate('/auth')}
+            >
+              Join BCO Beta
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+            <p className="text-xs text-muted-foreground mt-4">Free during Open Beta · No credit card required</p>
+          </div>
         </div>
       </section>
       </RevealOnScroll>
