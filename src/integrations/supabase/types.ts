@@ -1502,6 +1502,7 @@ export type Database = {
           pickup_date: string | null
           pickup_time: string | null
           pickup_time_type: string
+          pod_required: boolean
           rate: number | null
           settlement: number | null
           start_miles: number | null
@@ -1544,6 +1545,7 @@ export type Database = {
           pickup_date?: string | null
           pickup_time?: string | null
           pickup_time_type?: string
+          pod_required?: boolean
           rate?: number | null
           settlement?: number | null
           start_miles?: number | null
@@ -1586,6 +1588,7 @@ export type Database = {
           pickup_date?: string | null
           pickup_time?: string | null
           pickup_time_type?: string
+          pod_required?: boolean
           rate?: number | null
           settlement?: number | null
           start_miles?: number | null

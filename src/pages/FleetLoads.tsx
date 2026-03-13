@@ -803,6 +803,21 @@ export default function FleetLoads() {
                   />
                 </div>
 
+                {/* POD Required Toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">POD Required</p>
+                      <p className="text-xs text-muted-foreground">Require Transflo POD link and signature on delivery</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={formData.pod_required ?? true}
+                    onCheckedChange={(checked) => setFormData({ ...formData, pod_required: checked })}
+                  />
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="origin">Origin (Full Address) *</Label>

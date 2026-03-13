@@ -1,0 +1,1 @@
+ALTER TABLE public.fleet_loads ADD COLUMN pod_required boolean NOT NULL DEFAULT true;
