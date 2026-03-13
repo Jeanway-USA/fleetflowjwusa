@@ -92,7 +92,7 @@ export default function Landing() {
                 <Button variant="ghost" className="justify-start" onClick={() => { setMenuOpen(false); navigate('/pricing'); }}>Pricing</Button>
                 <Button variant="outline" className="justify-start" onClick={() => { setMenuOpen(false); navigate('/auth'); }}>Sign In</Button>
                 <Button className="gradient-gold text-primary-foreground" onClick={() => { setMenuOpen(false); navigate('/auth'); }}>
-                  Start Free Trial
+                  Join Free Beta
                 </Button>
               </nav>
             </SheetContent>
