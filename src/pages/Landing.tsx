@@ -14,10 +14,10 @@ import {
 import RevealOnScroll from '@/components/shared/RevealOnScroll';
 
 const STATS = [
-  { label: 'Loads Managed', value: '50K+' },
-  { label: 'BCOs Served', value: '500+' },
-  { label: 'IFTA Hours Saved', value: '10K+' },
-  { label: 'Uptime', value: '99.9%' },
+  { label: 'Cost to You', value: '$0' },
+  { label: 'Built for Landstar', value: '100%' },
+  { label: 'Features Included', value: 'All' },
+  { label: 'Setup Time', value: '< 5 min' },
 ];
 
 export default function Landing() {
