@@ -498,6 +498,12 @@ export default function Drivers() {
                   <Input id="medical_card_expiry" type="date" value={formData.medical_card_expiry || ''} onChange={(e) => setFormData({ ...formData, medical_card_expiry: e.target.value })} />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="mvr_expiry">Annual MVR Expiry</Label>
+                  <Input id="mvr_expiry" type="date" value={(formData as any).mvr_expiry || ''} onChange={(e) => setFormData({ ...formData, mvr_expiry: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="space-y-2">
                   <Label htmlFor="hire_date">Hire Date</Label>
                   <Input id="hire_date" type="date" value={formData.hire_date || ''} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} />
                 </div>
