@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle2, Truck, Users, Package, Crown, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { CheckCircle2, Truck, Users, Package, Crown, ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
