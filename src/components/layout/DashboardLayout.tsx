@@ -123,6 +123,23 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
   const { tier } = useSubscriptionTier();
   const tourDef = getTourForRoute(location.pathname);
   const tour = useProductTour({ tourId: tourDef?.id || 'none', totalSteps: tourDef?.steps.length || 0 });
+  const [showWelcome, setShowWelcome] = useState(false);
+  const { user } = useAuth();
+
+  // Check if user has completed onboarding tour
+  useEffect(() => {
+    if (!user || isDemoMode) return;
+    supabase
+      .from('profiles')
+      .select('has_completed_onboarding_tour')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data && !(data as any).has_completed_onboarding_tour) {
+          setShowWelcome(true);
+        }
+      });
+  }, [user, isDemoMode]);
 
   // Keyboard shortcut: Ctrl/Cmd + B to toggle sidebar
   useEffect(() => {
