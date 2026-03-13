@@ -1,38 +1,66 @@
 
 
-## Analysis
+## QoL Improvements Across All Areas
 
-The deactivation redirect logic is **mostly in place** but has one critical gap:
+### 1. Dynamic Period Selector (Finance)
+The Finance page has hardcoded period options (`Q1 2026`, `January 2026`, etc.). This should dynamically generate periods based on the actual data range so it stays relevant as time passes without manual code updates.
 
-**`ProtectedRoute`** checks `orgIsActive` but does **not** wait for `orgLoading` to resolve. Since `orgIsActive` defaults to `true` in AuthContext state, there's a race condition: a user with a deactivated org can briefly access protected dashboard pages before `fetchOrgData` completes and sets `orgIsActive = false`.
+**File:** `src/pages/Finance.tsx`
+- Scan the `expenses` and `loads` date fields to determine the earliest and latest dates in the dataset
+- Auto-generate monthly and quarterly period options from that range up to the current date
+- Default to the current month instead of a hardcoded quarter
 
-**`RoleBasedRedirect`** correctly waits for `orgLoading` — no issue there.
+### 2. Expense Table Pagination / Virtualization (Finance)
+The expense table renders all rows at once. For users with hundreds of imported expenses, this causes slow rendering.
 
-**`SuperAdminGuard`** does not check `orgIsActive` — this is correct since super admins should always have access.
+**File:** `src/pages/Finance.tsx`
+- Add simple client-side pagination (e.g., 50 rows per page) with Previous/Next controls and a row count indicator below the table
+- Use existing `@tanstack/react-virtual` (already installed) or simple slice-based pagination
 
-## Plan
+### 3. Breadcrumb Navigation in Header (Overall UX)
+The top header bar (`DashboardLayout`) currently has only a sidebar trigger and empty space. Adding breadcrumbs improves orientation, especially on deeper pages.
 
-### 1. `src/components/shared/ProtectedRoute.tsx` — Wait for `orgLoading`
+**Files:** `src/components/layout/DashboardLayout.tsx`
+- Use the existing `Breadcrumb` UI component (already in `src/components/ui/breadcrumb.tsx`)
+- Map current `location.pathname` to a human-readable breadcrumb trail (e.g., `Finance > Expenses`, `Fleet > Trucks`)
+- Display in the header alongside the sidebar trigger
 
-Add `orgLoading` to the destructured auth values and include it in the loading gate:
+### 4. Keyboard Shortcut for Sidebar Toggle (Overall UX)
+Add a `Ctrl+B` / `Cmd+B` keyboard shortcut to toggle the sidebar, matching common app conventions.
 
-```tsx
-const { user, loading, rolesLoading, orgLoading, hasRole, orgIsActive, orgId } = useAuth();
+**File:** `src/components/layout/DashboardLayout.tsx`
+- Add a `useEffect` with a keydown listener that calls the sidebar toggle from `useSidebar()`
 
-if (loading || rolesLoading || orgLoading) {
-  // show spinner
-}
-```
+### 5. Confirm Before Single Expense Delete (Finance)
+Currently, clicking the trash icon on a single expense row immediately deletes without confirmation. Mass delete has a confirmation dialog but single delete does not.
 
-This is the only change needed. It closes the race condition where `orgIsActive` is still `true` (default) while org data is being fetched.
+**File:** `src/pages/Finance.tsx`
+- Add a `deleteConfirmId` state
+- Show the existing `ConfirmDeleteDialog` before executing `deleteExpenseMutation`
 
-### Why nothing else needs to change
+### 6. Pull-to-Refresh on Driver Dashboard (Driver)
+The driver dashboard is a mobile-first view. Add a manual refresh button in the header so drivers can re-fetch active loads without navigating away.
 
-- `RoleBasedRedirect` already waits for `orgLoading` and redirects to `/account-deactivated` when `!orgIsActive` — correct.
-- `ProtectedRoute` already redirects to `/account-deactivated` when `orgId && !orgIsActive` — correct, just needs the loading gate fix.
-- `/account-deactivated` is an unprotected route (no `ProtectedRoute` wrapper) — correct, so deactivated users can reach it.
-- `SuperAdminGuard` bypasses org checks — correct by design.
+**File:** `src/pages/DriverDashboard.tsx`
+- Add a `RefreshCw` icon button next to the date display
+- On click, invalidate the key queries (`driver-active-loads`, `driver-weekly-loads`, etc.) and show a brief loading indicator
 
-### Files to edit
-- `src/components/shared/ProtectedRoute.tsx` — Add `orgLoading` to loading check (one-line change)
+### 7. Dispatcher Quick-Assign Improvement (Dispatcher)
+The FleetMapView + DriverAssignmentPanel + Alerts row uses `lg:grid-cols-3` which can feel cramped. On medium screens it stacks all 3 vertically.
+
+**File:** `src/pages/DispatcherDashboard.tsx`
+- Change the map/assignment/alerts grid to `md:grid-cols-2 lg:grid-cols-3` so on medium screens, map and assignment sit side-by-side with alerts below
+
+### 8. Sidebar Active State on Nested Routes (Overall UX)
+The sidebar only highlights exact path matches (`location.pathname === item.path`). If a user is on `/driver-view/abc123`, no sidebar item highlights.
+
+**File:** `src/components/layout/AppSidebar.tsx`
+- Change `isActive` check to use `startsWith` for paths that have sub-routes (e.g., `/driver-view` should highlight "Driver Performance")
+
+### Files Modified
+- `src/pages/Finance.tsx` (dynamic periods, pagination, delete confirmation)
+- `src/components/layout/DashboardLayout.tsx` (breadcrumbs, keyboard shortcut)
+- `src/pages/DriverDashboard.tsx` (refresh button)
+- `src/pages/DispatcherDashboard.tsx` (responsive grid)
+- `src/components/layout/AppSidebar.tsx` (nested route highlighting)
 
