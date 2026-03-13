@@ -216,7 +216,7 @@ export default function DispatcherDashboard() {
         <UpcomingPickups />
 
         {/* Fleet Status Grid */}
-        <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+        <div data-tour="driver-status" className="grid gap-6 grid-cols-1 md:grid-cols-2">
           <DriverStatusGrid />
           <TruckStatusGrid />
         </div>
