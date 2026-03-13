@@ -115,6 +115,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
 }) {
   const { toggleSidebar } = useSidebar();
   const location = useLocation();
+  const { tier } = useSubscriptionTier();
 
   // Keyboard shortcut: Ctrl/Cmd + B to toggle sidebar
   useEffect(() => {
