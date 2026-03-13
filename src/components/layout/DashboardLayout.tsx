@@ -224,6 +224,16 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
       {isDemoMode && <DemoControls />}
       <CommandPalette />
       <BetaFeedbackWidget />
+      {tourDef && (
+        <ProductTour
+          steps={tourDef.steps}
+          currentStep={tour.currentStep}
+          isActive={tour.isActive}
+          onNext={tour.nextStep}
+          onPrev={tour.prevStep}
+          onSkip={tour.skipTour}
+        />
+      )}
     </div>
   );
 }
