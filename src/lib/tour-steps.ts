@@ -98,7 +98,7 @@ const driverTour: TourDefinition = {
 // Map route prefixes to tour definitions
 const TOUR_MAP: Record<string, TourDefinition> = {
   '/dispatcher-dashboard': dispatcherTour,
-  '/executive-dashboard': executiveTour,
+  '/executive-dashboard': bcoTour,
   '/driver-dashboard': driverTour,
 };
 

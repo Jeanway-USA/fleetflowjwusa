@@ -712,7 +712,7 @@ export default function ExecutiveDashboard() {
         </ErrorBoundary>
 
         {/* Row 2: Health Score + KPI Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6" data-tour="revenue-kpi">
           <div className="lg:col-span-1">
             <CompanyHealthScore data={healthData} isLoading={kpiLoading || operationalLoading} />
           </div>
