@@ -370,6 +370,16 @@ export default function Drivers() {
                     </span>
                   </div>
 
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      Annual MVR
+                    </span>
+                    <span className={isExpiringSoon((driver as any).mvr_expiry) ? 'text-destructive font-medium' : ''}>
+                      {formatDate((driver as any).mvr_expiry)}
+                    </span>
+                  </div>
+
                   {driver.hazmat_expiry && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground flex items-center gap-2">
