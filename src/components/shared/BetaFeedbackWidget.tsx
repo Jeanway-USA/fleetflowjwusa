@@ -144,6 +144,7 @@ export function BetaFeedbackWidget() {
         className="fixed bottom-6 right-6 z-50 h-12 w-12 rounded-full shadow-lg"
         onClick={() => setOpen(true)}
         aria-label="Send feedback"
+        data-tour="beta-feedback"
       >
         <MessageSquare className="h-5 w-5" />
       </Button>
