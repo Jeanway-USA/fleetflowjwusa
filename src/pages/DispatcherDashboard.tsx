@@ -210,7 +210,6 @@ export default function DispatcherDashboard() {
             <ActiveLoadsBoard />
           </ErrorBoundary>
         </div>
-        </ErrorBoundary>
 
         {/* Upcoming Pickups - Full Width */}
         <UpcomingPickups />
