@@ -78,7 +78,7 @@ export default function Landing() {
             <Button variant="ghost" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/pricing')}>Pricing</Button>
             <Button variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/auth')}>Sign In</Button>
             <Button className="gradient-gold text-primary-foreground active:scale-[0.97] transition-transform" onClick={() => navigate('/auth')}>
-              Start Free Trial
+              Join Free Beta
             </Button>
           </div>
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
