@@ -234,12 +234,24 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
               </div>
             )}
             <div className="flex-1" />
-            {tourDef && (
-              <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7 text-muted-foreground" onClick={tour.startTour}>
-                <CircleHelp className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Take a Tour</span>
-              </Button>
-            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7 text-muted-foreground">
+                  <CircleHelp className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Help</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Help & Resources</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {tourDef && (
+                  <DropdownMenuItem onClick={() => tour.startTour()}>
+                    <Compass className="mr-2 h-4 w-4" />
+                    Replay Welcome Tour
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
         <div className="flex-1 p-2 sm:p-4 lg:p-6 animate-fade-in">
