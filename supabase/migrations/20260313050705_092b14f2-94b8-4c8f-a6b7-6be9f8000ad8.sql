@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN has_completed_onboarding_tour BOOLEAN NOT NULL DEFAULT false;
