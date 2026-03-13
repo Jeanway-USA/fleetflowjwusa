@@ -3,7 +3,7 @@ import { SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sid
 import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { AlertTriangle, ShieldAlert, Sparkles } from 'lucide-react';
+import { AlertTriangle, CircleHelp, ShieldAlert, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DemoControls } from '@/components/demo/DemoControls';
 import { useTheme } from '@/contexts/ThemeContext';
