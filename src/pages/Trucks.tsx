@@ -263,7 +263,7 @@ export default function Trucks() {
                   <span className="text-xs">Never Inspected</span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent>
+              <TooltipContent side="bottom">
                 <p>No 120-Day Inspection on record</p>
               </TooltipContent>
             </Tooltip>
@@ -291,7 +291,7 @@ export default function Trucks() {
                 </span>
               </div>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent side="bottom">
               <p>Due: {inspection.nextInspectionDate}</p>
             </TooltipContent>
           </Tooltip>
