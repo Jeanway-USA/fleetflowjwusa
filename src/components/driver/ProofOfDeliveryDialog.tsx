@@ -67,7 +67,7 @@ export function ProofOfDeliveryDialog({
       }
 
       // 2. Save document records
-      const docInserts: Record<string, any>[] = [];
+      const docInserts: { document_type: string; file_name: string; file_path: string; related_type: string; related_id: string; uploaded_by: string }[] = [];
       if (!sigUploadError) {
         docInserts.push({
           document_type: 'pod_signature',
