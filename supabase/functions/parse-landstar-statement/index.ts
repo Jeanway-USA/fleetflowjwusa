@@ -93,6 +93,16 @@ serve(async (req) => {
       );
     }
 
+    // Validate PDF size (20 MB limit)
+    const MAX_PDF_BYTES = 20 * 1024 * 1024;
+    const estimatedBytes = pdfBase64.length * 0.75;
+    if (estimatedBytes > MAX_PDF_BYTES) {
+      return new Response(
+        JSON.stringify({ error: "File exceeds 20 MB limit." }),
+        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log("Parsing Landstar statement, base64 length:", pdfBase64.length);
 
     const systemPrompt = `You are an expert at extracting expense data from Landstar Card Activity Statements and Contractor Statements.
