@@ -41,26 +41,32 @@ const dispatcherTour: TourDefinition = {
   ],
 };
 
-const executiveTour: TourDefinition = {
-  id: 'executive_v1',
+const bcoTour: TourDefinition = {
+  id: 'bco_toolkit_v1',
   steps: [
     {
-      id: 'revenue-kpi',
+      id: 'dashboard-metrics',
       targetSelector: '[data-tour="revenue-kpi"]',
-      title: 'Revenue KPIs',
-      description: 'Your top-line financial metrics at a glance — revenue, margins, and trends.',
+      title: 'Your Command Center',
+      description: 'Get an instant read on your target Rate Per Mile (RPM), weekly revenue, and fleet health.',
     },
     {
-      id: 'fleet-status',
-      targetSelector: '[data-tour="fleet-status"]',
-      title: 'Fleet Overview',
-      description: 'Monitor fleet utilization, truck availability, and operational health.',
+      id: 'loads-dispatch',
+      targetSelector: '[data-tour="nav-fleet-loads"]',
+      title: 'Manage Your Freight',
+      description: 'Track your active Landstar loads, monitor deadhead, and calculate expected revenue in real-time.',
     },
     {
-      id: 'critical-alerts',
-      targetSelector: '[data-tour="critical-alerts"]',
-      title: 'Critical Alerts',
-      description: 'Action items that need your immediate attention — compliance, safety, and financial flags.',
+      id: 'finance-statements',
+      targetSelector: '[data-tour="nav-finance"]',
+      title: 'Automated Accounting',
+      description: 'Upload your weekly statements here. We will automatically parse your deductions, fuel costs, and settlements.',
+    },
+    {
+      id: 'beta-feedback',
+      targetSelector: '[data-tour="beta-feedback"]',
+      title: 'Shape the Platform',
+      description: 'Your input drives our updates. Click here anytime to report a bug or request a new feature for your operation.',
     },
   ],
 };
