@@ -287,24 +287,31 @@ export default function Pricing() {
                     ))}
                   </ul>
                   <p className="text-xs text-muted-foreground italic mb-4">{tier.upgradeNote}</p>
-                  <Button 
-                    className={`w-full ${tier.popular ? 'gradient-gold text-primary-foreground glow-gold' : ''}`}
-                    variant={tier.popular ? 'default' : 'outline'}
-                    onClick={() => handleSubscribe(tier.id)}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        Start 14-Day Trial
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </>
-                    )}
-                  </Button>
+                  {subscriptionTier === 'open_beta' ? (
+                    <Button className="w-full" variant="outline" disabled>
+                      <CheckCircle2 className="mr-2 h-4 w-4 text-primary" />
+                      Included in Beta
+                    </Button>
+                  ) : (
+                    <Button 
+                      className={`w-full ${tier.popular ? 'gradient-gold text-primary-foreground glow-gold' : ''}`}
+                      variant={tier.popular ? 'default' : 'outline'}
+                      onClick={() => handleSubscribe(tier.id)}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          Start 14-Day Trial
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );

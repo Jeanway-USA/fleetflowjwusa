@@ -3,6 +3,15 @@ import { useAuth, type SubscriptionTier } from '@/contexts/AuthContext';
 export type { SubscriptionTier };
 
 const TIER_FEATURES: Record<SubscriptionTier, string[]> = {
+  open_beta: [
+    'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
+    'dvir', 'fuel_planner', 'crm_basic',
+    'drivers', 'dispatch', 'settlements', 'fleet_analytics',
+    'gps_tracking', 'payroll', 'driver_performance', 'maintenance_full',
+    'trucks', 'trailers', 'incidents', 'safety', 'executive_dashboard',
+    'agency_loads', 'carrier_vetting', 'commissions', 'crm', 'load_board',
+    'insights',
+  ],
   solo_bco: [
     'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
     'dvir', 'fuel_planner', 'crm_basic',
