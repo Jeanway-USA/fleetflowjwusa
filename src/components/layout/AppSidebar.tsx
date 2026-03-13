@@ -143,7 +143,7 @@ function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, current
               {items.map((item) => {
                 const active = currentPath === item.path || currentPath.startsWith(item.path + '/');
                 return (
-                  <SidebarMenuItem key={item.path}>
+                  <SidebarMenuItem key={item.path} {...(item.tourId ? { 'data-tour': item.tourId } : {})}>
                     <SidebarMenuButton
                       isActive={active}
                       onClick={() => onNavigate(item.path)}
