@@ -3,10 +3,11 @@ import { SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sid
 import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { AlertTriangle, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DemoControls } from '@/components/demo/DemoControls';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useSubscriptionTier } from '@/hooks/useSubscriptionTier';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -114,6 +115,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
 }) {
   const { toggleSidebar } = useSidebar();
   const location = useLocation();
+  const { tier } = useSubscriptionTier();
 
   // Keyboard shortcut: Ctrl/Cmd + B to toggle sidebar
   useEffect(() => {
@@ -192,6 +194,12 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
+            )}
+            {tier === 'open_beta' && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/15 to-yellow-500/15 border border-amber-500/30">
+                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">Beta Member</span>
+              </div>
             )}
             <div className="flex-1" />
           </div>

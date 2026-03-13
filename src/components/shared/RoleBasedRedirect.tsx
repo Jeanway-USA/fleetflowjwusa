@@ -32,6 +32,7 @@ export function RoleBasedRedirect() {
   if (hasRole('owner')) {
     switch (subscriptionTier) {
       case 'solo_bco':
+      case 'open_beta':
         return <Navigate to="/fleet-loads" replace />;
       case 'agency':
         return <Navigate to="/agency-loads" replace />;

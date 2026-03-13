@@ -30,6 +30,7 @@ interface PaletteItem {
 }
 
 const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
+  open_beta: new Set(['loads','ifta','maintenance_basic','documents','profit_loss','dvir','fuel_planner','crm_basic','drivers','dispatch','settlements','fleet_analytics','gps_tracking','payroll','driver_performance','maintenance_full','trucks','trailers','incidents','safety','executive_dashboard','agency_loads','commissions','crm','insights']),
   solo_bco: new Set(['loads','ifta','maintenance_basic','documents','profit_loss','dvir','fuel_planner','crm_basic']),
   fleet_owner: new Set(['loads','ifta','maintenance_basic','documents','profit_loss','dvir','fuel_planner','crm_basic','drivers','dispatch','settlements','fleet_analytics','gps_tracking','payroll','driver_performance','maintenance_full','trucks','trailers','incidents','safety','executive_dashboard','insights']),
   agency: new Set(['agency_loads','commissions','crm','documents','insights']),

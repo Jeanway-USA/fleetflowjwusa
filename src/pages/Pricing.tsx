@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CheckCircle2, Truck, Users, Package, Crown, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { CheckCircle2, Truck, Users, Package, Crown, ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -121,7 +121,7 @@ interface PlanPrices {
 
 export default function Pricing() {
   const navigate = useNavigate();
-  const { user, orgId } = useAuth();
+  const { user, orgId, subscriptionTier } = useAuth();
   const [showAllInOne, setShowAllInOne] = useState(false);
   const [isAnnual, setIsAnnual] = useState(false);
   const [prices, setPrices] = useState<PlanPrices | null>(null);
@@ -218,7 +218,14 @@ export default function Pricing() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-extrabold mb-3">Simple, Transparent Pricing</h1>
-          <p className="text-lg text-muted-foreground mb-6">Start with a 14-day free trial. No credit card required.</p>
+          {subscriptionTier === 'open_beta' ? (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/15 to-yellow-500/15 border border-amber-500/30 mb-6">
+              <Sparkles className="h-4 w-4 text-amber-500" />
+              <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">You have full access during the Open Beta — no payment required!</span>
+            </div>
+          ) : (
+            <p className="text-lg text-muted-foreground mb-6">Start with a 14-day free trial. No credit card required.</p>
+          )}
           
           <div className="flex items-center justify-center gap-6 flex-wrap">
             <div className="flex items-center gap-3">
@@ -280,24 +287,31 @@ export default function Pricing() {
                     ))}
                   </ul>
                   <p className="text-xs text-muted-foreground italic mb-4">{tier.upgradeNote}</p>
-                  <Button 
-                    className={`w-full ${tier.popular ? 'gradient-gold text-primary-foreground glow-gold' : ''}`}
-                    variant={tier.popular ? 'default' : 'outline'}
-                    onClick={() => handleSubscribe(tier.id)}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        Start 14-Day Trial
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </>
-                    )}
-                  </Button>
+                  {subscriptionTier === 'open_beta' ? (
+                    <Button className="w-full" variant="outline" disabled>
+                      <CheckCircle2 className="mr-2 h-4 w-4 text-primary" />
+                      Included in Beta
+                    </Button>
+                  ) : (
+                    <Button 
+                      className={`w-full ${tier.popular ? 'gradient-gold text-primary-foreground glow-gold' : ''}`}
+                      variant={tier.popular ? 'default' : 'outline'}
+                      onClick={() => handleSubscribe(tier.id)}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          Start 14-Day Trial
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             );

@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
 type AppRole = Database['public']['Enums']['app_role'];
-export type SubscriptionTier = 'solo_bco' | 'fleet_owner' | 'agency' | 'all_in_one';
+export type SubscriptionTier = 'solo_bco' | 'fleet_owner' | 'agency' | 'all_in_one' | 'open_beta';
 
 interface AuthContextType {
   user: User | null;
