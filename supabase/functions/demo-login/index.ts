@@ -152,7 +152,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Demo login error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "Demo login is temporarily unavailable." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
