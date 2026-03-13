@@ -218,7 +218,14 @@ export default function Pricing() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-extrabold mb-3">Simple, Transparent Pricing</h1>
-          <p className="text-lg text-muted-foreground mb-6">Start with a 14-day free trial. No credit card required.</p>
+          {subscriptionTier === 'open_beta' ? (
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/15 to-yellow-500/15 border border-amber-500/30 mb-6">
+              <Sparkles className="h-4 w-4 text-amber-500" />
+              <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">You have full access during the Open Beta — no payment required!</span>
+            </div>
+          ) : (
+            <p className="text-lg text-muted-foreground mb-6">Start with a 14-day free trial. No credit card required.</p>
+          )}
           
           <div className="flex items-center justify-center gap-6 flex-wrap">
             <div className="flex items-center gap-3">
