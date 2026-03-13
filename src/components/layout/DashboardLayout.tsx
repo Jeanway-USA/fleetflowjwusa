@@ -207,6 +207,12 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
               </div>
             )}
             <div className="flex-1" />
+            {tourDef && (
+              <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7 text-muted-foreground" onClick={tour.startTour}>
+                <CircleHelp className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Take a Tour</span>
+              </Button>
+            )}
           </div>
         </header>
         <div className="flex-1 p-2 sm:p-4 lg:p-6 animate-fade-in">
