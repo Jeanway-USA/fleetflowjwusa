@@ -114,9 +114,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log(`PM schedule check initiated by user: ${user.id}`);
+    // Resolve caller's org_id for data isolation
+    const { data: callerProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (profileError || !callerProfile?.org_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Organization not found' }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    const orgId = callerProfile.org_id;
+    console.log(`PM schedule check initiated by user: ${user.id} for org: ${orgId}`);
 
-    // Fetch all required data in parallel
+    // Fetch all required data in parallel, scoped to caller's org
     const [
       { data: trucks, error: trucksError },
       { data: profiles, error: profilesError },
@@ -125,12 +140,12 @@ Deno.serve(async (req) => {
       { data: loads, error: loadsError },
       { data: existingNotifications, error: existingError },
     ] = await Promise.all([
-      supabase.from("trucks").select("id, unit_number, make, current_odometer").eq("status", "active"),
+      supabase.from("trucks").select("id, unit_number, make, current_odometer").eq("status", "active").eq("org_id", orgId),
       supabase.from("manufacturer_pm_profiles").select("*"),
-      supabase.from("service_schedules").select("*"),
-      supabase.from("work_orders").select("id, truck_id, entry_date, service_type, service_types").eq("status", "completed").order("entry_date", { ascending: false }),
-      supabase.from("fleet_loads").select("truck_id, end_miles, actual_miles, delivery_date").eq("status", "delivered"),
-      supabase.from("pm_notifications").select("truck_id, service_name, notification_type").gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()), // Last 24h
+      supabase.from("service_schedules").select("*").eq("org_id", orgId),
+      supabase.from("work_orders").select("id, truck_id, entry_date, service_type, service_types").eq("status", "completed").eq("org_id", orgId).order("entry_date", { ascending: false }),
+      supabase.from("fleet_loads").select("truck_id, end_miles, actual_miles, delivery_date").eq("status", "delivered").eq("org_id", orgId),
+      supabase.from("pm_notifications").select("truck_id, service_name, notification_type").eq("org_id", orgId).gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
     ]);
 
     if (trucksError) throw trucksError;
