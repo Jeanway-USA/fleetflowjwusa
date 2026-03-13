@@ -121,7 +121,7 @@ interface PlanPrices {
 
 export default function Pricing() {
   const navigate = useNavigate();
-  const { user, orgId } = useAuth();
+  const { user, orgId, subscriptionTier } = useAuth();
   const [showAllInOne, setShowAllInOne] = useState(false);
   const [isAnnual, setIsAnnual] = useState(false);
   const [prices, setPrices] = useState<PlanPrices | null>(null);
