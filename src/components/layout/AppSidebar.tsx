@@ -61,6 +61,7 @@ interface NavItem {
   path: string;
   roles: AppRole[];
   feature?: string;
+  tourId?: string;
 }
 
 const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
