@@ -1,12 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SignaturePad } from './SignaturePad';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { CheckCircle, Camera, ImageIcon, Loader2, X, ClipboardCheck, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Loader2, ClipboardCheck, AlertTriangle, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ProofOfDeliveryDialogProps {
@@ -29,44 +30,22 @@ export function ProofOfDeliveryDialog({
   onComplete,
 }: ProofOfDeliveryDialogProps) {
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
-  const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
+  const [transfloLink, setTransfloLink] = useState('');
   const [exceptionNotes, setExceptionNotes] = useState('');
   const [hasException, setHasException] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    const newPhotos: { file: File; preview: string }[] = [];
-    const remaining = 5 - photos.length;
-
-    for (let i = 0; i < Math.min(files.length, remaining); i++) {
-      const file = files[i];
-      if (file.type.startsWith('image/')) {
-        newPhotos.push({ file, preview: URL.createObjectURL(file) });
-      }
-    }
-
-    setPhotos(prev => [...prev, ...newPhotos]);
-    // Reset the input
-    if (e.target) e.target.value = '';
-  };
-
-  const removePhoto = (index: number) => {
-    setPhotos(prev => {
-      const updated = [...prev];
-      URL.revokeObjectURL(updated[index].preview);
-      updated.splice(index, 1);
-      return updated;
-    });
-  };
+  const isValidTransfloLink = (url: string) =>
+    url.trim() === '' || url.trim().startsWith('https://viewer.transfloexpress.com/');
 
   const handleSubmit = async () => {
     if (!signatureDataUrl) {
       toast.error('Please provide a signature to confirm delivery');
+      return;
+    }
+
+    if (transfloLink.trim() && !isValidTransfloLink(transfloLink)) {
+      toast.error('Please enter a valid Transflo Express link');
       return;
     }
 
@@ -82,28 +61,13 @@ export function ProofOfDeliveryDialog({
       const { error: sigUploadError } = await supabase.storage
         .from('dvir-photos')
         .upload(sigPath, signatureBlob, { contentType: 'image/png' });
-      
+
       if (sigUploadError) {
         console.warn('Signature upload failed, continuing anyway:', sigUploadError.message);
       }
 
-      // 2. Upload BOL/POD photos
-      const uploadedPaths: string[] = [];
-      for (const photo of photos) {
-        const filePath = `pod/${user.id}/${loadId}/${Date.now()}-${photo.file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('dvir-photos')
-          .upload(filePath, photo.file);
-        
-        if (uploadError) {
-          console.warn('Photo upload failed:', uploadError.message);
-        } else {
-          uploadedPaths.push(filePath);
-        }
-      }
-
-      // 3. Save document records for each uploaded file
-      const docInserts = [];
+      // 2. Save document records
+      const docInserts: Record<string, any>[] = [];
       if (!sigUploadError) {
         docInserts.push({
           document_type: 'pod_signature',
@@ -114,11 +78,13 @@ export function ProofOfDeliveryDialog({
           uploaded_by: user.id,
         });
       }
-      for (const path of uploadedPaths) {
+
+      // Save Transflo link as a document record
+      if (transfloLink.trim()) {
         docInserts.push({
-          document_type: 'proof_of_delivery',
-          file_name: `POD Photo - Load ${loadNumber || loadId.substring(0, 8)}`,
-          file_path: path,
+          document_type: 'transflo_pod',
+          file_name: `Transflo POD - Load ${loadNumber || loadId.substring(0, 8)}`,
+          file_path: transfloLink.trim(),
           related_type: 'load',
           related_id: loadId,
           uploaded_by: user.id,
@@ -129,7 +95,7 @@ export function ProofOfDeliveryDialog({
         await supabase.from('documents').insert(docInserts);
       }
 
-      // 4. Update load status to delivered with delivery timestamp
+      // 3. Update load status to delivered
       const deliveryNotes = hasException && exceptionNotes
         ? `\n--- POD Exception ---\n${exceptionNotes}`
         : '';
@@ -139,14 +105,13 @@ export function ProofOfDeliveryDialog({
         delivery_date: format(new Date(), 'yyyy-MM-dd'),
       };
 
-      // Append exception notes to existing notes if any
       if (deliveryNotes) {
         const { data: currentLoad } = await supabase
           .from('fleet_loads')
           .select('notes')
           .eq('id', loadId)
           .single();
-        
+
         updateData.notes = (currentLoad?.notes || '') + deliveryNotes;
       }
 
@@ -157,7 +122,7 @@ export function ProofOfDeliveryDialog({
 
       if (updateError) throw updateError;
 
-      // 5. Log status change
+      // 4. Log status change
       await supabase.from('load_status_logs').insert({
         load_id: loadId,
         previous_status: 'in_transit',
@@ -166,16 +131,11 @@ export function ProofOfDeliveryDialog({
         notes: hasException ? `Delivered with exceptions: ${exceptionNotes}` : 'Delivered - POD captured',
       });
 
-      // 6. Create notification for dispatch
-      // We don't know the dispatcher's driver_id, so we skip driver_notifications
-      // The load status change itself serves as the notification via dashboard queries
-
       toast.success('Delivery confirmed! POD captured successfully.');
 
       // Cleanup
-      photos.forEach(p => URL.revokeObjectURL(p.preview));
-      setPhotos([]);
       setSignatureDataUrl(null);
+      setTransfloLink('');
       setExceptionNotes('');
       setHasException(false);
       onOpenChange(false);
@@ -190,9 +150,8 @@ export function ProofOfDeliveryDialog({
 
   const handleClose = () => {
     if (!isSubmitting) {
-      photos.forEach(p => URL.revokeObjectURL(p.preview));
-      setPhotos([]);
       setSignatureDataUrl(null);
+      setTransfloLink('');
       setExceptionNotes('');
       setHasException(false);
       onOpenChange(false);
@@ -221,81 +180,29 @@ export function ProofOfDeliveryDialog({
             </span>
           </div>
 
-          {/* BOL / POD Photos */}
+          {/* Transflo POD Link */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">BOL / POD Photos</Label>
+            <Label htmlFor="transflo-link" className="text-sm font-medium flex items-center gap-2">
+              <ExternalLink className="h-4 w-4" />
+              Transflo POD Link
+            </Label>
+            <Input
+              id="transflo-link"
+              type="url"
+              placeholder="https://viewer.transfloexpress.com/ViewBatchExM.aspx?ConfNumber=..."
+              value={transfloLink}
+              onChange={(e) => setTransfloLink(e.target.value)}
+              disabled={isSubmitting}
+              className={transfloLink && !isValidTransfloLink(transfloLink) ? 'border-destructive' : ''}
+            />
             <p className="text-xs text-muted-foreground">
-              Take photos of the signed Bill of Lading or delivery receipt
+              Paste the link from your Transflo Express app (optional)
             </p>
-
-            {photos.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
-                {photos.map((photo, index) => (
-                  <div key={index} className="relative aspect-square rounded-lg overflow-hidden border">
-                    <img
-                      src={photo.preview}
-                      alt={`POD photo ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={() => removePhoto(index)}
-                      disabled={isSubmitting}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
+            {transfloLink && !isValidTransfloLink(transfloLink) && (
+              <p className="text-xs text-destructive">
+                Link must start with https://viewer.transfloexpress.com/
+              </p>
             )}
-
-            {photos.length < 5 && (
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => cameraInputRef.current?.click()}
-                  disabled={isSubmitting}
-                  className="flex-1"
-                >
-                  <Camera className="h-4 w-4 mr-2" />
-                  Camera
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isSubmitting}
-                  className="flex-1"
-                >
-                  <ImageIcon className="h-4 w-4 mr-2" />
-                  Gallery
-                </Button>
-              </div>
-            )}
-
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-            />
           </div>
 
           {/* Signature */}
