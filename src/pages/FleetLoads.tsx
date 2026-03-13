@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText } from 'lucide-react';
 
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
@@ -800,6 +800,21 @@ export default function FleetLoads() {
                   <Switch
                     checked={formData.auto_email_updates ?? true}
                     onCheckedChange={(checked) => setFormData({ ...formData, auto_email_updates: checked })}
+                  />
+                </div>
+
+                {/* POD Required Toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">POD Required</p>
+                      <p className="text-xs text-muted-foreground">Require Transflo POD link and signature on delivery</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={formData.pod_required ?? true}
+                    onCheckedChange={(checked) => setFormData({ ...formData, pod_required: checked })}
                   />
                 </div>
 

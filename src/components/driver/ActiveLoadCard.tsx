@@ -59,6 +59,7 @@ interface Load {
   notes: string | null;
   landstar_load_id: string | null;
   tracking_id?: string | null;
+  pod_required?: boolean;
   load_accessorials?: { amount: number }[];
 }
 
@@ -170,10 +171,13 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   const handleProgressStatus = async () => {
     if (!nextStatus) return;
 
-    // If transitioning to delivered, open POD dialog instead
+    // If transitioning to delivered, check if POD is required
     if (nextStatus === 'delivered') {
-      setPodDialogOpen(true);
-      return;
+      if (load.pod_required !== false) {
+        setPodDialogOpen(true);
+        return;
+      }
+      // POD not required — fall through to direct status update
     }
     
     setIsUpdating(true);
