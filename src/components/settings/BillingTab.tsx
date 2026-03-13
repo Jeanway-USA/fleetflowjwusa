@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import type { SubscriptionTier } from '@/contexts/AuthContext';
 
 const TIER_LABELS: Record<SubscriptionTier, string> = {
+  open_beta: 'Open Beta',
   solo_bco: 'Solo BCO',
   fleet_owner: 'Fleet Owner',
   agency: 'Agency',
@@ -19,6 +20,7 @@ const TIER_LABELS: Record<SubscriptionTier, string> = {
 };
 
 const TIER_DESCRIPTIONS: Record<SubscriptionTier, string> = {
+  open_beta: 'Full platform access during the open beta period.',
   solo_bco: 'Essential tools for independent owner-operators.',
   fleet_owner: 'Full fleet management with dispatch, payroll, and analytics.',
   agency: 'Agency load management and commission tracking.',
