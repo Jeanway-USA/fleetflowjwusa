@@ -22,6 +22,7 @@ import { InfrastructureTab } from '@/components/superadmin/InfrastructureTab';
 import { ResetDemoDialog } from '@/components/superadmin/ResetDemoDialog';
 import { BillingPromotionsTab } from '@/components/superadmin/BillingPromotionsTab';
 import { FeedbackTab } from '@/components/superadmin/FeedbackTab';
+import { BetaLifecycleCard } from '@/components/superadmin/BetaLifecycleCard';
 
 const TIER_COLORS: Record<string, string> = {
   solo_bco: 'hsl(45, 80%, 45%)',
