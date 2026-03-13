@@ -119,6 +119,8 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
   const { toggleSidebar } = useSidebar();
   const location = useLocation();
   const { tier } = useSubscriptionTier();
+  const tourDef = getTourForRoute(location.pathname);
+  const tour = useProductTour({ tourId: tourDef?.id || 'none', totalSteps: tourDef?.steps.length || 0 });
 
   // Keyboard shortcut: Ctrl/Cmd + B to toggle sidebar
   useEffect(() => {
