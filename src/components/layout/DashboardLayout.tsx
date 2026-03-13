@@ -19,6 +19,9 @@ import {
 import { CommandPalette } from '@/components/shared/CommandPalette';
 import { BetaFeedbackWidget } from '@/components/shared/BetaFeedbackWidget';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { ProductTour } from '@/components/shared/ProductTour';
+import { useProductTour } from '@/hooks/useProductTour';
+import { getTourForRoute } from '@/lib/tour-steps';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/executive-dashboard': 'Executive Dashboard',
