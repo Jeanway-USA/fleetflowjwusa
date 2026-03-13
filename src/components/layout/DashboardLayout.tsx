@@ -3,7 +3,15 @@ import { SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sid
 import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { AlertTriangle, CircleHelp, ShieldAlert, Sparkles } from 'lucide-react';
+import { AlertTriangle, CircleHelp, Compass, ShieldAlert, Sparkles } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { WelcomeBetaModal } from '@/components/shared/WelcomeBetaModal';
 import { Button } from '@/components/ui/button';
@@ -226,12 +234,24 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
               </div>
             )}
             <div className="flex-1" />
-            {tourDef && (
-              <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7 text-muted-foreground" onClick={tour.startTour}>
-                <CircleHelp className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Take a Tour</span>
-              </Button>
-            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7 text-muted-foreground">
+                  <CircleHelp className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Help</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Help & Resources</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {tourDef && (
+                  <DropdownMenuItem onClick={() => tour.startTour()}>
+                    <Compass className="mr-2 h-4 w-4" />
+                    Replay Welcome Tour
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
         <div className="flex-1 p-2 sm:p-4 lg:p-6 animate-fade-in">
