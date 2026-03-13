@@ -158,6 +158,8 @@ export default function SuperAdminDashboard() {
               )}
             </CardContent>
           </Card>
+
+          <BetaLifecycleCard />
         </TabsContent>
 
         {/* Tab 2: Organizations */}
