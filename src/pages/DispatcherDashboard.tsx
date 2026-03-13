@@ -205,8 +205,11 @@ export default function DispatcherDashboard() {
         </ErrorBoundary>
 
         {/* Active Loads - Full Width */}
-        <ErrorBoundary compact>
-          <ActiveLoadsBoard />
+        <div data-tour="active-loads">
+          <ErrorBoundary compact>
+            <ActiveLoadsBoard />
+          </ErrorBoundary>
+        </div>
         </ErrorBoundary>
 
         {/* Upcoming Pickups - Full Width */}
