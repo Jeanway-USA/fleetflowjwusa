@@ -59,6 +59,7 @@ interface Load {
   notes: string | null;
   landstar_load_id: string | null;
   tracking_id?: string | null;
+  pod_required?: boolean;
   load_accessorials?: { amount: number }[];
 }
 
