@@ -291,7 +291,7 @@ export default function Trucks() {
                 </span>
               </div>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent side="bottom">
               <p>Due: {inspection.nextInspectionDate}</p>
             </TooltipContent>
           </Tooltip>
