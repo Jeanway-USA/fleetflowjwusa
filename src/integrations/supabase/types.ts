@@ -3960,6 +3960,7 @@ export type Database = {
       }
     }
     Functions: {
+      auto_cleanup_empty_orgs: { Args: never; Returns: number }
       create_audit_log: {
         Args: {
           p_action: string
