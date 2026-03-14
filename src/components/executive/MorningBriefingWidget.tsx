@@ -58,7 +58,8 @@ export function MorningBriefingWidget() {
           .from('fleet_loads')
           .select('id', { count: 'exact', head: true })
           .eq('org_id', orgId)
-          .eq('status', 'delivered'),
+          .eq('status', 'delivered')
+          .eq('pod_required', true),
       ]);
 
       // Count expiring drivers client-side (OR across 3 columns)
@@ -79,6 +80,7 @@ export function MorningBriefingWidget() {
           .select('id')
           .eq('org_id', orgId)
           .eq('status', 'delivered')
+          .eq('pod_required', true)
           .limit(500);
 
         if (deliveredLoads?.length) {
