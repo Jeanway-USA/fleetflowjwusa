@@ -80,6 +80,7 @@ export function MorningBriefingWidget() {
           .select('id')
           .eq('org_id', orgId)
           .eq('status', 'delivered')
+          .eq('pod_required', true)
           .limit(500);
 
         if (deliveredLoads?.length) {
