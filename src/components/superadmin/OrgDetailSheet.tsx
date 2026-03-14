@@ -31,7 +31,7 @@ export function OrgDetailSheet({ org, open, onOpenChange }: OrgDetailSheetProps)
     mutationFn: async ({ newTier, newIsActive, newTrialEndsAt }: { newTier?: string; newIsActive?: boolean; newTrialEndsAt?: string }) => {
       const { error } = await supabase.rpc('super_admin_update_org' as any, {
         target_org_id: org.id,
-        new_tier: newTier ?? null,
+        new_subscription_tier: newTier ?? null,
         new_is_active: newIsActive ?? null,
         new_trial_ends_at: newTrialEndsAt ?? null,
       });
