@@ -130,7 +130,7 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
 
     try {
       // Step 1: Upload PDF to storage (bypasses functions relay)
-      const tempPath = `temp-rc/${Date.now()}-${file.name}`;
+      const tempPath = `${orgId}/temp-rc/${Date.now()}-${file.name}`;
       console.log('[RC Upload] Uploading PDF to storage:', tempPath);
       const { error: uploadError } = await supabase.storage
         .from('documents')
