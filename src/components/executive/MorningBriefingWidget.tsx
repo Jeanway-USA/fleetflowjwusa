@@ -88,7 +88,7 @@ export function MorningBriefingWidget() {
           const { data: podDocs } = await supabase
             .from('documents')
             .select('related_id')
-            .eq('document_type', 'pod')
+            .in('document_type', ['pod_signature', 'transflo_pod'])
             .in('related_id', loadIds);
 
           const podLoadIds = new Set(podDocs?.map((d) => d.related_id) ?? []);
