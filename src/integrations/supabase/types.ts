@@ -1643,6 +1643,8 @@ export type Database = {
           pickup_time: string | null
           pickup_time_type: string
           pod_required: boolean
+          pod_signature_path: string | null
+          pod_transflo_link: string | null
           rate: number | null
           settlement: number | null
           start_miles: number | null
@@ -1686,6 +1688,8 @@ export type Database = {
           pickup_time?: string | null
           pickup_time_type?: string
           pod_required?: boolean
+          pod_signature_path?: string | null
+          pod_transflo_link?: string | null
           rate?: number | null
           settlement?: number | null
           start_miles?: number | null
@@ -1729,6 +1733,8 @@ export type Database = {
           pickup_time?: string | null
           pickup_time_type?: string
           pod_required?: boolean
+          pod_signature_path?: string | null
+          pod_transflo_link?: string | null
           rate?: number | null
           settlement?: number | null
           start_miles?: number | null

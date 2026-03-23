@@ -1196,13 +1196,10 @@ export default function FleetLoads() {
               </TabsContent>
 
               <TabsContent value="pod" className="mt-4">
-                {editingLoad?.id ? (
-                  <PODViewer loadId={editingLoad.id} />
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>Save the load first to view POD documents.</p>
-                  </div>
-                )}
+                <PODViewer
+                  podSignaturePath={editingLoad?.pod_signature_path}
+                  podTransfloLink={editingLoad?.pod_transflo_link}
+                />
               </TabsContent>
 
               <TabsContent value="history" className="mt-4">
