@@ -123,11 +123,19 @@ export function ProofOfDeliveryDialog({
       if (updateError) throw updateError;
 
       // 4. Log status change
+      // Get org_id for RLS compliance
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id')
+        .eq('id', user.id)
+        .single();
+
       await supabase.from('load_status_logs').insert({
         load_id: loadId,
         previous_status: 'in_transit',
         new_status: 'delivered',
         changed_by: user.id,
+        org_id: profile?.org_id,
         notes: hasException ? `Delivered with exceptions: ${exceptionNotes}` : 'Delivered - POD captured',
       });
 
