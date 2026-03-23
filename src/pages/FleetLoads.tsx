@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image } from 'lucide-react';
 
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
@@ -735,12 +735,15 @@ export default function FleetLoads() {
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="details">Load Details</TabsTrigger>
                 <TabsTrigger value="revenue">Revenue</TabsTrigger>
                 <TabsTrigger value="miles">Miles</TabsTrigger>
                 <TabsTrigger value="expenses" className="flex items-center gap-1">
                   <Receipt className="h-4 w-4" /> Expenses
+                </TabsTrigger>
+                <TabsTrigger value="pod" className="flex items-center gap-1">
+                  <FileCheck className="h-4 w-4" /> POD
                 </TabsTrigger>
                 <TabsTrigger value="history" className="flex items-center gap-1">
                   <History className="h-4 w-4" /> History
@@ -1187,6 +1190,16 @@ export default function FleetLoads() {
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <p>Save the load first to add expenses.</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="pod" className="mt-4">
+                {editingLoad?.id ? (
+                  <PODViewer loadId={editingLoad.id} />
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Save the load first to view POD documents.</p>
                   </div>
                 )}
               </TabsContent>
