@@ -55,6 +55,13 @@ export function ProofOfDeliveryDialog({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Fetch org_id early for document inserts
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id')
+        .eq('id', user.id)
+        .single();
+
       // 1. Upload signature as a document
       const signatureBlob = await (await fetch(signatureDataUrl)).blob();
       const sigPath = `pod/${user.id}/${loadId}/signature-${Date.now()}.png`;
@@ -67,7 +74,7 @@ export function ProofOfDeliveryDialog({
       }
 
       // 2. Save document records
-      const docInserts: { document_type: string; file_name: string; file_path: string; related_type: string; related_id: string; uploaded_by: string }[] = [];
+      const docInserts: { document_type: string; file_name: string; file_path: string; related_type: string; related_id: string; uploaded_by: string; org_id: string | null }[] = [];
       if (!sigUploadError) {
         docInserts.push({
           document_type: 'pod_signature',
@@ -76,6 +83,7 @@ export function ProofOfDeliveryDialog({
           related_type: 'load',
           related_id: loadId,
           uploaded_by: user.id,
+          org_id: profile?.org_id ?? null,
         });
       }
 
@@ -88,6 +96,7 @@ export function ProofOfDeliveryDialog({
           related_type: 'load',
           related_id: loadId,
           uploaded_by: user.id,
+          org_id: profile?.org_id ?? null,
         });
       }
 
@@ -123,13 +132,6 @@ export function ProofOfDeliveryDialog({
       if (updateError) throw updateError;
 
       // 4. Log status change
-      // Get org_id for RLS compliance
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('org_id')
-        .eq('id', user.id)
-        .single();
-
       await supabase.from('load_status_logs').insert({
         load_id: loadId,
         previous_status: 'in_transit',
