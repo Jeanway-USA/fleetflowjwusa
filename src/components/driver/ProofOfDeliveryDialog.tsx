@@ -112,6 +112,8 @@ export function ProofOfDeliveryDialog({
       const updateData: Record<string, any> = {
         status: 'delivered',
         delivery_date: format(new Date(), 'yyyy-MM-dd'),
+        pod_signature_path: !sigUploadError ? sigPath : null,
+        pod_transflo_link: transfloLink.trim() || null,
       };
 
       if (deliveryNotes) {

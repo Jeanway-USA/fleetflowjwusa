@@ -47,27 +47,19 @@ export function BriefingLoadsDialog({ type, open, onOpenChange }: BriefingLoadsD
         return data ?? [];
       }
 
-      // missing-pod: delivered loads with pod_required=true that have no POD docs
-      const { data: deliveredLoads, error } = await supabase
+      // missing-pod: delivered loads with pod_required=true that have no POD data
+      const { data, error } = await supabase
         .from('fleet_loads')
         .select('id, landstar_load_id, origin, destination, delivery_date, status, driver_id, drivers(first_name, last_name)')
         .eq('org_id', orgId)
         .eq('status', 'delivered')
         .eq('pod_required', true)
+        .is('pod_signature_path', null)
+        .is('pod_transflo_link', null)
         .order('delivery_date', { ascending: false })
         .limit(500);
       if (error) throw error;
-      if (!deliveredLoads?.length) return [];
-
-      const loadIds = deliveredLoads.map((l) => l.id);
-      const { data: podDocs } = await supabase
-        .from('documents')
-        .select('related_id')
-        .in('document_type', ['pod_signature', 'transflo_pod'])
-        .in('related_id', loadIds);
-
-      const podLoadIds = new Set(podDocs?.map((d) => d.related_id) ?? []);
-      return deliveredLoads.filter((l) => !podLoadIds.has(l.id));
+      return data ?? [];
     },
     enabled: open && !!orgId,
   });

@@ -79,19 +79,11 @@ export function MorningBriefingWidget() {
           .eq('org_id', orgId)
           .eq('status', 'delivered')
           .eq('pod_required', true)
+          .is('pod_signature_path', null)
+          .is('pod_transflo_link', null)
           .limit(500);
 
-        if (deliveredLoads?.length) {
-          const loadIds = deliveredLoads.map((l) => l.id);
-          const { data: podDocs } = await supabase
-            .from('documents')
-            .select('related_id')
-            .in('document_type', ['pod_signature', 'transflo_pod'])
-            .in('related_id', loadIds);
-
-          const podLoadIds = new Set(podDocs?.map((d) => d.related_id) ?? []);
-          missingPodCount = loadIds.filter((id) => !podLoadIds.has(id)).length;
-        }
+        missingPodCount = deliveredLoads?.length ?? 0;
       }
 
       let overdueSet = new Set<string>();
