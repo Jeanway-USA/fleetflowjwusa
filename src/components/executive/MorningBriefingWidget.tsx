@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -5,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Truck, Users, Wrench, FileWarning } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { BriefingLoadsDialog } from './BriefingLoadsDialog';
 
 interface BriefingMetric {
   key: string;
@@ -12,12 +14,15 @@ interface BriefingMetric {
   count: number;
   icon: React.ElementType;
   colorClass: string;
-  route: string;
+  action: 'navigate' | 'dialog';
+  route?: string;
+  dialogType?: 'pickup-today' | 'missing-pod';
 }
 
 export function MorningBriefingWidget() {
   const { orgId } = useAuth();
   const navigate = useNavigate();
+  const [activeDialog, setActiveDialog] = useState<'pickup-today' | 'missing-pod' | null>(null);
 
   const { data: metrics } = useQuery({
     queryKey: ['morning-briefing', orgId],
@@ -31,7 +36,6 @@ export function MorningBriefingWidget() {
       );
 
       const [loadsToday, expiringDrivers, overdueTrucks, missingPods] = await Promise.all([
-        // Loads picking up today
         supabase
           .from('fleet_loads')
           .select('id', { count: 'exact', head: true })
@@ -39,21 +43,18 @@ export function MorningBriefingWidget() {
           .eq('pickup_date', today)
           .in('status', ['assigned', 'booked']),
 
-        // Drivers with expiring docs in < 30 days
         supabase
           .from('drivers')
           .select('id, license_expiry, medical_card_expiry, mvr_expiry')
           .eq('org_id', orgId)
           .eq('status', 'active'),
 
-        // Trucks with overdue service schedules
         supabase
           .from('service_schedules')
           .select('truck_id, service_name, interval_miles, interval_days, last_performed_miles, last_performed_date, trucks!inner(org_id, status)')
           .eq('trucks.org_id', orgId)
           .eq('trucks.status', 'active'),
 
-        // Delivered loads with no POD document
         supabase
           .from('fleet_loads')
           .select('id', { count: 'exact', head: true })
@@ -62,7 +63,6 @@ export function MorningBriefingWidget() {
           .eq('pod_required', true),
       ]);
 
-      // Count expiring drivers client-side (OR across 3 columns)
       let expiringCount = 0;
       if (expiringDrivers.data) {
         expiringCount = expiringDrivers.data.filter((d) => {
@@ -71,10 +71,8 @@ export function MorningBriefingWidget() {
         }).length;
       }
 
-      // For delivered loads missing PODs, check which have no POD document
       let missingPodCount = 0;
       if ((missingPods.count ?? 0) > 0) {
-        // Get delivered load IDs and check which have POD documents
         const { data: deliveredLoads } = await supabase
           .from('fleet_loads')
           .select('id')
@@ -96,7 +94,6 @@ export function MorningBriefingWidget() {
         }
       }
 
-      // Count overdue trucks from service schedules
       let overdueSet = new Set<string>();
       if (overdueTrucks.data) {
         const todayDate = new Date();
@@ -107,8 +104,6 @@ export function MorningBriefingWidget() {
             dueDate.setDate(dueDate.getDate() + sched.interval_days);
             if (todayDate > dueDate) overdueSet.add(sched.truck_id);
           }
-          // Miles-based overdue detection is harder without current odometer in this query,
-          // so we rely on date-based schedules (120-day inspections) here
         }
       }
 
@@ -121,7 +116,8 @@ export function MorningBriefingWidget() {
           count: loadsToday.count ?? 0,
           icon: Truck,
           colorClass: 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20',
-          route: '/fleet-loads',
+          action: 'dialog',
+          dialogType: 'pickup-today',
         });
       }
 
@@ -132,6 +128,7 @@ export function MorningBriefingWidget() {
           count: expiringCount,
           icon: Users,
           colorClass: 'bg-warning/10 text-warning border-warning/20 hover:bg-warning/20',
+          action: 'navigate',
           route: '/safety',
         });
       }
@@ -143,6 +140,7 @@ export function MorningBriefingWidget() {
           count: overdueSet.size,
           icon: Wrench,
           colorClass: 'bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20',
+          action: 'navigate',
           route: '/maintenance',
         });
       }
@@ -154,7 +152,8 @@ export function MorningBriefingWidget() {
           count: missingPodCount,
           icon: FileWarning,
           colorClass: 'bg-accent/50 text-accent-foreground border-accent hover:bg-accent/70',
-          route: '/fleet-loads',
+          action: 'dialog',
+          dialogType: 'missing-pod',
         });
       }
 
@@ -166,25 +165,41 @@ export function MorningBriefingWidget() {
 
   if (!metrics?.length) return null;
 
+  const handleClick = (m: BriefingMetric) => {
+    if (m.action === 'navigate' && m.route) {
+      navigate(m.route);
+    } else if (m.action === 'dialog' && m.dialogType) {
+      setActiveDialog(m.dialogType);
+    }
+  };
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {metrics.map((m) => {
-        const Icon = m.icon;
-        return (
-          <button
-            key={m.key}
-            onClick={() => navigate(m.route)}
-            className={cn(
-              'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer',
-              m.colorClass
-            )}
-          >
-            <Icon className="h-4 w-4" />
-            <span className="font-bold">{m.count}</span>
-            <span>{m.label}</span>
-          </button>
-        );
-      })}
-    </div>
+    <>
+      <div className="flex flex-wrap gap-2">
+        {metrics.map((m) => {
+          const Icon = m.icon;
+          return (
+            <button
+              key={m.key}
+              onClick={() => handleClick(m)}
+              className={cn(
+                'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer',
+                m.colorClass
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              <span className="font-bold">{m.count}</span>
+              <span>{m.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <BriefingLoadsDialog
+        type={activeDialog ?? 'pickup-today'}
+        open={activeDialog !== null}
+        onOpenChange={(open) => { if (!open) setActiveDialog(null); }}
+      />
+    </>
   );
 }
