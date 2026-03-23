@@ -121,7 +121,7 @@ export function MorningBriefingWidget() {
           count: loadsToday.count ?? 0,
           icon: Truck,
           colorClass: 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20',
-          route: '/loads?status=assigned',
+          route: '/fleet-loads',
         });
       }
 
@@ -154,7 +154,7 @@ export function MorningBriefingWidget() {
           count: missingPodCount,
           icon: FileWarning,
           colorClass: 'bg-accent/50 text-accent-foreground border-accent hover:bg-accent/70',
-          route: '/loads?status=delivered',
+          route: '/fleet-loads',
         });
       }
 
