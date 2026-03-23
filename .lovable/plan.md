@@ -1,18 +1,32 @@
 
 
-## Fix: POD Documents Not Visible + Morning Briefing Query Mismatch
+## Plan: Add Detail Dialogs for Morning Briefing Alerts
 
-### Problem 1: POD documents inserted without `org_id`
-The `ProofOfDeliveryDialog` inserts into the `documents` table without `org_id`. RLS requires `org_id` to match the user's org, so these rows are invisible to all queries. The `useDocumentUpload` hook correctly includes `org_id` but the POD dialog does its own manual insert.
-
-### Problem 2: Morning Briefing checks wrong `document_type`
-The MorningBriefingWidget queries for `document_type = 'pod'` but POD documents are stored as `'pod_signature'` and `'transflo_pod'`.
+### Problem
+Clicking "Loads Picking Up Today" or "Delivered Loads Missing PODs" just navigates to `/fleet-loads`, forcing the user to manually find the relevant loads. The user wants clicking these badges to open a focused popup showing exactly which loads are affected.
 
 ### Solution
+Replace the `navigate()` behavior for these two badges with dialogs that display the specific loads.
 
-| File | Change |
+### Changes
+
+**1. Refactor `MorningBriefingWidget.tsx`**
+- Change the `BriefingMetric` type: replace `route: string` with `action: 'navigate' | 'dialog'` and `dialogType?: string`
+- Add state: `activeDialog: null | 'loads-today' | 'missing-pods'`
+- On click: if `action === 'navigate'`, use `navigate()` as before (for drivers/maintenance). If `action === 'dialog'`, set `activeDialog` to show the relevant dialog.
+
+**2. Create `src/components/executive/BriefingLoadsDialog.tsx`**
+A reusable dialog component that accepts a `type` prop (`'pickup-today' | 'missing-pod'`) and fetches/displays the relevant loads.
+
+- **Pickup Today**: Queries `fleet_loads` where `pickup_date = today` and `status IN ('assigned', 'booked')`. Displays: Load #, Origin → Destination, Driver, Status.
+- **Missing PODs**: Queries `fleet_loads` where `status = 'delivered'` and `pod_required = true`, then cross-references `documents` to exclude loads that already have POD docs. Displays: Load #, Origin → Destination, Delivery Date, Driver.
+
+Both views render in a `Dialog` with a `Table` inside. Each row has a "View" button that navigates to `/fleet-loads` (future: could scroll to that load).
+
+### Files
+
+| File | Action |
 |------|--------|
-| `src/components/driver/ProofOfDeliveryDialog.tsx` | Add `org_id: profile?.org_id` to the document insert objects (lines 72-79 and 84-91). Move the profile fetch earlier so it's available for both inserts. |
-| `src/components/executive/MorningBriefingWidget.tsx` | Line 91: change `.eq('document_type', 'pod')` to `.in('document_type', ['pod_signature', 'transflo_pod'])` |
-| Migration SQL | Backfill existing POD documents missing `org_id`: `UPDATE documents SET org_id = fl.org_id FROM fleet_loads fl WHERE fl.id = documents.related_id AND documents.related_type = 'load' AND documents.org_id IS NULL AND documents.document_type IN ('pod_signature', 'transflo_pod');` |
+| `src/components/executive/BriefingLoadsDialog.tsx` | Create — dialog showing filtered load lists |
+| `src/components/executive/MorningBriefingWidget.tsx` | Edit — open dialog instead of navigating for load-related badges |
 
