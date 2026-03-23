@@ -1,32 +1,42 @@
 
 
-## Plan: Add Detail Dialogs for Morning Briefing Alerts
+## Plan: Store POD Data Directly on Fleet Loads
 
 ### Problem
-Clicking "Loads Picking Up Today" or "Delivered Loads Missing PODs" just navigates to `/fleet-loads`, forcing the user to manually find the relevant loads. The user wants clicking these badges to open a focused popup showing exactly which loads are affected.
+The POD tab queries the `documents` table for signature and Transflo link records, but those records are invisible due to RLS issues (missing `org_id` on insert). Instead of fighting the documents table, we'll store POD data directly on the `fleet_loads` row where it belongs.
 
 ### Solution
-Replace the `navigate()` behavior for these two badges with dialogs that display the specific loads.
+Add two columns to `fleet_loads` — `pod_signature_path` and `pod_transflo_link` — and save them during delivery confirmation. The POD viewer reads from the load itself instead of querying documents.
 
-### Changes
+### Database Migration
+```sql
+ALTER TABLE fleet_loads
+  ADD COLUMN pod_signature_path text,
+  ADD COLUMN pod_transflo_link text;
+```
 
-**1. Refactor `MorningBriefingWidget.tsx`**
-- Change the `BriefingMetric` type: replace `route: string` with `action: 'navigate' | 'dialog'` and `dialogType?: string`
-- Add state: `activeDialog: null | 'loads-today' | 'missing-pods'`
-- On click: if `action === 'navigate'`, use `navigate()` as before (for drivers/maintenance). If `action === 'dialog'`, set `activeDialog` to show the relevant dialog.
+Backfill from existing document records:
+```sql
+UPDATE fleet_loads SET pod_signature_path = d.file_path
+FROM documents d
+WHERE d.related_id = fleet_loads.id AND d.related_type = 'load'
+  AND d.document_type = 'pod_signature'
+  AND fleet_loads.pod_signature_path IS NULL;
 
-**2. Create `src/components/executive/BriefingLoadsDialog.tsx`**
-A reusable dialog component that accepts a `type` prop (`'pickup-today' | 'missing-pod'`) and fetches/displays the relevant loads.
+UPDATE fleet_loads SET pod_transflo_link = d.file_path
+FROM documents d
+WHERE d.related_id = fleet_loads.id AND d.related_type = 'load'
+  AND d.document_type = 'transflo_pod'
+  AND fleet_loads.pod_transflo_link IS NULL;
+```
 
-- **Pickup Today**: Queries `fleet_loads` where `pickup_date = today` and `status IN ('assigned', 'booked')`. Displays: Load #, Origin → Destination, Driver, Status.
-- **Missing PODs**: Queries `fleet_loads` where `status = 'delivered'` and `pod_required = true`, then cross-references `documents` to exclude loads that already have POD docs. Displays: Load #, Origin → Destination, Delivery Date, Driver.
+### File Changes
 
-Both views render in a `Dialog` with a `Table` inside. Each row has a "View" button that navigates to `/fleet-loads` (future: could scroll to that load).
-
-### Files
-
-| File | Action |
+| File | Change |
 |------|--------|
-| `src/components/executive/BriefingLoadsDialog.tsx` | Create — dialog showing filtered load lists |
-| `src/components/executive/MorningBriefingWidget.tsx` | Edit — open dialog instead of navigating for load-related badges |
+| `src/components/driver/ProofOfDeliveryDialog.tsx` | Save `pod_signature_path` and `pod_transflo_link` on the fleet_loads UPDATE (already updating the load to "delivered") |
+| `src/components/loads/PODViewer.tsx` | Accept load data as props instead of querying documents. Show signature via `SignedImage` using `pod_signature_path`, show Transflo link from `pod_transflo_link` |
+| `src/pages/FleetLoads.tsx` | Pass the load's `pod_signature_path` and `pod_transflo_link` to PODViewer |
+| `src/components/executive/MorningBriefingWidget.tsx` | Check `pod_signature_path IS NULL AND pod_transflo_link IS NULL` instead of querying documents table |
+| `src/components/executive/BriefingLoadsDialog.tsx` | Same — filter missing PODs by checking the load columns directly |
 
