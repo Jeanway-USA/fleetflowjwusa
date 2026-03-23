@@ -27,7 +27,7 @@ export function InfrastructureTab() {
         .from('super_admin_infrastructure_stats' as any)
         .select('*');
       if (error) throw error;
-      return (data ?? []) as InfraRow[];
+      return (data ?? []) as unknown as InfraRow[];
     },
   });
 
