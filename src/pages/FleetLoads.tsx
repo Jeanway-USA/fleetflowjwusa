@@ -28,6 +28,7 @@ import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
+import { PODViewer } from '@/components/loads/PODViewer';
 
 // Accessorial types commonly used in trucking
 const ACCESSORIAL_TYPES = [
