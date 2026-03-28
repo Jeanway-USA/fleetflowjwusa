@@ -45,9 +45,21 @@ export function CompleteJobModal({ workOrder, open, onOpenChange }: CompleteJobM
 
       // Upload invoice if provided
       if (invoiceFile) {
+        // Fetch org_id to comply with storage RLS policies
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser) throw new Error('Not authenticated');
+
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('org_id')
+          .eq('user_id', currentUser.id)
+          .single();
+
+        if (profileError || !profile?.org_id) throw new Error('Could not resolve organization');
+
         const fileExt = invoiceFile.name.split('.').pop();
         const fileName = `${workOrder.id}-invoice-${Date.now()}.${fileExt}`;
-        const filePath = `invoices/${fileName}`;
+        const filePath = `${profile.org_id}/invoices/${fileName}`;
         
         const { error: uploadError } = await supabase.storage
           .from('documents')
@@ -55,7 +67,6 @@ export function CompleteJobModal({ workOrder, open, onOpenChange }: CompleteJobM
 
         if (uploadError) throw uploadError;
 
-        // Store the path (not public URL) for private bucket
         invoiceUrl = filePath;
       }
 
