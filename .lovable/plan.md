@@ -1,42 +1,24 @@
 
 
-## Plan: Store POD Data Directly on Fleet Loads
+## Fix: Work Order Completion Fails Due to Storage RLS
 
 ### Problem
-The POD tab queries the `documents` table for signature and Transflo link records, but those records are invisible due to RLS issues (missing `org_id` on insert). Instead of fighting the documents table, we'll store POD data directly on the `fleet_loads` row where it belongs.
+The `CompleteJobModal` uploads invoice files to `invoices/${fileName}` in the `documents` storage bucket. But the storage RLS policy requires the first folder segment to be the user's `org_id` (e.g., `${org_id}/invoices/${fileName}`). This causes a "new row violates row-level security policy" error.
 
 ### Solution
-Add two columns to `fleet_loads` — `pod_signature_path` and `pod_transflo_link` — and save them during delivery confirmation. The POD viewer reads from the load itself instead of querying documents.
+Update the upload path in `CompleteJobModal.tsx` to prefix with the user's org_id.
 
-### Database Migration
-```sql
-ALTER TABLE fleet_loads
-  ADD COLUMN pod_signature_path text,
-  ADD COLUMN pod_transflo_link text;
-```
-
-Backfill from existing document records:
-```sql
-UPDATE fleet_loads SET pod_signature_path = d.file_path
-FROM documents d
-WHERE d.related_id = fleet_loads.id AND d.related_type = 'load'
-  AND d.document_type = 'pod_signature'
-  AND fleet_loads.pod_signature_path IS NULL;
-
-UPDATE fleet_loads SET pod_transflo_link = d.file_path
-FROM documents d
-WHERE d.related_id = fleet_loads.id AND d.related_type = 'load'
-  AND d.document_type = 'transflo_pod'
-  AND fleet_loads.pod_transflo_link IS NULL;
-```
-
-### File Changes
+### Changes
 
 | File | Change |
 |------|--------|
-| `src/components/driver/ProofOfDeliveryDialog.tsx` | Save `pod_signature_path` and `pod_transflo_link` on the fleet_loads UPDATE (already updating the load to "delivered") |
-| `src/components/loads/PODViewer.tsx` | Accept load data as props instead of querying documents. Show signature via `SignedImage` using `pod_signature_path`, show Transflo link from `pod_transflo_link` |
-| `src/pages/FleetLoads.tsx` | Pass the load's `pod_signature_path` and `pod_transflo_link` to PODViewer |
-| `src/components/executive/MorningBriefingWidget.tsx` | Check `pod_signature_path IS NULL AND pod_transflo_link IS NULL` instead of querying documents table |
-| `src/components/executive/BriefingLoadsDialog.tsx` | Same — filter missing PODs by checking the load columns directly |
+| `src/components/maintenance/CompleteJobModal.tsx` | Fetch the user's profile to get `org_id`, then change the upload path from `invoices/${fileName}` to `${org_id}/invoices/${fileName}` |
+
+### Detail
+In `CompleteJobModal.tsx`, before the upload:
+1. Get the current user's session via `supabase.auth.getUser()`
+2. Fetch their `org_id` from `profiles`
+3. Use `${orgId}/invoices/${fileName}` as the storage path
+
+This matches the existing pattern used in other upload components (e.g., `ProofOfDeliveryDialog`, `useDocumentUpload`).
 
