@@ -21,7 +21,7 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
   const { data: driverSettings } = useQuery({
     queryKey: ['driver-settings', driverId],
     queryFn: async () => {
-      const { data, error } = await (supabase.from('driver_settings' as any) as any)
+      const { data, error } = await (supabase.from('driver_settings_safe' as any) as any)
         .select('weekly_miles_goal, weekly_revenue_goal, pay_week_start_day')
         .eq('driver_id', driverId)
         .maybeSingle();

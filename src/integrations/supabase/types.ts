@@ -4091,6 +4091,8 @@ export type Database = {
           driver_id: string | null
           id: string | null
           landstar_username: string | null
+          org_id: string | null
+          pay_week_start_day: number | null
           theme_preference: string | null
           updated_at: string | null
           weekly_miles_goal: number | null
@@ -4101,6 +4103,8 @@ export type Database = {
           driver_id?: string | null
           id?: string | null
           landstar_username?: string | null
+          org_id?: string | null
+          pay_week_start_day?: number | null
           theme_preference?: string | null
           updated_at?: string | null
           weekly_miles_goal?: number | null
@@ -4111,6 +4115,8 @@ export type Database = {
           driver_id?: string | null
           id?: string | null
           landstar_username?: string | null
+          org_id?: string | null
+          pay_week_start_day?: number | null
           theme_preference?: string | null
           updated_at?: string | null
           weekly_miles_goal?: number | null
@@ -4129,6 +4135,27 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: true
             referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "driver_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
