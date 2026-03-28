@@ -56,7 +56,7 @@ export default function DriverSettings() {
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ['driver-settings', driver?.id],
     queryFn: async () => {
-      const { data, error } = await (supabase.from('driver_settings' as any) as any)
+      const { data, error } = await (supabase.from('driver_settings_safe' as any) as any)
         .select('weekly_miles_goal, weekly_revenue_goal, pay_week_start_day')
         .eq('driver_id', driver?.id)
         .maybeSingle();
@@ -100,7 +100,7 @@ export default function DriverSettings() {
     mutationFn: async (data: { weekly_miles_goal: number; weekly_revenue_goal: number; pay_week_start_day: number }) => {
       if (!driver?.id) throw new Error('Driver not found');
 
-      const { data: existing } = await (supabase.from('driver_settings' as any) as any)
+      const { data: existing } = await (supabase.from('driver_settings_safe' as any) as any)
         .select('id')
         .eq('driver_id', driver.id)
         .maybeSingle();
