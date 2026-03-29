@@ -44,14 +44,18 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 export default function CRM() {
-  const { hasRole, isOwner } = useAuth();
   const { isIndependent } = useOrganizationMode();
-  const canEdit = isOwner || hasRole('dispatcher');
 
-  // If independent mode, show broker database
   if (isIndependent) {
     return <BrokerDatabase />;
   }
+
+  return <AgentCRM />;
+}
+
+function AgentCRM() {
+  const { hasRole, isOwner } = useAuth();
+  const canEdit = isOwner || hasRole('dispatcher');
 
   const [typeFilter, setTypeFilter] = useState('all');
   const [search, setSearch] = useState('');
