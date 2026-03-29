@@ -30,6 +30,7 @@ import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 import { PODViewer } from '@/components/loads/PODViewer';
+import { BrokerRateHistoryCard } from '@/components/loads/BrokerRateHistoryCard';
 
 // Accessorial types commonly used in trucking
 const ACCESSORIAL_TYPES = [
