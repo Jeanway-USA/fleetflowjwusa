@@ -1,0 +1,1 @@
+ALTER TABLE fleet_loads ADD COLUMN invoice_email text DEFAULT NULL;
