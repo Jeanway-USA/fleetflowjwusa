@@ -1628,6 +1628,8 @@ export type Database = {
           driver_id: string | null
           empty_miles: number | null
           end_miles: number | null
+          factoring_status: string | null
+          factoring_submission_id: string | null
           fuel_advance: number | null
           fuel_surcharge: number | null
           gross_revenue: number | null
@@ -1677,6 +1679,8 @@ export type Database = {
           driver_id?: string | null
           empty_miles?: number | null
           end_miles?: number | null
+          factoring_status?: string | null
+          factoring_submission_id?: string | null
           fuel_advance?: number | null
           fuel_surcharge?: number | null
           gross_revenue?: number | null
@@ -1726,6 +1730,8 @@ export type Database = {
           driver_id?: string | null
           empty_miles?: number | null
           end_miles?: number | null
+          factoring_status?: string | null
+          factoring_submission_id?: string | null
           fuel_advance?: number | null
           fuel_surcharge?: number | null
           gross_revenue?: number | null
@@ -3064,6 +3070,10 @@ export type Database = {
           complimentary_ends_at: string | null
           created_at: string
           dot_number: string | null
+          factoring_enabled: boolean | null
+          factoring_fee_percentage: number | null
+          factoring_provider_name: string | null
+          factoring_remit_address: string | null
           id: string
           is_active: boolean
           is_complimentary: boolean
@@ -3086,6 +3096,10 @@ export type Database = {
           complimentary_ends_at?: string | null
           created_at?: string
           dot_number?: string | null
+          factoring_enabled?: boolean | null
+          factoring_fee_percentage?: number | null
+          factoring_provider_name?: string | null
+          factoring_remit_address?: string | null
           id?: string
           is_active?: boolean
           is_complimentary?: boolean
@@ -3108,6 +3122,10 @@ export type Database = {
           complimentary_ends_at?: string | null
           created_at?: string
           dot_number?: string | null
+          factoring_enabled?: boolean | null
+          factoring_fee_percentage?: number | null
+          factoring_provider_name?: string | null
+          factoring_remit_address?: string | null
           id?: string
           is_active?: boolean
           is_complimentary?: boolean
@@ -4310,10 +4328,13 @@ export type Database = {
       }
       super_admin_organizations: {
         Row: {
+          applied_promo_code_id: string | null
           banner_url: string | null
           complimentary_ends_at: string | null
           created_at: string | null
           dot_number: string | null
+          factoring_enabled: boolean | null
+          factoring_provider_name: string | null
           id: string | null
           is_active: boolean | null
           is_complimentary: boolean | null
@@ -4321,16 +4342,24 @@ export type Database = {
           mc_number: string | null
           name: string | null
           primary_color: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_period_end: string | null
+          subscription_status: string | null
           subscription_tier: string | null
           tms_mode: string | null
           trial_ends_at: string | null
+          updated_at: string | null
           user_count: number | null
         }
         Insert: {
+          applied_promo_code_id?: string | null
           banner_url?: string | null
           complimentary_ends_at?: string | null
           created_at?: string | null
           dot_number?: string | null
+          factoring_enabled?: boolean | null
+          factoring_provider_name?: string | null
           id?: string | null
           is_active?: boolean | null
           is_complimentary?: boolean | null
@@ -4338,16 +4367,24 @@ export type Database = {
           mc_number?: string | null
           name?: string | null
           primary_color?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_period_end?: string | null
+          subscription_status?: string | null
           subscription_tier?: string | null
           tms_mode?: string | null
           trial_ends_at?: string | null
+          updated_at?: string | null
           user_count?: never
         }
         Update: {
+          applied_promo_code_id?: string | null
           banner_url?: string | null
           complimentary_ends_at?: string | null
           created_at?: string | null
           dot_number?: string | null
+          factoring_enabled?: boolean | null
+          factoring_provider_name?: string | null
           id?: string | null
           is_active?: boolean | null
           is_complimentary?: boolean | null
@@ -4355,12 +4392,25 @@ export type Database = {
           mc_number?: string | null
           name?: string | null
           primary_color?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_period_end?: string | null
+          subscription_status?: string | null
           subscription_tier?: string | null
           tms_mode?: string | null
           trial_ends_at?: string | null
+          updated_at?: string | null
           user_count?: never
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "organizations_applied_promo_code_id_fkey"
+            columns: ["applied_promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       super_admin_usage_metrics: {
         Row: {
