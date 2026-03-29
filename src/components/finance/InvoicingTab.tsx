@@ -8,16 +8,20 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { FileText, Download, Loader2, Receipt } from 'lucide-react';
+import { Eye, Pencil, Loader2, Receipt, FileText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { formatCurrency } from '@/lib/formatters';
+import { InvoicePreviewDialog } from './InvoicePreviewDialog';
 
 export function InvoicingTab() {
   const { orgId } = useAuth();
   const queryClient = useQueryClient();
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [previewLoad, setPreviewLoad] = useState<any>(null);
+  const [previewMode, setPreviewMode] = useState<'preview' | 'edit'>('preview');
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const { data: loads = [], isLoading } = useQuery({
+  const { data: loads = [] } = useQuery({
     queryKey: ['invoiceable-loads', orgId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -39,11 +43,7 @@ export function InvoicingTab() {
       setGeneratingId(loadId);
       const load = loads.find(l => l.id === loadId);
       if (!load) throw new Error('Load not found');
-
-      // Generate invoice number
       const invoiceNumber = `INV-${format(new Date(), 'yyyyMMdd')}-${loadId.slice(0, 6).toUpperCase()}`;
-
-      // Update the load with invoice data
       const { error } = await supabase
         .from('fleet_loads')
         .update({
@@ -52,7 +52,6 @@ export function InvoicingTab() {
           invoiced_at: new Date().toISOString(),
         } as any)
         .eq('id', loadId);
-
       if (error) throw error;
       return invoiceNumber;
     },
@@ -60,6 +59,7 @@ export function InvoicingTab() {
       queryClient.invalidateQueries({ queryKey: ['invoiceable-loads'] });
       toast.success(`Invoice ${invoiceNumber} generated`);
       setGeneratingId(null);
+      setDialogOpen(false);
     },
     onError: (e: any) => {
       toast.error(e.message || 'Failed to generate invoice');
@@ -67,19 +67,57 @@ export function InvoicingTab() {
     },
   });
 
-  const getLineItems = (load: any) => {
-    const items: { label: string; amount: number }[] = [];
-    if (load.rate) items.push({ label: 'Linehaul Rate', amount: load.rate });
-    if (load.fuel_surcharge) items.push({ label: 'Fuel Surcharge', amount: load.fuel_surcharge });
-    if (load.accessorials) items.push({ label: 'Accessorials', amount: load.accessorials });
-    if (load.detention_pay) items.push({ label: 'Detention', amount: load.detention_pay });
-    if (load.lumper) items.push({ label: 'Lumper', amount: load.lumper });
-    return items;
+  const updateInvoice = useMutation({
+    mutationFn: async ({ loadId, amounts }: { loadId: string; amounts: Record<string, number> }) => {
+      setGeneratingId(loadId);
+      const { error } = await supabase
+        .from('fleet_loads')
+        .update({
+          rate: amounts.rate,
+          fuel_surcharge: amounts.fuel_surcharge,
+          accessorials: amounts.accessorials,
+          detention_pay: amounts.detention_pay,
+          lumper: amounts.lumper,
+          invoiced_at: new Date().toISOString(),
+        })
+        .eq('id', loadId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoiceable-loads'] });
+      toast.success('Invoice updated & resent');
+      setGeneratingId(null);
+      setDialogOpen(false);
+    },
+    onError: (e: any) => {
+      toast.error(e.message || 'Failed to update invoice');
+      setGeneratingId(null);
+    },
+  });
+
+  const openPreview = (load: any) => {
+    setPreviewLoad(load);
+    setPreviewMode('preview');
+    setDialogOpen(true);
   };
 
-  const getTotal = (load: any) => {
-    return (load.rate || 0) + (load.fuel_surcharge || 0) + (load.accessorials || 0) + (load.detention_pay || 0) + (load.lumper || 0);
+  const openEdit = (load: any) => {
+    setPreviewLoad(load);
+    setPreviewMode('edit');
+    setDialogOpen(true);
   };
+
+  const handleDialogConfirm = (updatedAmounts?: Record<string, number>) => {
+    if (!previewLoad) return;
+    if (previewMode === 'edit' && updatedAmounts) {
+      updateInvoice.mutate({ loadId: previewLoad.id, amounts: updatedAmounts });
+    } else {
+      generateInvoice.mutate(previewLoad.id);
+    }
+  };
+
+  const getTotal = (load: any) =>
+    (load.rate || 0) + (load.fuel_surcharge || 0) + (load.accessorials || 0) + (load.detention_pay || 0) + (load.lumper || 0);
 
   return (
     <div className="space-y-6">
@@ -141,50 +179,26 @@ export function InvoicingTab() {
                       <TableHead className="hidden md:table-cell">Route</TableHead>
                       <TableHead className="hidden md:table-cell">Delivered</TableHead>
                       <TableHead>Total</TableHead>
-                      <TableHead className="hidden md:table-cell">Line Items</TableHead>
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {uninvoicedLoads.map((load) => {
-                      const items = getLineItems(load);
-                      const total = getTotal(load);
-                      return (
-                        <TableRow key={load.id}>
-                          <TableCell className="font-medium">{load.landstar_load_id || load.id.slice(0, 8)}</TableCell>
-                          <TableCell className="hidden md:table-cell text-sm">
-                            {load.origin} → {load.destination}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell text-sm">
-                            {load.delivery_date ? format(parseISO(load.delivery_date), 'MMM d, yyyy') : '—'}
-                          </TableCell>
-                          <TableCell className="font-semibold">{formatCurrency(total)}</TableCell>
-                          <TableCell className="hidden md:table-cell">
-                            <div className="flex flex-wrap gap-1">
-                              {items.map((item, i) => (
-                                <Badge key={i} variant="outline" className="text-[10px]">
-                                  {item.label}: {formatCurrency(item.amount)}
-                                </Badge>
-                              ))}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              onClick={() => generateInvoice.mutate(load.id)}
-                              disabled={generatingId === load.id}
-                            >
-                              {generatingId === load.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                              ) : (
-                                <FileText className="h-4 w-4 mr-1" />
-                              )}
-                              Generate Invoice
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {uninvoicedLoads.map((load) => (
+                      <TableRow key={load.id}>
+                        <TableCell className="font-medium">{load.landstar_load_id || load.id.slice(0, 8)}</TableCell>
+                        <TableCell className="hidden md:table-cell text-sm">{load.origin} → {load.destination}</TableCell>
+                        <TableCell className="hidden md:table-cell text-sm">
+                          {load.delivery_date ? format(parseISO(load.delivery_date), 'MMM d, yyyy') : '—'}
+                        </TableCell>
+                        <TableCell className="font-semibold">{formatCurrency(getTotal(load))}</TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" onClick={() => openPreview(load)}>
+                            <Eye className="h-4 w-4 mr-1" />
+                            Preview Invoice
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               )}
@@ -210,6 +224,7 @@ export function InvoicingTab() {
                       <TableHead>Amount</TableHead>
                       <TableHead className="hidden md:table-cell">Invoiced On</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -217,15 +232,19 @@ export function InvoicingTab() {
                       <TableRow key={load.id}>
                         <TableCell className="font-mono text-sm">{load.invoice_number || '—'}</TableCell>
                         <TableCell>{load.landstar_load_id || load.id.slice(0, 8)}</TableCell>
-                        <TableCell className="hidden md:table-cell text-sm">
-                          {load.origin} → {load.destination}
-                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-sm">{load.origin} → {load.destination}</TableCell>
                         <TableCell className="font-semibold">{formatCurrency(getTotal(load))}</TableCell>
                         <TableCell className="hidden md:table-cell text-sm">
                           {load.invoiced_at ? format(parseISO(load.invoiced_at), 'MMM d, yyyy') : '—'}
                         </TableCell>
                         <TableCell>
                           <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Invoiced</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" variant="outline" onClick={() => openEdit(load)}>
+                            <Pencil className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -236,6 +255,15 @@ export function InvoicingTab() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <InvoicePreviewDialog
+        load={previewLoad}
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        mode={previewMode}
+        onConfirm={handleDialogConfirm}
+        confirming={!!generatingId}
+      />
     </div>
   );
 }
