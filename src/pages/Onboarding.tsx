@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import textLogo from '@/assets/Text_Logo.png';
+import logoIcon from '@/assets/Logo.png';
 
 const TRAILER_TYPES = ['Dry Van', 'Reefer', 'Flatbed', 'Step Deck', 'Lowboy', 'Tanker', 'Hopper', 'Other'];
 const INVITE_ROLES = [

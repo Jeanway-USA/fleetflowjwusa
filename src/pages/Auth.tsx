@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Sparkles, Truck, MessageSquare, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
 import textLogo from '@/assets/Text_Logo.png';
+import logoIcon from '@/assets/Logo.png';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string()

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogOut, Clock } from 'lucide-react';
 import textLogo from '@/assets/Text_Logo.png';
+import logoIcon from '@/assets/Logo.png';
 
 
 export default function PendingAccess() {

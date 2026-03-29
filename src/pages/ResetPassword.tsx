@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Loader2, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
 import textLogo from '@/assets/Text_Logo.png';
+import logoIcon from '@/assets/Logo.png';
 
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 

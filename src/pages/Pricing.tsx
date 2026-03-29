@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import textLogo from '@/assets/Text_Logo.png';
+import logoIcon from '@/assets/Logo.png';
 
 interface TierMeta {
   id: string;
