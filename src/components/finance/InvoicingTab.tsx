@@ -51,6 +51,7 @@ export function InvoicingTab() {
           invoice_status: 'invoiced',
           invoice_number: invoiceNumber,
           invoiced_at: new Date().toISOString(),
+          invoice_email: overrideEmail || null,
         } as any)
         .eq('id', loadId);
       if (error) throw error;
@@ -93,7 +94,8 @@ export function InvoicingTab() {
           detention_pay: amounts.detention_pay,
           lumper: amounts.lumper,
           invoiced_at: new Date().toISOString(),
-        })
+          invoice_email: overrideEmail || null,
+        } as any)
         .eq('id', loadId);
       if (error) throw error;
     },
