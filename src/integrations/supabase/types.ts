@@ -4471,30 +4471,18 @@ export type Database = {
       }
       super_admin_reset_demo: { Args: never; Returns: undefined }
       super_admin_resume_beta: { Args: never; Returns: number }
-      super_admin_update_org:
-        | {
-            Args: {
-              new_complimentary_ends_at?: string
-              new_is_active?: boolean
-              new_is_complimentary?: boolean
-              new_subscription_tier?: string
-              new_trial_ends_at?: string
-              target_org_id: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              new_complimentary_ends_at?: string
-              new_is_active?: boolean
-              new_is_complimentary?: boolean
-              new_subscription_tier?: string
-              new_tms_mode?: string
-              new_trial_ends_at?: string
-              target_org_id: string
-            }
-            Returns: undefined
-          }
+      super_admin_update_org: {
+        Args: {
+          new_complimentary_ends_at?: string
+          new_is_active?: boolean
+          new_is_complimentary?: boolean
+          new_subscription_tier?: string
+          new_tms_mode?: string
+          new_trial_ends_at?: string
+          target_org_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "owner" | "payroll_admin" | "dispatcher" | "safety" | "driver"

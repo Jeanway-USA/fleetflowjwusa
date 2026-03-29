@@ -1,0 +1,1 @@
+DROP FUNCTION public.super_admin_update_org(uuid, text, boolean, timestamptz, boolean, timestamptz);
