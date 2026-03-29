@@ -969,6 +969,12 @@ export default function Finance() {
           </TabsContent>
         )}
 
+        {isIndependent && (
+          <TabsContent value="factoring" className="mt-6">
+            <FactoringTab />
+          </TabsContent>
+        )}
+
         <TabsContent value="settings" className="mt-6">
           <CompensationSettingsTab getSetting={getSetting} />
         </TabsContent>
