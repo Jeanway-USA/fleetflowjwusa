@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { Building2, Calendar, Users, Palette, CheckCircle, XCircle } from 'lucide-react';
+import { Building2, Calendar, Users, Palette, CheckCircle, XCircle, Truck, FileText } from 'lucide-react';
 
 const TIER_LABELS: Record<string, string> = {
   solo_bco: 'Solo BCO',
@@ -26,14 +26,16 @@ interface OrgDetailSheetProps {
 export function OrgDetailSheet({ org, open, onOpenChange }: OrgDetailSheetProps) {
   const queryClient = useQueryClient();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [selectedTmsMode, setSelectedTmsMode] = useState<string | null>(null);
 
   const updateOrg = useMutation({
-    mutationFn: async ({ newTier, newIsActive, newTrialEndsAt }: { newTier?: string; newIsActive?: boolean; newTrialEndsAt?: string }) => {
+    mutationFn: async ({ newTier, newIsActive, newTrialEndsAt, newTmsMode }: { newTier?: string; newIsActive?: boolean; newTrialEndsAt?: string; newTmsMode?: string }) => {
       const { error } = await supabase.rpc('super_admin_update_org' as any, {
         target_org_id: org.id,
         new_subscription_tier: newTier ?? null,
         new_is_active: newIsActive ?? null,
         new_trial_ends_at: newTrialEndsAt ?? null,
+        new_tms_mode: newTmsMode ?? null,
       });
       if (error) throw error;
     },
