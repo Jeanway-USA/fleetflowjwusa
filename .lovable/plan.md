@@ -1,69 +1,99 @@
 
 
-## Plan: Add TMS Mode (Landstar BCO vs Independent) to Organization Setup
+## Plan: Independent Mode Features — Broker CRM, Invoicing, Super Admin Override
 
 ### Overview
-Add a `tms_mode` column to organizations and wire it through onboarding, sidebar navigation, settings, and a reusable hook.
+This plan adds four capabilities: (1) Super Admin can view/override org TMS mode, (2) Broker Database for independent mode, (3) Invoice generator on Finance page, (4) dynamic CRM sidebar label.
 
 ---
 
 ### 1. Database Migration
 
-**Add column + backfill:**
+**A. Update `super_admin_organizations` view** to include `tms_mode`, `dot_number`, `mc_number`:
 ```sql
-ALTER TABLE organizations ADD COLUMN tms_mode text NOT NULL DEFAULT 'landstar';
+DROP VIEW IF EXISTS public.super_admin_organizations;
+CREATE VIEW public.super_admin_organizations WITH (security_invoker = false) AS
+SELECT id, name, subscription_tier, created_at, trial_ends_at, is_active,
+       primary_color, logo_url, banner_url, is_complimentary, complimentary_ends_at,
+       tms_mode, dot_number, mc_number,
+       (SELECT count(*)::integer FROM profiles p WHERE p.org_id = o.id) AS user_count
+FROM organizations o
+WHERE is_super_admin();
 ```
-All existing orgs already get `'landstar'` via the default.
 
-**Update `create_onboarding_org` RPC** to accept an optional `_tms_mode` parameter and set it on the new org row.
+**B. Update `super_admin_update_org` RPC** to accept `new_tms_mode text DEFAULT NULL` and apply it:
+```sql
+tms_mode = COALESCE(new_tms_mode, tms_mode),
+```
 
----
-
-### 2. Onboarding UI (`src/pages/Onboarding.tsx`)
-
-- Add `tmsMode` state (`'landstar' | 'independent'`), defaulting to `'landstar'`.
-- At the top of Step 1, render two selectable cards: "I am a Landstar BCO" and "I have my own DOT/MC Authority".
-- Conditionally show/hide DOT and MC fields based on selection:
-  - Landstar: hide DOT/MC fields entirely.
-  - Independent: show DOT/MC fields, make them required (block Continue if empty).
-- Pass `_tms_mode` to the `create_onboarding_org` RPC call (requires updating the RPC to accept it).
-
----
-
-### 3. `useOrganizationMode` Hook (`src/hooks/useOrganizationMode.ts`)
-
-- New hook that queries `organizations.tms_mode` for the current user's org (using `orgId` from `useAuth()`).
-- Returns `{ tmsMode: 'landstar' | 'independent', isLoading }`.
-- Uses `react-query` with key `['org-tms-mode', orgId]`.
+**C. Add `invoice_status` column** to `fleet_loads`:
+```sql
+ALTER TABLE fleet_loads ADD COLUMN invoice_status text DEFAULT NULL;
+ALTER TABLE fleet_loads ADD COLUMN invoice_url text DEFAULT NULL;
+ALTER TABLE fleet_loads ADD COLUMN invoice_number text DEFAULT NULL;
+ALTER TABLE fleet_loads ADD COLUMN invoiced_at timestamptz DEFAULT NULL;
+```
 
 ---
 
-### 4. Sidebar Navigation (`src/components/layout/AppSidebar.tsx`)
+### 2. Super Admin — `OrgDetailSheet.tsx`
 
+- Add "Business Configuration" section showing TMS Mode badge, DOT Number, MC Number (read from the org data already returned by the view).
+- Add a "Change TMS Mode" dropdown (`landstar` / `independent`) with Save button, calling the updated `super_admin_update_org` RPC with `new_tms_mode`.
+- Add state `selectedTmsMode` similar to existing `selectedTier`.
+
+---
+
+### 3. Broker Database — `src/components/crm/BrokerDatabase.tsx`
+
+- New component for independent-mode CRM.
+- Stores broker data in the existing `crm_contacts` table with `contact_type = 'broker'`.
+- Fields displayed: Company Name (Broker Name), MC#, Credit Score (via `tags`), Average Days to Pay (via `notes` or a parsed field), Contact Info.
+- Add broker-specific form fields: MC Number (stored in `agent_code` field), Credit Score, Avg Days to Pay.
+- Uses existing `useCRMData` hooks filtered to `broker` type.
+
+**CRM page update** (`src/pages/CRM.tsx`):
 - Import `useOrganizationMode`.
-- Add a `tmsMode` filter to nav items using a new optional `tmsMode` property on `NavItem`:
-  - `'landstar'` — item only shows in Landstar mode.
-  - `'independent'` — item only shows in Independent mode.
-  - `undefined` — always shows.
-- Specific changes:
-  - "CRM" item: always visible (label stays "CRM").
-  - "IFTA Reporting": mark as `tmsMode: 'independent'` (Landstar handles IFTA).
-  - No items are removed from Landstar mode at this stage — existing nav stays. Future iterations can add "Direct Invoices" and "Authority Compliance" pages for independent mode.
+- If `isIndependent`, render `<BrokerDatabase />` as the default view instead of showing agent tabs.
+- If `isLandstar`, keep existing behavior.
 
 ---
 
-### 5. Settings Company Tab (`src/components/settings/CompanyTab.tsx`)
+### 4. Invoice Generator — `src/components/finance/InvoicingTab.tsx`
 
+- New tab component showing delivered loads that haven't been invoiced (`invoice_status IS NULL`).
+- Each row has a "Generate Invoice" button.
+- Invoice generation:
+  - Fetches org branding (name, logo, address from org data).
+  - Maps load data: Rate, Fuel Surcharge, Accessorials, Detention, Lumper.
+  - If `pod_signature_path` exists, fetches signed URL and includes it.
+  - Generates PDF using an edge function (`generate-invoice`) that returns a PDF.
+  - Stores PDF in `{org_id}/invoices/` storage bucket.
+  - Updates load with `invoice_status = 'invoiced'`, `invoice_url`, `invoice_number`, `invoiced_at`.
+- Shows invoiced loads in a separate "Sent" section.
+
+**Finance page update** (`src/pages/Finance.tsx`):
 - Import `useOrganizationMode`.
-- Display current mode as a read-only badge ("Landstar BCO" or "Independent Owner-Operator").
-- If `tmsMode === 'landstar'`: hide DOT/MC fields (Landstar's corporate authority applies).
-- If `tmsMode === 'independent'`: show editable DOT/MC fields (already partially present via the org update flow — need to add them to this tab).
+- Conditionally add "Invoicing" tab when `isIndependent`.
 
 ---
 
-### 6. AuthContext Update (`src/contexts/AuthContext.tsx`)
+### 5. Sidebar CRM Label — `AppSidebar.tsx`
 
-- Fetch `tms_mode` alongside existing org data query and expose it on the context as `tmsMode`. This avoids a separate query in the hook — the hook can just read from AuthContext instead.
+- Update the CRM nav item in `operationsItems`:
+  - Dynamically set `title` and `icon` based on `currentTmsMode`:
+    - Landstar: "Agent CRM", `Contact` icon
+    - Independent: "Broker CRM", `Building2` icon
+
+---
+
+### 6. Edge Function — `supabase/functions/generate-invoice/index.ts`
+
+- Accepts `load_id` in request body.
+- Fetches load data + org branding from DB.
+- Generates a professional invoice PDF (using a library like `jspdf` or server-rendered HTML-to-PDF).
+- Uploads to storage bucket.
+- Returns the file path.
 
 ---
 
@@ -71,10 +101,12 @@ All existing orgs already get `'landstar'` via the default.
 
 | File | Action |
 |------|--------|
-| Migration SQL | Create — add `tms_mode` column, update `create_onboarding_org` RPC |
-| `src/contexts/AuthContext.tsx` | Edit — fetch and expose `tmsMode` |
-| `src/hooks/useOrganizationMode.ts` | Create — convenience hook reading from AuthContext |
-| `src/pages/Onboarding.tsx` | Edit — add mode selector cards, conditional DOT/MC fields |
-| `src/components/layout/AppSidebar.tsx` | Edit — filter nav items by `tmsMode` |
-| `src/components/settings/CompanyTab.tsx` | Edit — show mode badge, conditionally show/hide DOT/MC |
+| Migration SQL | Create — update view, RPC, add invoice columns |
+| `src/components/superadmin/OrgDetailSheet.tsx` | Edit — add business config section + TMS mode override |
+| `src/components/crm/BrokerDatabase.tsx` | Create — broker-focused CRM component |
+| `src/pages/CRM.tsx` | Edit — conditionally show BrokerDatabase for independent mode |
+| `src/components/finance/InvoicingTab.tsx` | Create — invoice generation tab |
+| `src/pages/Finance.tsx` | Edit — add Invoicing tab for independent mode |
+| `src/components/layout/AppSidebar.tsx` | Edit — dynamic CRM label/icon |
+| `supabase/functions/generate-invoice/index.ts` | Create — PDF invoice generator edge function |
 
