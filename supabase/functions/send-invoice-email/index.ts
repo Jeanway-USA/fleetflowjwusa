@@ -280,14 +280,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build line items
-    const lineItems = [
+    // Build line items — fetch itemized accessorials
+    const { data: loadAccessorials } = await supabaseAdmin
+      .from('load_accessorials')
+      .select('accessorial_type, amount, percentage')
+      .eq('load_id', load_id);
+
+    const lineItems: { label: string; amount: number }[] = [
       { label: 'Linehaul Rate', amount: load.rate || 0 },
       { label: 'Fuel Surcharge', amount: load.fuel_surcharge || 0 },
-      { label: 'Accessorials', amount: load.accessorials || 0 },
-      { label: 'Detention', amount: load.detention_pay || 0 },
-      { label: 'Lumper', amount: load.lumper || 0 },
     ];
+
+    if (loadAccessorials && loadAccessorials.length > 0) {
+      // Use itemized accessorials
+      for (const acc of loadAccessorials) {
+        const net = (acc.amount || 0) * ((acc.percentage || 100) / 100);
+        if (net > 0) {
+          lineItems.push({ label: acc.accessorial_type, amount: net });
+        }
+      }
+    } else {
+      // Fallback to legacy flat fields
+      if (load.accessorials) lineItems.push({ label: 'Accessorials', amount: load.accessorials });
+      if (load.detention_pay) lineItems.push({ label: 'Detention', amount: load.detention_pay });
+      if (load.lumper) lineItems.push({ label: 'Lumper', amount: load.lumper });
+    }
 
     const total = lineItems.reduce((sum, item) => sum + item.amount, 0);
 

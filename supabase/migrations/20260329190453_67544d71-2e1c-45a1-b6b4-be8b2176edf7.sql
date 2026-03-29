@@ -1,0 +1,1 @@
+ALTER TABLE fleet_loads ADD COLUMN IF NOT EXISTS negotiation_notes text DEFAULT NULL;

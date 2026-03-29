@@ -9,12 +9,6 @@ import { formatCurrency, formatNoticeOfAssignment } from '@/lib/formatters';
 import { format, parseISO } from 'date-fns';
 import { Printer, FileText, Loader2, Save, Mail } from 'lucide-react';
 
-interface LineItem {
-  key: string;
-  label: string;
-  amount: number;
-}
-
 interface InvoicePreviewDialogProps {
   load: any;
   open: boolean;
@@ -24,12 +18,10 @@ interface InvoicePreviewDialogProps {
   confirming?: boolean;
 }
 
-const LINE_ITEM_KEYS: { key: string; label: string; field: string }[] = [
+// Base line items (always shown)
+const BASE_LINE_ITEMS: { key: string; label: string; field: string }[] = [
   { key: 'rate', label: 'Linehaul Rate', field: 'rate' },
   { key: 'fuel_surcharge', label: 'Fuel Surcharge', field: 'fuel_surcharge' },
-  { key: 'accessorials', label: 'Accessorials', field: 'accessorials' },
-  { key: 'detention_pay', label: 'Detention', field: 'detention_pay' },
-  { key: 'lumper', label: 'Lumper', field: 'lumper' },
 ];
 
 export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, confirming }: InvoicePreviewDialogProps) {
@@ -41,15 +33,40 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
   const [brokerEmail, setBrokerEmail] = useState<string>('');
   const [emailOverride, setEmailOverride] = useState<string>('');
   const [factoringNotice, setFactoringNotice] = useState<string | null>(null);
+  const [itemizedAccessorials, setItemizedAccessorials] = useState<{ type: string; amount: number }[]>([]);
 
   useEffect(() => {
     if (load && open) {
+      // Set base amounts
       const initial: Record<string, number> = {};
-      LINE_ITEM_KEYS.forEach(({ key, field }) => {
+      BASE_LINE_ITEMS.forEach(({ key, field }) => {
         initial[key] = load[field] || 0;
       });
       setAmounts(initial);
       setEmailOverride(load.invoice_email || '');
+
+      // Fetch itemized accessorials from load_accessorials table
+      supabase
+        .from('load_accessorials')
+        .select('accessorial_type, amount, percentage')
+        .eq('load_id', load.id)
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setItemizedAccessorials(
+              data.map((a: any) => ({
+                type: a.accessorial_type,
+                amount: (a.amount || 0) * ((a.percentage || 100) / 100),
+              }))
+            );
+          } else {
+            // Fallback: show legacy fields if no itemized records
+            const legacy: { type: string; amount: number }[] = [];
+            if (load.detention_pay) legacy.push({ type: 'Detention', amount: load.detention_pay });
+            if (load.lumper) legacy.push({ type: 'Lumper', amount: load.lumper });
+            if (load.accessorials) legacy.push({ type: 'Accessorials', amount: load.accessorials });
+            setItemizedAccessorials(legacy);
+          }
+        });
 
       // Look up broker/agent from CRM
       if (load.agency_code) {
@@ -72,7 +89,7 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
         setBrokerEmail('');
       }
 
-      // Fetch factoring settings for notice of assignment
+      // Fetch factoring settings
       if (orgId) {
         supabase
           .from('organizations')
@@ -94,7 +111,9 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
 
   if (!load) return null;
 
-  const total = Object.values(amounts).reduce((sum, v) => sum + (v || 0), 0);
+  const baseTotal = Object.values(amounts).reduce((sum, v) => sum + (v || 0), 0);
+  const accessorialsTotal = itemizedAccessorials.reduce((sum, a) => sum + a.amount, 0);
+  const total = baseTotal + accessorialsTotal;
   const invoiceNumber = load.invoice_number || `INV-${format(new Date(), 'yyyyMMdd')}-${load.id.slice(0, 6).toUpperCase()}`;
 
   const handlePrint = () => {
@@ -223,7 +242,8 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
               </tr>
             </thead>
             <tbody>
-              {LINE_ITEM_KEYS.map(({ key, label }) => {
+              {/* Base items (Linehaul, FSC) */}
+              {BASE_LINE_ITEMS.map(({ key, label }) => {
                 const value = amounts[key] || 0;
                 if (mode === 'preview' && value === 0) return null;
                 return (
@@ -245,6 +265,17 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
                   </tr>
                 );
               })}
+              {/* Itemized Accessorials */}
+              {itemizedAccessorials.map((acc, i) => (
+                acc.amount > 0 && (
+                  <tr key={`acc-${i}`} className="border-b border-border/50">
+                    <td className="py-2 text-foreground">{acc.type}</td>
+                    <td className="py-2 text-right">
+                      <span className="font-medium text-foreground">{formatCurrency(acc.amount)}</span>
+                    </td>
+                  </tr>
+                )
+              ))}
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-foreground">
