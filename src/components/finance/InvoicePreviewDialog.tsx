@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/formatters';
 import { format, parseISO } from 'date-fns';
-import { Printer, FileText, Loader2, Save } from 'lucide-react';
+import { Printer, FileText, Loader2, Save, Mail } from 'lucide-react';
 
 interface LineItem {
   key: string;
@@ -19,7 +20,7 @@ interface InvoicePreviewDialogProps {
   open: boolean;
   onClose: () => void;
   mode: 'preview' | 'edit';
-  onConfirm: (updatedAmounts?: Record<string, number>) => void;
+  onConfirm: (updatedAmounts?: Record<string, number>, overrideEmail?: string) => void;
   confirming?: boolean;
 }
 
@@ -36,6 +37,9 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
   const printRef = useRef<HTMLDivElement>(null);
 
   const [amounts, setAmounts] = useState<Record<string, number>>({});
+  const [brokerName, setBrokerName] = useState<string>('');
+  const [brokerEmail, setBrokerEmail] = useState<string>('');
+  const [emailOverride, setEmailOverride] = useState<string>('');
 
   useEffect(() => {
     if (load && open) {
@@ -44,6 +48,28 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
         initial[key] = load[field] || 0;
       });
       setAmounts(initial);
+      setEmailOverride('');
+
+      // Look up broker/agent from CRM
+      if (load.agency_code) {
+        supabase
+          .from('crm_contacts')
+          .select('email, company_name, contact_name')
+          .eq('agent_code', load.agency_code)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data) {
+              setBrokerName(data.contact_name || data.company_name || '');
+              setBrokerEmail(data.email || '');
+            } else {
+              setBrokerName('');
+              setBrokerEmail('');
+            }
+          });
+      } else {
+        setBrokerName('');
+        setBrokerEmail('');
+      }
     }
   }, [load, open]);
 
@@ -79,10 +105,11 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
   };
 
   const handleConfirm = () => {
+    const finalEmail = emailOverride || brokerEmail || '';
     if (mode === 'edit') {
-      onConfirm(amounts);
+      onConfirm(amounts, finalEmail);
     } else {
-      onConfirm();
+      onConfirm(undefined, finalEmail);
     }
   };
 
@@ -134,6 +161,35 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
             <div>
               <p className="text-muted-foreground">Destination</p>
               <p className="font-medium text-foreground">{load.destination}</p>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Bill To */}
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-foreground flex items-center gap-1">
+              <Mail className="h-4 w-4" /> Bill To
+            </p>
+            {brokerName && (
+              <p className="text-sm text-foreground font-medium">{brokerName}</p>
+            )}
+            {brokerEmail ? (
+              <p className="text-sm text-muted-foreground">{brokerEmail}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No broker email found in CRM</p>
+            )}
+            <div className="flex items-center gap-2">
+              <Input
+                type="email"
+                placeholder="Override recipient email"
+                value={emailOverride}
+                onChange={(e) => setEmailOverride(e.target.value)}
+                className="h-8 text-sm max-w-xs"
+              />
+              {emailOverride && (
+                <span className="text-xs text-muted-foreground">Will send to this email instead</span>
+              )}
             </div>
           </div>
 

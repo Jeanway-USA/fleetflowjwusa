@@ -20,6 +20,7 @@ export function InvoicingTab() {
   const [previewLoad, setPreviewLoad] = useState<any>(null);
   const [previewMode, setPreviewMode] = useState<'preview' | 'edit'>('preview');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [overrideEmail, setOverrideEmail] = useState<string>('');
 
   const { data: loads = [] } = useQuery({
     queryKey: ['invoiceable-loads', orgId],
@@ -55,9 +56,22 @@ export function InvoicingTab() {
       if (error) throw error;
       return invoiceNumber;
     },
-    onSuccess: (invoiceNumber) => {
+    onSuccess: async (invoiceNumber, loadId) => {
       queryClient.invalidateQueries({ queryKey: ['invoiceable-loads'] });
       toast.success(`Invoice ${invoiceNumber} generated`);
+      // Send invoice email
+      try {
+        const { data } = await supabase.functions.invoke('send-invoice-email', {
+          body: { load_id: loadId, override_email: overrideEmail || undefined },
+        });
+        if (data?.success) {
+          toast.success(`Invoice emailed to ${data.recipientEmail}`);
+        } else if (data?.error) {
+          toast.warning(data.error);
+        }
+      } catch {
+        toast.warning('Invoice generated but email could not be sent');
+      }
       setGeneratingId(null);
       setDialogOpen(false);
     },
@@ -83,9 +97,22 @@ export function InvoicingTab() {
         .eq('id', loadId);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['invoiceable-loads'] });
-      toast.success('Invoice updated & resent');
+      toast.success('Invoice updated');
+      // Resend invoice email
+      try {
+        const { data } = await supabase.functions.invoke('send-invoice-email', {
+          body: { load_id: variables.loadId, override_email: overrideEmail || undefined },
+        });
+        if (data?.success) {
+          toast.success(`Invoice resent to ${data.recipientEmail}`);
+        } else if (data?.error) {
+          toast.warning(data.error);
+        }
+      } catch {
+        toast.warning('Invoice updated but email could not be sent');
+      }
       setGeneratingId(null);
       setDialogOpen(false);
     },
@@ -107,8 +134,9 @@ export function InvoicingTab() {
     setDialogOpen(true);
   };
 
-  const handleDialogConfirm = (updatedAmounts?: Record<string, number>) => {
+  const handleDialogConfirm = (updatedAmounts?: Record<string, number>, emailOverride?: string) => {
     if (!previewLoad) return;
+    setOverrideEmail(emailOverride || '');
     if (previewMode === 'edit' && updatedAmounts) {
       updateInvoice.mutate({ loadId: previewLoad.id, amounts: updatedAmounts });
     } else {
