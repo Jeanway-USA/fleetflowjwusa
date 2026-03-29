@@ -3064,6 +3064,7 @@ export type Database = {
           subscription_period_end: string | null
           subscription_status: string | null
           subscription_tier: string
+          tms_mode: string
           trial_ends_at: string | null
           updated_at: string
         }
@@ -3085,6 +3086,7 @@ export type Database = {
           subscription_period_end?: string | null
           subscription_status?: string | null
           subscription_tier?: string
+          tms_mode?: string
           trial_ends_at?: string | null
           updated_at?: string
         }
@@ -3106,6 +3108,7 @@ export type Database = {
           subscription_period_end?: string | null
           subscription_status?: string | null
           subscription_tier?: string
+          tms_mode?: string
           trial_ends_at?: string | null
           updated_at?: string
         }
@@ -4363,10 +4366,12 @@ export type Database = {
         }
         Returns: string
       }
-      create_onboarding_org: {
-        Args: { _name: string; _tier?: string }
-        Returns: string
-      }
+      create_onboarding_org:
+        | { Args: { _name: string; _tier?: string }; Returns: string }
+        | {
+            Args: { _name: string; _tier?: string; _tms_mode?: string }
+            Returns: string
+          }
       get_driver_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       has_admin_access: { Args: { _user_id: string }; Returns: boolean }
