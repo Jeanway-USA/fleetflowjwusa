@@ -1,48 +1,45 @@
 
 
-## Plan: Independent Mode Features — Broker CRM, Invoicing, Super Admin Override
+## Plan: Invoice Preview & Edit with Resend
 
 ### Overview
-This plan adds four capabilities: (1) Super Admin can view/override org TMS mode, (2) Broker Database for independent mode, (3) Invoice generator on Finance page, (4) dynamic CRM sidebar label.
+Add an in-app invoice preview dialog (rendered HTML, not PDF) that users can view before generating, and an edit capability on sent invoices that updates the data and resends the invoice email. No edge function needed — the invoice is rendered client-side as a printable HTML view.
 
 ---
 
-### 1. Database Migration ✅
+### 1. New Component: `InvoicePreviewDialog.tsx`
 
-- Updated `super_admin_organizations` view to include `tms_mode`, `dot_number`, `mc_number`
-- Updated `super_admin_update_org` RPC to accept `new_tms_mode` parameter
-- Added `invoice_status`, `invoice_url`, `invoice_number`, `invoiced_at` columns to `fleet_loads`
+Create `src/components/finance/InvoicePreviewDialog.tsx`:
 
-### 2. Super Admin — `OrgDetailSheet.tsx` ✅
+- A `Dialog` that renders a professional invoice using org branding (logo, name, address from AuthContext) and load data (rate, fuel surcharge, accessorials, detention, lumper).
+- Accepts props: `load`, `open`, `onClose`, `mode: 'preview' | 'edit'`, `onConfirm`.
+- In **preview mode** (pre-send): read-only view with "Generate Invoice" button at the bottom.
+- In **edit mode** (post-send): line item amounts become editable `Input` fields. A "Save & Resend" button at the bottom.
+- The invoice layout includes: company logo/name header, invoice number, date, bill-to (broker from CRM or load data), itemized line items table, and total.
+- Includes a "Print / Download PDF" button that triggers `window.print()` on a print-optimized container.
 
-- Added "Business Configuration" section showing TMS Mode badge, DOT/MC numbers
-- Added "Change TMS Mode" dropdown with Save button
+### 2. Update `InvoicingTab.tsx`
 
-### 3. Broker Database — `BrokerDatabase.tsx` ✅
+**Pending tab changes:**
+- Replace the current "Generate Invoice" button with a "Preview Invoice" button.
+- Clicking opens `InvoicePreviewDialog` in `preview` mode.
+- Confirming from the preview dialog triggers the existing `generateInvoice` mutation.
 
-- Created broker CRM component using `crm_contacts` with `contact_type = 'broker'`
-- Fields: Broker Name, MC#, Credit Score, Avg Days to Pay, Contact Info
-- CRM page routes to BrokerDatabase when `isIndependent`
+**Invoiced tab changes:**
+- Add an "Edit" button (Pencil icon) to each invoiced load row.
+- Clicking opens `InvoicePreviewDialog` in `edit` mode, with editable line items.
+- "Save & Resend" updates the load's rate/fuel_surcharge/accessorials/detention_pay/lumper in `fleet_loads`, updates `invoiced_at` to now, and shows a success toast.
 
-### 4. Invoice Generator — `InvoicingTab.tsx` ✅
+### 3. No Database Changes
 
-- Created invoicing tab showing delivered loads ready to invoice
-- Generates invoice numbers and marks loads as invoiced
-- Shows invoiced loads in a separate "Sent" section
-- Tab visible only in independent mode
+The existing `fleet_loads` columns (`invoice_status`, `invoice_number`, `invoiced_at`, `rate`, `fuel_surcharge`, `accessorials`, `detention_pay`, `lumper`) already support everything needed. Editing updates the amounts directly on the load row and refreshes `invoiced_at`.
 
-### 5. Sidebar CRM Label — `AppSidebar.tsx` ✅
+---
 
-- CRM nav item dynamically shows "Agent CRM" (Contact icon) or "Broker CRM" (Building2 icon) based on mode
-
-### Files Changed
+### Files
 
 | File | Action |
 |------|--------|
-| Migration SQL | Created — updated view, RPC, added invoice columns |
-| `src/components/superadmin/OrgDetailSheet.tsx` | Edited — business config + TMS mode override |
-| `src/components/crm/BrokerDatabase.tsx` | Created — broker CRM component |
-| `src/pages/CRM.tsx` | Edited — routes to BrokerDatabase for independent mode |
-| `src/components/finance/InvoicingTab.tsx` | Created — invoice generation tab |
-| `src/pages/Finance.tsx` | Edited — added Invoicing tab for independent mode |
-| `src/components/layout/AppSidebar.tsx` | Edited — dynamic CRM label/icon |
+| `src/components/finance/InvoicePreviewDialog.tsx` | Create — invoice preview/edit dialog with print support |
+| `src/components/finance/InvoicingTab.tsx` | Edit — wire preview button for pending loads, edit button for invoiced loads |
+
