@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Sparkles, Truck, MessageSquare, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
 import textLogo from '@/assets/Text_Logo.png';
+import logoIcon from '@/assets/Logo.png';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string()
@@ -117,7 +118,8 @@ export default function Auth() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <div className="flex justify-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-8">
+            <img src={logoIcon} alt="" className="h-10 w-auto" />
             <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
           </div>
           <Card className="border-border bg-card">
@@ -169,7 +171,8 @@ export default function Auth() {
 
         <div className="relative z-10 max-w-md mx-auto lg:mx-0 space-y-8">
           {/* Brand */}
-          <div>
+          <div className="flex items-center gap-2">
+            <img src={logoIcon} alt="" className="h-10 w-auto" />
             <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
           </div>
 

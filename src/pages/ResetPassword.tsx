@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Loader2, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
 import textLogo from '@/assets/Text_Logo.png';
+import logoIcon from '@/assets/Logo.png';
 
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
@@ -78,7 +79,8 @@ export default function ResetPassword() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <div className="flex justify-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-8">
+            <img src={logoIcon} alt="" className="h-10 w-auto" />
             <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
           </div>
 
@@ -108,7 +110,8 @@ export default function ResetPassword() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <div className="flex justify-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-8">
+            <img src={logoIcon} alt="" className="h-10 w-auto" />
             <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
           </div>
 
@@ -128,7 +131,8 @@ export default function ResetPassword() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="flex justify-center mb-8">
+        <div className="flex items-center justify-center gap-2 mb-8">
+          <img src={logoIcon} alt="" className="h-10 w-auto" />
           <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
         </div>
 

@@ -72,7 +72,10 @@ export default function Landing() {
       {/* Nav */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-8 w-auto" />
+          <div className="flex items-center gap-2">
+            <img src={logoIcon} alt="" className="h-8 w-auto" />
+            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-8 w-auto" />
+          </div>
           <div className="hidden sm:flex items-center gap-3">
             <Button variant="ghost" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/pricing')}>Pricing</Button>
             <Button variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/auth')}>Sign In</Button>
@@ -423,7 +426,10 @@ export default function Landing() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-10">
             {/* Brand */}
             <div className="col-span-2 md:col-span-1">
-              <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-7 w-auto" />
+              <div className="flex items-center gap-2">
+                <img src={logoIcon} alt="" className="h-7 w-auto" />
+                <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-7 w-auto" />
+              </div>
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">The all-in-one platform built for Landstar BCOs to track finances, dispatch loads, and grow profitably.</p>
             </div>
             {/* Product */}

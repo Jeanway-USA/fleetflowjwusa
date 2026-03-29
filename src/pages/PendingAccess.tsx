@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, LogOut, Clock } from 'lucide-react';
 import textLogo from '@/assets/Text_Logo.png';
+import logoIcon from '@/assets/Logo.png';
 
 
 export default function PendingAccess() {
@@ -36,7 +37,8 @@ export default function PendingAccess() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
-          <div className="flex justify-center">
+          <div className="flex items-center justify-center gap-2">
+            <img src={logoIcon} alt="" className="h-9 w-auto" />
             <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-9 w-auto" />
           </div>
           <div className="flex justify-center">
