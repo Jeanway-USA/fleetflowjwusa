@@ -166,6 +166,35 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
 
           <Separator />
 
+          {/* Bill To */}
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-foreground flex items-center gap-1">
+              <Mail className="h-4 w-4" /> Bill To
+            </p>
+            {brokerName && (
+              <p className="text-sm text-foreground font-medium">{brokerName}</p>
+            )}
+            {brokerEmail ? (
+              <p className="text-sm text-muted-foreground">{brokerEmail}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No broker email found in CRM</p>
+            )}
+            <div className="flex items-center gap-2">
+              <Input
+                type="email"
+                placeholder="Override recipient email"
+                value={emailOverride}
+                onChange={(e) => setEmailOverride(e.target.value)}
+                className="h-8 text-sm max-w-xs"
+              />
+              {emailOverride && (
+                <span className="text-xs text-muted-foreground">Will send to this email instead</span>
+              )}
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Line Items */}
           <table className="w-full text-sm">
             <thead>
