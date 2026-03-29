@@ -53,6 +53,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { Database } from '@/integrations/supabase/types';
+import logoIcon from '@/assets/Logo.png';
+import textLogo from '@/assets/Text_Logo.png';
 
 type AppRole = Database['public']['Enums']['app_role'];
 
@@ -302,10 +304,7 @@ export function AppSidebar() {
           {bannerSrc ? (
             <img src={bannerSrc} alt="Company Logo" className="h-12 w-auto object-contain" />
           ) : (
-            <div className="text-center">
-              <span className="text-lg font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
-              <p className="text-[10px] text-muted-foreground -mt-0.5">by JeanWayUSA</p>
-            </div>
+            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-8 w-auto" />
           )}
         </div>
         <DropdownMenu>

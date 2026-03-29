@@ -15,6 +15,7 @@ import {
   Users, Plus, X, SkipForward, Upload, ImageIcon, LogOut,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import textLogo from '@/assets/Text_Logo.png';
 
 const TRAILER_TYPES = ['Dry Van', 'Reefer', 'Flatbed', 'Step Deck', 'Lowboy', 'Tanker', 'Hopper', 'Other'];
 const INVITE_ROLES = [
@@ -239,10 +240,7 @@ export default function Onboarding() {
       <div className="border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="w-20" />
-          <div className="text-center">
-            <h1 className="text-2xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">by JeanWayUSA</p>
-          </div>
+          <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-8 w-auto" />
           <div className="w-20 flex justify-end">
             <Button
               variant="ghost"

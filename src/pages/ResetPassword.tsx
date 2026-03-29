@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { Loader2, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
+import textLogo from '@/assets/Text_Logo.png';
 
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
 
@@ -77,9 +78,8 @@ export default function ResetPassword() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <div className="flex flex-col items-center mb-8">
-            <h1 className="text-3xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
-            <p className="text-xs text-muted-foreground mt-1">by JeanWayUSA</p>
+          <div className="flex justify-center mb-8">
+            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
           </div>
 
           <Card className="border-border bg-card">
@@ -108,9 +108,8 @@ export default function ResetPassword() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <div className="flex flex-col items-center mb-8">
-            <h1 className="text-3xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
-            <p className="text-xs text-muted-foreground mt-1">by JeanWayUSA</p>
+          <div className="flex justify-center mb-8">
+            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
           </div>
 
           <Card className="border-border bg-card">
@@ -129,9 +128,8 @@ export default function ResetPassword() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="flex flex-col items-center mb-8">
-          <h1 className="text-3xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
-          <p className="text-xs text-muted-foreground mt-1">by JeanWayUSA</p>
+        <div className="flex justify-center mb-8">
+          <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
         </div>
 
         <Card className="border-border bg-card">
