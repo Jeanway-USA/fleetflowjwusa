@@ -28,6 +28,7 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import type { SubscriptionTier } from '@/contexts/AuthContext';
+import { useOrganizationMode, type TmsMode } from '@/hooks/useOrganizationMode';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -62,6 +63,7 @@ interface NavItem {
   roles: AppRole[];
   feature?: string;
   tourId?: string;
+  tmsMode?: TmsMode;
 }
 
 const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
@@ -169,6 +171,7 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, roles, user, hasRole, isOwner, setSimulatedRole, isSimulating, simulatedRole, subscriptionTier, bannerUrl, logoUrl, isSuperAdmin } = useAuth();
+  const { tmsMode: currentTmsMode } = useOrganizationMode();
   const { theme } = useTheme();
   const actuallyIsOwner = roles.includes('owner');
   const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
@@ -182,8 +185,9 @@ export function AppSidebar() {
   const filterByRoleAndTier = useCallback((items: NavItem[]) => items.filter(item => {
     const roleMatch = item.roles.some(role => hasRole(role));
     const tierMatch = !item.feature || tierFeatures.has(item.feature);
-    return roleMatch && tierMatch;
-  }), [hasRole, tierFeatures]);
+    const modeMatch = !item.tmsMode || item.tmsMode === currentTmsMode;
+    return roleMatch && tierMatch && modeMatch;
+  }), [hasRole, tierFeatures, currentTmsMode]);
 
   // --- Dashboard items (non-collapsible) ---
   const dashboardNavItems: NavItem[] = actuallyIsOwner ? [
@@ -222,7 +226,7 @@ export function AppSidebar() {
   const backOfficeItems: NavItem[] = [
     { title: 'Finance & P/L', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'], feature: 'profit_loss', tourId: 'nav-finance' },
     { title: 'Company Insights', icon: BarChart3, path: '/insights', roles: ['owner', 'payroll_admin'], feature: 'insights' },
-    { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta' },
+    { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta', tmsMode: 'independent' as TmsMode },
   ];
 
   const filteredOps = useMemo(() => filterByRoleAndTier(operationsItems), [filterByRoleAndTier]);

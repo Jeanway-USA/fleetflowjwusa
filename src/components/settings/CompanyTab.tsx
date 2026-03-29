@@ -6,12 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { Building2, Trophy } from 'lucide-react';
+import { useOrganizationMode } from '@/hooks/useOrganizationMode';
+import { Building2, Trophy, Landmark } from 'lucide-react';
 
 export function CompanyTab() {
   const { orgId, orgName, refreshOrgData, isDemoMode } = useAuth();
+  const { tmsMode, isLandstar, isIndependent } = useOrganizationMode();
   const queryClient = useQueryClient();
 
   // Company name
@@ -93,8 +96,74 @@ export function CompanyTab() {
     }
   };
 
+  // DOT/MC state for independent mode
+  const [dotNumber, setDotNumber] = useState('');
+  const [mcNumber, setMcNumber] = useState('');
+  const [isSavingAuthority, setIsSavingAuthority] = useState(false);
+
+  const { data: orgDetails } = useQuery({
+    queryKey: ['org-details', orgId],
+    queryFn: async () => {
+      if (!orgId) return null;
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('dot_number, mc_number')
+        .eq('id', orgId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId && isIndependent,
+  });
+
+  useEffect(() => {
+    if (orgDetails) {
+      setDotNumber(orgDetails.dot_number || '');
+      setMcNumber(orgDetails.mc_number || '');
+    }
+  }, [orgDetails]);
+
+  const handleSaveAuthority = async () => {
+    if (!orgId) return;
+    setIsSavingAuthority(true);
+    try {
+      const { error } = await supabase
+        .from('organizations')
+        .update({ dot_number: dotNumber.trim() || null, mc_number: mcNumber.trim() || null })
+        .eq('id', orgId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['org-details', orgId] });
+      toast.success('Authority details updated');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update authority details');
+    } finally {
+      setIsSavingAuthority(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* TMS Mode Badge */}
+      <Card className="card-elevated">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Landmark className="h-5 w-5 text-primary" />
+            TMS Mode
+          </CardTitle>
+          <CardDescription>Your organization's operating mode</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Badge variant={isLandstar ? 'default' : 'secondary'} className="text-sm px-3 py-1">
+            {isLandstar ? 'Landstar BCO' : 'Independent Owner-Operator'}
+          </Badge>
+          <p className="text-xs text-muted-foreground mt-2">
+            {isLandstar
+              ? 'Operating under Landstar\'s authority. DOT/MC numbers are managed by Landstar.'
+              : 'Operating under your own DOT/MC authority.'}
+          </p>
+        </CardContent>
+      </Card>
+
       <Card className="card-elevated">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -122,6 +191,39 @@ export function CompanyTab() {
               </Button>
             </div>
           </div>
+
+          {isIndependent && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>DOT Number</Label>
+                  <Input
+                    value={dotNumber}
+                    onChange={(e) => setDotNumber(e.target.value)}
+                    placeholder="1234567"
+                    disabled={isDemoMode}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>MC Number</Label>
+                  <Input
+                    value={mcNumber}
+                    onChange={(e) => setMcNumber(e.target.value)}
+                    placeholder="MC-123456"
+                    disabled={isDemoMode}
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={handleSaveAuthority}
+                disabled={isSavingAuthority || isDemoMode}
+                className="gradient-gold text-primary-foreground"
+              >
+                {isSavingAuthority ? 'Saving...' : 'Save Authority Details'}
+              </Button>
+            </>
+          )}
+
           <div className="space-y-2">
             <Label>Timezone</Label>
             <Select defaultValue="america-chicago">
