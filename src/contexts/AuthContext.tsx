@@ -18,6 +18,7 @@ interface AuthContextType {
   orgName: string | null;
   orgIsActive: boolean;
   subscriptionTier: SubscriptionTier;
+  tmsMode: string | null;
   primaryColor: string | null;
   logoUrl: string | null;
   bannerUrl: string | null;
@@ -59,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<SubscriptionTier>('solo_bco');
+  const [tmsMode, setTmsMode] = useState<string | null>(null);
   const [primaryColor, setPrimaryColor] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
@@ -96,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setOrgId(profile.org_id);
       const { data: orgData } = await supabase
         .from('organizations')
-        .select('name, subscription_tier, primary_color, logo_url, banner_url, is_active')
+        .select('name, subscription_tier, primary_color, logo_url, banner_url, is_active, tms_mode')
         .eq('id', profile.org_id)
         .single();
 
@@ -104,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOrgName(orgData.name);
         setOrgIsActive(orgData.is_active !== false);
         setSubscriptionTier((orgData.subscription_tier as SubscriptionTier) || 'solo_bco');
+        setTmsMode(orgData.tms_mode || 'landstar');
         setPrimaryColor(orgData.primary_color || null);
         setLogoUrl(orgData.logo_url || null);
         setBannerUrl(orgData.banner_url || null);
@@ -345,6 +348,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       orgName: simulatedOrgName || orgName,
       orgIsActive,
       subscriptionTier: (simulatedOrgTier as SubscriptionTier) || subscriptionTier,
+      tmsMode,
       primaryColor,
       logoUrl,
       bannerUrl,
