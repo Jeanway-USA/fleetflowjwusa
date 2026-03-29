@@ -1634,6 +1634,7 @@ export type Database = {
           fuel_surcharge: number | null
           gross_revenue: number | null
           id: string
+          invoice_email: string | null
           invoice_number: string | null
           invoice_status: string | null
           invoice_url: string | null
@@ -1685,6 +1686,7 @@ export type Database = {
           fuel_surcharge?: number | null
           gross_revenue?: number | null
           id?: string
+          invoice_email?: string | null
           invoice_number?: string | null
           invoice_status?: string | null
           invoice_url?: string | null
@@ -1736,6 +1738,7 @@ export type Database = {
           fuel_surcharge?: number | null
           gross_revenue?: number | null
           id?: string
+          invoice_email?: string | null
           invoice_number?: string | null
           invoice_status?: string | null
           invoice_url?: string | null

@@ -238,7 +238,8 @@ Deno.serve(async (req) => {
     const logoUrl = org?.logo_url || null;
 
     // Find broker/agent email from CRM contacts
-    let recipientEmail: string | null = override_email || null;
+    // Fallback chain: override_email → load.invoice_email → CRM lookup
+    let recipientEmail: string | null = override_email || load.invoice_email || null;
     let brokerName: string | null = null;
 
     if (!recipientEmail && load.agency_code) {
@@ -325,6 +326,12 @@ Deno.serve(async (req) => {
     });
 
     console.log('Invoice email sent:', JSON.stringify(emailResponse));
+
+    // Persist the recipient email used for this invoice
+    await supabaseAdmin
+      .from('fleet_loads')
+      .update({ invoice_email: recipientEmail })
+      .eq('id', load_id);
 
     return new Response(JSON.stringify({
       success: true,

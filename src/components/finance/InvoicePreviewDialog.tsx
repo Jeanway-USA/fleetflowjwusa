@@ -49,7 +49,7 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
         initial[key] = load[field] || 0;
       });
       setAmounts(initial);
-      setEmailOverride('');
+      setEmailOverride(load.invoice_email || '');
 
       // Look up broker/agent from CRM
       if (load.agency_code) {
