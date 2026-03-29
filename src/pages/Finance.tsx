@@ -32,6 +32,7 @@ import { CompensationSettingsTab } from '@/components/finance/CompensationSettin
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { InvoicingTab } from '@/components/finance/InvoicingTab';
+import { FactoringTab } from '@/components/finance/FactoringTab';
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
 import { US_STATES } from '@/lib/us-states';
@@ -647,6 +648,7 @@ export default function Finance() {
           <TabsTrigger value="commissions">Commissions</TabsTrigger>
           <TabsTrigger value="settlements">Settlements</TabsTrigger>
           {isIndependent && <TabsTrigger value="invoicing">Invoicing</TabsTrigger>}
+          {isIndependent && <TabsTrigger value="factoring">Factoring Portal</TabsTrigger>}
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 

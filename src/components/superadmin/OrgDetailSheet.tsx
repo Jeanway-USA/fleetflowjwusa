@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { Building2, Calendar, Users, Palette, CheckCircle, XCircle, Truck, FileText } from 'lucide-react';
+import { Building2, Calendar, Users, Palette, CheckCircle, XCircle, Truck, FileText, Banknote, Receipt } from 'lucide-react';
 
 const TIER_LABELS: Record<string, string> = {
   solo_bco: 'Solo BCO',
@@ -155,7 +155,18 @@ export function OrgDetailSheet({ org, open, onOpenChange }: OrgDetailSheetProps)
                 <span className="text-sm text-muted-foreground">MC Number</span>
                 <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{org.mc_number}</code>
               </div>
-            )}
+           )}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Factoring Provider</span>
+              {org.factoring_enabled ? (
+                <Badge variant="default" className="gap-1">
+                  <Banknote className="h-3 w-3" />
+                  {org.factoring_provider_name || 'Enabled (no name)'}
+                </Badge>
+              ) : (
+                <span className="text-sm text-muted-foreground">Not configured</span>
+              )}
+            </div>
           </div>
 
           <Separator />
