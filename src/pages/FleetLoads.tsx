@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { calculateRevenue as calculateRevenueFn } from '@/lib/revenue-calculator';
 
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -55,6 +56,7 @@ import { format, parseISO } from 'date-fns';
 
 export default function FleetLoads() {
   const { hasRole, isAdmin, orgId } = useAuth();
+  const { isIndependent, isLandstar } = useOrganizationMode();
   const isDriverOnly = hasRole('driver') && !isAdmin;
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -311,6 +313,7 @@ export default function FleetLoads() {
       ...formData,
       ...calculated,
       org_id: orgId,
+      negotiation_notes: formData.negotiation_notes || null,
     };
 
     if (editingLoad) {
