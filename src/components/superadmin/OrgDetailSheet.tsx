@@ -133,6 +133,60 @@ export function OrgDetailSheet({ org, open, onOpenChange }: OrgDetailSheetProps)
 
           <Separator />
 
+          {/* Business Configuration */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-1.5">
+              <FileText className="h-4 w-4" /> Business Configuration
+            </h3>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">TMS Mode</span>
+              <Badge variant={org.tms_mode === 'independent' ? 'default' : 'secondary'}>
+                {org.tms_mode === 'independent' ? 'Independent O/O' : 'Landstar BCO'}
+              </Badge>
+            </div>
+            {org.dot_number && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">DOT Number</span>
+                <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{org.dot_number}</code>
+              </div>
+            )}
+            {org.mc_number && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">MC Number</span>
+                <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{org.mc_number}</code>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Change TMS Mode */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Change TMS Mode</label>
+            <div className="flex gap-2">
+              <Select value={selectedTmsMode || org.tms_mode || 'landstar'} onValueChange={setSelectedTmsMode}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="landstar">Landstar BCO</SelectItem>
+                  <SelectItem value="independent">Independent O/O</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                disabled={!selectedTmsMode || selectedTmsMode === (org.tms_mode || 'landstar') || updateOrg.isPending}
+                onClick={() => {
+                  if (selectedTmsMode) updateOrg.mutate({ newTmsMode: selectedTmsMode });
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Change Tier */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Change Tier</label>

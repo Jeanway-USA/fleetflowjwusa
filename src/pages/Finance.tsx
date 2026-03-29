@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -30,6 +31,7 @@ import { CommissionsTab } from '@/components/finance/CommissionsTab';
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { InvoicingTab } from '@/components/finance/InvoicingTab';
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
 import { US_STATES } from '@/lib/us-states';
@@ -71,6 +73,7 @@ const isActualExpense = (expense: Expense): boolean => {
 export default function Finance() {
   const queryClient = useQueryClient();
   const { orgId } = useAuth();
+  const { isIndependent } = useOrganizationMode();
   // Default to current month
   const now = new Date();
   const defaultPeriod = `${now.getFullYear()}-${now.getMonth() + 1}`;
