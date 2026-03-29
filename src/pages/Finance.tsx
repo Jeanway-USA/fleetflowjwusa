@@ -646,6 +646,7 @@ export default function Finance() {
           <TabsTrigger value="payroll">Payroll</TabsTrigger>
           <TabsTrigger value="commissions">Commissions</TabsTrigger>
           <TabsTrigger value="settlements">Settlements</TabsTrigger>
+          {isIndependent && <TabsTrigger value="invoicing">Invoicing</TabsTrigger>}
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -959,6 +960,12 @@ export default function Finance() {
         <TabsContent value="settlements" className="mt-6">
           <SettlementsTab />
         </TabsContent>
+
+        {isIndependent && (
+          <TabsContent value="invoicing" className="mt-6">
+            <InvoicingTab />
+          </TabsContent>
+        )}
 
         <TabsContent value="settings" className="mt-6">
           <CompensationSettingsTab getSetting={getSetting} />
