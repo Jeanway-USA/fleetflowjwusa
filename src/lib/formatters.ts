@@ -59,3 +59,19 @@ export function getTruckName(
   const truck = trucks.find(t => t.id === truckId);
   return truck?.unit_number || '-';
 }
+
+/**
+ * Format a Notice of Assignment string for factoring invoices.
+ * Returns null if provider name is not provided.
+ */
+export function formatNoticeOfAssignment(
+  providerName: string | null | undefined,
+  remitAddress: string | null | undefined
+): string | null {
+  if (!providerName) return null;
+  let notice = `Notice of Assignment: Pay to ${providerName}`;
+  if (remitAddress) {
+    notice += `\n${remitAddress}`;
+  }
+  return notice;
+}
