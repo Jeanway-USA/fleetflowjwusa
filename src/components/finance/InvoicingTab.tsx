@@ -20,6 +20,7 @@ export function InvoicingTab() {
   const [previewLoad, setPreviewLoad] = useState<any>(null);
   const [previewMode, setPreviewMode] = useState<'preview' | 'edit'>('preview');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [overrideEmail, setOverrideEmail] = useState<string>('');
 
   const { data: loads = [] } = useQuery({
     queryKey: ['invoiceable-loads', orgId],
@@ -133,8 +134,9 @@ export function InvoicingTab() {
     setDialogOpen(true);
   };
 
-  const handleDialogConfirm = (updatedAmounts?: Record<string, number>) => {
+  const handleDialogConfirm = (updatedAmounts?: Record<string, number>, emailOverride?: string) => {
     if (!previewLoad) return;
+    setOverrideEmail(emailOverride || '');
     if (previewMode === 'edit' && updatedAmounts) {
       updateInvoice.mutate({ loadId: previewLoad.id, amounts: updatedAmounts });
     } else {
