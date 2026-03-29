@@ -5,12 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationMode } from '@/hooks/useOrganizationMode';
-import { Building2, Trophy, Landmark } from 'lucide-react';
+import { Building2, Trophy, Landmark, Banknote } from 'lucide-react';
 
 export function CompanyTab() {
   const { orgId, orgName, refreshOrgData, isDemoMode } = useAuth();
@@ -107,7 +109,7 @@ export function CompanyTab() {
       if (!orgId) return null;
       const { data, error } = await supabase
         .from('organizations')
-        .select('dot_number, mc_number')
+        .select('dot_number, mc_number, factoring_enabled, factoring_fee_percentage, factoring_provider_name, factoring_remit_address')
         .eq('id', orgId)
         .single();
       if (error) throw error;
@@ -116,12 +118,46 @@ export function CompanyTab() {
     enabled: !!orgId && isIndependent,
   });
 
+  // Factoring state
+  const [factoringEnabled, setFactoringEnabled] = useState(false);
+  const [factoringFee, setFactoringFee] = useState('');
+  const [factoringProvider, setFactoringProvider] = useState('');
+  const [factoringRemitAddress, setFactoringRemitAddress] = useState('');
+  const [isSavingFactoring, setIsSavingFactoring] = useState(false);
+
   useEffect(() => {
     if (orgDetails) {
       setDotNumber(orgDetails.dot_number || '');
       setMcNumber(orgDetails.mc_number || '');
+      setFactoringEnabled(orgDetails.factoring_enabled || false);
+      setFactoringFee(orgDetails.factoring_fee_percentage?.toString() || '');
+      setFactoringProvider(orgDetails.factoring_provider_name || '');
+      setFactoringRemitAddress(orgDetails.factoring_remit_address || '');
     }
   }, [orgDetails]);
+
+  const handleSaveFactoring = async () => {
+    if (!orgId) return;
+    setIsSavingFactoring(true);
+    try {
+      const { error } = await supabase
+        .from('organizations')
+        .update({
+          factoring_enabled: factoringEnabled,
+          factoring_fee_percentage: factoringFee ? parseFloat(factoringFee) : null,
+          factoring_provider_name: factoringProvider.trim() || null,
+          factoring_remit_address: factoringRemitAddress.trim() || null,
+        } as any)
+        .eq('id', orgId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['org-details', orgId] });
+      toast.success('Factoring settings saved');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save factoring settings');
+    } finally {
+      setIsSavingFactoring(false);
+    }
+  };
 
   const handleSaveAuthority = async () => {
     if (!orgId) return;
@@ -288,6 +324,82 @@ export function CompanyTab() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Factoring Settings - Independent Only */}
+      {isIndependent && (
+        <Card className="card-elevated">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-primary" />
+              Factoring Settings
+            </CardTitle>
+            <CardDescription>Configure invoice factoring for faster payments</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Enable Factoring</Label>
+                <p className="text-xs text-muted-foreground">Submit invoices to a factoring company for quick funding</p>
+              </div>
+              <Switch
+                checked={factoringEnabled}
+                onCheckedChange={setFactoringEnabled}
+                disabled={isDemoMode}
+              />
+            </div>
+
+            {factoringEnabled && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Factoring Company Name</Label>
+                    <Input
+                      value={factoringProvider}
+                      onChange={(e) => setFactoringProvider(e.target.value)}
+                      placeholder="e.g. RTS Financial, OTR Solutions"
+                      disabled={isDemoMode}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Default Factoring Fee %</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="10"
+                      value={factoringFee}
+                      onChange={(e) => setFactoringFee(e.target.value)}
+                      placeholder="e.g. 3.0"
+                      disabled={isDemoMode}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Notice of Assignment / Remit To Address</Label>
+                  <Textarea
+                    value={factoringRemitAddress}
+                    onChange={(e) => setFactoringRemitAddress(e.target.value)}
+                    placeholder="This text will appear on all generated invoices..."
+                    rows={3}
+                    disabled={isDemoMode}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This notice will be appended to all invoices when factoring is enabled.
+                  </p>
+                </div>
+              </>
+            )}
+
+            <Button
+              onClick={handleSaveFactoring}
+              disabled={isSavingFactoring || isDemoMode}
+              className="gradient-gold text-primary-foreground"
+            >
+              {isSavingFactoring ? 'Saving...' : 'Save Factoring Settings'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

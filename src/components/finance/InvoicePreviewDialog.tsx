@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, formatNoticeOfAssignment } from '@/lib/formatters';
 import { format, parseISO } from 'date-fns';
 import { Printer, FileText, Loader2, Save, Mail } from 'lucide-react';
 
@@ -33,13 +33,14 @@ const LINE_ITEM_KEYS: { key: string; label: string; field: string }[] = [
 ];
 
 export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, confirming }: InvoicePreviewDialogProps) {
-  const { orgName, logoUrl } = useAuth();
+  const { orgName, logoUrl, orgId } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
 
   const [amounts, setAmounts] = useState<Record<string, number>>({});
   const [brokerName, setBrokerName] = useState<string>('');
   const [brokerEmail, setBrokerEmail] = useState<string>('');
   const [emailOverride, setEmailOverride] = useState<string>('');
+  const [factoringNotice, setFactoringNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (load && open) {
@@ -70,8 +71,26 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
         setBrokerName('');
         setBrokerEmail('');
       }
+
+      // Fetch factoring settings for notice of assignment
+      if (orgId) {
+        supabase
+          .from('organizations')
+          .select('factoring_enabled, factoring_provider_name, factoring_remit_address')
+          .eq('id', orgId)
+          .single()
+          .then(({ data }) => {
+            if (data?.factoring_enabled) {
+              setFactoringNotice(
+                formatNoticeOfAssignment(data.factoring_provider_name, data.factoring_remit_address)
+              );
+            } else {
+              setFactoringNotice(null);
+            }
+          });
+      }
     }
-  }, [load, open]);
+  }, [load, open, orgId]);
 
   if (!load) return null;
 
@@ -234,6 +253,17 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
               </tr>
             </tfoot>
           </table>
+
+          {/* Notice of Assignment */}
+          {factoringNotice && (
+            <>
+              <Separator />
+              <div className="bg-muted/50 border border-border rounded-md p-3">
+                <p className="text-xs font-semibold text-foreground mb-1">NOTICE OF ASSIGNMENT</p>
+                <p className="text-xs text-muted-foreground whitespace-pre-line">{factoringNotice}</p>
+              </div>
+            </>
+          )}
         </div>
 
         <DialogFooter className="flex-row gap-2">
