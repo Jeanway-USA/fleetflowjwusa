@@ -12,6 +12,8 @@ import {
   ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone, Menu, Sparkles, Clock
 } from 'lucide-react';
 import RevealOnScroll from '@/components/shared/RevealOnScroll';
+import logoIcon from '@/assets/Logo.png';
+import textLogo from '@/assets/Text_Logo.png';
 
 const STATS = [
   { label: 'Cost to You', value: '$0' },
@@ -70,10 +72,7 @@ export default function Landing() {
       {/* Nav */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div>
-            <span className="text-xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
-            <span className="text-[10px] text-muted-foreground ml-1.5">by JeanWayUSA</span>
-          </div>
+          <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-8 w-auto" />
           <div className="hidden sm:flex items-center gap-3">
             <Button variant="ghost" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/pricing')}>Pricing</Button>
             <Button variant="outline" className="active:scale-[0.97] transition-transform" onClick={() => navigate('/auth')}>Sign In</Button>
@@ -424,7 +423,7 @@ export default function Landing() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-10">
             {/* Brand */}
             <div className="col-span-2 md:col-span-1">
-              <span className="text-lg font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</span>
+              <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-7 w-auto" />
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">The all-in-one platform built for Landstar BCOs to track finances, dispatch loads, and grow profitably.</p>
             </div>
             {/* Product */}
@@ -457,7 +456,7 @@ export default function Landing() {
             </div>
           </div>
           <div className="border-t border-border pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
-            <p className="text-xs text-muted-foreground">© 2026 Fleet Flow TMS by JeanWayUSA. All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">© 2026 FleetFlow TMS by JeanWay USA. All rights reserved.</p>
             <p className="text-xs text-muted-foreground">Built for Landstar BCOs & Agents</p>
           </div>
         </div>

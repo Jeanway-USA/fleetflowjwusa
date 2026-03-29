@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Sparkles, Truck, MessageSquare, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
+import textLogo from '@/assets/Text_Logo.png';
 
 const emailSchema = z.string().email('Please enter a valid email address');
 const passwordSchema = z.string()
@@ -116,9 +117,8 @@ export default function Auth() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
-          <div className="flex flex-col items-center mb-8">
-            <h1 className="text-3xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
-            <p className="text-xs text-muted-foreground mt-1">by JeanWayUSA</p>
+          <div className="flex justify-center mb-8">
+            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
           </div>
           <Card className="border-border bg-card">
             <CardHeader className="text-center">
@@ -170,8 +170,7 @@ export default function Auth() {
         <div className="relative z-10 max-w-md mx-auto lg:mx-0 space-y-8">
           {/* Brand */}
           <div>
-            <h1 className="text-3xl lg:text-4xl font-extrabold text-gradient-gold tracking-tight">Fleet Flow TMS</h1>
-            <p className="text-sm text-white/50 mt-1">by JeanWayUSA</p>
+            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
           </div>
 
           {/* Badge */}
