@@ -304,7 +304,10 @@ export function AppSidebar() {
           {bannerSrc ? (
             <img src={bannerSrc} alt="Company Logo" className="h-12 w-auto object-contain" />
           ) : (
-            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-8 w-auto" />
+            <div className="flex items-center gap-2">
+              <img src={logoIcon} alt="" className="h-8 w-auto" />
+              <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-8 w-auto" />
+            </div>
           )}
         </div>
         <DropdownMenu>

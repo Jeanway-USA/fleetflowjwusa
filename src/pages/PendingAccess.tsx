@@ -36,7 +36,8 @@ export default function PendingAccess() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
-          <div className="flex justify-center">
+          <div className="flex items-center justify-center gap-2">
+            <img src={logoIcon} alt="" className="h-9 w-auto" />
             <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-9 w-auto" />
           </div>
           <div className="flex justify-center">
