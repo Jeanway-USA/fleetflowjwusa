@@ -1,24 +1,80 @@
 
 
-## Fix: Work Order Completion Fails Due to Storage RLS
+## Plan: Add TMS Mode (Landstar BCO vs Independent) to Organization Setup
 
-### Problem
-The `CompleteJobModal` uploads invoice files to `invoices/${fileName}` in the `documents` storage bucket. But the storage RLS policy requires the first folder segment to be the user's `org_id` (e.g., `${org_id}/invoices/${fileName}`). This causes a "new row violates row-level security policy" error.
+### Overview
+Add a `tms_mode` column to organizations and wire it through onboarding, sidebar navigation, settings, and a reusable hook.
 
-### Solution
-Update the upload path in `CompleteJobModal.tsx` to prefix with the user's org_id.
+---
 
-### Changes
+### 1. Database Migration
 
-| File | Change |
+**Add column + backfill:**
+```sql
+ALTER TABLE organizations ADD COLUMN tms_mode text NOT NULL DEFAULT 'landstar';
+```
+All existing orgs already get `'landstar'` via the default.
+
+**Update `create_onboarding_org` RPC** to accept an optional `_tms_mode` parameter and set it on the new org row.
+
+---
+
+### 2. Onboarding UI (`src/pages/Onboarding.tsx`)
+
+- Add `tmsMode` state (`'landstar' | 'independent'`), defaulting to `'landstar'`.
+- At the top of Step 1, render two selectable cards: "I am a Landstar BCO" and "I have my own DOT/MC Authority".
+- Conditionally show/hide DOT and MC fields based on selection:
+  - Landstar: hide DOT/MC fields entirely.
+  - Independent: show DOT/MC fields, make them required (block Continue if empty).
+- Pass `_tms_mode` to the `create_onboarding_org` RPC call (requires updating the RPC to accept it).
+
+---
+
+### 3. `useOrganizationMode` Hook (`src/hooks/useOrganizationMode.ts`)
+
+- New hook that queries `organizations.tms_mode` for the current user's org (using `orgId` from `useAuth()`).
+- Returns `{ tmsMode: 'landstar' | 'independent', isLoading }`.
+- Uses `react-query` with key `['org-tms-mode', orgId]`.
+
+---
+
+### 4. Sidebar Navigation (`src/components/layout/AppSidebar.tsx`)
+
+- Import `useOrganizationMode`.
+- Add a `tmsMode` filter to nav items using a new optional `tmsMode` property on `NavItem`:
+  - `'landstar'` — item only shows in Landstar mode.
+  - `'independent'` — item only shows in Independent mode.
+  - `undefined` — always shows.
+- Specific changes:
+  - "CRM" item: always visible (label stays "CRM").
+  - "IFTA Reporting": mark as `tmsMode: 'independent'` (Landstar handles IFTA).
+  - No items are removed from Landstar mode at this stage — existing nav stays. Future iterations can add "Direct Invoices" and "Authority Compliance" pages for independent mode.
+
+---
+
+### 5. Settings Company Tab (`src/components/settings/CompanyTab.tsx`)
+
+- Import `useOrganizationMode`.
+- Display current mode as a read-only badge ("Landstar BCO" or "Independent Owner-Operator").
+- If `tmsMode === 'landstar'`: hide DOT/MC fields (Landstar's corporate authority applies).
+- If `tmsMode === 'independent'`: show editable DOT/MC fields (already partially present via the org update flow — need to add them to this tab).
+
+---
+
+### 6. AuthContext Update (`src/contexts/AuthContext.tsx`)
+
+- Fetch `tms_mode` alongside existing org data query and expose it on the context as `tmsMode`. This avoids a separate query in the hook — the hook can just read from AuthContext instead.
+
+---
+
+### Files
+
+| File | Action |
 |------|--------|
-| `src/components/maintenance/CompleteJobModal.tsx` | Fetch the user's profile to get `org_id`, then change the upload path from `invoices/${fileName}` to `${org_id}/invoices/${fileName}` |
-
-### Detail
-In `CompleteJobModal.tsx`, before the upload:
-1. Get the current user's session via `supabase.auth.getUser()`
-2. Fetch their `org_id` from `profiles`
-3. Use `${orgId}/invoices/${fileName}` as the storage path
-
-This matches the existing pattern used in other upload components (e.g., `ProofOfDeliveryDialog`, `useDocumentUpload`).
+| Migration SQL | Create — add `tms_mode` column, update `create_onboarding_org` RPC |
+| `src/contexts/AuthContext.tsx` | Edit — fetch and expose `tmsMode` |
+| `src/hooks/useOrganizationMode.ts` | Create — convenience hook reading from AuthContext |
+| `src/pages/Onboarding.tsx` | Edit — add mode selector cards, conditional DOT/MC fields |
+| `src/components/layout/AppSidebar.tsx` | Edit — filter nav items by `tmsMode` |
+| `src/components/settings/CompanyTab.tsx` | Edit — show mode badge, conditionally show/hide DOT/MC |
 
