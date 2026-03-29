@@ -1642,6 +1642,7 @@ export type Database = {
           is_power_only: boolean | null
           landstar_load_id: string | null
           lumper: number | null
+          negotiation_notes: string | null
           net_revenue: number | null
           notes: string | null
           org_id: string
@@ -1694,6 +1695,7 @@ export type Database = {
           is_power_only?: boolean | null
           landstar_load_id?: string | null
           lumper?: number | null
+          negotiation_notes?: string | null
           net_revenue?: number | null
           notes?: string | null
           org_id: string
@@ -1746,6 +1748,7 @@ export type Database = {
           is_power_only?: boolean | null
           landstar_load_id?: string | null
           lumper?: number | null
+          negotiation_notes?: string | null
           net_revenue?: number | null
           notes?: string | null
           org_id?: string
