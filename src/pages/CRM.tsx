@@ -20,9 +20,11 @@ import {
   type UnifiedContact,
 } from '@/hooks/useCRMData';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { CRMSummaryCards } from '@/components/crm/CRMSummaryCards';
 import { ContactFormDialog } from '@/components/crm/ContactFormDialog';
 import { ContactDetailSheet } from '@/components/crm/ContactDetailSheet';
+import { BrokerDatabase } from '@/components/crm/BrokerDatabase';
 
 const TYPE_TABS = [
   { value: 'all', label: 'All' },
@@ -42,6 +44,16 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 export default function CRM() {
+  const { isIndependent } = useOrganizationMode();
+
+  if (isIndependent) {
+    return <BrokerDatabase />;
+  }
+
+  return <AgentCRM />;
+}
+
+function AgentCRM() {
   const { hasRole, isOwner } = useAuth();
   const canEdit = isOwner || hasRole('dispatcher');
 

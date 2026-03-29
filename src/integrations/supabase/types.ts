@@ -1632,6 +1632,10 @@ export type Database = {
           fuel_surcharge: number | null
           gross_revenue: number | null
           id: string
+          invoice_number: string | null
+          invoice_status: string | null
+          invoice_url: string | null
+          invoiced_at: string | null
           is_power_only: boolean | null
           landstar_load_id: string | null
           lumper: number | null
@@ -1677,6 +1681,10 @@ export type Database = {
           fuel_surcharge?: number | null
           gross_revenue?: number | null
           id?: string
+          invoice_number?: string | null
+          invoice_status?: string | null
+          invoice_url?: string | null
+          invoiced_at?: string | null
           is_power_only?: boolean | null
           landstar_load_id?: string | null
           lumper?: number | null
@@ -1722,6 +1730,10 @@ export type Database = {
           fuel_surcharge?: number | null
           gross_revenue?: number | null
           id?: string
+          invoice_number?: string | null
+          invoice_status?: string | null
+          invoice_url?: string | null
+          invoiced_at?: string | null
           is_power_only?: boolean | null
           landstar_load_id?: string | null
           lumper?: number | null
@@ -4301,13 +4313,16 @@ export type Database = {
           banner_url: string | null
           complimentary_ends_at: string | null
           created_at: string | null
+          dot_number: string | null
           id: string | null
           is_active: boolean | null
           is_complimentary: boolean | null
           logo_url: string | null
+          mc_number: string | null
           name: string | null
           primary_color: string | null
           subscription_tier: string | null
+          tms_mode: string | null
           trial_ends_at: string | null
           user_count: number | null
         }
@@ -4315,13 +4330,16 @@ export type Database = {
           banner_url?: string | null
           complimentary_ends_at?: string | null
           created_at?: string | null
+          dot_number?: string | null
           id?: string | null
           is_active?: boolean | null
           is_complimentary?: boolean | null
           logo_url?: string | null
+          mc_number?: string | null
           name?: string | null
           primary_color?: string | null
           subscription_tier?: string | null
+          tms_mode?: string | null
           trial_ends_at?: string | null
           user_count?: never
         }
@@ -4329,13 +4347,16 @@ export type Database = {
           banner_url?: string | null
           complimentary_ends_at?: string | null
           created_at?: string | null
+          dot_number?: string | null
           id?: string | null
           is_active?: boolean | null
           is_complimentary?: boolean | null
           logo_url?: string | null
+          mc_number?: string | null
           name?: string | null
           primary_color?: string | null
           subscription_tier?: string | null
+          tms_mode?: string | null
           trial_ends_at?: string | null
           user_count?: never
         }
@@ -4394,17 +4415,30 @@ export type Database = {
       }
       super_admin_reset_demo: { Args: never; Returns: undefined }
       super_admin_resume_beta: { Args: never; Returns: number }
-      super_admin_update_org: {
-        Args: {
-          new_complimentary_ends_at?: string
-          new_is_active?: boolean
-          new_is_complimentary?: boolean
-          new_subscription_tier?: string
-          new_trial_ends_at?: string
-          target_org_id: string
-        }
-        Returns: undefined
-      }
+      super_admin_update_org:
+        | {
+            Args: {
+              new_complimentary_ends_at?: string
+              new_is_active?: boolean
+              new_is_complimentary?: boolean
+              new_subscription_tier?: string
+              new_trial_ends_at?: string
+              target_org_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              new_complimentary_ends_at?: string
+              new_is_active?: boolean
+              new_is_complimentary?: boolean
+              new_subscription_tier?: string
+              new_tms_mode?: string
+              new_trial_ends_at?: string
+              target_org_id: string
+            }
+            Returns: undefined
+          }
     }
     Enums: {
       app_role: "owner" | "payroll_admin" | "dispatcher" | "safety" | "driver"

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { Building2, Calendar, Users, Palette, CheckCircle, XCircle } from 'lucide-react';
+import { Building2, Calendar, Users, Palette, CheckCircle, XCircle, Truck, FileText } from 'lucide-react';
 
 const TIER_LABELS: Record<string, string> = {
   solo_bco: 'Solo BCO',
@@ -26,14 +26,16 @@ interface OrgDetailSheetProps {
 export function OrgDetailSheet({ org, open, onOpenChange }: OrgDetailSheetProps) {
   const queryClient = useQueryClient();
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [selectedTmsMode, setSelectedTmsMode] = useState<string | null>(null);
 
   const updateOrg = useMutation({
-    mutationFn: async ({ newTier, newIsActive, newTrialEndsAt }: { newTier?: string; newIsActive?: boolean; newTrialEndsAt?: string }) => {
+    mutationFn: async ({ newTier, newIsActive, newTrialEndsAt, newTmsMode }: { newTier?: string; newIsActive?: boolean; newTrialEndsAt?: string; newTmsMode?: string }) => {
       const { error } = await supabase.rpc('super_admin_update_org' as any, {
         target_org_id: org.id,
         new_subscription_tier: newTier ?? null,
         new_is_active: newIsActive ?? null,
         new_trial_ends_at: newTrialEndsAt ?? null,
+        new_tms_mode: newTmsMode ?? null,
       });
       if (error) throw error;
     },
@@ -128,6 +130,60 @@ export function OrgDetailSheet({ org, open, onOpenChange }: OrgDetailSheetProps)
               </div>
             </div>
           )}
+
+          <Separator />
+
+          {/* Business Configuration */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-1.5">
+              <FileText className="h-4 w-4" /> Business Configuration
+            </h3>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">TMS Mode</span>
+              <Badge variant={org.tms_mode === 'independent' ? 'default' : 'secondary'}>
+                {org.tms_mode === 'independent' ? 'Independent O/O' : 'Landstar BCO'}
+              </Badge>
+            </div>
+            {org.dot_number && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">DOT Number</span>
+                <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{org.dot_number}</code>
+              </div>
+            )}
+            {org.mc_number && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">MC Number</span>
+                <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{org.mc_number}</code>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Change TMS Mode */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Change TMS Mode</label>
+            <div className="flex gap-2">
+              <Select value={selectedTmsMode || org.tms_mode || 'landstar'} onValueChange={setSelectedTmsMode}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="landstar">Landstar BCO</SelectItem>
+                  <SelectItem value="independent">Independent O/O</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                disabled={!selectedTmsMode || selectedTmsMode === (org.tms_mode || 'landstar') || updateOrg.isPending}
+                onClick={() => {
+                  if (selectedTmsMode) updateOrg.mutate({ newTmsMode: selectedTmsMode });
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
 
           <Separator />
 

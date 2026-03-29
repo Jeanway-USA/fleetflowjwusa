@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -30,6 +31,7 @@ import { CommissionsTab } from '@/components/finance/CommissionsTab';
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
+import { InvoicingTab } from '@/components/finance/InvoicingTab';
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
 import { US_STATES } from '@/lib/us-states';
@@ -71,6 +73,7 @@ const isActualExpense = (expense: Expense): boolean => {
 export default function Finance() {
   const queryClient = useQueryClient();
   const { orgId } = useAuth();
+  const { isIndependent } = useOrganizationMode();
   // Default to current month
   const now = new Date();
   const defaultPeriod = `${now.getFullYear()}-${now.getMonth() + 1}`;
@@ -643,6 +646,7 @@ export default function Finance() {
           <TabsTrigger value="payroll">Payroll</TabsTrigger>
           <TabsTrigger value="commissions">Commissions</TabsTrigger>
           <TabsTrigger value="settlements">Settlements</TabsTrigger>
+          {isIndependent && <TabsTrigger value="invoicing">Invoicing</TabsTrigger>}
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
@@ -956,6 +960,12 @@ export default function Finance() {
         <TabsContent value="settlements" className="mt-6">
           <SettlementsTab />
         </TabsContent>
+
+        {isIndependent && (
+          <TabsContent value="invoicing" className="mt-6">
+            <InvoicingTab />
+          </TabsContent>
+        )}
 
         <TabsContent value="settings" className="mt-6">
           <CompensationSettingsTab getSetting={getSetting} />
