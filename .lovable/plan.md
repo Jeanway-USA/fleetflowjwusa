@@ -1,28 +1,33 @@
 
 
-## Fix: Ambiguous `super_admin_update_org` RPC Overload
+## Plan: Replace Text Branding with Logo Images
 
-### Problem
-There are two versions of the `super_admin_update_org` function in the database:
-1. One with 6 parameters (without `new_tms_mode`)
-2. One with 7 parameters (with `new_tms_mode`)
+### Overview
+Replace all instances of the text-based "Fleet Flow TMS / by JeanWayUSA" branding with the uploaded logo images. Use the icon logo (Logo.png) for compact spaces (sidebar, nav headers) and the text logo (Text_Logo.png) for larger branding areas (hero, footer, auth pages).
 
-When `OrgActionsDropdown` calls the RPC with only `target_org_id`, `new_trial_ends_at`, `new_is_complimentary`, and `new_complimentary_ends_at`, Postgres cannot disambiguate which overload to use because both accept those parameters as defaults.
+---
 
-### Solution
+### Assets
+- Copy `Logo.png` → `src/assets/Logo.png` (square icon — sidebar, nav)
+- Copy `Text_Logo.png` → `src/assets/Text_Logo.png` (wide text logo — hero, footer, auth)
 
-**Database migration**: Drop the older 6-parameter overload, keeping only the 7-parameter version (which has `new_tms_mode` defaulting to `NULL`).
+### Files to Update
 
-```sql
-DROP FUNCTION public.super_admin_update_org(uuid, text, boolean, timestamptz, boolean, timestamptz);
-```
-
-This is safe because the 7-parameter version already defaults `new_tms_mode` to `NULL`, so all existing call sites work unchanged.
-
-### Files
-| File | Action |
+| File | Change |
 |------|--------|
-| Migration SQL | Drop the old 6-param overload of `super_admin_update_org` |
+| `src/pages/Landing.tsx` | Nav header: icon logo + text logo. Footer brand: text logo. CTA section text reference stays as-is. |
+| `src/components/layout/AppSidebar.tsx` | Replace text branding block with icon logo (small) or text logo (expanded sidebar). |
+| `src/pages/Auth.tsx` | Replace heading text with text logo image. |
+| `src/pages/ResetPassword.tsx` | Replace 3 heading instances with text logo. |
+| `src/pages/Onboarding.tsx` | Replace heading with text logo. |
+| `src/pages/PendingAccess.tsx` | Replace heading with text logo. |
+| `src/pages/Pricing.tsx` | Nav and footer — icon + text logo. |
+| `src/pages/CheckoutSuccess.tsx` | Minor text reference, keep as plain text (contextual sentence). |
 
-No frontend changes needed.
+### Approach
+- Import logos as ES6 modules (`import logo from "@/assets/Logo.png"`).
+- Icon logo renders at ~32–40px height in nav/sidebar contexts.
+- Text logo renders at ~160–200px width in hero/auth/footer contexts.
+- Add `alt="FleetFlow TMS by JeanWay USA"` for accessibility.
+- The text logo is white, so it works on dark backgrounds. For light theme compatibility, add `dark:invert-0 invert` class or rely on the app's dark-first design.
 
