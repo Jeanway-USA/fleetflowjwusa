@@ -758,7 +758,7 @@ export default function FleetLoads() {
               <TabsContent value="details" className="space-y-4 mt-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="landstar_load_id">Landstar Load ID</Label>
+                    <Label htmlFor="landstar_load_id">{isLandstar ? 'Landstar Load ID' : 'Load ID'}</Label>
                     <Input 
                       id="landstar_load_id" 
                       value={formData.landstar_load_id || ''} 

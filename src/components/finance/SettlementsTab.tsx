@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Plus, FileText, Pencil, Trash2, Loader2, Eye, Upload, MoreHorizontal } from 'lucide-react';
+import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format, parseISO, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
