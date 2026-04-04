@@ -87,7 +87,7 @@ export function DemoControls() {
             className="w-full gradient-gold text-primary-foreground text-xs h-8"
             onClick={async () => {
               await signOut();
-              navigate('/');
+              navigate('/auth');
             }}
           >
             Start Your Beta Account
