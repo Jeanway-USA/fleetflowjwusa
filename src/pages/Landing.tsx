@@ -474,7 +474,7 @@ export default function Landing() {
           className="w-full gradient-gold text-primary-foreground"
           onClick={() => navigate('/auth')}
         >
-          Join BCO Beta
+          Join Beta
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
