@@ -448,8 +448,8 @@ export default function Landing() {
               <h5 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wider">Company</h5>
               <ul className="space-y-2.5">
                 <li><button onClick={() => navigate('/pricing')} className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Pricing</button></li>
-                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">About</button></li>
-                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Contact</button></li>
+                <li><button onClick={() => navigate('/about')} className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">About</button></li>
+                <li><button onClick={() => navigate('/contact')} className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Contact</button></li>
               </ul>
             </div>
             {/* Legal */}
