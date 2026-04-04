@@ -23,6 +23,7 @@ import { ResetDemoDialog } from '@/components/superadmin/ResetDemoDialog';
 import { BillingPromotionsTab } from '@/components/superadmin/BillingPromotionsTab';
 import { FeedbackTab } from '@/components/superadmin/FeedbackTab';
 import { BetaLifecycleCard } from '@/components/superadmin/BetaLifecycleCard';
+import { ChangelogTab } from '@/components/superadmin/ChangelogTab';
 
 const TIER_COLORS: Record<string, string> = {
   solo_bco: 'hsl(45, 80%, 45%)',
@@ -122,6 +123,7 @@ export default function SuperAdminDashboard() {
           <TabsTrigger value="health" className="data-[state=active]:bg-background data-[state=active]:text-foreground">System Health</TabsTrigger>
           <TabsTrigger value="billing" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Billing</TabsTrigger>
           <TabsTrigger value="feedback" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Feedback</TabsTrigger>
+          <TabsTrigger value="changelog" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Changelog</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Overview */}
@@ -293,6 +295,11 @@ export default function SuperAdminDashboard() {
         {/* Tab 7: Feedback */}
         <TabsContent value="feedback">
           <FeedbackTab />
+        </TabsContent>
+
+        {/* Tab 8: Changelog */}
+        <TabsContent value="changelog">
+          <ChangelogTab />
         </TabsContent>
       </Tabs>
 
