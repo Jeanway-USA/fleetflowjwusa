@@ -1,5 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 const TYPE_COLORS: Record<string, number> = {
   Update: 0x22c55e,
@@ -21,32 +25,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const supabaseAuth = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+      return new Response(JSON.stringify({ error: "Server config error" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } =
-      await supabaseAuth.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
+    const supabaseAuth = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
+    if (userError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     // Check super admin
-    const { data: isSA } = await supabaseAdmin.rpc("is_super_admin");
-    // Use service role to check directly
     const { data: saRow } = await supabaseAdmin
       .from("super_admins")
       .select("id")
@@ -65,10 +71,7 @@ Deno.serve(async (req) => {
     if (!title || !description || !type) {
       return new Response(
         JSON.stringify({ error: "title, description, and type are required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -76,10 +79,7 @@ Deno.serve(async (req) => {
     if (!validTypes.includes(type)) {
       return new Response(
         JSON.stringify({ error: "type must be Update, Announcement, or Bug Fix" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -107,15 +107,10 @@ Deno.serve(async (req) => {
         footer: { text: "FleetFlow TMS" },
       };
 
-      const discordPayload: Record<string, unknown> = {
-        embeds: [embed],
-        thread_name: `[${type}] ${title}`,
-      };
-
       const discordRes = await fetch(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(discordPayload),
+        body: JSON.stringify({ embeds: [embed], thread_name: `[${type}] ${title}` }),
       });
 
       if (!discordRes.ok) {
@@ -124,8 +119,6 @@ Deno.serve(async (req) => {
       } else {
         await discordRes.text();
       }
-    } else {
-      console.warn("DISCORD_WEBHOOK_URL not set, skipping Discord notification");
     }
 
     return new Response(JSON.stringify({ success: true }), {
