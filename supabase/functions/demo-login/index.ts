@@ -115,8 +115,7 @@ serve(async (req) => {
       .select("id")
       .single();
     if (orgError) throw new Error(`Org creation failed: ${orgError.message}`);
-    if (userError) throw new Error(`User creation failed: ${userError.message}`);
-    const userId = userData.user.id;
+
 
     await supabase
       .from("profiles")
