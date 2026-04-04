@@ -589,7 +589,7 @@ export default function FleetLoads() {
           <DataTable
             columns={[
               { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
-              { key: 'landstar_load_id', header: 'Landstar ID', hiddenOnMobile: true, render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
+              { key: 'landstar_load_id', header: isLandstar ? 'Landstar ID' : 'Load ID', hiddenOnMobile: true, render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
               { key: 'tracking_id', header: 'Tracking ID', hiddenOnMobile: true, render: (load: any) => 
                 load.tracking_id ? (
                   <span 
@@ -758,7 +758,7 @@ export default function FleetLoads() {
               <TabsContent value="details" className="space-y-4 mt-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="landstar_load_id">Landstar Load ID</Label>
+                    <Label htmlFor="landstar_load_id">{isLandstar ? 'Landstar Load ID' : 'Load ID'}</Label>
                     <Input 
                       id="landstar_load_id" 
                       value={formData.landstar_load_id || ''} 

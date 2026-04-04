@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Plus, FileText, Pencil, Trash2, Loader2, Eye, Upload, MoreHorizontal } from 'lucide-react';
+import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format, parseISO, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
@@ -108,6 +109,7 @@ function calcNetPay(data: Partial<Settlement>): number {
 export function SettlementsTab() {
   const queryClient = useQueryClient();
   const { orgId } = useAuth();
+  const { isLandstar } = useOrganizationMode();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
   const [viewingSettlement, setViewingSettlement] = useState<Settlement | null>(null);
@@ -396,10 +398,10 @@ export function SettlementsTab() {
         ...(data.period_end ? { period_end: data.period_end } : {}),
       }));
 
-      toast.success(`Imported ${expenses.length} items from Landstar statement`);
+      toast.success(`Imported ${expenses.length} items from ${isLandstar ? 'Landstar statement' : 'statement'}`);
     } catch (error: any) {
       console.error('PDF import error:', error);
-      toast.error(error.message || 'Failed to parse Landstar PDF');
+      toast.error(error.message || `Failed to parse ${isLandstar ? 'Landstar ' : ''}PDF`);
     } finally {
       setIsImporting(false);
       if (pdfInputRef.current) pdfInputRef.current.value = '';
