@@ -44,11 +44,19 @@ serve(async (req) => {
 
     console.log("Sign-in failed, checking if user exists:", signInError?.message);
 
-    // 2. Check if user exists via admin API
-    const { data: userList } = await supabase.auth.admin.listUsers({ perPage: 1, page: 1 });
-    const existingUser = userList?.users?.find((u: any) => u.email === DEMO_EMAIL);
+    // 2. Try to create user — if already exists, reset password instead
+    const { data: createData, error: createError } = await supabase.auth.admin.createUser({
+      email: DEMO_EMAIL,
+      password: DEMO_PASSWORD,
+      email_confirm: true,
+      user_metadata: { first_name: "Demo", last_name: "User" },
+    });
 
-    if (existingUser) {
+    if (createError && createError.message.includes("already been registered")) {
+      // User exists but password is wrong — find and reset
+      const { data: userList } = await supabase.auth.admin.listUsers({ perPage: 1000, page: 1 });
+      const existingUser = userList?.users?.find((u: any) => u.email === DEMO_EMAIL);
+      if (!existingUser) throw new Error("Demo user not found after creation conflict");
       // User exists but password doesn't match — reset it
       console.log("Demo user exists, resetting password");
       const { error: updateErr } = await supabase.auth.admin.updateUserById(existingUser.id, {
