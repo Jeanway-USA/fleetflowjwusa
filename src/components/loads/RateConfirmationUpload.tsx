@@ -63,6 +63,7 @@ interface RateConfirmationUploadProps {
 export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers, trucks }: RateConfirmationUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const { isLandstar } = useOrganizationMode();
   const [fileName, setFileName] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedLoadData | null>(null);
   const [matchingLoad, setMatchingLoad] = useState<ExistingLoad | null>(null);
