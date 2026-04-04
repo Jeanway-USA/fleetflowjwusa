@@ -127,7 +127,7 @@ export default function Landing() {
                 <span className="text-gradient-gold">Finances & Dispatch.</span>
               </h1>
               <p className="text-base sm:text-lg text-[hsl(0_0%_65%)] mb-8 max-w-xl leading-relaxed">
-                The all-in-one platform built specifically for Landstar BCOs to track expenses, manage card advances, and streamline dispatching.
+                The all-in-one platform built specifically for owner-operators to track expenses, manage finances, and streamline dispatching.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
