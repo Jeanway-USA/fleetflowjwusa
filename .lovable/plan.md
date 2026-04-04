@@ -1,45 +1,17 @@
 
 
-## Dynamic Landstar / Independent Terminology
-
-### Approach
-Use the existing `useOrganizationMode()` hook (already provides `isLandstar` flag) to conditionally render Landstar-specific labels. No new hooks or constants needed.
+## Add Discord Role Mention Toggle to Changelog
 
 ### Changes
 
-#### 1. `src/pages/FleetLoads.tsx`
-- Line 592: Table column header `'Landstar ID'` → `isLandstar ? 'Landstar ID' : 'Load ID'`
-- Line 761: Form label `'Landstar Load ID'` → `isLandstar ? 'Landstar Load ID' : 'Load ID'`
-- Import `useOrganizationMode` at top
+#### 1. `src/components/superadmin/ChangelogTab.tsx`
+- Add a `mentionRole` boolean state (default `false`)
+- Add a Switch/Checkbox next to the submit button labeled "Mention 🛠️ Updates role"
+- Pass `mentionRole` in the request body to the edge function
 
-#### 2. `src/components/finance/StatementUpload.tsx`
-- Line 259: Card title `'Import from Landstar Statements'` → `isLandstar ? 'Import from Landstar Statements' : 'Import from Statements'`
-- Import `useOrganizationMode`
+#### 2. `supabase/functions/discord-updates/index.ts`
+- Accept optional `mentionRole` boolean from the request body
+- When `true`, prepend `<@&1487974512745123901>` to the Discord webhook payload's `content` field (role mentions go in `content`, not inside embeds)
 
-#### 3. `src/components/finance/SettlementsTab.tsx`
-- Line 399: Toast message referencing "Landstar statement" → dynamic
-- Import `useOrganizationMode`
-
-#### 4. `src/components/loads/RateConfirmationUpload.tsx`
-- Any UI labels referencing "Landstar" in the upload card → dynamic (e.g., "Load ID" label at line 410)
-- Import `useOrganizationMode`
-
-#### 5. `src/components/layout/AppSidebar.tsx`
-- Verify sidebar labels are already mode-aware (the CRM label already switches per memory context). No Landstar-specific load/revenue labels to change — confirm and leave as-is if clean.
-
-### Not in scope
-- Database column names (`landstar_load_id`) remain unchanged — these are internal identifiers
-- Landing page marketing copy stays Landstar-branded (public-facing, not org-specific)
-- Driver Settings Landstar Portal section — only shown in Landstar mode already (or should be gated separately)
-- Edge function internals (`parse-landstar-statement`) — backend naming, not user-facing
-
-### Pattern
-Each file adds:
-```tsx
-import { useOrganizationMode } from '@/hooks/useOrganizationMode';
-// inside component:
-const { isLandstar } = useOrganizationMode();
-// then:
-{isLandstar ? 'Landstar Load ID' : 'Load ID'}
-```
+Two files touched, minimal changes.
 
