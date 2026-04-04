@@ -102,22 +102,19 @@ serve(async (req) => {
         JSON.stringify({ session: retrySession.session }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    } else if (createError) {
+      throw new Error(`User creation failed: ${createError.message}`);
     }
 
-    // 3. User doesn't exist — create everything from scratch
+    // 3. User was just created successfully — set up org and seed data
+    const userId = createData!.user.id;
+
     const { data: orgData, error: orgError } = await supabase
       .from("organizations")
       .insert({ name: DEMO_ORG_NAME, subscription_tier: "all_in_one" })
       .select("id")
       .single();
     if (orgError) throw new Error(`Org creation failed: ${orgError.message}`);
-
-    const { data: userData, error: userError } = await supabase.auth.admin.createUser({
-      email: DEMO_EMAIL,
-      password: DEMO_PASSWORD,
-      email_confirm: true,
-      user_metadata: { first_name: "Demo", last_name: "User" },
-    });
     if (userError) throw new Error(`User creation failed: ${userError.message}`);
     const userId = userData.user.id;
 
