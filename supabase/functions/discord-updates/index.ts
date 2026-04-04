@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { title, description, type } = await req.json();
+    const { title, description, type, mentionRole } = await req.json();
 
     if (!title || !description || !type) {
       return new Response(
