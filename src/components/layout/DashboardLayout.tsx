@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { CommandPalette } from '@/components/shared/CommandPalette';
 import { BetaFeedbackWidget } from '@/components/shared/BetaFeedbackWidget';
+import { DiscordBanner } from '@/components/shared/DiscordBanner';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProductTour } from '@/components/shared/ProductTour';
 import { useProductTour } from '@/hooks/useProductTour';
@@ -254,6 +255,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
             </DropdownMenu>
           </div>
         </header>
+        <DiscordBanner />
         <div className="flex-1 p-2 sm:p-4 lg:p-6 animate-fade-in">
           <ErrorBoundary>
             {children}
