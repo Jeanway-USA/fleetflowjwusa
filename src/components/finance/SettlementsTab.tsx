@@ -398,10 +398,10 @@ export function SettlementsTab() {
         ...(data.period_end ? { period_end: data.period_end } : {}),
       }));
 
-      toast.success(`Imported ${expenses.length} items from Landstar statement`);
+      toast.success(`Imported ${expenses.length} items from ${isLandstar ? 'Landstar statement' : 'statement'}`);
     } catch (error: any) {
       console.error('PDF import error:', error);
-      toast.error(error.message || 'Failed to parse Landstar PDF');
+      toast.error(error.message || `Failed to parse ${isLandstar ? 'Landstar ' : ''}PDF`);
     } finally {
       setIsImporting(false);
       if (pdfInputRef.current) pdfInputRef.current.value = '';

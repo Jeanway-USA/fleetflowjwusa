@@ -408,7 +408,7 @@ export function RateConfirmationUpload({ onDataExtracted, existingLoads, drivers
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <p className="text-xs text-muted-foreground">Load ID</p>
+                <p className="text-xs text-muted-foreground">{isLandstar ? 'Landstar Load ID' : 'Load ID'}</p>
                 <p className="font-mono font-medium">{extractedData.landstar_load_id || '-'}</p>
               </div>
               <div>

@@ -258,7 +258,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <FileText className="h-5 w-5" />
-          Import from Landstar Statements
+          {isLandstar ? 'Import from Landstar Statements' : 'Import from Statements'}
         </CardTitle>
         <CardDescription>
           Upload multiple documents at once — we'll cross-reference and deduplicate before importing
