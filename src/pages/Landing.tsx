@@ -405,7 +405,7 @@ export default function Landing() {
             <span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary mb-4 border border-primary/30 rounded-full px-4 py-1 bg-primary/10">Open Beta</span>
             <h3 className="text-2xl sm:text-3xl font-bold mb-3">Join the Open Beta</h3>
             <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto">
-              Be among the first Landstar BCOs to experience Fleet Flow TMS. Full platform access, zero cost during the beta period.
+              Be among the first owner-operators to experience Fleet Flow TMS. Full platform access, zero cost during the beta period.
             </p>
             <Button 
               size="lg" 
