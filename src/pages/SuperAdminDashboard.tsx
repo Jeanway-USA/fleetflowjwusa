@@ -296,6 +296,13 @@ export default function SuperAdminDashboard() {
         <TabsContent value="feedback">
           <FeedbackTab />
         </TabsContent>
+
+        {/* Tab 8: Changelog */}
+        <TabsContent value="changelog">
+          <ChangelogTab />
+        </TabsContent>
+      </Tabs>
+        </TabsContent>
       </Tabs>
 
       <OrgDetailSheet org={selectedOrg} open={sheetOpen} onOpenChange={setSheetOpen} />
