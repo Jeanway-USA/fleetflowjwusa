@@ -123,6 +123,7 @@ export default function SuperAdminDashboard() {
           <TabsTrigger value="health" className="data-[state=active]:bg-background data-[state=active]:text-foreground">System Health</TabsTrigger>
           <TabsTrigger value="billing" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Billing</TabsTrigger>
           <TabsTrigger value="feedback" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Feedback</TabsTrigger>
+          <TabsTrigger value="changelog" className="data-[state=active]:bg-background data-[state=active]:text-foreground">Changelog</TabsTrigger>
         </TabsList>
 
         {/* Tab 1: Overview */}
