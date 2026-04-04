@@ -412,7 +412,7 @@ export default function Landing() {
               className="gradient-gold text-primary-foreground text-lg px-10 pulse-glow-gold active:scale-[0.97] transition-transform"
               onClick={() => navigate('/auth')}
             >
-              Join BCO Beta
+              Join Beta
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <p className="text-xs text-muted-foreground mt-4">Free during Open Beta · No credit card required</p>
