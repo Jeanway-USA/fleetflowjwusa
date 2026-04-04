@@ -82,7 +82,7 @@ export default function About() {
               <h2 className="text-2xl font-semibold">Why It's Free</h2>
             </div>
             <p className="text-muted-foreground leading-relaxed">
-              We started FleetFlow because we needed it ourselves. We know how tight margins can be in trucking, and the last thing an owner-operator needs is another expensive subscription eating into their bottom line. That's why our core platform is free during the open beta — we want as many owner-operators as possible to benefit from it while we continue improving based on real feedback from real drivers.
+              We started FleetFlow because our team needed it. We know how tight margins can be in trucking, and the last thing an owner-operator needs is another expensive subscription eating into their bottom line. That's why our core platform is free during the open beta — we want as many owner-operators as possible to benefit from it while we continue improving based on real feedback from real drivers.
             </p>
           </section>
         </RevealOnScroll>
