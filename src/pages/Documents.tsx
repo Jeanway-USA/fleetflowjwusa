@@ -180,6 +180,8 @@ export default function Documents() {
           </AlertDescription>
         </Alert>
       )}
+
+      <div className="space-y-6">
         <Card className="card-elevated">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
