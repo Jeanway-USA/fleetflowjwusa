@@ -29,7 +29,7 @@ export default function About() {
           <div className="text-center space-y-4">
             <h1 className="text-4xl md:text-5xl font-bold">About FleetFlow</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Built by a trucker, for truckers. FleetFlow started from a simple need and grew into a platform for every owner-operator.
+              Built by owner-operators, for owner-operators. FleetFlow started from a simple need and grew into a platform for every trucking business.
             </p>
           </div>
         </RevealOnScroll>
