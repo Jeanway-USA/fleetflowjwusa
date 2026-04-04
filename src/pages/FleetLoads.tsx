@@ -1005,103 +1005,104 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
-                {/* Independent mode: show lumper, accessorials, negotiation notes, broker history */}
-                {isIndependent && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="lumper">Lumper ($)</Label>
-                      <Input 
-                        id="lumper" 
-                        type="number" 
-                        step="0.01" 
-                        value={formData.lumper || ''} 
-                        onChange={(e) => setFormData({ ...formData, lumper: parseFloat(e.target.value) || 0 })} 
-                      />
-                    </div>
+                {/* Lumper - shown for both modes */}
+                <div className="space-y-2">
+                  <Label htmlFor="lumper">Lumper ($)</Label>
+                  <Input 
+                    id="lumper" 
+                    type="number" 
+                    step="0.01" 
+                    value={formData.lumper || ''} 
+                    onChange={(e) => setFormData({ ...formData, lumper: parseFloat(e.target.value) || 0 })} 
+                  />
+                </div>
 
-                    {/* Accessorials Section */}
-                    <div className="border-t pt-4 mt-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <Label className="text-base font-medium">Accessorials</Label>
-                        <Button type="button" variant="outline" size="sm" onClick={addAccessorial}>
-                          <Plus className="h-4 w-4 mr-1" /> Add Accessorial
-                        </Button>
-                      </div>
-                      
-                      {accessorials.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">No accessorials added. Click "Add Accessorial" to add detention, layover, etc.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {accessorials.map((acc, index) => (
-                            <div key={index} className="grid grid-cols-12 gap-2 items-end p-3 bg-muted/50 rounded-lg">
-                              <div className="col-span-4 space-y-1">
-                                <Label className="text-xs">Type</Label>
-                                <Select 
-                                  value={acc.accessorial_type} 
-                                  onValueChange={(v) => updateAccessorial(index, 'accessorial_type', v)}
-                                >
-                                  <SelectTrigger className="h-9">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {ACCESSORIAL_TYPES.map(type => (
-                                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="col-span-3 space-y-1">
-                                <Label className="text-xs">Amount ($)</Label>
-                                <Input 
-                                  type="number" 
-                                  step="0.01"
-                                  className="h-9"
-                                  value={acc.amount || ''} 
-                                  onChange={(e) => updateAccessorial(index, 'amount', parseFloat(e.target.value) || 0)}
-                                  placeholder="0.00"
-                                />
-                              </div>
-                              <div className="col-span-2 space-y-1">
-                                <Label className="text-xs">% Paid</Label>
-                                <Input 
-                                  type="number" 
-                                  min="0" 
-                                  max="100"
-                                  className="h-9"
-                                  value={acc.percentage || ''} 
-                                  onChange={(e) => updateAccessorial(index, 'percentage', parseFloat(e.target.value) || 100)}
-                                  placeholder="100"
-                                />
-                              </div>
-                              <div className="col-span-2 space-y-1">
-                                <Label className="text-xs">Net</Label>
-                                <div className="h-9 px-2 py-1.5 rounded-md border bg-muted text-sm font-medium">
-                                  {formatCurrency(acc.amount * (acc.percentage / 100))}
-                                </div>
-                              </div>
-                              <div className="col-span-1">
-                                <Button 
-                                  type="button" 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-9 w-9 text-destructive"
-                                  onClick={() => removeAccessorial(index)}
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                          <div className="flex justify-end pt-2">
-                            <div className="text-sm">
-                              <span className="text-muted-foreground">Total Accessorials: </span>
-                              <span className="font-bold">{formatCurrency(calculateAccessorialsTotal())}</span>
+                {/* Accessorials Section - shown for both modes */}
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-base font-medium">Accessorials</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={addAccessorial}>
+                      <Plus className="h-4 w-4 mr-1" /> Add Accessorial
+                    </Button>
+                  </div>
+                  
+                  {accessorials.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No accessorials added. Click "Add Accessorial" to add detention, layover, etc.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {accessorials.map((acc, index) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 items-end p-3 bg-muted/50 rounded-lg">
+                          <div className="col-span-4 space-y-1">
+                            <Label className="text-xs">Type</Label>
+                            <Select 
+                              value={acc.accessorial_type} 
+                              onValueChange={(v) => updateAccessorial(index, 'accessorial_type', v)}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ACCESSORIAL_TYPES.map(type => (
+                                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-3 space-y-1">
+                            <Label className="text-xs">Amount ($)</Label>
+                            <Input 
+                              type="number" 
+                              step="0.01"
+                              className="h-9"
+                              value={acc.amount || ''} 
+                              onChange={(e) => updateAccessorial(index, 'amount', parseFloat(e.target.value) || 0)}
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs">% Paid</Label>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              max="100"
+                              className="h-9"
+                              value={acc.percentage || ''} 
+                              onChange={(e) => updateAccessorial(index, 'percentage', parseFloat(e.target.value) || 100)}
+                              placeholder="100"
+                            />
+                          </div>
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs">Net</Label>
+                            <div className="h-9 px-2 py-1.5 rounded-md border bg-muted text-sm font-medium">
+                              {formatCurrency(acc.amount * (acc.percentage / 100))}
                             </div>
                           </div>
+                          <div className="col-span-1">
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-9 w-9 text-destructive"
+                              onClick={() => removeAccessorial(index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                      )}
+                      ))}
+                      <div className="flex justify-end pt-2">
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Total Accessorials: </span>
+                          <span className="font-bold">{formatCurrency(calculateAccessorialsTotal())}</span>
+                        </div>
+                      </div>
                     </div>
+                  )}
+                </div>
 
+                {/* Independent mode only: negotiation tools & broker history */}
+                {isIndependent && (
+                  <>
                     {/* Total Negotiated Rate Calculator */}
                     <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
                       <div className="flex items-center justify-between">
@@ -1135,20 +1136,6 @@ export default function FleetLoads() {
                       <BrokerRateHistoryCard agencyCode={formData.agency_code} currentLoads={loads} />
                     )}
                   </>
-                )}
-
-                {/* Landstar mode: simpler view with just lumper */}
-                {isLandstar && (
-                  <div className="space-y-2">
-                    <Label htmlFor="lumper">Lumper ($)</Label>
-                    <Input 
-                      id="lumper" 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.lumper || ''} 
-                      onChange={(e) => setFormData({ ...formData, lumper: parseFloat(e.target.value) || 0 })} 
-                    />
-                  </div>
                 )}
 
                 <div className="grid grid-cols-2 gap-4">
