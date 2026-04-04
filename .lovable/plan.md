@@ -1,14 +1,32 @@
 
 
-## Update "Why It's Free" Section
+## Prevent Page "Refresh" on Tab Switch
 
-### Changes to `src/pages/About.tsx`
+### Root Cause
+The `QueryClient` in `src/App.tsx` (line 54) is instantiated with default settings. React Query's default behavior sets `refetchOnWindowFocus: true`, which triggers all active queries to refetch when the user returns to the tab. This causes loading spinners and re-renders that feel like a full page refresh.
 
-**Section header (line 82):** Change from `"Why It's Free"` → `"Affordable for Everyone"`
+### Fix
 
-**Section body (lines 84-86):** Replace the current paragraph with messaging that positions the free tier as beta-only and emphasizes competitive pricing going forward:
+**File: `src/App.tsx` — line 54**
 
-> We started FleetFlow because our team needed it. We know how tight margins can be in trucking, and the last thing an owner-operator needs is another expensive subscription eating into their bottom line. During our open beta, the platform is completely free so we can gather real feedback from real drivers. Once we launch fully, our pricing will remain competitive and accessible — designed so that businesses of any size can afford the tools they need to run efficiently.
+Change the QueryClient initialization from:
+```ts
+const queryClient = new QueryClient();
+```
+to:
+```ts
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
+```
 
-**Icon:** Keep `Heart` — still fits the affordability/accessibility theme.
+- `refetchOnWindowFocus: false` — stops queries from re-firing when the tab regains focus.
+- `staleTime: 5 * 60 * 1000` — keeps cached data fresh for 5 minutes, reducing unnecessary network calls.
+
+This is a single-line change in one file. No other files need modification.
 
