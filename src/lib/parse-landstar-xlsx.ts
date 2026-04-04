@@ -42,7 +42,7 @@ const EXPENSE_TYPE_MAP: [RegExp, string][] = [
   [/\bCARD FEE\b/i, 'Card Fee'],
   [/\bCARD PRE-TRIP\b/i, 'Advance'],
   [/\bCARD CONT\.?\s*SPEC\s*ADV\b/i, 'Advance'],
-  [/\bTRIP%?\s*ESCROW/i, 'Escrow Payment'],
+  
   [/\bTRKSTP SCN\b/i, 'Trip Scanning'],
   [/\bDD FEE\b/i, 'Direct Deposit Fee'],
   [/\bPERMIT/i, 'Licensing/Permits'],

@@ -487,7 +487,7 @@ export default function ExecutiveDashboard() {
         'Card Load': 'Payments & Advances',
         'Card Fee': 'Payments & Advances',
         'Direct Deposit Fee': 'Payments & Advances',
-        'Escrow Payment': 'Payments & Advances',
+        
       };
 
       // Group expenses by category

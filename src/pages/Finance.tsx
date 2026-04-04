@@ -47,7 +47,7 @@ const expenseTypes = [
   'Licensing/Permits', 'Registration/Plates', 'Insurance', 'LCN/Satellite', 'Maintenance',
   'Cell Phone', 'Trip Scanning', 'Card Load', 'Card Fee', 'Cash Advance', 'Direct Deposit Fee',
   'Advance', 'Direct Deposit',
-  'Escrow Payment', 'Truck Warranty', 'CPP/Benefits', 'IFTA', 'PrePass/Scale', 'Tolls', 'Parking', 'Misc'
+  'Truck Warranty', 'CPP/Benefits', 'IFTA', 'PrePass/Scale', 'Tolls', 'Parking', 'Misc'
 ];
 
 const GALLONS_EXPENSE_TYPES = ['Fuel', 'DEF'];

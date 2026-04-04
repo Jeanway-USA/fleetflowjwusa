@@ -121,7 +121,7 @@ EXPENSE TYPE MAPPING - Use these exact expense_type values:
 - Card Pre-Trip, Card Load → "Card Load"
 - Cash Advance → "Cash Advance"
 - Direct-Deposit Fee, DD Fee → "Direct Deposit Fee"
-- TRIP% ESCROW PAYMENT, Escrow → "Escrow Payment"
+- TRIP% ESCROW PAYMENT, Escrow → SKIP/IGNORE entirely (do not include in output)
 - PERMITS, Permit → "Licensing/Permits"
 - PLATE, Registration, Plates → "Registration/Plates"
 - LCN FEES, LCN → "LCN/Satellite"
