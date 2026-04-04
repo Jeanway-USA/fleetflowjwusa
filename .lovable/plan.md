@@ -1,33 +1,36 @@
 
 
-## Plan: Replace Text Branding with Logo Images
+## Plan: Add Individual Delete Button to Org Actions
 
 ### Overview
-Replace all instances of the text-based "Fleet Flow TMS / by JeanWayUSA" branding with the uploaded logo images. Use the icon logo (Logo.png) for compact spaces (sidebar, nav headers) and the text logo (Text_Logo.png) for larger branding areas (hero, footer, auth pages).
+Add a "Delete Organization" option to each organization's action dropdown in the Super Admin panel, with a confirmation dialog. This requires a new database function and a frontend update.
 
----
+### Database Migration
+Create a `super_admin_delete_org` function that:
+- Requires super admin privileges
+- Protects the demo org (`a0000000-0000-0000-0000-000000000001`)
+- Cascades deletion of all related data (profiles, loads, expenses, etc.) before deleting the org
+- Returns void
 
-### Assets
-- Copy `Logo.png` → `src/assets/Logo.png` (square icon — sidebar, nav)
-- Copy `Text_Logo.png` → `src/assets/Text_Logo.png` (wide text logo — hero, footer, auth)
+```sql
+CREATE OR REPLACE FUNCTION public.super_admin_delete_org(target_org_id uuid)
+RETURNS void ...
+```
 
-### Files to Update
+The function will delete from all child tables (same pattern as `super_admin_reset_demo`) then delete the organization row.
 
-| File | Change |
+### Frontend Changes
+
+**`src/components/superadmin/OrgActionsDropdown.tsx`**:
+- Add a `deleteOpen` state for a confirmation dialog
+- Add a `deleteOrg` mutation calling the new RPC
+- Add a "Delete Organization" menu item (red, destructive styling) after a separator
+- Add an AlertDialog confirmation with the org name displayed
+- Protect the demo org by disabling the option if `org.id === 'a0000000-...'`
+
+### Files
+| File | Action |
 |------|--------|
-| `src/pages/Landing.tsx` | Nav header: icon logo + text logo. Footer brand: text logo. CTA section text reference stays as-is. |
-| `src/components/layout/AppSidebar.tsx` | Replace text branding block with icon logo (small) or text logo (expanded sidebar). |
-| `src/pages/Auth.tsx` | Replace heading text with text logo image. |
-| `src/pages/ResetPassword.tsx` | Replace 3 heading instances with text logo. |
-| `src/pages/Onboarding.tsx` | Replace heading with text logo. |
-| `src/pages/PendingAccess.tsx` | Replace heading with text logo. |
-| `src/pages/Pricing.tsx` | Nav and footer — icon + text logo. |
-| `src/pages/CheckoutSuccess.tsx` | Minor text reference, keep as plain text (contextual sentence). |
-
-### Approach
-- Import logos as ES6 modules (`import logo from "@/assets/Logo.png"`).
-- Icon logo renders at ~32–40px height in nav/sidebar contexts.
-- Text logo renders at ~160–200px width in hero/auth/footer contexts.
-- Add `alt="FleetFlow TMS by JeanWay USA"` for accessibility.
-- The text logo is white, so it works on dark backgrounds. For light theme compatibility, add `dark:invert-0 invert` class or rely on the app's dark-first design.
+| Migration SQL | New `super_admin_delete_org` function |
+| `src/components/superadmin/OrgActionsDropdown.tsx` | Add delete menu item + confirmation dialog |
 
