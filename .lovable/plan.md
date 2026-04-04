@@ -1,24 +1,21 @@
 
 
-## Skip "TRIP% ESCROW PAYMENT" During Expense Import
+## Fix: Show Accessorials in Landstar Mode
 
-"TRIP% ESCROW PAYMENT" is an internal escrow withholding that doesn't affect net pay. It should be filtered out during import, similar to how revenue lines are already skipped.
+### Problem
+The accessorials section in the load dialog is wrapped inside `{isIndependent && (...)}` (line 1009), so it only appears for organizations using "independent" TMS mode. Your organization uses Landstar mode, which has a stripped-down section (lines 1141-1152) that only shows the Lumper field -- no accessorials.
 
-### Changes
+### Solution
+Move the accessorials section out of the `isIndependent` conditional so it displays for **both** Landstar and Independent modes.
 
-**1. `src/lib/parse-landstar-xlsx.ts`**
-- Add `/\bTRIP%?\s*ESCROW/i` to `REVENUE_IGNORE_PATTERNS` so these lines are skipped entirely during XLSX parsing.
-- Remove the corresponding entry from `EXPENSE_TYPE_MAP` since it will never reach mapping.
+### Changes -- `src/pages/FleetLoads.tsx`
 
-**2. `supabase/functions/parse-landstar-statement/index.ts`**
-- Update the AI prompt to instruct the model to **skip/ignore** "TRIP% ESCROW PAYMENT" lines instead of categorizing them as "Escrow Payment".
+**1. Extract the Accessorials section from the `isIndependent` block** (lines 1022-1103) and place it after the Landstar/Independent conditional blocks (after line 1152), so it renders for all modes.
 
-**3. `src/pages/Finance.tsx`**
-- Remove `'Escrow Payment'` from the `EXPENSE_TYPES` filter array since it will no longer appear.
+**2. Keep mode-specific sections intact:**
+- Independent mode keeps: Lumper, Total Negotiated Rate calculator, Negotiation Notes, Broker History
+- Landstar mode keeps: Lumper (as-is)
+- Both modes get: Accessorials section (moved to shared area)
 
-**4. `src/pages/ExecutiveDashboard.tsx`**
-- Remove the `'Escrow Payment'` entry from the expense category mapping.
-
-### Impact
-Existing escrow records already in the database are unaffected. Future imports (both XLSX and AI-parsed PDFs) will simply skip these lines.
+The accessorial management functions (`addAccessorial`, `removeAccessorial`, `updateAccessorial`, `calculateAccessorialsTotal`) and mutations already work regardless of mode -- only the UI was gated.
 
