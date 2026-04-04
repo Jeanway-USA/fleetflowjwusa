@@ -36,6 +36,24 @@ export default function Documents() {
   const { orgId } = useAuth();
   const queryClient = useQueryClient();
   const { upload: storageUpload, remove: storageRemove } = useStorageProvider();
+  const { data: storageStatus } = useStorageStatus();
+  const isGoogleDrive = storageStatus?.provider === 'google_drive' && storageStatus?.is_active;
+
+  // Fetch root folder ID for "Open in Google Drive" link
+  const { data: storageConfig } = useQuery({
+    queryKey: ['storage-config-root', orgId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('org_storage_config')
+        .select('root_folder_id')
+        .eq('org_id', orgId!)
+        .eq('is_active', true)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!orgId && isGoogleDrive,
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [selectedType, setSelectedType] = useState('BOL');
