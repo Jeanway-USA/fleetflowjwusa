@@ -379,7 +379,7 @@ export default function Landing() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {[
-              { icon: FileText, title: 'Automated Statement Parsing', desc: 'Upload your Landstar settlement PDF and watch it auto-map every line item — revenue, deductions, and advances — in seconds.', accent: 'bg-primary/10 text-primary' },
+              { icon: FileText, title: 'Automated Statement Parsing', desc: 'Upload your settlement PDF and watch it auto-map every line item — revenue, deductions, and advances — in seconds.', accent: 'bg-primary/10 text-primary' },
               { icon: Fuel, title: 'Fuel & Card Advance Tracking', desc: 'Track fuel purchases, Comdata advances, and per-load expenses so you always know your true cost-per-mile.', accent: 'bg-emerald-500/10 text-emerald-500' },
               { icon: Package, title: 'Active Load Dispatching', desc: 'Assign drivers, update statuses, and monitor pickups & deliveries from a single real-time board.', accent: 'bg-blue-500/10 text-blue-500' },
               { icon: Smartphone, title: 'Driver Mobile Access', desc: 'Drivers get their own dashboard for BOL uploads, DVIR forms, and live trip updates — right from their phone.', accent: 'bg-purple-500/10 text-purple-500' },
