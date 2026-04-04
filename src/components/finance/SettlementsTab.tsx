@@ -109,6 +109,7 @@ function calcNetPay(data: Partial<Settlement>): number {
 export function SettlementsTab() {
   const queryClient = useQueryClient();
   const { orgId } = useAuth();
+  const { isLandstar } = useOrganizationMode();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
   const [viewingSettlement, setViewingSettlement] = useState<Settlement | null>(null);
