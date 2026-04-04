@@ -26,6 +26,7 @@ export function ChangelogTab() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<string>('Update');
+  const [mentionRole, setMentionRole] = useState(false);
 
   const { data: entries, isLoading } = useQuery({
     queryKey: ['changelog-entries'],
