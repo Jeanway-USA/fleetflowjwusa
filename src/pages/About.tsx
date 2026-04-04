@@ -97,7 +97,7 @@ export default function About() {
               <h2 className="text-2xl font-semibold">The Vision</h2>
             </div>
             <p className="text-muted-foreground leading-relaxed">
-              FleetFlow is more than a TMS — it's a growing community of owner-operators helping shape the tools they actually need. Every feature we build is driven by feedback from drivers like you. Whether you're a solo BCO running one truck or managing a small fleet, FleetFlow is designed to scale with your business and make your life on the road just a little bit easier.
+              FleetFlow is more than a TMS — it's a growing community of owner-operators helping shape the tools they actually need. Every feature we build is driven by feedback from drivers like you. Whether you're a solo owner-operator running one truck or managing a small fleet, FleetFlow is designed to scale with your business and make your life on the road just a little bit easier.
             </p>
           </section>
         </RevealOnScroll>
