@@ -12,6 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Send, Megaphone } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const TYPE_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive'> = {
   Update: 'default',
