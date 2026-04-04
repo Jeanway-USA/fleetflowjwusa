@@ -46,7 +46,7 @@ export function ChangelogTab() {
       if (!session) throw new Error('Not authenticated');
 
       const res = await supabase.functions.invoke('discord-updates', {
-        body: { title, description, type },
+        body: { title, description, type, mentionRole },
       });
 
       if (res.error) throw new Error(res.error.message || 'Failed to send update');
