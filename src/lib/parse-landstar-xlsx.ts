@@ -28,6 +28,7 @@ const REVENUE_IGNORE_PATTERNS: RegExp[] = [
   /\b1099\s*REVENUE\b/i,
   /\bLINEHAUL\b/i,
   /\bTRACTOR\s*LEASE\b/i,
+  /\bTRIP%?\s*ESCROW/i,
 ];
 
 // Advance patterns (non-P&L)
@@ -41,7 +42,7 @@ const EXPENSE_TYPE_MAP: [RegExp, string][] = [
   [/\bCARD FEE\b/i, 'Card Fee'],
   [/\bCARD PRE-TRIP\b/i, 'Advance'],
   [/\bCARD CONT\.?\s*SPEC\s*ADV\b/i, 'Advance'],
-  [/\bTRIP%?\s*ESCROW/i, 'Escrow Payment'],
+  
   [/\bTRKSTP SCN\b/i, 'Trip Scanning'],
   [/\bDD FEE\b/i, 'Direct Deposit Fee'],
   [/\bPERMIT/i, 'Licensing/Permits'],
