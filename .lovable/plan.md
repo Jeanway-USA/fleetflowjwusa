@@ -1,48 +1,35 @@
 
 
-## Add About, Contact, Privacy Policy & Terms of Service Pages
+## Remove Landstar-Specific Terminology from Landing Page
 
 ### Overview
-Create four new public pages linked from the Landing footer. Contact form emails sent via Resend (already configured with `RESEND_API_KEY`, sending from `no-reply@jeanwayusa.com`), matching the existing pattern used by `send-invoice-email` and `invite-user`.
+Replace all Landstar-specific references on the Landing page with generic owner-operator / trucking terminology. Also update the About page where Landstar is mentioned prominently.
 
 ### Changes
 
-#### 1. New Edge Function: `supabase/functions/contact-form/index.ts`
-- Accept POST with `name`, `email`, `subject`, `message` (validated with Zod)
-- Authenticate as super admin NOT required — public endpoint
-- Send email to `hr@jeanwayusa.com` via Resend with all form details
-- Send confirmation reply to the submitter
-- CORS headers included
-- Uses existing `RESEND_API_KEY` secret
+#### 1. `src/pages/Landing.tsx` — 10 text replacements
 
-#### 2. New Page: `src/pages/About.tsx`
-- Origin story based on provided context (Siadrak, Landstar, owner-operator needs)
-- Sections: Mission, Origin Story, Why It's Free, Vision
-- Dark theme with gold accents, RevealOnScroll animations
-- Back-to-home navigation header
+| Line | Current | Replacement |
+|------|---------|-------------|
+| 20 | `'Built for Landstar', value: '100%'` | `'Built for Truckers', value: '100%'` |
+| 123 | `Built for Landstar BCOs & Agents` | `Built for Owner-Operators` |
+| 130 | `...built specifically for Landstar BCOs to track expenses, manage card advances, and streamline dispatching.` | `...built specifically for owner-operators to track expenses, manage finances, and streamline dispatching.` |
+| 138 | `Join Free BCO Beta` | `Join Free Beta` |
+| 253 | `Solo BCO` | `Solo Operator` |
+| 263 | `The Owner-Operator Pack` | (keep as-is) |
+| 378 | `...how Landstar BCOs actually run their business.` | `...how owner-operators actually run their business.` |
+| 382 | `Upload your Landstar settlement PDF...` | `Upload your settlement PDF...` |
+| 408 | `Be among the first Landstar BCOs to experience...` | `Be among the first owner-operators to experience...` |
+| 415 | `Join BCO Beta` | `Join Beta` |
+| 433 | `...built for Landstar BCOs to track finances...` | `...built for owner-operators to track finances...` |
+| 466 | `Built for Landstar BCOs & Agents` | `Built for Owner-Operators` |
+| 477 | `Join BCO Beta` | `Join Beta` |
 
-#### 3. New Page: `src/pages/Contact.tsx`
-- Form fields: Name, Email, Subject, Message
-- Client-side validation with zod + react-hook-form
-- On submit: invoke `contact-form` edge function
-- Success/error toast feedback
-- Same dark theme styling
+#### 2. `src/pages/About.tsx` — Minor adjustments
 
-#### 4. New Page: `src/pages/PrivacyPolicy.tsx`
-- Standard privacy policy tailored to fleet management TMS
-- Covers: data collection, GPS/location data, financial records, cookies, third-party services, user rights
-- Effective date included
-
-#### 5. New Page: `src/pages/TermsOfService.tsx`
-- Standard TOS covering: account responsibilities, acceptable use, service availability, limitation of liability, termination
-- Tailored to FleetFlow TMS context
-
-#### 6. Update `src/App.tsx`
-- Add lazy imports and routes: `/about`, `/contact`, `/privacy`, `/terms`
-
-#### 7. Update `src/pages/Landing.tsx` (footer)
-- Wire the four footer buttons to `navigate('/about')`, `/contact`, `/privacy`, `/terms`
-
-### No database table needed
-Contact form submissions go directly to email via the edge function — no persistence required unless you want it later.
+| Line | Current | Replacement |
+|------|---------|-------------|
+| 48 | `...leased to Landstar — a trucking company exclusively for Owner-Operators. Like many BCOs, he was...` | `...leased to a major carrier. Like many owner-operators, he was...` |
+| 85 | `...we want as many BCOs as possible...` | `...we want as many owner-operators as possible...` |
+| 100 | `Whether you're a solo BCO running one truck...` | `Whether you're a solo owner-operator running one truck...` |
 
