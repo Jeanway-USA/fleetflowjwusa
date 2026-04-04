@@ -17,7 +17,7 @@ import textLogo from '@/assets/Text_Logo.png';
 
 const STATS = [
   { label: 'Cost to You', value: '$0' },
-  { label: 'Built for Landstar', value: '100%' },
+  { label: 'Built for Truckers', value: '100%' },
   { label: 'Features Included', value: 'All' },
   { label: 'Setup Time', value: '< 5 min' },
 ];
