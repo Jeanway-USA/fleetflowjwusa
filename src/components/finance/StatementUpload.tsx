@@ -60,6 +60,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 export function StatementUpload({ existingLoads, trucks, existingExpenses, onExpensesImported, orgId }: StatementUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const { isLandstar } = useOrganizationMode();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [reconciliationResult, setReconciliationResult] = useState<ReconciliationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
