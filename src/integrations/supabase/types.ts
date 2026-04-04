@@ -4491,6 +4491,10 @@ export type Database = {
       has_safety_access: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      storage_user_same_org: {
+        Args: { folder_owner_id: string }
+        Returns: boolean
+      }
       super_admin_delete_org: {
         Args: { target_org_id: string }
         Returns: undefined
