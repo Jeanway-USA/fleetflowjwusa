@@ -179,19 +179,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        const previousUserId = currentUserIdRef.current;
         setSession(session);
         setUser(session?.user ?? null);
+        currentUserIdRef.current = session?.user?.id ?? null;
         
         if (session?.user) {
-          setRolesLoading(true);
-          setOrgLoading(true);
-          setTimeout(() => {
-            fetchUserRoles(session.user.id).then((fetchedRoles) => {
-              setRoles(fetchedRoles);
-              setRolesLoading(false);
-            });
-            fetchOrgData(session.user.id).finally(() => setOrgLoading(false));
-          }, 0);
+          // Only re-fetch roles/org when the user actually changed
+          // (not on TOKEN_REFRESHED which fires on tab focus)
+          const userChanged = session.user.id !== previousUserId;
+          if (userChanged) {
+            setRolesLoading(true);
+            setOrgLoading(true);
+            setTimeout(() => {
+              fetchUserRoles(session.user.id).then((fetchedRoles) => {
+                setRoles(fetchedRoles);
+                setRolesLoading(false);
+              });
+              fetchOrgData(session.user.id).finally(() => setOrgLoading(false));
+            }, 0);
+          }
         } else {
           setRoles([]);
           setRolesLoading(false);
