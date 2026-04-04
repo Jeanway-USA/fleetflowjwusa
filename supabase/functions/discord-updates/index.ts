@@ -37,29 +37,33 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseAuth = createClient(supabaseUrl, anonKey, {
+    const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
-    if (userError || !user) {
+    const { data: userData, error: userError } = await userClient.auth.getUser();
+    if (userError || !userData.user) {
+      console.error("Auth error:", userError);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = user.id;
+    const userId = userData.user.id;
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    // Check super admin
-    const { data: saRow } = await supabaseAdmin
-      .from("super_admins")
-      .select("id")
-      .eq("user_id", userId)
-      .maybeSingle();
+    const { data: isSuperAdmin, error: adminCheckError } = await userClient.rpc("is_super_admin");
 
-    if (!saRow) {
+    if (adminCheckError) {
+      console.error("Super admin check failed:", adminCheckError);
+      return new Response(JSON.stringify({ error: "Authorization check failed" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!isSuperAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
