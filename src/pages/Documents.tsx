@@ -155,11 +155,31 @@ export default function Documents() {
     },
   ];
 
+  const driveFolderUrl = storageConfig?.root_folder_id
+    ? `https://drive.google.com/drive/folders/${storageConfig.root_folder_id}`
+    : null;
+
   return (
     <>
       <PageHeader title="Documents" description="Upload and manage BOLs, PODs, receipts, and other documents" />
-      
-      <div className="space-y-6">
+
+      {isGoogleDrive && (
+        <Alert className="mb-6 border-primary/30 bg-primary/5">
+          <Cloud className="h-4 w-4" />
+          <AlertTitle>Google Drive Storage Active</AlertTitle>
+          <AlertDescription className="flex items-center justify-between">
+            <span>Your documents are stored in your connected Google Drive account.</span>
+            {driveFolderUrl && (
+              <Button variant="outline" size="sm" asChild className="ml-4 shrink-0">
+                <a href={driveFolderUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open in Google Drive
+                </a>
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
         <Card className="card-elevated">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
