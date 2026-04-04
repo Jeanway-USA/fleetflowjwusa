@@ -10,9 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Upload, Trash2, FolderOpen } from 'lucide-react';
+import { FileText, Upload, Trash2, FolderOpen, ExternalLink, Cloud } from 'lucide-react';
 import { toast } from 'sonner';
-import { useStorageProvider } from '@/hooks/useStorageProvider';
+import { useStorageProvider, useStorageStatus } from '@/hooks/useStorageProvider';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { Database } from '@/integrations/supabase/types';
 
 type Document = Database['public']['Tables']['documents']['Row'];
