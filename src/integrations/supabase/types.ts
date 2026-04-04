@@ -222,6 +222,33 @@ export type Database = {
           },
         ]
       }
+      changelog: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string
+          id: string
+          title: string
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          id?: string
+          title: string
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          id?: string
+          title?: string
+          type?: string
+        }
+        Relationships: []
+      }
       company_resources: {
         Row: {
           address: string | null
