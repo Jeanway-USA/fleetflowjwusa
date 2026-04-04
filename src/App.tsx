@@ -46,6 +46,10 @@ const SuperAdminDashboard = lazy(() => import("./pages/SuperAdminDashboard"));
 const PublicLoadTracker = lazy(() => import("./pages/PublicLoadTracker"));
 const AccountDeactivated = lazy(() => import("./pages/AccountDeactivated"));
 const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
+const About = lazy(() => import("./pages/About"));
+const Contact = lazy(() => import("./pages/Contact"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 
 const queryClient = new QueryClient();
 
