@@ -430,7 +430,7 @@ export default function Landing() {
                 <img src={logoIcon} alt="" className="h-7 w-auto" />
                 <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-7 w-auto" />
               </div>
-              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">The all-in-one platform built for Landstar BCOs to track finances, dispatch loads, and grow profitably.</p>
+              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">The all-in-one platform built for owner-operators to track finances, dispatch loads, and grow profitably.</p>
             </div>
             {/* Product */}
             <div>
