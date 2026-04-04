@@ -1,19 +1,22 @@
 
 
-## Fix Demo Controls
+## Fix: Foreign Key Constraint Error When Deleting/Deactivating Organizations
 
-### Problem 1: Tier buttons appear to do nothing
-The tier switch updates the database and refreshes the auth context, but the user stays on the current page. Since the sidebar items change but the current page may still be accessible, there's no visible feedback beyond the toast. The fix: after switching tiers, navigate to the correct landing page for that tier.
+### Root Cause
 
-### Problem 2: "Start Beta Account" navigates to landing instead of auth
-Line 88 navigates to `/` after signing out. It should navigate to `/auth` so prospects go straight to the signup form.
+The `user_roles` table has a foreign key `org_id REFERENCES organizations(id)` **without** `ON DELETE CASCADE`. When the super admin tries to delete or deactivate an organization, two paths fail:
 
-### Changes — `src/components/demo/DemoControls.tsx`
+1. **`super_admin_update_org`** (deactivate + auto-delete empty orgs): Attempts `DELETE FROM organizations` without first clearing `user_roles` rows for that org.
+2. **`super_admin_delete_org`** (manual delete): Deletes `user_roles` by joining on `profiles.org_id`, but if some `user_roles` rows reference the org directly via `user_roles.org_id`, those are missed.
 
-**Tier switch handler** — after `refreshOrgData()`, navigate to the appropriate dashboard:
-- `solo_bco` → `/fleet-loads`
-- `fleet_owner` → `/executive-dashboard`
-- `agency` → `/agency-loads`
+### Fix — Single Migration
 
-**Start Beta button** — change `navigate('/')` to `navigate('/auth')`.
+Update both RPC functions to delete `user_roles WHERE org_id = target_org_id` before deleting the organization.
+
+**`super_admin_delete_org`** — add `DELETE FROM public.user_roles WHERE org_id = target_org_id;` before the existing profiles-based delete (replace the join-based delete entirely since the direct `org_id` match is more reliable).
+
+**`super_admin_update_org`** — in the auto-delete block (when `new_is_active = false` and no profiles remain), add `DELETE FROM public.user_roles WHERE org_id = target_org_id;` before the `DELETE FROM organizations` statement.
+
+### Files
+- **New migration SQL** — recreates both functions with the `user_roles` cleanup fix.
 
