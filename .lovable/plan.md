@@ -1,17 +1,14 @@
 
 
-## Rewrite About Page — Depersonalize & Remove Landstar References
+## Update "Why It's Free" Section
 
-### What Changes
+### Changes to `src/pages/About.tsx`
 
-**Origin Story (lines 46-56)** — Remove "Siadrak" by name and all personal pronouns. Rewrite as a team-driven narrative: "Our founding team includes owner-operators who lived the problem firsthand — juggling spreadsheets, paper receipts, and disconnected apps." Mention that FleetFlow was originally built for a specific carrier's contractors but quickly expanded to serve all owner-operators.
+**Section header (line 82):** Change from `"Why It's Free"` → `"Affordable for Everyone"`
 
-**Hero subtitle (line 32)** — Change from "Built by a trucker, for truckers" to "Built by owner-operators, for owner-operators" to keep the peer credibility without being personal.
+**Section body (lines 84-86):** Replace the current paragraph with messaging that positions the free tier as beta-only and emphasizes competitive pricing going forward:
 
-**Why It's Free (line 85)** — Minor tweak: "We started FleetFlow because our team needed it" instead of "we needed it ourselves."
+> We started FleetFlow because our team needed it. We know how tight margins can be in trucking, and the last thing an owner-operator needs is another expensive subscription eating into their bottom line. During our open beta, the platform is completely free so we can gather real feedback from real drivers. Once we launch fully, our pricing will remain competitive and accessible — designed so that businesses of any size can afford the tools they need to run efficiently.
 
-All other sections (Mission, Vision, CTA) remain unchanged — they're already generic and professional.
-
-### Files Modified
-- `src/pages/About.tsx` — Text-only edits, no structural changes
+**Icon:** Keep `Heart` — still fits the affordability/accessibility theme.
 
