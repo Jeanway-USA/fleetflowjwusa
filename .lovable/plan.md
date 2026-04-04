@@ -1,22 +1,24 @@
 
 
-## Fix: Foreign Key Constraint Error When Deleting/Deactivating Organizations
+## Skip "TRIP% ESCROW PAYMENT" During Expense Import
 
-### Root Cause
+"TRIP% ESCROW PAYMENT" is an internal escrow withholding that doesn't affect net pay. It should be filtered out during import, similar to how revenue lines are already skipped.
 
-The `user_roles` table has a foreign key `org_id REFERENCES organizations(id)` **without** `ON DELETE CASCADE`. When the super admin tries to delete or deactivate an organization, two paths fail:
+### Changes
 
-1. **`super_admin_update_org`** (deactivate + auto-delete empty orgs): Attempts `DELETE FROM organizations` without first clearing `user_roles` rows for that org.
-2. **`super_admin_delete_org`** (manual delete): Deletes `user_roles` by joining on `profiles.org_id`, but if some `user_roles` rows reference the org directly via `user_roles.org_id`, those are missed.
+**1. `src/lib/parse-landstar-xlsx.ts`**
+- Add `/\bTRIP%?\s*ESCROW/i` to `REVENUE_IGNORE_PATTERNS` so these lines are skipped entirely during XLSX parsing.
+- Remove the corresponding entry from `EXPENSE_TYPE_MAP` since it will never reach mapping.
 
-### Fix — Single Migration
+**2. `supabase/functions/parse-landstar-statement/index.ts`**
+- Update the AI prompt to instruct the model to **skip/ignore** "TRIP% ESCROW PAYMENT" lines instead of categorizing them as "Escrow Payment".
 
-Update both RPC functions to delete `user_roles WHERE org_id = target_org_id` before deleting the organization.
+**3. `src/pages/Finance.tsx`**
+- Remove `'Escrow Payment'` from the `EXPENSE_TYPES` filter array since it will no longer appear.
 
-**`super_admin_delete_org`** — add `DELETE FROM public.user_roles WHERE org_id = target_org_id;` before the existing profiles-based delete (replace the join-based delete entirely since the direct `org_id` match is more reliable).
+**4. `src/pages/ExecutiveDashboard.tsx`**
+- Remove the `'Escrow Payment'` entry from the expense category mapping.
 
-**`super_admin_update_org`** — in the auto-delete block (when `new_is_active = false` and no profiles remain), add `DELETE FROM public.user_roles WHERE org_id = target_org_id;` before the `DELETE FROM organizations` statement.
-
-### Files
-- **New migration SQL** — recreates both functions with the `user_roles` cleanup fix.
+### Impact
+Existing escrow records already in the database are unaffected. Future imports (both XLSX and AI-parsed PDFs) will simply skip these lines.
 
