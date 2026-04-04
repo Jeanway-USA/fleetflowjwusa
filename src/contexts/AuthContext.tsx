@@ -217,6 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      currentUserIdRef.current = session?.user?.id ?? null;
       
       if (session?.user) {
         setRolesLoading(true);
