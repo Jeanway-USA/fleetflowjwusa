@@ -83,6 +83,10 @@ const App = () => {
                     <Route path="/onboarding" element={<Onboarding />} />
                     <Route path="/account-deactivated" element={<AccountDeactivated />} />
                     <Route path="/checkout-success" element={<CheckoutSuccess />} />
+                    <Route path="/about" element={<About />} />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/privacy" element={<PrivacyPolicy />} />
+                    <Route path="/terms" element={<TermsOfService />} />
 
                     {/* Dashboard routes */}
                     <Route path="/executive-dashboard" element={

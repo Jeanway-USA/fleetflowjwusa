@@ -456,8 +456,8 @@ export default function Landing() {
             <div>
               <h5 className="text-sm font-semibold text-foreground mb-4 uppercase tracking-wider">Legal</h5>
               <ul className="space-y-2.5">
-                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Privacy Policy</button></li>
-                <li><button className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Terms of Service</button></li>
+                <li><button onClick={() => navigate('/privacy')} className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Privacy Policy</button></li>
+                <li><button onClick={() => navigate('/terms')} className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Terms of Service</button></li>
               </ul>
             </div>
           </div>
