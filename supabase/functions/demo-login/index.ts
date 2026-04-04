@@ -19,6 +19,7 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const DEMO_PASSWORD = Deno.env.get("DEMO_USER_PASSWORD");
     if (!DEMO_PASSWORD) {
+      console.error("DEMO_USER_PASSWORD secret is not set");
       return new Response(
         JSON.stringify({ error: "Demo login not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -28,7 +29,7 @@ serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Try to sign in the demo user first
+    // 1. Try to sign in
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: DEMO_EMAIL,
       password: DEMO_PASSWORD,
@@ -41,40 +42,91 @@ serve(async (req) => {
       );
     }
 
-    // Demo user doesn't exist yet — create everything
-    // 1. Create demo org
-    const { data: orgData, error: orgError } = await supabase
-      .from("organizations")
-      .insert({ name: DEMO_ORG_NAME, subscription_tier: "all_in_one" })
-      .select("id")
-      .single();
+    console.log("Sign-in failed, checking if user exists:", signInError?.message);
 
-    if (orgError) throw new Error(`Org creation failed: ${orgError.message}`);
-
-    // 2. Create demo user (auto-confirmed)
-    const { data: userData, error: userError } = await supabase.auth.admin.createUser({
+    // 2. Try to create user — if already exists, reset password instead
+    const { data: createData, error: createError } = await supabase.auth.admin.createUser({
       email: DEMO_EMAIL,
       password: DEMO_PASSWORD,
       email_confirm: true,
       user_metadata: { first_name: "Demo", last_name: "User" },
     });
 
-    if (userError) throw new Error(`User creation failed: ${userError.message}`);
-    const userId = userData.user.id;
+    if (createError && createError.message.includes("already been registered")) {
+      // User exists but password is wrong — find and reset
+      const { data: userList } = await supabase.auth.admin.listUsers({ perPage: 1000, page: 1 });
+      const existingUser = userList?.users?.find((u: any) => u.email === DEMO_EMAIL);
+      if (!existingUser) throw new Error("Demo user not found after creation conflict");
+      // User exists but password doesn't match — reset it
+      console.log("Demo user exists, resetting password");
+      const { error: updateErr } = await supabase.auth.admin.updateUserById(existingUser.id, {
+        password: DEMO_PASSWORD,
+      });
+      if (updateErr) throw new Error(`Password reset failed: ${updateErr.message}`);
 
-    // 3. Link profile to org
+      // Ensure profile + org linkage exists
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("org_id")
+        .eq("user_id", existingUser.id)
+        .single();
+
+      if (!profile?.org_id) {
+        // Create org and link
+        const { data: orgData, error: orgError } = await supabase
+          .from("organizations")
+          .insert({ name: DEMO_ORG_NAME, subscription_tier: "all_in_one" })
+          .select("id")
+          .single();
+        if (orgError) throw new Error(`Org creation failed: ${orgError.message}`);
+
+        await supabase
+          .from("profiles")
+          .update({ org_id: orgData.id, first_name: "Demo", last_name: "User" })
+          .eq("user_id", existingUser.id);
+
+        await supabase.from("user_roles").upsert(
+          { user_id: existingUser.id, role: "owner", org_id: orgData.id },
+          { onConflict: "user_id,role" }
+        );
+      }
+
+      // Sign in with corrected password
+      const { data: retrySession, error: retryErr } = await supabase.auth.signInWithPassword({
+        email: DEMO_EMAIL,
+        password: DEMO_PASSWORD,
+      });
+      if (retryErr) throw new Error(`Retry sign-in failed: ${retryErr.message}`);
+
+      return new Response(
+        JSON.stringify({ session: retrySession.session }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } else if (createError) {
+      throw new Error(`User creation failed: ${createError.message}`);
+    }
+
+    // 3. User was just created successfully — set up org and seed data
+    const userId = createData!.user.id;
+
+    const { data: orgData, error: orgError } = await supabase
+      .from("organizations")
+      .insert({ name: DEMO_ORG_NAME, subscription_tier: "all_in_one" })
+      .select("id")
+      .single();
+    if (orgError) throw new Error(`Org creation failed: ${orgError.message}`);
+
+
     await supabase
       .from("profiles")
       .update({ org_id: orgData.id, first_name: "Demo", last_name: "User" })
       .eq("user_id", userId);
 
-    // 4. Assign owner role
-    await supabase.from("user_roles").insert({ user_id: userId, role: "owner" });
+    await supabase.from("user_roles").insert({ user_id: userId, role: "owner", org_id: orgData.id });
 
-    // 5. Seed sample data
+    // Seed sample data
     const orgId = orgData.id;
 
-    // Sample trucks
     const { data: trucks } = await supabase
       .from("trucks")
       .insert([
@@ -84,7 +136,6 @@ serve(async (req) => {
       ])
       .select("id, unit_number");
 
-    // Sample drivers
     const { data: drivers } = await supabase
       .from("drivers")
       .insert([
@@ -94,7 +145,6 @@ serve(async (req) => {
       ])
       .select("id");
 
-    // Sample fleet loads
     if (trucks && drivers && trucks.length >= 2 && drivers.length >= 2) {
       await supabase.from("fleet_loads").insert([
         { origin: "Dallas, TX", destination: "Houston, TX", rate: 2200, status: "delivered", pickup_date: "2026-02-01", delivery_date: "2026-02-02", driver_id: drivers[0].id, truck_id: trucks[0].id, booked_miles: 240, actual_miles: 245, gross_revenue: 2200, net_revenue: 1870, org_id: orgId },
@@ -105,7 +155,6 @@ serve(async (req) => {
       ]);
     }
 
-    // Sample expenses
     if (trucks && trucks.length >= 2) {
       await supabase.from("expenses").insert([
         { expense_type: "Fuel", amount: 450, expense_date: "2026-02-01", vendor: "Pilot", gallons: 120, jurisdiction: "TX", truck_id: trucks[0].id, org_id: orgId },
@@ -115,21 +164,18 @@ serve(async (req) => {
       ]);
     }
 
-    // Sample CRM contacts for Agency view
     await supabase.from("crm_contacts").insert([
       { company_name: "Swift Logistics", contact_name: "John Davis", contact_type: "shipper", email: "john@swiftlogistics.com", phone: "555-0201", city: "Dallas", state: "TX", is_active: true, org_id: orgId },
       { company_name: "Prime Carriers", contact_name: "Maria Santos", contact_type: "carrier", email: "maria@primecarriers.com", phone: "555-0202", city: "Atlanta", state: "GA", is_active: true, org_id: orgId },
       { company_name: "Landstar BCO Network", contact_name: "Tom Mitchell", contact_type: "agent", agent_code: "AGT-501", agent_status: "active", email: "tom@landstar.com", phone: "555-0203", city: "Jacksonville", state: "FL", is_active: true, org_id: orgId },
     ]);
 
-    // Sample agency loads
     const { data: agencyLoads } = await supabase.from("agency_loads").insert([
       { origin: "Memphis, TN", destination: "Nashville, TN", broker_name: "Swift Logistics", broker_rate: 2800, carrier_name: "Prime Carriers", carrier_rate: 2400, margin: 400, status: "delivered", pickup_date: "2026-02-01", delivery_date: "2026-02-02", org_id: orgId },
       { origin: "Jacksonville, FL", destination: "Savannah, GA", broker_name: "Swift Logistics", broker_rate: 1600, carrier_name: "Prime Carriers", carrier_rate: 1350, margin: 250, status: "in_transit", pickup_date: "2026-02-10", org_id: orgId },
       { origin: "Houston, TX", destination: "San Antonio, TX", broker_name: "Swift Logistics", broker_rate: 1200, carrier_name: "Prime Carriers", carrier_rate: 1000, margin: 200, status: "pending", pickup_date: "2026-02-15", org_id: orgId },
     ]).select("id");
 
-    // Sample agent commissions
     if (agencyLoads && agencyLoads.length > 0) {
       await supabase.from("agent_commissions").insert([
         { agent_name: "Tom Mitchell", load_id: agencyLoads[0].id, commission_rate: 10, commission_amount: 280, status: "paid", payout_date: "2026-02-05", org_id: orgId },
@@ -137,12 +183,10 @@ serve(async (req) => {
       ]);
     }
 
-    // 6. Sign in as demo user and return session
     const { data: session, error: sessionError } = await supabase.auth.signInWithPassword({
       email: DEMO_EMAIL,
       password: DEMO_PASSWORD,
     });
-
     if (sessionError) throw new Error(`Demo sign-in failed: ${sessionError.message}`);
 
     return new Response(
