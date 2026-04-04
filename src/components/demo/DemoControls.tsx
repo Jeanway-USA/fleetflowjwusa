@@ -32,6 +32,8 @@ export function DemoControls() {
       if (error) throw error;
       await refreshOrgData();
       toast.success(`Switched to ${TIERS.find(t => t.value === tier)?.label} view`);
+      const landing = tier === 'agency' ? '/agency-loads' : tier === 'fleet_owner' ? '/executive-dashboard' : '/fleet-loads';
+      navigate(landing);
     } catch {
       toast.error('Failed to switch tier');
     } finally {
