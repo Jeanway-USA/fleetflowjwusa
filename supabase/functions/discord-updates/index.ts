@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { title, description, type } = await req.json();
+    const { title, description, type, mentionRole } = await req.json();
 
     if (!title || !description || !type) {
       return new Response(
@@ -111,10 +111,18 @@ Deno.serve(async (req) => {
         footer: { text: "FleetFlow TMS" },
       };
 
+      const discordPayload: Record<string, unknown> = {
+        embeds: [embed],
+        thread_name: `[${type}] ${title}`,
+      };
+      if (mentionRole) {
+        discordPayload.content = "<@&1487974512745123901>";
+      }
+
       const discordRes = await fetch(webhookUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ embeds: [embed], thread_name: `[${type}] ${title}` }),
+        body: JSON.stringify(discordPayload),
       });
 
       if (!discordRes.ok) {
