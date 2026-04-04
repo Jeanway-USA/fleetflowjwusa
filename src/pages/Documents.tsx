@@ -10,9 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileText, Upload, Trash2, FolderOpen } from 'lucide-react';
+import { FileText, Upload, Trash2, FolderOpen, ExternalLink, Cloud } from 'lucide-react';
 import { toast } from 'sonner';
-import { useStorageProvider } from '@/hooks/useStorageProvider';
+import { useStorageProvider, useStorageStatus } from '@/hooks/useStorageProvider';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { Database } from '@/integrations/supabase/types';
 
 type Document = Database['public']['Tables']['documents']['Row'];
@@ -35,6 +36,24 @@ export default function Documents() {
   const { orgId } = useAuth();
   const queryClient = useQueryClient();
   const { upload: storageUpload, remove: storageRemove } = useStorageProvider();
+  const { data: storageStatus } = useStorageStatus();
+  const isGoogleDrive = storageStatus?.provider === 'google_drive' && storageStatus?.is_active;
+
+  // Fetch root folder ID for "Open in Google Drive" link
+  const { data: storageConfig } = useQuery({
+    queryKey: ['storage-config-root', orgId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('org_storage_config')
+        .select('root_folder_id')
+        .eq('org_id', orgId!)
+        .eq('is_active', true)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!orgId && isGoogleDrive,
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [selectedType, setSelectedType] = useState('BOL');
@@ -136,10 +155,32 @@ export default function Documents() {
     },
   ];
 
+  const driveFolderUrl = storageConfig?.root_folder_id
+    ? `https://drive.google.com/drive/folders/${storageConfig.root_folder_id}`
+    : null;
+
   return (
     <>
       <PageHeader title="Documents" description="Upload and manage BOLs, PODs, receipts, and other documents" />
-      
+
+      {isGoogleDrive && (
+        <Alert className="mb-6 border-primary/30 bg-primary/5">
+          <Cloud className="h-4 w-4" />
+          <AlertTitle>Google Drive Storage Active</AlertTitle>
+          <AlertDescription className="flex items-center justify-between">
+            <span>Your documents are stored in your connected Google Drive account.</span>
+            {driveFolderUrl && (
+              <Button variant="outline" size="sm" asChild className="ml-4 shrink-0">
+                <a href={driveFolderUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open in Google Drive
+                </a>
+              </Button>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="space-y-6">
         <Card className="card-elevated">
           <CardHeader>

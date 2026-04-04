@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Eye, Download, Loader2 } from 'lucide-react';
-import { getSignedUrl, extractStoragePath } from '@/hooks/useSignedUrl';
+import { getFileUrl } from '@/hooks/useStorageProvider';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface DocumentViewerProps {
@@ -11,7 +12,8 @@ interface DocumentViewerProps {
 }
 
 /**
- * Component to view and download documents from private storage buckets
+ * Component to view and download documents from private storage buckets.
+ * Supports both built-in storage and Google Drive via the storage proxy.
  */
 export function DocumentViewer({ 
   storedPath, 
@@ -19,55 +21,80 @@ export function DocumentViewer({
   bucket = 'documents' 
 }: DocumentViewerProps) {
   const [loading, setLoading] = useState<'view' | 'download' | null>(null);
-  
+
+  const fetchBlob = async (url: string): Promise<Blob> => {
+    // For gdrive proxy URLs we need to attach the auth token
+    if (storedPath.startsWith('gdrive:')) {
+      const { data: { session } } = await supabase.auth.getSession();
+      const resp = await fetch(url, {
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {},
+      });
+      if (!resp.ok) throw new Error('Download failed');
+      return resp.blob();
+    }
+    // Built-in signed URLs work without extra auth
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('Download failed');
+    return resp.blob();
+  };
+
   const handleView = async () => {
     setLoading('view');
     try {
-      const filePath = extractStoragePath(storedPath, bucket) || storedPath;
-      const signedUrl = await getSignedUrl(bucket, filePath);
-      
-      if (signedUrl) {
-        window.open(signedUrl, '_blank');
-      } else {
+      const useProxy = storedPath.startsWith('gdrive:');
+      const url = await getFileUrl(bucket, storedPath, useProxy);
+
+      if (!url) {
         toast.error('Could not access document');
+        return;
       }
-    } catch (error) {
+
+      if (storedPath.startsWith('gdrive:')) {
+        // Fetch blob and open in new tab to avoid leaking auth tokens in URL
+        const blob = await fetchBlob(url);
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch {
       toast.error('Failed to open document');
     } finally {
       setLoading(null);
     }
   };
-  
+
   const handleDownload = async () => {
     setLoading('download');
     try {
-      const filePath = extractStoragePath(storedPath, bucket) || storedPath;
-      const signedUrl = await getSignedUrl(bucket, filePath);
-      
-      if (!signedUrl) {
+      const useProxy = storedPath.startsWith('gdrive:');
+      const url = await getFileUrl(bucket, storedPath, useProxy);
+
+      if (!url) {
         toast.error('Could not access document');
         return;
       }
-      
-      const response = await fetch(signedUrl);
-      const blob = await response.blob();
+
+      const blob = await fetchBlob(url);
       const blobUrl = URL.createObjectURL(blob);
-      
+
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       URL.revokeObjectURL(blobUrl);
-    } catch (error) {
+    } catch {
       toast.error('Failed to download document');
     } finally {
       setLoading(null);
     }
   };
-  
+
   return (
     <div className="flex gap-1">
       <Button 
