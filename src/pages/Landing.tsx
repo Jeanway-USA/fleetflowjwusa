@@ -17,7 +17,7 @@ import textLogo from '@/assets/Text_Logo.png';
 
 const STATS = [
   { label: 'Cost to You', value: '$0' },
-  { label: 'Built for Landstar', value: '100%' },
+  { label: 'Built for Truckers', value: '100%' },
   { label: 'Features Included', value: 'All' },
   { label: 'Setup Time', value: '< 5 min' },
 ];
@@ -120,14 +120,14 @@ export default function Landing() {
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(45_80%_50%/0.12)] text-[hsl(45_80%_60%)] text-sm font-medium mb-6 border border-[hsl(45_80%_50%/0.2)]">
                 <Truck className="h-4 w-4" />
-                Built for Landstar BCOs & Agents
+                Built for Owner-Operators
               </div>
               <h1 className="text-3xl sm:text-5xl lg:text-[3.5rem] font-extrabold tracking-tight mb-6 leading-[1.1] text-white">
                 Master Your Fleet's{' '}
                 <span className="text-gradient-gold">Finances & Dispatch.</span>
               </h1>
               <p className="text-base sm:text-lg text-[hsl(0_0%_65%)] mb-8 max-w-xl leading-relaxed">
-                The all-in-one platform built specifically for Landstar BCOs to track expenses, manage card advances, and streamline dispatching.
+                The all-in-one platform built specifically for owner-operators to track expenses, manage finances, and streamline dispatching.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
@@ -135,7 +135,7 @@ export default function Landing() {
                   className="gradient-gold text-primary-foreground text-lg px-8 pulse-glow-gold hover:scale-105 active:scale-[0.97] transition-transform"
                   onClick={() => navigate('/auth')}
                 >
-                  Join Free BCO Beta
+                  Join Free Beta
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
                 <Button 
@@ -250,7 +250,7 @@ export default function Landing() {
           <p className="text-muted-foreground text-base sm:text-lg">Start free during our Open Beta. Premium tiers coming soon.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-6 items-center max-w-5xl mx-auto">
-          {/* Solo BCO — Coming Soon */}
+          {/* Solo Operator — Coming Soon */}
           <Card className="border-border opacity-60 relative overflow-hidden">
             <CardContent className="p-6">
               <Badge variant="secondary" className="mb-4"><Clock className="h-3 w-3 mr-1" />Coming Soon</Badge>
@@ -259,7 +259,7 @@ export default function Landing() {
                   <Truck className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h4 className="font-bold">Solo BCO</h4>
+                  <h4 className="font-bold">Solo Operator</h4>
                   <p className="text-xs text-muted-foreground">The Owner-Operator Pack</p>
                 </div>
               </div>
@@ -375,11 +375,11 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h3 className="text-2xl sm:text-3xl font-bold mb-3">Built for the Way You Work</h3>
-            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">Four core capabilities designed around how Landstar BCOs actually run their business.</p>
+            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">Four core capabilities designed around how owner-operators actually run their business.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {[
-              { icon: FileText, title: 'Automated Statement Parsing', desc: 'Upload your Landstar settlement PDF and watch it auto-map every line item — revenue, deductions, and advances — in seconds.', accent: 'bg-primary/10 text-primary' },
+              { icon: FileText, title: 'Automated Statement Parsing', desc: 'Upload your settlement PDF and watch it auto-map every line item — revenue, deductions, and advances — in seconds.', accent: 'bg-primary/10 text-primary' },
               { icon: Fuel, title: 'Fuel & Card Advance Tracking', desc: 'Track fuel purchases, Comdata advances, and per-load expenses so you always know your true cost-per-mile.', accent: 'bg-emerald-500/10 text-emerald-500' },
               { icon: Package, title: 'Active Load Dispatching', desc: 'Assign drivers, update statuses, and monitor pickups & deliveries from a single real-time board.', accent: 'bg-blue-500/10 text-blue-500' },
               { icon: Smartphone, title: 'Driver Mobile Access', desc: 'Drivers get their own dashboard for BOL uploads, DVIR forms, and live trip updates — right from their phone.', accent: 'bg-purple-500/10 text-purple-500' },
@@ -405,14 +405,14 @@ export default function Landing() {
             <span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary mb-4 border border-primary/30 rounded-full px-4 py-1 bg-primary/10">Open Beta</span>
             <h3 className="text-2xl sm:text-3xl font-bold mb-3">Join the Open Beta</h3>
             <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto">
-              Be among the first Landstar BCOs to experience Fleet Flow TMS. Full platform access, zero cost during the beta period.
+              Be among the first owner-operators to experience Fleet Flow TMS. Full platform access, zero cost during the beta period.
             </p>
             <Button 
               size="lg" 
               className="gradient-gold text-primary-foreground text-lg px-10 pulse-glow-gold active:scale-[0.97] transition-transform"
               onClick={() => navigate('/auth')}
             >
-              Join BCO Beta
+              Join Beta
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <p className="text-xs text-muted-foreground mt-4">Free during Open Beta · No credit card required</p>
@@ -430,7 +430,7 @@ export default function Landing() {
                 <img src={logoIcon} alt="" className="h-7 w-auto" />
                 <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-7 w-auto" />
               </div>
-              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">The all-in-one platform built for Landstar BCOs to track finances, dispatch loads, and grow profitably.</p>
+              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">The all-in-one platform built for owner-operators to track finances, dispatch loads, and grow profitably.</p>
             </div>
             {/* Product */}
             <div>
@@ -463,7 +463,7 @@ export default function Landing() {
           </div>
           <div className="border-t border-border pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
             <p className="text-xs text-muted-foreground">© 2026 FleetFlow TMS by JeanWay USA. All rights reserved.</p>
-            <p className="text-xs text-muted-foreground">Built for Landstar BCOs & Agents</p>
+            <p className="text-xs text-muted-foreground">Built for Owner-Operators</p>
           </div>
         </div>
       </footer>
@@ -474,7 +474,7 @@ export default function Landing() {
           className="w-full gradient-gold text-primary-foreground"
           onClick={() => navigate('/auth')}
         >
-          Join BCO Beta
+          Join Beta
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>

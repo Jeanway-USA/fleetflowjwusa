@@ -45,7 +45,7 @@ export default function About() {
             </div>
             <div className="space-y-4 text-muted-foreground leading-relaxed">
               <p>
-                The whole idea behind FleetFlow really started with Siadrak. He drives a truck leased to Landstar — a trucking company exclusively for Owner-Operators. Like many BCOs, he was juggling spreadsheets, paper receipts, and multiple apps just to keep track of his company's revenue, expenses, and day-to-day operations.
+                The whole idea behind FleetFlow really started with Siadrak. He drives a truck leased to a major carrier. Like many owner-operators, he was juggling spreadsheets, paper receipts, and multiple apps just to keep track of his company's revenue, expenses, and day-to-day operations.
               </p>
               <p>
                 He wanted an easier way to see everything in one place — a single dashboard where he could monitor his finances, track loads, and eventually manage drivers and know exactly what they're doing at any given time.
@@ -82,7 +82,7 @@ export default function About() {
               <h2 className="text-2xl font-semibold">Why It's Free</h2>
             </div>
             <p className="text-muted-foreground leading-relaxed">
-              We started FleetFlow because we needed it ourselves. We know how tight margins can be in trucking, and the last thing an owner-operator needs is another expensive subscription eating into their bottom line. That's why our core platform is free during the open beta — we want as many BCOs as possible to benefit from it while we continue improving based on real feedback from real drivers.
+              We started FleetFlow because we needed it ourselves. We know how tight margins can be in trucking, and the last thing an owner-operator needs is another expensive subscription eating into their bottom line. That's why our core platform is free during the open beta — we want as many owner-operators as possible to benefit from it while we continue improving based on real feedback from real drivers.
             </p>
           </section>
         </RevealOnScroll>
@@ -97,7 +97,7 @@ export default function About() {
               <h2 className="text-2xl font-semibold">The Vision</h2>
             </div>
             <p className="text-muted-foreground leading-relaxed">
-              FleetFlow is more than a TMS — it's a growing community of owner-operators helping shape the tools they actually need. Every feature we build is driven by feedback from drivers like you. Whether you're a solo BCO running one truck or managing a small fleet, FleetFlow is designed to scale with your business and make your life on the road just a little bit easier.
+              FleetFlow is more than a TMS — it's a growing community of owner-operators helping shape the tools they actually need. Every feature we build is driven by feedback from drivers like you. Whether you're a solo owner-operator running one truck or managing a small fleet, FleetFlow is designed to scale with your business and make your life on the road just a little bit easier.
             </p>
           </section>
         </RevealOnScroll>
