@@ -45,13 +45,13 @@ export default function About() {
             </div>
             <div className="space-y-4 text-muted-foreground leading-relaxed">
               <p>
-                The whole idea behind FleetFlow really started with Siadrak. He drives a truck leased to a major carrier. Like many owner-operators, he was juggling spreadsheets, paper receipts, and multiple apps just to keep track of his company's revenue, expenses, and day-to-day operations.
+                Our founding team includes owner-operators who lived the problem firsthand — juggling spreadsheets, paper receipts, and disconnected apps just to keep track of revenue, expenses, and day-to-day operations.
               </p>
               <p>
-                He wanted an easier way to see everything in one place — a single dashboard where he could monitor his finances, track loads, and eventually manage drivers and know exactly what they're doing at any given time.
+                We wanted an easier way to see everything in one place — a single dashboard to monitor finances, track loads, and manage drivers. FleetFlow was originally built for a specific carrier's contractors, but we quickly realized the need was universal.
               </p>
               <p>
-                So we started building. What began as a personal tool quickly turned into something much bigger. We realized that if Siadrak needed this, thousands of other owner-operators probably did too. So we decided to make it available to everyone.
+                What began as an internal tool quickly turned into something much bigger. Thousands of owner-operators face the same challenges, so we decided to make it available to everyone.
               </p>
             </div>
           </section>
