@@ -259,7 +259,7 @@ export default function Landing() {
                   <Truck className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h4 className="font-bold">Solo BCO</h4>
+                  <h4 className="font-bold">Solo Operator</h4>
                   <p className="text-xs text-muted-foreground">The Owner-Operator Pack</p>
                 </div>
               </div>
