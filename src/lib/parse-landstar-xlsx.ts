@@ -28,6 +28,7 @@ const REVENUE_IGNORE_PATTERNS: RegExp[] = [
   /\b1099\s*REVENUE\b/i,
   /\bLINEHAUL\b/i,
   /\bTRACTOR\s*LEASE\b/i,
+  /\bTRIP%?\s*ESCROW/i,
 ];
 
 // Advance patterns (non-P&L)
