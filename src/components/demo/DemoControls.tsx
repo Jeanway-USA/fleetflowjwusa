@@ -32,6 +32,8 @@ export function DemoControls() {
       if (error) throw error;
       await refreshOrgData();
       toast.success(`Switched to ${TIERS.find(t => t.value === tier)?.label} view`);
+      const landing = tier === 'agency' ? '/agency-loads' : tier === 'fleet_owner' ? '/executive-dashboard' : '/fleet-loads';
+      navigate(landing);
     } catch {
       toast.error('Failed to switch tier');
     } finally {
@@ -85,7 +87,7 @@ export function DemoControls() {
             className="w-full gradient-gold text-primary-foreground text-xs h-8"
             onClick={async () => {
               await signOut();
-              navigate('/');
+              navigate('/auth');
             }}
           >
             Start Your Beta Account
