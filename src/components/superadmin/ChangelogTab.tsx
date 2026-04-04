@@ -109,10 +109,16 @@ export function ChangelogTab() {
               rows={4}
               maxLength={2000}
             />
-            <Button type="submit" disabled={submit.isPending} className="gap-2">
-              <Send className="h-4 w-4" />
-              {submit.isPending ? 'Posting…' : 'Post Update'}
-            </Button>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Switch id="mention-role" checked={mentionRole} onCheckedChange={setMentionRole} />
+                <Label htmlFor="mention-role" className="text-sm cursor-pointer">Mention 🛠️ Updates role</Label>
+              </div>
+              <Button type="submit" disabled={submit.isPending} className="gap-2">
+                <Send className="h-4 w-4" />
+                {submit.isPending ? 'Posting…' : 'Post Update'}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
