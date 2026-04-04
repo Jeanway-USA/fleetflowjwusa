@@ -255,6 +255,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
             </DropdownMenu>
           </div>
         </header>
+        <DiscordBanner />
         <div className="flex-1 p-2 sm:p-4 lg:p-6 animate-fade-in">
           <ErrorBoundary>
             {children}
