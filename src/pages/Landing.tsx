@@ -120,7 +120,7 @@ export default function Landing() {
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(45_80%_50%/0.12)] text-[hsl(45_80%_60%)] text-sm font-medium mb-6 border border-[hsl(45_80%_50%/0.2)]">
                 <Truck className="h-4 w-4" />
-                Built for Landstar BCOs & Agents
+                Built for Owner-Operators
               </div>
               <h1 className="text-3xl sm:text-5xl lg:text-[3.5rem] font-extrabold tracking-tight mb-6 leading-[1.1] text-white">
                 Master Your Fleet's{' '}
