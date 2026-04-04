@@ -250,7 +250,7 @@ export default function Landing() {
           <p className="text-muted-foreground text-base sm:text-lg">Start free during our Open Beta. Premium tiers coming soon.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-6 items-center max-w-5xl mx-auto">
-          {/* Solo BCO — Coming Soon */}
+          {/* Solo Operator — Coming Soon */}
           <Card className="border-border opacity-60 relative overflow-hidden">
             <CardContent className="p-6">
               <Badge variant="secondary" className="mb-4"><Clock className="h-3 w-3 mr-1" />Coming Soon</Badge>
