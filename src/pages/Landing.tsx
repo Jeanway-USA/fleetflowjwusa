@@ -463,7 +463,7 @@ export default function Landing() {
           </div>
           <div className="border-t border-border pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
             <p className="text-xs text-muted-foreground">© 2026 FleetFlow TMS by JeanWay USA. All rights reserved.</p>
-            <p className="text-xs text-muted-foreground">Built for Landstar BCOs & Agents</p>
+            <p className="text-xs text-muted-foreground">Built for Owner-Operators</p>
           </div>
         </div>
       </footer>
