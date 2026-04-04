@@ -302,8 +302,6 @@ export default function SuperAdminDashboard() {
           <ChangelogTab />
         </TabsContent>
       </Tabs>
-        </TabsContent>
-      </Tabs>
 
       <OrgDetailSheet org={selectedOrg} open={sheetOpen} onOpenChange={setSheetOpen} />
       <AuditLogDetailSheet log={selectedLog} open={logSheetOpen} onOpenChange={setLogSheetOpen} />
