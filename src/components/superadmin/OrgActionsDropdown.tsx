@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Switch } from '@/components/ui/switch';
@@ -11,10 +12,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { MoreHorizontal, Eye, CalendarIcon, KeyRound, Gift } from 'lucide-react';
+import { MoreHorizontal, Eye, CalendarIcon, KeyRound, Gift, Trash2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+
+const DEMO_ORG_ID = 'a0000000-0000-0000-0000-000000000001';
 
 interface OrgActionsDropdownProps {
   org: any;
@@ -24,6 +27,7 @@ export function OrgActionsDropdown({ org }: OrgActionsDropdownProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [planOpen, setPlanOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   
   // Trial state
   const [trialDate, setTrialDate] = useState<Date | undefined>(
@@ -63,6 +67,22 @@ export function OrgActionsDropdown({ org }: OrgActionsDropdownProps) {
     onError: (err: any) => toast.error(err.message || 'Failed to update plan access'),
   });
 
+  const deleteOrg = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('super_admin_delete_org' as any, {
+        target_org_id: org.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['super-admin-organizations'] });
+      queryClient.invalidateQueries({ queryKey: ['super-admin-dashboard'] });
+      toast.success(`Organization "${org.name}" deleted`);
+      setDeleteOpen(false);
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to delete organization'),
+  });
+
   const resetPassword = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.rpc('super_admin_get_owner_email' as any, {
@@ -93,6 +113,8 @@ export function OrgActionsDropdown({ org }: OrgActionsDropdownProps) {
     });
   };
 
+  const isDemoOrg = org.id === DEMO_ORG_ID;
+
   return (
     <>
       <DropdownMenu>
@@ -112,9 +134,18 @@ export function OrgActionsDropdown({ org }: OrgActionsDropdownProps) {
           <DropdownMenuItem onClick={handlePasswordReset}>
             <KeyRound className="h-4 w-4 mr-2" /> Force Password Reset
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled={isDemoOrg}
+            onClick={() => setDeleteOpen(true)}
+            className="text-destructive focus:text-destructive"
+          >
+            <Trash2 className="h-4 w-4 mr-2" /> Delete Organization
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
+      {/* Plan Access Dialog */}
       <Dialog open={planOpen} onOpenChange={setPlanOpen}>
         <DialogContent className="sm:max-w-sm" onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
@@ -201,6 +232,38 @@ export function OrgActionsDropdown({ org }: OrgActionsDropdownProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Organization</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete <strong>"{org.name}"</strong>? This will remove all associated data including users, loads, expenses, and documents. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteOrg.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                deleteOrg.mutate();
+              }}
+              disabled={deleteOrg.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteOrg.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                'Delete Organization'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
