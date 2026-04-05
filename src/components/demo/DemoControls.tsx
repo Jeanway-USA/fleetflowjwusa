@@ -25,15 +25,21 @@ export function DemoControls() {
     if (tier === subscriptionTier || !orgId) return;
     setSwitching(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('organizations')
         .update({ subscription_tier: tier })
-        .eq('id', orgId);
-      if (error) throw error;
+        .eq('id', orgId)
+        .select('subscription_tier')
+        .single();
+      if (error || !data) throw new Error('Tier update blocked by permissions');
       await refreshOrgData();
       toast.success(`Switched to ${TIERS.find(t => t.value === tier)?.label} view`);
       const landing = tier === 'agency' ? '/agency-loads' : tier === 'fleet_owner' ? '/executive-dashboard' : '/fleet-loads';
-      navigate(landing);
+      if (window.location.pathname === landing) {
+        window.location.reload();
+      } else {
+        navigate(landing, { replace: true });
+      }
     } catch {
       toast.error('Failed to switch tier');
     } finally {

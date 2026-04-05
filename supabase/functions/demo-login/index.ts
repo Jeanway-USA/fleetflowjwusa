@@ -36,6 +36,40 @@ serve(async (req) => {
     });
 
     if (signInData?.session) {
+      const userId = signInData.session.user.id;
+      // Verify org linkage on every sign-in
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("org_id")
+        .eq("user_id", userId)
+        .single();
+
+      if (!profile?.org_id) {
+        console.log("Demo user missing org linkage, re-creating");
+        const { data: orgData, error: orgError } = await supabase
+          .from("organizations")
+          .insert({ name: DEMO_ORG_NAME, subscription_tier: "all_in_one" })
+          .select("id")
+          .single();
+        if (orgError) throw new Error(`Org creation failed: ${orgError.message}`);
+
+        await supabase
+          .from("profiles")
+          .update({ org_id: orgData.id, first_name: "Demo", last_name: "User" })
+          .eq("user_id", userId);
+
+        await supabase.from("user_roles").upsert(
+          { user_id: userId, role: "owner", org_id: orgData.id },
+          { onConflict: "user_id,role" }
+        );
+      } else {
+        // Ensure user_roles.org_id matches profiles.org_id
+        await supabase.from("user_roles").upsert(
+          { user_id: userId, role: "owner", org_id: profile.org_id },
+          { onConflict: "user_id,role" }
+        );
+      }
+
       return new Response(
         JSON.stringify({ session: signInData.session }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
