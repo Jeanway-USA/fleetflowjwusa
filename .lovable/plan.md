@@ -1,80 +1,55 @@
 
+Fix the demo switcher by moving tier changes out of the client-side table update flow and into a dedicated backend function, then add the missing All-in-One option.
 
-## Fix: Demo Controls Tier Switching
+1. Root cause
+- The current Demo Controls rely on a direct client update to `organizations.subscription_tier`.
+- That path is brittle for demo mode because it depends on the demo user’s org/owner linkage and RLS being perfectly aligned at the time of the click.
+- Even when the tier system itself supports `all_in_one`, the Demo Controls panel only exposes 3 buttons.
+- The existing routing/tier-gating code already supports `all_in_one`, so the missing piece is a reliable switch mechanism plus the new button.
 
-### Problem Analysis
-The Demo Controls tier-switching buttons likely fail silently because:
+2. What to build
+- Add a new backend function, `demo-switch-tier`, that:
+  - verifies the caller is the demo account
+  - repairs/ensures `profiles.org_id` and the demo user’s `owner` role point to the same org
+  - updates the org’s `subscription_tier` with admin privileges
+  - returns the normalized tier and the correct landing route
+- Update `src/components/demo/DemoControls.tsx` to:
+  - add an `All-in-One` button
+  - call the new backend function instead of updating `organizations` directly
+  - refresh org data after success
+  - force a deterministic route change so users always see a visible change immediately
 
-1. **Silent RLS failure**: Supabase `.update()` returns `{ data: null, error: null }` when RLS blocks the operation (0 rows matched). The current code only checks `if (error)`, so it proceeds to show a success toast even when nothing was updated.
+3. Files to update
+- `src/components/demo/DemoControls.tsx`
+  - extend the tier list to include `all_in_one`
+  - replace direct `.from('organizations').update(...)` with `supabase.functions.invoke('demo-switch-tier', { body: { tier } })`
+  - use the returned `landingPath` and force navigation with a hard route change if needed so the page visibly updates every time
+  - surface backend error messages in the toast instead of a generic silent failure
+- `supabase/functions/demo-switch-tier/index.ts` (new)
+  - follow the same demo-account repair pattern already used in `demo-login`
+  - use an admin client for the org update
+  - map tiers to routes:
+    - `solo_bco` → `/fleet-loads`
+    - `fleet_owner` → `/executive-dashboard`
+    - `agency` → `/agency-loads`
+    - `all_in_one` → `/executive-dashboard`
+- `supabase/functions/demo-login/index.ts`
+  - optionally extract/reuse the same “ensure demo org + owner linkage” logic so both functions stay consistent
+  - keep demo login defaulting to `all_in_one`
 
-2. **Same-route navigation**: When clicking "Solo BCO" while already on `/fleet-loads`, `navigate('/fleet-loads')` is a no-op — React Router doesn't re-render the page.
+4. Technical details
+- No database migration is needed.
+- `all_in_one` is already supported in:
+  - `AuthContext` type
+  - `useSubscriptionTier`
+  - `RoleBasedRedirect`
+  - sidebar feature maps
+- The safest fix is to stop depending on client-side RLS for demo tier switching and make the backend return the authoritative result.
+- The redirect should be explicit and forceful enough that users always see a route/page change after clicking a tier.
 
-3. **Potential org mismatch**: If the demo user's session was created previously and the org was recreated, the `user_roles.org_id` might not match the `profiles.org_id`, causing `is_owner()` to return false.
-
-### Changes
-
-**1. `src/components/demo/DemoControls.tsx`** — Fix tier switching reliability
-- After the `.update()` call, verify rows were actually affected by re-querying the org or using `.select()` on the update.
-- Force navigation even if already on the target route by using `navigate(landing, { replace: true })` combined with a key change or `window.location` as a fallback for same-route transitions.
-- Add a `window.location.reload()` after navigation if the tier change requires a full sidebar re-render on the same route.
-
-**2. `supabase/functions/demo-login/index.ts`** — Harden org/role consistency
-- When the sign-in succeeds on the first attempt (existing user, correct password), still verify that `profiles.org_id` exists and `user_roles` has the correct `org_id`. If not, fix the linkage before returning the session.
-- This prevents stale org references from causing RLS failures.
-
-### Technical Details
-
-```typescript
-// DemoControls.tsx — verify update worked
-const { data, error } = await supabase
-  .from('organizations')
-  .update({ subscription_tier: tier })
-  .eq('id', orgId)
-  .select('subscription_tier')
-  .single();
-
-if (error || !data) throw new Error('Tier update blocked');
-
-await refreshOrgData();
-toast.success(`Switched to ${TIERS.find(t => t.value === tier)?.label} view`);
-
-// Force re-render even on same route
-const landing = tier === 'agency' ? '/agency-loads' 
-  : tier === 'fleet_owner' ? '/executive-dashboard' 
-  : '/fleet-loads';
-navigate(landing, { replace: true });
-// If same page, force reload
-if (window.location.pathname === landing) {
-  window.location.reload();
-}
-```
-
-```typescript
-// demo-login/index.ts — add consistency check on successful first sign-in
-if (signInData?.session) {
-  const userId = signInData.session.user.id;
-  // Verify org linkage exists
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("org_id")
-    .eq("user_id", userId)
-    .single();
-    
-  if (!profile?.org_id) {
-    // Re-create org and link (same logic as new user setup)
-    // ...
-  }
-  
-  return new Response(
-    JSON.stringify({ session: signInData.session }),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-}
-```
-
-### Files
-| File | Change |
-|------|--------|
-| `src/components/demo/DemoControls.tsx` | Verify update succeeded with `.select()`, force reload on same-route navigation |
-| `supabase/functions/demo-login/index.ts` | Verify org/role linkage on every successful sign-in, not just on first creation |
-
+5. Expected result
+- Solo BCO button visibly routes to the Solo experience.
+- Fleet Owner button visibly routes to the executive view.
+- Agency button visibly routes to the agency loads view.
+- All-in-One button unlocks all plan-gated features and routes to the executive dashboard.
+- Users no longer need a manual refresh to see the tier change take effect.
