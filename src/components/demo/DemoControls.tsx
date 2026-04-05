@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth, type SubscriptionTier } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Sparkles, ArrowRight, X } from 'lucide-react';
 
@@ -11,37 +10,40 @@ const TIERS: { label: string; value: SubscriptionTier }[] = [
   { label: 'Solo BCO', value: 'solo_bco' },
   { label: 'Fleet Owner', value: 'fleet_owner' },
   { label: 'Agency', value: 'agency' },
+  { label: 'All-in-One', value: 'all_in_one' },
 ];
 
+const TIER_ROUTES: Record<string, string> = {
+  solo_bco: '/fleet-loads',
+  fleet_owner: '/executive-dashboard',
+  agency: '/agency-loads',
+  all_in_one: '/executive-dashboard',
+};
+
 export function DemoControls() {
-  const { isDemoMode, orgId, subscriptionTier, refreshOrgData, signOut } = useAuth();
-  const navigate = useNavigate();
+  const { isDemoMode, subscriptionTier, signOut } = useAuth();
   const [switching, setSwitching] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   if (!isDemoMode) return null;
 
   const handleTierSwitch = async (tier: SubscriptionTier) => {
-    if (tier === subscriptionTier || !orgId) return;
+    if (tier === subscriptionTier) return;
     setSwitching(true);
     try {
-      const { data, error } = await supabase
-        .from('organizations')
-        .update({ subscription_tier: tier })
-        .eq('id', orgId)
-        .select('subscription_tier')
-        .single();
-      if (error || !data) throw new Error('Tier update blocked by permissions');
-      await refreshOrgData();
+      const { data, error } = await supabase.functions.invoke('demo-switch-tier', {
+        body: { tier },
+      });
+      if (error) throw new Error(error.message || 'Switch failed');
+      if (data?.error) throw new Error(data.error);
+
+      const landingPath = data?.landingPath || TIER_ROUTES[tier] || '/fleet-loads';
       toast.success(`Switched to ${TIERS.find(t => t.value === tier)?.label} view`);
-      const landing = tier === 'agency' ? '/agency-loads' : tier === 'fleet_owner' ? '/executive-dashboard' : '/fleet-loads';
-      if (window.location.pathname === landing) {
-        window.location.reload();
-      } else {
-        navigate(landing, { replace: true });
-      }
-    } catch {
-      toast.error('Failed to switch tier');
+
+      // Hard navigation ensures full state refresh
+      window.location.assign(landingPath);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to switch tier');
     } finally {
       setSwitching(false);
     }
@@ -59,7 +61,7 @@ export function DemoControls() {
   }
 
   return (
-    <Card className="fixed bottom-6 right-6 z-50 w-72 shadow-xl border-primary/20">
+    <Card className="fixed bottom-6 right-6 z-50 w-80 shadow-xl border-primary/20">
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-semibold flex items-center gap-1.5">
@@ -71,13 +73,13 @@ export function DemoControls() {
           </button>
         </div>
 
-        <div className="flex gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
           {TIERS.map(t => (
             <Button
               key={t.value}
               size="sm"
               variant={subscriptionTier === t.value ? 'default' : 'outline'}
-              className="flex-1 text-xs h-8"
+              className="text-xs h-8"
               disabled={switching}
               onClick={() => handleTierSwitch(t.value)}
             >
@@ -93,7 +95,7 @@ export function DemoControls() {
             className="w-full gradient-gold text-primary-foreground text-xs h-8"
             onClick={async () => {
               await signOut();
-              navigate('/auth');
+              window.location.assign('/auth');
             }}
           >
             Start Your Beta Account
