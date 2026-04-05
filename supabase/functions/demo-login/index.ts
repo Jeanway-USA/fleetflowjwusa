@@ -60,8 +60,7 @@ serve(async (req) => {
 
         await adminClient
           .from("profiles")
-          .update({ org_id: orgData.id, first_name: "Demo", last_name: "User" })
-          .eq("user_id", userId);
+          .upsert({ user_id: userId, org_id: orgData.id, email: DEMO_EMAIL, first_name: "Demo", last_name: "User" }, { onConflict: "user_id" });
 
         await adminClient.from("user_roles").upsert(
           { user_id: userId, role: "owner", org_id: orgData.id },
@@ -119,8 +118,7 @@ serve(async (req) => {
 
         await adminClient
           .from("profiles")
-          .update({ org_id: orgData.id, first_name: "Demo", last_name: "User" })
-          .eq("user_id", existingUser.id);
+          .upsert({ user_id: existingUser.id, org_id: orgData.id, email: DEMO_EMAIL, first_name: "Demo", last_name: "User" }, { onConflict: "user_id" });
 
         await adminClient.from("user_roles").upsert(
           { user_id: existingUser.id, role: "owner", org_id: orgData.id },
@@ -155,8 +153,7 @@ serve(async (req) => {
 
     await adminClient
       .from("profiles")
-      .update({ org_id: orgData.id, first_name: "Demo", last_name: "User" })
-      .eq("user_id", userId);
+      .upsert({ user_id: userId, org_id: orgData.id, email: DEMO_EMAIL, first_name: "Demo", last_name: "User" }, { onConflict: "user_id" });
 
     await adminClient.from("user_roles").insert({ user_id: userId, role: "owner", org_id: orgData.id });
 
