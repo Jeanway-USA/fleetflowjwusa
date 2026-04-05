@@ -25,20 +25,25 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    // Admin client — never call signInWithPassword on this one
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    // Separate client for sign-in so it doesn't taint admin context
+    const authClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
     // 1. Try to sign in
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInError } = await authClient.auth.signInWithPassword({
       email: DEMO_EMAIL,
       password: DEMO_PASSWORD,
     });
 
     if (signInData?.session) {
       const userId = signInData.session.user.id;
-      // Verify org linkage on every sign-in
-      const { data: profile } = await supabase
+      // Verify org linkage on every sign-in (use adminClient to bypass RLS)
+      const { data: profile } = await adminClient
         .from("profiles")
         .select("org_id")
         .eq("user_id", userId)
@@ -46,25 +51,25 @@ serve(async (req) => {
 
       if (!profile?.org_id) {
         console.log("Demo user missing org linkage, re-creating");
-        const { data: orgData, error: orgError } = await supabase
+        const { data: orgData, error: orgError } = await adminClient
           .from("organizations")
           .insert({ name: DEMO_ORG_NAME, subscription_tier: "all_in_one" })
           .select("id")
           .single();
         if (orgError) throw new Error(`Org creation failed: ${orgError.message}`);
 
-        await supabase
+        await adminClient
           .from("profiles")
           .update({ org_id: orgData.id, first_name: "Demo", last_name: "User" })
           .eq("user_id", userId);
 
-        await supabase.from("user_roles").upsert(
+        await adminClient.from("user_roles").upsert(
           { user_id: userId, role: "owner", org_id: orgData.id },
           { onConflict: "user_id,role" }
         );
       } else {
         // Ensure user_roles.org_id matches profiles.org_id
-        await supabase.from("user_roles").upsert(
+        await adminClient.from("user_roles").upsert(
           { user_id: userId, role: "owner", org_id: profile.org_id },
           { onConflict: "user_id,role" }
         );
