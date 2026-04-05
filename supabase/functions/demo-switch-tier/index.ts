@@ -83,8 +83,7 @@ serve(async (req) => {
 
       await adminClient
         .from("profiles")
-        .update({ org_id: orgId })
-        .eq("user_id", user.id);
+        .upsert({ user_id: user.id, org_id: orgId, email: DEMO_EMAIL, first_name: "Demo", last_name: "User" }, { onConflict: "user_id" });
     }
 
     // Ensure user_roles has owner for this org
