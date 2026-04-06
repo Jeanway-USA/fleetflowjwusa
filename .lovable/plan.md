@@ -1,51 +1,34 @@
 
 
-## Add Content Security Policy (CSP) to index.html
+## Clickjacking Protection for index.html
 
-### What This Does
-Adds a `<meta http-equiv="Content-Security-Policy">` tag that restricts which domains can serve scripts, styles, images, and network connections — blocking unauthorized third-party code injection (XSS).
+### Problem
+The site can potentially be embedded in a hostile `<iframe>` on another domain, enabling clickjacking attacks.
 
-### External Domains Identified in the Codebase
+### Important Note
+`frame-ancestors` is **not supported** in `<meta>` CSP tags — it only works via HTTP headers. However, we already have `frame-src 'none'` which prevents *our* site from loading external iframes. For clickjacking defense via meta tag, the frame-busting script is the primary mechanism. We can still document this limitation.
 
-| Domain | Used For | CSP Directive |
-|--------|----------|---------------|
-| `iwivgqsihxicyptaoewm.supabase.co` | Backend API + Auth | `connect-src`, `script-src` |
-| `*.tile.openstreetmap.org` | Map tiles (Leaflet) | `img-src` |
-| `*.basemaps.cartocdn.com` | CARTO map tiles (IFTA) | `img-src` |
-| `cdnjs.cloudflare.com` | Leaflet marker icons | `img-src` |
-| `nominatim.openstreetmap.org` | Geocoding API | `connect-src` |
-| `router.project-osrm.org` | Routing API | `connect-src` |
-| `pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev` | OG preview image | `img-src` |
-| `fonts.googleapis.com` / `fonts.gstatic.com` | Google Fonts (if added later) | `style-src` / `font-src` |
+### Changes — `index.html`
 
-### Change
-
-**`index.html`** — Add CSP meta tag after line 5:
-
+1. **Add frame-busting script** at the very top of `<head>` (after `<meta charset>`), before any other tags:
 ```html
-<meta http-equiv="Content-Security-Policy" content="
-  default-src 'self';
-  script-src 'self';
-  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-  font-src 'self' https://fonts.gstatic.com;
-  img-src 'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://cdnjs.cloudflare.com https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev;
-  connect-src 'self' https://iwivgqsihxicyptaoewm.supabase.co https://nominatim.openstreetmap.org https://router.project-osrm.org;
-  worker-src 'self' blob:;
-  frame-src 'none';
-  object-src 'none';
-  base-uri 'self';
-">
+<script>
+  if (window.top !== window.self) { window.top.location = window.self.location; }
+</script>
 ```
+This runs immediately and breaks out of any iframe. It must come before the CSP meta tag.
 
-### Key Decisions
-- **`'unsafe-inline'` for styles only** — Required because Tailwind and component libraries inject inline styles. Scripts do NOT get `'unsafe-inline'`.
-- **`blob:` in img-src and worker-src** — Needed for Leaflet tile rendering and the PWA service worker.
-- **`data:` in img-src** — Used by Leaflet and inline SVG icons.
-- **`frame-src 'none'`** and **`object-src 'none'`** — Blocks iframe and plugin injection vectors.
-- **Google Fonts pre-allowed** — Even if not currently imported, this avoids breakage if added later. Can be removed for stricter policy.
+2. **Update CSP meta tag** — add `frame-ancestors 'none'` to the policy string. While browsers ignore `frame-ancestors` in meta CSP, it documents intent and will work if the policy is later moved to an HTTP header.
+
+3. **Adjust `script-src`** — the inline frame-busting script requires `'unsafe-inline'` in `script-src`, OR we use a `nonce`/`hash`. Since adding `'unsafe-inline'` to scripts weakens XSS protection, we'll use a **SHA-256 hash** of the exact snippet to keep the policy strict.
+
+### No Conflicts
+- Supabase auth uses redirects (not iframes) — unaffected.
+- No dashboard component uses self-embedding iframes (`frame-src` is already `'none'`).
+- The Lovable preview iframe is handled by the SW guard in `main.tsx` which unregisters service workers — the frame-busting script will cause the preview to navigate to top, but this is acceptable since the published site is the target.
 
 ### Files
 | File | Change |
 |------|--------|
-| `index.html` | Add CSP meta tag in `<head>` |
+| `index.html` | Add frame-busting script + update CSP with `frame-ancestors 'none'` and script hash |
 
