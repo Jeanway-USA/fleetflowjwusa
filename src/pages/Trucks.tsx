@@ -57,6 +57,12 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     next_inspection_date,
     current_driver_id,
     purchase_mileage,
+    loan_balance,
+    monthly_payment,
+    interest_rate,
+    loan_term_months,
+    loan_start_date,
+    lender_name,
   } = truck;
 
   return {
@@ -71,6 +77,12 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     next_inspection_date: next_inspection_date ?? null,
     current_driver_id: current_driver_id ?? null,
     purchase_mileage: purchase_mileage ?? null,
+    loan_balance: loan_balance ?? null,
+    monthly_payment: monthly_payment ?? null,
+    interest_rate: interest_rate ?? null,
+    loan_term_months: loan_term_months ?? null,
+    loan_start_date: loan_start_date ?? null,
+    lender_name: lender_name ?? null,
   };
 };
 
