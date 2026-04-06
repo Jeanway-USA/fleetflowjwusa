@@ -11,6 +11,7 @@ import { LoadRouteMap } from './LoadRouteMap';
 import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { getRelativeTimestamp } from './RelativeTimestamp';
 
 // Helper to format and clean special instructions for better readability
@@ -141,6 +142,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   const [isUpdating, setIsUpdating] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [podDialogOpen, setPodDialogOpen] = useState(false);
+  const { isOnline, enqueue } = useOfflineQueue();
 
   if (!load) {
     return (
@@ -180,6 +182,13 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
       // POD not required — fall through to direct status update
     }
     
+    if (!isOnline) {
+      enqueue('load_status_update', { id: load.id, status: nextStatus });
+      toast.success(`Status update saved. Will sync when online.`);
+      onStatusUpdate?.();
+      return;
+    }
+
     setIsUpdating(true);
     try {
       const { error } = await supabase

@@ -57,6 +57,11 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // 5 minutes
+      networkMode: 'offlineFirst',
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours — persist cache for offline use
+    },
+    mutations: {
+      networkMode: 'offlineFirst',
     },
   },
 });
