@@ -123,7 +123,6 @@ export default function LoadOptimizer() {
       <PageHeader
         title="Load Optimizer"
         description="Evaluate a potential load before booking — powered by your real operational costs."
-        icon={Calculator}
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
