@@ -17,12 +17,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock, Truck as TruckIcon, MoreHorizontal, FileSpreadsheet } from 'lucide-react';
+import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock, Truck as TruckIcon, MoreHorizontal, FileSpreadsheet, Landmark } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { formatCurrency } from '@/lib/formatters';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { addDays, differenceInDays, format } from 'date-fns';
+import { addDays, addMonths, differenceInDays, format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
@@ -53,6 +57,12 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     next_inspection_date,
     current_driver_id,
     purchase_mileage,
+    loan_balance,
+    monthly_payment,
+    interest_rate,
+    loan_term_months,
+    loan_start_date,
+    lender_name,
   } = truck;
 
   return {
@@ -67,6 +77,12 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     next_inspection_date: next_inspection_date ?? null,
     current_driver_id: current_driver_id ?? null,
     purchase_mileage: purchase_mileage ?? null,
+    loan_balance: loan_balance ?? null,
+    monthly_payment: monthly_payment ?? null,
+    interest_rate: interest_rate ?? null,
+    loan_term_months: loan_term_months ?? null,
+    loan_start_date: loan_start_date ?? null,
+    lender_name: lender_name ?? null,
   };
 };
 
@@ -245,6 +261,16 @@ export default function Trucks() {
       }
     },
     { key: 'status', header: 'Status', render: (truck: TruckWithDriver) => <StatusBadge status={truck.status} /> },
+    {
+      key: 'loan',
+      header: 'Loan',
+      hiddenOnMobile: true,
+      render: (truck: TruckWithDriver) => {
+        const balance = truck.loan_balance;
+        if (!balance || balance <= 0) return <span className="text-muted-foreground">—</span>;
+        return <Badge variant="secondary" className="text-xs font-mono">{formatCurrency(balance, { maximumFractionDigits: 0 })}</Badge>;
+      },
+    },
     { 
       key: 'next_120_inspection', 
       header: '120-Day Inspection',
@@ -513,6 +539,55 @@ export default function Trucks() {
                 </p>
               </div>
             </div>
+
+            {/* Financing Section */}
+            <Collapsible>
+              <CollapsibleTrigger className="flex items-center gap-2 w-full border-t pt-4 text-sm font-medium hover:text-primary transition-colors">
+                <Landmark className="h-4 w-4" />
+                Loan & Financing
+                <span className="text-xs text-muted-foreground ml-auto">Click to expand</span>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="lender_name">Lender Name</Label>
+                    <Input id="lender_name" value={(formData as any).lender_name || ''} onChange={(e) => setFormData({ ...formData, lender_name: e.target.value || null } as any)} placeholder="e.g. Daimler Truck Financial" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="loan_balance">Loan Balance ($)</Label>
+                    <Input id="loan_balance" type="number" step="0.01" value={(formData as any).loan_balance || ''} onChange={(e) => setFormData({ ...formData, loan_balance: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="monthly_payment">Monthly Payment ($)</Label>
+                    <Input id="monthly_payment" type="number" step="0.01" value={(formData as any).monthly_payment || ''} onChange={(e) => setFormData({ ...formData, monthly_payment: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="interest_rate">Interest Rate (%)</Label>
+                    <Input id="interest_rate" type="number" step="0.01" value={(formData as any).interest_rate || ''} onChange={(e) => setFormData({ ...formData, interest_rate: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="loan_term_months">Loan Term (months)</Label>
+                    <Input id="loan_term_months" type="number" value={(formData as any).loan_term_months || ''} onChange={(e) => setFormData({ ...formData, loan_term_months: e.target.value ? parseInt(e.target.value) : null } as any)} placeholder="e.g. 60" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="loan_start_date">Loan Start Date</Label>
+                    <Input id="loan_start_date" type="date" value={(formData as any).loan_start_date || ''} onChange={(e) => setFormData({ ...formData, loan_start_date: e.target.value || null } as any)} />
+                  </div>
+                </div>
+                {(formData as any).loan_start_date && (formData as any).loan_term_months && (
+                  <div className="rounded-md bg-muted p-3">
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">Estimated Payoff Date:</span>{' '}
+                      {format(addMonths(new Date((formData as any).loan_start_date + 'T00:00:00'), (formData as any).loan_term_months), 'MM/dd/yyyy')}
+                    </p>
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
@@ -539,12 +614,15 @@ export default function Trucks() {
           </DialogHeader>
           {viewingTruck && (
             <Tabs defaultValue="expenses" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="expenses" className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4" /> Expenses
                 </TabsTrigger>
                 <TabsTrigger value="documents" className="flex items-center gap-2">
                   <FileText className="h-4 w-4" /> Documents
+                </TabsTrigger>
+                <TabsTrigger value="financing" className="flex items-center gap-2">
+                  <Landmark className="h-4 w-4" /> Financing
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="expenses" className="mt-4">
@@ -561,6 +639,55 @@ export default function Trucks() {
                   documentTypes={['Registration', 'Insurance', 'Inspection', 'Title', 'Other']}
                   title="Truck Documents"
                 />
+              </TabsContent>
+              <TabsContent value="financing" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Landmark className="h-4 w-4" /> Loan Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {viewingTruck.lender_name || viewingTruck.loan_balance ? (
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Lender</p>
+                          <p className="font-medium">{viewingTruck.lender_name || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Remaining Balance</p>
+                          <p className="font-medium">{viewingTruck.loan_balance ? formatCurrency(viewingTruck.loan_balance) : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Monthly Payment</p>
+                          <p className="font-medium">{viewingTruck.monthly_payment ? formatCurrency(viewingTruck.monthly_payment) : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Interest Rate</p>
+                          <p className="font-medium">{viewingTruck.interest_rate != null ? `${viewingTruck.interest_rate}%` : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Loan Term</p>
+                          <p className="font-medium">{viewingTruck.loan_term_months ? `${viewingTruck.loan_term_months} months` : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Loan Start Date</p>
+                          <p className="font-medium">{viewingTruck.loan_start_date ? format(new Date(viewingTruck.loan_start_date + 'T00:00:00'), 'MM/dd/yyyy') : '—'}</p>
+                        </div>
+                        {viewingTruck.loan_start_date && viewingTruck.loan_term_months && (
+                          <div className="col-span-2 rounded-md bg-muted p-3 mt-2">
+                            <p className="text-sm">
+                              <span className="font-medium">Estimated Payoff Date:</span>{' '}
+                              {format(addMonths(new Date(viewingTruck.loan_start_date + 'T00:00:00'), viewingTruck.loan_term_months), 'MM/dd/yyyy')}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No financing information on file for this truck.</p>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           )}

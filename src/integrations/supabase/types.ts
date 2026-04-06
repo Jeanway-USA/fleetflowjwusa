@@ -3857,12 +3857,18 @@ export type Database = {
           current_driver_id: string | null
           current_odometer: number | null
           id: string
+          interest_rate: number | null
           last_120_inspection_date: string | null
           last_120_inspection_miles: number | null
+          lender_name: string | null
           license_plate: string | null
           license_plate_state: string | null
+          loan_balance: number | null
+          loan_start_date: string | null
+          loan_term_months: number | null
           make: string | null
           model: string | null
+          monthly_payment: number | null
           next_inspection_date: string | null
           org_id: string
           purchase_mileage: number | null
@@ -3877,12 +3883,18 @@ export type Database = {
           current_driver_id?: string | null
           current_odometer?: number | null
           id?: string
+          interest_rate?: number | null
           last_120_inspection_date?: string | null
           last_120_inspection_miles?: number | null
+          lender_name?: string | null
           license_plate?: string | null
           license_plate_state?: string | null
+          loan_balance?: number | null
+          loan_start_date?: string | null
+          loan_term_months?: number | null
           make?: string | null
           model?: string | null
+          monthly_payment?: number | null
           next_inspection_date?: string | null
           org_id: string
           purchase_mileage?: number | null
@@ -3897,12 +3909,18 @@ export type Database = {
           current_driver_id?: string | null
           current_odometer?: number | null
           id?: string
+          interest_rate?: number | null
           last_120_inspection_date?: string | null
           last_120_inspection_miles?: number | null
+          lender_name?: string | null
           license_plate?: string | null
           license_plate_state?: string | null
+          loan_balance?: number | null
+          loan_start_date?: string | null
+          loan_term_months?: number | null
           make?: string | null
           model?: string | null
+          monthly_payment?: number | null
           next_inspection_date?: string | null
           org_id?: string
           purchase_mileage?: number | null
