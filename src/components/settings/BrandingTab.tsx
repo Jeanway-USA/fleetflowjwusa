@@ -89,6 +89,18 @@ export function BrandingTab() {
     }
   };
 
+  const validateFile = (file: File): boolean => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Only image files are accepted (PNG, JPG, SVG, WebP).');
+      return false;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('File exceeds the 2MB limit.');
+      return false;
+    }
+    return true;
+  };
+
   const handleFileUpload = async (
     file: File,
     type: 'logo' | 'banner',
@@ -255,11 +267,11 @@ export function BrandingTab() {
                 <input
                   ref={logoInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file, 'logo', setIsUploadingLogo);
+                    if (file && validateFile(file)) handleFileUpload(file, 'logo', setIsUploadingLogo);
                     e.target.value = '';
                   }}
                 />
@@ -302,11 +314,11 @@ export function BrandingTab() {
                 <input
                   ref={bannerInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file, 'banner', setIsUploadingBanner);
+                    if (file && validateFile(file)) handleFileUpload(file, 'banner', setIsUploadingBanner);
                     e.target.value = '';
                   }}
                 />
