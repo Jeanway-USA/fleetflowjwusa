@@ -27,7 +27,7 @@ import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { addDays, differenceInDays, format } from 'date-fns';
+import { addDays, differenceInDays, format, addMonths as addMonthsFns } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
