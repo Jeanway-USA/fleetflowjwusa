@@ -539,6 +539,55 @@ export default function Trucks() {
                 </p>
               </div>
             </div>
+
+            {/* Financing Section */}
+            <Collapsible>
+              <CollapsibleTrigger className="flex items-center gap-2 w-full border-t pt-4 text-sm font-medium hover:text-primary transition-colors">
+                <Landmark className="h-4 w-4" />
+                Loan & Financing
+                <span className="text-xs text-muted-foreground ml-auto">Click to expand</span>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="lender_name">Lender Name</Label>
+                    <Input id="lender_name" value={(formData as any).lender_name || ''} onChange={(e) => setFormData({ ...formData, lender_name: e.target.value || null } as any)} placeholder="e.g. Daimler Truck Financial" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="loan_balance">Loan Balance ($)</Label>
+                    <Input id="loan_balance" type="number" step="0.01" value={(formData as any).loan_balance || ''} onChange={(e) => setFormData({ ...formData, loan_balance: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="monthly_payment">Monthly Payment ($)</Label>
+                    <Input id="monthly_payment" type="number" step="0.01" value={(formData as any).monthly_payment || ''} onChange={(e) => setFormData({ ...formData, monthly_payment: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="interest_rate">Interest Rate (%)</Label>
+                    <Input id="interest_rate" type="number" step="0.01" value={(formData as any).interest_rate || ''} onChange={(e) => setFormData({ ...formData, interest_rate: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="loan_term_months">Loan Term (months)</Label>
+                    <Input id="loan_term_months" type="number" value={(formData as any).loan_term_months || ''} onChange={(e) => setFormData({ ...formData, loan_term_months: e.target.value ? parseInt(e.target.value) : null } as any)} placeholder="e.g. 60" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="loan_start_date">Loan Start Date</Label>
+                    <Input id="loan_start_date" type="date" value={(formData as any).loan_start_date || ''} onChange={(e) => setFormData({ ...formData, loan_start_date: e.target.value || null } as any)} />
+                  </div>
+                </div>
+                {(formData as any).loan_start_date && (formData as any).loan_term_months && (
+                  <div className="rounded-md bg-muted p-3">
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">Estimated Payoff Date:</span>{' '}
+                      {format(addMonths(new Date((formData as any).loan_start_date + 'T00:00:00'), (formData as any).loan_term_months), 'MM/dd/yyyy')}
+                    </p>
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
