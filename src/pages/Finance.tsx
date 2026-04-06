@@ -599,7 +599,7 @@ export default function Finance() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
@@ -635,6 +635,24 @@ export default function Finance() {
           <CardContent>
             <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(netProfit)}</div>
             <p className="text-xs text-muted-foreground">Margin: {profitMargin.toFixed(1)}%</p>
+          </CardContent>
+        </Card>
+        <Card className="card-elevated">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Equipment Debt</CardTitle>
+            <Landmark className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const activeLoanTrucks = trucks.filter((t: any) => t.status === 'active' && t.monthly_payment != null && t.monthly_payment > 0);
+              const totalMonthly = activeLoanTrucks.reduce((sum: number, t: any) => sum + (t.monthly_payment || 0), 0);
+              return (
+                <>
+                  <div className="text-2xl font-bold">{formatCurrency(totalMonthly)}</div>
+                  <p className="text-xs text-muted-foreground">{activeLoanTrucks.length} truck{activeLoanTrucks.length !== 1 ? 's' : ''} with active loans · /mo</p>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
