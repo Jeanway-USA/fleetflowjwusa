@@ -614,12 +614,15 @@ export default function Trucks() {
           </DialogHeader>
           {viewingTruck && (
             <Tabs defaultValue="expenses" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="expenses" className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4" /> Expenses
                 </TabsTrigger>
                 <TabsTrigger value="documents" className="flex items-center gap-2">
                   <FileText className="h-4 w-4" /> Documents
+                </TabsTrigger>
+                <TabsTrigger value="financing" className="flex items-center gap-2">
+                  <Landmark className="h-4 w-4" /> Financing
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="expenses" className="mt-4">
@@ -636,6 +639,55 @@ export default function Trucks() {
                   documentTypes={['Registration', 'Insurance', 'Inspection', 'Title', 'Other']}
                   title="Truck Documents"
                 />
+              </TabsContent>
+              <TabsContent value="financing" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Landmark className="h-4 w-4" /> Loan Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {viewingTruck.lender_name || viewingTruck.loan_balance ? (
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Lender</p>
+                          <p className="font-medium">{viewingTruck.lender_name || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Remaining Balance</p>
+                          <p className="font-medium">{viewingTruck.loan_balance ? formatCurrency(viewingTruck.loan_balance) : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Monthly Payment</p>
+                          <p className="font-medium">{viewingTruck.monthly_payment ? formatCurrency(viewingTruck.monthly_payment) : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Interest Rate</p>
+                          <p className="font-medium">{viewingTruck.interest_rate != null ? `${viewingTruck.interest_rate}%` : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Loan Term</p>
+                          <p className="font-medium">{viewingTruck.loan_term_months ? `${viewingTruck.loan_term_months} months` : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Loan Start Date</p>
+                          <p className="font-medium">{viewingTruck.loan_start_date ? format(new Date(viewingTruck.loan_start_date + 'T00:00:00'), 'MM/dd/yyyy') : '—'}</p>
+                        </div>
+                        {viewingTruck.loan_start_date && viewingTruck.loan_term_months && (
+                          <div className="col-span-2 rounded-md bg-muted p-3 mt-2">
+                            <p className="text-sm">
+                              <span className="font-medium">Estimated Payoff Date:</span>{' '}
+                              {format(addMonths(new Date(viewingTruck.loan_start_date + 'T00:00:00'), viewingTruck.loan_term_months), 'MM/dd/yyyy')}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No financing information on file for this truck.</p>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           )}
