@@ -40,9 +40,9 @@ export default function LoadOptimizer() {
       data?.forEach(r => { map[r.setting_key] = r.setting_value; });
       return {
         targetMargin: parseFloat(map['target_profit_margin']) || DEFAULT_TARGET_MARGIN,
-        truckPct: parseFloat(map['truck_percentage']) || DEFAULT_TRUCK_PCT,
-        trailerPct: parseFloat(map['trailer_percentage']) || DEFAULT_TRAILER_PCT,
-        advancePct: parseFloat(map['advance_percentage']) || DEFAULT_ADVANCE_PCT,
+        truckPct: ((v) => v > 1 ? v / 100 : v)(parseFloat(map['truck_percentage'])) || DEFAULT_TRUCK_PCT,
+        trailerPct: ((v) => v > 1 ? v / 100 : v)(parseFloat(map['trailer_percentage'])) || DEFAULT_TRAILER_PCT,
+        advancePct: ((v) => v > 1 ? v / 100 : v)(parseFloat(map['advance_percentage'])) || DEFAULT_ADVANCE_PCT,
         ownsTrailer: map['owns_trailer'] === 'true',
       };
     },
