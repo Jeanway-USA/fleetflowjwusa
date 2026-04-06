@@ -1,45 +1,27 @@
 
 
-## Load Optimizer Tool
+## Fix: Truck % Display Showing 6500% Instead of 65%
 
-A standalone calculator page where you can evaluate a potential Landstar load before booking it, using your real operational CPM from the Finance module.
+### Root Cause
+The `company_settings` table stores `truck_percentage` as `65` (a whole number percentage), but the code assumes it's a decimal (`0.65`). When displaying, it multiplies by 100 again — producing `6500%`. The same issue affects the revenue calculation, where `truckPct` of `65` instead of `0.65` would produce wildly incorrect splits.
 
-### New Files
+### Fix (in `src/pages/LoadOptimizer.tsx`)
 
-**`src/pages/LoadOptimizer.tsx`** — Full-page calculator with:
-- **Input Section**: Gross Pay (rate), Miles, and Deadhead Miles fields
-- **Revenue Calculation**: Uses `calculateRevenue()` from `src/lib/revenue-calculator.ts` for the Landstar split (truck %, trailer %, FSC), then applies `useOperationalCPM()` to compute True Net Profit
-- **Deadhead Analysis**: Adds deadhead miles to loaded miles for total CPM impact; shows profit with and without deadhead
-- **Go/No-Go Recommendation**: Pulls target margin from `company_settings` (new key `target_profit_margin`, default 15%). Displays a large green "GO" or red "NO-GO" badge based on whether the load exceeds the target margin
-- **Breakdown Card**: Shows itemized costs — Landstar split, operational overhead (CPM x total miles), estimated driver pay, deadhead cost — and final True Net Profit
+**Line 43-45** — Normalize DB values to decimals when parsing:
+```typescript
+truckPct: (parseFloat(map['truck_percentage']) > 1 
+  ? parseFloat(map['truck_percentage']) / 100 
+  : parseFloat(map['truck_percentage'])) || DEFAULT_TRUCK_PCT,
+```
+Apply the same `> 1 ? val/100 : val` guard to `trailerPct` and `advancePct`.
 
-**Fields in the calculator form:**
-- Gross Pay (linehaul rate)
-- Fuel Surcharge (optional, default 0)
-- Loaded Miles
-- Deadhead Miles (miles to pickup)
-- Power Only toggle
+This way:
+- If DB stores `65` → normalized to `0.65` → displays as `65%` ✓
+- If DB stores `0.65` → stays `0.65` → displays as `65%` ✓
+- Calculation in `calculateRevenue()` receives the correct decimal ✓
 
-### Existing File Changes
-
-**`src/components/layout/AppSidebar.tsx`**
-- Add nav item: `{ title: 'Load Optimizer', icon: Calculator, path: '/load-optimizer', roles: ['owner', 'dispatcher'], feature: 'loads' }` in the `operationsItems` array
-
-**`src/App.tsx`**
-- Add lazy import and protected route for `/load-optimizer`
-
-### Technical Details
-
-- `useOperationalCPM()` provides the True CPM and `calculateTrueProfit()` helper
-- `calculateRevenue()` handles the Landstar revenue split logic (truck %, trailer %, FSC passthrough)
-- Target margin stored in `company_settings` as `target_profit_margin`; read via a simple supabase query with fallback to 15%
-- No database migration needed — uses existing `company_settings` key-value store
-- All calculation is client-side and instant as the user types (controlled inputs with `useMemo` for derived values)
-
-### Files
-| File | Action |
+### Single file change
+| File | Change |
 |------|--------|
-| `src/pages/LoadOptimizer.tsx` | Create — calculator page |
-| `src/App.tsx` | Add route |
-| `src/components/layout/AppSidebar.tsx` | Add nav item |
+| `src/pages/LoadOptimizer.tsx` | Normalize percentage values from `company_settings` on lines 43-45 |
 
