@@ -1,24 +1,51 @@
 
 
-## Fix Branding Upload Validation
+## Add Content Security Policy (CSP) to index.html
 
-### Problem
-The logo and banner file inputs use `accept="image/*"` which still allows videos and other non-image files through the file picker on some browsers. There is no file size validation — files over 2MB are uploaded without warning.
+### What This Does
+Adds a `<meta http-equiv="Content-Security-Policy">` tag that restricts which domains can serve scripts, styles, images, and network connections — blocking unauthorized third-party code injection (XSS).
 
-### Changes
+### External Domains Identified in the Codebase
 
-**`src/components/settings/BrandingTab.tsx`**
+| Domain | Used For | CSP Directive |
+|--------|----------|---------------|
+| `iwivgqsihxicyptaoewm.supabase.co` | Backend API + Auth | `connect-src`, `script-src` |
+| `*.tile.openstreetmap.org` | Map tiles (Leaflet) | `img-src` |
+| `*.basemaps.cartocdn.com` | CARTO map tiles (IFTA) | `img-src` |
+| `cdnjs.cloudflare.com` | Leaflet marker icons | `img-src` |
+| `nominatim.openstreetmap.org` | Geocoding API | `connect-src` |
+| `router.project-osrm.org` | Routing API | `connect-src` |
+| `pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev` | OG preview image | `img-src` |
+| `fonts.googleapis.com` / `fonts.gstatic.com` | Google Fonts (if added later) | `style-src` / `font-src` |
 
-1. **Add a validation function** before `handleFileUpload` is called in both `onChange` handlers:
-   - Check `file.size > 2 * 1024 * 1024` → show `toast.error('File exceeds the 2MB limit.')` and return
-   - Check `!file.type.startsWith('image/')` → show `toast.error('Only image files are accepted (PNG, JPG, SVG, WebP).')` and return
+### Change
 
-2. **Restrict `accept` attributes** from `image/*` to `image/png,image/jpeg,image/svg+xml,image/webp,image/gif` to prevent video files from appearing in the file picker
+**`index.html`** — Add CSP meta tag after line 5:
 
-3. **Apply validation in both** the logo `onChange` (line 260-264) and banner `onChange` (line 307-311) handlers, before calling `handleFileUpload`
+```html
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self';
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' data: blob: https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://cdnjs.cloudflare.com https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev;
+  connect-src 'self' https://iwivgqsihxicyptaoewm.supabase.co https://nominatim.openstreetmap.org https://router.project-osrm.org;
+  worker-src 'self' blob:;
+  frame-src 'none';
+  object-src 'none';
+  base-uri 'self';
+">
+```
 
-### File
+### Key Decisions
+- **`'unsafe-inline'` for styles only** — Required because Tailwind and component libraries inject inline styles. Scripts do NOT get `'unsafe-inline'`.
+- **`blob:` in img-src and worker-src** — Needed for Leaflet tile rendering and the PWA service worker.
+- **`data:` in img-src** — Used by Leaflet and inline SVG icons.
+- **`frame-src 'none'`** and **`object-src 'none'`** — Blocks iframe and plugin injection vectors.
+- **Google Fonts pre-allowed** — Even if not currently imported, this avoids breakage if added later. Can be removed for stricter policy.
+
+### Files
 | File | Change |
 |------|--------|
-| `src/components/settings/BrandingTab.tsx` | Add size/type validation + restrict accept attribute |
+| `index.html` | Add CSP meta tag in `<head>` |
 
