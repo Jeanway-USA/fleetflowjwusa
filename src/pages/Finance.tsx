@@ -33,6 +33,7 @@ import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMo
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { InvoicingTab } from '@/components/finance/InvoicingTab';
 import { FactoringTab } from '@/components/finance/FactoringTab';
+import { LoadProfitabilityTab } from '@/components/finance/LoadProfitabilityTab';
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
 import { US_STATES } from '@/lib/us-states';
@@ -661,6 +662,7 @@ export default function Finance() {
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="pl">P&L Summary</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
+          <TabsTrigger value="profitability">Profitability</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="payroll">Payroll</TabsTrigger>
           <TabsTrigger value="commissions">Commissions</TabsTrigger>
@@ -691,6 +693,19 @@ export default function Finance() {
 
         <TabsContent value="revenue" className="mt-6">
           <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
+        </TabsContent>
+
+        <TabsContent value="profitability" className="mt-6">
+          <LoadProfitabilityTab
+            deliveredLoads={deliveredLoads}
+            loadExpenses={loadExpenses}
+            drivers={drivers}
+            expenses={filteredExpenses}
+            totalExpenses={totalExpenses}
+            totalPayroll={totalPayroll}
+            revenueTotals={revenueTotals}
+            allLoads={loads}
+          />
         </TabsContent>
 
         <TabsContent value="expenses" className="mt-6">
