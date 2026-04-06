@@ -1,57 +1,58 @@
 
 
-## Loan & Financing Management for Trucks
+## True Net Income & Load Profitability Enhancement
 
-### 1. Database Migration
-Add 6 new nullable columns to the `trucks` table:
+### Analysis
+The existing schema already contains all necessary cost data:
+- `load_expenses` table has per-load breakdowns: `fuel_cost`, `truck_payment`, `tolls`, `operating_total`, etc.
+- `fleet_loads` has `gross_revenue`, `net_revenue`, `actual_miles`, `booked_miles`
+- `expenses` table has standalone expenses (fuel, insurance, etc.)
+- `useOperationalCPM` hook already calculates cost-per-mile from `company_settings`
+- `drivers` table has `pay_rate` and `pay_type` for driver pay estimation
 
-```sql
-ALTER TABLE public.trucks
-  ADD COLUMN loan_balance numeric DEFAULT NULL,
-  ADD COLUMN monthly_payment numeric DEFAULT NULL,
-  ADD COLUMN interest_rate numeric DEFAULT NULL,
-  ADD COLUMN loan_term_months integer DEFAULT NULL,
-  ADD COLUMN loan_start_date date DEFAULT NULL,
-  ADD COLUMN lender_name text DEFAULT NULL;
-```
+No database migration needed — all fields exist. This is a pure UI/logic feature.
 
-No RLS changes needed -- existing truck policies already cover these columns.
+### What to Build
 
-### 2. Trucks Page - Edit/Add Dialog (`src/pages/Trucks.tsx`)
+**1. New Component: `LoadProfitabilityTab.tsx`**
+A new tab on the Finance page ("Profitability") containing:
 
-**Financing section in the form** (after the driver assignment section, before DialogFooter):
-- Add a collapsible "Financing" section with a `Landmark` (bank) icon header
-- Fields in a 2-column grid: Lender Name, Loan Balance, Monthly Payment, Interest Rate (%), Loan Term (months), Loan Start Date
-- Display a computed "Estimated Payoff Date" (loan_start_date + loan_term_months) as read-only text below the fields
-- Update `toEditableTruck()` to include the 6 new fields
-- Update `formData` state handling for the new fields
+- **Per-Load Profitability Table**: For each delivered load in the period, show:
+  - Load ID, Origin → Destination, Miles
+  - Gross Revenue
+  - Driver Pay (estimated from `pay_rate` x gross or flat)
+  - Fuel Cost (from `load_expenses.fuel_cost`)
+  - Tolls (from `load_expenses.tolls`)
+  - Overhead (CPM x miles, using `useOperationalCPM`)
+  - **True Net Income** = Gross Revenue - (Driver Pay + Fuel + Tolls + Overhead)
+  - Color-coded: green if profitable, red if not
 
-**Loan badge on the data table**:
-- Add a new column after the Status column called "Loan"
-- If `loan_balance > 0`, show a small badge with the formatted remaining balance (e.g. `$42,500`)
-- If no loan, show a muted dash
+- **Break-Even Indicator Card**: Shows the minimum rate-per-mile needed to cover costs. Calculated as: `(total expenses in period) / (total miles in period)`. Displayed as a prominent card with the current average RPM alongside it for comparison.
 
-**Truck Details dialog** (the "View Details" dialog):
-- Add a third tab "Financing" alongside Expenses and Documents
-- Show a read-only card with lender name, balance, monthly payment, rate, term, start date, and calculated payoff date
+- **CPM Calculator Card**: Shows `total period expenses / total period miles` as actual CPM, alongside the configured operational CPM from settings. Highlights variance.
 
-### 3. Finance Page - Equipment Debt Widget (`src/pages/Finance.tsx`)
+- **Net vs Gross Revenue Trends Chart**: Using the existing `RevenueTrendsChart` pattern (Shadcn `ChartContainer` + Recharts `AreaChart`), show monthly Gross Revenue, True Net Income, and Total Costs over the last 6 months.
 
-Add a 4th summary card in the existing grid (change from `md:grid-cols-3` to `md:grid-cols-4`):
-- Title: "Equipment Debt"
-- Icon: `Landmark` (bank icon)
-- Value: sum of `monthly_payment` from all active trucks (status = 'active') that have a non-null monthly_payment
-- Subtitle: "X trucks with active loans"
+**2. Update `Finance.tsx`**
+- Add a "Profitability" tab trigger after "Revenue"
+- Pass the necessary data (deliveredLoads, loadExpenses, drivers, expenses, trucks, CPM) to the new component
+- Join `load_expenses` to loads by `load_id` for per-load cost lookup
 
-The trucks query already exists on the Finance page (line 138-145), so we just need to compute the aggregate from the existing data. The new columns will be available once the migration runs.
+**3. Update `PLSummaryTab.tsx`**
+- Add a "True Net Income" row in the Net Profit Calculation section that factors in the operational CPM overhead
+- Add the Break-Even RPM as a new stat tile in the 2x2 grid
 
-### 4. Types
-The `src/integrations/supabase/types.ts` file auto-regenerates after migration -- no manual edit needed.
-
-### Files Changed
-| File | Change |
+### Files to Create/Update
+| File | Action |
 |------|--------|
-| New migration SQL | Add 6 columns to `trucks` |
-| `src/pages/Trucks.tsx` | Financing form section, loan badge column, financing details tab |
-| `src/pages/Finance.tsx` | Equipment Debt summary card |
+| `src/components/finance/LoadProfitabilityTab.tsx` | New — per-load profitability table, break-even card, CPM calculator, trends chart |
+| `src/pages/Finance.tsx` | Add "Profitability" tab, pass data to new component |
+| `src/components/finance/PLSummaryTab.tsx` | Add True Net Income row and Break-Even RPM stat tile |
+
+### Technical Details
+- Driver pay estimation: `load.gross_revenue * (driver.pay_rate / 100)` for percentage-based, or `driver.pay_rate * load.actual_miles` for per-mile
+- Break-even RPM: `(totalExpenses + totalPayroll) / totalActualMiles`
+- Trends chart: aggregate loads by month for the last 6 months, computing gross, net, and true net per month
+- All calculations are client-side from already-fetched queries (no new DB calls needed)
+- Uses existing Shadcn chart components (`ChartContainer`, `AreaChart`) matching the `RevenueTrendsChart` pattern
 
