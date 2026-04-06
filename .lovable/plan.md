@@ -1,93 +1,24 @@
 
 
-## PWA with Offline Capabilities for FleetFlow TMS
+## Fix Branding Upload Validation
 
-### Overview
-Convert FleetFlow into an installable PWA with a service worker for asset caching, an offline mode indicator in the dashboard header, and an expanded offline sync system for driver actions (fuel receipts, load status updates) that auto-syncs to the backend when connectivity returns.
+### Problem
+The logo and banner file inputs use `accept="image/*"` which still allows videos and other non-image files through the file picker on some browsers. There is no file size validation — files over 2MB are uploaded without warning.
 
-### Important Caveat
-PWA features (offline support, install prompts) will only work in the **published** version of the app, not in the Lovable editor preview. The service worker is disabled in development to avoid caching issues.
+### Changes
 
----
+**`src/components/settings/BrandingTab.tsx`**
 
-### Files to Create
+1. **Add a validation function** before `handleFileUpload` is called in both `onChange` handlers:
+   - Check `file.size > 2 * 1024 * 1024` → show `toast.error('File exceeds the 2MB limit.')` and return
+   - Check `!file.type.startsWith('image/')` → show `toast.error('Only image files are accepted (PNG, JPG, SVG, WebP).')` and return
 
-**1. `public/manifest.json`** — Web app manifest
-- App name: "FleetFlow TMS", short name: "FleetFlow"
-- `display: "standalone"`, theme/background colors matching brand
-- Icon placeholders (192px, 512px)
+2. **Restrict `accept` attributes** from `image/*` to `image/png,image/jpeg,image/svg+xml,image/webp,image/gif` to prevent video files from appearing in the file picker
 
-**2. `src/components/shared/OfflineIndicator.tsx`** — Offline mode badge
-- Uses the existing `useOfflineSync` hook for `isOnline`, `pendingCount`, `isSyncing`
-- Shows a persistent amber banner/pill in the header when offline: "Offline — N pending"
-- Shows a brief green "Syncing..." indicator when reconnecting
-- Compact enough to sit in the DashboardLayout header bar
+3. **Apply validation in both** the logo `onChange` (line 260-264) and banner `onChange` (line 307-311) handlers, before calling `handleFileUpload`
 
-**3. `src/hooks/useOfflineQueue.ts`** — Generic offline action queue (replaces/extends `useOfflineSync`)
-- Stores pending actions in localStorage with type discrimination: `load_status_update`, `fuel_receipt`, `dvir_inspection`
-- Each action has: `id`, `type`, `payload`, `timestamp`
-- On reconnect, processes the queue in order, calling the appropriate Supabase insert/update for each type
-- Removes successfully synced items; retains failed ones with retry
-- Exposes: `isOnline`, `pendingCount`, `isSyncing`, `enqueue(action)`, `syncAll()`
-
----
-
-### Files to Update
-
-**4. `vite.config.ts`** — Add `vite-plugin-pwa`
-- Install `vite-plugin-pwa` dependency
-- Configure with `registerType: 'autoUpdate'`, `devOptions: { enabled: false }`
-- `navigateFallbackDenylist: [/^\/~oauth/]`
-- Workbox runtime caching for Supabase API calls (NetworkFirst strategy)
-- Precache app shell assets
-
-**5. `src/main.tsx`** — Service worker registration guard
-- Add iframe/preview-host detection guard
-- Unregister any stale service workers when in preview/iframe context
-- Only register SW in production on the published domain
-
-**6. `index.html`** — Add manifest link and meta tags
-- `<link rel="manifest" href="/manifest.json">`
-- `<meta name="theme-color">`, apple touch icon meta tags
-
-**7. `src/components/layout/DashboardLayout.tsx`** — Add `OfflineIndicator`
-- Import and render `<OfflineIndicator />` in the header bar (next to breadcrumbs)
-
-**8. `src/App.tsx`** — Configure TanStack Query for offline
-- Set `QueryClient` with `networkMode: 'offlineFirst'` so queries serve cached data when offline
-- Add `gcTime: Infinity` for critical driver queries to persist cache longer
-
-**9. `src/hooks/useOfflineSync.ts`** — Refactor to use `useOfflineQueue`
-- Delegate to the new generic queue instead of duplicating online/offline logic
-- Keep the existing DVIR-specific interface as a wrapper
-
-**10. `src/components/driver/ActiveLoadCard.tsx`** — Offline status updates
-- When updating load status offline, enqueue the action via `useOfflineQueue` instead of failing
-- Show toast: "Status update saved. Will sync when online."
-
----
-
-### Technical Details
-
-- **Service Worker Strategy**: Precache app shell (HTML, JS, CSS). Use NetworkFirst for API calls so cached responses are served when offline.
-- **TanStack Query `networkMode: 'offlineFirst'`**: Queries return stale cached data when offline instead of throwing errors. Mutations are paused and retried on reconnect.
-- **Offline Queue Storage**: localStorage-based (simple key-value). Actions are JSON-serializable payloads. File uploads (fuel receipts) store metadata only — actual file upload happens on sync via the Supabase storage API.
-- **Auto-sync**: The `useOfflineQueue` hook listens for the `online` window event and triggers `syncAll()` automatically.
-
-### Dependencies to Install
-- `vite-plugin-pwa` (dev dependency)
-
-### Files Summary
-| File | Action |
+### File
+| File | Change |
 |------|--------|
-| `public/manifest.json` | Create — PWA manifest |
-| `src/components/shared/OfflineIndicator.tsx` | Create — offline status badge |
-| `src/hooks/useOfflineQueue.ts` | Create — generic offline action queue |
-| `vite.config.ts` | Update — add vite-plugin-pwa |
-| `src/main.tsx` | Update — SW registration guard |
-| `index.html` | Update — manifest link + meta tags |
-| `src/components/layout/DashboardLayout.tsx` | Update — render OfflineIndicator |
-| `src/App.tsx` | Update — TanStack Query offline config |
-| `src/hooks/useOfflineSync.ts` | Update — delegate to useOfflineQueue |
-| `src/components/driver/ActiveLoadCard.tsx` | Update — offline-safe status updates |
+| `src/components/settings/BrandingTab.tsx` | Add size/type validation + restrict accept attribute |
 
