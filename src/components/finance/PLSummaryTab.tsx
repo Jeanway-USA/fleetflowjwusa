@@ -201,7 +201,7 @@ export function PLSummaryTab({
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="p-4 bg-muted rounded-lg text-center">
                 <p className="text-sm text-muted-foreground">Loads</p>
                 <p className="text-2xl font-bold">{revenueTotals.loadCount}</p>
