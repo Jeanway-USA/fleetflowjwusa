@@ -1,7 +1,8 @@
 import { Card, CardContent, CardTitle, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
-import { DollarSign, TrendingUp, TrendingDown, Percent, PiggyBank, Route } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, PiggyBank, Route, Target } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
+import { useOperationalCPM } from '@/hooks/useOperationalCPM';
 
 interface PLSummaryTabProps {
   revenueTotals: any;
@@ -36,6 +37,11 @@ export function PLSummaryTab({
   totalRevenueWithCommissions,
   getSetting,
 }: PLSummaryTabProps) {
+  const { costPerMile } = useOperationalCPM();
+  const overheadCost = costPerMile * totalActualMilesWithDeadhead;
+  const trueNetIncome = netProfit - overheadCost;
+  const breakEvenRPM = totalActualMilesWithDeadhead > 0 ? (totalExpenses + payrollTotals.netPay + overheadCost) / totalActualMilesWithDeadhead : 0;
+
   return (
     <>
       {/* Revenue Flow */}
@@ -195,7 +201,7 @@ export function PLSummaryTab({
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <div className="p-4 bg-muted rounded-lg text-center">
                 <p className="text-sm text-muted-foreground">Loads</p>
                 <p className="text-2xl font-bold">{revenueTotals.loadCount}</p>
@@ -216,6 +222,18 @@ export function PLSummaryTab({
                 <p className="text-sm text-muted-foreground">Profit Per Mile</p>
                 <p className="text-xl font-bold">
                   {revenueTotals.actualMiles > 0 ? formatCurrency(netProfit / revenueTotals.actualMiles) : '$0.00'}
+                </p>
+              </div>
+              <div className="p-4 bg-primary/10 rounded-lg text-center">
+                <p className="text-sm text-muted-foreground">True Net Income</p>
+                <p className={`text-xl font-bold ${trueNetIncome >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  {formatCurrency(trueNetIncome)}
+                </p>
+              </div>
+              <div className="p-4 bg-muted rounded-lg text-center">
+                <p className="text-sm text-muted-foreground flex items-center justify-center gap-1"><Target className="h-3 w-3" /> Break-Even RPM</p>
+                <p className="text-xl font-bold">
+                  {formatCurrency(breakEvenRPM)}
                 </p>
               </div>
             </div>
