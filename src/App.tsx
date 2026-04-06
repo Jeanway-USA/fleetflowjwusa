@@ -171,6 +171,11 @@ const App = () => {
                       </ProtectedRoute>
                     } />
                     <Route path="/resources" element={<Navigate to="/crm" replace />} />
+                    <Route path="/load-optimizer" element={
+                      <ProtectedRoute allowedRoles={['owner', 'dispatcher']} requiredFeature="loads">
+                        <LoadOptimizer />
+                      </ProtectedRoute>
+                    } />
                     <Route path="/maintenance" element={
                       <ProtectedRoute allowedRoles={['owner', 'safety']} requiredFeature="maintenance_full">
                         <MaintenanceManagement />
