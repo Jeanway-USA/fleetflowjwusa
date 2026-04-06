@@ -216,6 +216,7 @@ export function AppSidebar() {
     { title: 'Agency Loads', icon: Building2, path: '/agency-loads', roles: ['owner', 'dispatcher'], feature: 'agency_loads' },
     { title: currentTmsMode === 'independent' ? 'Broker CRM' : 'Agent CRM', icon: currentTmsMode === 'independent' ? Building2 : Contact, path: '/crm', roles: ['owner', 'dispatcher', 'safety', 'driver'], feature: 'crm' },
     { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'], feature: 'maintenance_full' },
+    { title: 'Load Optimizer', icon: BarChart, path: '/load-optimizer', roles: ['owner', 'dispatcher'], feature: 'loads' },
   ];
 
   const safetyItems: NavItem[] = [
