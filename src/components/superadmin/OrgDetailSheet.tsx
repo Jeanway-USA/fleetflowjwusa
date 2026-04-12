@@ -15,6 +15,7 @@ const TIER_LABELS: Record<string, string> = {
   fleet_owner: 'Fleet Owner',
   agency: 'Agency',
   all_in_one: 'All-in-One',
+  open_beta: 'Open Beta',
 };
 
 interface OrgDetailSheetProps {
