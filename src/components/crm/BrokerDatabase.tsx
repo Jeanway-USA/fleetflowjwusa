@@ -196,9 +196,20 @@ export function BrokerDatabase() {
       <PageHeader
         title="Broker CRM"
         description="Manage your broker relationships, credit scores, and payment terms"
-        action={canEdit ? { label: 'Add Broker', onClick: () => openForm() } : undefined}
       />
 
+      <Tabs defaultValue="brokers" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="brokers" className="gap-1.5"><Building2 className="h-4 w-4" /> Brokers</TabsTrigger>
+          <TabsTrigger value="documents" className="gap-1.5"><Briefcase className="h-4 w-4" /> Carrier Packet</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="brokers" className="space-y-4">
+          {canEdit && (
+            <div className="flex justify-end">
+              <Button onClick={() => openForm()} className="gap-1.5"><Plus className="h-4 w-4" /> Add Broker</Button>
+            </div>
+          )}
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="rounded-lg border bg-card p-4">
