@@ -54,6 +54,7 @@ const EXPENSE_TYPE_MAP: [RegExp, string][] = [
   [/\bUNLADEN\s*LIABILITY\b/i, 'Insurance'],
   [/\bCPP\b/i, 'CPP/Benefits'],
   [/\bREIMB\b/i, 'Reimbursement'],
+  [/\bESCROW\b/i, 'Misc'],
 ];
 
 function mapExpenseType(description: string): string {

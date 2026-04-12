@@ -702,7 +702,7 @@ export default function Finance() {
                 <Select onValueChange={selectExpensesByType}>
                   <SelectTrigger className="w-44"><SelectValue placeholder="Select by type" /></SelectTrigger>
                   <SelectContent>
-                    {EXPENSE_TYPES.filter(type => sortedFilteredExpenses.some(e => e.expense_type === type)).map(type => {
+                    {[...new Set(sortedFilteredExpenses.map(e => e.expense_type))].sort().map(type => {
                       const count = sortedFilteredExpenses.filter(e => e.expense_type === type).length;
                       return <SelectItem key={type} value={type}>{type} ({count})</SelectItem>;
                     })}
@@ -824,7 +824,7 @@ export default function Finance() {
                   <Table>
                     <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {EXPENSE_TYPES.map(type => {
+                      {Object.keys(standaloneExpenseTotals.byType).sort().map(type => {
                         const amount = standaloneExpenseTotals.byType[type] || 0;
                         const gallons = standaloneExpenseTotals.gallonsByType[type] || 0;
                         if (amount === 0) return null;
@@ -851,7 +851,7 @@ export default function Finance() {
                   <Table>
                     <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {EXPENSE_TYPES.map(type => {
+                      {Object.keys(loadLinkedExpenseTotals.byType).sort().map(type => {
                         const amount = loadLinkedExpenseTotals.byType[type] || 0;
                         if (amount === 0) return null;
                         return (
