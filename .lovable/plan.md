@@ -1,34 +1,58 @@
 
 
-## Clickjacking Protection for index.html
+## Fix Text Clipping and Overlap Across All Metric/KPI Cards
 
 ### Problem
-The site can potentially be embedded in a hostile `<iframe>` on another domain, enabling clickjacking attacks.
+Throughout the app, metric cards display an icon (like a dollar sign) with a value below or beside it. In constrained containers (especially responsive grids), the large bold text values overflow, clip, or overlap with labels. This affects readability on all screen sizes.
 
-### Important Note
-`frame-ancestors` is **not supported** in `<meta>` CSP tags — it only works via HTTP headers. However, we already have `frame-src 'none'` which prevents *our* site from loading external iframes. For clickjacking defense via meta tag, the frame-busting script is the primary mechanism. We can still document this limitation.
+### Root Cause
+- Large font sizes (`text-2xl`, `text-xl`) in fixed-width grid cells without overflow protection
+- No `truncate`, `min-w-0`, or `overflow-hidden` on text containers
+- Some grid layouts use too many columns for the available space
 
-### Changes — `index.html`
+### Files to Fix
 
-1. **Add frame-busting script** at the very top of `<head>` (after `<meta charset>`), before any other tags:
-```html
-<script>
-  if (window.top !== window.self) { window.top.location = window.self.location; }
-</script>
+| File | Issue |
+|------|-------|
+| `src/pages/LoadOptimizer.tsx` | `MetricTile` — icon + value stacked in `text-center` with no overflow handling; `BreakdownRow` labels can be long |
+| `src/components/executive/RevenueKPICards.tsx` | 5-col grid with `text-2xl` values that clip on medium screens |
+| `src/components/executive/OperationalMetrics.tsx` | `MetricRow` value can overlap label on narrow widths |
+| `src/components/finance/PLSummaryTab.tsx` | `grid-cols-3` boxes with `text-2xl` values; revenue flow boxes clip on small screens |
+| `src/components/finance/InvoicingTab.tsx` | Long currency values in `text-2xl` beside icons |
+| `src/components/maintenance/MaintenanceKPICards.tsx` | `text-2xl` values without truncation |
+| `src/components/crm/CRMSummaryCards.tsx` | 6-col grid with icon+text cards, clipping on mid-range screens |
+| `src/components/executive/CompanyHealthScore.tsx` | Metric breakdown grid on small screens |
+| `src/pages/DriverPerformance.tsx` | KPI cards with `text-2xl` values |
+| `src/components/driver/DriverPayWidget.tsx` | `text-3xl` earnings value can clip |
+| `src/components/performance/PerformanceCharts.tsx` | Chart axis labels |
+
+### Fix Strategy (Consistent Pattern)
+
+1. **Add `min-w-0` to flex/grid children** — prevents flex items from refusing to shrink below content width
+2. **Add `truncate` to value elements** — clips with ellipsis instead of overflowing
+3. **Reduce font sizes on small screens** — use responsive classes like `text-lg sm:text-2xl`
+4. **Add `overflow-hidden` to card containers** where needed
+5. **Make grids responsive** — e.g., change `grid-cols-3` to `grid-cols-1 sm:grid-cols-3` where not already done
+6. **Ensure proper `gap` and `flex-shrink-0`** on icons so they don't compress
+
+### Example Fix (MetricTile in LoadOptimizer)
+```tsx
+// Before
+<p className="text-xl font-bold ...">{value}</p>
+
+// After  
+<p className="text-lg sm:text-xl font-bold truncate ...">{value}</p>
 ```
-This runs immediately and breaks out of any iframe. It must come before the CSP meta tag.
 
-2. **Update CSP meta tag** — add `frame-ancestors 'none'` to the policy string. While browsers ignore `frame-ancestors` in meta CSP, it documents intent and will work if the policy is later moved to an HTTP header.
+### Example Fix (RevenueKPICards)
+```tsx
+// Before
+<div className="text-2xl font-bold mb-1">{displayValue}</div>
 
-3. **Adjust `script-src`** — the inline frame-busting script requires `'unsafe-inline'` in `script-src`, OR we use a `nonce`/`hash`. Since adding `'unsafe-inline'` to scripts weakens XSS protection, we'll use a **SHA-256 hash** of the exact snippet to keep the policy strict.
+// After
+<div className="text-xl sm:text-2xl font-bold mb-1 truncate">{displayValue}</div>
+```
 
-### No Conflicts
-- Supabase auth uses redirects (not iframes) — unaffected.
-- No dashboard component uses self-embedding iframes (`frame-src` is already `'none'`).
-- The Lovable preview iframe is handled by the SW guard in `main.tsx` which unregisters service workers — the frame-busting script will cause the preview to navigate to top, but this is acceptable since the published site is the target.
-
-### Files
-| File | Change |
-|------|--------|
-| `index.html` | Add frame-busting script + update CSP with `frame-ancestors 'none'` and script hash |
+### Scope
+All ~11 files listed above, applying the same consistent pattern to every metric/value display element.
 
