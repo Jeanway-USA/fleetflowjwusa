@@ -702,7 +702,7 @@ export default function Finance() {
                 <Select onValueChange={selectExpensesByType}>
                   <SelectTrigger className="w-44"><SelectValue placeholder="Select by type" /></SelectTrigger>
                   <SelectContent>
-                    {expenseTypes.filter(type => sortedFilteredExpenses.some(e => e.expense_type === type)).map(type => {
+                    {EXPENSE_TYPES.filter(type => sortedFilteredExpenses.some(e => e.expense_type === type)).map(type => {
                       const count = sortedFilteredExpenses.filter(e => e.expense_type === type).length;
                       return <SelectItem key={type} value={type}>{type} ({count})</SelectItem>;
                     })}
@@ -824,7 +824,7 @@ export default function Finance() {
                   <Table>
                     <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {expenseTypes.map(type => {
+                      {EXPENSE_TYPES.map(type => {
                         const amount = standaloneExpenseTotals.byType[type] || 0;
                         const gallons = standaloneExpenseTotals.gallonsByType[type] || 0;
                         if (amount === 0) return null;
@@ -851,7 +851,7 @@ export default function Finance() {
                   <Table>
                     <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {expenseTypes.map(type => {
+                      {EXPENSE_TYPES.map(type => {
                         const amount = loadLinkedExpenseTotals.byType[type] || 0;
                         if (amount === 0) return null;
                         return (
@@ -1001,7 +1001,7 @@ export default function Finance() {
                 <Label>Type *</Label>
                 <Select value={expenseFormData.expense_type || 'Fuel'} onValueChange={(v) => setExpenseFormData({ ...expenseFormData, expense_type: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{expenseTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
+                  <SelectContent>{EXPENSE_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
@@ -1084,7 +1084,7 @@ export default function Finance() {
                 <Label>Expense Type</Label>
                 <Select value={massEditFormData.expense_type || ''} onValueChange={(v) => setMassEditFormData({ ...massEditFormData, expense_type: v })}>
                   <SelectTrigger><SelectValue placeholder="Keep current" /></SelectTrigger>
-                  <SelectContent>{expenseTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
+                  <SelectContent>{EXPENSE_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
