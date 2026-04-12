@@ -168,20 +168,25 @@ export function DispatcherAlerts() {
         }
       });
 
-      // Fetch trucks with upcoming inspections
-      const { data: trucks } = await supabase
-        .from('trucks')
-        .select('id, unit_number, next_inspection_date')
-        .eq('status', 'active');
+      // Fetch inspection schedules from service_schedules (source of truth)
+      const { data: inspectionSchedules } = await supabase
+        .from('service_schedules')
+        .select('id, truck_id, last_performed_date, interval_days, trucks!inner(unit_number, status)')
+        .eq('service_name', '120-Day Inspection')
+        .eq('trucks.status', 'active')
+        .not('last_performed_date', 'is', null);
 
-      trucks?.forEach(truck => {
-        if (truck.next_inspection_date && isBefore(new Date(truck.next_inspection_date), in14Days)) {
+      inspectionSchedules?.forEach(schedule => {
+        const lastPerformed = new Date(schedule.last_performed_date + 'T00:00:00');
+        const nextDue = addDays(lastPerformed, schedule.interval_days);
+        if (isBefore(nextDue, in14Days)) {
+          const truck = schedule.trucks as any;
           alertsList.push({
-            id: `insp-${truck.id}`,
+            id: `insp-${schedule.truck_id}`,
             type: 'inspection',
-            priority: isBefore(new Date(truck.next_inspection_date), now) ? 'high' : 'medium',
+            priority: isBefore(nextDue, now) ? 'high' : 'medium',
             title: `Inspection Due - Unit ${truck.unit_number}`,
-            description: `Due ${format(new Date(truck.next_inspection_date), 'MMM d, yyyy')}`,
+            description: `Due ${format(nextDue, 'MMM d, yyyy')}`,
             link: '/trucks',
           });
         }
