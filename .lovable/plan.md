@@ -1,31 +1,21 @@
 
 
-## Remove Mock Data from Factoring Portal
+## Fix Load Optimizer for Independent Mode
 
 ### Problem
-The `FactoringBatchBuilder` component uses hardcoded mock loads and a hardcoded 2.5% fee rate. Meanwhile, the `FactoringTab` component directly below it already fetches real `fleet_loads` data, reads the factoring fee percentage from the organization settings, and provides the same batch-submit functionality — all without mock data.
-
-### Solution
-Remove the `FactoringBatchBuilder` component entirely and enhance the existing `FactoringTab` to incorporate the batch-builder's visual design elements (the split-layout with document indicators) while continuing to use real data.
+In Independent mode, the owner-operator keeps 100% of the load revenue — there's no Landstar truck/trailer percentage split. Currently the Load Optimizer always applies truck % (default 65%) and trailer % splits, which is only correct for Landstar BCOs.
 
 ### Changes
 
-**1. Remove `FactoringBatchBuilder` from Finance page (`src/pages/Finance.tsx`)**
-- Remove the import of `FactoringBatchBuilder`
-- Remove `<FactoringBatchBuilder />` from the factoring tab content (line 1008)
-- Keep `<FactoringTab />` as the sole component
+**File: `src/pages/LoadOptimizer.tsx`**
+- Import `useOrganizationMode` hook
+- When `isIndependent` is true, override revenue settings to use `truckPct: 1.0`, `trailerPct: 0`, and skip the power-only toggle entirely (not applicable for independents)
+- Hide the "Truck %" display in the footer stats when independent
+- Hide the "Power Only" toggle when independent (power-only is a Landstar concept)
+- The rest of the analysis (CPM overhead, deadhead, margin, go/no-go) stays the same
 
-**2. Enhance `FactoringTab` "Ready" tab (`src/components/finance/FactoringTab.tsx`)**
-- In the "Ready to Submit" tab, add Rate Con and POD document indicators per load by checking the `documents` table for each load's attachments
-- If a load is missing its POD, disable its checkbox and show a tooltip (matching the batch builder's UX)
-- Display the factoring fee percentage from `orgSettings.factoring_fee_percentage` in the batch summary (already done)
-- Show factoring provider name from `orgSettings.factoring_provider_name` in the header (already done)
-- Add a small "Batch Summary" sidebar or section showing total gross, fee, and net payout for selected loads (bringing over the batch builder's summary panel)
+**No changes to `revenue-calculator.ts`** — passing `truckPct: 1.0` and `trailerPct: 0` already produces the correct result (net revenue = rate + FSC + accessorials).
 
-**3. Delete `src/components/finance/FactoringBatchBuilder.tsx`**
-
-### Technical details
-- The `FactoringTab` already queries `organizations` for `factoring_fee_percentage` and `factoring_provider_name` — no new settings queries needed
-- Document presence check: query `documents` table where `related_id IN (load_ids)` and `document_type IN ('rate_confirmation', 'pod')` to determine which loads have Rate Con / POD attached
-- The fee rate label will dynamically show the configured percentage instead of hardcoded "2.5%"
+### Result
+Independent users see gross = net (100% of the load is theirs), and the optimizer focuses purely on whether the load covers operational costs and meets the target margin.
 
