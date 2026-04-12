@@ -1,36 +1,53 @@
 
 
-## Build SmartLoadCreator Component
+## Build IndependentLoadBuilder Component
 
 ### Overview
-A polished rate confirmation upload component with framer-motion animations and a 3-column parsed results grid. Uses the existing `parse-rate-confirmation` edge function for real AI extraction — no mock data.
+A clean 3-tab manual load creation form tailored for Independent Owner-Operators, focused on broker details rather than internal company fields. Replaces the generic "Add Load" dialog experience when in Independent mode.
 
-### Changes
+### File: `src/components/loads/IndependentLoadBuilder.tsx` (Create)
 
-**1. Install framer-motion**
-- `npm install framer-motion`
+**Structure**: A Card wrapping shadcn Tabs with 3 tabs and a persistent footer.
 
-**2. Create `src/components/loads/SmartLoadCreator.tsx`**
+**Tab 1 — "1. Broker & Rate"** (Building icon)
+- Brokerage Name input with a simulated autocomplete dropdown (Combobox-style: hardcoded suggestions like "CH Robinson", "TQL", "Coyote Logistics", "Echo Global", "XPO Logistics" that filter on type)
+- Broker Load / PO Number input
+- Linehaul Rate ($) number input (DollarSign icon)
+- Accessorial Pay ($) number input
+- Calculated read-only Total Gross Rate field (linehaul + accessorial, auto-computed)
+- "Factoring Approved?" Switch toggle
 
-Self-contained component that wraps the existing rate confirmation parsing flow with enhanced UX:
+**Tab 2 — "2. Route & Stops"** (MapPin icon)
+- Shipper (Pick-up) section: Facility Name, Address, Date (date input), Time (text input)
+- Consignee (Delivery) section: same fields
+- "Add Intermediate Stop" secondary button that appends a new stop section with the same fields plus a remove button
+- Intermediate stops stored in local state array
 
-- **Drop zone**: Reuses the same drag-and-drop pattern from `RateConfirmationUpload` but with updated copy: "Drag & Drop Broker Rate Confirmation PDF here or click to browse"
-- **Scanning animation**: When file is dropped, show a framer-motion animated card with a pulsing scan icon and an animated `Progress` bar that fills over ~3 seconds with text "Extracting Load Details via AI..."
-- **Parsed Results (3-column grid)**: Appears after extraction completes, animated in with `motion.div` fade+slide:
-  - **Column 1 — Broker Info**: Broker Name (from origin context or notes), Load/Reference ID, Contact info if available
-  - **Column 2 — Logistics**: Origin City/State, Destination City/State, Total Miles, Pick-up Date, Delivery Date
-  - **Column 3 — Financials**: Gross Rate (rate + FSC), Rate Per Mile (calculated from rate+FSC / miles), Equipment type if available
-- **Bottom**: Large primary Button "Review & Create Load" that calls `onDataExtracted` callback
+**Tab 3 — "3. Equipment & Docs"** (Truck icon)
+- Total Weight (lbs) number input
+- Commodity Description text input
+- Equipment Type selector dropdown (Dry Van, Flatbed, Reefer, Step Deck, Power Only)
+- File input button styled as an upload area for "Signed Rate Confirmation" attachment (visual only — no actual upload wiring)
 
-**Processing**: Calls `supabase.functions.invoke('parse-rate-confirmation')` via the same storage-upload-then-invoke pattern already used in `RateConfirmationUpload`. All data is real AI-extracted data, not mock.
+**Footer**: Always visible below the tabs
+- "Cancel" ghost button → calls `onCancel` prop
+- "Save Active Load" primary button → calls `onSave` prop with form data
 
-**3. Integrate into `src/pages/FleetLoads.tsx`**
-- Add `SmartLoadCreator` as an alternative view option or replace the existing `RateConfirmationUpload` in the "Add Load" dialog for Independent mode users.
+**Props**: `onSave(data)`, `onCancel()`, optional `initialData` for edit mode
 
-### Technical details
-- framer-motion: `AnimatePresence`, `motion.div` for fade/slide transitions on results grid
-- Progress bar: Uses shadcn `Progress` with a `useEffect` interval to animate value from 0→90 during processing, snaps to 100 on completion
-- No mock data — all results come from the existing `parse-rate-confirmation` edge function
-- Reuses `useAuth`, `useStorageProvider`, `useOrganizationMode` hooks
-- Component accepts same props as `RateConfirmationUpload` for compatibility
+**State**: Local `useState` for all fields; no react-hook-form library needed (plain controlled inputs as used throughout the existing codebase). Autocomplete uses a filtered list + Popover/Command pattern from shadcn.
+
+**Icons**: Building2 (broker), DollarSign (rate), MapPin (route), Truck (equipment), Plus (add stop), Upload (file), X (remove stop)
+
+### File: `src/pages/FleetLoads.tsx` (Modify)
+- Import `IndependentLoadBuilder`
+- When `isIndependent` and the Add Load dialog opens, render `IndependentLoadBuilder` instead of the default 6-tab form
+- Wire `onSave` to the existing `handleSubmit` mutation, mapping the broker-focused fields to the `fleet_loads` columns
+- Wire `onCancel` to close the dialog
+
+### Technical notes
+- No new dependencies — uses existing shadcn/ui components and Lucide icons
+- Autocomplete uses shadcn Command + Popover (already in the project)
+- The component follows the same controlled-input pattern as the existing form in FleetLoads
+- Intermediate stops are UI-only for now (stored in state, passed in `onSave` payload for future DB support)
 
