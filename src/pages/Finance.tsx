@@ -706,6 +706,7 @@ export default function Finance() {
             totalPayroll={totalPayroll}
             revenueTotals={revenueTotals}
             allLoads={loads}
+            isIndependent={isIndependent}
           />
         </TabsContent>
 

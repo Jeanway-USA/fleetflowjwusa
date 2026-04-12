@@ -4,9 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '@/components/ui/chart';
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from 'recharts';
-import { TrendingUp, TrendingDown, Calculator, Target, BarChart3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, BarChart3, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
-import { useOperationalCPM } from '@/hooks/useOperationalCPM';
 import { format, parseISO } from 'date-fns';
 
 interface LoadProfitabilityTabProps {
@@ -18,6 +17,7 @@ interface LoadProfitabilityTabProps {
   totalPayroll: number;
   revenueTotals: any;
   allLoads: any[];
+  isIndependent?: boolean;
 }
 
 const chartConfig = {
@@ -35,17 +35,30 @@ export function LoadProfitabilityTab({
   totalPayroll,
   revenueTotals,
   allLoads,
+  isIndependent = false,
 }: LoadProfitabilityTabProps) {
-  const { costPerMile } = useOperationalCPM();
 
-  // Build load expense lookup
+  // Build load-linked expense lookup from the expenses table (consistent with P&L)
   const loadExpenseMap = useMemo(() => {
-    const map = new Map<string, any>();
-    loadExpenses.forEach((le: any) => map.set(le.load_id, le));
+    const map = new Map<string, { fuel: number; tolls: number; other: number; total: number }>();
+    expenses.forEach((exp: any) => {
+      if (!exp.load_id) return;
+      const existing = map.get(exp.load_id) || { fuel: 0, tolls: 0, other: 0, total: 0 };
+      const amount = exp.amount || 0;
+      if (exp.expense_type === 'fuel') {
+        existing.fuel += amount;
+      } else if (exp.expense_type === 'tolls') {
+        existing.tolls += amount;
+      } else {
+        existing.other += amount;
+      }
+      existing.total += amount;
+      map.set(exp.load_id, existing);
+    });
     return map;
-  }, [loadExpenses]);
+  }, [expenses]);
 
-  // Driver lookup
+  // Driver lookup (only needed for Landstar mode)
   const driverMap = useMemo(() => {
     const map = new Map<string, any>();
     drivers.forEach((d: any) => map.set(d.id, d));
@@ -57,23 +70,23 @@ export function LoadProfitabilityTab({
     return deliveredLoads.map((load: any) => {
       const gross = load.gross_revenue || 0;
       const miles = load.actual_miles || load.booked_miles || 0;
-      const le = loadExpenseMap.get(load.id);
-      const driver = load.driver_id ? driverMap.get(load.driver_id) : null;
+      const linkedExpenses = loadExpenseMap.get(load.id) || { fuel: 0, tolls: 0, other: 0, total: 0 };
 
-      // Driver pay estimation
+      // Driver pay: skip for independent (owner IS the driver)
       let driverPay = 0;
-      if (driver) {
-        if (driver.pay_type === 'percentage') {
-          driverPay = gross * ((driver.pay_rate || 0) / 100);
-        } else {
-          driverPay = (driver.pay_rate || 0) * miles;
+      if (!isIndependent && load.driver_id) {
+        const driver = driverMap.get(load.driver_id);
+        if (driver) {
+          if (driver.pay_type === 'percentage') {
+            driverPay = gross * ((driver.pay_rate || 0) / 100);
+          } else {
+            driverPay = (driver.pay_rate || 0) * miles;
+          }
         }
       }
 
-      const fuelCost = le?.fuel_cost || 0;
-      const tolls = le?.tolls || 0;
-      const overhead = costPerMile * miles;
-      const totalCost = driverPay + fuelCost + tolls + overhead;
+      const directCosts = linkedExpenses.total;
+      const totalCost = driverPay + directCosts;
       const trueNet = gross - totalCost;
 
       return {
@@ -85,32 +98,33 @@ export function LoadProfitabilityTab({
         miles,
         grossRevenue: gross,
         driverPay,
-        fuelCost,
-        tolls,
-        overhead,
+        fuelCost: linkedExpenses.fuel,
+        tolls: linkedExpenses.tolls,
+        otherExpenses: linkedExpenses.other,
+        directCosts,
         totalCost,
         trueNetIncome: trueNet,
         rpm: miles > 0 ? gross / miles : 0,
       };
     }).sort((a, b) => a.trueNetIncome - b.trueNetIncome);
-  }, [deliveredLoads, loadExpenseMap, driverMap, costPerMile]);
+  }, [deliveredLoads, loadExpenseMap, driverMap, isIndependent]);
 
   // Aggregates
   const totalTrueNet = loadProfitability.reduce((s, l) => s + l.trueNetIncome, 0);
   const totalGross = loadProfitability.reduce((s, l) => s + l.grossRevenue, 0);
   const totalMiles = revenueTotals.actualMiles || loadProfitability.reduce((s, l) => s + l.miles, 0);
 
-  // Break-even RPM
+  // Break-even RPM — consistent with P&L: (total expenses + payroll) / total miles
   const breakEvenRPM = totalMiles > 0 ? (totalExpenses + totalPayroll) / totalMiles : 0;
   const actualRPM = totalMiles > 0 ? revenueTotals.netRevenue / totalMiles : 0;
 
-  // Actual CPM
+  // Actual CPM — consistent with P&L
   const actualCPM = totalMiles > 0 ? (totalExpenses + totalPayroll) / totalMiles : 0;
 
-  // Monthly trends (last 6 months from delivered loads across ALL loads)
+  // Monthly trends
   const trendData = useMemo(() => {
     const monthMap = new Map<string, { gross: number; trueNet: number; costs: number }>();
-    
+
     loadProfitability.forEach((lp) => {
       if (!lp.pickupDate) return;
       const monthKey = format(parseISO(lp.pickupDate), 'MMM yyyy');
@@ -176,10 +190,7 @@ export function LoadProfitabilityTab({
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(actualCPM)}</div>
             <p className="text-xs text-muted-foreground">
-              Configured: {formatCurrency(costPerMile)}/mi
-              {actualCPM <= costPerMile
-                ? <span className="text-success ml-1">✓ On target</span>
-                : <span className="text-destructive ml-1">⚠ Over budget</span>}
+              All costs / total miles
             </p>
           </CardContent>
         </Card>
@@ -193,7 +204,7 @@ export function LoadProfitabilityTab({
             <div className={`text-2xl font-bold ${totalGross > 0 && (totalTrueNet / totalGross) * 100 >= 0 ? 'text-success' : 'text-destructive'}`}>
               {totalGross > 0 ? ((totalTrueNet / totalGross) * 100).toFixed(1) : '0.0'}%
             </div>
-            <p className="text-xs text-muted-foreground">After all estimated costs</p>
+            <p className="text-xs text-muted-foreground">After all tracked costs</p>
           </CardContent>
         </Card>
       </div>
@@ -230,7 +241,7 @@ export function LoadProfitabilityTab({
         <CardHeader>
           <CardTitle>Per-Load Profitability</CardTitle>
           <CardDescription>
-            True net income per load = Gross Revenue − (Driver Pay + Fuel + Tolls + Overhead @ {formatCurrency(costPerMile)}/mi)
+            True net = Gross Revenue − ({!isIndependent ? 'Driver Pay + ' : ''}Load-linked expenses)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -241,17 +252,17 @@ export function LoadProfitabilityTab({
                   <TableHead>Load</TableHead>
                   <TableHead className="text-right">Miles</TableHead>
                   <TableHead className="text-right">Gross Rev</TableHead>
-                  <TableHead className="text-right">Driver Pay</TableHead>
+                  {!isIndependent && <TableHead className="text-right">Driver Pay</TableHead>}
                   <TableHead className="text-right">Fuel</TableHead>
                   <TableHead className="text-right">Tolls</TableHead>
-                  <TableHead className="text-right">Overhead</TableHead>
+                  <TableHead className="text-right">Other</TableHead>
                   <TableHead className="text-right">True Net</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loadProfitability.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={isIndependent ? 7 : 8} className="text-center py-8 text-muted-foreground">
                       No delivered loads in this period
                     </TableCell>
                   </TableRow>
@@ -263,10 +274,12 @@ export function LoadProfitabilityTab({
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">{lp.miles.toLocaleString()}</TableCell>
                       <TableCell className="text-right text-sm">{formatCurrency(lp.grossRevenue)}</TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.driverPay)}</TableCell>
+                      {!isIndependent && (
+                        <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.driverPay)}</TableCell>
+                      )}
                       <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.fuelCost)}</TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.tolls)}</TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.overhead)}</TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.otherExpenses)}</TableCell>
                       <TableCell className="text-right">
                         <Badge variant={lp.trueNetIncome >= 0 ? 'default' : 'destructive'} className={lp.trueNetIncome >= 0 ? 'bg-success text-success-foreground' : ''}>
                           {formatCurrency(lp.trueNetIncome)}
