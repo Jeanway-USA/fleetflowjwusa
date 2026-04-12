@@ -10,27 +10,7 @@ import { toast } from 'sonner';
 import { Plus, Trash2, DollarSign, Fuel, MapPin } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { US_STATES } from '@/lib/us-states';
-
-const EXPENSE_TYPES = [
-  'Fuel',
-  'DEF',
-  'Truck Payment',
-  'Trailer Payment',
-  'Licensing/Permits',
-  'Insurance',
-  'LCN',
-  'Maintenance',
-  'Cell Phone',
-  'Trip Scanning',
-  'Card Load',
-  'IFTA',
-  'PrePass/Scale',
-  'Tolls',
-  'Parking',
-  'Misc',
-];
-
-const GALLONS_EXPENSE_TYPES = ['Fuel', 'DEF'];
+import { EXPENSE_TYPES, GALLONS_EXPENSE_TYPES } from '@/lib/expense-types';
 
 interface ExpensesListProps {
   relatedType: 'load' | 'truck';

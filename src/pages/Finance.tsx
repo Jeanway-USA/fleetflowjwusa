@@ -38,40 +38,12 @@ import { LoadProfitabilityTab } from '@/components/finance/LoadProfitabilityTab'
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
 import { US_STATES } from '@/lib/us-states';
+import { EXPENSE_TYPES, GALLONS_EXPENSE_TYPES, ADVANCE_EXPENSE_TYPES, CREDIT_EXPENSE_TYPES, isAdvanceExpense, isCreditExpense, isActualExpense } from '@/lib/expense-types';
 
 type Expense = Database['public']['Tables']['expenses']['Row'];
 type ExpenseInsert = Database['public']['Tables']['expenses']['Insert'];
 type DriverPayroll = Database['public']['Tables']['driver_payroll']['Row'];
 type AgentCommission = Database['public']['Tables']['agent_commissions']['Row'];
-
-const expenseTypes = [
-  'Fuel', 'DEF', 'Fuel Discount', 'Reimbursement', 'Truck Payment', 'Trailer Payment',
-  'Licensing/Permits', 'Registration/Plates', 'Insurance', 'LCN/Satellite', 'Maintenance',
-  'Cell Phone', 'Trip Scanning', 'Card Load', 'Card Fee', 'Cash Advance', 'Direct Deposit Fee',
-  'Advance', 'Direct Deposit',
-  'Truck Warranty', 'CPP/Benefits', 'IFTA', 'PrePass/Scale', 'Tolls', 'Parking', 'Misc'
-];
-
-const GALLONS_EXPENSE_TYPES = ['Fuel', 'DEF'];
-
-// Advance types are non-P&L (early access to funds, not true expenses)
-const ADVANCE_EXPENSE_TYPES = ['Advance', 'Cash Advance', 'Card Load', 'Direct Deposit'];
-
-// Credit types offset expenses (money coming back)
-const CREDIT_EXPENSE_TYPES = ['Reimbursement', 'Fuel Discount'];
-
-const isAdvanceExpense = (expense: Expense): boolean => {
-  return ADVANCE_EXPENSE_TYPES.includes(expense.expense_type) ||
-    (expense.notes?.includes('Advance (Non-P&L)') ?? false);
-};
-
-const isCreditExpense = (expense: Expense): boolean => {
-  return CREDIT_EXPENSE_TYPES.includes(expense.expense_type) || expense.amount < 0;
-};
-
-const isActualExpense = (expense: Expense): boolean => {
-  return !isAdvanceExpense(expense) && !isCreditExpense(expense);
-};
 
 export default function Finance() {
   const queryClient = useQueryClient();
