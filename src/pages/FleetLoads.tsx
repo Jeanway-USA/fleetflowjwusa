@@ -12,6 +12,7 @@ import { DataTable } from '@/components/shared/DataTable';
 import { ExpensesList } from '@/components/shared/ExpensesList';
 import { RateConfirmationUpload } from '@/components/loads/RateConfirmationUpload';
 import { SmartLoadCreator } from '@/components/loads/SmartLoadCreator';
+import { IndependentLoadBuilder } from '@/components/loads/IndependentLoadBuilder';
 import DriverLoadsView from '@/components/driver/DriverLoadsView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -755,6 +756,50 @@ export default function FleetLoads() {
           <DialogHeader>
             <DialogTitle>{editingLoad ? 'Edit Load' : 'Add New Load'}</DialogTitle>
           </DialogHeader>
+          {isIndependent && !editingLoad ? (
+            <IndependentLoadBuilder
+              onSave={(data) => {
+                const intermediateStopsText = formatIntermediateStops(
+                  (data.intermediate_stops || []).map((s: any, i: number) => ({
+                    stop_number: i + 1,
+                    stop_type: 'intermediate',
+                    facility_name: s.facility_name,
+                    address: s.address,
+                    date: s.date,
+                  }))
+                );
+                const notes = [
+                  data.shipper_facility ? `Shipper: ${data.shipper_facility}` : '',
+                  data.consignee_facility ? `Consignee: ${data.consignee_facility}` : '',
+                  data.commodity ? `Commodity: ${data.commodity}` : '',
+                  data.weight ? `Weight: ${data.weight} lbs` : '',
+                  data.equipment ? `Equipment: ${data.equipment}` : '',
+                  data.broker_name ? `Broker: ${data.broker_name}` : '',
+                  data.factoring_approved ? 'Factoring: Approved' : '',
+                  intermediateStopsText,
+                ].filter(Boolean).join('\n');
+
+                const payload = {
+                  landstar_load_id: data.landstar_load_id || null,
+                  origin: data.origin,
+                  destination: data.destination,
+                  pickup_date: data.pickup_date || null,
+                  pickup_time: data.pickup_time || null,
+                  delivery_date: data.delivery_date || null,
+                  delivery_time: data.delivery_time || null,
+                  rate: data.rate || 0,
+                  fuel_surcharge: 0,
+                  notes,
+                  status: 'pending',
+                  is_power_only: false,
+                  org_id: orgId,
+                };
+                const calculated = calculateRevenueLocal(payload);
+                createMutation.mutate({ load: { ...payload, ...calculated }, accessorials: [] });
+              }}
+              onCancel={closeDialog}
+            />
+          ) : (
           <form onSubmit={handleSubmit}>
             <Tabs defaultValue="details" className="w-full">
               <TabsList className="grid w-full grid-cols-6">
@@ -1286,6 +1331,7 @@ export default function FleetLoads() {
               </Button>
             </DialogFooter>
           </form>
+          )}
         </DialogContent>
       </Dialog>
     </>
