@@ -64,8 +64,8 @@ export default function DriverPerformance() {
             <Trophy className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{drivers.length}</div>
-            <p className="text-xs text-muted-foreground">Fleet average score: {fleetAverages.score.toFixed(0)}%</p>
+            <div className="text-xl sm:text-2xl font-bold truncate">{drivers.length}</div>
+            <p className="text-xs text-muted-foreground truncate">Fleet average score: {fleetAverages.score.toFixed(0)}%</p>
           </CardContent>
         </Card>
         <Card className="card-elevated">
@@ -74,7 +74,7 @@ export default function DriverPerformance() {
             <Target className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{fleetAverages.loads.toFixed(1)}</div>
+            <div className="text-xl sm:text-2xl font-bold truncate">{fleetAverages.loads.toFixed(1)}</div>
             <p className="text-xs text-muted-foreground">Per selected period</p>
           </CardContent>
         </Card>
@@ -84,7 +84,7 @@ export default function DriverPerformance() {
             <DollarSign className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">{formatCurrency(fleetAverages.revenue)}</div>
+            <div className="text-xl sm:text-2xl font-bold text-success truncate">{formatCurrency(fleetAverages.revenue)}</div>
             <p className="text-xs text-muted-foreground">Per selected period</p>
           </CardContent>
         </Card>
@@ -94,10 +94,10 @@ export default function DriverPerformance() {
             <Award className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold truncate">
               {driverMetrics[0]?.driver.first_name || '—'}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground truncate">
               Score: {driverMetrics[0]?.overallScore.toFixed(0) || 0}%
             </p>
           </CardContent>

@@ -47,18 +47,18 @@ export function PLSummaryTab({
       {/* Revenue Flow */}
       <Card className="card-elevated mb-6">
         <CardContent className="pt-6">
-          <div className="grid grid-cols-3 gap-6 text-center">
-            <div className="p-4 bg-muted rounded-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 text-center">
+            <div className="p-4 bg-muted rounded-lg overflow-hidden">
               <p className="text-sm text-muted-foreground mb-1">100% GROSS</p>
-              <p className="text-2xl font-bold">{formatCurrency(revenueTotals.grossRevenue)}</p>
+              <p className="text-xl sm:text-2xl font-bold truncate">{formatCurrency(revenueTotals.grossRevenue)}</p>
             </div>
-            <div className="p-4 bg-primary/10 rounded-lg">
-              <p className="text-sm text-muted-foreground mb-1">TRUCK REVENUE ({getSetting('truck_percentage', '65')}%)</p>
-              <p className="text-2xl font-bold">{formatCurrency(revenueTotals.truckRevenue)}</p>
+            <div className="p-4 bg-primary/10 rounded-lg overflow-hidden">
+              <p className="text-sm text-muted-foreground mb-1 truncate">TRUCK REVENUE ({getSetting('truck_percentage', '65')}%)</p>
+              <p className="text-xl sm:text-2xl font-bold truncate">{formatCurrency(revenueTotals.truckRevenue)}</p>
             </div>
-            <div className="p-4 bg-success/10 rounded-lg">
+            <div className="p-4 bg-success/10 rounded-lg overflow-hidden">
               <p className="text-sm text-muted-foreground mb-1">NET PROFIT</p>
-              <p className="text-2xl font-bold text-success">{formatCurrency(netProfit)}</p>
+              <p className="text-xl sm:text-2xl font-bold text-success truncate">{formatCurrency(netProfit)}</p>
             </div>
           </div>
         </CardContent>
@@ -193,46 +193,46 @@ export function PLSummaryTab({
                 <span className="font-mono text-destructive">-{formatCurrency(payrollTotals.netPay)}</span>
               </div>
               <div className="border-t pt-3">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center gap-2">
                   <span className="font-bold text-lg">{netProfit >= 0 ? 'NET PROFIT' : 'NET LOSS'}</span>
-                  <span className={`font-bold text-2xl ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  <span className={`font-bold text-xl sm:text-2xl truncate ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
                     {formatCurrency(netProfit)}
                   </span>
                 </div>
               </div>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-muted rounded-lg text-center">
+              <div className="p-4 bg-muted rounded-lg text-center overflow-hidden">
                 <p className="text-sm text-muted-foreground">Loads</p>
-                <p className="text-2xl font-bold">{revenueTotals.loadCount}</p>
+                <p className="text-xl sm:text-2xl font-bold truncate">{revenueTotals.loadCount}</p>
               </div>
-              <div className="p-4 bg-muted rounded-lg text-center">
+              <div className="p-4 bg-muted rounded-lg text-center overflow-hidden">
                 <p className="text-sm text-muted-foreground">Profit Margin</p>
-                <p className={`text-2xl font-bold ${profitMargin >= 0 ? 'text-success' : 'text-destructive'}`}>
+                <p className={`text-xl sm:text-2xl font-bold truncate ${profitMargin >= 0 ? 'text-success' : 'text-destructive'}`}>
                   {profitMargin.toFixed(1)}%
                 </p>
               </div>
-              <div className="p-4 bg-muted rounded-lg text-center">
+              <div className="p-4 bg-muted rounded-lg text-center overflow-hidden">
                 <p className="text-sm text-muted-foreground">Avg Per Load</p>
-                <p className="text-xl font-bold">
+                <p className="text-lg sm:text-xl font-bold truncate">
                   {revenueTotals.loadCount > 0 ? formatCurrency(netProfit / revenueTotals.loadCount) : '$0.00'}
                 </p>
               </div>
-              <div className="p-4 bg-muted rounded-lg text-center">
+              <div className="p-4 bg-muted rounded-lg text-center overflow-hidden">
                 <p className="text-sm text-muted-foreground">Profit Per Mile</p>
-                <p className="text-xl font-bold">
+                <p className="text-lg sm:text-xl font-bold truncate">
                   {revenueTotals.actualMiles > 0 ? formatCurrency(netProfit / revenueTotals.actualMiles) : '$0.00'}
                 </p>
               </div>
-              <div className="p-4 bg-primary/10 rounded-lg text-center">
+              <div className="p-4 bg-primary/10 rounded-lg text-center overflow-hidden">
                 <p className="text-sm text-muted-foreground">True Net Income</p>
-                <p className={`text-xl font-bold ${trueNetIncome >= 0 ? 'text-success' : 'text-destructive'}`}>
+                <p className={`text-lg sm:text-xl font-bold truncate ${trueNetIncome >= 0 ? 'text-success' : 'text-destructive'}`}>
                   {formatCurrency(trueNetIncome)}
                 </p>
               </div>
-              <div className="p-4 bg-muted rounded-lg text-center">
-                <p className="text-sm text-muted-foreground flex items-center justify-center gap-1"><Target className="h-3 w-3" /> Break-Even RPM</p>
-                <p className="text-xl font-bold">
+              <div className="p-4 bg-muted rounded-lg text-center overflow-hidden">
+                <p className="text-sm text-muted-foreground flex items-center justify-center gap-1"><Target className="h-3 w-3 flex-shrink-0" /> Break-Even RPM</p>
+                <p className="text-lg sm:text-xl font-bold truncate">
                   {formatCurrency(breakEvenRPM)}
                 </p>
               </div>

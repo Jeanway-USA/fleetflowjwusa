@@ -307,12 +307,12 @@ export default function LoadOptimizer() {
 
 function MetricTile({ label, value, positive, icon: Icon }: { label: string; value: string; positive: boolean; icon: React.ElementType }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-3 text-center">
+    <div className="rounded-lg border border-border bg-card p-3 text-center overflow-hidden min-w-0">
       <div className="mb-1 flex items-center justify-center gap-1">
-        <Icon className={`h-4 w-4 ${positive ? 'text-success' : 'text-destructive'}`} />
+        <Icon className={`h-4 w-4 flex-shrink-0 ${positive ? 'text-success' : 'text-destructive'}`} />
       </div>
-      <p className={`text-xl font-bold ${positive ? 'text-success' : 'text-destructive'}`}>{value}</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={`text-lg sm:text-xl font-bold truncate ${positive ? 'text-success' : 'text-destructive'}`}>{value}</p>
+      <p className="text-xs text-muted-foreground truncate">{label}</p>
     </div>
   );
 }
@@ -321,9 +321,9 @@ function BreakdownRow({ label, value, bold, sub, negative, positive }: {
   label: string; value: string; bold?: boolean; sub?: boolean; negative?: boolean; positive?: boolean;
 }) {
   return (
-    <div className={`flex items-center justify-between ${sub ? 'pl-4 text-sm' : ''}`}>
-      <span className={`${bold ? 'font-semibold' : ''} ${sub ? 'text-muted-foreground' : ''}`}>{label}</span>
-      <span className={`font-mono ${bold ? 'font-bold text-base' : 'text-sm'} ${negative ? 'text-destructive' : ''} ${positive ? 'text-success' : ''}`}>
+    <div className={`flex items-center justify-between gap-2 ${sub ? 'pl-4 text-sm' : ''}`}>
+      <span className={`min-w-0 truncate ${bold ? 'font-semibold' : ''} ${sub ? 'text-muted-foreground' : ''}`}>{label}</span>
+      <span className={`font-mono flex-shrink-0 ${bold ? 'font-bold text-base' : 'text-sm'} ${negative ? 'text-destructive' : ''} ${positive ? 'text-success' : ''}`}>
         {value}
       </span>
     </div>

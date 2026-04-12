@@ -93,7 +93,7 @@ function MaintenanceCostCard() {
           <Skeleton className="h-8 w-[120px]" />
         ) : (
           <>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold truncate">
               ${(data || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -120,7 +120,7 @@ function CostPerMileCard() {
           <Skeleton className="h-8 w-[80px]" />
         ) : (
           <>
-            <div className="text-2xl font-bold">
+            <div className="text-xl sm:text-2xl font-bold truncate">
               ${(data || 0).toFixed(3)}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -154,7 +154,7 @@ function ComplianceAlertCard() {
         ) : (
           <>
             <div className={cn(
-              'text-2xl font-bold',
+              'text-xl sm:text-2xl font-bold truncate',
               hasAlerts && 'text-red-600'
             )}>
               {data?.count || 0}

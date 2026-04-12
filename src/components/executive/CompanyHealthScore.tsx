@@ -116,7 +116,7 @@ export function CompanyHealthScore({ data, isLoading }: CompanyHealthScoreProps)
         </div>
 
         {/* Metric Breakdown */}
-        <div className="grid grid-cols-2 gap-2 mt-4 w-full text-xs">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-4 w-full text-xs">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Retention</span>
             <span className="font-medium">{data.profitMargin.toFixed(0)}%</span>

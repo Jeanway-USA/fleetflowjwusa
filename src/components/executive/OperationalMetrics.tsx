@@ -29,14 +29,14 @@ function MetricRow({
   suffix?: string;
 }) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-border last:border-0">
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-muted">
+    <div className="flex items-center justify-between gap-2 py-3 border-b border-border last:border-0">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="p-2 rounded-lg bg-muted flex-shrink-0">
           <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
-        <span className="text-sm text-muted-foreground">{label}</span>
+        <span className="text-sm text-muted-foreground truncate">{label}</span>
       </div>
-      <span className="font-semibold">
+      <span className="font-semibold flex-shrink-0">
         {value}
         {suffix}
       </span>

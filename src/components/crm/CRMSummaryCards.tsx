@@ -23,23 +23,23 @@ export function CRMSummaryCards({ contacts }: CRMSummaryCardsProps) {
   const totalActive = contacts.filter((c) => c.is_active).length;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      <Card className="border-border">
+    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+      <Card className="border-border overflow-hidden">
         <CardContent className="p-4 flex items-center gap-3">
-          <UserCheck className="h-5 w-5 text-primary" />
-          <div>
+          <UserCheck className="h-5 w-5 text-primary flex-shrink-0" />
+          <div className="min-w-0">
             <p className="text-xs text-muted-foreground">Total Active</p>
-            <p className="text-xl font-bold">{totalActive}</p>
+            <p className="text-lg sm:text-xl font-bold truncate">{totalActive}</p>
           </div>
         </CardContent>
       </Card>
       {Object.entries(TYPE_CONFIG).map(([type, config]) => (
-        <Card key={type} className="border-border">
+        <Card key={type} className="border-border overflow-hidden">
           <CardContent className="p-4 flex items-center gap-3">
-            <config.icon className={`h-5 w-5 ${config.color}`} />
-            <div>
+            <config.icon className={`h-5 w-5 flex-shrink-0 ${config.color}`} />
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground">{config.label}</p>
-              <p className="text-xl font-bold">{counts[type] || 0}</p>
+              <p className="text-lg sm:text-xl font-bold truncate">{counts[type] || 0}</p>
             </div>
           </CardContent>
         </Card>
