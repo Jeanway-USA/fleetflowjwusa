@@ -1,24 +1,37 @@
 
 
-## Remove Horizontal Scrollbar from Sheet Component
+## Remove Vertical Scrollbar from Sheet Inner Wrapper
 
 ### Problem
-The inner scrollable wrapper (`overflow-y-auto`) shows a horizontal scrollbar because `SheetHeader` and `SheetFooter` use negative horizontal margins (`-mx-6`) to stretch beyond their parent's padding, causing horizontal overflow.
+The shared `SheetContent` component wraps children in a div with `overflow-y-auto`, which shows a vertical scrollbar even when content fits without scrolling.
 
 ### Fix
-Add `overflow-x-hidden` to the inner scrollable div so only vertical scrolling is allowed. The horizontal overflow from the negative-margin sticky header/footer pattern is purely cosmetic stretching and does not contain horizontally-scrollable content.
+Change the inner wrapper's overflow from `overflow-y-auto` to `overflow-y-hidden` is too aggressive (it would break sheets that DO need scrolling). Instead, the best approach is to keep `overflow-y-auto` but hide the scrollbar track visually using Tailwind's `scrollbar-none` utility (or the equivalent CSS). This way sheets that need scrolling still work, but no visible scrollbar appears.
 
-### File to update
-- `src/components/ui/sheet.tsx` — line 63
+Alternatively, since this is a global primitive, a cleaner solution: keep `overflow-y-auto` and add the `scrollbar-hide` class. Tailwind v3 doesn't have this built-in, so the simplest approach is to add a small CSS utility in `index.css`.
 
-### Change
-```tsx
-// Before
-<div className="flex-1 overflow-y-auto p-6">
+### File changes
 
-// After
-<div className="flex-1 overflow-y-auto overflow-x-hidden p-6">
+**`src/index.css`** — Add a utility class:
+```css
+/* Hide scrollbar but keep scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
 ```
 
-Single line change, no other files affected.
+**`src/components/ui/sheet.tsx`** — Line 63, add the utility:
+```tsx
+// Before
+<div className="flex-1 overflow-y-auto overflow-x-hidden p-6">
+
+// After
+<div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide p-6">
+```
+
+This hides the scrollbar visually on all sheets while preserving scroll functionality for sheets with longer content.
 
