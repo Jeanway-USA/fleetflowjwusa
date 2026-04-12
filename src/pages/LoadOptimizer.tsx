@@ -147,7 +147,7 @@ export default function LoadOptimizer() {
                     placeholder="2,500"
                     value={grossPay}
                     onChange={e => setGrossPay(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 sm:pl-10"
                   />
                 </div>
               </div>
@@ -161,7 +161,7 @@ export default function LoadOptimizer() {
                     placeholder="0"
                     value={fuelSurcharge}
                     onChange={e => setFuelSurcharge(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 sm:pl-10"
                   />
                 </div>
               </div>
@@ -178,7 +178,7 @@ export default function LoadOptimizer() {
                     placeholder="850"
                     value={loadedMiles}
                     onChange={e => setLoadedMiles(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 sm:pl-10"
                   />
                 </div>
               </div>
@@ -192,7 +192,7 @@ export default function LoadOptimizer() {
                     placeholder="120"
                     value={deadheadMiles}
                     onChange={e => setDeadheadMiles(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 sm:pl-10"
                   />
                 </div>
               </div>

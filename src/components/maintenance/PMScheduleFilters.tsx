@@ -60,7 +60,7 @@ export function PMScheduleFilters({
           placeholder="Search unit number..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-10"
+          className="pl-10 sm:pl-10"
         />
       </div>
 

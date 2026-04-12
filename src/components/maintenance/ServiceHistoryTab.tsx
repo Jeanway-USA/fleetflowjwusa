@@ -226,7 +226,7 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
         <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search by description, service type, vendor..."
-          className="pl-10"
+          className="pl-10 sm:pl-10"
           value={searchQuery}
           onChange={handleSearchChange}
         />
@@ -463,7 +463,7 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
                   type="number"
                   min="0"
                   step="0.01"
-                  className="pl-8"
+                  className="pl-8 sm:pl-8"
                   value={editForm.final_cost}
                   onChange={(e) => setEditForm({ ...editForm, final_cost: e.target.value })}
                   placeholder="0.00"
