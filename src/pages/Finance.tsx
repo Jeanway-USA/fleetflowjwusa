@@ -33,7 +33,7 @@ import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMo
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { InvoicingTab } from '@/components/finance/InvoicingTab';
 import { FactoringTab } from '@/components/finance/FactoringTab';
-import { FactoringBatchBuilder } from '@/components/finance/FactoringBatchBuilder';
+
 import { LoadProfitabilityTab } from '@/components/finance/LoadProfitabilityTab';
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
@@ -1004,8 +1004,7 @@ export default function Finance() {
         )}
 
         {isIndependent && (
-          <TabsContent value="factoring" className="mt-6 space-y-6">
-            <FactoringBatchBuilder />
+          <TabsContent value="factoring" className="mt-6">
             <FactoringTab />
           </TabsContent>
         )}
