@@ -508,19 +508,35 @@ export default function FleetLoads() {
 
       {/* Rate Confirmation Upload */}
       <div className="mb-6">
-        <RateConfirmationUpload
-          onDataExtracted={handleRateConfirmationData}
-          existingLoads={loads.map((l: any) => ({
-            id: l.id,
-            landstar_load_id: l.landstar_load_id,
-            origin: l.origin,
-            destination: l.destination,
-            rate: l.rate,
-            pickup_date: l.pickup_date,
-          }))}
-          drivers={drivers}
-          trucks={trucks}
-        />
+        {isIndependent ? (
+          <SmartLoadCreator
+            onDataExtracted={handleRateConfirmationData}
+            existingLoads={loads.map((l: any) => ({
+              id: l.id,
+              landstar_load_id: l.landstar_load_id,
+              origin: l.origin,
+              destination: l.destination,
+              rate: l.rate,
+              pickup_date: l.pickup_date,
+            }))}
+            drivers={drivers}
+            trucks={trucks}
+          />
+        ) : (
+          <RateConfirmationUpload
+            onDataExtracted={handleRateConfirmationData}
+            existingLoads={loads.map((l: any) => ({
+              id: l.id,
+              landstar_load_id: l.landstar_load_id,
+              origin: l.origin,
+              destination: l.destination,
+              rate: l.rate,
+              pickup_date: l.pickup_date,
+            }))}
+            drivers={drivers}
+            trucks={trucks}
+          />
+        )}
       </div>
 
       {/* Summary Cards */}
