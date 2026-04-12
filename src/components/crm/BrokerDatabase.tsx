@@ -11,10 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
-import { Search, Building2, Plus, Trash2, Edit2, Eye, MoreHorizontal } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Search, Building2, Plus, Trash2, Edit2, Eye, MoreHorizontal, Briefcase } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/formatters';
+import { CarrierDocumentHub } from './CarrierDocumentHub';
 
 interface BrokerContact {
   id: string;
