@@ -43,7 +43,7 @@ export function PerformanceCharts({ metrics }: PerformanceChartsProps) {
               <BarChart data={chartData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" domain={[0, 100]} />
-                <YAxis dataKey="name" type="category" width={100} />
+                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12 }} />
                 <Tooltip />
                 <Bar dataKey="score" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
               </BarChart>
@@ -62,7 +62,7 @@ export function PerformanceCharts({ metrics }: PerformanceChartsProps) {
               <BarChart data={chartData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                <YAxis dataKey="name" type="category" width={100} />
+                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Bar dataKey="revenue" fill="hsl(var(--success))" radius={[0, 4, 4, 0]} />
               </BarChart>
@@ -81,7 +81,7 @@ export function PerformanceCharts({ metrics }: PerformanceChartsProps) {
               <BarChart data={chartData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" domain={[0, 'auto']} />
-                <YAxis dataKey="name" type="category" width={100} />
+                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12 }} />
                 <Tooltip formatter={(value: number) => `${value} MPG`} />
                 <Bar dataKey="mpg" fill="hsl(var(--warning))" radius={[0, 4, 4, 0]} />
               </BarChart>

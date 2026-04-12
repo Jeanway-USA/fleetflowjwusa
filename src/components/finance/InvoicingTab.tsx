@@ -152,35 +152,35 @@ export function InvoicingTab() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <Receipt className="h-8 w-8 text-primary" />
-              <div>
+              <Receipt className="h-8 w-8 text-primary flex-shrink-0" />
+              <div className="min-w-0">
                 <p className="text-sm text-muted-foreground">Ready to Invoice</p>
-                <p className="text-2xl font-bold">{uninvoicedLoads.length}</p>
+                <p className="text-xl sm:text-2xl font-bold truncate">{uninvoicedLoads.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8 text-emerald-600" />
-              <div>
+              <FileText className="h-8 w-8 text-emerald-600 flex-shrink-0" />
+              <div className="min-w-0">
                 <p className="text-sm text-muted-foreground">Invoiced</p>
-                <p className="text-2xl font-bold">{invoicedLoads.length}</p>
+                <p className="text-xl sm:text-2xl font-bold truncate">{invoicedLoads.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="overflow-hidden">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <Receipt className="h-8 w-8 text-amber-600" />
-              <div>
+              <Receipt className="h-8 w-8 text-amber-600 flex-shrink-0" />
+              <div className="min-w-0">
                 <p className="text-sm text-muted-foreground">Uninvoiced Revenue</p>
-                <p className="text-2xl font-bold">{formatCurrency(uninvoicedLoads.reduce((sum, l) => sum + getTotal(l), 0))}</p>
+                <p className="text-xl sm:text-2xl font-bold truncate">{formatCurrency(uninvoicedLoads.reduce((sum, l) => sum + getTotal(l), 0))}</p>
               </div>
             </div>
           </CardContent>

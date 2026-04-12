@@ -92,9 +92,9 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
 
       <CardContent className="space-y-4">
         {/* Earnings Summary */}
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-3xl font-bold text-primary">
+        <div className="flex items-end justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-2xl sm:text-3xl font-bold text-primary truncate">
               ${weeklyEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
             <p className="text-sm text-muted-foreground">
