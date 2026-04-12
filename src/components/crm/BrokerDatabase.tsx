@@ -223,8 +223,8 @@ export function BrokerDatabase() {
 
       <div className="space-y-4">
         <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search brokers..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search brokers..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
         </div>
 
         <DataTable

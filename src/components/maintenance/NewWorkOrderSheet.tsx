@@ -559,13 +559,13 @@ export function NewWorkOrderSheet({ open, onOpenChange, initialData }: NewWorkOr
               <div className="grid gap-2">
                 <Label htmlFor="costEstimate">Cost Estimate</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                   <Input
                     id="costEstimate"
                     type="number"
                     min="0"
                     step="0.01"
-                    className="pl-7"
+                    className="pl-8"
                     placeholder="0.00"
                     value={formData.cost_estimate}
                     onChange={(e) => handleChange('cost_estimate', e.target.value)}
