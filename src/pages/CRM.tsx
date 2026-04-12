@@ -126,7 +126,7 @@ function AgentCRM() {
               placeholder="Search contacts..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
+              className="pl-10 sm:pl-10"
             />
           </div>
           <Tabs value={typeFilter} onValueChange={setTypeFilter}>
