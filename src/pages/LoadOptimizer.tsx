@@ -140,28 +140,28 @@ export default function LoadOptimizer() {
               <div className="space-y-2">
                 <Label htmlFor="grossPay">Gross Pay (Linehaul Rate)</Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <DollarSign className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="grossPay"
                     type="number"
                     placeholder="2,500"
                     value={grossPay}
                     onChange={e => setGrossPay(e.target.value)}
-                    className="pl-9"
+                    className="pl-10"
                   />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="fsc">Fuel Surcharge (optional)</Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <DollarSign className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="fsc"
                     type="number"
                     placeholder="0"
                     value={fuelSurcharge}
                     onChange={e => setFuelSurcharge(e.target.value)}
-                    className="pl-9"
+                    className="pl-10"
                   />
                 </div>
               </div>
@@ -171,28 +171,28 @@ export default function LoadOptimizer() {
               <div className="space-y-2">
                 <Label htmlFor="loadedMiles">Loaded Miles</Label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="loadedMiles"
                     type="number"
                     placeholder="850"
                     value={loadedMiles}
                     onChange={e => setLoadedMiles(e.target.value)}
-                    className="pl-9"
+                    className="pl-10"
                   />
                 </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="deadheadMiles">Deadhead Miles (to pickup)</Label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     id="deadheadMiles"
                     type="number"
                     placeholder="120"
                     value={deadheadMiles}
                     onChange={e => setDeadheadMiles(e.target.value)}
-                    className="pl-9"
+                    className="pl-10"
                   />
                 </div>
               </div>

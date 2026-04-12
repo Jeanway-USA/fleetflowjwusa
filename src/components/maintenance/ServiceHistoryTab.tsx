@@ -223,7 +223,7 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
   return (
     <div className="space-y-4">
       <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           placeholder="Search by description, service type, vendor..."
           className="pl-10"
@@ -457,13 +457,13 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
             <div className="grid gap-2">
               <Label htmlFor="edit-cost">Cost</Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                 <Input
                   id="edit-cost"
                   type="number"
                   min="0"
                   step="0.01"
-                  className="pl-7"
+                  className="pl-8"
                   value={editForm.final_cost}
                   onChange={(e) => setEditForm({ ...editForm, final_cost: e.target.value })}
                   placeholder="0.00"
