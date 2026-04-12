@@ -112,7 +112,7 @@ export function LoadProfitabilityTab({
         trueNetIncome: trueNet,
         rpm: miles > 0 ? gross / miles : 0,
       };
-    }).sort((a, b) => a.trueNetIncome - b.trueNetIncome);
+    }).sort((a, b) => (b.pickupDate || '').localeCompare(a.pickupDate || ''));
   }, [deliveredLoads, loadExpenseMap, driverMap, isIndependent]);
 
   // Aggregates
@@ -256,7 +256,8 @@ export function LoadProfitabilityTab({
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead>Load</TableHead>
-                  <TableHead className="text-right">Miles</TableHead>
+                   <TableHead>Date</TableHead>
+                   <TableHead className="text-right">Miles</TableHead>
                   <TableHead className="text-right">Gross Rev</TableHead>
                   {!isIndependent && <TableHead className="text-right">Driver Pay</TableHead>}
                   <TableHead className="text-right">Fuel</TableHead>
@@ -268,7 +269,7 @@ export function LoadProfitabilityTab({
               <TableBody>
                 {loadProfitability.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isIndependent ? 7 : 8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={isIndependent ? 8 : 9} className="text-center py-8 text-muted-foreground">
                       No delivered loads in this period
                     </TableCell>
                   </TableRow>
@@ -276,9 +277,12 @@ export function LoadProfitabilityTab({
                   loadProfitability.map((lp) => (
                     <TableRow key={lp.id}>
                       <TableCell>
-                        <div className="font-medium text-sm">{lp.loadId}</div>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm">{lp.miles.toLocaleString()}</TableCell>
+                         <div className="font-medium text-sm">{lp.loadId}</div>
+                       </TableCell>
+                       <TableCell className="text-sm text-muted-foreground">
+                         {lp.pickupDate ? format(parseISO(lp.pickupDate), 'MMM d, yyyy') : '—'}
+                       </TableCell>
+                       <TableCell className="text-right font-mono text-sm">{lp.miles.toLocaleString()}</TableCell>
                       <TableCell className="text-right text-sm">{formatCurrency(lp.grossRevenue)}</TableCell>
                       {!isIndependent && (
                         <TableCell className="text-right text-sm text-muted-foreground">{formatCurrency(lp.driverPay)}</TableCell>
