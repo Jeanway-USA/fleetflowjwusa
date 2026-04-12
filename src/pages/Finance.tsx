@@ -38,40 +38,12 @@ import { LoadProfitabilityTab } from '@/components/finance/LoadProfitabilityTab'
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
 import { US_STATES } from '@/lib/us-states';
+import { EXPENSE_TYPES, GALLONS_EXPENSE_TYPES, ADVANCE_EXPENSE_TYPES, CREDIT_EXPENSE_TYPES, isAdvanceExpense, isCreditExpense, isActualExpense } from '@/lib/expense-types';
 
 type Expense = Database['public']['Tables']['expenses']['Row'];
 type ExpenseInsert = Database['public']['Tables']['expenses']['Insert'];
 type DriverPayroll = Database['public']['Tables']['driver_payroll']['Row'];
 type AgentCommission = Database['public']['Tables']['agent_commissions']['Row'];
-
-const expenseTypes = [
-  'Fuel', 'DEF', 'Fuel Discount', 'Reimbursement', 'Truck Payment', 'Trailer Payment',
-  'Licensing/Permits', 'Registration/Plates', 'Insurance', 'LCN/Satellite', 'Maintenance',
-  'Cell Phone', 'Trip Scanning', 'Card Load', 'Card Fee', 'Cash Advance', 'Direct Deposit Fee',
-  'Advance', 'Direct Deposit',
-  'Truck Warranty', 'CPP/Benefits', 'IFTA', 'PrePass/Scale', 'Tolls', 'Parking', 'Misc'
-];
-
-const GALLONS_EXPENSE_TYPES = ['Fuel', 'DEF'];
-
-// Advance types are non-P&L (early access to funds, not true expenses)
-const ADVANCE_EXPENSE_TYPES = ['Advance', 'Cash Advance', 'Card Load', 'Direct Deposit'];
-
-// Credit types offset expenses (money coming back)
-const CREDIT_EXPENSE_TYPES = ['Reimbursement', 'Fuel Discount'];
-
-const isAdvanceExpense = (expense: Expense): boolean => {
-  return ADVANCE_EXPENSE_TYPES.includes(expense.expense_type) ||
-    (expense.notes?.includes('Advance (Non-P&L)') ?? false);
-};
-
-const isCreditExpense = (expense: Expense): boolean => {
-  return CREDIT_EXPENSE_TYPES.includes(expense.expense_type) || expense.amount < 0;
-};
-
-const isActualExpense = (expense: Expense): boolean => {
-  return !isAdvanceExpense(expense) && !isCreditExpense(expense);
-};
 
 export default function Finance() {
   const queryClient = useQueryClient();
@@ -730,7 +702,7 @@ export default function Finance() {
                 <Select onValueChange={selectExpensesByType}>
                   <SelectTrigger className="w-44"><SelectValue placeholder="Select by type" /></SelectTrigger>
                   <SelectContent>
-                    {expenseTypes.filter(type => sortedFilteredExpenses.some(e => e.expense_type === type)).map(type => {
+                    {EXPENSE_TYPES.filter(type => sortedFilteredExpenses.some(e => e.expense_type === type)).map(type => {
                       const count = sortedFilteredExpenses.filter(e => e.expense_type === type).length;
                       return <SelectItem key={type} value={type}>{type} ({count})</SelectItem>;
                     })}
@@ -852,7 +824,7 @@ export default function Finance() {
                   <Table>
                     <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {expenseTypes.map(type => {
+                      {EXPENSE_TYPES.map(type => {
                         const amount = standaloneExpenseTotals.byType[type] || 0;
                         const gallons = standaloneExpenseTotals.gallonsByType[type] || 0;
                         if (amount === 0) return null;
@@ -879,7 +851,7 @@ export default function Finance() {
                   <Table>
                     <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {expenseTypes.map(type => {
+                      {EXPENSE_TYPES.map(type => {
                         const amount = loadLinkedExpenseTotals.byType[type] || 0;
                         if (amount === 0) return null;
                         return (
@@ -1029,7 +1001,7 @@ export default function Finance() {
                 <Label>Type *</Label>
                 <Select value={expenseFormData.expense_type || 'Fuel'} onValueChange={(v) => setExpenseFormData({ ...expenseFormData, expense_type: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{expenseTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
+                  <SelectContent>{EXPENSE_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
@@ -1112,7 +1084,7 @@ export default function Finance() {
                 <Label>Expense Type</Label>
                 <Select value={massEditFormData.expense_type || ''} onValueChange={(v) => setMassEditFormData({ ...massEditFormData, expense_type: v })}>
                   <SelectTrigger><SelectValue placeholder="Keep current" /></SelectTrigger>
-                  <SelectContent>{expenseTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
+                  <SelectContent>{EXPENSE_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
