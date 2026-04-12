@@ -11,6 +11,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DataTable } from '@/components/shared/DataTable';
 import { ExpensesList } from '@/components/shared/ExpensesList';
 import { RateConfirmationUpload } from '@/components/loads/RateConfirmationUpload';
+import { SmartLoadCreator } from '@/components/loads/SmartLoadCreator';
 import DriverLoadsView from '@/components/driver/DriverLoadsView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -507,19 +508,35 @@ export default function FleetLoads() {
 
       {/* Rate Confirmation Upload */}
       <div className="mb-6">
-        <RateConfirmationUpload
-          onDataExtracted={handleRateConfirmationData}
-          existingLoads={loads.map((l: any) => ({
-            id: l.id,
-            landstar_load_id: l.landstar_load_id,
-            origin: l.origin,
-            destination: l.destination,
-            rate: l.rate,
-            pickup_date: l.pickup_date,
-          }))}
-          drivers={drivers}
-          trucks={trucks}
-        />
+        {isIndependent ? (
+          <SmartLoadCreator
+            onDataExtracted={handleRateConfirmationData}
+            existingLoads={loads.map((l: any) => ({
+              id: l.id,
+              landstar_load_id: l.landstar_load_id,
+              origin: l.origin,
+              destination: l.destination,
+              rate: l.rate,
+              pickup_date: l.pickup_date,
+            }))}
+            drivers={drivers}
+            trucks={trucks}
+          />
+        ) : (
+          <RateConfirmationUpload
+            onDataExtracted={handleRateConfirmationData}
+            existingLoads={loads.map((l: any) => ({
+              id: l.id,
+              landstar_load_id: l.landstar_load_id,
+              origin: l.origin,
+              destination: l.destination,
+              rate: l.rate,
+              pickup_date: l.pickup_date,
+            }))}
+            drivers={drivers}
+            trucks={trucks}
+          />
+        )}
       </div>
 
       {/* Summary Cards */}
