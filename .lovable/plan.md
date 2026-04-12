@@ -1,58 +1,37 @@
 
 
-## Carrier Document Hub — Real Storage, Real Email, No Mock Data
+## Build FactoringBatchBuilder Component
 
-### Three changes requested
+### Overview
+A split-layout component with mock data that lets a driver select delivered loads and preview a factoring batch summary. Integrates into the Finance page's existing Factoring tab area.
 
-1. **Use native storage only** for carrier packet document uploads (bypass Google Drive even if configured)
-2. **Remove all mock/hardcoded data** — documents are fetched from the `documents` table
-3. **Send carrier packet email via Resend** using the same pattern as the existing `send-invoice-email` edge function
+### File: `src/components/finance/FactoringBatchBuilder.tsx` (Create)
 
----
+**Left column — "Ready to Factor":**
+- ScrollArea containing 5 mock load cards
+- Each card: Checkbox, load number, broker name, delivery date, gross pay
+- Two icon indicators per card: Rate Con (FileCheck2) and POD (Camera) — green if present, amber/red if missing
+- If POD is missing: checkbox disabled, wrapped in Tooltip showing "POD required before factoring"
+- One mock load missing POD to demo the disabled state
 
-### 1. Database migration — expand document_type constraint
+**Right column — "Current Batch Summary":**
+- Card showing: loads selected count, total gross, factoring fee (2.5%), net payout
+- Updates reactively as checkboxes are toggled
+- Large primary Button at bottom: "Generate Factoring Schedule & Send" with Send icon
 
-Add carrier packet document types to the existing `documents_document_type_check` constraint:
-- `W-9`, `MC Authority`, `COI`, `NOA`
+**Layout:** `grid grid-cols-1 lg:grid-cols-2 gap-6` — stacks on mobile, side-by-side on desktop.
 
-### 2. Create `send-carrier-packet` edge function
+**Mock data (5 loads):**
+| # | Load | Broker | Date | Gross | Rate Con | POD |
+|---|------|--------|------|-------|----------|-----|
+| 1 | LD-4521 | TQL | 04/08/2026 | $3,200 | Yes | Yes |
+| 2 | LD-4518 | Echo | 04/06/2026 | $2,750 | Yes | Yes |
+| 3 | LD-4515 | CH Robinson | 04/04/2026 | $4,100 | Yes | No |
+| 4 | LD-4510 | Coyote | 04/02/2026 | $1,950 | Yes | Yes |
+| 5 | LD-4507 | XPO | 03/30/2026 | $3,600 | Yes | Yes |
 
-A new edge function modeled after `send-invoice-email`:
-- Authenticates the caller, resolves their org
-- Accepts: `recipientEmail`, `message`, `documentIds[]` (the selected carrier docs)
-- Fetches the document records from `documents` table (with org_id check)
-- For each selected document, generates a short-lived signed URL from native storage
-- Builds an HTML email with the user's message and download links for each attached document
-- Sends via Resend (same `RESEND_API_KEY` secret, same `no-reply@jeanwayusa.com` sender)
-- Returns success/failure
+**Components used:** Card, CardHeader, CardContent, CardTitle, Checkbox, Button, Badge, ScrollArea, Tooltip/TooltipTrigger/TooltipContent/TooltipProvider
 
-### 3. Rewrite `CarrierDocumentHub.tsx` — real data, native uploads
-
-**Document grid:**
-- Query `documents` table where `related_type = 'carrier_packet'` and `document_type` in `['W-9', 'MC Authority', 'COI', 'NOA']`
-- For each of the 4 document types, show the card with real status:
-  - If a document exists → show file name, upload date, Preview/Update buttons
-  - If no document exists → show "Missing" badge with Upload button
-- Upload uses `supabase.storage.from('documents').upload(...)` directly (native, not through `useStorageProvider`) to ensure files are always in built-in storage
-- Insert a `documents` row with `related_type: 'carrier_packet'`, appropriate `document_type`
-- Preview uses `DocumentViewer` with the stored path
-
-**Quick Send section:**
-- Checkboxes only show document types that have been uploaded (can't attach missing docs)
-- Send button calls `supabase.functions.invoke('send-carrier-packet', { body: { ... } })`
-- Shows loading state and success/error toast
-
-### 4. Files to create/modify
-
-| File | Action |
-|------|--------|
-| DB migration | Add `W-9`, `MC Authority`, `COI`, `NOA` to document_type check |
-| `supabase/functions/send-carrier-packet/index.ts` | Create — Resend-based email sender |
-| `src/components/crm/CarrierDocumentHub.tsx` | Rewrite — real storage + real email |
-
-### Technical notes
-- Native storage is enforced by calling `supabase.storage.from('documents').upload()` directly instead of going through `useStorageProvider` (which would route to Google Drive if configured)
-- Signed URLs for email download links are generated server-side in the edge function using service role
-- No file attachments in email (Resend limit / best practice) — download links instead
-- The org's `related_id` for carrier packet docs will be the org_id itself since these are org-level documents
+### File: `src/pages/Finance.tsx` (Modify)
+Import and render `FactoringBatchBuilder` inside the existing Factoring tab content area, above or below the current `FactoringTab` component.
 
