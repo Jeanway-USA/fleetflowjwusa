@@ -1,21 +1,36 @@
 
 
-## Fix Load Optimizer for Independent Mode
+## Build SmartLoadCreator Component
 
-### Problem
-In Independent mode, the owner-operator keeps 100% of the load revenue — there's no Landstar truck/trailer percentage split. Currently the Load Optimizer always applies truck % (default 65%) and trailer % splits, which is only correct for Landstar BCOs.
+### Overview
+A polished rate confirmation upload component with framer-motion animations and a 3-column parsed results grid. Uses the existing `parse-rate-confirmation` edge function for real AI extraction — no mock data.
 
 ### Changes
 
-**File: `src/pages/LoadOptimizer.tsx`**
-- Import `useOrganizationMode` hook
-- When `isIndependent` is true, override revenue settings to use `truckPct: 1.0`, `trailerPct: 0`, and skip the power-only toggle entirely (not applicable for independents)
-- Hide the "Truck %" display in the footer stats when independent
-- Hide the "Power Only" toggle when independent (power-only is a Landstar concept)
-- The rest of the analysis (CPM overhead, deadhead, margin, go/no-go) stays the same
+**1. Install framer-motion**
+- `npm install framer-motion`
 
-**No changes to `revenue-calculator.ts`** — passing `truckPct: 1.0` and `trailerPct: 0` already produces the correct result (net revenue = rate + FSC + accessorials).
+**2. Create `src/components/loads/SmartLoadCreator.tsx`**
 
-### Result
-Independent users see gross = net (100% of the load is theirs), and the optimizer focuses purely on whether the load covers operational costs and meets the target margin.
+Self-contained component that wraps the existing rate confirmation parsing flow with enhanced UX:
+
+- **Drop zone**: Reuses the same drag-and-drop pattern from `RateConfirmationUpload` but with updated copy: "Drag & Drop Broker Rate Confirmation PDF here or click to browse"
+- **Scanning animation**: When file is dropped, show a framer-motion animated card with a pulsing scan icon and an animated `Progress` bar that fills over ~3 seconds with text "Extracting Load Details via AI..."
+- **Parsed Results (3-column grid)**: Appears after extraction completes, animated in with `motion.div` fade+slide:
+  - **Column 1 — Broker Info**: Broker Name (from origin context or notes), Load/Reference ID, Contact info if available
+  - **Column 2 — Logistics**: Origin City/State, Destination City/State, Total Miles, Pick-up Date, Delivery Date
+  - **Column 3 — Financials**: Gross Rate (rate + FSC), Rate Per Mile (calculated from rate+FSC / miles), Equipment type if available
+- **Bottom**: Large primary Button "Review & Create Load" that calls `onDataExtracted` callback
+
+**Processing**: Calls `supabase.functions.invoke('parse-rate-confirmation')` via the same storage-upload-then-invoke pattern already used in `RateConfirmationUpload`. All data is real AI-extracted data, not mock.
+
+**3. Integrate into `src/pages/FleetLoads.tsx`**
+- Add `SmartLoadCreator` as an alternative view option or replace the existing `RateConfirmationUpload` in the "Add Load" dialog for Independent mode users.
+
+### Technical details
+- framer-motion: `AnimatePresence`, `motion.div` for fade/slide transitions on results grid
+- Progress bar: Uses shadcn `Progress` with a `useEffect` interval to animate value from 0→90 during processing, snaps to 100 on completion
+- No mock data — all results come from the existing `parse-rate-confirmation` edge function
+- Reuses `useAuth`, `useStorageProvider`, `useOrganizationMode` hooks
+- Component accepts same props as `RateConfirmationUpload` for compatibility
 
