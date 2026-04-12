@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOperationalCPM } from '@/hooks/useOperationalCPM';
 import { calculateRevenue, type RevenueSettings, type RevenueInput } from '@/lib/revenue-calculator';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,6 +22,7 @@ const DEFAULT_ADVANCE_PCT = 0.30;
 export default function LoadOptimizer() {
   const { orgId } = useAuth();
   const { costPerMile, isLoading: cpmLoading } = useOperationalCPM();
+  const { isIndependent } = useOrganizationMode();
 
   const [grossPay, setGrossPay] = useState('');
   const [fuelSurcharge, setFuelSurcharge] = useState('');
@@ -59,19 +61,21 @@ export default function LoadOptimizer() {
 
     if (rate <= 0 || miles <= 0) return null;
 
-    const revSettings: RevenueSettings = {
-      truckPct: settings?.truckPct ?? DEFAULT_TRUCK_PCT,
-      trailerPct: settings?.trailerPct ?? DEFAULT_TRAILER_PCT,
-      advancePct: settings?.advancePct ?? DEFAULT_ADVANCE_PCT,
-      ownsTrailer: settings?.ownsTrailer ?? false,
-    };
+    const revSettings: RevenueSettings = isIndependent
+      ? { truckPct: 1.0, trailerPct: 0, advancePct: 0, ownsTrailer: false }
+      : {
+          truckPct: settings?.truckPct ?? DEFAULT_TRUCK_PCT,
+          trailerPct: settings?.trailerPct ?? DEFAULT_TRAILER_PCT,
+          advancePct: settings?.advancePct ?? DEFAULT_ADVANCE_PCT,
+          ownsTrailer: settings?.ownsTrailer ?? false,
+        };
 
     const revInput: RevenueInput = {
       rate,
       fuel_surcharge: fsc,
       lumper: 0,
       advance_taken: 0,
-      is_power_only: isPowerOnly,
+      is_power_only: isIndependent ? false : isPowerOnly,
       accessorialsTotal: 0,
     };
 
@@ -113,7 +117,7 @@ export default function LoadOptimizer() {
       deadheadImpact,
       totalMiles,
     };
-  }, [grossPay, fuelSurcharge, loadedMiles, deadheadMiles, isPowerOnly, costPerMile, settings, targetMargin]);
+  }, [grossPay, fuelSurcharge, loadedMiles, deadheadMiles, isPowerOnly, costPerMile, settings, targetMargin, isIndependent]);
 
   const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
   const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -198,17 +202,21 @@ export default function LoadOptimizer() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
-              <Switch id="powerOnly" checked={isPowerOnly} onCheckedChange={setIsPowerOnly} />
-              <Label htmlFor="powerOnly" className="cursor-pointer">Power Only (70% flat rate)</Label>
-            </div>
+            {!isIndependent && (
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                <Switch id="powerOnly" checked={isPowerOnly} onCheckedChange={setIsPowerOnly} />
+                <Label htmlFor="powerOnly" className="cursor-pointer">Power Only (70% flat rate)</Label>
+              </div>
+            )}
 
             <Separator />
 
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <span>CPM: <strong className="text-foreground">{fmt(costPerMile)}</strong></span>
               <span>Target Margin: <strong className="text-foreground">{fmtPct(targetMargin)}</strong></span>
-              <span>Truck %: <strong className="text-foreground">{((settings?.truckPct ?? DEFAULT_TRUCK_PCT) * 100).toFixed(0)}%</strong></span>
+              {!isIndependent && (
+                <span>Truck %: <strong className="text-foreground">{((settings?.truckPct ?? DEFAULT_TRUCK_PCT) * 100).toFixed(0)}%</strong></span>
+              )}
             </div>
           </CardContent>
         </Card>
