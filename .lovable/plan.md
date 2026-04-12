@@ -1,10 +1,11 @@
 
-Goal: fix the remaining clipping the screenshot shows on text-entry fields, starting with Load Optimizer and then standardizing the pattern site-wide.
+Goal: fix text-entry clipping site-wide, not just in a few pages.
 
 What I found
-- The issue in your screenshot is not the KPI cards anymore; it is the form input fields with left-side icons/prefixes.
-- In `LoadOptimizer.tsx`, the icon is absolutely positioned, but the input only uses `pl-9`, which is too tight relative to the shared `Input` padding and height.
-- The same pattern appears in other places:
+- The remaining issue is primarily in entry fields with leading icons/prefixes, especially on `/load-optimizer`.
+- The current shared `Input` still uses a generic padding setup, while icon/prefix fields are manually patched with `pl-10` or `pl-8`.
+- That spacing is still too tight in places, especially with `type="number"` fields, placeholders, and the current input height/text sizing.
+- The same fragile pattern still exists in:
   - `src/pages/LoadOptimizer.tsx`
   - `src/pages/CRM.tsx`
   - `src/components/crm/BrokerDatabase.tsx`
@@ -12,44 +13,58 @@ What I found
   - `src/components/maintenance/ServiceHistoryTab.tsx`
   - `src/components/maintenance/NewWorkOrderSheet.tsx`
   - `src/components/maintenance/CompleteJobModal.tsx`
-- The shared `Input` component also lacks a standardized “with leading icon/prefix” variant, so multiple screens are hand-tuning `pl-7`, `pl-9`, and `pl-10`.
+- There are also shared entry primitives that should be hardened at the source:
+  - `src/components/ui/input.tsx`
+  - `src/components/ui/textarea.tsx`
+  - `src/components/ui/select.tsx`
+  - `src/components/ui/command.tsx`
 
 Implementation plan
-1. Standardize prefixed input spacing in the shared input component
-- Update `src/components/ui/input.tsx` so text stays vertically centered and has safer horizontal padding for mobile/desktop.
-- Add a reusable class pattern for inputs that have a left icon/prefix so every prefixed field gets enough left inset consistently.
+1. Strengthen shared text-entry primitives
+- Update `Input` so text/placeholder alignment is more resilient across text, number, email, password, and date fields.
+- Add a reusable spacing convention for fields with a leading icon/prefix and one for trailing actions.
+- Tighten `Textarea`, `SelectTrigger`, and `CommandInput` so they use the same vertical rhythm and don’t clip text on mobile or dense layouts.
 
-2. Fix Load Optimizer first
-- Increase left padding for the 4 prefixed numeric fields.
-- Make the decorative icons non-interactive and keep them vertically centered.
-- Verify placeholders and typed values no longer overlap with the icon.
+2. Replace one-off padding hacks with a standard pattern
+- Stop relying on scattered `pl-8` / `pl-10` values as the final fix.
+- Use a consistent “leading adornment” pattern for icon/prefix fields and apply it everywhere that currently uses absolute-positioned icons or `$` prefixes.
 
-3. Sweep all matching prefixed inputs across the app
-- Replace hard-coded `pl-7` / `pl-9` / `pl-10` usages with the same spacing pattern in:
-  - CRM search
-  - Broker search
-  - PM schedule filters
-  - Service history search
-  - Maintenance cost fields in sheets/modals
+3. Fix all currently identified prefixed fields
+- Load Optimizer: all 4 numeric fields.
+- CRM + Broker search fields.
+- PM schedule and service history search fields.
+- Maintenance currency inputs in work-order creation/edit/complete flows.
 
-4. Do a broader text-entry pass
-- Review shared `Textarea` and any remaining high-risk text-entry layouts to ensure no clipping from padding/line-height mismatches.
-- Only patch additional screens where the issue is caused by the same entry-field pattern, not unrelated layout bugs.
+4. Do a broader site-wide input sweep
+- Review password fields, search fields, selects, command inputs, and textareas for the same clipping risk.
+- Catch form controls that may not use left icons but still inherit cramped text/placeholder behavior from the shared primitives.
 
-5. Verify responsiveness
-- Re-check the affected entry fields on small and medium viewports, especially Load Optimizer.
-- Confirm the fix does not affect search fields, numeric inputs, or modal forms.
+5. Verify comprehensively
+- Re-check representative pages with many forms and mixed field types:
+  - Auth / Reset Password
+  - CRM
+  - Load Optimizer
+  - Maintenance forms
+  - Finance/shared expense forms
+- Verify desktop and mobile breakpoints, with long placeholders and entered values.
 
-Technical details
-- Root cause: absolute-positioned leading icons with insufficient left padding on the input itself.
-- Likely fix pattern:
-  - icon: `pointer-events-none absolute left-3 top-1/2 -translate-y-1/2`
-  - input: use a larger consistent left inset such as `pl-10 sm:pl-11`
-- For dollar-prefix fields now using `pl-7`, they should be brought up to the same safe spacing standard.
-- This is a frontend-only change; no backend or auth changes are needed.
+Technical approach
+- Standardize entry-field layout around:
+  - safer internal padding
+  - explicit leading/trailing adornment spacing
+  - centered text line-height
+  - non-interactive decorative icons/prefixes
+  - overflow-safe text rendering in shared controls
+- Likely outcome:
+  - shared `Input` gets more robust defaults
+  - shared `Textarea`, `SelectTrigger`, and `CommandInput` are aligned to the same sizing model
+  - affected feature files are updated to use the standardized spacing classes instead of ad hoc padding
 
-Files to update
+Files likely to update
 - `src/components/ui/input.tsx`
+- `src/components/ui/textarea.tsx`
+- `src/components/ui/select.tsx`
+- `src/components/ui/command.tsx`
 - `src/pages/LoadOptimizer.tsx`
 - `src/pages/CRM.tsx`
 - `src/components/crm/BrokerDatabase.tsx`
@@ -57,9 +72,9 @@ Files to update
 - `src/components/maintenance/ServiceHistoryTab.tsx`
 - `src/components/maintenance/NewWorkOrderSheet.tsx`
 - `src/components/maintenance/CompleteJobModal.tsx`
-- Possibly `src/components/ui/textarea.tsx` if the broader pass shows the same spacing issue there
+- likely a few additional auth/finance/shared form files found during the full sweep
 
-Expected outcome
-- No more icon/text overlap in Load Optimizer inputs
-- Consistent entry-field spacing across the rest of the app
-- Fewer one-off padding hacks going forward because the pattern becomes standardized
+Expected result
+- No overlap between icons/prefixes and placeholder or entered text
+- Consistent text-entry rendering across the whole app
+- A real global fix in shared form primitives, instead of isolated page-by-page patches
