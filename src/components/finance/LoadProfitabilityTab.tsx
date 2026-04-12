@@ -39,15 +39,21 @@ export function LoadProfitabilityTab({
 }: LoadProfitabilityTabProps) {
 
   // Build load-linked expense lookup from the expenses table (consistent with P&L)
+  // Non-P&L expense types to exclude (must match Finance.tsx logic)
+  const nonPLTypes = ['Advance', 'Cash Advance', 'Card Load', 'Direct Deposit', 'Reimbursement', 'Fuel Discount'];
+
   const loadExpenseMap = useMemo(() => {
     const map = new Map<string, { fuel: number; tolls: number; other: number; total: number }>();
     expenses.forEach((exp: any) => {
       if (!exp.load_id) return;
+      // Exclude non-P&L items and credits (negative amounts)
+      if (nonPLTypes.includes(exp.expense_type) || (exp.amount || 0) < 0) return;
       const existing = map.get(exp.load_id) || { fuel: 0, tolls: 0, other: 0, total: 0 };
       const amount = exp.amount || 0;
-      if (exp.expense_type === 'fuel') {
+      const type = exp.expense_type;
+      if (type === 'Fuel' || type === 'DEF') {
         existing.fuel += amount;
-      } else if (exp.expense_type === 'tolls') {
+      } else if (type === 'Tolls') {
         existing.tolls += amount;
       } else {
         existing.other += amount;
