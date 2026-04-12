@@ -290,6 +290,12 @@ export function BrokerDatabase() {
           exportFilename="brokers"
         />
       </div>
+        </TabsContent>
+
+        <TabsContent value="documents">
+          <CarrierDocumentHub />
+        </TabsContent>
+      </Tabs>
 
       {/* Broker Form Dialog */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
