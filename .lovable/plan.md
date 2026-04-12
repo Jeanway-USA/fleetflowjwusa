@@ -1,37 +1,31 @@
 
 
-## Build FactoringBatchBuilder Component
+## Remove Mock Data from Factoring Portal
 
-### Overview
-A split-layout component with mock data that lets a driver select delivered loads and preview a factoring batch summary. Integrates into the Finance page's existing Factoring tab area.
+### Problem
+The `FactoringBatchBuilder` component uses hardcoded mock loads and a hardcoded 2.5% fee rate. Meanwhile, the `FactoringTab` component directly below it already fetches real `fleet_loads` data, reads the factoring fee percentage from the organization settings, and provides the same batch-submit functionality — all without mock data.
 
-### File: `src/components/finance/FactoringBatchBuilder.tsx` (Create)
+### Solution
+Remove the `FactoringBatchBuilder` component entirely and enhance the existing `FactoringTab` to incorporate the batch-builder's visual design elements (the split-layout with document indicators) while continuing to use real data.
 
-**Left column — "Ready to Factor":**
-- ScrollArea containing 5 mock load cards
-- Each card: Checkbox, load number, broker name, delivery date, gross pay
-- Two icon indicators per card: Rate Con (FileCheck2) and POD (Camera) — green if present, amber/red if missing
-- If POD is missing: checkbox disabled, wrapped in Tooltip showing "POD required before factoring"
-- One mock load missing POD to demo the disabled state
+### Changes
 
-**Right column — "Current Batch Summary":**
-- Card showing: loads selected count, total gross, factoring fee (2.5%), net payout
-- Updates reactively as checkboxes are toggled
-- Large primary Button at bottom: "Generate Factoring Schedule & Send" with Send icon
+**1. Remove `FactoringBatchBuilder` from Finance page (`src/pages/Finance.tsx`)**
+- Remove the import of `FactoringBatchBuilder`
+- Remove `<FactoringBatchBuilder />` from the factoring tab content (line 1008)
+- Keep `<FactoringTab />` as the sole component
 
-**Layout:** `grid grid-cols-1 lg:grid-cols-2 gap-6` — stacks on mobile, side-by-side on desktop.
+**2. Enhance `FactoringTab` "Ready" tab (`src/components/finance/FactoringTab.tsx`)**
+- In the "Ready to Submit" tab, add Rate Con and POD document indicators per load by checking the `documents` table for each load's attachments
+- If a load is missing its POD, disable its checkbox and show a tooltip (matching the batch builder's UX)
+- Display the factoring fee percentage from `orgSettings.factoring_fee_percentage` in the batch summary (already done)
+- Show factoring provider name from `orgSettings.factoring_provider_name` in the header (already done)
+- Add a small "Batch Summary" sidebar or section showing total gross, fee, and net payout for selected loads (bringing over the batch builder's summary panel)
 
-**Mock data (5 loads):**
-| # | Load | Broker | Date | Gross | Rate Con | POD |
-|---|------|--------|------|-------|----------|-----|
-| 1 | LD-4521 | TQL | 04/08/2026 | $3,200 | Yes | Yes |
-| 2 | LD-4518 | Echo | 04/06/2026 | $2,750 | Yes | Yes |
-| 3 | LD-4515 | CH Robinson | 04/04/2026 | $4,100 | Yes | No |
-| 4 | LD-4510 | Coyote | 04/02/2026 | $1,950 | Yes | Yes |
-| 5 | LD-4507 | XPO | 03/30/2026 | $3,600 | Yes | Yes |
+**3. Delete `src/components/finance/FactoringBatchBuilder.tsx`**
 
-**Components used:** Card, CardHeader, CardContent, CardTitle, Checkbox, Button, Badge, ScrollArea, Tooltip/TooltipTrigger/TooltipContent/TooltipProvider
-
-### File: `src/pages/Finance.tsx` (Modify)
-Import and render `FactoringBatchBuilder` inside the existing Factoring tab content area, above or below the current `FactoringTab` component.
+### Technical details
+- The `FactoringTab` already queries `organizations` for `factoring_fee_percentage` and `factoring_provider_name` — no new settings queries needed
+- Document presence check: query `documents` table where `related_id IN (load_ids)` and `document_type IN ('rate_confirmation', 'pod')` to determine which loads have Rate Con / POD attached
+- The fee rate label will dynamically show the configured percentage instead of hardcoded "2.5%"
 
