@@ -159,7 +159,9 @@ export function FleetMapView() {
 
   // Subscribe to realtime location updates
   useEffect(() => {
-    const channel = supabase
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
       .channel('driver-locations-realtime')
       .on(
         'postgres_changes',
@@ -192,9 +194,12 @@ export function FleetMapView() {
         }
       )
       .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription unavailable:', err);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, []);
 

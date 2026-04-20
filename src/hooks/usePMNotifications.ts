@@ -44,23 +44,28 @@ export function usePMNotifications() {
 
   // Subscribe to realtime updates
   useEffect(() => {
-    const channel = supabase
-      .channel('pm-notifications-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'pm_notifications',
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['pm-notifications'] });
-        }
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel('pm-notifications-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'pm_notifications',
+          },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ['pm-notifications'] });
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription unavailable:', err);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [queryClient]);
 

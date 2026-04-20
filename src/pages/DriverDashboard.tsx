@@ -157,7 +157,9 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefresh} disabled={isRefreshing}>
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
-            <DriverNotifications driverId={driver.id} />
+            <ErrorBoundary compact>
+              <DriverNotifications driverId={driver.id} />
+            </ErrorBoundary>
             <span className="text-sm text-muted-foreground">
               {format(new Date(), 'EEE, MMM d')}
             </span>

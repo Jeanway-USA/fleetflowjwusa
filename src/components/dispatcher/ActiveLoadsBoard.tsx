@@ -137,13 +137,18 @@ export function ActiveLoadsBoard() {
   });
 
   useEffect(() => {
-    const channel = supabase
-      .channel('active-loads-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'fleet_loads' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel('active-loads-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'fleet_loads' }, () => {
+          queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
+        })
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription unavailable:', err);
+    }
+    return () => { if (channel) supabase.removeChannel(channel); };
   }, [queryClient]);
 
   if (isLoading) {

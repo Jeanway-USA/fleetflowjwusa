@@ -94,23 +94,28 @@ export default function DispatcherDashboard() {
 
   // Real-time updates for dispatcher stats when loads change
   useEffect(() => {
-    const channel = supabase
-      .channel('dispatcher-stats-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'fleet_loads',
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['dispatcher-stats'] });
-        }
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel('dispatcher-stats-realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'fleet_loads',
+          },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ['dispatcher-stats'] });
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription unavailable:', err);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [queryClient]);
 

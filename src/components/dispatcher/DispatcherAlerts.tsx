@@ -49,19 +49,24 @@ export function DispatcherAlerts() {
 
   // Realtime subscription: auto-refresh alerts when driver_requests change
   useEffect(() => {
-    const channel = supabase
-      .channel('dispatcher-alerts-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'driver_requests' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['dispatcher-alerts'] });
-        }
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel('dispatcher-alerts-realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'driver_requests' },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ['dispatcher-alerts'] });
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription unavailable:', err);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [queryClient]);
 
