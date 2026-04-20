@@ -54,24 +54,29 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
   useEffect(() => {
     if (!driverId) return;
 
-    const channel = supabase
-      .channel('driver-notifications-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'driver_notifications',
-          filter: `driver_id=eq.${driverId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['driver-notifications', driverId] });
-        }
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel('driver-notifications-realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'driver_notifications',
+            filter: `driver_id=eq.${driverId}`,
+          },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ['driver-notifications', driverId] });
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription unavailable:', err);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [driverId, queryClient]);
 
