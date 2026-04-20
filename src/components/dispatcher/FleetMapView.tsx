@@ -194,9 +194,12 @@ export function FleetMapView() {
         }
       )
       .subscribe();
+    } catch (err) {
+      console.warn('Realtime subscription unavailable:', err);
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, []);
 
