@@ -396,7 +396,14 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Built-in storage: generate signed URL
+      // Built-in storage: generate signed URL — IDOR guard
+      const denied = assertOwnsPath(bucket, fileRef);
+      if (denied) {
+        return new Response(JSON.stringify({ error: denied }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const { data: signedData, error: signedError } = await supabase.storage
         .from(bucket)
         .createSignedUrl(fileRef, 3600);
