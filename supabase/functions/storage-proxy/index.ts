@@ -303,6 +303,16 @@ Deno.serve(async (req) => {
         });
       }
 
+      // IDOR guard for built-in storage uploads
+      if (!(storageConfig?.provider === 'google_drive' && storageConfig.encrypted_credentials)) {
+        const denied = assertOwnsPath(bucket, filePath);
+        if (denied) {
+          return new Response(JSON.stringify({ error: denied }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       const fileData = new Uint8Array(await file.arrayBuffer());
 
       // Google Drive path
