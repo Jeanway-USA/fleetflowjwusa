@@ -328,8 +328,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     : roles.some(r => ['owner', 'dispatcher'].includes(r));
 
   const hasSafetyAccess = simulatedRole 
-    ? ['owner', 'dispatcher'].includes(simulatedRole)
-    : roles.some(r => ['owner', 'dispatcher'].includes(r));
+    ? ['owner', 'safety'].includes(simulatedRole)
+    : roles.some(r => ['owner', 'safety'].includes(r));
 
   return (
     <AuthContext.Provider value={{
