@@ -43,22 +43,24 @@ function buildInvoiceEmailHtml(params: {
 }): string {
   const { orgName, logoUrl, invoiceNumber, invoiceDate, loadDisplayId, origin, destination, deliveryDate, brokerName, lineItems, total } = params;
 
-  const logoSection = logoUrl
-    ? `<img src="${logoUrl}" alt="${orgName}" style="max-height: 48px; max-width: 160px; margin-bottom: 8px;" />`
+  const safeOrgName = escapeHtml(orgName);
+  const safeLogoUrl = safeUrl(logoUrl);
+  const logoSection = safeLogoUrl
+    ? `<img src="${safeLogoUrl}" alt="${safeOrgName}" style="max-height: 48px; max-width: 160px; margin-bottom: 8px;" />`
     : '';
 
   const lineItemRows = lineItems
     .filter(item => item.amount > 0)
     .map(item => `
       <tr>
-        <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; color: #333; font-size: 14px;">${item.label}</td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; color: #333; font-size: 14px;">${escapeHtml(item.label)}</td>
         <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; color: #333; font-size: 14px; text-align: right; font-weight: 500;">${formatCurrency(item.amount)}</td>
       </tr>
     `).join('');
 
   const billToSection = brokerName
     ? `<p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Bill To</p>
-       <p style="margin: 0; color: #1a1a1a; font-size: 15px; font-weight: 600;">${brokerName}</p>`
+       <p style="margin: 0; color: #1a1a1a; font-size: 15px; font-weight: 600;">${escapeHtml(brokerName)}</p>`
     : '';
 
   return `<!DOCTYPE html>
