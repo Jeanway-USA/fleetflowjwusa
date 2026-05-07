@@ -262,6 +262,23 @@ Deno.serve(async (req) => {
 
     const orgId = profile.org_id;
 
+    // IDOR guard for built-in storage paths.
+    // - documents bucket: must start with `${orgId}/`
+    // - dvir-photos / dvir-signatures / branding-assets / beta_feedback: must start with `${user.id}/`
+    function assertOwnsPath(bucket: string, fileRef: string): string | null {
+      if (!fileRef || fileRef.startsWith('gdrive:') || fileRef.startsWith('http')) return null;
+      const orgScoped = ['documents'];
+      const userScoped = ['dvir-photos', 'dvir-signatures', 'branding-assets', 'beta_feedback'];
+      if (orgScoped.includes(bucket)) {
+        if (!fileRef.startsWith(`${orgId}/`)) return 'Forbidden: path does not belong to your organization';
+      } else if (userScoped.includes(bucket)) {
+        if (!fileRef.startsWith(`${user.id}/`)) return 'Forbidden: path does not belong to you';
+      } else {
+        return 'Forbidden: bucket not allowed';
+      }
+      return null;
+    }
+
     // Check org storage config
     const { data: storageConfig } = await supabase
       .from('org_storage_config')
@@ -284,6 +301,16 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: 'Missing file or path' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      }
+
+      // IDOR guard for built-in storage uploads
+      if (!(storageConfig?.provider === 'google_drive' && storageConfig.encrypted_credentials)) {
+        const denied = assertOwnsPath(bucket, filePath);
+        if (denied) {
+          return new Response(JSON.stringify({ error: denied }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
 
       const fileData = new Uint8Array(await file.arrayBuffer());
@@ -369,7 +396,14 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Built-in storage: generate signed URL
+      // Built-in storage: generate signed URL — IDOR guard
+      const denied = assertOwnsPath(bucket, fileRef);
+      if (denied) {
+        return new Response(JSON.stringify({ error: denied }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const { data: signedData, error: signedError } = await supabase.storage
         .from(bucket)
         .createSignedUrl(fileRef, 3600);
@@ -413,6 +447,14 @@ Deno.serve(async (req) => {
         if (idx !== -1) {
           storagePath = fileRef.slice(idx + publicPattern.length);
         }
+      }
+
+      // IDOR guard
+      const denied = assertOwnsPath(bucket, storagePath);
+      if (denied) {
+        return new Response(JSON.stringify({ error: denied }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       const { data: signedData, error: signedError } = await supabase.storage
@@ -459,7 +501,14 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Built-in storage
+      // Built-in storage — IDOR guard
+      const denied = assertOwnsPath(bucket, fileRef);
+      if (denied) {
+        return new Response(JSON.stringify({ error: denied }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       await supabase.storage.from(bucket).remove([fileRef]);
 
       return new Response(JSON.stringify({ success: true }), {

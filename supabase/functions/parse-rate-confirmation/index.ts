@@ -216,6 +216,18 @@ serve(async (req) => {
       const { filePath, pdfBase64: rawBase64 } = body;
 
       if (filePath) {
+        // IDOR guard: ensure path belongs to caller's org
+        const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('org_id')
+          .eq('user_id', userId)
+          .single();
+        if (!profile?.org_id || !filePath.startsWith(`${profile.org_id}/`)) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden: path does not belong to your organization' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         console.log("Downloading PDF from storage:", filePath);
         const { data: fileData, error: downloadError } = await supabaseAdmin.storage
           .from('documents')

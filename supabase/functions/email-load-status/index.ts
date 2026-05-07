@@ -31,6 +31,16 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: '#EF4444',
 };
 
+function escapeHtml(s: unknown): string {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function buildEmailHtml(params: {
   loadDisplayId: string;
   statusLabel: string;
@@ -48,7 +58,7 @@ function buildEmailHtml(params: {
       <table role="presentation" style="width: 100%; border-collapse: collapse; margin-top: 24px;">
         <tr>
           <td align="center">
-            <a href="${trackingUrl}" style="display: inline-block; padding: 14px 36px; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);">
+            <a href="${escapeHtml(trackingUrl)}" style="display: inline-block; padding: 14px 36px; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);">
               Track This Load Live →
             </a>
           </td>
@@ -61,7 +71,7 @@ function buildEmailHtml(params: {
       <tr>
         <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
           <span style="color: #6B7280; font-size: 13px;">📍 Driver Location</span>
-          <span style="float: right; color: #1a1a1a; font-size: 13px; font-weight: 500;">${driverLocationText}</span>
+          <span style="float: right; color: #1a1a1a; font-size: 13px; font-weight: 500;">${escapeHtml(driverLocationText)}</span>
         </td>
       </tr>`
     : '';
@@ -90,7 +100,7 @@ function buildEmailHtml(params: {
           <tr>
             <td style="padding: 36px 40px;">
 
-              ${agentName ? `<p style="margin: 0 0 20px; color: #4a4a4a; font-size: 15px;">Hi <strong>${agentName}</strong>,</p>` : ''}
+              ${agentName ? `<p style="margin: 0 0 20px; color: #4a4a4a; font-size: 15px;">Hi <strong>${escapeHtml(agentName)}</strong>,</p>` : ''}
 
               <p style="margin: 0 0 24px; color: #4a4a4a; font-size: 15px; line-height: 1.6;">
                 There's a status update for one of your loads:
@@ -101,11 +111,11 @@ function buildEmailHtml(params: {
                 <tr>
                   <td style="padding: 20px 24px;">
                     <p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600;">Load Reference</p>
-                    <p style="margin: 0 0 16px; color: #1a1a1a; font-size: 22px; font-weight: 700; font-family: monospace;">#${loadDisplayId}</p>
+                    <p style="margin: 0 0 16px; color: #1a1a1a; font-size: 22px; font-weight: 700; font-family: monospace;">#${escapeHtml(loadDisplayId)}</p>
 
                     <p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600;">Current Status</p>
                     <span style="display: inline-block; padding: 6px 16px; background-color: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40; border-radius: 20px; font-size: 14px; font-weight: 600;">
-                      ${statusLabel}
+                      ${escapeHtml(statusLabel)}
                     </span>
                   </td>
                 </tr>
@@ -116,13 +126,13 @@ function buildEmailHtml(params: {
                 <tr>
                   <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
                     <span style="color: #6B7280; font-size: 13px;">🔵 Pickup</span>
-                    <span style="float: right; color: #1a1a1a; font-size: 13px; font-weight: 500; max-width: 300px; text-align: right;">${origin}</span>
+                    <span style="float: right; color: #1a1a1a; font-size: 13px; font-weight: 500; max-width: 300px; text-align: right;">${escapeHtml(origin)}</span>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
                     <span style="color: #6B7280; font-size: 13px;">🔴 Delivery</span>
-                    <span style="float: right; color: #1a1a1a; font-size: 13px; font-weight: 500; max-width: 300px; text-align: right;">${destination}</span>
+                    <span style="float: right; color: #1a1a1a; font-size: 13px; font-weight: 500; max-width: 300px; text-align: right;">${escapeHtml(destination)}</span>
                   </td>
                 </tr>
                 ${locationSection}

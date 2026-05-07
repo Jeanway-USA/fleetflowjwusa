@@ -11,6 +11,23 @@ function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 }
 
+function escapeHtml(s: unknown): string {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeUrl(u: string | null | undefined): string {
+  if (!u) return '';
+  const trimmed = String(u).trim();
+  if (/^https?:\/\//i.test(trimmed)) return escapeHtml(trimmed);
+  return '';
+}
+
 function buildInvoiceEmailHtml(params: {
   orgName: string;
   logoUrl: string | null;
@@ -26,22 +43,24 @@ function buildInvoiceEmailHtml(params: {
 }): string {
   const { orgName, logoUrl, invoiceNumber, invoiceDate, loadDisplayId, origin, destination, deliveryDate, brokerName, lineItems, total } = params;
 
-  const logoSection = logoUrl
-    ? `<img src="${logoUrl}" alt="${orgName}" style="max-height: 48px; max-width: 160px; margin-bottom: 8px;" />`
+  const safeOrgName = escapeHtml(orgName);
+  const safeLogoUrl = safeUrl(logoUrl);
+  const logoSection = safeLogoUrl
+    ? `<img src="${safeLogoUrl}" alt="${safeOrgName}" style="max-height: 48px; max-width: 160px; margin-bottom: 8px;" />`
     : '';
 
   const lineItemRows = lineItems
     .filter(item => item.amount > 0)
     .map(item => `
       <tr>
-        <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; color: #333; font-size: 14px;">${item.label}</td>
+        <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; color: #333; font-size: 14px;">${escapeHtml(item.label)}</td>
         <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; color: #333; font-size: 14px; text-align: right; font-weight: 500;">${formatCurrency(item.amount)}</td>
       </tr>
     `).join('');
 
   const billToSection = brokerName
     ? `<p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Bill To</p>
-       <p style="margin: 0; color: #1a1a1a; font-size: 15px; font-weight: 600;">${brokerName}</p>`
+       <p style="margin: 0; color: #1a1a1a; font-size: 15px; font-weight: 600;">${escapeHtml(brokerName)}</p>`
     : '';
 
   return `<!DOCTYPE html>
@@ -63,12 +82,12 @@ function buildInvoiceEmailHtml(params: {
                 <tr>
                   <td style="vertical-align: top;">
                     ${logoSection}
-                    <h2 style="margin: 0; color: #1a1a1a; font-size: 20px; font-weight: 700;">${orgName}</h2>
+                    <h2 style="margin: 0; color: #1a1a1a; font-size: 20px; font-weight: 700;">${safeOrgName}</h2>
                   </td>
                   <td style="text-align: right; vertical-align: top;">
                     <p style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">INVOICE</p>
-                    <p style="margin: 4px 0 0; color: #6B7280; font-size: 13px; font-family: monospace;">${invoiceNumber}</p>
-                    <p style="margin: 2px 0 0; color: #6B7280; font-size: 13px;">${invoiceDate}</p>
+                    <p style="margin: 4px 0 0; color: #6B7280; font-size: 13px; font-family: monospace;">${escapeHtml(invoiceNumber)}</p>
+                    <p style="margin: 2px 0 0; color: #6B7280; font-size: 13px;">${escapeHtml(invoiceDate)}</p>
                   </td>
                 </tr>
               </table>
@@ -88,9 +107,9 @@ function buildInvoiceEmailHtml(params: {
                   </td>
                   <td style="vertical-align: top; width: 50%; text-align: right;">
                     <p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Load Reference</p>
-                    <p style="margin: 0 0 12px; color: #1a1a1a; font-size: 15px; font-weight: 600;">${loadDisplayId}</p>
+                    <p style="margin: 0 0 12px; color: #1a1a1a; font-size: 15px; font-weight: 600;">${escapeHtml(loadDisplayId)}</p>
                     <p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Delivery Date</p>
-                    <p style="margin: 0; color: #1a1a1a; font-size: 14px;">${deliveryDate}</p>
+                    <p style="margin: 0; color: #1a1a1a; font-size: 14px;">${escapeHtml(deliveryDate)}</p>
                   </td>
                 </tr>
               </table>
@@ -104,13 +123,13 @@ function buildInvoiceEmailHtml(params: {
                 <tr>
                   <td style="padding: 14px 16px; border-bottom: 1px solid #e8e8e8;">
                     <span style="color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Origin</span><br/>
-                    <span style="color: #1a1a1a; font-size: 14px; font-weight: 500;">${origin}</span>
+                    <span style="color: #1a1a1a; font-size: 14px; font-weight: 500;">${escapeHtml(origin)}</span>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding: 14px 16px;">
                     <span style="color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Destination</span><br/>
-                    <span style="color: #1a1a1a; font-size: 14px; font-weight: 500;">${destination}</span>
+                    <span style="color: #1a1a1a; font-size: 14px; font-weight: 500;">${escapeHtml(destination)}</span>
                   </td>
                 </tr>
               </table>
@@ -138,7 +157,7 @@ function buildInvoiceEmailHtml(params: {
           <tr>
             <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 12px 12px; text-align: center;">
               <p style="margin: 0; color: #9a9a9a; font-size: 12px;">
-                © ${new Date().getFullYear()} ${orgName}. All rights reserved.
+                © ${new Date().getFullYear()} ${safeOrgName}. All rights reserved.
               </p>
             </td>
           </tr>
