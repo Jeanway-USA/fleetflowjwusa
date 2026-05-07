@@ -58,7 +58,7 @@ function buildEmailHtml(params: {
       <table role="presentation" style="width: 100%; border-collapse: collapse; margin-top: 24px;">
         <tr>
           <td align="center">
-            <a href="${trackingUrl}" style="display: inline-block; padding: 14px 36px; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);">
+            <a href="${escapeHtml(trackingUrl)}" style="display: inline-block; padding: 14px 36px; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);">
               Track This Load Live →
             </a>
           </td>
