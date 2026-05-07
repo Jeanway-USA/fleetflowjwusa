@@ -126,13 +126,13 @@ function buildEmailHtml(params: {
                 <tr>
                   <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
                     <span style="color: #6B7280; font-size: 13px;">🔵 Pickup</span>
-                    <span style="float: right; color: #1a1a1a; font-size: 13px; font-weight: 500; max-width: 300px; text-align: right;">${origin}</span>
+                    <span style="float: right; color: #1a1a1a; font-size: 13px; font-weight: 500; max-width: 300px; text-align: right;">${escapeHtml(origin)}</span>
                   </td>
                 </tr>
                 <tr>
                   <td style="padding: 10px 0; border-bottom: 1px solid #f0f0f0;">
                     <span style="color: #6B7280; font-size: 13px;">🔴 Delivery</span>
-                    <span style="float: right; color: #1a1a1a; font-size: 13px; font-weight: 500; max-width: 300px; text-align: right;">${destination}</span>
+                    <span style="float: right; color: #1a1a1a; font-size: 13px; font-weight: 500; max-width: 300px; text-align: right;">${escapeHtml(destination)}</span>
                   </td>
                 </tr>
                 ${locationSection}
