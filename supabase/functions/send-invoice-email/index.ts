@@ -11,6 +11,23 @@ function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 }
 
+function escapeHtml(s: unknown): string {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeUrl(u: string | null | undefined): string {
+  if (!u) return '';
+  const trimmed = String(u).trim();
+  if (/^https?:\/\//i.test(trimmed)) return escapeHtml(trimmed);
+  return '';
+}
+
 function buildInvoiceEmailHtml(params: {
   orgName: string;
   logoUrl: string | null;
