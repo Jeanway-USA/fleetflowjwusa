@@ -501,7 +501,14 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Built-in storage
+      // Built-in storage — IDOR guard
+      const denied = assertOwnsPath(bucket, fileRef);
+      if (denied) {
+        return new Response(JSON.stringify({ error: denied }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       await supabase.storage.from(bucket).remove([fileRef]);
 
       return new Response(JSON.stringify({ success: true }), {
