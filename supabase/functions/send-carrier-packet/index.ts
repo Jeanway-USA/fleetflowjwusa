@@ -157,7 +157,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch the selected documents (with org_id check)
+    // Authorization: only owners or dispatchers may send carrier packets
+    const { data: roleRow } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('org_id', profile.org_id)
+      .in('role', ['owner', 'dispatcher'])
+      .maybeSingle();
+
+    if (!roleRow) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { data: documents, error: docError } = await supabaseAdmin
       .from('documents')
       .select('id, file_name, file_path, document_type')
