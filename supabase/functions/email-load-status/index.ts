@@ -100,7 +100,7 @@ function buildEmailHtml(params: {
           <tr>
             <td style="padding: 36px 40px;">
 
-              ${agentName ? `<p style="margin: 0 0 20px; color: #4a4a4a; font-size: 15px;">Hi <strong>${agentName}</strong>,</p>` : ''}
+              ${agentName ? `<p style="margin: 0 0 20px; color: #4a4a4a; font-size: 15px;">Hi <strong>${escapeHtml(agentName)}</strong>,</p>` : ''}
 
               <p style="margin: 0 0 24px; color: #4a4a4a; font-size: 15px; line-height: 1.6;">
                 There's a status update for one of your loads:
@@ -111,11 +111,11 @@ function buildEmailHtml(params: {
                 <tr>
                   <td style="padding: 20px 24px;">
                     <p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600;">Load Reference</p>
-                    <p style="margin: 0 0 16px; color: #1a1a1a; font-size: 22px; font-weight: 700; font-family: monospace;">#${loadDisplayId}</p>
+                    <p style="margin: 0 0 16px; color: #1a1a1a; font-size: 22px; font-weight: 700; font-family: monospace;">#${escapeHtml(loadDisplayId)}</p>
 
                     <p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600;">Current Status</p>
                     <span style="display: inline-block; padding: 6px 16px; background-color: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40; border-radius: 20px; font-size: 14px; font-weight: 600;">
-                      ${statusLabel}
+                      ${escapeHtml(statusLabel)}
                     </span>
                   </td>
                 </tr>
