@@ -31,6 +31,16 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: '#EF4444',
 };
 
+function escapeHtml(s: unknown): string {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function buildEmailHtml(params: {
   loadDisplayId: string;
   statusLabel: string;
