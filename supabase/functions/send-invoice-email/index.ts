@@ -212,6 +212,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Authorization: only owners, dispatchers, or payroll admins may send invoices
+    const { data: roleRow } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('org_id', profile.org_id)
+      .in('role', ['owner', 'dispatcher', 'payroll_admin'])
+      .maybeSingle();
+
+    if (!roleRow) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Fetch load (with org_id check for IDOR protection)
     const { data: load, error: loadError } = await supabaseAdmin
       .from('fleet_loads')
