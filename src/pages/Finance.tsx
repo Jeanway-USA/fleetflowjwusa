@@ -692,15 +692,9 @@ export default function Finance() {
           </div>
         </TabsContent>
 
-        <TabsContent value="expenses" className="mt-6">
+        <TabsContent value="expenses">
+          <div className="space-y-6 animate-in fade-in-50">
           <AuditReconciliation loads={loads} />
-          <StatementUpload 
-            existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination }))}
-            trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
-            existingExpenses={expenses.map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id }))}
-            onExpensesImported={() => queryClient.invalidateQueries({ queryKey: ['expenses'] })}
-            orgId={orgId}
-          />
 
           <Card className="card-elevated">
             <CardHeader className="flex flex-row items-center justify-between">
