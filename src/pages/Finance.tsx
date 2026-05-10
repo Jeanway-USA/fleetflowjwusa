@@ -643,17 +643,14 @@ export default function Finance() {
         </Card>
       </div>
 
-      <Tabs defaultValue="pl" className="w-full">
+      <Tabs defaultValue="overview" className="w-full">
         <TabsList className="flex flex-wrap">
-          <TabsTrigger value="pl">P&L Summary</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="profitability">Profitability</TabsTrigger>
-          <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll</TabsTrigger>
-          <TabsTrigger value="commissions">Commissions</TabsTrigger>
+          <TabsTrigger value="overview">Overview & P&L</TabsTrigger>
           <TabsTrigger value="settlements">Settlements</TabsTrigger>
-          {isIndependent && <TabsTrigger value="invoicing">Invoicing</TabsTrigger>}
-          {isIndependent && <TabsTrigger value="factoring">Factoring Portal</TabsTrigger>}
+          <TabsTrigger value="invoicing">Invoicing & Factoring</TabsTrigger>
+          <TabsTrigger value="payroll">Payroll & Commissions</TabsTrigger>
+          <TabsTrigger value="expenses">Expenses</TabsTrigger>
+          <TabsTrigger value="profitability">Profitability</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
