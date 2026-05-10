@@ -1,51 +1,25 @@
-# Fix Safety compliance alerts staying stuck after an inspection is completed
+I found two likely causes behind the “updates appear, then revert” and route-sticking behavior:
 
-## Root cause
+1. The app still has production PWA/service-worker generation enabled through `vite-plugin-pwa`, while `src/main.tsx` only unregisters service workers after the app JS has already loaded. A previously installed service worker can still serve an older app shell before that cleanup runs, which matches seeing updates briefly and then an older version returning.
+2. Sidebar navigation is implemented as button `onClick={() => navigate(path)}` actions instead of real route links. This can make route changes harder to preserve/debug in preview/history contexts and gives less reliable URL behavior than React Router links.
 
-The Safety page (`src/pages/Safety.tsx`, lines ~129–140) builds the "Inspections" alert list strictly from `trucks.next_inspection_date`.
+Plan:
 
-When a work order with service type "Inspection" is completed in Maintenance Management (`useCompleteWorkOrder` in `src/hooks/useMaintenanceData.ts`, lines ~960–999), the hook updates:
-- `trucks.last_120_inspection_date` / `last_120_inspection_miles`
-- `service_schedules.last_performed_date` for the "120-Day Inspection" row
+1. **Disable stale app-shell caching**
+   - Remove the PWA plugin registration from `vite.config.ts` so future preview/published builds cannot install or update a service worker that caches old routes/assets.
+   - Keep the existing runtime unregister guard in `src/main.tsx` as an extra cleanup for users who already have one installed.
 
-…but it never moves `trucks.next_inspection_date` forward, and never invalidates the `['trucks']` query key that Safety uses. Result: the alert keeps showing the old due date even though the truck was just inspected.
+2. **Make sidebar routing link-based**
+   - Update `AppSidebar.tsx` navigation buttons to render through React Router `Link`/`NavLink` via the existing shadcn `asChild` pattern where possible.
+   - Preserve all existing sidebar styling, role filtering, active states, collapsible sections, and owner role-simulation behavior.
+   - Keep special actions (sign out, simulation exit, external Discord link) as actions/anchors.
 
-The reverse path (`useRevertWorkOrder`, lines ~576–612) has the same blind spot — it rolls back `last_120_inspection_date` but leaves `next_inspection_date` untouched.
+3. **Targeted verification**
+   - Restart the dev server after the config change.
+   - Check preview console/network for service-worker/cache errors.
+   - Verify clicking sidebar items updates `window.location.pathname` and renders the selected page instead of staying on `/` or the previous route.
+   - Confirm the earlier Finance page changes are still present in source; if they still do not show after cache cleanup, inspect the live preview again for a remaining build/HMR issue.
 
-## Changes
-
-All edits are in `src/hooks/useMaintenanceData.ts` — no schema changes, no Safety/Trucks UI changes, no styling changes.
-
-### 1. `useCompleteWorkOrder` — inspection branch (~line 964)
-
-When a completed work order's service type is an inspection:
-- Compute `nextInspectionDate = inspectionDate + 120 days` (matches the existing "120-Day Inspection" cadence already enforced by `service_schedules` and `create_default_service_schedules`).
-- Add `next_inspection_date: nextInspectionDate` to the existing `trucks` update alongside `last_120_inspection_date` and `last_120_inspection_miles`.
-
-### 2. `useRevertWorkOrder` — inspection branch (~lines 580–612)
-
-Mirror the new behavior on revert:
-- If a previous inspection WO exists: set `next_inspection_date = effectiveInspDate + 120 days` on the truck.
-- If none exists: set `next_inspection_date = null` (alongside the existing nulling of `last_120_inspection_date`).
-
-### 3. Cache invalidation
-
-In both `useCompleteWorkOrder.onSuccess` (~line 1004) and `useRevertWorkOrder.onSuccess` (~line 618), add:
-```ts
-queryClient.invalidateQueries({ queryKey: ['trucks'] });
-```
-This is the key Safety, Trucks, and the dispatcher TruckStatusGrid all share, so the alert disappears immediately after a completion.
-
-## Out of scope (intentionally)
-
-- No change to the Safety page logic or UI — it keeps reading `trucks.next_inspection_date`.
-- No change to the Trucks page form (manual edits still work as before).
-- DVIRs (`driver_inspections` pre/post-trip) are unrelated to the annual/120-day DOT inspection and continue to not affect this alert.
-- No DB triggers — keeping the sync in the existing client mutation is consistent with how the rest of the maintenance flow already works.
-
-## Verification
-
-1. Create an "Inspection" work order for a truck whose `next_inspection_date` is overdue.
-2. Complete it via the CompleteJobModal.
-3. Open Safety → Inspections card: the truck should disappear from the alert list, and the count badge should drop. Trucks page should show the new `next_inspection_date` ~120 days out.
-4. Revert the work order in Service History → the alert should reappear with the prior due date (or be cleared if no prior inspection existed).
+Out of scope:
+- No changes to Finance dashboard layout code in this pass unless verification proves the source exists but preview still cannot load it.
+- No database or backend changes.
