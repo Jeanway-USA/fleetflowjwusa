@@ -1,25 +1,42 @@
-I found two likely causes behind the “updates appear, then revert” and route-sticking behavior:
+## Problem
 
-1. The app still has production PWA/service-worker generation enabled through `vite-plugin-pwa`, while `src/main.tsx` only unregisters service workers after the app JS has already loaded. A previously installed service worker can still serve an older app shell before that cleanup runs, which matches seeing updates briefly and then an older version returning.
-2. Sidebar navigation is implemented as button `onClick={() => navigate(path)}` actions instead of real route links. This can make route changes harder to preserve/debug in preview/history contexts and gives less reliable URL behavior than React Router links.
+Truck **433780** still shows on the Safety page as needing inspection. Its `next_inspection_date` in the database is `2026-04-11` (expired), but a completed inspection work order exists with `entry_date = 2026-04-09` and `completed_at = 2026-04-10`. The expected next inspection date should be `2026-08-07` (120 days after the inspection).
 
-Plan:
+## Root cause
 
-1. **Disable stale app-shell caching**
-   - Remove the PWA plugin registration from `vite.config.ts` so future preview/published builds cannot install or update a service worker that caches old routes/assets.
-   - Keep the existing runtime unregister guard in `src/main.tsx` as an extra cleanup for users who already have one installed.
+The recent client-side fix in `useCompleteWorkOrder` (which auto-advances `next_inspection_date` by 120 days when an inspection work order is completed) only runs for **new** completions going forward. The April 10 completion happened before that fix shipped, so this truck's record was never updated. Any other path that flips a work order to `completed` (bulk updates, prior code paths, manual edits) also bypasses the client logic.
 
-2. **Make sidebar routing link-based**
-   - Update `AppSidebar.tsx` navigation buttons to render through React Router `Link`/`NavLink` via the existing shadcn `asChild` pattern where possible.
-   - Preserve all existing sidebar styling, role filtering, active states, collapsible sections, and owner role-simulation behavior.
-   - Keep special actions (sign out, simulation exit, external Discord link) as actions/anchors.
+## Plan
 
-3. **Targeted verification**
-   - Restart the dev server after the config change.
-   - Check preview console/network for service-worker/cache errors.
-   - Verify clicking sidebar items updates `window.location.pathname` and renders the selected page instead of staying on `/` or the previous route.
-   - Confirm the earlier Finance page changes are still present in source; if they still do not show after cache cleanup, inspect the live preview again for a remaining build/HMR issue.
+### 1. Add a Postgres trigger on `work_orders` (single source of truth)
 
-Out of scope:
-- No changes to Finance dashboard layout code in this pass unless verification proves the source exists but preview still cannot load it.
-- No database or backend changes.
+Create `AFTER INSERT OR UPDATE` trigger on `work_orders` that fires when:
+- `status` becomes `'completed'`, AND
+- `service_type = 'inspection'` OR `'inspection' = ANY(service_types)`
+
+The trigger function:
+- Picks the inspection date: `COALESCE(NEW.estimated_completion, NEW.entry_date, NEW.completed_at::date)`.
+- Sets `trucks.next_inspection_date = inspection_date + interval '120 days'` for `trucks.id = NEW.truck_id`.
+- Only updates if the new date is later than the existing `next_inspection_date` (so we never accidentally pull a date earlier than what's stored).
+
+This guarantees correctness regardless of how a work order is completed (UI, bulk import, future code paths).
+
+### 2. One-time backfill
+
+Run a single migration statement that, for every truck, looks at its most recent completed inspection work order and sets `next_inspection_date = inspection_date + 120 days` when that result is later than the currently stored value. This will immediately fix truck 433780 and any other trucks in the same state.
+
+### 3. Keep the existing client logic
+
+Leave the `useCompleteWorkOrder` / `useRevertWorkOrder` updates in `src/hooks/useMaintenanceData.ts` as-is. They remain useful for instant UI feedback and offline behavior; the trigger acts as a safety net.
+
+### 4. Verification
+
+- Re-query truck 433780: `next_inspection_date` should be `2026-08-07`.
+- Reload `/safety`: truck should drop off the Inspections alert list.
+- Complete a fresh test inspection work order on another truck and confirm both client cache and DB row update.
+
+## Out of scope
+
+- No changes to the Safety page UI.
+- No changes to the 120-day interval (matches current product logic).
+- No changes to other work-order types (PM, repair, etc.).
