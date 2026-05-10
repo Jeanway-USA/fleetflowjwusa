@@ -281,7 +281,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
               onClick={() => !isProcessing && fileInputRef.current?.click()}
             >
               <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm font-medium">Drop statement files here (PDF & Excel)</p>
+              <p className="text-sm font-medium">Drop statement files here (PDF & XLSX)</p>
               <p className="text-xs text-muted-foreground">
                 Supports Card Activity PDF, Contractor PDF, Settlement XLSX, Freight Bill XLSX
               </p>
