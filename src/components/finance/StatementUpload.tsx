@@ -92,9 +92,8 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
 
   const isExcelFile = (file: File) => {
     const ext = file.name.toLowerCase();
-    return ext.endsWith('.xlsx') || ext.endsWith('.xls') ||
-      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      file.type === 'application/vnd.ms-excel';
+    return ext.endsWith('.xlsx') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   };
 
   const convertFileToBase64 = (file: File): Promise<string> => {
