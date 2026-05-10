@@ -56,6 +56,7 @@ export default function Finance() {
   const [selectedTruck, setSelectedTruck] = useState<string>('all');
   const [searchParams, setSearchParams] = useSearchParams();
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseFormData, setExpenseFormData] = useState<Partial<ExpenseInsert>>({});
   const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
