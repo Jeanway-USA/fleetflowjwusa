@@ -255,7 +255,7 @@ export function LoadProfitabilityTab({
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead>Load</TableHead>
+                  <TableHead>{isIndependent ? 'Load ID' : 'Landstar Load ID'}</TableHead>
                    <TableHead>Date</TableHead>
                    <TableHead className="text-right">Miles</TableHead>
                   <TableHead className="text-right">Gross Rev</TableHead>

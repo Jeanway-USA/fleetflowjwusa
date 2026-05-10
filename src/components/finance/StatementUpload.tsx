@@ -92,9 +92,8 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
 
   const isExcelFile = (file: File) => {
     const ext = file.name.toLowerCase();
-    return ext.endsWith('.xlsx') || ext.endsWith('.xls') ||
-      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      file.type === 'application/vnd.ms-excel';
+    return ext.endsWith('.xlsx') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   };
 
   const convertFileToBase64 = (file: File): Promise<string> => {
@@ -112,11 +111,11 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
   const addFiles = (files: File[]) => {
     const validFiles = files.filter(f => {
       const name = f.name.toLowerCase();
-      return name.endsWith('.pdf') || name.endsWith('.xlsx') || name.endsWith('.xls');
+      return name.endsWith('.pdf') || name.endsWith('.xlsx');
     });
 
     if (validFiles.length === 0) {
-      toast.error('Please upload PDF or Excel (.xlsx/.xls) files');
+      toast.error('Please upload PDF or XLSX files only');
       return;
     }
 
@@ -282,7 +281,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
               onClick={() => !isProcessing && fileInputRef.current?.click()}
             >
               <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm font-medium">Drop statement files here (PDF & Excel)</p>
+              <p className="text-sm font-medium">Drop statement files here (PDF & XLSX)</p>
               <p className="text-xs text-muted-foreground">
                 Supports Card Activity PDF, Contractor PDF, Settlement XLSX, Freight Bill XLSX
               </p>
@@ -291,7 +290,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.xlsx,.xls"
+              accept=".pdf,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               multiple
               className="hidden"
               onChange={handleFileSelect}

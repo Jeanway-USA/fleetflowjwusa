@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, MapPin, Banknote, MoreHorizontal, Landmark } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, MapPin, Banknote, MoreHorizontal, Landmark, Upload } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { StatementUpload } from '@/components/finance/StatementUpload';
@@ -56,6 +56,7 @@ export default function Finance() {
   const [selectedTruck, setSelectedTruck] = useState<string>('all');
   const [searchParams, setSearchParams] = useSearchParams();
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseFormData, setExpenseFormData] = useState<Partial<ExpenseInsert>>({});
   const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
@@ -522,7 +523,18 @@ export default function Finance() {
 
   return (
     <>
-      <PageHeader title="Finance & P/L" description="Track revenue, expenses, and profitability" />
+      <PageHeader
+        title="Financial Hub"
+        description="Revenue, expenses, profitability, and payouts in one place"
+      >
+        <Button
+          onClick={() => setUploadDialogOpen(true)}
+          className="w-full sm:w-auto gradient-gold text-primary-foreground"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Upload Statement
+        </Button>
+      </PageHeader>
 
       {/* Period and Truck Selector */}
       <div className="flex flex-wrap gap-4 mb-6">
@@ -631,66 +643,58 @@ export default function Finance() {
         </Card>
       </div>
 
-      <Tabs defaultValue="pl" className="w-full">
+      <Tabs defaultValue="overview" className="w-full">
         <TabsList className="flex flex-wrap">
-          <TabsTrigger value="pl">P&L Summary</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="profitability">Profitability</TabsTrigger>
-          <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll</TabsTrigger>
-          <TabsTrigger value="commissions">Commissions</TabsTrigger>
+          <TabsTrigger value="overview">Overview & P&L</TabsTrigger>
           <TabsTrigger value="settlements">Settlements</TabsTrigger>
-          {isIndependent && <TabsTrigger value="invoicing">Invoicing</TabsTrigger>}
-          {isIndependent && <TabsTrigger value="factoring">Factoring Portal</TabsTrigger>}
+          <TabsTrigger value="invoicing">Invoicing & Factoring</TabsTrigger>
+          <TabsTrigger value="payroll">Payroll & Commissions</TabsTrigger>
+          <TabsTrigger value="expenses">Expenses</TabsTrigger>
+          <TabsTrigger value="profitability">Profitability</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pl" className="mt-6">
-          <PLSummaryTab
-            revenueTotals={revenueTotals}
-            loadExpenseTotals={loadExpenseTotals}
-            standaloneExpenseTotals={standaloneExpenseTotals}
-            loadLinkedExpenseTotals={loadLinkedExpenseTotals}
-            payrollTotals={payrollTotals}
-            commissionTotals={commissionTotals}
-            deadheadMiles={deadheadMiles}
-            totalEmptyMiles={totalEmptyMiles}
-            totalActualMilesWithDeadhead={totalActualMilesWithDeadhead}
-            netProfit={netProfit}
-            profitMargin={profitMargin}
-            totalExpenses={totalExpenses}
-            totalRevenueWithCommissions={totalRevenueWithCommissions}
-            getSetting={getSetting}
-          />
+        <TabsContent value="overview">
+          <div className="space-y-6 animate-in fade-in-50">
+            <PLSummaryTab
+              revenueTotals={revenueTotals}
+              loadExpenseTotals={loadExpenseTotals}
+              standaloneExpenseTotals={standaloneExpenseTotals}
+              loadLinkedExpenseTotals={loadLinkedExpenseTotals}
+              payrollTotals={payrollTotals}
+              commissionTotals={commissionTotals}
+              deadheadMiles={deadheadMiles}
+              totalEmptyMiles={totalEmptyMiles}
+              totalActualMilesWithDeadhead={totalActualMilesWithDeadhead}
+              netProfit={netProfit}
+              profitMargin={profitMargin}
+              totalExpenses={totalExpenses}
+              totalRevenueWithCommissions={totalRevenueWithCommissions}
+              getSetting={getSetting}
+            />
+            <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
+          </div>
         </TabsContent>
 
-        <TabsContent value="revenue" className="mt-6">
-          <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
+        <TabsContent value="profitability">
+          <div className="space-y-6 animate-in fade-in-50">
+            <LoadProfitabilityTab
+              deliveredLoads={deliveredLoads}
+              loadExpenses={loadExpenses}
+              drivers={drivers}
+              expenses={filteredExpenses}
+              totalExpenses={totalExpenses}
+              totalPayroll={totalPayroll}
+              revenueTotals={revenueTotals}
+              allLoads={loads}
+              isIndependent={isIndependent}
+            />
+          </div>
         </TabsContent>
 
-        <TabsContent value="profitability" className="mt-6">
-          <LoadProfitabilityTab
-            deliveredLoads={deliveredLoads}
-            loadExpenses={loadExpenses}
-            drivers={drivers}
-            expenses={filteredExpenses}
-            totalExpenses={totalExpenses}
-            totalPayroll={totalPayroll}
-            revenueTotals={revenueTotals}
-            allLoads={loads}
-            isIndependent={isIndependent}
-          />
-        </TabsContent>
-
-        <TabsContent value="expenses" className="mt-6">
+        <TabsContent value="expenses">
+          <div className="space-y-6 animate-in fade-in-50">
           <AuditReconciliation loads={loads} />
-          <StatementUpload 
-            existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination }))}
-            trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
-            existingExpenses={expenses.map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id }))}
-            onExpensesImported={() => queryClient.invalidateQueries({ queryKey: ['expenses'] })}
-            orgId={orgId}
-          />
 
           <Card className="card-elevated">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -946,46 +950,68 @@ export default function Finance() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </TabsContent>
 
-        <TabsContent value="payroll" className="mt-6">
-          <PayrollTab
-            filteredPayrolls={filteredPayrolls}
-            payrollTotals={payrollTotals}
-            payrollsLoading={payrollsLoading}
-            drivers={drivers}
-            getDriverName={getDriverName}
-          />
+        <TabsContent value="payroll">
+          <div className="space-y-6 animate-in fade-in-50">
+            <PayrollTab
+              filteredPayrolls={filteredPayrolls}
+              payrollTotals={payrollTotals}
+              payrollsLoading={payrollsLoading}
+              drivers={drivers}
+              getDriverName={getDriverName}
+            />
+            <CommissionsTab
+              filteredCommissions={filteredCommissions}
+              commissionTotals={commissionTotals}
+              commissionsLoading={commissionsLoading}
+            />
+          </div>
         </TabsContent>
 
-        <TabsContent value="commissions" className="mt-6">
-          <CommissionsTab
-            filteredCommissions={filteredCommissions}
-            commissionTotals={commissionTotals}
-            commissionsLoading={commissionsLoading}
-          />
+        <TabsContent value="settlements">
+          <div className="space-y-6 animate-in fade-in-50">
+            <SettlementsTab />
+          </div>
         </TabsContent>
 
-        <TabsContent value="settlements" className="mt-6">
-          <SettlementsTab />
+        <TabsContent value="invoicing">
+          <div className="space-y-6 animate-in fade-in-50">
+            {isIndependent && <InvoicingTab />}
+            {isIndependent && <FactoringTab />}
+            {!isIndependent && (
+              <Card className="card-elevated">
+                <CardContent className="py-10 text-center text-muted-foreground">
+                  Invoicing & Factoring are available in Independent Owner-Operator mode.
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
 
-        {isIndependent && (
-          <TabsContent value="invoicing" className="mt-6">
-            <InvoicingTab />
-          </TabsContent>
-        )}
-
-        {isIndependent && (
-          <TabsContent value="factoring" className="mt-6">
-            <FactoringTab />
-          </TabsContent>
-        )}
-
-        <TabsContent value="settings" className="mt-6">
-          <CompensationSettingsTab getSetting={getSetting} />
+        <TabsContent value="settings">
+          <div className="space-y-6 animate-in fade-in-50">
+            <CompensationSettingsTab getSetting={getSetting} />
+          </div>
         </TabsContent>
       </Tabs>
+
+      {/* Upload Statement Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Upload Statement</DialogTitle>
+          </DialogHeader>
+          <StatementUpload
+            existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination }))}
+            trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
+            existingExpenses={expenses.map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id }))}
+            onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setUploadDialogOpen(false); }}
+            orgId={orgId}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Expense Dialog */}
       <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
