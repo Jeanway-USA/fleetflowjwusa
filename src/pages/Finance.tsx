@@ -997,6 +997,22 @@ export default function Finance() {
         </TabsContent>
       </Tabs>
 
+      {/* Upload Statement Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Upload Statement</DialogTitle>
+          </DialogHeader>
+          <StatementUpload
+            existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination }))}
+            trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
+            existingExpenses={expenses.map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id }))}
+            onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setUploadDialogOpen(false); }}
+            orgId={orgId}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* Expense Dialog */}
       <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
         <DialogContent className="max-w-lg">
