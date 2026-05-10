@@ -950,44 +950,50 @@ export default function Finance() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </TabsContent>
 
-        <TabsContent value="payroll" className="mt-6">
-          <PayrollTab
-            filteredPayrolls={filteredPayrolls}
-            payrollTotals={payrollTotals}
-            payrollsLoading={payrollsLoading}
-            drivers={drivers}
-            getDriverName={getDriverName}
-          />
+        <TabsContent value="payroll">
+          <div className="space-y-6 animate-in fade-in-50">
+            <PayrollTab
+              filteredPayrolls={filteredPayrolls}
+              payrollTotals={payrollTotals}
+              payrollsLoading={payrollsLoading}
+              drivers={drivers}
+              getDriverName={getDriverName}
+            />
+            <CommissionsTab
+              filteredCommissions={filteredCommissions}
+              commissionTotals={commissionTotals}
+              commissionsLoading={commissionsLoading}
+            />
+          </div>
         </TabsContent>
 
-        <TabsContent value="commissions" className="mt-6">
-          <CommissionsTab
-            filteredCommissions={filteredCommissions}
-            commissionTotals={commissionTotals}
-            commissionsLoading={commissionsLoading}
-          />
+        <TabsContent value="settlements">
+          <div className="space-y-6 animate-in fade-in-50">
+            <SettlementsTab />
+          </div>
         </TabsContent>
 
-        <TabsContent value="settlements" className="mt-6">
-          <SettlementsTab />
+        <TabsContent value="invoicing">
+          <div className="space-y-6 animate-in fade-in-50">
+            {isIndependent && <InvoicingTab />}
+            {isIndependent && <FactoringTab />}
+            {!isIndependent && (
+              <Card className="card-elevated">
+                <CardContent className="py-10 text-center text-muted-foreground">
+                  Invoicing & Factoring are available in Independent Owner-Operator mode.
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
 
-        {isIndependent && (
-          <TabsContent value="invoicing" className="mt-6">
-            <InvoicingTab />
-          </TabsContent>
-        )}
-
-        {isIndependent && (
-          <TabsContent value="factoring" className="mt-6">
-            <FactoringTab />
-          </TabsContent>
-        )}
-
-        <TabsContent value="settings" className="mt-6">
-          <CompensationSettingsTab getSetting={getSetting} />
+        <TabsContent value="settings">
+          <div className="space-y-6 animate-in fade-in-50">
+            <CompensationSettingsTab getSetting={getSetting} />
+          </div>
         </TabsContent>
       </Tabs>
 
