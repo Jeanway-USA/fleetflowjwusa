@@ -25,7 +25,7 @@ import {
   ChevronRight,
   LucideIcon
 } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import type { SubscriptionTier } from '@/contexts/AuthContext';
 import { useOrganizationMode, type TmsMode } from '@/hooks/useOrganizationMode';
@@ -128,10 +128,9 @@ interface CollapsibleNavGroupProps {
   isOpen: boolean;
   onToggle: (key: string, open: boolean) => void;
   currentPath: string;
-  onNavigate: (path: string) => void;
 }
 
-function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, currentPath, onNavigate }: CollapsibleNavGroupProps) {
+function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, currentPath }: CollapsibleNavGroupProps) {
   if (items.length === 0) return null;
 
   return (
@@ -149,12 +148,14 @@ function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, current
                 return (
                   <SidebarMenuItem key={item.path} {...(item.tourId ? { 'data-tour': item.tourId } : {})}>
                     <SidebarMenuButton
+                      asChild
                       isActive={active}
-                      onClick={() => onNavigate(item.path)}
                       className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary"
                     >
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                      <Link to={item.path}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -395,7 +396,6 @@ export function AppSidebar() {
             isOpen={groupOpen[group.key] ?? true}
             onToggle={handleToggle}
             currentPath={currentPath}
-            onNavigate={(path) => navigate(path)}
           />
         ))}
 
