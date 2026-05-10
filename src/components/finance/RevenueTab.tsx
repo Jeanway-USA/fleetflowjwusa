@@ -81,7 +81,7 @@ export function RevenueTab({ filteredLoads, revenueTotals }: RevenueTabProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Load ID</TableHead>
+                  <TableHead>{isIndependent ? 'Load ID' : 'Landstar Load ID'}</TableHead>
                   <TableHead>Route</TableHead>
                   <TableHead className="text-right">Linehaul</TableHead>
                   <TableHead className="text-right">FSC</TableHead>
