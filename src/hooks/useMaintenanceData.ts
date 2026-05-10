@@ -628,6 +628,7 @@ export function useDeleteCompletedWorkOrder() {
       queryClient.invalidateQueries({ queryKey: ['pm-schedule'] });
       queryClient.invalidateQueries({ queryKey: ['compliance-alerts'] });
       queryClient.invalidateQueries({ queryKey: ['service-schedules-120day'] });
+      queryClient.invalidateQueries({ queryKey: ['trucks'] });
     },
   });
 }
