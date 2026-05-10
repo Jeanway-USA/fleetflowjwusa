@@ -111,11 +111,11 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
   const addFiles = (files: File[]) => {
     const validFiles = files.filter(f => {
       const name = f.name.toLowerCase();
-      return name.endsWith('.pdf') || name.endsWith('.xlsx') || name.endsWith('.xls');
+      return name.endsWith('.pdf') || name.endsWith('.xlsx');
     });
 
     if (validFiles.length === 0) {
-      toast.error('Please upload PDF or Excel (.xlsx/.xls) files');
+      toast.error('Please upload PDF or XLSX files only');
       return;
     }
 
