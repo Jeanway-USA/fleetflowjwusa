@@ -586,12 +586,19 @@ export function useDeleteCompletedWorkOrder() {
 
             await supabase
               .from('trucks')
-              .update({ last_120_inspection_date: null, last_120_inspection_miles: null })
+              .update({
+                last_120_inspection_date: null,
+                last_120_inspection_miles: null,
+                next_inspection_date: null,
+              })
               .eq('id', truckId);
           } else {
             const effectiveInspDate = prevInspection.estimated_completion || prevInspection.entry_date;
             const odometerAtService =
               prevInspection.odometer_reading ?? (await getOdometerAtDate(effectiveInspDate)) ?? null;
+            const nextInspectionDate = addDays(new Date(`${effectiveInspDate}T00:00:00`), 120)
+              .toISOString()
+              .split('T')[0];
 
             await supabase
               .from('service_schedules')
@@ -607,6 +614,7 @@ export function useDeleteCompletedWorkOrder() {
               .update({
                 last_120_inspection_date: effectiveInspDate,
                 last_120_inspection_miles: odometerAtService,
+                next_inspection_date: nextInspectionDate,
               })
               .eq('id', truckId);
           }
