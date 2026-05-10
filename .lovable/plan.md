@@ -1,46 +1,74 @@
+## Finance Hub Redesign
 
+Refresh the layout of `src/pages/Finance.tsx` and tweak a few related widgets so the page feels less cluttered, while keeping every existing table component, data flow, and styling completely untouched internally.
 
-## Fix "WebSocket not available: The operation is insecure" Crash on Driver Dashboard
+### 1. Header & "Upload Statement" modal
 
-### Root cause
-On iOS Safari (and certain in-app WebViews / mixed-context situations), the Supabase Realtime client throws `WebSocket not available: The operation is insecure` synchronously when `supabase.channel(...).subscribe()` is called. This happens inside `DriverNotifications` (and a few other components that use realtime). Because `DriverNotifications` is rendered in the dashboard header and is **not** wrapped in an `ErrorBoundary`, the throw bubbles up to the page-level boundary and replaces the entire dashboard with the "Something went wrong" screen.
+In `src/pages/Finance.tsx`:
+- Replace the current `<PageHeader title="Finance & P/L" ... />` with a new header titled **"Financial Hub"** and description "Revenue, expenses, profitability, and payouts in one place."
+- Add an `Upload Statement` button (with `Upload` icon) into the header `action`/`children` slot.
+- Add a new `uploadDialogOpen` state. Clicking the button opens a `<Dialog>` whose `<DialogContent className="max-w-3xl">` renders the existing `<StatementUpload ... />` component with the same props it already receives today.
+- Remove `<StatementUpload>` from inside the Expenses tab body (it currently sits at the top of `TabsContent value="expenses"`, ~line 687). All other expense table logic stays exactly where it is.
 
-### Fix (2 parts)
+### 2. File input restriction
 
-**1. Defensively wrap every realtime `.subscribe()` call in try/catch**
+In `src/components/finance/StatementUpload.tsx`:
+- The dropzone helper text and validation already mention PDF + Excel; tighten the file picker so it only accepts `.xlsx` and `.pdf` (drop `.xls`):
+  - `<input ... accept=".xlsx,application/pdf" />`
+  - Update `addFiles()` validation regex to accept only `.pdf` and `.xlsx`.
+  - Update the `isExcelFile()` check / dropzone copy to say "PDF & XLSX".
 
-In each of these files, wrap the `supabase.channel(...).on(...).subscribe()` chain in a try/catch and log a warning instead of throwing. Realtime is always an enhancement — the page must work without it.
+### 3. Tab consolidation
 
-Files:
-- `src/components/driver/DriverNotifications.tsx`
-- `src/hooks/usePMNotifications.ts`
-- `src/components/dispatcher/FleetMapView.tsx`
-- `src/components/dispatcher/DispatcherAlerts.tsx`
-- `src/components/dispatcher/ActiveLoadsBoard.tsx`
-- `src/pages/DispatcherDashboard.tsx`
+Replace the long flat `TabsList` with a slim 4-tab layout:
 
-Pattern:
-```ts
-useEffect(() => {
-  if (!driverId) return;
-  let channel: ReturnType<typeof supabase.channel> | null = null;
-  try {
-    channel = supabase.channel('driver-notifications-realtime')
-      .on('postgres_changes', { ... }, () => { ... })
-      .subscribe();
-  } catch (err) {
-    console.warn('Realtime subscription unavailable:', err);
-  }
-  return () => { if (channel) supabase.removeChannel(channel); };
-}, [driverId, queryClient]);
+| Tab value          | Label                   | Renders                                                                 |
+|--------------------|-------------------------|-------------------------------------------------------------------------|
+| `overview`         | Overview & P&L          | `PLSummaryTab` then `RevenueTab` stacked                                |
+| `settlements`      | Settlements             | `SettlementsTab`                                                        |
+| `invoicing`        | Invoicing & Factoring   | `InvoicingTab` then `FactoringTab` stacked                              |
+| `payroll`          | Payroll & Commissions   | `PayrollTab` (commissions stay deferred per request — see notes)        |
+
+Remaining current tabs (`profitability`, `expenses`, `commissions`, `settings`) are not part of the requested 4 buckets. To avoid losing functionality without explicit guidance, I will move them into a small secondary chip row below the main tabs labeled "More", or — simpler — keep their content rendered conditionally via the same tab switch but hidden from `TabsList`. **Recommendation:** keep only the 4 requested tabs visible; the Expenses table, Profitability, Commissions, and Settings panels remain in the file but are not rendered. We can resurface them in a follow-up once you tell me where to slot them.
+
+`defaultValue` becomes `"overview"`. Update the `?tab=` query-param sync logic to map old values (`pl`, `revenue` → `overview`; `factoring` → `invoicing`; `commissions` → `payroll`).
+
+### 4. Spacing & animation per tab
+
+Wrap each `TabsContent` body in:
+```tsx
+<div className="space-y-6 animate-in fade-in-50">
+  ...tab content...
+</div>
+```
+Drop the existing `mt-6` on `TabsContent` (the wrapper handles spacing).
+
+### 5. Dynamic "Load ID" terminology
+
+Add a small helper at the top of each affected tab:
+```tsx
+const { isIndependent } = useOrganizationMode();
+const loadIdLabel = isIndependent ? 'Load ID' : 'Landstar Load ID';
 ```
 
-**2. Wrap `DriverNotifications` in an `ErrorBoundary` in the dashboard header**
+Apply it in:
+- `src/components/finance/RevenueTab.tsx` — the `<TableHead>Load ID</TableHead>` becomes `<TableHead>{loadIdLabel}</TableHead>`. Cell content (`load.landstar_load_id || '-'`) is unchanged.
+- `src/components/finance/LoadProfitabilityTab.tsx` — wherever the load identifier column header is rendered, swap to `{loadIdLabel}`. The data fallback (`load.landstar_load_id || origin→destination`) is unchanged.
 
-In `src/pages/DriverDashboard.tsx`, wrap `<DriverNotifications driverId={driver.id} />` with `<ErrorBoundary compact>` so any future bell-icon failure can't take down the entire page.
+No styles, sorting, filtering, or row rendering inside these tables changes.
 
-### Result
-- iOS Safari / in-app browsers no longer crash the Driver Dashboard
-- Realtime updates simply degrade gracefully — the user can still pull-to-refresh
-- A future failure in the notification bell would render a tiny inline error instead of nuking the page
+### Files touched
 
+- `src/pages/Finance.tsx` — header, modal, tab consolidation, wrapper divs, query-param mapping.
+- `src/components/finance/StatementUpload.tsx` — accept attribute + validation tightened to `.xlsx`/`.pdf`.
+- `src/components/finance/RevenueTab.tsx` — dynamic load-ID header only.
+- `src/components/finance/LoadProfitabilityTab.tsx` — dynamic load-ID header only.
+
+### Open question
+
+The 4 requested tab buckets don't include **Expenses**, **Profitability**, **Commissions**, or **Settings**. Want me to:
+
+- (a) Hide them entirely (simplest, matches the brief literally), or
+- (b) Add a secondary "More" tab/menu that exposes Expenses, Profitability, Commissions, and Settings so nothing is lost?
+
+I'll default to **(b)** unless you say otherwise — it preserves functionality without re-cluttering the main tab strip.
