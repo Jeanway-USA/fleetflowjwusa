@@ -586,12 +586,19 @@ export function useDeleteCompletedWorkOrder() {
 
             await supabase
               .from('trucks')
-              .update({ last_120_inspection_date: null, last_120_inspection_miles: null })
+              .update({
+                last_120_inspection_date: null,
+                last_120_inspection_miles: null,
+                next_inspection_date: null,
+              })
               .eq('id', truckId);
           } else {
             const effectiveInspDate = prevInspection.estimated_completion || prevInspection.entry_date;
             const odometerAtService =
               prevInspection.odometer_reading ?? (await getOdometerAtDate(effectiveInspDate)) ?? null;
+            const nextInspectionDate = addDays(new Date(`${effectiveInspDate}T00:00:00`), 120)
+              .toISOString()
+              .split('T')[0];
 
             await supabase
               .from('service_schedules')
@@ -607,6 +614,7 @@ export function useDeleteCompletedWorkOrder() {
               .update({
                 last_120_inspection_date: effectiveInspDate,
                 last_120_inspection_miles: odometerAtService,
+                next_inspection_date: nextInspectionDate,
               })
               .eq('id', truckId);
           }
@@ -620,6 +628,7 @@ export function useDeleteCompletedWorkOrder() {
       queryClient.invalidateQueries({ queryKey: ['pm-schedule'] });
       queryClient.invalidateQueries({ queryKey: ['compliance-alerts'] });
       queryClient.invalidateQueries({ queryKey: ['service-schedules-120day'] });
+      queryClient.invalidateQueries({ queryKey: ['trucks'] });
     },
   });
 }
@@ -964,7 +973,10 @@ export function useCompleteWorkOrder() {
         if (type === 'inspection' || type.includes('inspection')) {
           // Update the 120-Day Inspection service schedule for this truck
           const inspectionDate = workOrder.estimated_completion || workOrder.entry_date;
-          
+          const nextInspectionDate = addDays(new Date(`${inspectionDate}T00:00:00`), 120)
+            .toISOString()
+            .split('T')[0];
+
           const { error: scheduleError } = await supabase
             .from('service_schedules')
             .update({
@@ -978,12 +990,13 @@ export function useCompleteWorkOrder() {
             console.error('Failed to update service schedule:', scheduleError);
           }
 
-          // Also update the truck's last_120_inspection_date
+          // Also update the truck's inspection dates so Safety alerts clear
           await supabase
             .from('trucks')
             .update({
               last_120_inspection_date: inspectionDate,
               last_120_inspection_miles: workOrder.odometer_reading || currentOdometer,
+              next_inspection_date: nextInspectionDate,
             })
             .eq('id', workOrder.truck_id);
         } else if (scheduleName) {
@@ -1009,6 +1022,7 @@ export function useCompleteWorkOrder() {
       queryClient.invalidateQueries({ queryKey: ['compliance-alerts'] });
       queryClient.invalidateQueries({ queryKey: ['service-schedules-120day'] });
       queryClient.invalidateQueries({ queryKey: ['pm-schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['trucks'] });
     },
   });
 }
