@@ -1,74 +1,51 @@
-## Finance Hub Redesign
+# Fix Safety compliance alerts staying stuck after an inspection is completed
 
-Refresh the layout of `src/pages/Finance.tsx` and tweak a few related widgets so the page feels less cluttered, while keeping every existing table component, data flow, and styling completely untouched internally.
+## Root cause
 
-### 1. Header & "Upload Statement" modal
+The Safety page (`src/pages/Safety.tsx`, lines ~129–140) builds the "Inspections" alert list strictly from `trucks.next_inspection_date`.
 
-In `src/pages/Finance.tsx`:
-- Replace the current `<PageHeader title="Finance & P/L" ... />` with a new header titled **"Financial Hub"** and description "Revenue, expenses, profitability, and payouts in one place."
-- Add an `Upload Statement` button (with `Upload` icon) into the header `action`/`children` slot.
-- Add a new `uploadDialogOpen` state. Clicking the button opens a `<Dialog>` whose `<DialogContent className="max-w-3xl">` renders the existing `<StatementUpload ... />` component with the same props it already receives today.
-- Remove `<StatementUpload>` from inside the Expenses tab body (it currently sits at the top of `TabsContent value="expenses"`, ~line 687). All other expense table logic stays exactly where it is.
+When a work order with service type "Inspection" is completed in Maintenance Management (`useCompleteWorkOrder` in `src/hooks/useMaintenanceData.ts`, lines ~960–999), the hook updates:
+- `trucks.last_120_inspection_date` / `last_120_inspection_miles`
+- `service_schedules.last_performed_date` for the "120-Day Inspection" row
 
-### 2. File input restriction
+…but it never moves `trucks.next_inspection_date` forward, and never invalidates the `['trucks']` query key that Safety uses. Result: the alert keeps showing the old due date even though the truck was just inspected.
 
-In `src/components/finance/StatementUpload.tsx`:
-- The dropzone helper text and validation already mention PDF + Excel; tighten the file picker so it only accepts `.xlsx` and `.pdf` (drop `.xls`):
-  - `<input ... accept=".xlsx,application/pdf" />`
-  - Update `addFiles()` validation regex to accept only `.pdf` and `.xlsx`.
-  - Update the `isExcelFile()` check / dropzone copy to say "PDF & XLSX".
+The reverse path (`useRevertWorkOrder`, lines ~576–612) has the same blind spot — it rolls back `last_120_inspection_date` but leaves `next_inspection_date` untouched.
 
-### 3. Tab consolidation
+## Changes
 
-Replace the long flat `TabsList` with a slim 4-tab layout:
+All edits are in `src/hooks/useMaintenanceData.ts` — no schema changes, no Safety/Trucks UI changes, no styling changes.
 
-| Tab value          | Label                   | Renders                                                                 |
-|--------------------|-------------------------|-------------------------------------------------------------------------|
-| `overview`         | Overview & P&L          | `PLSummaryTab` then `RevenueTab` stacked                                |
-| `settlements`      | Settlements             | `SettlementsTab`                                                        |
-| `invoicing`        | Invoicing & Factoring   | `InvoicingTab` then `FactoringTab` stacked                              |
-| `payroll`          | Payroll & Commissions   | `PayrollTab` (commissions stay deferred per request — see notes)        |
+### 1. `useCompleteWorkOrder` — inspection branch (~line 964)
 
-Remaining current tabs (`profitability`, `expenses`, `commissions`, `settings`) are not part of the requested 4 buckets. To avoid losing functionality without explicit guidance, I will move them into a small secondary chip row below the main tabs labeled "More", or — simpler — keep their content rendered conditionally via the same tab switch but hidden from `TabsList`. **Recommendation:** keep only the 4 requested tabs visible; the Expenses table, Profitability, Commissions, and Settings panels remain in the file but are not rendered. We can resurface them in a follow-up once you tell me where to slot them.
+When a completed work order's service type is an inspection:
+- Compute `nextInspectionDate = inspectionDate + 120 days` (matches the existing "120-Day Inspection" cadence already enforced by `service_schedules` and `create_default_service_schedules`).
+- Add `next_inspection_date: nextInspectionDate` to the existing `trucks` update alongside `last_120_inspection_date` and `last_120_inspection_miles`.
 
-`defaultValue` becomes `"overview"`. Update the `?tab=` query-param sync logic to map old values (`pl`, `revenue` → `overview`; `factoring` → `invoicing`; `commissions` → `payroll`).
+### 2. `useRevertWorkOrder` — inspection branch (~lines 580–612)
 
-### 4. Spacing & animation per tab
+Mirror the new behavior on revert:
+- If a previous inspection WO exists: set `next_inspection_date = effectiveInspDate + 120 days` on the truck.
+- If none exists: set `next_inspection_date = null` (alongside the existing nulling of `last_120_inspection_date`).
 
-Wrap each `TabsContent` body in:
-```tsx
-<div className="space-y-6 animate-in fade-in-50">
-  ...tab content...
-</div>
+### 3. Cache invalidation
+
+In both `useCompleteWorkOrder.onSuccess` (~line 1004) and `useRevertWorkOrder.onSuccess` (~line 618), add:
+```ts
+queryClient.invalidateQueries({ queryKey: ['trucks'] });
 ```
-Drop the existing `mt-6` on `TabsContent` (the wrapper handles spacing).
+This is the key Safety, Trucks, and the dispatcher TruckStatusGrid all share, so the alert disappears immediately after a completion.
 
-### 5. Dynamic "Load ID" terminology
+## Out of scope (intentionally)
 
-Add a small helper at the top of each affected tab:
-```tsx
-const { isIndependent } = useOrganizationMode();
-const loadIdLabel = isIndependent ? 'Load ID' : 'Landstar Load ID';
-```
+- No change to the Safety page logic or UI — it keeps reading `trucks.next_inspection_date`.
+- No change to the Trucks page form (manual edits still work as before).
+- DVIRs (`driver_inspections` pre/post-trip) are unrelated to the annual/120-day DOT inspection and continue to not affect this alert.
+- No DB triggers — keeping the sync in the existing client mutation is consistent with how the rest of the maintenance flow already works.
 
-Apply it in:
-- `src/components/finance/RevenueTab.tsx` — the `<TableHead>Load ID</TableHead>` becomes `<TableHead>{loadIdLabel}</TableHead>`. Cell content (`load.landstar_load_id || '-'`) is unchanged.
-- `src/components/finance/LoadProfitabilityTab.tsx` — wherever the load identifier column header is rendered, swap to `{loadIdLabel}`. The data fallback (`load.landstar_load_id || origin→destination`) is unchanged.
+## Verification
 
-No styles, sorting, filtering, or row rendering inside these tables changes.
-
-### Files touched
-
-- `src/pages/Finance.tsx` — header, modal, tab consolidation, wrapper divs, query-param mapping.
-- `src/components/finance/StatementUpload.tsx` — accept attribute + validation tightened to `.xlsx`/`.pdf`.
-- `src/components/finance/RevenueTab.tsx` — dynamic load-ID header only.
-- `src/components/finance/LoadProfitabilityTab.tsx` — dynamic load-ID header only.
-
-### Open question
-
-The 4 requested tab buckets don't include **Expenses**, **Profitability**, **Commissions**, or **Settings**. Want me to:
-
-- (a) Hide them entirely (simplest, matches the brief literally), or
-- (b) Add a secondary "More" tab/menu that exposes Expenses, Profitability, Commissions, and Settings so nothing is lost?
-
-I'll default to **(b)** unless you say otherwise — it preserves functionality without re-cluttering the main tab strip.
+1. Create an "Inspection" work order for a truck whose `next_inspection_date` is overdue.
+2. Complete it via the CompleteJobModal.
+3. Open Safety → Inspections card: the truck should disappear from the alert list, and the count badge should drop. Trucks page should show the new `next_inspection_date` ~120 days out.
+4. Revert the work order in Service History → the alert should reappear with the prior due date (or be cleared if no prior inspection existed).
