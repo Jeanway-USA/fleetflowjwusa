@@ -290,7 +290,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.xlsx,.xls"
+              accept=".pdf,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               multiple
               className="hidden"
               onChange={handleFileSelect}
