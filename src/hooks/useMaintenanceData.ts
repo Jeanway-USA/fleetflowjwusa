@@ -964,7 +964,10 @@ export function useCompleteWorkOrder() {
         if (type === 'inspection' || type.includes('inspection')) {
           // Update the 120-Day Inspection service schedule for this truck
           const inspectionDate = workOrder.estimated_completion || workOrder.entry_date;
-          
+          const nextInspectionDate = addDays(new Date(`${inspectionDate}T00:00:00`), 120)
+            .toISOString()
+            .split('T')[0];
+
           const { error: scheduleError } = await supabase
             .from('service_schedules')
             .update({
@@ -978,12 +981,13 @@ export function useCompleteWorkOrder() {
             console.error('Failed to update service schedule:', scheduleError);
           }
 
-          // Also update the truck's last_120_inspection_date
+          // Also update the truck's inspection dates so Safety alerts clear
           await supabase
             .from('trucks')
             .update({
               last_120_inspection_date: inspectionDate,
               last_120_inspection_miles: workOrder.odometer_reading || currentOdometer,
+              next_inspection_date: nextInspectionDate,
             })
             .eq('id', workOrder.truck_id);
         } else if (scheduleName) {
