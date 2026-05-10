@@ -523,7 +523,18 @@ export default function Finance() {
 
   return (
     <>
-      <PageHeader title="Finance & P/L" description="Track revenue, expenses, and profitability" />
+      <PageHeader
+        title="Financial Hub"
+        description="Revenue, expenses, profitability, and payouts in one place"
+      >
+        <Button
+          onClick={() => setUploadDialogOpen(true)}
+          className="w-full sm:w-auto gradient-gold text-primary-foreground"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Upload Statement
+        </Button>
+      </PageHeader>
 
       {/* Period and Truck Selector */}
       <div className="flex flex-wrap gap-4 mb-6">
