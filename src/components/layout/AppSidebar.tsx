@@ -406,15 +406,19 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton isActive={currentPath === '/driver-stats'} onClick={() => navigate('/driver-stats')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <BarChart className="h-4 w-4" />
-                    <span>My Stats</span>
+                  <SidebarMenuButton asChild isActive={currentPath === '/driver-stats'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
+                    <Link to="/driver-stats">
+                      <BarChart className="h-4 w-4" />
+                      <span>My Stats</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton isActive={currentPath === '/driver-settings'} onClick={() => navigate('/driver-settings')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <Settings className="h-4 w-4" />
-                    <span>My Settings</span>
+                  <SidebarMenuButton asChild isActive={currentPath === '/driver-settings'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
+                    <Link to="/driver-settings">
+                      <Settings className="h-4 w-4" />
+                      <span>My Settings</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -429,9 +433,11 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton isActive={currentPath === '/super-admin'} onClick={() => navigate('/super-admin')} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <ShieldCheck className="h-4 w-4" />
-                    <span>Super Admin</span>
+                  <SidebarMenuButton asChild isActive={currentPath === '/super-admin'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
+                    <Link to="/super-admin">
+                      <ShieldCheck className="h-4 w-4" />
+                      <span>Super Admin</span>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
