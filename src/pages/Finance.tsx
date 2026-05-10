@@ -654,41 +654,42 @@ export default function Finance() {
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="pl" className="mt-6">
-          <PLSummaryTab
-            revenueTotals={revenueTotals}
-            loadExpenseTotals={loadExpenseTotals}
-            standaloneExpenseTotals={standaloneExpenseTotals}
-            loadLinkedExpenseTotals={loadLinkedExpenseTotals}
-            payrollTotals={payrollTotals}
-            commissionTotals={commissionTotals}
-            deadheadMiles={deadheadMiles}
-            totalEmptyMiles={totalEmptyMiles}
-            totalActualMilesWithDeadhead={totalActualMilesWithDeadhead}
-            netProfit={netProfit}
-            profitMargin={profitMargin}
-            totalExpenses={totalExpenses}
-            totalRevenueWithCommissions={totalRevenueWithCommissions}
-            getSetting={getSetting}
-          />
+        <TabsContent value="overview">
+          <div className="space-y-6 animate-in fade-in-50">
+            <PLSummaryTab
+              revenueTotals={revenueTotals}
+              loadExpenseTotals={loadExpenseTotals}
+              standaloneExpenseTotals={standaloneExpenseTotals}
+              loadLinkedExpenseTotals={loadLinkedExpenseTotals}
+              payrollTotals={payrollTotals}
+              commissionTotals={commissionTotals}
+              deadheadMiles={deadheadMiles}
+              totalEmptyMiles={totalEmptyMiles}
+              totalActualMilesWithDeadhead={totalActualMilesWithDeadhead}
+              netProfit={netProfit}
+              profitMargin={profitMargin}
+              totalExpenses={totalExpenses}
+              totalRevenueWithCommissions={totalRevenueWithCommissions}
+              getSetting={getSetting}
+            />
+            <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
+          </div>
         </TabsContent>
 
-        <TabsContent value="revenue" className="mt-6">
-          <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
-        </TabsContent>
-
-        <TabsContent value="profitability" className="mt-6">
-          <LoadProfitabilityTab
-            deliveredLoads={deliveredLoads}
-            loadExpenses={loadExpenses}
-            drivers={drivers}
-            expenses={filteredExpenses}
-            totalExpenses={totalExpenses}
-            totalPayroll={totalPayroll}
-            revenueTotals={revenueTotals}
-            allLoads={loads}
-            isIndependent={isIndependent}
-          />
+        <TabsContent value="profitability">
+          <div className="space-y-6 animate-in fade-in-50">
+            <LoadProfitabilityTab
+              deliveredLoads={deliveredLoads}
+              loadExpenses={loadExpenses}
+              drivers={drivers}
+              expenses={filteredExpenses}
+              totalExpenses={totalExpenses}
+              totalPayroll={totalPayroll}
+              revenueTotals={revenueTotals}
+              allLoads={loads}
+              isIndependent={isIndependent}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="expenses" className="mt-6">
