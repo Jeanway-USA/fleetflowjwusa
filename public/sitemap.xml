@@ -15,6 +15,26 @@
   <url><loc>https://tms.jeanwayusa.com/executive-dashboard</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
   <url><loc>https://tms.jeanwayusa.com/dispatcher-dashboard</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
   <url><loc>https://tms.jeanwayusa.com/driver-dashboard</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/driver-performance</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/driver-settings</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/driver-stats</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/drivers</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/trucks</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/trailers</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/fleet-loads</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/agency-loads</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/finance</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/ledger</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/insights</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/ifta</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/maintenance</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/safety</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/incidents</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/crm</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/documents</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/resources</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/load-optimizer</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/settings</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
   <url><loc>https://tms.jeanwayusa.com/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://tms.jeanwayusa.com/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
 </urlset>
