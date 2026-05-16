@@ -369,7 +369,7 @@ export default function Pricing() {
             </table>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-border bg-card/50 py-8 mt-12">
