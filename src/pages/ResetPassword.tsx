@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 import { z } from 'zod';
 import textLogo from '@/assets/Text_Logo.png';
 import logoIcon from '@/assets/Logo.png';
