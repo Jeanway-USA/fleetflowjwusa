@@ -5,6 +5,11 @@
   <url><loc>https://tms.jeanwayusa.com/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://tms.jeanwayusa.com/contact</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://tms.jeanwayusa.com/auth</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/track</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/onboarding</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/pending-access</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/reset-password</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/landing</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://tms.jeanwayusa.com/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://tms.jeanwayusa.com/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
 </urlset>
