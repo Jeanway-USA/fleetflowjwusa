@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 import { z } from 'zod';
 import textLogo from '@/assets/Text_Logo.png';
 import logoIcon from '@/assets/Logo.png';
@@ -132,6 +133,15 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <h1 className="sr-only">Reset Your FleetFlow TMS Password</h1>
       <div className="w-full max-w-md">
+        <Helmet>
+          <title>Reset Your Password — FleetFlow TMS</title>
+          <meta name="description" content="Set a new password for your FleetFlow TMS account to regain secure access to your fleet dashboard." />
+          <meta property="og:title" content="Reset Your Password — FleetFlow TMS" />
+          <meta property="og:description" content="Set a new password for your FleetFlow TMS account." />
+          <meta property="og:url" content="https://tms.jeanwayusa.com/reset-password" />
+          <link rel="canonical" href="https://tms.jeanwayusa.com/reset-password" />
+          <meta name="robots" content="noindex" />
+        </Helmet>
         <div className="flex items-center justify-center gap-2 mb-8">
           <img src={logoIcon} alt="" className="h-10 w-auto" />
           <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
