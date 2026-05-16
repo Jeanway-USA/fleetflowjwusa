@@ -12,8 +12,10 @@ export default function TermsOfService() {
     <div className="min-h-screen bg-background text-foreground">
       <Helmet>
         <title>Terms of Service — FleetFlow TMS</title>
-        <meta name="description" content="The terms that govern your use of FleetFlow TMS." />
+        <meta name="description" content="Read the terms of service that govern your use of the FleetFlow TMS platform and services for owner-operators and fleets." />
         <link rel="canonical" href="https://tms.jeanwayusa.com/terms" />
+        <meta property="og:title" content="Terms of Service — FleetFlow TMS" />
+        <meta property="og:description" content="The terms that govern your use of FleetFlow TMS." />
         <meta property="og:url" content="https://tms.jeanwayusa.com/terms" />
       </Helmet>
       <header className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-50">

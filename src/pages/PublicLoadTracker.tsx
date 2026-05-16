@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Loader2, MapPin, Truck, CheckCircle, Package, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { LoadRouteMap } from '@/components/driver/LoadRouteMap';
@@ -98,6 +99,14 @@ export default function PublicLoadTracker() {
 
   return (
     <div className="min-h-screen bg-background" style={brandStyle}>
+      <Helmet>
+        <title>Track Your Shipment — FleetFlow TMS</title>
+        <meta name="description" content="Real-time shipment tracking. View pickup, in-transit, and delivery status for your FleetFlow TMS load in one place." />
+        <link rel="canonical" href="https://tms.jeanwayusa.com/track" />
+        <meta property="og:title" content="Track Your Shipment — FleetFlow TMS" />
+        <meta property="og:description" content="Real-time shipment tracking for FleetFlow TMS loads." />
+        <meta property="og:url" content="https://tms.jeanwayusa.com/track" />
+      </Helmet>
       <h1 className="sr-only">
         Shipment Tracking{data.load_number ? ` — Load #${data.load_number}` : ''}
       </h1>
