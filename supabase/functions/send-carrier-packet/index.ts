@@ -14,12 +14,32 @@ function buildCarrierPacketHtml(params: {
 }): string {
   const { orgName, message, documents } = params;
 
+  const escapeHtml = (s: string) =>
+    String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const safeUrl = (u: string) => {
+    try {
+      const parsed = new URL(u);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '#';
+      return escapeHtml(parsed.toString());
+    } catch {
+      return '#';
+    }
+  };
+
+  const safeOrgName = escapeHtml(orgName);
+
   const docLinks = documents
     .map(
       (d) => `
       <tr>
         <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0;">
-          <a href="${d.url}" style="color: #2563eb; text-decoration: none; font-size: 14px; font-weight: 500;">${d.label}</a>
+          <a href="${safeUrl(d.url)}" style="color: #2563eb; text-decoration: none; font-size: 14px; font-weight: 500;">${escapeHtml(d.label)}</a>
           <br/><span style="color: #6B7280; font-size: 12px;">Click to download</span>
         </td>
       </tr>`
