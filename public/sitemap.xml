@@ -18,6 +18,7 @@
   <url><loc>https://tms.jeanwayusa.com/driver-performance</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
   <url><loc>https://tms.jeanwayusa.com/driver-settings</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
   <url><loc>https://tms.jeanwayusa.com/driver-stats</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/super-admin</loc><changefreq>yearly</changefreq><priority>0.1</priority></url>
   <url><loc>https://tms.jeanwayusa.com/drivers</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
   <url><loc>https://tms.jeanwayusa.com/trucks</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
   <url><loc>https://tms.jeanwayusa.com/trailers</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
