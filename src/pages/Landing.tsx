@@ -102,6 +102,7 @@ export default function Landing() {
         </div>
       </header>
 
+      <main>
       {/* Hero */}
       <section className="relative overflow-hidden bg-[hsl(240_20%_4%)]">
         {/* Dot pattern overlay */}
