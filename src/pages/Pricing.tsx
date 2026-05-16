@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -198,6 +199,26 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Pricing — FleetFlow TMS Plans for Owner-Operators &amp; Fleets</title>
+        <meta name="description" content="Simple, transparent pricing for FleetFlow TMS. Free during open beta. Plans for Solo BCOs, Fleet Owners, Agencies, and All-in-One brokerages." />
+        <link rel="canonical" href="https://tms.jeanwayusa.com/pricing" />
+        <meta property="og:title" content="FleetFlow TMS Pricing" />
+        <meta property="og:description" content="Plans built for owner-operators and small fleets. Free during open beta." />
+        <meta property="og:url" content="https://tms.jeanwayusa.com/pricing" />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": "FleetFlow TMS",
+          "description": "All-in-one transportation management platform for owner-operators and small fleets.",
+          "brand": { "@type": "Brand", "name": "FleetFlow TMS" },
+          "offers": [
+            { "@type": "Offer", "name": "Solo BCO", "priceCurrency": "USD", "price": prices?.solo_bco?.monthly ?? 0, "url": "https://tms.jeanwayusa.com/pricing" },
+            { "@type": "Offer", "name": "Fleet Owner", "priceCurrency": "USD", "price": prices?.fleet_owner?.monthly ?? 0, "url": "https://tms.jeanwayusa.com/pricing" },
+            { "@type": "Offer", "name": "Agency", "priceCurrency": "USD", "price": prices?.agency?.monthly ?? 0, "url": "https://tms.jeanwayusa.com/pricing" }
+          ]
+        })}</script>
+      </Helmet>
       {/* Nav */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">

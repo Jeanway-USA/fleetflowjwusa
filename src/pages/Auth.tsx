@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Sparkles, Truck, MessageSquare, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
+import { Helmet } from 'react-helmet-async';
 import textLogo from '@/assets/Text_Logo.png';
 import logoIcon from '@/assets/Logo.png';
 
@@ -163,6 +164,15 @@ export default function Auth() {
   // Main Auth — split-screen layout
   return (
     <div className="min-h-screen bg-background grid lg:grid-cols-2">
+      <Helmet>
+        <title>Sign In or Join the Free Beta — FleetFlow TMS</title>
+        <meta name="description" content="Sign in to FleetFlow TMS or create a free beta account. All-in-one TMS for owner-operators and small fleets." />
+        <link rel="canonical" href="https://tms.jeanwayusa.com/auth" />
+        <meta property="og:title" content="Sign In — FleetFlow TMS" />
+        <meta property="og:description" content="Sign in or join the free open beta." />
+        <meta property="og:url" content="https://tms.jeanwayusa.com/auth" />
+      </Helmet>
+      <h1 className="sr-only">Sign In or Create a FleetFlow TMS Account</h1>
       {/* Left Panel — Beta Benefits */}
       <div className="relative flex flex-col justify-center px-6 py-10 lg:py-0 lg:px-16 bg-[hsl(240_20%_4%)] text-white overflow-hidden">
         {/* Decorative gradient orbs */}

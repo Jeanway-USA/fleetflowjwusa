@@ -237,6 +237,7 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <h1 className="sr-only">Onboarding — Set Up Your FleetFlow Organization</h1>
       {/* Header */}
       <div className="border-b border-border bg-card/80 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
