@@ -98,13 +98,16 @@ export default function PublicLoadTracker() {
 
   return (
     <div className="min-h-screen bg-background" style={brandStyle}>
+      <h1 className="sr-only">
+        Shipment Tracking{data.load_number ? ` — Load #${data.load_number}` : ''}
+      </h1>
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         {/* Org Header */}
         <div className="text-center space-y-2">
           {(data.org?.banner_url || data.org?.logo_url) ? (
             <img
               src={data.org.banner_url || data.org.logo_url!}
-              alt={data.org.name || 'Company'}
+              alt={data.org?.name ? `${data.org.name} logo` : 'Organization Logo'}
               className="h-12 mx-auto object-contain"
             />
           ) : (

@@ -27,6 +27,7 @@ export default function CheckoutSuccess() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <h1 className="sr-only">Checkout Successful</h1>
       <Card className="max-w-md w-full text-center">
         <CardHeader className="pb-4">
           <div className="mx-auto w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mb-4">

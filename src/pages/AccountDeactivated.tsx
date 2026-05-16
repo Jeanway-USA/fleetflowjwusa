@@ -15,6 +15,7 @@ export default function AccountDeactivated() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <h1 className="sr-only">Account Deactivated</h1>
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
