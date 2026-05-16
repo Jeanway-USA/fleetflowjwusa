@@ -200,14 +200,14 @@ export default function Auth() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm leading-tight">{b.title}</h3>
-                  <p className="text-xs text-white/60 mt-1 leading-relaxed">{b.description}</p>
+                  <p className="text-xs text-white/80 mt-1 leading-relaxed">{b.description}</p>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Back link */}
-          <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-sm text-white/40 hover:text-white/70 transition-colors mt-4">
+          <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors mt-4">
             <ArrowLeft className="h-4 w-4" /> Back to Home
           </button>
         </div>

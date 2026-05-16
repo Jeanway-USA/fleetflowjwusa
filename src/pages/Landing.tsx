@@ -11,6 +11,7 @@ import {
   Truck, DollarSign, Shield, BarChart3, Users, Package, 
   ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone, Menu, Sparkles, Clock
 } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 import RevealOnScroll from '@/components/shared/RevealOnScroll';
 import logoIcon from '@/assets/Logo.png';
 import textLogo from '@/assets/Text_Logo.png';
@@ -69,6 +70,14 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background pb-20 sm:pb-0">
+      <Helmet>
+        <title>FleetFlow TMS — Fleet Finance & Dispatch for Owner-Operators</title>
+        <meta name="description" content="All-in-one TMS for owner-operators and small fleets. Track loads, IFTA, maintenance, settlements, and driver pay in one place." />
+        <link rel="canonical" href="https://tms.jeanwayusa.com/" />
+        <meta property="og:title" content="FleetFlow TMS — Fleet Finance & Dispatch for Owner-Operators" />
+        <meta property="og:description" content="All-in-one TMS for owner-operators and small fleets. Loads, IFTA, maintenance, settlements, and driver pay." />
+        <meta property="og:url" content="https://tms.jeanwayusa.com/" />
+      </Helmet>
       {/* Nav */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
