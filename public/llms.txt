@@ -1,0 +1,18 @@
+# FleetFlow TMS
+
+> All-in-one transportation management system built for owner-operators, Landstar BCOs, and small fleets. Track loads, IFTA, maintenance, settlements, and driver pay in one place.
+
+FleetFlow TMS is operated by JeanWay USA. It provides load management, financial tracking, IFTA fuel-tax automation, maintenance scheduling, driver settlements, CRM, and dispatch tools for independent trucking businesses.
+
+## Pages
+
+- [Home](/): Product overview and feature highlights.
+- [Pricing](/pricing): Subscription tiers (Solo BCO, Fleet Owner, Agency, All-in-One) — free during open beta.
+- [About](/about): Mission, origin story, and vision.
+- [Contact](/contact): Get in touch with the FleetFlow team.
+- [Sign In / Sign Up](/auth): Account access and free beta signup.
+
+## Optional
+
+- [Privacy Policy](/privacy)
+- [Terms of Service](/terms)
