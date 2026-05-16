@@ -102,6 +102,7 @@ export default function Landing() {
         </div>
       </header>
 
+      <main>
       {/* Hero */}
       <section className="relative overflow-hidden bg-[hsl(240_20%_4%)]">
         {/* Dot pattern overlay */}
@@ -420,6 +421,7 @@ export default function Landing() {
         </div>
       </section>
       </RevealOnScroll>
+      </main>
 
       <footer className="bg-[hsl(240_20%_4%)] border-t border-border pt-12 pb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

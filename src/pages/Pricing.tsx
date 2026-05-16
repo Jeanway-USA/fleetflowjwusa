@@ -237,7 +237,7 @@ export default function Pricing() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-extrabold mb-3">Simple, Transparent Pricing</h1>
@@ -369,7 +369,7 @@ export default function Pricing() {
             </table>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-border bg-card/50 py-8 mt-12">
