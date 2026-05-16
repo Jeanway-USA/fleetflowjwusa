@@ -14,12 +14,32 @@ function buildCarrierPacketHtml(params: {
 }): string {
   const { orgName, message, documents } = params;
 
+  const escapeHtml = (s: string) =>
+    String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const safeUrl = (u: string) => {
+    try {
+      const parsed = new URL(u);
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '#';
+      return escapeHtml(parsed.toString());
+    } catch {
+      return '#';
+    }
+  };
+
+  const safeOrgName = escapeHtml(orgName);
+
   const docLinks = documents
     .map(
       (d) => `
       <tr>
         <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0;">
-          <a href="${d.url}" style="color: #2563eb; text-decoration: none; font-size: 14px; font-weight: 500;">${d.label}</a>
+          <a href="${safeUrl(d.url)}" style="color: #2563eb; text-decoration: none; font-size: 14px; font-weight: 500;">${escapeHtml(d.label)}</a>
           <br/><span style="color: #6B7280; font-size: 12px;">Click to download</span>
         </td>
       </tr>`
@@ -46,7 +66,7 @@ function buildCarrierPacketHtml(params: {
           <!-- Header -->
           <tr>
             <td style="padding: 32px 40px 24px;">
-              <h2 style="margin: 0; color: #1a1a1a; font-size: 20px; font-weight: 700;">Carrier Packet from ${orgName}</h2>
+              <h2 style="margin: 0; color: #1a1a1a; font-size: 20px; font-weight: 700;">Carrier Packet from ${safeOrgName}</h2>
             </td>
           </tr>
           <tr><td style="padding: 0 40px;"><hr style="border: none; border-top: 2px solid #F59E0B; margin: 0;" /></td></tr>
@@ -72,7 +92,7 @@ function buildCarrierPacketHtml(params: {
           <tr>
             <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 12px 12px; text-align: center;">
               <p style="margin: 0; color: #9a9a9a; font-size: 12px;">
-                © ${new Date().getFullYear()} ${orgName}. All rights reserved.
+                © ${new Date().getFullYear()} ${safeOrgName}. All rights reserved.
               </p>
             </td>
           </tr>

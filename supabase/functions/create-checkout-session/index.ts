@@ -162,7 +162,15 @@ serve(async (req) => {
     }
 
     // Create checkout session with dynamic price_data
-    const origin = req.headers.get("origin") || "https://fleetflowjwusa.lovable.app";
+    const ALLOWED_ORIGINS = [
+      "https://fleetflowjwusa.lovable.app",
+      "https://tms.jeanwayusa.com",
+      "http://localhost:5173",
+    ];
+    const rawOrigin = req.headers.get("origin") || "";
+    const origin = ALLOWED_ORIGINS.includes(rawOrigin)
+      ? rawOrigin
+      : "https://fleetflowjwusa.lovable.app";
     
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
