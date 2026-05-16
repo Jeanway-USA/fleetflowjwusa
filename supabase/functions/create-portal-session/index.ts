@@ -85,7 +85,15 @@ serve(async (req) => {
     logStep("Found Stripe customer", { customerId: org.stripe_customer_id });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const origin = req.headers.get("origin") || "https://fleetflowjwusa.lovable.app";
+    const ALLOWED_ORIGINS = [
+      "https://fleetflowjwusa.lovable.app",
+      "https://tms.jeanwayusa.com",
+      "http://localhost:5173",
+    ];
+    const rawOrigin = req.headers.get("origin") || "";
+    const origin = ALLOWED_ORIGINS.includes(rawOrigin)
+      ? rawOrigin
+      : "https://fleetflowjwusa.lovable.app";
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: org.stripe_customer_id,
