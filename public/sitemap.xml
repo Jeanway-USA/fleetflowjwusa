@@ -10,6 +10,11 @@
   <url><loc>https://tms.jeanwayusa.com/pending-access</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://tms.jeanwayusa.com/reset-password</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://tms.jeanwayusa.com/landing</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/checkout-success</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/account-deactivated</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/executive-dashboard</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/dispatcher-dashboard</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/driver-dashboard</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
   <url><loc>https://tms.jeanwayusa.com/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://tms.jeanwayusa.com/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
 </urlset>
