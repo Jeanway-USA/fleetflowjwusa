@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import logoIcon from '@/assets/Logo.png';
@@ -9,9 +10,15 @@ export default function TermsOfService() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <Helmet>
+        <title>Terms of Service — FleetFlow TMS</title>
+        <meta name="description" content="The terms that govern your use of FleetFlow TMS." />
+        <link rel="canonical" href="https://tms.jeanwayusa.com/terms" />
+        <meta property="og:url" content="https://tms.jeanwayusa.com/terms" />
+      </Helmet>
       <header className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} aria-label="Back to home">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Helmet } from 'react-helmet-async';
 import RevealOnScroll from '@/components/shared/RevealOnScroll';
 import logoIcon from '@/assets/Logo.png';
 import textLogo from '@/assets/Text_Logo.png';
@@ -49,9 +50,17 @@ export default function Contact() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <Helmet>
+        <title>Contact FleetFlow TMS — Get in Touch</title>
+        <meta name="description" content="Have a question about FleetFlow TMS? Send us a message and our team will get back to you shortly." />
+        <link rel="canonical" href="https://tms.jeanwayusa.com/contact" />
+        <meta property="og:title" content="Contact FleetFlow TMS" />
+        <meta property="og:description" content="Reach the FleetFlow team — questions, feedback, support." />
+        <meta property="og:url" content="https://tms.jeanwayusa.com/contact" />
+      </Helmet>
       <header className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} aria-label="Back to home">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
