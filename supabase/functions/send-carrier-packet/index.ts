@@ -92,7 +92,7 @@ function buildCarrierPacketHtml(params: {
           <tr>
             <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 12px 12px; text-align: center;">
               <p style="margin: 0; color: #9a9a9a; font-size: 12px;">
-                © ${new Date().getFullYear()} ${orgName}. All rights reserved.
+                © ${new Date().getFullYear()} ${safeOrgName}. All rights reserved.
               </p>
             </td>
           </tr>
