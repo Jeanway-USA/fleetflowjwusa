@@ -334,7 +334,8 @@ export function ActiveLoadsBoard() {
               ]}
             />
           ) : (
-          {loads && loads.length > 0 ? (
+            <>
+            {loads && loads.length > 0 ? (
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
               {loads.map((load) => {
                 const rpm = load.rate && load.booked_miles && load.booked_miles > 0
