@@ -25,6 +25,19 @@ export default function DispatcherDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  // Scroll to a section when navigated with a hash (e.g. from command palette ⌘K → Assign Driver)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const id = window.location.hash.slice(1);
+    if (!id) return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 200);
+    return () => clearTimeout(t);
+  }, []);
+
+
   // Fetch user's first name from profile
   const { data: profile } = useQuery({
     queryKey: ['user-profile', user?.id],
