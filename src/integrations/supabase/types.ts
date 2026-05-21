@@ -1471,12 +1471,15 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           description: string | null
           expense_date: string
           expense_type: string
           gallons: number | null
           id: string
+          is_approved: boolean
           jurisdiction: string | null
           load_id: string | null
           notes: string | null
@@ -1487,12 +1490,15 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           description?: string | null
           expense_date?: string
           expense_type: string
           gallons?: number | null
           id?: string
+          is_approved?: boolean
           jurisdiction?: string | null
           load_id?: string | null
           notes?: string | null
@@ -1503,12 +1509,15 @@ export type Database = {
         }
         Update: {
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           description?: string | null
           expense_date?: string
           expense_type?: string
           gallons?: number | null
           id?: string
+          is_approved?: boolean
           jurisdiction?: string | null
           load_id?: string | null
           notes?: string | null

@@ -1,56 +1,42 @@
 ## Goal
+Make `DataTable` a true bulk-ops table (selection already exists), then apply it to active loads and expenses with real bulk mutations.
 
-Turn `src/components/shared/CommandPalette.tsx` into a keyboard-first dispatcher tool: global Ctrl/Cmd+K open, full arrow/enter navigation (already provided by shadcn `Command`), dispatcher quick actions, and live search across CRM contacts + active loads simultaneously.
+## 1. `src/components/shared/DataTable.tsx` — upgrades
+Selection + `bulkActions` prop are already implemented. Add:
 
-## Changes
+- **Screen-floating action bar**: replace the in-container sticky bar with a `fixed bottom-6 left-1/2 -translate-x-1/2 z-50` card (rounded, `bg-background border shadow-lg`, animated `slide-in-from-bottom`). Shows count, Clear button, and `bulkActions(selectedIds)`. Rendered via a portal-less `fixed` div so it floats over the whole viewport.
+- **Column filters**: extend `Column<T>` with `filter?: { type: 'text' } | { type: 'date-range'; accessor: (item: T) => string | null }`. Render a second header row with `<Input>` for text columns and two compact date inputs (from / to) for date-range columns. Filter state held internally (`Record<string, string | { from?: string; to?: string }>`); data is filtered before being passed to the virtualizer. Add a small "Clear filters" link when any filter is active. Hide the filter row behind a `Filter` toggle button in the toolbar (off by default to avoid noise on tables that don't need it).
+- Keep all existing behavior (density, column visibility, CSV export, virtualization, double-click).
 
-### 1. Keep existing global shortcut
-- `Ctrl/Cmd + K` toggle is already wired in the component and mounted globally via `DashboardLayout`. Verify and keep.
-- Add `Esc` close (already built into `CommandDialog`).
-- Add a small "⌘K" hint in the dashboard header so users discover it.
+## 2. Database — `expenses.is_approved`
+Migration adds:
+- `is_approved boolean not null default false`
+- `approved_at timestamptz`
+- `approved_by uuid` (no FK to `auth.users`)
+- Index on `(org_id, is_approved)`
 
-### 2. Add dispatcher quick actions
-Extend `QUICK_ACTIONS` (visible to `owner` + `dispatcher`):
-- **New Load** → `/fleet-loads?action=new-load` (already exists, keep)
-- **Assign Driver** → `/dispatcher-dashboard?action=assign-driver` (opens the existing DriverAssignmentPanel modal)
-- **Change Load Status** → `/fleet-loads?action=bulk-status` (opens existing BulkStatusEditDialog)
-- **Search Broker** → focuses the palette input prefixed with `broker:` to filter CRM results to brokers
-- Keep existing New Maintenance / Upload Expense entries
+No RLS changes — existing `Owner payroll can access expenses` policy already covers UPDATEs.
 
-For the two new dashboard/loads actions, wire the receiving pages to read the `?action=` query param on mount and open the corresponding dialog (pattern already used elsewhere in the app — `FleetLoads` reads `action=new-load`).
+## 3. `src/components/dispatcher/ActiveLoadsBoard.tsx`
+- Add a `view` state (`'cards' | 'table'`) with a segmented toggle in the card header (Cards / Table icons).
+- Keep existing card rendering for `'cards'`.
+- For `'table'`, render the upgraded `DataTable` with columns: checkbox, Load #, Origin, Destination, Driver, Truck, Pickup (date-range filter), Status (text filter), Rate, RPM. `selectable`, `selectedIds` state, `bulkActions={(ids) => <BulkStatusMenu ids={ids} />}`.
+- `BulkStatusMenu`: shadcn `DropdownMenu` with items `Assigned`, `Loading`, `In Transit`, `Unloading`, `Delivered`, `Cancelled`. On click, run `useMutation` doing `supabase.from('fleet_loads').update({ status }).in('id', [...ids])`, toast result, invalidate `['active-loads-dispatcher']`, clear selection.
+- Keep the existing details Dialog (open via row click in table view).
 
-### 3. Live search across CRM + active loads
-Add a debounced search (~200ms) on the palette input. When `query.length >= 2`:
+## 4. `src/components/shared/ExpensesList.tsx`
+- Replace the plain `<Table>` with `DataTable`. Columns: checkbox, Date (date-range filter), Type (text filter), Vendor (text filter), Amount, Gallons, Approved (badge: `Pending` / `Approved`), Actions (existing delete button). Keep totals row by rendering a footer below the table using the filtered totals (compute from same filter state isn't accessible from outside — simplest: show "Total" using full `expenses` total above the table; sufficient for this scope).
+- `selectedIds` state. `bulkActions={(ids) => (<><Button onClick={approveAll}>Approve N</Button><Button variant="outline" onClick={unapproveAll}>Mark pending</Button></>)}`.
+- `approveMutation`: `supabase.from('expenses').update({ is_approved: true, approved_at: new Date().toISOString(), approved_by: (await supabase.auth.getUser()).data.user?.id }).in('id', [...ids])`. Invalidate `queryKey` + `['expenses']`. Toast, clear selection.
 
-- Query `crm_contacts` (`select id, company_name, contact_name, contact_type, city, state`) — `ilike` on `company_name`, `contact_name`, `email`; limit 8; filter by `is_active=true`.
-- Query `fleet_loads` (`select id, load_number, origin, destination, status, driver_id`) — `ilike` on `load_number`, `origin`, `destination`; exclude `status in (delivered, cancelled)`; limit 8.
-- Run both with `Promise.all` inside a `useQuery(['palette-search', query])` with `staleTime: 30s` and `enabled: query.length >= 2`.
-- RLS already scopes results to the user's org — no extra filter needed.
+## Technical notes
+- Filtering happens client-side inside `DataTable` (data sets here are bounded — active loads, per-load/truck expenses).
+- Date-range comparison uses ISO strings (`YYYY-MM-DD`) — both query value and column accessor produce that shape; lexicographic compare is correct.
+- Floating bar uses semantic tokens only (`bg-background`, `border-border`, `text-foreground`, `text-muted-foreground`) per the design system. No `text-white` / hex colors.
+- Memory rule respected: when parsing `expense_date` strings for the date-range accessor, no parsing needed (string compare on `YYYY-MM-DD`).
 
-Render two new `CommandGroup`s above Navigation:
-- **Contacts** — icon by contact_type, label `company_name — contact_name`, sub `city, state`. Selecting navigates to `/crm?contactId=<id>` (CRM page already supports opening the detail sheet via query param; if not, add a small effect there).
-- **Active Loads** — label `#load_number  origin → destination`, status badge. Selecting navigates to `/fleet-loads?loadId=<id>`.
-
-Keep existing Navigation + Quick Actions groups visible when query is empty; hide them once a search is active to keep results focused (optional: still show Quick Actions).
-
-### 4. Keyboard navigation
-shadcn `Command` (cmdk) already handles ↑/↓/Enter/typeahead. No extra work beyond making sure each `CommandItem` has a stable `value` prop so cmdk's fuzzy filter doesn't fight the async results — we'll set `shouldFilter={false}` on the `Command` when a remote query is active and rely on the server `ilike`.
-
-### 5. Loading + empty states
-- Show a `CommandLoading` row ("Searching…") while the query is pending.
-- Keep `CommandEmpty` for "No results found."
-
-### 6. Files to touch
-
-- `src/components/shared/CommandPalette.tsx` — main rewrite (add search, groups, actions, debounce, query).
-- `src/pages/DispatcherDashboard.tsx` — handle `?action=assign-driver` to open the assignment panel.
-- `src/pages/FleetLoads.tsx` — handle `?action=bulk-status` and `?loadId=` (loadId may already exist; verify).
-- `src/pages/CRM.tsx` — handle `?contactId=` to open the contact detail sheet (verify; add if missing).
-- `src/components/layout/DashboardLayout.tsx` — add small "⌘K" hint button in header that opens the palette (dispatch a custom event the palette listens for, or lift `open` state via a tiny zustand/context — simplest: dispatch `window` event `open-command-palette`).
-
-### Technical notes
-
-- Use existing `supabase` client; no new deps.
-- Debounce via `useDebouncedCallback` (already in `src/hooks/`).
-- All new colors/icons use existing semantic tokens — no design-system changes.
-- Demo mode: searches still work (read-only); quick actions that mutate are already guarded by `useDemoGuard` on their target pages.
+## Files touched
+- edit `src/components/shared/DataTable.tsx`
+- edit `src/components/dispatcher/ActiveLoadsBoard.tsx`
+- edit `src/components/shared/ExpensesList.tsx`
+- new migration: add `is_approved`, `approved_at`, `approved_by` to `expenses`
