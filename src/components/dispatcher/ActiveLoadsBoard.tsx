@@ -164,6 +164,22 @@ export function ActiveLoadsBoard() {
     return () => { if (channel) supabase.removeChannel(channel); };
   }, [queryClient]);
 
+  const bulkStatusMutation = useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
+      const { error } = await supabase.from('fleet_loads').update({ status }).in('id', ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count, vars) => {
+      const label = STATUS_OPTIONS.find(s => s.value === vars.status)?.label ?? vars.status;
+      queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
+      toast.success(`Updated ${count} load${count !== 1 ? 's' : ''} to ${label}`);
+      setSelectedIds(new Set());
+    },
+    onError: (err: any) => toast.error(err.message || 'Failed to update statuses'),
+  });
+
+
   if (isLoading) {
     return (
       <Card className="card-elevated">
