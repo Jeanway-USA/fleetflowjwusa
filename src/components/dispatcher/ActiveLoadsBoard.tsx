@@ -419,6 +419,8 @@ export function ActiveLoadsBoard() {
               <p>No active loads at the moment</p>
             </div>
           )}
+            </>
+          )}
         </CardContent>
       </Card>
 
