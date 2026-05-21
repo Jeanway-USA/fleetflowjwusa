@@ -187,7 +187,7 @@ export default function DispatcherDashboard() {
           </div>
 
           {/* Driver Assignment Panel */}
-          <div>
+          <div id="assign-driver" className="scroll-mt-20">
             <ErrorBoundary compact>
               <DriverAssignmentPanel />
             </ErrorBoundary>
