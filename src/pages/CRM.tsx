@@ -73,6 +73,17 @@ function AgentCRM() {
   const { deleteResource: deleteResourceMutation } = useResourceMutations();
   const { deleteFacility: deleteFacilityMutation } = useFacilityMutations();
 
+  // Open contact detail sheet from ?contactId= (command palette deep-link)
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get('contactId');
+    if (id && contacts && contacts.length > 0) {
+      const match = contacts.find((c) => c.id === id);
+      if (match) setDetailContact(match);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, contacts]);
+
   const filtered = useMemo(() => {
     if (!search.trim()) return contacts;
     const q = search.toLowerCase();
