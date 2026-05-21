@@ -3,7 +3,8 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Download, SlidersHorizontal, RotateCcw, Rows3, AlignJustify, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Download, SlidersHorizontal, RotateCcw, Rows3, AlignJustify, X, Filter } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -28,12 +29,17 @@ function getDensityConfig(density: Density) {
   return { rowHeight: 48, thClass: 'h-12 px-4 text-sm', tdClass: 'px-4 text-sm' };
 }
 
+type ColumnFilter<T> =
+  | { type: 'text'; accessor?: (item: T) => string | null | undefined }
+  | { type: 'date-range'; accessor: (item: T) => string | null | undefined };
+
 interface Column<T> {
   key: keyof T | string;
   header: string;
   render?: (item: T) => React.ReactNode;
   width?: string;
   hiddenOnMobile?: boolean;
+  filter?: ColumnFilter<T>;
 }
 
 interface DataTableProps<T> {
@@ -73,6 +79,8 @@ function exportToCsv<T extends { id: string }>(columns: Column<T>[], data: T[], 
 function getStorageKey(tableId: string) {
   return `datatable-view-${tableId}`;
 }
+
+type FilterValue = string | { from?: string; to?: string };
 
 export function DataTable<T extends { id: string }>({ 
   columns, 
@@ -130,6 +138,48 @@ export function DataTable<T extends { id: string }>({
   );
 
   const showSelection = selectable && onSelectionChange;
+  const hasAnyFilter = useMemo(() => columns.some(c => c.filter), [columns]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filterValues, setFilterValues] = useState<Record<string, FilterValue>>({});
+
+  const activeFilterCount = useMemo(() => {
+    return Object.values(filterValues).filter(v => {
+      if (!v) return false;
+      if (typeof v === 'string') return v.trim().length > 0;
+      return Boolean(v.from || v.to);
+    }).length;
+  }, [filterValues]);
+
+  // Apply column filters
+  const filteredData = useMemo(() => {
+    if (activeFilterCount === 0) return data;
+    return data.filter(item => {
+      for (const col of columns) {
+        if (!col.filter) continue;
+        const key = String(col.key);
+        const raw = filterValues[key];
+        if (!raw) continue;
+        if (col.filter.type === 'text') {
+          const needle = (typeof raw === 'string' ? raw : '').trim().toLowerCase();
+          if (!needle) continue;
+          const value = col.filter.accessor
+            ? col.filter.accessor(item)
+            : (item[col.key as keyof T] as unknown);
+          const hay = String(value ?? '').toLowerCase();
+          if (!hay.includes(needle)) return false;
+        } else if (col.filter.type === 'date-range') {
+          const range = typeof raw === 'string' ? {} : raw;
+          if (!range.from && !range.to) continue;
+          const value = col.filter.accessor(item);
+          if (!value) return false;
+          const v = String(value).slice(0, 10);
+          if (range.from && v < range.from) return false;
+          if (range.to && v > range.to) return false;
+        }
+      }
+      return true;
+    });
+  }, [data, columns, filterValues, activeFilterCount]);
 
   const computedWidths = useMemo(() => {
     const defaultWidth = `${100 / visibleColumns.length}%`;
@@ -137,7 +187,7 @@ export function DataTable<T extends { id: string }>({
   }, [visibleColumns]);
 
   const rowVirtualizer = useVirtualizer({
-    count: data.length,
+    count: filteredData.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
     overscan: 15,
@@ -156,20 +206,21 @@ export function DataTable<T extends { id: string }>({
 
   const resetVisibility = () => setColumnVisibility({});
   const toggleDensity = () => setDensity(prev => prev === 'standard' ? 'compact' : 'standard');
+  const clearFilters = () => setFilterValues({});
 
   // Selection helpers
   const safeSelectedIds = selectedIds ?? new Set<string>();
-  const allSelected = data.length > 0 && data.every(item => safeSelectedIds.has(item.id));
-  const someSelected = !allSelected && data.some(item => safeSelectedIds.has(item.id));
+  const allSelected = filteredData.length > 0 && filteredData.every(item => safeSelectedIds.has(item.id));
+  const someSelected = !allSelected && filteredData.some(item => safeSelectedIds.has(item.id));
 
   const toggleAll = useCallback(() => {
     if (!onSelectionChange) return;
     if (allSelected) {
       onSelectionChange(new Set());
     } else {
-      onSelectionChange(new Set(data.map(item => item.id)));
+      onSelectionChange(new Set(filteredData.map(item => item.id)));
     }
-  }, [allSelected, data, onSelectionChange]);
+  }, [allSelected, filteredData, onSelectionChange]);
 
   const toggleRow = useCallback((id: string) => {
     if (!onSelectionChange) return;
@@ -257,6 +308,16 @@ export function DataTable<T extends { id: string }>({
   return (
     <div className="space-y-2">
       <div className="flex justify-end gap-2">
+        {hasAnyFilter && (
+          <Button
+            variant={filtersOpen || activeFilterCount > 0 ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={() => setFiltersOpen(o => !o)}
+          >
+            <Filter className="mr-2 h-4 w-4" />
+            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+          </Button>
+        )}
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -294,17 +355,70 @@ export function DataTable<T extends { id: string }>({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-        {exportFilename && data.length > 0 && (
+        {exportFilename && filteredData.length > 0 && (
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportToCsv(visibleColumns, data, exportFilename)}
+            onClick={() => exportToCsv(visibleColumns, filteredData, exportFilename)}
           >
             <Download className="mr-2 h-4 w-4" />
             Export CSV
           </Button>
         )}
       </div>
+
+      {hasAnyFilter && filtersOpen && (
+        <div className="rounded-lg border border-border bg-muted/30 p-3 flex flex-wrap items-end gap-3">
+          {columns.filter(c => c.filter).map(col => {
+            const key = String(col.key);
+            if (col.filter?.type === 'text') {
+              const value = (filterValues[key] as string) || '';
+              return (
+                <div key={key} className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">{col.header}</label>
+                  <Input
+                    value={value}
+                    placeholder={`Filter ${col.header.toLowerCase()}`}
+                    className="h-8 w-44"
+                    onChange={(e) => setFilterValues(prev => ({ ...prev, [key]: e.target.value }))}
+                  />
+                </div>
+              );
+            }
+            if (col.filter?.type === 'date-range') {
+              const range = (typeof filterValues[key] === 'object' ? filterValues[key] as { from?: string; to?: string } : {}) || {};
+              return (
+                <div key={key} className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">{col.header}</label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="date"
+                      value={range.from || ''}
+                      className="h-8 w-40"
+                      onChange={(e) => setFilterValues(prev => ({ ...prev, [key]: { ...range, from: e.target.value || undefined } }))}
+                    />
+                    <span className="text-xs text-muted-foreground">to</span>
+                    <Input
+                      type="date"
+                      value={range.to || ''}
+                      className="h-8 w-40"
+                      onChange={(e) => setFilterValues(prev => ({ ...prev, [key]: { ...range, to: e.target.value || undefined } }))}
+                    />
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })}
+          {activeFilterCount > 0 && (
+            <Button variant="ghost" size="sm" className="h-8" onClick={clearFilters}>
+              <X className="mr-1 h-3 w-3" />
+              Clear filters
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="relative">
         <div
           ref={scrollRef}
@@ -339,8 +453,15 @@ export function DataTable<T extends { id: string }>({
                 display: 'block',
               }}
             >
+              {filteredData.length === 0 && (
+                <tr style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
+                  <td colSpan={visibleColumns.length + (showSelection ? 1 : 0)} className={cn(tdClass, "text-center text-muted-foreground py-8")}>
+                    No rows match the current filters.
+                  </td>
+                </tr>
+              )}
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const item = data[virtualRow.index];
+                const item = filteredData[virtualRow.index];
                 const isSelected = showSelection && safeSelectedIds.has(item.id);
                 return (
                   <tr
@@ -391,27 +512,33 @@ export function DataTable<T extends { id: string }>({
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Floating bulk action bar */}
-        {showSelection && safeSelectedIds.size > 0 && (
-          <div className="sticky bottom-0 left-0 right-0 z-20 flex items-center justify-between gap-4 rounded-b-lg border border-t-border bg-background px-4 py-2 shadow-lg">
-            <div className="flex items-center gap-3">
+      {/* Floating bulk action bar — fixed to viewport */}
+      {showSelection && safeSelectedIds.size > 0 && (
+        <div
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in slide-in-from-bottom-4 fade-in"
+          role="region"
+          aria-label="Bulk actions"
+        >
+          <div className="flex items-center gap-4 rounded-full border border-border bg-background px-4 py-2 shadow-lg">
+            <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-foreground">
-                {safeSelectedIds.size} row{safeSelectedIds.size !== 1 ? 's' : ''} selected
+                {safeSelectedIds.size} selected
               </span>
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearSelection}>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground" onClick={clearSelection}>
                 <X className="mr-1 h-3 w-3" />
                 Clear
               </Button>
             </div>
             {bulkActions && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 border-l border-border pl-3">
                 {bulkActions(safeSelectedIds)}
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
