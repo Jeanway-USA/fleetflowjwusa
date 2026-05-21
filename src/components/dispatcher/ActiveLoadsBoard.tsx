@@ -98,11 +98,22 @@ function formatSpecialInstructions(notes: string | null): React.ReactNode {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'assigned', label: 'Assigned' },
+  { value: 'loading', label: 'Loading' },
+  { value: 'in_transit', label: 'In Transit' },
+  { value: 'unloading', label: 'Unloading' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
 export function ActiveLoadsBoard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedLoad, setSelectedLoad] = useState<ActiveLoad | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [view, setView] = useState<'cards' | 'table'>('cards');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: loads, isLoading } = useQuery({
     queryKey: ['active-loads-dispatcher'],
