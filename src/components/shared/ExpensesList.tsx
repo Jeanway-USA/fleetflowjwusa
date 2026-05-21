@@ -4,13 +4,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { Plus, Trash2, DollarSign, Fuel, MapPin } from 'lucide-react';
+import { Plus, Trash2, DollarSign, Fuel, MapPin, CheckCircle2, Undo2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { US_STATES } from '@/lib/us-states';
 import { EXPENSE_TYPES, GALLONS_EXPENSE_TYPES } from '@/lib/expense-types';
+import { DataTable } from '@/components/shared/DataTable';
 
 interface ExpensesListProps {
   relatedType: 'load' | 'truck';
@@ -18,9 +19,20 @@ interface ExpensesListProps {
   title?: string;
 }
 
+interface ExpenseRow {
+  id: string;
+  expense_type: string;
+  expense_date: string | null;
+  vendor: string | null;
+  amount: number | null;
+  gallons: number | null;
+  is_approved: boolean | null;
+}
+
 export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: ExpensesListProps) {
   const queryClient = useQueryClient();
   const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState({
     expense_type: 'Fuel',
     amount: '',
@@ -49,7 +61,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
 
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      return (data || []) as ExpenseRow[];
     },
     enabled: !!relatedId,
   });
@@ -77,6 +89,25 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
       queryClient.invalidateQueries({ queryKey });
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       toast.success('Expense deleted');
+    },
+    onError: (error: any) => toast.error(error.message),
+  });
+
+  const bulkApproveMutation = useMutation({
+    mutationFn: async ({ ids, approved }: { ids: string[]; approved: boolean }) => {
+      const { data: userData } = await supabase.auth.getUser();
+      const payload = approved
+        ? { is_approved: true, approved_at: new Date().toISOString(), approved_by: userData.user?.id ?? null }
+        : { is_approved: false, approved_at: null, approved_by: null };
+      const { error } = await supabase.from('expenses').update(payload).in('id', ids);
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count, vars) => {
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast.success(vars.approved ? `Approved ${count} expense${count !== 1 ? 's' : ''}` : `Marked ${count} as pending`);
+      setSelectedIds(new Set());
     },
     onError: (error: any) => toast.error(error.message),
   });
@@ -129,7 +160,7 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
     return format(parseISO(date), 'MM/dd/yyyy');
   };
 
-  const totalExpenses = expenses.reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
+  const totalExpenses = expenses.reduce((sum: number, exp: ExpenseRow) => sum + (exp.amount || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -137,7 +168,9 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
         <div className="flex items-center gap-2">
           <DollarSign className="h-5 w-5 text-muted-foreground" />
           <h3 className="font-medium">{title}</h3>
-          <span className="text-sm text-muted-foreground">({expenses.length} items)</span>
+          <span className="text-sm text-muted-foreground">
+            ({expenses.length} items · {formatCurrency(totalExpenses)} total)
+          </span>
         </div>
         {!showAddForm && (
           <Button variant="outline" size="sm" onClick={() => setShowAddForm(true)}>
@@ -162,10 +195,10 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
             </div>
             <div className="space-y-2">
               <Label>Date</Label>
-              <Input 
-                type="date" 
-                value={formData.expense_date} 
-                onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })} 
+              <Input
+                type="date"
+                value={formData.expense_date}
+                onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
               />
             </div>
           </div>
@@ -173,34 +206,34 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Amount ($) *</Label>
-              <Input 
-                type="number" 
-                step="0.01" 
-                placeholder="0.00" 
-                value={formData.amount} 
-                onChange={(e) => setFormData({ ...formData, amount: e.target.value })} 
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={formData.amount}
+                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 required
               />
             </div>
             {GALLONS_EXPENSE_TYPES.includes(formData.expense_type) && (
               <div className="space-y-2">
                 <Label>Gallons</Label>
-                <Input 
-                  type="number" 
-                  step="0.01" 
-                  placeholder="0.00" 
-                  value={formData.gallons} 
-                  onChange={(e) => setFormData({ ...formData, gallons: e.target.value })} 
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.gallons}
+                  onChange={(e) => setFormData({ ...formData, gallons: e.target.value })}
                 />
               </div>
             )}
             {!GALLONS_EXPENSE_TYPES.includes(formData.expense_type) && (
               <div className="space-y-2">
                 <Label>Vendor</Label>
-                <Input 
-                  placeholder="Vendor name" 
-                  value={formData.vendor} 
-                  onChange={(e) => setFormData({ ...formData, vendor: e.target.value })} 
+                <Input
+                  placeholder="Vendor name"
+                  value={formData.vendor}
+                  onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
                 />
               </div>
             )}
@@ -210,18 +243,18 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Vendor</Label>
-                <Input 
-                  placeholder="Fuel stop / vendor" 
-                  value={formData.vendor} 
-                  onChange={(e) => setFormData({ ...formData, vendor: e.target.value })} 
+                <Input
+                  placeholder="Fuel stop / vendor"
+                  value={formData.vendor}
+                  onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
                   <MapPin className="h-3 w-3" /> State (IFTA)
                 </Label>
-                <Select 
-                  value={formData.jurisdiction || 'none'} 
+                <Select
+                  value={formData.jurisdiction || 'none'}
                   onValueChange={(v) => setFormData({ ...formData, jurisdiction: v === 'none' ? '' : v })}
                 >
                   <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
@@ -238,10 +271,10 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
 
           <div className="space-y-2">
             <Label>Description</Label>
-            <Input 
-              placeholder="Optional description" 
-              value={formData.description} 
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })} 
+            <Input
+              placeholder="Optional description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
           </div>
 
@@ -259,59 +292,105 @@ export function ExpensesList({ relatedType, relatedId, title = 'Expenses' }: Exp
         </div>
       )}
 
-      {isLoading ? (
-        <p className="text-center text-muted-foreground py-4">Loading expenses...</p>
-      ) : expenses.length === 0 ? (
-        <p className="text-center text-muted-foreground py-8">No expenses recorded yet.</p>
-      ) : (
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Vendor</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Gallons</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {expenses.map((expense: any) => (
-                <TableRow key={expense.id}>
-                  <TableCell>{formatDate(expense.expense_date)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {GALLONS_EXPENSE_TYPES.includes(expense.expense_type) && <Fuel className="h-4 w-4 text-muted-foreground" />}
-                      {expense.expense_type}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{expense.vendor || '-'}</TableCell>
-                  <TableCell className="text-right font-medium">{formatCurrency(expense.amount)}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {expense.gallons ? `${expense.gallons} gal` : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => deleteMutation.mutate(expense.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              <TableRow className="bg-muted/50 font-medium">
-                <TableCell colSpan={3}>Total</TableCell>
-                <TableCell className="text-right">{formatCurrency(totalExpenses)}</TableCell>
-                <TableCell colSpan={2}></TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      <DataTable<ExpenseRow>
+        tableId={`expenses-${relatedType}`}
+        loading={isLoading}
+        data={expenses}
+        emptyMessage="No expenses recorded yet."
+        selectable
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        bulkActions={(ids) => (
+          <>
+            <Button
+              size="sm"
+              className="h-8"
+              disabled={bulkApproveMutation.isPending}
+              onClick={() => bulkApproveMutation.mutate({ ids: Array.from(ids), approved: true })}
+            >
+              <CheckCircle2 className="mr-1 h-4 w-4" />
+              Approve {ids.size}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8"
+              disabled={bulkApproveMutation.isPending}
+              onClick={() => bulkApproveMutation.mutate({ ids: Array.from(ids), approved: false })}
+            >
+              <Undo2 className="mr-1 h-4 w-4" />
+              Mark pending
+            </Button>
+          </>
+        )}
+        columns={[
+          {
+            key: 'expense_date',
+            header: 'Date',
+            width: '14%',
+            render: (e) => formatDate(e.expense_date),
+            filter: { type: 'date-range', accessor: (e) => e.expense_date },
+          },
+          {
+            key: 'expense_type',
+            header: 'Type',
+            width: '18%',
+            render: (e) => (
+              <div className="flex items-center gap-2">
+                {GALLONS_EXPENSE_TYPES.includes(e.expense_type) && <Fuel className="h-4 w-4 text-muted-foreground" />}
+                {e.expense_type}
+              </div>
+            ),
+            filter: { type: 'text', accessor: (e) => e.expense_type },
+          },
+          {
+            key: 'vendor',
+            header: 'Vendor',
+            width: '20%',
+            render: (e) => <span className="text-muted-foreground">{e.vendor || '-'}</span>,
+            filter: { type: 'text', accessor: (e) => e.vendor },
+          },
+          {
+            key: 'amount',
+            header: 'Amount',
+            width: '14%',
+            render: (e) => <span className="font-medium">{formatCurrency(e.amount)}</span>,
+          },
+          {
+            key: 'gallons',
+            header: 'Gallons',
+            width: '12%',
+            render: (e) => <span className="text-muted-foreground">{e.gallons ? `${e.gallons} gal` : '-'}</span>,
+          },
+          {
+            key: 'is_approved',
+            header: 'Status',
+            width: '12%',
+            render: (e) => (
+              e.is_approved ? (
+                <Badge variant="outline" className="bg-success/10 text-success border-success/20">Approved</Badge>
+              ) : (
+                <Badge variant="outline" className="bg-muted text-muted-foreground">Pending</Badge>
+              )
+            ),
+          },
+          {
+            key: 'actions',
+            header: '',
+            width: '10%',
+            render: (e) => (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-destructive"
+                onClick={(ev) => { ev.stopPropagation(); deleteMutation.mutate(e.id); }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
