@@ -237,6 +237,18 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
               </div>
             )}
             <div className="flex-1" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden md:inline-flex h-7 gap-2 text-xs text-muted-foreground"
+              onClick={() => window.dispatchEvent(new CustomEvent('open-command-palette'))}
+              aria-label="Open command palette"
+            >
+              <span>Search…</span>
+              <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium">
+                ⌘K
+              </kbd>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7 text-muted-foreground">

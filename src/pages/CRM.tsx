@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -71,6 +72,17 @@ function AgentCRM() {
   const { deleteContact: deleteCRMMutation } = useContactMutations();
   const { deleteResource: deleteResourceMutation } = useResourceMutations();
   const { deleteFacility: deleteFacilityMutation } = useFacilityMutations();
+
+  // Open contact detail sheet from ?contactId= (command palette deep-link)
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get('contactId');
+    if (id && contacts && contacts.length > 0) {
+      const match = contacts.find((c) => c.id === id);
+      if (match) setDetailContact(match);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, contacts]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return contacts;

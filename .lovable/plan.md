@@ -1,42 +1,56 @@
-## Problem
+## Goal
 
-Truck **433780** still shows on the Safety page as needing inspection. Its `next_inspection_date` in the database is `2026-04-11` (expired), but a completed inspection work order exists with `entry_date = 2026-04-09` and `completed_at = 2026-04-10`. The expected next inspection date should be `2026-08-07` (120 days after the inspection).
+Turn `src/components/shared/CommandPalette.tsx` into a keyboard-first dispatcher tool: global Ctrl/Cmd+K open, full arrow/enter navigation (already provided by shadcn `Command`), dispatcher quick actions, and live search across CRM contacts + active loads simultaneously.
 
-## Root cause
+## Changes
 
-The recent client-side fix in `useCompleteWorkOrder` (which auto-advances `next_inspection_date` by 120 days when an inspection work order is completed) only runs for **new** completions going forward. The April 10 completion happened before that fix shipped, so this truck's record was never updated. Any other path that flips a work order to `completed` (bulk updates, prior code paths, manual edits) also bypasses the client logic.
+### 1. Keep existing global shortcut
+- `Ctrl/Cmd + K` toggle is already wired in the component and mounted globally via `DashboardLayout`. Verify and keep.
+- Add `Esc` close (already built into `CommandDialog`).
+- Add a small "⌘K" hint in the dashboard header so users discover it.
 
-## Plan
+### 2. Add dispatcher quick actions
+Extend `QUICK_ACTIONS` (visible to `owner` + `dispatcher`):
+- **New Load** → `/fleet-loads?action=new-load` (already exists, keep)
+- **Assign Driver** → `/dispatcher-dashboard?action=assign-driver` (opens the existing DriverAssignmentPanel modal)
+- **Change Load Status** → `/fleet-loads?action=bulk-status` (opens existing BulkStatusEditDialog)
+- **Search Broker** → focuses the palette input prefixed with `broker:` to filter CRM results to brokers
+- Keep existing New Maintenance / Upload Expense entries
 
-### 1. Add a Postgres trigger on `work_orders` (single source of truth)
+For the two new dashboard/loads actions, wire the receiving pages to read the `?action=` query param on mount and open the corresponding dialog (pattern already used elsewhere in the app — `FleetLoads` reads `action=new-load`).
 
-Create `AFTER INSERT OR UPDATE` trigger on `work_orders` that fires when:
-- `status` becomes `'completed'`, AND
-- `service_type = 'inspection'` OR `'inspection' = ANY(service_types)`
+### 3. Live search across CRM + active loads
+Add a debounced search (~200ms) on the palette input. When `query.length >= 2`:
 
-The trigger function:
-- Picks the inspection date: `COALESCE(NEW.estimated_completion, NEW.entry_date, NEW.completed_at::date)`.
-- Sets `trucks.next_inspection_date = inspection_date + interval '120 days'` for `trucks.id = NEW.truck_id`.
-- Only updates if the new date is later than the existing `next_inspection_date` (so we never accidentally pull a date earlier than what's stored).
+- Query `crm_contacts` (`select id, company_name, contact_name, contact_type, city, state`) — `ilike` on `company_name`, `contact_name`, `email`; limit 8; filter by `is_active=true`.
+- Query `fleet_loads` (`select id, load_number, origin, destination, status, driver_id`) — `ilike` on `load_number`, `origin`, `destination`; exclude `status in (delivered, cancelled)`; limit 8.
+- Run both with `Promise.all` inside a `useQuery(['palette-search', query])` with `staleTime: 30s` and `enabled: query.length >= 2`.
+- RLS already scopes results to the user's org — no extra filter needed.
 
-This guarantees correctness regardless of how a work order is completed (UI, bulk import, future code paths).
+Render two new `CommandGroup`s above Navigation:
+- **Contacts** — icon by contact_type, label `company_name — contact_name`, sub `city, state`. Selecting navigates to `/crm?contactId=<id>` (CRM page already supports opening the detail sheet via query param; if not, add a small effect there).
+- **Active Loads** — label `#load_number  origin → destination`, status badge. Selecting navigates to `/fleet-loads?loadId=<id>`.
 
-### 2. One-time backfill
+Keep existing Navigation + Quick Actions groups visible when query is empty; hide them once a search is active to keep results focused (optional: still show Quick Actions).
 
-Run a single migration statement that, for every truck, looks at its most recent completed inspection work order and sets `next_inspection_date = inspection_date + 120 days` when that result is later than the currently stored value. This will immediately fix truck 433780 and any other trucks in the same state.
+### 4. Keyboard navigation
+shadcn `Command` (cmdk) already handles ↑/↓/Enter/typeahead. No extra work beyond making sure each `CommandItem` has a stable `value` prop so cmdk's fuzzy filter doesn't fight the async results — we'll set `shouldFilter={false}` on the `Command` when a remote query is active and rely on the server `ilike`.
 
-### 3. Keep the existing client logic
+### 5. Loading + empty states
+- Show a `CommandLoading` row ("Searching…") while the query is pending.
+- Keep `CommandEmpty` for "No results found."
 
-Leave the `useCompleteWorkOrder` / `useRevertWorkOrder` updates in `src/hooks/useMaintenanceData.ts` as-is. They remain useful for instant UI feedback and offline behavior; the trigger acts as a safety net.
+### 6. Files to touch
 
-### 4. Verification
+- `src/components/shared/CommandPalette.tsx` — main rewrite (add search, groups, actions, debounce, query).
+- `src/pages/DispatcherDashboard.tsx` — handle `?action=assign-driver` to open the assignment panel.
+- `src/pages/FleetLoads.tsx` — handle `?action=bulk-status` and `?loadId=` (loadId may already exist; verify).
+- `src/pages/CRM.tsx` — handle `?contactId=` to open the contact detail sheet (verify; add if missing).
+- `src/components/layout/DashboardLayout.tsx` — add small "⌘K" hint button in header that opens the palette (dispatch a custom event the palette listens for, or lift `open` state via a tiny zustand/context — simplest: dispatch `window` event `open-command-palette`).
 
-- Re-query truck 433780: `next_inspection_date` should be `2026-08-07`.
-- Reload `/safety`: truck should drop off the Inspections alert list.
-- Complete a fresh test inspection work order on another truck and confirm both client cache and DB row update.
+### Technical notes
 
-## Out of scope
-
-- No changes to the Safety page UI.
-- No changes to the 120-day interval (matches current product logic).
-- No changes to other work-order types (PM, repair, etc.).
+- Use existing `supabase` client; no new deps.
+- Debounce via `useDebouncedCallback` (already in `src/hooks/`).
+- All new colors/icons use existing semantic tokens — no design-system changes.
+- Demo mode: searches still work (read-only); quick actions that mutate are already guarded by `useDemoGuard` on their target pages.

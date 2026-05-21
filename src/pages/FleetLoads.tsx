@@ -239,11 +239,24 @@ export default function FleetLoads() {
 
   // Auto-open dialog from command palette quick action
   useEffect(() => {
-    if (searchParams.get('action') === 'new-load') {
+    const action = searchParams.get('action');
+    const loadId = searchParams.get('loadId');
+    if (action === 'new-load') {
       openDialog();
       setSearchParams({}, { replace: true });
+    } else if (action === 'bulk-status') {
+      if (selectedIds.size > 0) {
+        setMassEditOpen(true);
+      } else {
+        toast.info('Select one or more loads first, then press ⌘K → Change Load Status');
+      }
+      setSearchParams({}, { replace: true });
+    } else if (loadId) {
+      const load = loads?.find((l: any) => l.id === loadId);
+      if (load) openDialog(load);
+      setSearchParams({}, { replace: true });
     }
-  }, [searchParams]);
+  }, [searchParams, loads]);
 
   const closeDialog = () => {
     setDialogOpen(false);
