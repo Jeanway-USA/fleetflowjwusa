@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Package, MapPin, User, Truck, Eye, MoreHorizontal, Calendar, DollarSign, Route, Pencil, Trash2 } from 'lucide-react';
+import { Package, MapPin, User, Truck, Eye, MoreHorizontal, Calendar, DollarSign, Route, Pencil, Trash2, LayoutGrid, Table as TableIcon, ChevronDown } from 'lucide-react';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { format, parseISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { LoadRouteMap } from '@/components/driver/LoadRouteMap';
+import { DataTable } from '@/components/shared/DataTable';
+import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
