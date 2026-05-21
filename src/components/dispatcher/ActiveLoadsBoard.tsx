@@ -210,12 +210,130 @@ export function ActiveLoadsBoard() {
               </CardTitle>
               <CardDescription>{loads?.length || 0} loads in pipeline</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={() => navigate('/fleet-loads')}>
-              View All
-            </Button>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-md border border-border bg-muted/30 p-0.5">
+                <Button
+                  variant={view === 'cards' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => setView('cards')}
+                  aria-pressed={view === 'cards'}
+                  aria-label="Card view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={view === 'table' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2"
+                  onClick={() => setView('table')}
+                  aria-pressed={view === 'table'}
+                  aria-label="Table view"
+                >
+                  <TableIcon className="h-4 w-4" />
+                </Button>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => navigate('/fleet-loads')}>
+                View All
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
+          {view === 'table' ? (
+            <DataTable<ActiveLoad>
+              tableId="active-loads-dispatcher"
+              data={loads || []}
+              emptyMessage="No active loads"
+              emptyIcon={Package}
+              onRowClick={(load) => { setSelectedLoad(load); setDetailsOpen(true); }}
+              selectable
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
+              bulkActions={(ids) => (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" className="h-8" disabled={bulkStatusMutation.isPending}>
+                      Change Status
+                      <ChevronDown className="ml-1 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {STATUS_OPTIONS.map(s => (
+                      <DropdownMenuItem
+                        key={s.value}
+                        onClick={() => bulkStatusMutation.mutate({ ids: Array.from(ids), status: s.value })}
+                      >
+                        {s.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              columns={[
+                {
+                  key: 'landstar_load_id',
+                  header: 'Load #',
+                  width: '12%',
+                  render: (l) => <span className="font-medium">{l.landstar_load_id || l.id.slice(0, 8)}</span>,
+                  filter: { type: 'text', accessor: (l) => l.landstar_load_id || l.id },
+                },
+                {
+                  key: 'origin',
+                  header: 'Origin',
+                  width: '16%',
+                  render: (l) => <span className="truncate">{l.origin}</span>,
+                  filter: { type: 'text', accessor: (l) => l.origin },
+                },
+                {
+                  key: 'destination',
+                  header: 'Destination',
+                  width: '16%',
+                  render: (l) => <span className="truncate">{l.destination}</span>,
+                  filter: { type: 'text', accessor: (l) => l.destination },
+                },
+                {
+                  key: 'driver',
+                  header: 'Driver',
+                  width: '14%',
+                  hiddenOnMobile: true,
+                  render: (l) => l.driver ? `${l.driver.first_name} ${l.driver.last_name}` : <span className="text-muted-foreground">Unassigned</span>,
+                  filter: { type: 'text', accessor: (l) => l.driver ? `${l.driver.first_name} ${l.driver.last_name}` : '' },
+                },
+                {
+                  key: 'truck',
+                  header: 'Truck',
+                  width: '8%',
+                  hiddenOnMobile: true,
+                  render: (l) => l.truck?.unit_number || <span className="text-muted-foreground">—</span>,
+                },
+                {
+                  key: 'pickup_date',
+                  header: 'Pickup',
+                  width: '12%',
+                  render: (l) => l.pickup_date ? format(new Date(l.pickup_date + 'T00:00:00'), 'MMM d') : '—',
+                  filter: { type: 'date-range', accessor: (l) => l.pickup_date },
+                },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  width: '12%',
+                  render: (l) => (
+                    <Badge variant="outline" className={statusColors[l.status] || ''}>
+                      {l.status.replace('_', ' ')}
+                    </Badge>
+                  ),
+                  filter: { type: 'text', accessor: (l) => l.status },
+                },
+                {
+                  key: 'rate',
+                  header: 'Rate',
+                  width: '10%',
+                  render: (l) => l.rate ? <span className="font-medium">${l.rate.toLocaleString()}</span> : '—',
+                },
+              ]}
+            />
+          ) : (
           {loads && loads.length > 0 ? (
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
               {loads.map((load) => {
