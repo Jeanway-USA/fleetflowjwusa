@@ -249,6 +249,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
                 ⌘K
               </kbd>
             </Button>
+            <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7 text-muted-foreground">
                   <CircleHelp className="h-3.5 w-3.5" />
