@@ -9,10 +9,12 @@ export function SuperAdminGuard({ children }: { children: ReactNode }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
-    if (loading || !user) {
+    if (loading) return;
+    if (!user) {
       setChecking(false);
       return;
     }
+    setChecking(true);
     supabase.rpc('is_super_admin').then(({ data, error }) => {
       setIsSuperAdmin(!error && data === true);
       setChecking(false);

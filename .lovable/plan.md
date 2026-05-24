@@ -1,42 +1,52 @@
-## Goal
-Make `DataTable` a true bulk-ops table (selection already exists), then apply it to active loads and expenses with real bulk mutations.
+## Problem
 
-## 1. `src/components/shared/DataTable.tsx` — upgrades
-Selection + `bulkActions` prop are already implemented. Add:
+Clicking **Super Admin** redirects you back to `/` even though your account is in `super_admins` and the sidebar correctly shows the button.
 
-- **Screen-floating action bar**: replace the in-container sticky bar with a `fixed bottom-6 left-1/2 -translate-x-1/2 z-50` card (rounded, `bg-background border shadow-lg`, animated `slide-in-from-bottom`). Shows count, Clear button, and `bulkActions(selectedIds)`. Rendered via a portal-less `fixed` div so it floats over the whole viewport.
-- **Column filters**: extend `Column<T>` with `filter?: { type: 'text' } | { type: 'date-range'; accessor: (item: T) => string | null }`. Render a second header row with `<Input>` for text columns and two compact date inputs (from / to) for date-range columns. Filter state held internally (`Record<string, string | { from?: string; to?: string }>`); data is filtered before being passed to the virtualizer. Add a small "Clear filters" link when any filter is active. Hide the filter row behind a `Filter` toggle button in the toolbar (off by default to avoid noise on tables that don't need it).
-- Keep all existing behavior (density, column visibility, CSV export, virtualization, double-click).
+## Root cause
 
-## 2. Database — `expenses.is_approved`
-Migration adds:
-- `is_approved boolean not null default false`
-- `approved_at timestamptz`
-- `approved_by uuid` (no FK to `auth.users`)
-- Index on `(org_id, is_approved)`
+`src/components/shared/SuperAdminGuard.tsx` has a race condition in its effect:
 
-No RLS changes — existing `Owner payroll can access expenses` policy already covers UPDATEs.
+```ts
+useEffect(() => {
+  if (loading || !user) {
+    setChecking(false);   // <-- sets checking=false during initial loading
+    return;
+  }
+  supabase.rpc('is_super_admin').then(...)
+}, [user, loading]);
+```
 
-## 3. `src/components/dispatcher/ActiveLoadsBoard.tsx`
-- Add a `view` state (`'cards' | 'table'`) with a segmented toggle in the card header (Cards / Table icons).
-- Keep existing card rendering for `'cards'`.
-- For `'table'`, render the upgraded `DataTable` with columns: checkbox, Load #, Origin, Destination, Driver, Truck, Pickup (date-range filter), Status (text filter), Rate, RPM. `selectable`, `selectedIds` state, `bulkActions={(ids) => <BulkStatusMenu ids={ids} />}`.
-- `BulkStatusMenu`: shadcn `DropdownMenu` with items `Assigned`, `Loading`, `In Transit`, `Unloading`, `Delivered`, `Cancelled`. On click, run `useMutation` doing `supabase.from('fleet_loads').update({ status }).in('id', [...ids])`, toast result, invalidate `['active-loads-dispatcher']`, clear selection.
-- Keep the existing details Dialog (open via row click in table view).
+Timeline when navigating to `/super-admin`:
+1. First render: `loading=true` → effect runs → `setChecking(false)`. Render shows spinner because `loading` is still true.
+2. `loading` flips to `false`. Effect re-runs, fires the `is_super_admin` RPC. But `checking` is already `false` and `isSuperAdmin` is still `false`.
+3. Render sees `!loading && !checking && !isSuperAdmin` → returns `<Navigate to="/" />` **before the RPC resolves**.
 
-## 4. `src/components/shared/ExpensesList.tsx`
-- Replace the plain `<Table>` with `DataTable`. Columns: checkbox, Date (date-range filter), Type (text filter), Vendor (text filter), Amount, Gallons, Approved (badge: `Pending` / `Approved`), Actions (existing delete button). Keep totals row by rendering a footer below the table using the filtered totals (compute from same filter state isn't accessible from outside — simplest: show "Total" using full `expenses` total above the table; sufficient for this scope).
-- `selectedIds` state. `bulkActions={(ids) => (<><Button onClick={approveAll}>Approve N</Button><Button variant="outline" onClick={unapproveAll}>Mark pending</Button></>)}`.
-- `approveMutation`: `supabase.from('expenses').update({ is_approved: true, approved_at: new Date().toISOString(), approved_by: (await supabase.auth.getUser()).data.user?.id }).in('id', [...ids])`. Invalidate `queryKey` + `['expenses']`. Toast, clear selection.
+The sidebar works because `AuthContext.isSuperAdmin` defaults differently and doesn't gate navigation.
 
-## Technical notes
-- Filtering happens client-side inside `DataTable` (data sets here are bounded — active loads, per-load/truck expenses).
-- Date-range comparison uses ISO strings (`YYYY-MM-DD`) — both query value and column accessor produce that shape; lexicographic compare is correct.
-- Floating bar uses semantic tokens only (`bg-background`, `border-border`, `text-foreground`, `text-muted-foreground`) per the design system. No `text-white` / hex colors.
-- Memory rule respected: when parsing `expense_date` strings for the date-range accessor, no parsing needed (string compare on `YYYY-MM-DD`).
+## Fix
 
-## Files touched
-- edit `src/components/shared/DataTable.tsx`
-- edit `src/components/dispatcher/ActiveLoadsBoard.tsx`
-- edit `src/components/shared/ExpensesList.tsx`
-- new migration: add `is_approved`, `approved_at`, `approved_by` to `expenses`
+Edit only `src/components/shared/SuperAdminGuard.tsx`:
+
+- Keep `checking=true` while `loading` is true (don't prematurely clear it).
+- Reset `checking=true` before kicking off the RPC.
+- Only `setChecking(false)` after the RPC resolves, or when there's confirmed no user.
+
+Resulting effect:
+
+```ts
+useEffect(() => {
+  if (loading) return;                  // wait for auth to settle
+  if (!user) { setChecking(false); return; }
+  setChecking(true);
+  supabase.rpc('is_super_admin').then(({ data, error }) => {
+    setIsSuperAdmin(!error && data === true);
+    setChecking(false);
+  });
+}, [user, loading]);
+```
+
+No other files, no DB or RLS changes — `super_admins` membership is already correct.
+
+## Verification
+
+After the fix, clicking Super Admin from the sidebar (or navigating to `/super-admin` directly) should briefly show the spinner, then render the Super Admin Dashboard.
