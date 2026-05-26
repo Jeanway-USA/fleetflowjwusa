@@ -1,52 +1,19 @@
 ## Problem
 
-Clicking **Super Admin** redirects you back to `/` even though your account is in `super_admins` and the sidebar correctly shows the button.
+On `/fleet-loads`, the totals row (Loads, Rate, FSC, Accessorials, Gross Revenue, Net Revenue, Settlement, Miles) sums **every** load in the filtered list — including loads with `status = 'cancelled'`. Cancelled loads should not contribute to gross or net income.
 
-## Root cause
+Other revenue surfaces (Finance P&L, Executive Dashboard, Broker Rate History) already filter to `status = 'delivered'`, so they are unaffected.
 
-`src/components/shared/SuperAdminGuard.tsx` has a race condition in its effect:
+## Change
 
-```ts
-useEffect(() => {
-  if (loading || !user) {
-    setChecking(false);   // <-- sets checking=false during initial loading
-    return;
-  }
-  supabase.rpc('is_super_admin').then(...)
-}, [user, loading]);
-```
-
-Timeline when navigating to `/super-admin`:
-1. First render: `loading=true` → effect runs → `setChecking(false)`. Render shows spinner because `loading` is still true.
-2. `loading` flips to `false`. Effect re-runs, fires the `is_super_admin` RPC. But `checking` is already `false` and `isSuperAdmin` is still `false`.
-3. Render sees `!loading && !checking && !isSuperAdmin` → returns `<Navigate to="/" />` **before the RPC resolves**.
-
-The sidebar works because `AuthContext.isSuperAdmin` defaults differently and doesn't gate navigation.
-
-## Fix
-
-Edit only `src/components/shared/SuperAdminGuard.tsx`:
-
-- Keep `checking=true` while `loading` is true (don't prematurely clear it).
-- Reset `checking=true` before kicking off the RPC.
-- Only `setChecking(false)` after the RPC resolves, or when there's confirmed no user.
-
-Resulting effect:
+In `src/pages/FleetLoads.tsx`, exclude cancelled loads from the totals reducer only. The table itself still displays cancelled loads (so users can see and manage them) — only the aggregated KPI row changes.
 
 ```ts
-useEffect(() => {
-  if (loading) return;                  // wait for auth to settle
-  if (!user) { setChecking(false); return; }
-  setChecking(true);
-  supabase.rpc('is_super_admin').then(({ data, error }) => {
-    setIsSuperAdmin(!error && data === true);
-    setChecking(false);
-  });
-}, [user, loading]);
+const totals = filteredLoads
+  .filter((l: any) => l.status !== 'cancelled')
+  .reduce((acc: any, load: any) => ({ ... }), { ... });
 ```
 
-No other files, no DB or RLS changes — `super_admins` membership is already correct.
+The `loads` count in totals will also drop cancelled rows so "Loads / Gross / Net" stay internally consistent.
 
-## Verification
-
-After the fix, clicking Super Admin from the sidebar (or navigating to `/super-admin` directly) should briefly show the spinner, then render the Super Admin Dashboard.
+No database, RLS, or other component changes needed.

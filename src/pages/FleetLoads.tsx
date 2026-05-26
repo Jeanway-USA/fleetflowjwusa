@@ -394,17 +394,20 @@ export default function FleetLoads() {
   };
 
   // Calculate totals
-  const totals = filteredLoads.reduce((acc: any, load: any) => ({
-    loads: acc.loads + 1,
-    rate: acc.rate + (load.rate || 0),
-    fuelSurcharge: acc.fuelSurcharge + (load.fuel_surcharge || 0),
-    accessorials: acc.accessorials + getLoadAccessorialsTotal(load.id),
-    grossRevenue: acc.grossRevenue + (load.gross_revenue || 0),
-    netRevenue: acc.netRevenue + (load.net_revenue || 0),
-    settlement: acc.settlement + (load.settlement || 0),
-    bookedMiles: acc.bookedMiles + (load.booked_miles || 0),
-    actualMiles: acc.actualMiles + getDisplayMiles(load),
-  }), { loads: 0, rate: 0, fuelSurcharge: 0, accessorials: 0, grossRevenue: 0, netRevenue: 0, settlement: 0, bookedMiles: 0, actualMiles: 0 });
+  // Exclude cancelled loads from totals — they should not count toward gross/net income.
+  const totals = filteredLoads
+    .filter((load: any) => load.status !== 'cancelled')
+    .reduce((acc: any, load: any) => ({
+      loads: acc.loads + 1,
+      rate: acc.rate + (load.rate || 0),
+      fuelSurcharge: acc.fuelSurcharge + (load.fuel_surcharge || 0),
+      accessorials: acc.accessorials + getLoadAccessorialsTotal(load.id),
+      grossRevenue: acc.grossRevenue + (load.gross_revenue || 0),
+      netRevenue: acc.netRevenue + (load.net_revenue || 0),
+      settlement: acc.settlement + (load.settlement || 0),
+      bookedMiles: acc.bookedMiles + (load.booked_miles || 0),
+      actualMiles: acc.actualMiles + getDisplayMiles(load),
+    }), { loads: 0, rate: 0, fuelSurcharge: 0, accessorials: 0, grossRevenue: 0, netRevenue: 0, settlement: 0, bookedMiles: 0, actualMiles: 0 });
 
   // Format intermediate stops for notes
   const formatIntermediateStops = (stops: any[]): string => {
