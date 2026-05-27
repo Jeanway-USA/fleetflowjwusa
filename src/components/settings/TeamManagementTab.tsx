@@ -35,6 +35,7 @@ const roleLabels: Record<AppRole, string> = {
   dispatcher: 'Dispatcher',
   safety: 'Safety',
   driver: 'Driver',
+  maintenance: 'Maintenance Staff',
 };
 
 const roleBadgeVariant: Record<AppRole, 'default' | 'secondary' | 'outline'> = {
@@ -43,6 +44,7 @@ const roleBadgeVariant: Record<AppRole, 'default' | 'secondary' | 'outline'> = {
   dispatcher: 'secondary',
   safety: 'outline',
   driver: 'outline',
+  maintenance: 'outline',
 };
 
 export function TeamManagementTab() {
