@@ -4,14 +4,28 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { LoadingButton } from '@/components/shared/LoadingButton';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { DriverFaultReportsPanel } from '@/components/maintenance/DriverFaultReportsPanel';
 import { PMNotificationsPanel } from '@/components/maintenance/PMNotificationsPanel';
 import {
   useFleetAvailability,
   useActiveWorkOrders,
+  useTodaysWorkOrders,
+  useStartWorkOrder,
+  type TodayUrgency,
+  type TodaysWorkOrder,
 } from '@/hooks/useMaintenanceData';
-import { useDriverFaultReports } from '@/hooks/useDriverFaultReports';
+import { useDriverFaultReports, type DriverFaultReport } from '@/hooks/useDriverFaultReports';
+import { useToast } from '@/hooks/use-toast';
 import {
   Truck,
   Wrench,
@@ -20,14 +34,16 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowRight,
+  CheckCircle2,
+  PlayCircle,
+  Calendar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { subDays } from 'date-fns';
+import { subDays, formatDistanceToNow } from 'date-fns';
 
 type Trend = {
   direction: 'up' | 'down' | 'flat';
   label: string;
-  /** When true, treat the direction as positive (green); otherwise it's negative (red). */
   positive: boolean;
 };
 
@@ -200,7 +216,7 @@ function AvgRepairTurnaroundCard() {
   };
 
   const delta = prior > 0 ? hours - prior : 0;
-  const improving = delta < 0; // less time = better
+  const improving = delta < 0;
   const direction: Trend['direction'] = prior === 0 || Math.abs(delta) < 0.5 ? 'flat' : improving ? 'down' : 'up';
 
   return (
@@ -219,10 +235,206 @@ function AvgRepairTurnaroundCard() {
   );
 }
 
-export default function MaintenanceDashboardHome() {
-  const navigate = useNavigate();
-  const handleViewTruck = () => navigate('/maintenance');
+function UrgencyBadge({ urgency }: { urgency: TodayUrgency }) {
+  if (urgency === 'high') return <Badge variant="destructive">High</Badge>;
+  if (urgency === 'medium')
+    return (
+      <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400">
+        Medium
+      </Badge>
+    );
+  return <Badge variant="secondary">Low</Badge>;
+}
 
+function TodaysPrioritiesCard() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { data, isLoading } = useTodaysWorkOrders();
+  const startMutation = useStartWorkOrder();
+
+  const items = data || [];
+
+  const handleStart = (e: React.MouseEvent, wo: TodaysWorkOrder) => {
+    e.stopPropagation();
+    startMutation.mutate(wo.id, {
+      onSuccess: () => toast({ title: 'Work started', description: `Truck ${wo.trucks?.unit_number ?? ''} is now in progress.` }),
+      onError: (err: any) => toast({ title: 'Failed to start', description: err?.message ?? 'Try again', variant: 'destructive' }),
+    });
+  };
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-base">Today's Priorities</CardTitle>
+          {!isLoading && (
+            <Badge variant="secondary" className="ml-1">{items.length}</Badge>
+          )}
+        </div>
+        <Button asChild variant="ghost" size="sm" className="gap-1 text-xs">
+          <Link to="/maintenance">
+            View all <ArrowRight className="h-3 w-3" />
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="space-y-2 p-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="px-6 py-10 text-center">
+            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
+            <p className="text-sm text-muted-foreground">No work orders scheduled for today.</p>
+            <Button asChild variant="link" size="sm" className="mt-1">
+              <Link to="/maintenance">Schedule one →</Link>
+            </Button>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[110px]">Truck</TableHead>
+                <TableHead>Issue</TableHead>
+                <TableHead className="w-[110px]">Urgency</TableHead>
+                <TableHead className="w-[130px] text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map(wo => {
+                const isInProgress = wo.status === 'in_progress';
+                const issue = wo.description || wo.service_type || '—';
+                return (
+                  <TableRow
+                    key={wo.id}
+                    onClick={() => navigate('/maintenance')}
+                    className="cursor-pointer transition-colors hover:bg-muted/50"
+                  >
+                    <TableCell className="font-medium">
+                      {wo.trucks?.unit_number ?? '—'}
+                    </TableCell>
+                    <TableCell className="max-w-[320px]">
+                      <span className="line-clamp-1 text-sm">{issue}</span>
+                    </TableCell>
+                    <TableCell>
+                      <UrgencyBadge urgency={wo.urgency} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <LoadingButton
+                        size="sm"
+                        variant={isInProgress ? 'secondary' : 'default'}
+                        disabled={isInProgress}
+                        loading={startMutation.isPending && startMutation.variables === wo.id}
+                        onClick={(e) => handleStart(e, wo)}
+                        className="gap-1"
+                      >
+                        <PlayCircle className="h-3.5 w-3.5" />
+                        {isInProgress ? 'In Progress' : 'Start Work'}
+                      </LoadingButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function priorityBadge(priority: DriverFaultReport['priority']) {
+  if (priority === 'critical' || priority === 'high')
+    return <Badge variant="destructive" className="capitalize">{priority}</Badge>;
+  if (priority === 'medium')
+    return (
+      <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400 capitalize">
+        {priority}
+      </Badge>
+    );
+  return <Badge variant="secondary" className="capitalize">{priority}</Badge>;
+}
+
+function LiveDriverAlertsCard() {
+  const navigate = useNavigate();
+  const { data, isLoading } = useDriverFaultReports();
+  const alerts = (data || []).filter(r => r.status === 'submitted').slice(0, 6);
+
+  return (
+    <Card className="border-destructive/40">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-destructive/20 bg-destructive/5">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          <div>
+            <CardTitle className="text-base">Live Driver Alerts</CardTitle>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Unverified — needs triage
+            </p>
+          </div>
+        </div>
+        {!isLoading && alerts.length > 0 && (
+          <Badge variant="destructive">{alerts.length}</Badge>
+        )}
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="space-y-2 p-4">
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+          </div>
+        ) : alerts.length === 0 ? (
+          <div className="px-6 py-10 text-center">
+            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
+            <p className="text-sm text-muted-foreground">No new driver alerts.</p>
+          </div>
+        ) : (
+          <ul className="divide-y">
+            {alerts.map(r => {
+              const driver = `${r.drivers?.first_name ?? ''} ${r.drivers?.last_name ?? ''}`.trim() || 'Driver';
+              return (
+                <li
+                  key={r.id}
+                  onClick={() => navigate('/maintenance')}
+                  className="cursor-pointer px-4 py-3 transition-colors hover:bg-destructive/5"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {priorityBadge(r.priority)}
+                      <span className="text-sm font-medium truncate">
+                        {r.trucks?.unit_number ?? '—'} · {driver}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                      {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">
+                    <span className="capitalize font-medium text-foreground/80">{r.issue_type}</span>
+                    {' — '}
+                    {r.description}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="border-t px-4 py-2 text-right">
+          <Button asChild variant="ghost" size="sm" className="gap-1 text-xs">
+            <Link to="/maintenance">
+              View all driver reports <ArrowRight className="h-3 w-3" />
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function MaintenanceDashboardHome() {
   return (
     <>
       <PageHeader
@@ -251,24 +463,18 @@ export default function MaintenanceDashboardHome() {
         </section>
 
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-base">Driver Fault Reports</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DriverFaultReportsPanel onViewTruck={handleViewTruck} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">PM Notifications</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <PMNotificationsPanel />
-            </CardContent>
-          </Card>
+          <TodaysPrioritiesCard />
+          <LiveDriverAlertsCard />
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">PM Notifications</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <PMNotificationsPanel />
+          </CardContent>
+        </Card>
       </div>
     </>
   );
