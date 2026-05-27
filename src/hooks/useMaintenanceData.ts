@@ -1023,6 +1023,8 @@ export function useCompleteWorkOrder() {
       queryClient.invalidateQueries({ queryKey: ['service-schedules-120day'] });
       queryClient.invalidateQueries({ queryKey: ['pm-schedule'] });
       queryClient.invalidateQueries({ queryKey: ['trucks'] });
+      queryClient.invalidateQueries({ queryKey: ['driver-fault-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['driver-maintenance-requests'] });
     },
   });
 }

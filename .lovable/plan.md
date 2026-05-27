@@ -1,33 +1,26 @@
 ## Goal
 
-Let the driver see their maintenance requests (current + history) on the Driver Dashboard, and chat back-and-forth with the maintenance team — mirroring the chat that already exists on the maintenance side.
+When a work order is marked **completed**, automatically close the matching driver fault report so it disappears from the Maintenance Dashboard's "Driver Fault Reports" panel (and shows as Completed in the driver's history).
 
-## What's already in place
+## How fault reports link to work orders
 
-- Table `maintenance_request_messages` + RLS allow driver ↔ maintenance chat.
-- `MaintenanceThread` (used today inside the maintenance `DriverFaultReportsPanel`) handles the full conversation UI with realtime updates.
-- `MaintenanceRequestCard` driver-side component is already written (with inline `MaintenanceThread` + a "Chat with shop" toggle and a "Report Issue" dialog) — but it's never imported on the dashboard, which is why the driver sees nothing.
+`useConvertFaultReportToWorkOrder` already writes `admin_notes = 'Converted to work order <wo.id>'` on the maintenance request when the shop converts it. We use that same link to close the request when the work order is done.
 
 ## Changes
 
-1. **New hook** `src/hooks/useDriverMaintenanceRequests.ts`
-   - Fetches `maintenance_requests` for the signed-in driver, joining `trucks(unit_number)`, ordered newest-first.
-   - Subscribes to realtime inserts/updates so new shop messages and status changes refresh the list.
+1. **Migration — DB trigger on `work_orders`**
+   - Create `public.complete_linked_maintenance_request()` (SECURITY DEFINER, `search_path = public`).
+   - When `NEW.status = 'completed'` and `OLD.status IS DISTINCT FROM 'completed'`, run:
+     ```sql
+     UPDATE public.maintenance_requests
+     SET status = 'completed', updated_at = now()
+     WHERE org_id = NEW.org_id
+       AND status <> 'completed'
+       AND admin_notes LIKE 'Converted to work order ' || NEW.id::text || '%';
+     ```
+   - Attach `AFTER UPDATE OF status ON public.work_orders` trigger calling that function.
 
-2. **Update `src/components/driver/MaintenanceRequestCard.tsx`**
-   - Use the new hook internally (drop the `requests` prop) so the card is self-contained.
-   - Default view: open requests (anything not `completed`).
-   - Add a "Show history" toggle that reveals completed requests below.
-   - Keep the existing inline `MaintenanceThread` per request and the "Report Issue" dialog.
-   - Show a small unread/last-message hint and the latest status badge.
+2. **Frontend invalidation** (`src/hooks/useMaintenanceData.ts`)
+   - In the work-order completion mutation's `onSuccess`, also invalidate `['driver-fault-reports']` and `['driver-maintenance-requests']` so the panel + driver dashboard refresh immediately. Realtime subscription on the driver side also already covers this.
 
-3. **Mount on Driver Dashboard** (`src/pages/DriverDashboard.tsx`)
-   - Import and render `MaintenanceRequestCard` just below `DriverRequestsCard`, passing `driverId` and `assignedTruck?.id`. No other layout changes.
-
-No database, RLS, or backend changes are needed — the chat table, policies, and the `MaintenanceThread` component already support driver participation.
-
-## Result
-
-- Driver sees all their submitted issues (current and past) on the dashboard.
-- Each request expands into a live chat thread with the maintenance team, with the same UX the maintenance role already uses.
-- Status updates from the shop (acknowledged / scheduled / in progress / completed) show up automatically.
+No UI/component edits are needed — the existing `useDriverFaultReports` query already filters out `completed` status, so as soon as the request flips to `completed` the card vanishes from the panel and moves to the driver's "Show history" list.
