@@ -75,6 +75,7 @@ function ReportRow({ report, onViewTruck }: { report: DriverFaultReport; onViewT
   const [threadOpen, setThreadOpen] = useState(false);
   const ack = useAcknowledgeFaultReport();
   const convert = useConvertFaultReportToWorkOrder();
+  const del = useDeleteFaultReport();
   const style = PRIORITY_STYLES[report.priority] ?? PRIORITY_STYLES.medium;
   const issueLabel = ISSUE_LABEL[report.issue_type] ?? report.issue_type;
   const acknowledged = report.status === 'acknowledged';
