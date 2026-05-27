@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useServiceHistory, useUpdateCompletedWorkOrder, useDeleteCompletedWorkOrder, useTrucks } from '@/hooks/useMaintenanceData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -11,9 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { format } from 'date-fns';
-import { Search, History, Pencil, Trash2, Loader2, ChevronDown, X, MoreHorizontal } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { format, subDays } from 'date-fns';
+import { Search, History, Pencil, Trash2, Loader2, ChevronDown, X, MoreHorizontal, Filter, Wrench, ClipboardList, DollarSign } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { toast } from 'sonner';
@@ -66,9 +66,38 @@ interface ServiceHistoryTabProps {
   onViewTruck: (truckId: string) => void;
 }
 
+type ServiceFilter = 'all' | 'pm' | 'repair' | 'tire' | 'inspection' | 'other' | 'M1' | 'PM_A' | 'M2' | 'M3';
+type DateRangeFilter = 'all' | '30d' | '90d' | '365d';
+
+const serviceFilterLabels: Record<ServiceFilter, string> = {
+  all: 'All Service Types',
+  pm: 'Preventive Maintenance',
+  repair: 'Repair',
+  tire: 'Tire',
+  inspection: 'Inspection',
+  other: 'Other',
+  M1: 'M1',
+  PM_A: 'PM A',
+  M2: 'M2',
+  M3: 'M3',
+};
+
+const dateRangeLabels: Record<DateRangeFilter, string> = {
+  all: 'All Time',
+  '30d': 'Last 30 Days',
+  '90d': 'Last 90 Days',
+  '365d': 'Last 365 Days',
+};
+
 export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('sh-search') || '');
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
+  const [serviceFilter, setServiceFilter] = useState<ServiceFilter>(
+    () => (localStorage.getItem('sh-service-filter') as ServiceFilter) || 'all'
+  );
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRangeFilter>(
+    () => (localStorage.getItem('sh-date-filter') as DateRangeFilter) || 'all'
+  );
   const [editingItem, setEditingItem] = useState<ServiceHistoryItem | null>(null);
   const [deleteItem, setDeleteItem] = useState<ServiceHistoryItem | null>(null);
   const [serviceTypesOpen, setServiceTypesOpen] = useState(false);
@@ -79,11 +108,54 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
     description: '',
     service_types: [] as string[],
   });
-  
+
+  useEffect(() => { localStorage.setItem('sh-search', searchQuery); }, [searchQuery]);
+  useEffect(() => { localStorage.setItem('sh-service-filter', serviceFilter); }, [serviceFilter]);
+  useEffect(() => { localStorage.setItem('sh-date-filter', dateRangeFilter); }, [dateRangeFilter]);
+
   const { data: history, isLoading } = useServiceHistory(debouncedQuery || undefined);
   const { data: trucks } = useTrucks();
   const updateWorkOrder = useUpdateCompletedWorkOrder();
   const deleteWorkOrder = useDeleteCompletedWorkOrder();
+
+  // Apply client-side filters (service type + date range) on top of server-search
+  const filteredHistory = useMemo(() => {
+    if (!history) return [];
+    const cutoff = (() => {
+      switch (dateRangeFilter) {
+        case '30d': return subDays(new Date(), 30);
+        case '90d': return subDays(new Date(), 90);
+        case '365d': return subDays(new Date(), 365);
+        default: return null;
+      }
+    })();
+    return history.filter(item => {
+      if (cutoff) {
+        const itemDate = new Date(item.date + 'T00:00:00');
+        if (itemDate < cutoff) return false;
+      }
+      if (serviceFilter !== 'all') {
+        const types = item.serviceTypes && item.serviceTypes.length > 0
+          ? item.serviceTypes
+          : item.serviceType.split(',').map(t => t.trim()).filter(Boolean);
+        const match = types.some(t =>
+          t === serviceFilter || t.toLowerCase() === serviceFilter.toLowerCase()
+        );
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [history, serviceFilter, dateRangeFilter]);
+
+  const summary = useMemo(() => {
+    return {
+      filteredCount: filteredHistory.length,
+      woCount: filteredHistory.filter(h => h.source === 'work_order').length,
+      logCount: filteredHistory.filter(h => h.source === 'maintenance_log').length,
+      totalCost: filteredHistory.reduce((sum, h) => sum + (h.cost || 0), 0),
+    };
+  }, [filteredHistory]);
+
 
   // Get truck make for the item being edited
   const editingTruck = useMemo(() => {
@@ -222,29 +294,113 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="relative max-w-sm">
-        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by description, service type, vendor..."
-          className="pl-10 sm:pl-10"
-          value={searchQuery}
-          onChange={handleSearchChange}
-        />
+      {/* Summary strip — mirrors PMFleetHealthSummary */}
+      <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/30 rounded-lg border">
+        <span className="text-sm font-medium text-muted-foreground mr-2">
+          Service History
+        </span>
+
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-foreground/80">
+          <History className="h-3.5 w-3.5" />
+          <span>{summary.filteredCount} Records</span>
+        </div>
+
+        <div className="h-4 w-px bg-border" />
+
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-blue-600 dark:text-blue-400">
+          <Wrench className="h-3.5 w-3.5" />
+          <span>{summary.woCount} Work Orders</span>
+        </div>
+
+        <div className="h-4 w-px bg-border" />
+
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-emerald-600 dark:text-emerald-400">
+          <ClipboardList className="h-3.5 w-3.5" />
+          <span>{summary.logCount} Manual Logs</span>
+        </div>
+
+        <div className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
+          <DollarSign className="h-3.5 w-3.5" />
+          ${summary.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2 })} total in range
+        </div>
       </div>
 
+      {/* Filters row — mirrors PMScheduleFilters */}
+      <div className="flex flex-wrap items-center gap-3 pb-2">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search description, service type, vendor..."
+            className="pl-10 sm:pl-10"
+            value={searchQuery}
+            onChange={handleSearchChange}
+          />
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <Filter className="h-4 w-4" />
+              {serviceFilterLabels[serviceFilter]}
+              <ChevronDown className="h-3 w-3 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuRadioGroup
+              value={serviceFilter}
+              onValueChange={(v) => setServiceFilter(v as ServiceFilter)}
+            >
+              <DropdownMenuRadioItem value="all">All Service Types</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="M1">M1</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="PM_A">PM A</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="M2">M2</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="M3">M3</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="pm">Preventive Maintenance</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="repair">Repair</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="tire">Tire</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="inspection">Inspection</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="other">Other</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              {dateRangeLabels[dateRangeFilter]}
+              <ChevronDown className="h-3 w-3 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuRadioGroup
+              value={dateRangeFilter}
+              onValueChange={(v) => setDateRangeFilter(v as DateRangeFilter)}
+            >
+              <DropdownMenuRadioItem value="all">All Time</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="30d">Last 30 Days</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="90d">Last 90 Days</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="365d">Last 365 Days</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Data container */}
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2, 3, 4, 5].map(i => (
             <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
-      ) : !history?.length ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <History className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium">No Service History</h3>
+      ) : !filteredHistory.length ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
+          <History className="h-10 w-10 text-muted-foreground mb-3" />
+          <h3 className="text-base font-medium">
+            {history?.length ? 'No matching records' : 'No Service History'}
+          </h3>
           <p className="text-sm text-muted-foreground">
-            {searchQuery 
-              ? 'No records match your search criteria.'
+            {history?.length || searchQuery
+              ? 'Try adjusting your filters or search query.'
               : 'Completed work orders and maintenance logs will appear here.'}
           </p>
         </div>
@@ -263,9 +419,11 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {history.map(item => (
-                <TableRow 
+              {filteredHistory.map(item => (
+                <TableRow
                   key={`${item.source}-${item.id}`}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => onViewTruck(item.truckId)}
                 >
                   <TableCell>
                     {format(new Date(item.date + 'T00:00:00'), 'MMM d, yyyy')}
@@ -274,14 +432,14 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
                   <TableCell>{getServiceTypeBadge(item.serviceType)}</TableCell>
                   <TableCell>{item.vendor || '-'}</TableCell>
                   <TableCell>
-                    {item.cost 
+                    {item.cost
                       ? `$${item.cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
                       : '-'}
                   </TableCell>
                   <TableCell className="max-w-[300px] truncate">
                     {item.description || '-'}
                   </TableCell>
-                  <TableCell>
+                  <TableCell onClick={e => e.stopPropagation()}>
                     {item.source === 'work_order' && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -307,6 +465,7 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
           </Table>
         </div>
       )}
+
 
       {/* Edit Dialog */}
       <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
