@@ -474,15 +474,12 @@ export default function MaintenanceDashboardHome() {
           <LiveDriverAlertsCard />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">PM Notifications</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <PMNotificationsPanel />
-          </CardContent>
-        </Card>
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+          <UpcomingPMCard />
+          <QuickActionsCard />
+        </div>
       </div>
     </>
   );
 }
+
