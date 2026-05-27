@@ -1,28 +1,33 @@
-## What's happening
+## Goal
 
-The "Issue" button is the maintenance tile inside `DriverRequestsCard` (My Requests card). The last edit reroutes future "Issue" submissions to `maintenance_requests`, but:
+Let the driver see their maintenance requests (current + history) on the Driver Dashboard, and chat back-and-forth with the maintenance team — mirroring the chat that already exists on the maintenance side.
 
-1. **The one issue you submitted earlier** ("tires — New Drive Tires Needed") was filed *before* that fix, so it still lives in `driver_requests` and appears under the dispatcher's Alerts. `maintenance_requests` is currently empty — that's why the Maintenance dashboard shows nothing.
-2. **The dispatcher Alerts panel still pulls maintenance-type driver_requests**, which is why the Approve/Deny dialog appeared at all. Since maintenance issues should never need dispatcher approval, this is wrong.
+## What's already in place
 
-## Fix
+- Table `maintenance_request_messages` + RLS allow driver ↔ maintenance chat.
+- `MaintenanceThread` (used today inside the maintenance `DriverFaultReportsPanel`) handles the full conversation UI with realtime updates.
+- `MaintenanceRequestCard` driver-side component is already written (with inline `MaintenanceThread` + a "Chat with shop" toggle and a "Report Issue" dialog) — but it's never imported on the dashboard, which is why the driver sees nothing.
 
-### 1. Backfill (one-off data migration)
-For every `driver_requests` row with `request_type = 'maintenance'` that has a `truck_id` and is not yet resolved (`status IN ('pending')`), insert a matching row into `maintenance_requests` with:
-- `driver_id`, `truck_id`, `org_id`
-- `issue_type` = normalized (strip the leading `"<type> — "` prefix from the subject if present, or derive from subject — practical: just use whatever leading word exists, defaulting to `'other'`)
-- `priority`
-- `description` = `subject + "\n\n" + description` (preserves the driver's notes)
-- `status = 'submitted'`
+## Changes
 
-Then mark the source `driver_requests` row `status = 'migrated'` so it disappears from dispatcher alerts and the driver's "Pending" list (the driver's recent list maps unknown statuses safely).
+1. **New hook** `src/hooks/useDriverMaintenanceRequests.ts`
+   - Fetches `maintenance_requests` for the signed-in driver, joining `trucks(unit_number)`, ordered newest-first.
+   - Subscribes to realtime inserts/updates so new shop messages and status changes refresh the list.
 
-### 2. Stop routing maintenance to the dispatcher (code)
-In `src/components/dispatcher/DispatcherAlerts.tsx`:
-- Add `.neq('request_type', 'maintenance')` to the pending `driver_requests` query (defensive — protects against any older rows or legacy clients).
+2. **Update `src/components/driver/MaintenanceRequestCard.tsx`**
+   - Use the new hook internally (drop the `requests` prop) so the card is self-contained.
+   - Default view: open requests (anything not `completed`).
+   - Add a "Show history" toggle that reveals completed requests below.
+   - Keep the existing inline `MaintenanceThread` per request and the "Report Issue" dialog.
+   - Show a small unread/last-message hint and the latest status badge.
 
-No DB schema or RLS changes are needed. No edits to the driver-side form (already routed correctly).
+3. **Mount on Driver Dashboard** (`src/pages/DriverDashboard.tsx`)
+   - Import and render `MaintenanceRequestCard` just below `DriverRequestsCard`, passing `driverId` and `assignedTruck?.id`. No other layout changes.
 
-### Files
-- New migration: backfill SQL described above.
-- `src/components/dispatcher/DispatcherAlerts.tsx` — exclude maintenance request_type.
+No database, RLS, or backend changes are needed — the chat table, policies, and the `MaintenanceThread` component already support driver participation.
+
+## Result
+
+- Driver sees all their submitted issues (current and past) on the dashboard.
+- Each request expands into a live chat thread with the maintenance team, with the same UX the maintenance role already uses.
+- Status updates from the shop (acknowledged / scheduled / in progress / completed) show up automatically.

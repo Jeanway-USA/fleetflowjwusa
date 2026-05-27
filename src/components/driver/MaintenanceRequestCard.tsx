@@ -2,25 +2,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Wrench, Plus, Clock, CheckCircle, AlertTriangle, Settings, MessageSquare } from 'lucide-react';
+import { Wrench, Plus, Clock, CheckCircle, Settings, MessageSquare, History } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useState } from 'react';
 import { MaintenanceRequestForm } from './MaintenanceRequestForm';
 import { MaintenanceThread } from '@/components/maintenance/MaintenanceThread';
-
-interface MaintenanceRequest {
-  id: string;
-  issue_type: string;
-  description: string;
-  priority: string;
-  status: string;
-  admin_notes: string | null;
-  created_at: string;
-  trucks?: { unit_number: string } | null;
-}
+import {
+  useDriverMaintenanceRequests,
+  type DriverMaintenanceRequest,
+} from '@/hooks/useDriverMaintenanceRequests';
 
 interface MaintenanceRequestCardProps {
-  requests: MaintenanceRequest[];
   driverId: string;
   truckId: string | undefined;
 }
@@ -67,7 +59,7 @@ function getPriorityBadge(priority: string) {
   }
 }
 
-function DriverRequestItem({ request }: { request: MaintenanceRequest }) {
+function DriverRequestItem({ request }: { request: DriverMaintenanceRequest }) {
   const [threadOpen, setThreadOpen] = useState(false);
   return (
     <div className="border rounded-lg p-3 space-y-2">
@@ -78,7 +70,7 @@ function DriverRequestItem({ request }: { request: MaintenanceRequest }) {
             {request.issue_type.replace('_', ' ')}
           </span>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap justify-end">
           {getPriorityBadge(request.priority)}
           {getStatusBadge(request.status)}
         </div>
@@ -95,7 +87,7 @@ function DriverRequestItem({ request }: { request: MaintenanceRequest }) {
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-2 pt-1">
+      <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
         <p className="text-xs text-muted-foreground">
           Submitted {format(parseISO(request.created_at), 'MMM d, h:mm a')}
           {request.trucks?.unit_number && ` • Truck ${request.trucks.unit_number}`}
@@ -118,14 +110,18 @@ function DriverRequestItem({ request }: { request: MaintenanceRequest }) {
   );
 }
 
-export function MaintenanceRequestCard({ requests, driverId, truckId }: MaintenanceRequestCardProps) {
+export function MaintenanceRequestCard({ driverId, truckId }: MaintenanceRequestCardProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const openRequests = requests.filter(r => r.status !== 'completed');
+  const [showHistory, setShowHistory] = useState(false);
+  const { data: requests = [], isLoading } = useDriverMaintenanceRequests(driverId);
+
+  const openRequests = requests.filter((r) => r.status !== 'completed');
+  const completedRequests = requests.filter((r) => r.status === 'completed');
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-base flex items-center gap-2">
             <Wrench className="h-5 w-5 text-primary" />
             Maintenance Requests
@@ -151,8 +147,10 @@ export function MaintenanceRequestCard({ requests, driverId, truckId }: Maintena
         </div>
       </CardHeader>
 
-      <CardContent>
-        {openRequests.length === 0 ? (
+      <CardContent className="space-y-3">
+        {isLoading ? (
+          <div className="text-center py-6 text-sm text-muted-foreground">Loading…</div>
+        ) : openRequests.length === 0 ? (
           <div className="text-center py-6 text-muted-foreground">
             <CheckCircle className="h-8 w-8 mx-auto mb-2 text-success" />
             <p className="text-sm">No open maintenance requests</p>
@@ -162,6 +160,27 @@ export function MaintenanceRequestCard({ requests, driverId, truckId }: Maintena
             {openRequests.map((request) => (
               <DriverRequestItem key={request.id} request={request} />
             ))}
+          </div>
+        )}
+
+        {completedRequests.length > 0 && (
+          <div className="pt-2 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full gap-1.5"
+              onClick={() => setShowHistory((v) => !v)}
+            >
+              <History className="h-3.5 w-3.5" />
+              {showHistory ? 'Hide history' : `Show history (${completedRequests.length})`}
+            </Button>
+            {showHistory && (
+              <div className="space-y-3 mt-3">
+                {completedRequests.map((request) => (
+                  <DriverRequestItem key={request.id} request={request} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </CardContent>
