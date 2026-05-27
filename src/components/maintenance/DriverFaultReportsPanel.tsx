@@ -1,15 +1,27 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { AlertTriangle, Check, Wrench, ChevronDown, ChevronUp, Loader2, Truck, MessageSquare } from 'lucide-react';
+import { AlertTriangle, Check, Wrench, ChevronDown, ChevronUp, Loader2, Truck, MessageSquare, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   useDriverFaultReports,
   useAcknowledgeFaultReport,
   useConvertFaultReportToWorkOrder,
+  useDeleteFaultReport,
   type DriverFaultReport,
 } from '@/hooks/useDriverFaultReports';
 import { MaintenanceThread } from './MaintenanceThread';
@@ -63,6 +75,7 @@ function ReportRow({ report, onViewTruck }: { report: DriverFaultReport; onViewT
   const [threadOpen, setThreadOpen] = useState(false);
   const ack = useAcknowledgeFaultReport();
   const convert = useConvertFaultReportToWorkOrder();
+  const del = useDeleteFaultReport();
   const style = PRIORITY_STYLES[report.priority] ?? PRIORITY_STYLES.medium;
   const issueLabel = ISSUE_LABEL[report.issue_type] ?? report.issue_type;
   const acknowledged = report.status === 'acknowledged';
@@ -168,6 +181,41 @@ function ReportRow({ report, onViewTruck }: { report: DriverFaultReport; onViewT
               Acknowledge
             </Button>
           )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                disabled={del.isPending}
+                aria-label="Delete report"
+              >
+                {del.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete driver fault report?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently removes the report from the panel and the driver's history. Any linked work order will remain. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() =>
+                    del.mutate(report.id, {
+                      onSuccess: () => toast.success('Report deleted'),
+                      onError: (e: any) => toast.error('Failed to delete: ' + (e?.message ?? 'Unknown error')),
+                    })
+                  }
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
