@@ -1,48 +1,58 @@
 ## Goal
 
-Add a dedicated Maintenance Staff home dashboard at `/maintenance-home` and route the Maintenance role there by default (from auth redirect and from the sidebar's "My Dashboard" entry). Existing `/maintenance` (work orders / PM / history) remains untouched.
+Extend `src/pages/MaintenanceDashboardHome.tsx` with two new actionable widgets beneath the KPI row, replacing the current generic "Driver Fault Reports" card with a focused, triage-oriented layout.
 
-## Files to create
+## New layout
 
-### `src/pages/MaintenanceDashboardHome.tsx`
-- Wrapped by `ProtectedRoute` in `App.tsx` (roles: `['owner', 'maintenance']`, `requiredFeature="maintenance_full"`).
-- Uses `PageHeader` (title: "Maintenance Dashboard", description: "Performance & status overview") to match Executive/Dispatcher dashboards.
-- Top section: "Performance & Status Overview" — responsive CSS grid `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6` with four KPI cards.
-- Below the KPI grid, a second responsive grid `grid-cols-1 lg:grid-cols-3 gap-6` with placeholders for future widgets (Active Work Orders preview, Recent Driver Reports, Upcoming PM) using existing components (`ActiveWorkOrdersTab`, `DriverFaultReportsPanel`, `PMNotificationsPanel`) wrapped in `Card`s — kept lightweight so the home is informational and links to `/maintenance` for full management.
+Below the KPI cards, the grid becomes:
 
-### KPI Card design (inline component within the page)
-Each KPI card:
-- `Card` + `CardHeader` (title + Lucide icon top-right, matching `MaintenanceKPICards`/`RevenueKPICards` style).
-- Large metric number (`text-2xl sm:text-3xl font-bold`).
-- Small trend row beneath: `ArrowUp` (green `text-emerald-600`) or `ArrowDown` (red `text-red-600`) + delta text + muted helper line.
-- `Skeleton` while loading.
+```text
++----------------------------------------+----------------------+
+| Today's Priorities (lg:col-span-2)     | Live Driver Alerts   |
++----------------------------------------+----------------------+
+| PM Notifications (full width below)                           |
++---------------------------------------------------------------+
+```
 
-### Four KPIs (data sources, all already in `useMaintenanceData.ts`)
-1. **Fleet Uptime** — `Truck` icon. `useFleetAvailability()` → `available / total * 100`. Trend: green if ≥95%, red below. Helper: "Target 95%+".
-2. **Open Work Orders** — `Wrench` icon. `useActiveWorkOrders()` → `data.length`. Trend up = red (more), down = green; compared against count from 7 days ago (compute via simple filter on `entry_date`, or omit and show "Active now").
-3. **Critical Driver Reports** — `AlertTriangle` icon. New small hook `useCriticalDriverFaultReports()` in `useDriverFaultReports.ts` (or reuse existing list filtered by `severity in ('high','critical')` AND `status` not in `('resolved','acknowledged')`). Red trend if > 0.
-4. **Avg. Repair Turnaround** — `Clock` icon. New small hook `useAvgRepairTurnaround()` in `useMaintenanceData.ts`: query last 30 days of `work_orders` where `status='completed'`, average `(completed_at - entry_date)` in hours; display as hours (<48) or days. Trend vs prior 30-day window.
+The existing PM Notifications card stays. The standalone `DriverFaultReportsPanel` card is removed (its functionality is superseded by the new Live Driver Alerts widget, which links into `/maintenance` for triage).
 
-## Files to edit
+## Widget 1 — Today's Priorities (large)
 
-### `src/App.tsx`
-- Lazy import `MaintenanceDashboardHome`.
-- Add route `/maintenance-home` (ProtectedRoute, roles `['owner','maintenance']`, feature `maintenance_full`).
+Wrapped in a standard `<Card>` with `CardHeader` ("Today's Priorities" + small count badge) and `CardContent`.
 
-### `src/components/shared/RoleBasedRedirect.tsx`
-- Change `hasRole('maintenance')` redirect from `/maintenance` → `/maintenance-home`.
+- **Data source**: new `useTodaysWorkOrders()` hook in `src/hooks/useMaintenanceData.ts`. Queries `work_orders` where `status in ('open','parts_ordered','in_progress')` AND `entry_date = today` (YYYY-MM-DD), joining `trucks(unit_number)`, ordered by an urgency rank derived from `service_type` (tire/brake/repair → high, pm/inspection → medium, default → low).
+- **Rendering**: minimalist `<Table>` (from `@/components/ui/table`) with columns: **Truck**, **Issue**, **Urgency**, **Action**.
+  - Truck: `unit_number`
+  - Issue: truncated `description ?? service_type`
+  - Urgency: `<Badge>` — High = `destructive`, Medium = `outline` with warning token, Low = `secondary`
+  - Action: `<Button size="sm">Start Work</Button>` (disabled when already `in_progress`)
+- **Row hover**: `hover:bg-muted/50 transition-colors cursor-pointer`; clicking a row navigates to `/maintenance`.
+- **Start Work**: new `useStartWorkOrder()` mutation that sets `status='in_progress'` and invalidates `active-work-orders`, `todays-work-orders`, `fleet-availability`. Uses `LoadingButton` for the pending state, toasts success/error.
+- **Empty state**: small muted "No work orders scheduled for today." with a link to `/maintenance` to schedule one.
+- **Loading**: 3 `Skeleton` rows.
 
-### `src/components/layout/AppSidebar.tsx`
-- Maintenance dashboard-switcher entry (line 204): point "My Dashboard" to `/maintenance-home`.
-- Update `pathToRole` map (line 207–211) to include `'/maintenance-home': 'maintenance'`.
-- Add a sidebar nav item under the Maintenance section for "Maintenance Management" → `/maintenance` so the existing page stays reachable for maintenance role.
+## Widget 2 — Live Driver Alerts (warning-styled)
 
-## Styling consistency
-- Reuse the same card/header/typography conventions as `MaintenanceKPICards.tsx` and `RevenueKPICards.tsx` (CardHeader with title + icon, `text-sm font-medium` title, `text-2xl sm:text-3xl font-bold` metric, `text-xs text-muted-foreground` helper).
-- Tailwind semantic tokens only; trend colors via `text-emerald-600` / `text-red-600` (already used in `MaintenanceKPICards`).
-- Responsive: 1 col mobile → 2 col tablet → 4 col desktop for KPI row; lower widget grid 1 col mobile → 3 col desktop.
+Wrapped in a `<Card>` with `className="border-destructive/40"`; `CardHeader` uses `bg-destructive/5 border-b border-destructive/20` and shows an `AlertTriangle` icon + title "Live Driver Alerts" + small caption "Unverified — needs triage".
+
+- **Data source**: reuse `useDriverFaultReports()` and filter to `status === 'submitted'` (truly unresolved incoming). Show top 6 ordered by priority then recency (already sorted by hook).
+- **Rendering**: vertical list of clickable rows (no table). Each row shows:
+  - Priority dot/badge (critical/high = `destructive`, medium = `outline`, low = `secondary`)
+  - Truck `unit_number` · driver first/last name
+  - Issue type + first ~80 chars of description
+  - Relative time (`formatDistanceToNow`)
+- **Row hover**: `hover:bg-destructive/5 transition-colors cursor-pointer`, full row clickable → navigates to `/maintenance` (driver fault reports panel there handles the triage actions like Acknowledge / Convert / Delete).
+- **Empty state**: muted "No new driver alerts." with a small green check icon.
+- **Loading**: 3 `Skeleton` rows.
+- Footer link "View all driver reports →" → `/maintenance`.
+
+## Files changed
+
+- `src/hooks/useMaintenanceData.ts` — add `useTodaysWorkOrders()` query + `useStartWorkOrder()` mutation.
+- `src/pages/MaintenanceDashboardHome.tsx` — add `TodaysPrioritiesCard` and `LiveDriverAlertsCard` components in-file; restructure the second grid row; remove the standalone `DriverFaultReportsPanel` card; keep `PMNotificationsPanel`.
 
 ## Out of scope
-- No DB migrations; all data sources already exist.
-- No changes to `/maintenance` page itself.
-- No tier-gating changes (reuses `maintenance_full`).
+
+- No DB migrations (uses existing `work_orders` + `maintenance_requests` tables/RLS).
+- No changes to `/maintenance` page or to existing maintenance components.
+- No changes to KPI cards or sidebar routing.
