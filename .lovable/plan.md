@@ -1,96 +1,125 @@
 ## Goal
 
-Make driver-submitted maintenance issues visible to maintenance staff on the `/maintenance` page in real time, with one-click "Convert to Work Order" so reports flow seamlessly into the existing Active Work Orders pipeline.
+Add a two-way chat thread per driver maintenance request, with a "Recommend OTR Service" quick-action that posts a highlighted recommendation card into the thread. Visible to drivers on the Driver Dashboard and to maintenance staff inside the Incoming Driver Fault Reports panel.
 
-## Current state
-
-- Table `public.maintenance_requests` already exists with the right columns (`driver_id`, `truck_id`, `issue_type`, `priority`, `description`, `status` ∈ submitted/acknowledged/scheduled/in_progress/completed, `admin_notes`, `org_id`).
-- Driver form at `src/components/driver/MaintenanceRequestForm.tsx` inserts into this table **without `org_id`**, which fails the RLS `WITH CHECK (org_id = get_user_org_id(auth.uid()))` and silently blocks submissions.
-- RLS currently allows owner + safety to manage. The new `maintenance` role has no policy yet.
-- The Maintenance Management page never reads from this table.
-
-## 1. Database migration
+## 1. Database — new table `maintenance_request_messages`
 
 ```sql
--- (a) Auto-populate org_id from the inserting user if not provided,
---     so existing driver clients work without a code change to org_id wiring.
-CREATE OR REPLACE FUNCTION public.set_maintenance_request_org_id()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-BEGIN
-  IF NEW.org_id IS NULL THEN
-    NEW.org_id := public.get_user_org_id(auth.uid());
-  END IF;
-  RETURN NEW;
-END;
-$$;
+CREATE TABLE public.maintenance_request_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id uuid NOT NULL REFERENCES public.maintenance_requests(id) ON DELETE CASCADE,
+  org_id uuid NOT NULL REFERENCES public.organizations(id),
+  sender_user_id uuid NOT NULL,
+  sender_role text NOT NULL CHECK (sender_role IN ('driver','maintenance','owner','safety')),
+  sender_name text,                       -- denormalized for fast render
+  message_type text NOT NULL DEFAULT 'chat' CHECK (message_type IN ('chat','recommendation')),
+  body text NOT NULL,
+  recommendation jsonb,                   -- {title, category, vendor?, phone?, url?}
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_mrm_request ON public.maintenance_request_messages(request_id, created_at);
 
-CREATE TRIGGER set_maintenance_request_org_id_trg
-  BEFORE INSERT ON public.maintenance_requests
-  FOR EACH ROW EXECUTE FUNCTION public.set_maintenance_request_org_id();
-
--- (b) Extend access to the new maintenance role.
-CREATE POLICY "Maintenance role can view maintenance requests"
-  ON public.maintenance_requests FOR SELECT
-  USING (has_role(auth.uid(), 'maintenance'::app_role)
-         AND org_id = get_user_org_id(auth.uid()));
-
-CREATE POLICY "Maintenance role can update maintenance requests"
-  ON public.maintenance_requests FOR UPDATE
-  USING (has_role(auth.uid(), 'maintenance'::app_role)
-         AND org_id = get_user_org_id(auth.uid()))
-  WITH CHECK (org_id = get_user_org_id(auth.uid()));
+GRANT SELECT, INSERT ON public.maintenance_request_messages TO authenticated;
+GRANT ALL ON public.maintenance_request_messages TO service_role;
+ALTER TABLE public.maintenance_request_messages ENABLE ROW LEVEL SECURITY;
 ```
 
-No schema/column changes. No new tables.
+**RLS** — same tenant + same request scoping:
 
-## 2. Driver form hardening — `src/components/driver/MaintenanceRequestForm.tsx`
+- SELECT: the requesting driver (`request.driver_id = get_driver_id_for_user(auth.uid())`) OR maintenance / safety / owner role, all within `org_id = get_user_org_id(auth.uid())`.
+- INSERT: same audience, plus `sender_user_id = auth.uid()` and the sender_role must match the user's actual capability (driver-owner of request OR has_role maintenance/safety/owner). `org_id` and `sender_user_id` defaulted via BEFORE INSERT trigger if omitted, mirroring the `set_maintenance_request_org_id` pattern.
 
-Also pass `org_id` explicitly when available (defensive, in case trigger is ever bypassed). Fetch via the existing profile/auth context if already imported nearby, otherwise leave the trigger as the single source of truth. Minimal change: add a `.select().single()` on the insert so the form surfaces server errors clearly.
+**Realtime**: `ALTER PUBLICATION supabase_realtime ADD TABLE public.maintenance_request_messages;` and `ALTER TABLE … REPLICA IDENTITY FULL`.
 
-## 3. New hook — `src/hooks/useDriverFaultReports.ts`
+## 2. Shared hook — `src/hooks/useMaintenanceThread.ts`
 
-Three exports, all scoped to `status IN ('submitted','acknowledged')` (i.e., not yet converted):
+- `useMaintenanceThread(requestId)` — `useQuery(['maintenance-thread', requestId])` returning messages ordered ascending. Subscribes to a Supabase realtime channel on mount; on INSERT events, invalidates the query.
+- `useSendMaintenanceMessage()` — mutation inserting `{ request_id, body, message_type, recommendation? }` with `sender_role` resolved from current user role (`'driver'` if `get_driver_id_for_user` matches, else `'maintenance'` / `'safety'` / `'owner'`). Sender role is computed client-side from already-loaded auth context; org_id + sender_user_id auto-filled by trigger.
+- Marks the parent request as `'acknowledged'` on the very first maintenance-side message (so the panel reflects staff engagement).
 
-- `useDriverFaultReports()` → `useQuery(['driver-fault-reports'])`, joins `drivers(first_name,last_name)` and `trucks(unit_number)`, ordered by priority (critical→low) then `created_at` desc.
-- `useAcknowledgeFaultReport()` → sets `status='acknowledged'`.
-- `useConvertFaultReportToWorkOrder()` → in one mutation: inserts a `work_orders` row (mapping `issue_type` → `service_type`: tire→`tire`, brake/engine/electrical/lights/trailer/other→`repair`; `description` carries the driver's text prefixed with "Driver report: "; `entry_date` = today; `cost_estimate` null), then updates the request to `status='in_progress'` with `admin_notes` storing the new work-order id for traceability. Invalidates `['driver-fault-reports']`, `['active-work-orders']`, `['fleet-availability']`.
+## 3. Recommendation presets — `src/lib/maintenanceRecommendations.ts`
 
-## 4. New panel — `src/components/maintenance/DriverFaultReportsPanel.tsx`
+Static catalog (no DB needed) used by the quick-action popover:
 
-Visual style matches the PM Schedule "Urgent Action Required" banner so it sits naturally above the Active Work Orders table.
+```ts
+export const RECOMMENDATION_PRESETS = [
+  { id: 'roadside_tire', title: 'Roadside Tire Repair',
+    category: 'tire', template: 'Call dispatch-approved roadside tire service. Stay with the truck.' },
+  { id: 'ta_petro',     title: 'Nearest TA / Petro Truck Service',
+    category: 'shop',  template: 'Route to the nearest TA / Petro shop and check in at the service desk.' },
+  { id: 'loves',        title: 'Love\'s Truck Care',
+    category: 'shop',  template: 'Stop at the nearest Love\'s Truck Care for diagnosis.' },
+  { id: 'pilot',        title: 'Pilot Flying J Service',
+    category: 'shop',  template: 'Head to the nearest Pilot Flying J truck service bay.' },
+  { id: 'mobile_mech',  title: 'Mobile Diesel Mechanic',
+    category: 'mobile',template: 'A mobile mechanic has been requested. Hold position and share live location.' },
+  { id: 'tow',          title: 'Tow to Nearest Shop',
+    category: 'tow',   template: 'Do not drive. Tow has been dispatched.' },
+  { id: 'park_safe',    title: 'Park Safely & Wait for Instructions',
+    category: 'hold',  template: 'Park in a safe location, set triangles, and await further instructions.' },
+  { id: 'continue',     title: 'Safe to Continue to Destination',
+    category: 'clear', template: 'Issue is non-critical. Continue carefully to the planned stop.' },
+];
+```
+
+Selecting a preset opens an inline edit so staff can tweak the templated text before posting; submission writes a row with `message_type='recommendation'` and `recommendation={title, category}`.
+
+## 4. UI component — `src/components/maintenance/MaintenanceThread.tsx`
+
+Single shared chat thread component reused on both sides. Props: `{ requestId, viewerRole: 'driver' | 'maintenance', showRecommendations?: boolean }`.
+
+Layout:
 
 ```text
-┌─ Incoming Driver Fault Reports ─────────────[N submitted]─┐
-│  [priority dot]  Unit #1023  ·  John D.  ·  2h ago         │
-│  [Critical badge] [Driver Submitted badge] Brake           │
-│  "Air leak from front-left brake chamber, audible hiss..." │
-│  [Convert to Work Order]   [Acknowledge]                   │
-├────────────────────────────────────────────────────────────┤
-│  ...                                                       │
-└────────────────────────────────────────────────────────────┘
+┌─ Driver Communications Log ─────────────────────────────┐
+│  ┌─ Maintenance · Sara P. · 2m ago ──────┐              │
+│  │ "Confirming brake chamber on front-L?" │              │
+│  └────────────────────────────────────────┘              │
+│                  ┌─ Driver · John D. · 1m ago ──────┐    │
+│                  │ "Confirmed, hissing audible."     │    │
+│                  └───────────────────────────────────┘    │
+│  ┌─ [Wrench] Recommendation · Maintenance ─────────┐    │
+│  │ Roadside Tire Repair                             │    │
+│  │ Call dispatch-approved roadside tire service…    │    │
+│  └──────────────────────────────────────────────────┘    │
+│ ───────────────────────────────────────────────────────  │
+│ [textarea: Type a message…]   [📎 Recommend ▾] [Send]   │
+└──────────────────────────────────────────────────────────┘
 ```
 
-- Card wrapper: `rounded-lg border` with left border accent in `destructive` when any critical report present, `warning` when only high, `border` otherwise.
-- Each row shows: Truck unit number (with `onClick` → `onViewTruck`), driver name, relative date (`formatDistanceToNow`), `Priority` color-coded badge (critical=destructive, high=amber, medium=blue, low=muted), an outlined "Driver Submitted" badge, the issue type chip, and the description (clamped to 2 lines with hover/expand).
-- Actions per row: **Convert to Work Order** (primary), **Acknowledge** (ghost) — the latter just marks acknowledged without converting, useful when staff want to triage first.
-- Hides itself entirely when there are zero submitted/acknowledged reports (no empty-state noise).
-- Skeleton row while loading.
+- Bubbles: maintenance/owner/safety align left with `bg-muted`; driver aligns right with `bg-primary/10`; recommendations are full-width with a `Wrench` icon, `border-l-4 border-primary`, distinct `bg-primary/5` and a `Recommendation` badge — regardless of side.
+- Each bubble shows a role badge (`Driver` / `Maintenance` / `Safety` / `Owner`), sender name, and `formatDistanceToNow`. Hover reveals exact timestamp via `<time>` tooltip.
+- Scrollable message area `max-h-80 overflow-y-auto`, auto-scrolls to bottom on new message.
+- Composer: textarea (Enter submits, Shift+Enter newline), disabled while sending. When `showRecommendations && viewerRole !== 'driver'`, a `Popover` lists the presets; clicking one prefills the textarea with the template and switches the submit button label to "Post Recommendation" until cleared.
+- Empty state: friendly "Start the conversation" prompt.
 
-## 5. Wire into Active Work Orders tab — `src/components/maintenance/ActiveWorkOrdersTab.tsx`
+## 5. Wire into existing UI
 
-Render `<DriverFaultReportsPanel onViewTruck={onViewTruck} />` as the first child of the existing `<div className="space-y-4">`, above the summary strip. Layout, filters, and table stay exactly as redesigned in the prior change. This satisfies the brief's option (b) — surfacing reports in the Active Work Orders stream with a clear "Driver Submitted" badge — while keeping them visually distinct as a dedicated incoming panel.
+### Maintenance side — `src/components/maintenance/DriverFaultReportsPanel.tsx`
+
+- Extend the panel query to include `status IN ('submitted','acknowledged','in_progress')` so converted requests stay in the panel while the thread is active. (Add a small "Linked WO" badge for `in_progress`.)
+- Each `ReportRow` gets a "Conversation" toggle button next to Acknowledge/Convert. When toggled, render `<MaintenanceThread requestId={report.id} viewerRole="maintenance" showRecommendations />` directly under that row.
+- Unread hint: small dot when latest message's `sender_role === 'driver'` and created after the row was last opened (tracked in component state).
+
+### Driver side — `src/components/driver/MaintenanceRequestCard.tsx`
+
+- Each open request row gets an inline "Open thread" toggle (no dialog) that renders `<MaintenanceThread requestId={request.id} viewerRole="driver" />`. No recommendation picker on the driver side.
+- Keep the existing `admin_notes` "Shop Response" block visible (legacy entries).
+
+### App.tsx
+
+- Allow the `maintenance` role to access existing thread inserts via the new table's RLS — handled by the migration above; no router changes.
 
 ## What does NOT change
 
-- Driver dashboard form's UX, fields, validation.
-- `work_orders` table schema or the existing Active Work Orders filtering/redesign.
-- Other maintenance tabs (PM Schedule, Predictive, Service History).
-- All other RLS policies on `maintenance_requests`.
+- `maintenance_requests` schema, the Driver dashboard's Report Issue form, the convert-to-work-order flow, KPI cards, PM tab, Service History, work_orders policies.
+- No new edge functions, no email notifications in this iteration — purely in-app realtime chat.
 
 ## Files touched
 
-- **DB migration** — trigger + 2 new RLS policies for `maintenance` role.
-- `src/components/driver/MaintenanceRequestForm.tsx` — surface server errors via `.select().single()`.
-- `src/hooks/useDriverFaultReports.ts` — **new**.
-- `src/components/maintenance/DriverFaultReportsPanel.tsx` — **new**.
-- `src/components/maintenance/ActiveWorkOrdersTab.tsx` — mount the panel at the top.
+- **DB migration** — new `maintenance_request_messages` table, trigger, RLS, realtime publication.
+- `src/hooks/useMaintenanceThread.ts` — **new**.
+- `src/lib/maintenanceRecommendations.ts` — **new**.
+- `src/components/maintenance/MaintenanceThread.tsx` — **new** (shared chat UI).
+- `src/components/maintenance/DriverFaultReportsPanel.tsx` — add toggle + render thread; widen status filter.
+- `src/components/driver/MaintenanceRequestCard.tsx` — add inline thread toggle per request.
