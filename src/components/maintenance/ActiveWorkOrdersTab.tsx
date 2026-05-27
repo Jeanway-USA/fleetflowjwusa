@@ -192,15 +192,19 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
 
   if (!workOrders?.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Wrench className="h-12 w-12 text-muted-foreground mb-4" />
-        <h3 className="text-lg font-medium">No Active Work Orders</h3>
-        <p className="text-sm text-muted-foreground">
-          All trucks are currently available. Create a new work order to get started.
-        </p>
+      <div className="space-y-4">
+        <DriverFaultReportsPanel onViewTruck={onViewTruck} />
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Wrench className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium">No Active Work Orders</h3>
+          <p className="text-sm text-muted-foreground">
+            All trucks are currently available. Create a new work order to get started.
+          </p>
+        </div>
       </div>
     );
   }
+
 
   return (
     <>
