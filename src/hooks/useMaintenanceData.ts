@@ -342,7 +342,63 @@ export function useActiveWorkOrders() {
   });
 }
 
+// Hook for Today's Work Orders (scheduled today, not yet completed)
+export type TodayUrgency = 'high' | 'medium' | 'low';
+
+export interface TodaysWorkOrder extends WorkOrder {
+  urgency: TodayUrgency;
+}
+
+function deriveUrgency(serviceType: string | null, serviceTypes: string[] | null): TodayUrgency {
+  const all = [serviceType, ...(serviceTypes || [])].filter(Boolean).map(s => (s as string).toLowerCase());
+  if (all.some(s => /(tire|brake|repair|engine|breakdown|tow)/.test(s))) return 'high';
+  if (all.some(s => /(pm|inspection|oil|m1|m2|m3|service)/.test(s))) return 'medium';
+  return 'low';
+}
+
+export function useTodaysWorkOrders() {
+  return useQuery({
+    queryKey: ['todays-work-orders'],
+    queryFn: async (): Promise<TodaysWorkOrder[]> => {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from('work_orders')
+        .select(`*, trucks (unit_number, make, model)`)
+        .in('status', ['open', 'parts_ordered', 'in_progress'])
+        .eq('entry_date', today)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const rows = (data || []) as WorkOrder[];
+      const order: Record<TodayUrgency, number> = { high: 0, medium: 1, low: 2 };
+      return rows
+        .map(wo => ({ ...wo, urgency: deriveUrgency(wo.service_type, wo.service_types) }))
+        .sort((a, b) => order[a.urgency] - order[b.urgency]);
+    },
+    staleTime: 1000 * 60,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useStartWorkOrder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('work_orders')
+        .update({ status: 'in_progress' })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['todays-work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['active-work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['fleet-availability'] });
+    },
+  });
+}
+
 // Hook for Service History (completed work orders + maintenance logs)
+
 export function useServiceHistory(searchQuery?: string) {
   return useQuery({
     queryKey: ['service-history', searchQuery],
