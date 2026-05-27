@@ -109,39 +109,7 @@ export function MaintenanceRequestCard({ requests, driverId, truckId }: Maintena
         ) : (
           <div className="space-y-3">
             {openRequests.map((request) => (
-              <div
-                key={request.id}
-                className="border rounded-lg p-3 space-y-2"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(request.status)}
-                    <span className="font-medium capitalize text-sm">
-                      {request.issue_type.replace('_', ' ')}
-                    </span>
-                  </div>
-                  <div className="flex gap-1">
-                    {getPriorityBadge(request.priority)}
-                    {getStatusBadge(request.status)}
-                  </div>
-                </div>
-
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {request.description}
-                </p>
-
-                {request.admin_notes && (
-                  <div className="bg-primary/10 rounded p-2 text-sm">
-                    <p className="text-xs text-muted-foreground mb-1">Shop Response:</p>
-                    <p>{request.admin_notes}</p>
-                  </div>
-                )}
-
-                <p className="text-xs text-muted-foreground">
-                  Submitted {format(parseISO(request.created_at), 'MMM d, h:mm a')}
-                  {request.trucks?.unit_number && ` • Truck ${request.trucks.unit_number}`}
-                </p>
-              </div>
+              <DriverRequestItem key={request.id} request={request} />
             ))}
           </div>
         )}
