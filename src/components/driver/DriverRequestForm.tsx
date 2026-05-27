@@ -79,25 +79,38 @@ export function DriverRequestForm({
 
     setIsSubmitting(true);
     try {
-      let finalSubject = subject.trim();
-      
       if (requestType === 'maintenance' && truckId) {
-        finalSubject = `${issueType.replace(/_/g, ' ')} — ${subject.trim()}`;
+        // Route maintenance issues into maintenance_requests so they appear
+        // on the Maintenance Dashboard with its chat thread.
+        const normalizedIssue = issueType.replace(/s$/, ''); // tires->tire, brakes->brake, lights->light
+        const detail = description.trim()
+          ? `${subject.trim()}\n\n${description.trim()}`
+          : subject.trim();
+        const { error } = await supabase.from('maintenance_requests').insert({
+          driver_id: driverId,
+          truck_id: truckId,
+          issue_type: normalizedIssue,
+          priority,
+          description: detail,
+          status: 'submitted',
+          // org_id auto-populated by set_maintenance_request_org_id_trg
+        });
+        if (error) throw error;
+      } else {
+        let finalSubject = subject.trim();
+        const { error } = await supabase.from('driver_requests').insert({
+          driver_id: driverId,
+          request_type: requestType,
+          subject: finalSubject,
+          description: description.trim() || null,
+          priority: 'medium',
+          load_id: requestType === 'detention' && activeLoadId ? activeLoadId : null,
+          truck_id: null,
+          start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
+          end_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
+        });
+        if (error) throw error;
       }
-
-      const { error } = await supabase.from('driver_requests').insert({
-        driver_id: driverId,
-        request_type: requestType,
-        subject: finalSubject,
-        description: description.trim() || null,
-        priority: requestType === 'maintenance' ? priority : 'medium',
-        load_id: requestType === 'detention' && activeLoadId ? activeLoadId : null,
-        truck_id: requestType === 'maintenance' && truckId ? truckId : null,
-        start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
-        end_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
-      });
-
-      if (error) throw error;
 
       toast.success('Request submitted');
       onSuccess();
@@ -108,6 +121,7 @@ export function DriverRequestForm({
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="space-y-4">
