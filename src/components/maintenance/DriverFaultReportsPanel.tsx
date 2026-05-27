@@ -60,11 +60,13 @@ function DriverName(r: DriverFaultReport) {
 
 function ReportRow({ report, onViewTruck }: { report: DriverFaultReport; onViewTruck: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [threadOpen, setThreadOpen] = useState(false);
   const ack = useAcknowledgeFaultReport();
   const convert = useConvertFaultReportToWorkOrder();
   const style = PRIORITY_STYLES[report.priority] ?? PRIORITY_STYLES.medium;
   const issueLabel = ISSUE_LABEL[report.issue_type] ?? report.issue_type;
   const acknowledged = report.status === 'acknowledged';
+  const linkedToWO = report.status === 'in_progress';
 
   const handleConvert = () => {
     convert.mutate(report, {
@@ -118,6 +120,11 @@ function ReportRow({ report, onViewTruck }: { report: DriverFaultReport; onViewT
                 Acknowledged
               </Badge>
             )}
+            {linkedToWO && (
+              <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-emerald-500/40 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10">
+                Linked WO
+              </Badge>
+            )}
           </div>
 
           <p
@@ -140,11 +147,22 @@ function ReportRow({ report, onViewTruck }: { report: DriverFaultReport; onViewT
         </div>
 
         <div className="flex flex-col sm:flex-row gap-2 shrink-0 ml-auto">
-          <Button size="sm" onClick={handleConvert} disabled={convert.isPending} className="gap-1.5">
-            {convert.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
-            Convert to Work Order
+          <Button
+            size="sm"
+            variant={threadOpen ? 'secondary' : 'outline'}
+            onClick={() => setThreadOpen((v) => !v)}
+            className="gap-1.5"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            {threadOpen ? 'Hide Chat' : 'Open Chat'}
           </Button>
-          {!acknowledged && (
+          {!linkedToWO && (
+            <Button size="sm" onClick={handleConvert} disabled={convert.isPending} className="gap-1.5">
+              {convert.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wrench className="h-3.5 w-3.5" />}
+              Convert to Work Order
+            </Button>
+          )}
+          {!acknowledged && !linkedToWO && (
             <Button size="sm" variant="ghost" onClick={handleAck} disabled={ack.isPending} className="gap-1.5">
               {ack.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
               Acknowledge
@@ -152,6 +170,12 @@ function ReportRow({ report, onViewTruck }: { report: DriverFaultReport; onViewT
           )}
         </div>
       </div>
+
+      {threadOpen && (
+        <div className="mt-3 pl-5">
+          <MaintenanceThread requestId={report.id} viewerRole="maintenance" showRecommendations />
+        </div>
+      )}
     </div>
   );
 }
