@@ -419,6 +419,7 @@ export function TeamManagementTab() {
                   <SelectItem value="payroll_admin">Payroll Admin</SelectItem>
                   <SelectItem value="dispatcher">Dispatcher</SelectItem>
                   <SelectItem value="safety">Safety</SelectItem>
+                  <SelectItem value="maintenance">Maintenance Staff</SelectItem>
                   <SelectItem value="driver">Driver</SelectItem>
                 </SelectContent>
               </Select>
