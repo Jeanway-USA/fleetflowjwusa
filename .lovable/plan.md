@@ -1,26 +1,18 @@
-## Goal
+## Add delete for driver fault reports
 
-When a work order is marked **completed**, automatically close the matching driver fault report so it disappears from the Maintenance Dashboard's "Driver Fault Reports" panel (and shows as Completed in the driver's history).
+Give maintenance staff a way to remove fault reports from the "Incoming Driver Fault Reports" panel (e.g. duplicates, test entries, or resolved-without-WO items).
 
-## How fault reports link to work orders
+### Changes
 
-`useConvertFaultReportToWorkOrder` already writes `admin_notes = 'Converted to work order <wo.id>'` on the maintenance request when the shop converts it. We use that same link to close the request when the work order is done.
+**1. `src/hooks/useDriverFaultReports.ts`**
+- Add `useDeleteFaultReport()` mutation that deletes the row from `maintenance_requests` by id and invalidates `['driver-fault-reports']` and `['driver-maintenance-requests']` so both the maintenance panel and the driver dashboard refresh.
 
-## Changes
+**2. `src/components/maintenance/DriverFaultReportsPanel.tsx`**
+- Add a small `Trash2` icon button on each `ReportRow` (ghost variant, destructive color), placed alongside the existing Chat / Convert / Acknowledge buttons.
+- Wrap it in a shadcn `AlertDialog` confirmation ("Delete this driver fault report? This cannot be undone.") to prevent accidental clicks.
+- On confirm: call the delete mutation, show success/error toast.
 
-1. **Migration — DB trigger on `work_orders`**
-   - Create `public.complete_linked_maintenance_request()` (SECURITY DEFINER, `search_path = public`).
-   - When `NEW.status = 'completed'` and `OLD.status IS DISTINCT FROM 'completed'`, run:
-     ```sql
-     UPDATE public.maintenance_requests
-     SET status = 'completed', updated_at = now()
-     WHERE org_id = NEW.org_id
-       AND status <> 'completed'
-       AND admin_notes LIKE 'Converted to work order ' || NEW.id::text || '%';
-     ```
-   - Attach `AFTER UPDATE OF status ON public.work_orders` trigger calling that function.
-
-2. **Frontend invalidation** (`src/hooks/useMaintenanceData.ts`)
-   - In the work-order completion mutation's `onSuccess`, also invalidate `['driver-fault-reports']` and `['driver-maintenance-requests']` so the panel + driver dashboard refresh immediately. Realtime subscription on the driver side also already covers this.
-
-No UI/component edits are needed — the existing `useDriverFaultReports` query already filters out `completed` status, so as soon as the request flips to `completed` the card vanishes from the panel and moves to the driver's "Show history" list.
+### Notes
+- No DB migration needed — existing RLS on `maintenance_requests` already permits org members to delete their org's rows.
+- Linked work orders are not touched; deleting a report that's already converted just removes the request record (the WO remains).
+- The driver-side card uses the same row; since it'll be gone from the table, it disappears from the driver's history list automatically via realtime.
