@@ -1,57 +1,50 @@
-## Inventory Alerts widget + responsive polish
+## Context
 
-### 1. New backend table: `parts_inventory`
+The `parts_inventory` table already exists and the Inventory Alerts widget already uses real Supabase data via `useLowStockParts()` — there is no mock array left to remove. What's missing relative to your spec are two fields: **`vendor_name`** (where the part was purchased) and **`last_restocked`** (timestamp of most recent restock).
 
-Migration creates a multi-tenant inventory table mechanics can manage.
+Existing column names differ slightly from your spec but map cleanly:
+- `quantity_on_hand` ↔ `quantity`
+- `min_threshold` ↔ `minimum_threshold`
 
-Columns:
-- `id`, `org_id`, `created_at`, `updated_at`
-- `part_number` (text, nullable) — e.g. `15W40-55GAL`
-- `part_name` (text, required) — e.g. "15W-40 Engine Oil"
-- `category` (text, nullable) — e.g. "Fluids", "Filters", "Brakes"
-- `quantity_on_hand` (numeric, default 0)
-- `min_threshold` (numeric, default 0) — reorder trigger level
-- `unit` (text, default 'ea') — ea / qt / gal / box
-- `reorder_url` (text, nullable) — optional vendor link
-- `reorder_requested_at` (timestamptz, nullable) — set when "Reorder" clicked
-- `notes` (text, nullable)
+I'll keep the existing names to avoid breaking the seeded data, hook, and widget, and just add the two new columns.
 
-GRANTs: `authenticated` (SELECT/INSERT/UPDATE/DELETE), `service_role` (ALL). No anon.
+## Plan
 
-RLS policies (org-scoped via `get_user_org_id`):
-- Maintenance + dispatcher + owner can manage (ALL)
-- Operations (`has_operations_access`) and safety (`has_safety_access`) can SELECT
+### 1. Database migration
+Add to `public.parts_inventory`:
+- `vendor_name text` (nullable)
+- `last_restocked timestamptz` (nullable)
+- Index on `(org_id, last_restocked desc)` for future "recently restocked" queries.
 
-`updated_at` trigger using existing `update_updated_at_column()`.
+Backfill `last_restocked = created_at` for existing rows so the UI doesn't show "Never" for seeded items, and set a reasonable `vendor_name` (e.g. `'NAPA Auto Parts'`, `'FleetPride'`) on the seeded demo rows.
 
-Seed ~6 rows for the demo org (`a0000000-0000-0000-0000-000000000001`): 15W-40 Oil, Air Filters, Fuel Filters, Brake Pads, DEF Fluid, Wiper Blades — with a mix of below-threshold and healthy stock so the widget shows real alerts in demo mode.
+No RLS/grants changes needed (table already correctly configured).
 
-### 2. New hook in `src/hooks/useMaintenanceData.ts`
+### 2. Types
+`src/integrations/supabase/types.ts` regenerates automatically after migration — no manual edit.
 
-- `PartInventoryItem` type
-- `useLowStockParts()` — selects parts where `quantity_on_hand <= min_threshold`, ordered by severity (0 first, then ratio), limit 8. Standard 5m staleTime, `refetchOnWindowFocus: false`.
-- `useRequestReorder()` mutation — stamps `reorder_requested_at = now()` for a given part id, invalidates the query, toasts success.
+Update `PartInventoryItem` in `src/hooks/useMaintenanceData.ts` to include:
+```ts
+vendor_name: string | null;
+last_restocked: string | null;
+```
 
-### 3. `MaintenanceDashboardHome.tsx` — new `InventoryAlertsCard`
+### 3. Hook (`useLowStockParts`)
+- Add `vendor_name, last_restocked` to the `.select(...)` columns.
+- Query already filters `quantity_on_hand <= min_threshold` — no logic change.
 
-Card styling consistent with `LiveDriverAlertsCard` but amber/warning-tinted (`border-amber-500/40`, `Package` icon header, "Below minimum threshold" caption). Inside:
-- Minimalist `<Table>`: Part (name + small muted part_number), Category badge, Qty (red text when 0, amber when ≤ threshold, format `X / Y unit`), Action ("Reorder" ghost button → `useRequestReorder`, or "Requested" muted text if `reorder_requested_at` set within last 7 days)
-- Loading: 3 `Skeleton` rows. Empty: `CheckCircle2` green "All parts stocked".
-- Footer link: "Manage inventory" → `/maintenance?tab=inventory` (link is harmless even if tab doesn't exist yet).
+### 4. Widget (`InventoryAlertsCard` in `MaintenanceDashboardHome.tsx`)
+- Add a small **Vendor** line under each part name (muted text, e.g. `"NAPA Auto Parts · Restocked 12 days ago"`).
+- Use `date-fns` `formatDistanceToNow` for the restock relative date; fall back to `"Not restocked yet"` when null.
+- No layout / responsive changes — the widget already fits the existing grid.
 
-### 4. Layout & responsive polish
+### 5. Verification
+After migration, confirm via a quick `select` that the new columns are populated for the demo org, and visually check the widget at `/maintenance-dashboard`.
 
-Rework the grid so everything collapses cleanly:
-- KPI row: `grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4` (already similar — verify gap consistency)
-- Middle row (Priorities + Live Alerts): `grid-cols-1 lg:grid-cols-3 gap-4` with Priorities `lg:col-span-2`
-- Bottom row (Upcoming PM + Inventory Alerts): `grid-cols-1 lg:grid-cols-3 gap-4` with Upcoming PM `lg:col-span-2`, Inventory Alerts in the third column
-- Quick Actions: full-width below, with internal `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` so the 4 buttons sit in a row on desktop instead of stacking
-- Outer page wrapper: `space-y-4 sm:space-y-6 p-4 sm:p-6` for uniform breathing room
-- All cards share the same `CardHeader` paddings, `CardTitle` size (`text-base font-semibold`), and `text-xs text-muted-foreground` captions — pass over each component and align
+## Files touched
+- New migration (adds 2 columns + index + seed backfill)
+- `src/hooks/useMaintenanceData.ts` (extend type + select)
+- `src/pages/MaintenanceDashboardHome.tsx` (render vendor + last restocked)
 
-No changes to KPI calculations, existing hooks, sidebar, routing, or `/maintenance`.
-
-### Files touched
-- New migration: `parts_inventory` table + RLS + seed
-- `src/hooks/useMaintenanceData.ts` — add type, `useLowStockParts`, `useRequestReorder`
-- `src/pages/MaintenanceDashboardHome.tsx` — add `InventoryAlertsCard`, restructure bottom grid, tighten spacing/typography across all sub-cards
+## Out of scope
+- Renaming `quantity_on_hand` → `quantity` or `min_threshold` → `minimum_threshold` (would break the existing hook, seeded data, and any future inventory pages). Let me know if you want a strict rename instead — I'd do it as a separate migration with a code sweep.

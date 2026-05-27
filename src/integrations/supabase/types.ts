@@ -3267,6 +3267,7 @@ export type Database = {
           category: string | null
           created_at: string
           id: string
+          last_restocked: string | null
           min_threshold: number
           notes: string | null
           org_id: string
@@ -3277,11 +3278,13 @@ export type Database = {
           reorder_url: string | null
           unit: string
           updated_at: string
+          vendor_name: string | null
         }
         Insert: {
           category?: string | null
           created_at?: string
           id?: string
+          last_restocked?: string | null
           min_threshold?: number
           notes?: string | null
           org_id: string
@@ -3292,11 +3295,13 @@ export type Database = {
           reorder_url?: string | null
           unit?: string
           updated_at?: string
+          vendor_name?: string | null
         }
         Update: {
           category?: string | null
           created_at?: string
           id?: string
+          last_restocked?: string | null
           min_threshold?: number
           notes?: string | null
           org_id?: string
@@ -3307,6 +3312,7 @@ export type Database = {
           reorder_url?: string | null
           unit?: string
           updated_at?: string
+          vendor_name?: string | null
         }
         Relationships: []
       }
