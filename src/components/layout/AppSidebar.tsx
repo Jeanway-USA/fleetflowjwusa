@@ -289,7 +289,7 @@ export function AppSidebar() {
     await signOut();
   };
 
-  const handleDashboardSwitch = (path: string, role: 'owner' | 'dispatcher' | 'driver') => {
+  const handleDashboardSwitch = (path: string, role: 'owner' | 'dispatcher' | 'driver' | 'maintenance') => {
     if (actuallyIsOwner) {
       if (role === 'owner') {
         setSimulatedRole(null);
