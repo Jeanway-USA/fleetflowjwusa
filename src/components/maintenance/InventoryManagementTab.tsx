@@ -52,6 +52,7 @@ import {
   useReceiveShipment,
   useDeletePart,
   type PartInventoryItem,
+  type CreatePartInput,
 } from '@/hooks/useMaintenanceData';
 
 // ----------------------------------------------------------------------------
