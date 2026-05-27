@@ -2,10 +2,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Wrench, Plus, Clock, CheckCircle, AlertTriangle, Settings } from 'lucide-react';
+import { Wrench, Plus, Clock, CheckCircle, AlertTriangle, Settings, MessageSquare } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useState } from 'react';
 import { MaintenanceRequestForm } from './MaintenanceRequestForm';
+import { MaintenanceThread } from '@/components/maintenance/MaintenanceThread';
 
 interface MaintenanceRequest {
   id: string;
