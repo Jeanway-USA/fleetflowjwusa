@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -220,8 +220,8 @@ function AvgRepairTurnaroundCard() {
 }
 
 export default function MaintenanceDashboardHome() {
-  return (
-    <>
+  const navigate = useNavigate();
+  const handleViewTruck = () => navigate('/maintenance');
       <PageHeader
         title="Maintenance Dashboard"
         description="Performance & status overview for your fleet maintenance operations"
