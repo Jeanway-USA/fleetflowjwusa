@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { AlertTriangle, Check, Wrench, ChevronDown, ChevronUp, Loader2, Truck } from 'lucide-react';
+import { AlertTriangle, Check, Wrench, ChevronDown, ChevronUp, Loader2, Truck, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,6 +12,7 @@ import {
   useConvertFaultReportToWorkOrder,
   type DriverFaultReport,
 } from '@/hooks/useDriverFaultReports';
+import { MaintenanceThread } from './MaintenanceThread';
 
 interface DriverFaultReportsPanelProps {
   onViewTruck: (truckId: string) => void;
