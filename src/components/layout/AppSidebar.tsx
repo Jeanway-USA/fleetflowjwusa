@@ -197,15 +197,18 @@ export function AppSidebar() {
     { title: 'Executive View', icon: Crown, path: '/executive-dashboard', roles: ['owner'] },
     { title: 'Dispatcher View', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['owner'] },
     { title: 'Driver View', icon: Truck, path: '/driver-dashboard', roles: ['owner'] },
+    { title: 'Maintenance View', icon: Wrench, path: '/maintenance', roles: ['owner'], feature: 'maintenance_full' },
   ] : [
     { title: 'My Dashboard', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['dispatcher'] },
     { title: 'My Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['driver'] },
+    { title: 'My Dashboard', icon: Wrench, path: '/maintenance', roles: ['maintenance'], feature: 'maintenance_full' },
   ];
 
-  const pathToRole: Record<string, 'owner' | 'dispatcher' | 'driver'> = {
+  const pathToRole: Record<string, 'owner' | 'dispatcher' | 'driver' | 'maintenance'> = {
     '/executive-dashboard': 'owner',
     '/dispatcher-dashboard': 'dispatcher',
     '/driver-dashboard': 'driver',
+    '/maintenance': 'maintenance',
   };
 
   // --- 3 collapsible groups ---
@@ -216,7 +219,6 @@ export function AppSidebar() {
     { title: 'Fleet Loads', icon: Package, path: '/fleet-loads', roles: ['owner', 'dispatcher', 'safety', 'driver'], feature: 'loads', tourId: 'nav-fleet-loads' },
     { title: 'Agency Loads', icon: Building2, path: '/agency-loads', roles: ['owner', 'dispatcher'], feature: 'agency_loads' },
     { title: currentTmsMode === 'independent' ? 'Broker CRM' : 'Agent CRM', icon: currentTmsMode === 'independent' ? Building2 : Contact, path: '/crm', roles: ['owner', 'dispatcher', 'safety', 'driver'], feature: 'crm' },
-    { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'], feature: 'maintenance_full' },
     { title: 'Load Optimizer', icon: BarChart, path: '/load-optimizer', roles: ['owner', 'dispatcher'], feature: 'loads' },
   ];
 
@@ -286,7 +288,7 @@ export function AppSidebar() {
     await signOut();
   };
 
-  const handleDashboardSwitch = (path: string, role: 'owner' | 'dispatcher' | 'driver') => {
+  const handleDashboardSwitch = (path: string, role: 'owner' | 'dispatcher' | 'driver' | 'maintenance') => {
     if (actuallyIsOwner) {
       if (role === 'owner') {
         setSimulatedRole(null);
