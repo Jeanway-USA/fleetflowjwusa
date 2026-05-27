@@ -66,9 +66,38 @@ interface ServiceHistoryTabProps {
   onViewTruck: (truckId: string) => void;
 }
 
+type ServiceFilter = 'all' | 'pm' | 'repair' | 'tire' | 'inspection' | 'other' | 'M1' | 'PM_A' | 'M2' | 'M3';
+type DateRangeFilter = 'all' | '30d' | '90d' | '365d';
+
+const serviceFilterLabels: Record<ServiceFilter, string> = {
+  all: 'All Service Types',
+  pm: 'Preventive Maintenance',
+  repair: 'Repair',
+  tire: 'Tire',
+  inspection: 'Inspection',
+  other: 'Other',
+  M1: 'M1',
+  PM_A: 'PM A',
+  M2: 'M2',
+  M3: 'M3',
+};
+
+const dateRangeLabels: Record<DateRangeFilter, string> = {
+  all: 'All Time',
+  '30d': 'Last 30 Days',
+  '90d': 'Last 90 Days',
+  '365d': 'Last 365 Days',
+};
+
 export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => localStorage.getItem('sh-search') || '');
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
+  const [serviceFilter, setServiceFilter] = useState<ServiceFilter>(
+    () => (localStorage.getItem('sh-service-filter') as ServiceFilter) || 'all'
+  );
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRangeFilter>(
+    () => (localStorage.getItem('sh-date-filter') as DateRangeFilter) || 'all'
+  );
   const [editingItem, setEditingItem] = useState<ServiceHistoryItem | null>(null);
   const [deleteItem, setDeleteItem] = useState<ServiceHistoryItem | null>(null);
   const [serviceTypesOpen, setServiceTypesOpen] = useState(false);
@@ -79,11 +108,54 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
     description: '',
     service_types: [] as string[],
   });
-  
+
+  useEffect(() => { localStorage.setItem('sh-search', searchQuery); }, [searchQuery]);
+  useEffect(() => { localStorage.setItem('sh-service-filter', serviceFilter); }, [serviceFilter]);
+  useEffect(() => { localStorage.setItem('sh-date-filter', dateRangeFilter); }, [dateRangeFilter]);
+
   const { data: history, isLoading } = useServiceHistory(debouncedQuery || undefined);
   const { data: trucks } = useTrucks();
   const updateWorkOrder = useUpdateCompletedWorkOrder();
   const deleteWorkOrder = useDeleteCompletedWorkOrder();
+
+  // Apply client-side filters (service type + date range) on top of server-search
+  const filteredHistory = useMemo(() => {
+    if (!history) return [];
+    const cutoff = (() => {
+      switch (dateRangeFilter) {
+        case '30d': return subDays(new Date(), 30);
+        case '90d': return subDays(new Date(), 90);
+        case '365d': return subDays(new Date(), 365);
+        default: return null;
+      }
+    })();
+    return history.filter(item => {
+      if (cutoff) {
+        const itemDate = new Date(item.date + 'T00:00:00');
+        if (itemDate < cutoff) return false;
+      }
+      if (serviceFilter !== 'all') {
+        const types = item.serviceTypes && item.serviceTypes.length > 0
+          ? item.serviceTypes
+          : item.serviceType.split(',').map(t => t.trim()).filter(Boolean);
+        const match = types.some(t =>
+          t === serviceFilter || t.toLowerCase() === serviceFilter.toLowerCase()
+        );
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [history, serviceFilter, dateRangeFilter]);
+
+  const summary = useMemo(() => {
+    return {
+      filteredCount: filteredHistory.length,
+      woCount: filteredHistory.filter(h => h.source === 'work_order').length,
+      logCount: filteredHistory.filter(h => h.source === 'maintenance_log').length,
+      totalCost: filteredHistory.reduce((sum, h) => sum + (h.cost || 0), 0),
+    };
+  }, [filteredHistory]);
+
 
   // Get truck make for the item being edited
   const editingTruck = useMemo(() => {
