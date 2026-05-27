@@ -1,15 +1,27 @@
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { AlertTriangle, Check, Wrench, ChevronDown, ChevronUp, Loader2, Truck, MessageSquare } from 'lucide-react';
+import { AlertTriangle, Check, Wrench, ChevronDown, ChevronUp, Loader2, Truck, MessageSquare, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   useDriverFaultReports,
   useAcknowledgeFaultReport,
   useConvertFaultReportToWorkOrder,
+  useDeleteFaultReport,
   type DriverFaultReport,
 } from '@/hooks/useDriverFaultReports';
 import { MaintenanceThread } from './MaintenanceThread';
