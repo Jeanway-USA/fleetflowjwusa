@@ -197,17 +197,18 @@ export function AppSidebar() {
     { title: 'Executive View', icon: Crown, path: '/executive-dashboard', roles: ['owner'] },
     { title: 'Dispatcher View', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['owner'] },
     { title: 'Driver View', icon: Truck, path: '/driver-dashboard', roles: ['owner'] },
-    { title: 'Maintenance View', icon: Wrench, path: '/maintenance', roles: ['owner'], feature: 'maintenance_full' },
+    { title: 'Maintenance View', icon: Wrench, path: '/maintenance-home', roles: ['owner'], feature: 'maintenance_full' },
   ] : [
     { title: 'My Dashboard', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['dispatcher'] },
     { title: 'My Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['driver'] },
-    { title: 'My Dashboard', icon: Wrench, path: '/maintenance', roles: ['maintenance'], feature: 'maintenance_full' },
+    { title: 'My Dashboard', icon: Wrench, path: '/maintenance-home', roles: ['maintenance'], feature: 'maintenance_full' },
   ];
 
   const pathToRole: Record<string, 'owner' | 'dispatcher' | 'driver' | 'maintenance'> = {
     '/executive-dashboard': 'owner',
     '/dispatcher-dashboard': 'dispatcher',
     '/driver-dashboard': 'driver',
+    '/maintenance-home': 'maintenance',
     '/maintenance': 'maintenance',
   };
 

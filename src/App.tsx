@@ -24,6 +24,7 @@ const AgencyLoads = lazy(() => import("./pages/AgencyLoads"));
 const Finance = lazy(() => import("./pages/Finance"));
 const CompanyInsights = lazy(() => import("./pages/CompanyInsights"));
 const MaintenanceManagement = lazy(() => import("./pages/MaintenanceManagement"));
+const MaintenanceDashboardHome = lazy(() => import("./pages/MaintenanceDashboardHome"));
 const Documents = lazy(() => import("./pages/Documents"));
 const Safety = lazy(() => import("./pages/Safety"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -184,6 +185,11 @@ const App = () => {
                     <Route path="/maintenance" element={
                       <ProtectedRoute allowedRoles={['owner', 'safety', 'maintenance']} requiredFeature="maintenance_full">
                         <MaintenanceManagement />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/maintenance-home" element={
+                      <ProtectedRoute allowedRoles={['owner', 'maintenance']} requiredFeature="maintenance_full">
+                        <MaintenanceDashboardHome />
                       </ProtectedRoute>
                     } />
                     <Route path="/documents" element={
