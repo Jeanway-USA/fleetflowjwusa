@@ -182,7 +182,7 @@ const App = () => {
                       </ProtectedRoute>
                     } />
                     <Route path="/maintenance" element={
-                      <ProtectedRoute allowedRoles={['owner', 'safety']} requiredFeature="maintenance_full">
+                      <ProtectedRoute allowedRoles={['owner', 'safety', 'maintenance']} requiredFeature="maintenance_full">
                         <MaintenanceManagement />
                       </ProtectedRoute>
                     } />
