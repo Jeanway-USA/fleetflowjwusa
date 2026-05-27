@@ -777,6 +777,14 @@ function InventoryAlertsCard() {
                         {qty} / {threshold} {p.unit}
                       </span>
                     </div>
+                    {(p.vendor_name || p.last_restocked) && (
+                      <div className="mt-0.5 text-[11px] text-muted-foreground truncate">
+                        {p.vendor_name ?? 'Vendor TBD'}
+                        {p.last_restocked
+                          ? ` · Restocked ${formatDistanceToNow(new Date(p.last_restocked), { addSuffix: true })}`
+                          : ' · Not restocked yet'}
+                      </div>
+                    )}
                   </div>
                   {recentlyRequested ? (
                     <span className="text-[11px] text-muted-foreground whitespace-nowrap">

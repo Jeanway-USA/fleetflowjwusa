@@ -1295,6 +1295,8 @@ export interface PartInventoryItem {
   reorder_url: string | null;
   reorder_requested_at: string | null;
   notes: string | null;
+  vendor_name: string | null;
+  last_restocked: string | null;
   created_at: string;
   updated_at: string;
 }
