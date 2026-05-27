@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { PMNotificationsPanel } from '@/components/maintenance/PMNotificationsPanel';
+import { NewWorkOrderSheet } from '@/components/maintenance/NewWorkOrderSheet';
 import {
   useFleetAvailability,
   useActiveWorkOrders,
@@ -25,6 +26,7 @@ import {
   type TodaysWorkOrder,
 } from '@/hooks/useMaintenanceData';
 import { useDriverFaultReports, type DriverFaultReport } from '@/hooks/useDriverFaultReports';
+import { usePMNotifications, type PMNotification } from '@/hooks/usePMNotifications';
 import { useToast } from '@/hooks/use-toast';
 import {
   Truck,
@@ -37,9 +39,14 @@ import {
   CheckCircle2,
   PlayCircle,
   Calendar,
+  Zap,
+  Plus,
+  Package,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { subDays, formatDistanceToNow } from 'date-fns';
+import { subDays, addDays, format, formatDistanceToNow } from 'date-fns';
+
 
 type Trend = {
   direction: 'up' | 'down' | 'flat';
