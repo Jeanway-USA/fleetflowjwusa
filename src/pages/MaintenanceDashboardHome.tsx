@@ -653,28 +653,30 @@ function QuickActionsCard({ onCreateWorkOrder, onLogParts }: QuickActionsCardPro
     <Card>
       <CardHeader className="flex flex-row items-center gap-2 space-y-0">
         <Zap className="h-4 w-4 text-primary" />
-        <CardTitle className="text-base">Quick Actions</CardTitle>
+        <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {actions.map(a => (
-          <Button
-            key={a.key}
-            variant={a.variant}
-            onClick={a.onClick}
-            className="w-full justify-start gap-3 h-auto py-3"
-          >
-            <a.icon className="h-4 w-4 shrink-0" />
-            <span className="flex flex-col items-start text-left">
-              <span className="text-sm font-semibold leading-tight">{a.label}</span>
-              <span className={cn(
-                'text-[11px] font-normal mt-0.5',
-                a.variant === 'default' ? 'text-primary-foreground/80' : 'text-muted-foreground',
-              )}>
-                {a.helper}
+      <CardContent>
+        <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {actions.map(a => (
+            <Button
+              key={a.key}
+              variant={a.variant}
+              onClick={a.onClick}
+              className="w-full justify-start gap-3 h-auto py-3"
+            >
+              <a.icon className="h-4 w-4 shrink-0" />
+              <span className="flex flex-col items-start text-left min-w-0">
+                <span className="text-sm font-semibold leading-tight truncate">{a.label}</span>
+                <span className={cn(
+                  'text-[11px] font-normal mt-0.5 truncate',
+                  a.variant === 'default' ? 'text-primary-foreground/80' : 'text-muted-foreground',
+                )}>
+                  {a.helper}
+                </span>
               </span>
-            </span>
-          </Button>
-        ))}
+            </Button>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
