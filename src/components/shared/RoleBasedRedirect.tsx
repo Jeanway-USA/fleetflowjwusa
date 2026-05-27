@@ -52,7 +52,7 @@ export function RoleBasedRedirect() {
   }
 
   if (hasRole('maintenance')) {
-    return <Navigate to="/maintenance" replace />;
+    return <Navigate to="/maintenance-home" replace />;
   }
 
   if (hasRole('safety') || hasRole('payroll_admin')) {
