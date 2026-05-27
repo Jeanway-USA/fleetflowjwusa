@@ -64,14 +64,19 @@ export function MaintenanceRequestForm({ driverId, truckId, onComplete }: Mainte
 
   const submitMutation = useMutation({
     mutationFn: async (data: MaintenanceRequestValues) => {
-      const { error } = await supabase.from('maintenance_requests').insert({
-        driver_id: driverId,
-        truck_id: truckId,
-        issue_type: data.issueType,
-        priority: data.priority,
-        description: data.description,
-        status: 'submitted',
-      });
+      const { error } = await supabase
+        .from('maintenance_requests')
+        .insert({
+          driver_id: driverId,
+          truck_id: truckId,
+          issue_type: data.issueType,
+          priority: data.priority,
+          description: data.description,
+          status: 'submitted',
+          // org_id auto-populated by set_maintenance_request_org_id_trg
+        })
+        .select('id')
+        .single();
       if (error) throw error;
     },
     onSuccess: () => {
