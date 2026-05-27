@@ -1,50 +1,44 @@
-## Context
-
-The `parts_inventory` table already exists and the Inventory Alerts widget already uses real Supabase data via `useLowStockParts()` — there is no mock array left to remove. What's missing relative to your spec are two fields: **`vendor_name`** (where the part was purchased) and **`last_restocked`** (timestamp of most recent restock).
-
-Existing column names differ slightly from your spec but map cleanly:
-- `quantity_on_hand` ↔ `quantity`
-- `min_threshold` ↔ `minimum_threshold`
-
-I'll keep the existing names to avoid breaking the seeded data, hook, and widget, and just add the two new columns.
-
 ## Plan
 
-### 1. Database migration
-Add to `public.parts_inventory`:
-- `vendor_name text` (nullable)
-- `last_restocked timestamptz` (nullable)
-- Index on `(org_id, last_restocked desc)` for future "recently restocked" queries.
+### 1. New hook in `src/hooks/useMaintenanceData.ts`
+Add `useAllPartsInventory()` — fetches every row from `parts_inventory` for the org, ordered by `part_name`. Same `PartInventoryItem` type that already includes `vendor_name` and `last_restocked`. 5-min staleTime, no window-focus refetch.
 
-Backfill `last_restocked = created_at` for existing rows so the UI doesn't show "Never" for seeded items, and set a reasonable `vendor_name` (e.g. `'NAPA Auto Parts'`, `'FleetPride'`) on the seeded demo rows.
+### 2. New component `src/components/maintenance/InventoryManagementTab.tsx`
+Self-contained tab using shadcn `Table`, `Input`, `Badge`, `Button`, `DropdownMenu`.
 
-No RLS/grants changes needed (table already correctly configured).
+**Search bar (above table)**
+- Single `Input` with `Search` icon, placeholder "Search by part name, number, or vendor…"
+- Local `useState` for the query, case-insensitive client-side filter across `part_name`, `part_number`, `vendor_name`.
+- Right side: result count (e.g. "12 of 47 parts").
 
-### 2. Types
-`src/integrations/supabase/types.ts` regenerates automatically after migration — no manual edit.
+**Table columns**
+1. **Part** — `part_name` (bold) with `part_number` muted below
+2. **Vendor** — `vendor_name` (or "—")
+3. **Quantity** — `{quantity_on_hand} {unit}`
+4. **Min. Threshold** — `{min_threshold} {unit}`
+5. **Status** — Badge:
+   - `quantity ≤ 0` → red "Out of Stock"
+   - `quantity ≤ min_threshold` → amber "Low Stock"
+   - otherwise → green "In Stock"
+6. **Actions** — placeholder `DropdownMenu` with disabled "Edit", "Adjust Quantity", "Request Reorder" items (wired later).
 
-Update `PartInventoryItem` in `src/hooks/useMaintenanceData.ts` to include:
-```ts
-vendor_name: string | null;
-last_restocked: string | null;
-```
+**States**
+- Loading: 5 `Skeleton` rows
+- Empty (no parts at all): centered `Package` icon + "No inventory yet" message
+- Empty (filter no match): "No parts match your search"
 
-### 3. Hook (`useLowStockParts`)
-- Add `vendor_name, last_restocked` to the `.select(...)` columns.
-- Query already filters `quantity_on_hand <= min_threshold` — no logic change.
+### 3. Wire into `src/pages/MaintenanceManagement.tsx`
+- Import `InventoryManagementTab` and `Package` icon
+- Add a 5th `TabsTrigger value="inventory"` with `Package` icon + label "Inventory"
+- Add matching `TabsContent value="inventory"` rendering `<InventoryManagementTab />`
 
-### 4. Widget (`InventoryAlertsCard` in `MaintenanceDashboardHome.tsx`)
-- Add a small **Vendor** line under each part name (muted text, e.g. `"NAPA Auto Parts · Restocked 12 days ago"`).
-- Use `date-fns` `formatDistanceToNow` for the restock relative date; fall back to `"Not restocked yet"` when null.
-- No layout / responsive changes — the widget already fits the existing grid.
-
-### 5. Verification
-After migration, confirm via a quick `select` that the new columns are populated for the demo org, and visually check the widget at `/maintenance-dashboard`.
+No DB or RLS changes — `parts_inventory` and its policies already allow maintenance/dispatcher/owner full management and ops/safety read.
 
 ## Files touched
-- New migration (adds 2 columns + index + seed backfill)
-- `src/hooks/useMaintenanceData.ts` (extend type + select)
-- `src/pages/MaintenanceDashboardHome.tsx` (render vendor + last restocked)
+- `src/hooks/useMaintenanceData.ts` (+ `useAllPartsInventory`)
+- `src/components/maintenance/InventoryManagementTab.tsx` (new)
+- `src/pages/MaintenanceManagement.tsx` (add tab)
 
-## Out of scope
-- Renaming `quantity_on_hand` → `quantity` or `min_threshold` → `minimum_threshold` (would break the existing hook, seeded data, and any future inventory pages). Let me know if you want a strict rename instead — I'd do it as a separate migration with a code sweep.
+## Out of scope (flagged for follow-up)
+- Add/Edit/Delete part dialogs and quantity adjustments — placeholder dropdown for now
+- Pagination — current dataset is small; can add later if it grows past ~50 rows
