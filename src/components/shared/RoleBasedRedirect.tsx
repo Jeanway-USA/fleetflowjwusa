@@ -51,6 +51,10 @@ export function RoleBasedRedirect() {
     return <Navigate to="/driver-dashboard" replace />;
   }
 
+  if (hasRole('maintenance')) {
+    return <Navigate to="/maintenance" replace />;
+  }
+
   if (hasRole('safety') || hasRole('payroll_admin')) {
     return <Navigate to="/executive-dashboard" replace />;
   }
