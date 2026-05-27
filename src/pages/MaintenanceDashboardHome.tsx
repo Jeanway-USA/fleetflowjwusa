@@ -441,7 +441,246 @@ function LiveDriverAlertsCard() {
   );
 }
 
+interface UpcomingPMItem {
+  id: string;
+  truckLabel: string;
+  serviceName: string;
+  notification: PMNotification;
+  isOverdue: boolean;
+  isImminent: boolean; // <= 48h
+  dueLabel: string;
+  sortKey: number;
+}
+
+function buildUpcomingItems(list: PMNotification[]): UpcomingPMItem[] {
+  const today = new Date();
+  const items: UpcomingPMItem[] = [];
+
+  for (const n of list) {
+    const remaining = n.days_or_miles_remaining;
+    const isOverdueType = n.notification_type === 'overdue';
+
+    if (n.unit === 'days' && remaining !== null) {
+      if (remaining > 7) continue;
+      const dueDate = addDays(today, remaining);
+      const isOverdue = remaining < 0 || isOverdueType;
+      const isImminent = !isOverdue && remaining <= 2;
+      items.push({
+        id: n.id,
+        truckLabel: n.trucks?.unit_number || 'Unknown',
+        serviceName: n.service_name,
+        notification: n,
+        isOverdue,
+        isImminent,
+        dueLabel: isOverdue
+          ? `Overdue · ${format(dueDate, 'MMM d')}`
+          : format(dueDate, 'MMM d'),
+        sortKey: remaining,
+      });
+    } else if (n.unit === 'miles' && (isOverdueType || n.notification_type === 'due_soon') && remaining !== null) {
+      const isOverdue = isOverdueType || remaining < 0;
+      items.push({
+        id: n.id,
+        truckLabel: n.trucks?.unit_number || 'Unknown',
+        serviceName: n.service_name,
+        notification: n,
+        isOverdue,
+        isImminent: false,
+        dueLabel: isOverdue
+          ? `Overdue · ${Math.abs(remaining).toLocaleString()} mi`
+          : `in ${remaining.toLocaleString()} mi`,
+        sortKey: isOverdue ? -9999 : 100 + remaining / 10000,
+      });
+    }
+  }
+
+  return items.sort((a, b) => a.sortKey - b.sortKey);
+}
+
+function UpcomingPMCard() {
+  const navigate = useNavigate();
+  const { data, isLoading } = usePMNotifications();
+  const items = buildUpcomingItems(data || []);
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <CardTitle className="text-base">Upcoming Preventive Maintenance</CardTitle>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Next 7 days</p>
+          </div>
+          {!isLoading && (
+            <Badge variant="secondary" className="ml-1">{items.length}</Badge>
+          )}
+        </div>
+        <Button asChild variant="ghost" size="sm" className="gap-1 text-xs">
+          <Link to="/maintenance?tab=predictive">
+            Calendar <ArrowRight className="h-3 w-3" />
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="space-y-2 p-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="px-6 py-10 text-center">
+            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
+            <p className="text-sm text-muted-foreground">
+              No preventive maintenance due in the next 7 days.
+            </p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[110px]">Truck</TableHead>
+                <TableHead>Service Type</TableHead>
+                <TableHead className="w-[180px]">Due Date</TableHead>
+                <TableHead className="w-[130px] text-right">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map(item => (
+                <TableRow
+                  key={item.id}
+                  onClick={() => navigate('/maintenance?tab=predictive')}
+                  className="cursor-pointer transition-colors hover:bg-muted/50"
+                >
+                  <TableCell className="font-medium">{item.truckLabel}</TableCell>
+                  <TableCell>
+                    <span className="text-sm">{item.serviceName}</span>
+                    {item.notification.service_code && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        ({item.notification.service_code})
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1.5 text-sm',
+                        item.isOverdue
+                          ? 'text-red-600 dark:text-red-400 font-medium'
+                          : item.isImminent
+                          ? 'text-amber-600 dark:text-amber-400 font-medium'
+                          : 'text-muted-foreground',
+                      )}
+                    >
+                      {item.isOverdue ? (
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                      ) : item.isImminent ? (
+                        <Clock className="h-3.5 w-3.5" />
+                      ) : (
+                        <Calendar className="h-3.5 w-3.5" />
+                      )}
+                      {item.dueLabel}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {item.isOverdue ? (
+                      <Badge variant="destructive">Overdue</Badge>
+                    ) : item.isImminent ? (
+                      <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400">
+                        Due soon
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">Upcoming</Badge>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface QuickActionsCardProps {
+  onCreateWorkOrder: () => void;
+  onLogParts: () => void;
+}
+
+function QuickActionsCard({ onCreateWorkOrder, onLogParts }: QuickActionsCardProps) {
+  const navigate = useNavigate();
+
+  const actions = [
+    {
+      key: 'create-wo',
+      label: 'Create New Work Order',
+      helper: 'Open a new repair or PM job',
+      icon: Plus,
+      variant: 'default' as const,
+      onClick: onCreateWorkOrder,
+    },
+    {
+      key: 'log-parts',
+      label: 'Log Parts Usage',
+      helper: 'Add parts & costs to a work order',
+      icon: Package,
+      variant: 'secondary' as const,
+      onClick: onLogParts,
+    },
+    {
+      key: 'message-driver',
+      label: 'Message a Driver',
+      helper: 'Open driver fault report threads',
+      icon: MessageSquare,
+      variant: 'secondary' as const,
+      onClick: () => navigate('/maintenance'),
+    },
+    {
+      key: 'truck-status',
+      label: 'Update Truck Status',
+      helper: 'Mark trucks active, in-shop or down',
+      icon: Truck,
+      variant: 'outline' as const,
+      onClick: () => navigate('/trucks'),
+    },
+  ];
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center gap-2 space-y-0">
+        <Zap className="h-4 w-4 text-primary" />
+        <CardTitle className="text-base">Quick Actions</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {actions.map(a => (
+          <Button
+            key={a.key}
+            variant={a.variant}
+            onClick={a.onClick}
+            className="w-full justify-start gap-3 h-auto py-3"
+          >
+            <a.icon className="h-4 w-4 shrink-0" />
+            <span className="flex flex-col items-start text-left">
+              <span className="text-sm font-semibold leading-tight">{a.label}</span>
+              <span className={cn(
+                'text-[11px] font-normal mt-0.5',
+                a.variant === 'default' ? 'text-primary-foreground/80' : 'text-muted-foreground',
+              )}>
+                {a.helper}
+              </span>
+            </span>
+          </Button>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function MaintenanceDashboardHome() {
+  const [woOpen, setWoOpen] = useState(false);
+
+
   return (
     <>
       <PageHeader
