@@ -680,9 +680,136 @@ function QuickActionsCard({ onCreateWorkOrder, onLogParts }: QuickActionsCardPro
   );
 }
 
+function InventoryAlertsCard() {
+  const { toast } = useToast();
+  const { data, isLoading } = useLowStockParts();
+  const reorder = useRequestReorder();
+  const parts = data || [];
+
+  const handleReorder = (part: PartInventoryItem) => {
+    reorder.mutate(part.id, {
+      onSuccess: () =>
+        toast({
+          title: 'Reorder requested',
+          description: `${part.part_name} flagged for purchasing.`,
+        }),
+      onError: (err: any) =>
+        toast({
+          title: 'Reorder failed',
+          description: err?.message ?? 'Try again',
+          variant: 'destructive',
+        }),
+    });
+  };
+
+  const isRecentlyRequested = (iso: string | null) => {
+    if (!iso) return false;
+    return Date.now() - new Date(iso).getTime() < 1000 * 60 * 60 * 24 * 7;
+  };
+
+  return (
+    <Card className="border-amber-500/40">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-amber-500/20 bg-amber-500/5">
+        <div className="flex items-center gap-2">
+          <Package className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <div>
+            <CardTitle className="text-base font-semibold">Inventory Alerts</CardTitle>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Below minimum threshold
+            </p>
+          </div>
+        </div>
+        {!isLoading && parts.length > 0 && (
+          <Badge
+            variant="outline"
+            className="border-amber-400 text-amber-700 dark:text-amber-400"
+          >
+            {parts.length}
+          </Badge>
+        )}
+      </CardHeader>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="space-y-2 p-4">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : parts.length === 0 ? (
+          <div className="px-6 py-10 text-center">
+            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
+            <p className="text-sm text-muted-foreground">All parts stocked above threshold.</p>
+          </div>
+        ) : (
+          <ul className="divide-y">
+            {parts.map(p => {
+              const qty = Number(p.quantity_on_hand);
+              const threshold = Number(p.min_threshold);
+              const out = qty <= 0;
+              const recentlyRequested = isRecentlyRequested(p.reorder_requested_at);
+              return (
+                <li key={p.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium truncate">{p.part_name}</span>
+                      {p.part_number && (
+                        <span className="text-[11px] text-muted-foreground truncate">
+                          {p.part_number}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs">
+                      {p.category && (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
+                          {p.category}
+                        </Badge>
+                      )}
+                      <span
+                        className={cn(
+                          'font-medium',
+                          out
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-amber-600 dark:text-amber-400',
+                        )}
+                      >
+                        {qty} / {threshold} {p.unit}
+                      </span>
+                    </div>
+                  </div>
+                  {recentlyRequested ? (
+                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                      Requested
+                    </span>
+                  ) : (
+                    <LoadingButton
+                      size="sm"
+                      variant="ghost"
+                      className="text-amber-700 dark:text-amber-400 hover:text-amber-800"
+                      loading={reorder.isPending && reorder.variables === p.id}
+                      onClick={() => handleReorder(p)}
+                    >
+                      Reorder
+                    </LoadingButton>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <div className="border-t px-4 py-2 text-right">
+          <Button asChild variant="ghost" size="sm" className="gap-1 text-xs">
+            <Link to="/maintenance?tab=inventory">
+              Manage inventory <ArrowRight className="h-3 w-3" />
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function MaintenanceDashboardHome() {
   const [woOpen, setWoOpen] = useState(false);
-
 
   return (
     <>
@@ -698,12 +825,12 @@ export default function MaintenanceDashboardHome() {
         </Button>
       </PageHeader>
 
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <section>
           <h2 className="text-lg font-semibold tracking-tight mb-3">
             Performance & Status Overview
           </h2>
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
             <FleetUptimeCard />
             <OpenWorkOrdersCard />
             <CriticalDriverReportsCard />
@@ -711,23 +838,26 @@ export default function MaintenanceDashboardHome() {
           </div>
         </section>
 
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
           <TodaysPrioritiesCard />
           <LiveDriverAlertsCard />
         </div>
 
-        <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
           <UpcomingPMCard />
-          <QuickActionsCard
-            onCreateWorkOrder={() => setWoOpen(true)}
-            onLogParts={() => setWoOpen(true)}
-          />
+          <InventoryAlertsCard />
         </div>
+
+        <QuickActionsCard
+          onCreateWorkOrder={() => setWoOpen(true)}
+          onLogParts={() => setWoOpen(true)}
+        />
       </div>
 
       <NewWorkOrderSheet open={woOpen} onOpenChange={setWoOpen} />
     </>
   );
 }
+
 
 
