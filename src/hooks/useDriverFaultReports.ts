@@ -60,6 +60,23 @@ export function useAcknowledgeFaultReport() {
   });
 }
 
+export function useDeleteFaultReport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('maintenance_requests')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['driver-fault-reports'] });
+      qc.invalidateQueries({ queryKey: ['driver-maintenance-requests'] });
+    },
+  });
+}
+
 function mapIssueToServiceType(issueType: string): string {
   if (issueType === 'tire') return 'tire';
   return 'repair';
