@@ -277,7 +277,7 @@ function TodaysPrioritiesCard() {
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base">Today's Priorities</CardTitle>
+          <CardTitle className="text-base font-semibold">Today's Priorities</CardTitle>
           {!isLoading && (
             <Badge variant="secondary" className="ml-1">{items.length}</Badge>
           )}
@@ -379,7 +379,7 @@ function LiveDriverAlertsCard() {
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-destructive" />
           <div>
-            <CardTitle className="text-base">Live Driver Alerts</CardTitle>
+            <CardTitle className="text-base font-semibold">Live Driver Alerts</CardTitle>
             <p className="text-[11px] text-muted-foreground mt-0.5">
               Unverified — needs triage
             </p>
@@ -511,7 +511,7 @@ function UpcomingPMCard() {
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
           <div>
-            <CardTitle className="text-base">Upcoming Preventive Maintenance</CardTitle>
+            <CardTitle className="text-base font-semibold">Upcoming Preventive Maintenance</CardTitle>
             <p className="text-[11px] text-muted-foreground mt-0.5">Next 7 days</p>
           </div>
           {!isLoading && (
