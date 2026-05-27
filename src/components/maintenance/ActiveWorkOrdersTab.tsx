@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { CheckCircle, Wrench, Package, Clock, DollarSign, Search, Filter, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CompleteJobModal } from './CompleteJobModal';
+import { DriverFaultReportsPanel } from './DriverFaultReportsPanel';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 
 interface ActiveWorkOrdersTabProps {
