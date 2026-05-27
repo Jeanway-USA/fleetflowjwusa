@@ -222,6 +222,9 @@ function AvgRepairTurnaroundCard() {
 export default function MaintenanceDashboardHome() {
   const navigate = useNavigate();
   const handleViewTruck = () => navigate('/maintenance');
+
+  return (
+    <>
       <PageHeader
         title="Maintenance Dashboard"
         description="Performance & status overview for your fleet maintenance operations"
@@ -253,7 +256,7 @@ export default function MaintenanceDashboardHome() {
               <CardTitle className="text-base">Driver Fault Reports</CardTitle>
             </CardHeader>
             <CardContent>
-              <DriverFaultReportsPanel />
+              <DriverFaultReportsPanel onViewTruck={handleViewTruck} />
             </CardContent>
           </Card>
 
