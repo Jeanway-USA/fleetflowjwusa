@@ -29,7 +29,7 @@ export function useDriverFaultReports() {
       const { data, error } = await supabase
         .from('maintenance_requests')
         .select('id, driver_id, truck_id, issue_type, priority, description, status, admin_notes, created_at, drivers(first_name, last_name), trucks(unit_number)')
-        .in('status', ['submitted', 'acknowledged'])
+        .in('status', ['submitted', 'acknowledged', 'in_progress'])
         .order('created_at', { ascending: false });
       if (error) throw error;
       const rows = (data || []) as unknown as DriverFaultReport[];

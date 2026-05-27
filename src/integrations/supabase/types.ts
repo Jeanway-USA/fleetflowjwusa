@@ -2923,6 +2923,74 @@ export type Database = {
           },
         ]
       }
+      maintenance_request_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          message_type: string
+          org_id: string
+          recommendation: Json | null
+          request_id: string
+          sender_name: string | null
+          sender_role: string
+          sender_user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          message_type?: string
+          org_id: string
+          recommendation?: Json | null
+          request_id: string
+          sender_name?: string | null
+          sender_role: string
+          sender_user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          message_type?: string
+          org_id?: string
+          recommendation?: Json | null
+          request_id?: string
+          sender_name?: string | null
+          sender_role?: string
+          sender_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_request_messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_request_messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "maintenance_request_messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_request_messages_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       maintenance_requests: {
         Row: {
           admin_notes: string | null
