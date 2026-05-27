@@ -87,7 +87,7 @@ export function useSendMaintenanceMessage() {
         message_type: args.message_type ?? 'chat',
         recommendation: args.recommendation ?? null,
         // sender_user_id + org_id auto-filled by set_mrm_defaults_trg
-      });
+      } as any);
       if (error) throw error;
 
       // First maintenance-side message → bump request to acknowledged
