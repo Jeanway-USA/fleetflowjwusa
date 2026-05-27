@@ -131,7 +131,7 @@ function AddPartDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
   });
 
   const onSubmit = (values: PartFormValues) => {
-    create.mutate(values, {
+    create.mutate(values as CreatePartInput, {
       onSuccess: () => {
         toast.success(`${values.part_name} added to inventory`);
         form.reset();
