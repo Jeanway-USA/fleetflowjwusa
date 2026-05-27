@@ -96,6 +96,7 @@ export function DispatcherAlerts() {
           driver:drivers!driver_requests_driver_id_fkey(first_name, last_name)
         `)
         .eq('status', 'pending')
+        .neq('request_type', 'maintenance')
         .order('created_at', { ascending: false });
 
       driverRequests?.forEach(req => {
