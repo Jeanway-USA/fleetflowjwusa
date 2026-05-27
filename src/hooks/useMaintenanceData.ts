@@ -1356,6 +1356,147 @@ export function useRequestReorder() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['low-stock-parts'] });
+      queryClient.invalidateQueries({ queryKey: ['all-parts-inventory'] });
     },
+  });
+}
+
+// Helper: resolve current user's org_id for inserts
+async function getCurrentOrgId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('org_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.org_id) throw new Error('No organization found for user');
+  return data.org_id as string;
+}
+
+function invalidatePartsQueries(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: ['all-parts-inventory'] });
+  qc.invalidateQueries({ queryKey: ['low-stock-parts'] });
+}
+
+export interface CreatePartInput {
+  part_name: string;
+  part_number?: string | null;
+  vendor_name?: string | null;
+  category?: string | null;
+  unit?: string;
+  quantity_on_hand: number;
+  min_threshold: number;
+}
+
+export function useCreatePart() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreatePartInput) => {
+      const org_id = await getCurrentOrgId();
+      const payload = {
+        org_id,
+        part_name: input.part_name,
+        part_number: input.part_number || null,
+        vendor_name: input.vendor_name || null,
+        category: input.category || null,
+        unit: input.unit || 'ea',
+        quantity_on_hand: input.quantity_on_hand,
+        min_threshold: input.min_threshold,
+        last_restocked: new Date().toISOString(),
+      };
+      const { data, error } = await (supabase as any)
+        .from('parts_inventory')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as PartInventoryItem;
+    },
+    onSuccess: () => invalidatePartsQueries(queryClient),
+  });
+}
+
+export interface UpdatePartInput {
+  id: string;
+  part_name?: string;
+  part_number?: string | null;
+  vendor_name?: string | null;
+  category?: string | null;
+  unit?: string;
+  min_threshold?: number;
+}
+
+export function useUpdatePart() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: UpdatePartInput) => {
+      const cleaned: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined) continue;
+        cleaned[k] = v === '' ? null : v;
+      }
+      const { error } = await (supabase as any)
+        .from('parts_inventory')
+        .update(cleaned)
+        .eq('id', id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => invalidatePartsQueries(queryClient),
+  });
+}
+
+export interface ReceiveShipmentInput {
+  id: string;
+  quantity: number;
+  vendor_name?: string | null;
+}
+
+export function useReceiveShipment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, quantity, vendor_name }: ReceiveShipmentInput) => {
+      // Fetch current quantity (small dataset; acceptable race risk)
+      const { data: current, error: fetchError } = await (supabase as any)
+        .from('parts_inventory')
+        .select('quantity_on_hand')
+        .eq('id', id)
+        .single();
+      if (fetchError) throw fetchError;
+
+      const newQty = Number(current.quantity_on_hand) + Number(quantity);
+      const patch: Record<string, unknown> = {
+        quantity_on_hand: newQty,
+        last_restocked: new Date().toISOString(),
+        reorder_requested_at: null,
+      };
+      if (vendor_name && vendor_name.trim()) {
+        patch.vendor_name = vendor_name.trim();
+      }
+      const { error } = await (supabase as any)
+        .from('parts_inventory')
+        .update(patch)
+        .eq('id', id);
+      if (error) throw error;
+      return { id, newQty };
+    },
+    onSuccess: () => invalidatePartsQueries(queryClient),
+  });
+}
+
+export function useDeletePart() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any)
+        .from('parts_inventory')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => invalidatePartsQueries(queryClient),
   });
 }
