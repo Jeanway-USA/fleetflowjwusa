@@ -22,8 +22,11 @@ import {
   useActiveWorkOrders,
   useTodaysWorkOrders,
   useStartWorkOrder,
+  useLowStockParts,
+  useRequestReorder,
   type TodayUrgency,
   type TodaysWorkOrder,
+  type PartInventoryItem,
 } from '@/hooks/useMaintenanceData';
 import { useDriverFaultReports, type DriverFaultReport } from '@/hooks/useDriverFaultReports';
 import { usePMNotifications, type PMNotification } from '@/hooks/usePMNotifications';
