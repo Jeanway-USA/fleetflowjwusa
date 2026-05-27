@@ -1,65 +1,57 @@
-## Goal
+## Inventory Alerts widget + responsive polish
 
-Add two more widgets to `src/pages/MaintenanceDashboardHome.tsx`: an "Upcoming Preventive Maintenance (Next 7 Days)" look-ahead list and a "Quick Actions" panel for common daily tasks.
+### 1. New backend table: `parts_inventory`
 
-## New layout
+Migration creates a multi-tenant inventory table mechanics can manage.
 
-The existing bottom row (which currently holds the standalone PM Notifications card) becomes a 3-column grid:
+Columns:
+- `id`, `org_id`, `created_at`, `updated_at`
+- `part_number` (text, nullable) — e.g. `15W40-55GAL`
+- `part_name` (text, required) — e.g. "15W-40 Engine Oil"
+- `category` (text, nullable) — e.g. "Fluids", "Filters", "Brakes"
+- `quantity_on_hand` (numeric, default 0)
+- `min_threshold` (numeric, default 0) — reorder trigger level
+- `unit` (text, default 'ea') — ea / qt / gal / box
+- `reorder_url` (text, nullable) — optional vendor link
+- `reorder_requested_at` (timestamptz, nullable) — set when "Reorder" clicked
+- `notes` (text, nullable)
 
-```text
-+----------------------------------------+----------------------+
-| Today's Priorities (lg:col-span-2)     | Live Driver Alerts   |
-+----------------------------------------+----------------------+
-| Upcoming PM (Next 7 Days)              | Quick Actions        |
-| (lg:col-span-2)                        |                      |
-+----------------------------------------+----------------------+
-```
+GRANTs: `authenticated` (SELECT/INSERT/UPDATE/DELETE), `service_role` (ALL). No anon.
 
-The standalone `PMNotificationsPanel` card is removed from this page — its info is now surfaced by the new "Upcoming PM" widget (which is more focused and scoped to the next 7 days), and the full panel remains available on `/maintenance`.
+RLS policies (org-scoped via `get_user_org_id`):
+- Maintenance + dispatcher + owner can manage (ALL)
+- Operations (`has_operations_access`) and safety (`has_safety_access`) can SELECT
 
-## Widget — Upcoming Preventive Maintenance (Next 7 Days)
+`updated_at` trigger using existing `update_updated_at_column()`.
 
-Wrapped in `<Card>` with `CardHeader` ("Upcoming Preventive Maintenance" + small "Next 7 days" caption + count badge) and `CardContent`.
+Seed ~6 rows for the demo org (`a0000000-0000-0000-0000-000000000001`): 15W-40 Oil, Air Filters, Fuel Filters, Brake Pads, DEF Fluid, Wiper Blades — with a mix of below-threshold and healthy stock so the widget shows real alerts in demo mode.
 
-- **Data source**: reuse existing `usePMNotifications()` hook. Filter to non-dismissed items where the service is due within 7 days. Two cases:
-  - `unit === 'days'` and `days_or_miles_remaining <= 7` (includes overdue / negative values)
-  - `unit === 'miles'` with `notification_type` of `'overdue'` or `'due_soon'` (treat as "imminent" since exact date isn't available)
-  Sort: overdue first, then by ascending days remaining.
-- **Rendering**: minimalist `<Table>` with columns **Truck**, **Service Type**, **Due Date**, **Status**.
-  - Truck: `trucks.unit_number`
-  - Service Type: `service_name` (e.g., Oil Change, 120-Day Inspection, Brake Service) — already comes from `pm_notifications.service_name`.
-  - Due Date:
-    - Days-based: compute `addDays(today, days_or_miles_remaining)` and format as `MMM d`. If negative, show "Overdue · MMM d".
-    - Miles-based: show `"in <N> mi"` (no calendar date available).
-  - Status indicator:
-    - Overdue (negative days or `notification_type === 'overdue'`): red `AlertTriangle` icon + red text.
-    - Due ≤ 48 hours (days-based with `days_or_miles_remaining <= 2`): amber `Clock` icon + amber text "Due soon".
-    - Otherwise: muted `Calendar` icon.
-- **Row hover**: `hover:bg-muted/50 transition-colors cursor-pointer`; clicking navigates to `/maintenance?tab=predictive` (matches existing PM panel behavior).
-- **Empty state**: muted "No preventive maintenance due in the next 7 days." with `CheckCircle2` icon.
-- **Loading**: 3 `Skeleton` rows.
-- Footer link: "Open predictive service calendar →" → `/maintenance?tab=predictive`.
+### 2. New hook in `src/hooks/useMaintenanceData.ts`
 
-## Widget — Quick Actions
+- `PartInventoryItem` type
+- `useLowStockParts()` — selects parts where `quantity_on_hand <= min_threshold`, ordered by severity (0 first, then ratio), limit 8. Standard 5m staleTime, `refetchOnWindowFocus: false`.
+- `useRequestReorder()` mutation — stamps `reorder_requested_at = now()` for a given part id, invalidates the query, toasts success.
 
-Wrapped in `<Card>` with `CardHeader` ("Quick Actions" + `Zap` icon) and `CardContent`. Single-column vertical stack of 4 full-width buttons with distinct lucide icons and a short helper line under each. Sized for easy tapping (default `h-12 sm:h-10`).
+### 3. `MaintenanceDashboardHome.tsx` — new `InventoryAlertsCard`
 
-| Button | Variant | Icon | Behavior |
-|---|---|---|---|
-| Create New Work Order | `default` (primary) | `Wrench` + `Plus` | Opens `<NewWorkOrderSheet>` mounted inline on this page (local `open` state). On success it already invalidates `active-work-orders`. |
-| Log Parts Usage | `secondary` | `Package` | Opens the same `NewWorkOrderSheet` (work orders are where parts/cost are logged today). Helper text: "Add parts & costs to a work order". |
-| Message a Driver | `secondary` | `MessageSquare` | Navigates to `/maintenance` and the user can pick a driver fault report thread there (driver messaging lives inside `MaintenanceThread` which is launched from the driver fault reports panel). Helper text: "Open driver fault report threads". |
-| Update Truck Status | `outline` | `Truck` | Navigates to `/trucks` where status can be edited. |
+Card styling consistent with `LiveDriverAlertsCard` but amber/warning-tinted (`border-amber-500/40`, `Package` icon header, "Below minimum threshold" caption). Inside:
+- Minimalist `<Table>`: Part (name + small muted part_number), Category badge, Qty (red text when 0, amber when ≤ threshold, format `X / Y unit`), Action ("Reorder" ghost button → `useRequestReorder`, or "Requested" muted text if `reorder_requested_at` set within last 7 days)
+- Loading: 3 `Skeleton` rows. Empty: `CheckCircle2` green "All parts stocked".
+- Footer link: "Manage inventory" → `/maintenance?tab=inventory` (link is harmless even if tab doesn't exist yet).
 
-All four buttons use `w-full justify-start gap-3` with the icon at the left, label bold, and a small `text-xs text-muted-foreground` helper under the label.
+### 4. Layout & responsive polish
 
-## Files changed
+Rework the grid so everything collapses cleanly:
+- KPI row: `grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4` (already similar — verify gap consistency)
+- Middle row (Priorities + Live Alerts): `grid-cols-1 lg:grid-cols-3 gap-4` with Priorities `lg:col-span-2`
+- Bottom row (Upcoming PM + Inventory Alerts): `grid-cols-1 lg:grid-cols-3 gap-4` with Upcoming PM `lg:col-span-2`, Inventory Alerts in the third column
+- Quick Actions: full-width below, with internal `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` so the 4 buttons sit in a row on desktop instead of stacking
+- Outer page wrapper: `space-y-4 sm:space-y-6 p-4 sm:p-6` for uniform breathing room
+- All cards share the same `CardHeader` paddings, `CardTitle` size (`text-base font-semibold`), and `text-xs text-muted-foreground` captions — pass over each component and align
 
-- `src/pages/MaintenanceDashboardHome.tsx` — add in-file `UpcomingPMCard` and `QuickActionsCard` components, mount `NewWorkOrderSheet` once with local open state, restructure the grid below the "Today's Priorities / Live Driver Alerts" row, remove the standalone `PMNotificationsPanel` card.
+No changes to KPI calculations, existing hooks, sidebar, routing, or `/maintenance`.
 
-## Out of scope
-
-- No new DB tables, RPCs, or migrations.
-- No new hooks — reuses `usePMNotifications`.
-- No changes to `/maintenance`, `/trucks`, sidebar, or the KPI cards / other widgets already on the dashboard.
-- No new "Log Parts" or standalone "Message Driver" pages — those map to existing flows as noted above.
+### Files touched
+- New migration: `parts_inventory` table + RLS + seed
+- `src/hooks/useMaintenanceData.ts` — add type, `useLowStockParts`, `useRequestReorder`
+- `src/pages/MaintenanceDashboardHome.tsx` — add `InventoryAlertsCard`, restructure bottom grid, tighten spacing/typography across all sub-cards

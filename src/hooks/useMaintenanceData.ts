@@ -1279,3 +1279,65 @@ export function useTruckProfitability(truckId: string | null) {
 
   return { data, isLoading };
 }
+
+// ============================================================================
+// Parts Inventory — low stock alerts for the Maintenance Dashboard
+// ============================================================================
+export interface PartInventoryItem {
+  id: string;
+  org_id: string;
+  part_number: string | null;
+  part_name: string;
+  category: string | null;
+  quantity_on_hand: number;
+  min_threshold: number;
+  unit: string;
+  reorder_url: string | null;
+  reorder_requested_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useLowStockParts() {
+  return useQuery({
+    queryKey: ['low-stock-parts'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('parts_inventory')
+        .select('*')
+        .order('quantity_on_hand', { ascending: true })
+        .limit(50);
+
+      if (error) throw error;
+
+      const all = (data || []) as PartInventoryItem[];
+      const low = all.filter(p => Number(p.quantity_on_hand) <= Number(p.min_threshold));
+      low.sort((a, b) => {
+        const ra = a.min_threshold > 0 ? a.quantity_on_hand / a.min_threshold : a.quantity_on_hand;
+        const rb = b.min_threshold > 0 ? b.quantity_on_hand / b.min_threshold : b.quantity_on_hand;
+        return ra - rb;
+      });
+      return low.slice(0, 8);
+    },
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useRequestReorder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (partId: string) => {
+      const { error } = await (supabase as any)
+        .from('parts_inventory')
+        .update({ reorder_requested_at: new Date().toISOString() })
+        .eq('id', partId);
+      if (error) throw error;
+      return partId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['low-stock-parts'] });
+    },
+  });
+}

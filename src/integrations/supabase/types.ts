@@ -3262,6 +3262,54 @@ export type Database = {
           },
         ]
       }
+      parts_inventory: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          min_threshold: number
+          notes: string | null
+          org_id: string
+          part_name: string
+          part_number: string | null
+          quantity_on_hand: number
+          reorder_requested_at: string | null
+          reorder_url: string | null
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          min_threshold?: number
+          notes?: string | null
+          org_id: string
+          part_name: string
+          part_number?: string | null
+          quantity_on_hand?: number
+          reorder_requested_at?: string | null
+          reorder_url?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          min_threshold?: number
+          notes?: string | null
+          org_id?: string
+          part_name?: string
+          part_number?: string | null
+          quantity_on_hand?: number
+          reorder_requested_at?: string | null
+          reorder_url?: string | null
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pm_notifications: {
         Row: {
           created_at: string
