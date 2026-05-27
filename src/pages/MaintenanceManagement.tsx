@@ -72,7 +72,21 @@ export default function MaintenanceManagement() {
             <CardTitle className="sr-only">Maintenance Tabs</CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <Tabs defaultValue="active" className="w-full">
+            <Tabs
+              value={(() => {
+                const t = searchParams.get('tab');
+                return ['active', 'pm', 'predictive', 'history', 'inventory'].includes(t ?? '')
+                  ? (t as string)
+                  : 'active';
+              })()}
+              onValueChange={(value) => {
+                const next = new URLSearchParams(searchParams);
+                if (value === 'active') next.delete('tab');
+                else next.set('tab', value);
+                setSearchParams(next, { replace: true });
+              }}
+              className="w-full"
+            >
               <TabsList className="w-full sm:w-auto">
                 <TabsTrigger value="active" className="gap-2 px-4">
                   <Wrench className="h-4 w-4" />
