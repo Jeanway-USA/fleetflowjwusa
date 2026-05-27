@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { CheckCircle, Wrench, Package, Clock, DollarSign, Search, Filter, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CompleteJobModal } from './CompleteJobModal';
+import { DriverFaultReportsPanel } from './DriverFaultReportsPanel';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 
 interface ActiveWorkOrdersTabProps {
@@ -204,6 +205,9 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
   return (
     <>
       <div className="space-y-4">
+        {/* Incoming driver-submitted fault reports */}
+        <DriverFaultReportsPanel onViewTruck={onViewTruck} />
+
         {/* Summary strip — mirrors PMFleetHealthSummary */}
         <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/30 rounded-lg border">
           <span className="text-sm font-medium text-muted-foreground mr-2">
