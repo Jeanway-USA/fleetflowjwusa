@@ -67,6 +67,57 @@ function getPriorityBadge(priority: string) {
   }
 }
 
+function DriverRequestItem({ request }: { request: MaintenanceRequest }) {
+  const [threadOpen, setThreadOpen] = useState(false);
+  return (
+    <div className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {getStatusIcon(request.status)}
+          <span className="font-medium capitalize text-sm">
+            {request.issue_type.replace('_', ' ')}
+          </span>
+        </div>
+        <div className="flex gap-1">
+          {getPriorityBadge(request.priority)}
+          {getStatusBadge(request.status)}
+        </div>
+      </div>
+
+      <p className="text-sm text-muted-foreground line-clamp-2">
+        {request.description}
+      </p>
+
+      {request.admin_notes && (
+        <div className="bg-primary/10 rounded p-2 text-sm">
+          <p className="text-xs text-muted-foreground mb-1">Shop Response:</p>
+          <p>{request.admin_notes}</p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <p className="text-xs text-muted-foreground">
+          Submitted {format(parseISO(request.created_at), 'MMM d, h:mm a')}
+          {request.trucks?.unit_number && ` • Truck ${request.trucks.unit_number}`}
+        </p>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 h-8"
+          onClick={() => setThreadOpen((v) => !v)}
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          {threadOpen ? 'Hide chat' : 'Chat with shop'}
+        </Button>
+      </div>
+
+      {threadOpen && (
+        <MaintenanceThread requestId={request.id} viewerRole="driver" />
+      )}
+    </div>
+  );
+}
+
 export function MaintenanceRequestCard({ requests, driverId, truckId }: MaintenanceRequestCardProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const openRequests = requests.filter(r => r.status !== 'completed');
