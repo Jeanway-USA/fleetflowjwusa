@@ -1301,6 +1301,22 @@ export interface PartInventoryItem {
   updated_at: string;
 }
 
+export function useAllPartsInventory() {
+  return useQuery({
+    queryKey: ['all-parts-inventory'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('parts_inventory')
+        .select('*')
+        .order('part_name', { ascending: true });
+      if (error) throw error;
+      return (data || []) as PartInventoryItem[];
+    },
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+}
+
 export function useLowStockParts() {
   return useQuery({
     queryKey: ['low-stock-parts'],
