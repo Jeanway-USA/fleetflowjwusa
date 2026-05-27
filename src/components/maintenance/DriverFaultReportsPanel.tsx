@@ -181,6 +181,41 @@ function ReportRow({ report, onViewTruck }: { report: DriverFaultReport; onViewT
               Acknowledge
             </Button>
           )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                disabled={del.isPending}
+                aria-label="Delete report"
+              >
+                {del.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete driver fault report?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This permanently removes the report from the panel and the driver's history. Any linked work order will remain. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() =>
+                    del.mutate(report.id, {
+                      onSuccess: () => toast.success('Report deleted'),
+                      onError: (e: any) => toast.error('Failed to delete: ' + (e?.message ?? 'Unknown error')),
+                    })
+                  }
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
