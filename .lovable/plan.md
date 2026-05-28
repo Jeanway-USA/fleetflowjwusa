@@ -1,35 +1,75 @@
-# Grant Maintenance Staff access to Trucks & Trailers
+# Enable Maintenance edits on Trucks & Trailers
 
-Small, focused change in two files. No new components, no DB changes.
+## Finding
 
-## 1. `src/App.tsx` — routes
+`src/pages/Trucks.tsx` and `src/pages/Trailers.tsx` have **no role-gated UI** — every action button (Edit, Update Status, three-dot menu, Log Service) renders for any user who can load the page. So there's nothing to flip in the UI conditionals.
 
-Add `'maintenance'` to the `allowedRoles` on both routes:
+The real blocker is **Row-Level Security**. Today the policies on `public.trucks` and `public.trailers` are:
 
-- `/trucks` → `allowedRoles={['owner', 'dispatcher', 'safety', 'maintenance']}`
-- `/trailers` → `allowedRoles={['owner', 'dispatcher', 'safety', 'maintenance']}`
+- **SELECT** — allowed only via `has_admin_access` (owner/payroll_admin/dispatcher/safety), `has_safety_access`, `has_operations_access`, or driver-of-record. **`maintenance` is in none of them.**
+- **ALL (write)** — `Owner dispatcher safety can manage trucks/trailers`. Maintenance is excluded.
 
-`requiredFeature="trucks"` / `"trailers"` stays as-is (already enabled across tiers that include maintenance).
+So a maintenance user opening `/trucks` today would see an empty list, and any edit would fail with an RLS violation.
 
-## 2. `src/components/layout/AppSidebar.tsx` — nav items
+## Change — single migration
 
-In the existing `operationsItems` array, add `'maintenance'` to the `roles` of the Trucks and Trailers entries:
+Add two new RLS policies per table allowing the `maintenance` role to read and update rows within their own org. INSERT and DELETE intentionally remain owner/dispatcher/safety only (maintenance shouldn't be provisioning or removing assets, only maintaining the ones the fleet team registers).
 
-```ts
-{ title: 'Trucks',   icon: Truck,     path: '/trucks',   roles: ['owner', 'dispatcher', 'safety', 'maintenance'], feature: 'trucks' },
-{ title: 'Trailers', icon: Container, path: '/trailers', roles: ['owner', 'dispatcher', 'safety', 'maintenance'], feature: 'trailers' },
+```sql
+-- TRUCKS: maintenance can view
+CREATE POLICY "Maintenance can view all trucks"
+ON public.trucks
+FOR SELECT
+USING (
+  has_role(auth.uid(), 'maintenance'::app_role)
+  AND org_id = get_user_org_id(auth.uid())
+);
+
+-- TRUCKS: maintenance can update (status, mileage, next_inspection_date, etc.)
+CREATE POLICY "Maintenance can update trucks"
+ON public.trucks
+FOR UPDATE
+USING (
+  has_role(auth.uid(), 'maintenance'::app_role)
+  AND org_id = get_user_org_id(auth.uid())
+)
+WITH CHECK (
+  org_id = get_user_org_id(auth.uid())
+);
+
+-- TRAILERS: same pattern
+CREATE POLICY "Maintenance can view all trailers"
+ON public.trailers
+FOR SELECT
+USING (
+  has_role(auth.uid(), 'maintenance'::app_role)
+  AND org_id = get_user_org_id(auth.uid())
+);
+
+CREATE POLICY "Maintenance can update trailers"
+ON public.trailers
+FOR UPDATE
+USING (
+  has_role(auth.uid(), 'maintenance'::app_role)
+  AND org_id = get_user_org_id(auth.uid())
+)
+WITH CHECK (
+  org_id = get_user_org_id(auth.uid())
+);
 ```
 
-This re-uses the same `Truck` / `Container` icons and styling already used in the Dispatcher/Executive views. For Maintenance users, the existing "Operations" collapsible group will appear automatically containing just these two items — no new group is needed (keeps the sidebar consistent with other roles). If you'd prefer a dedicated "Fleet Assets" group label for maintenance, say the word and I'll add one, but reusing "Operations" avoids divergence.
+## No code changes
 
-## 3. Verification
+`src/pages/Trucks.tsx`, `src/pages/Trailers.tsx`, and their child components don't gate buttons by role, so no edits are needed there. The existing `useUpdateTruckStatus`, edit dialogs, and inline status changes will all succeed for maintenance users once the policies above are in place.
 
-After the edits:
-- Sign in / simulate as a Maintenance user.
-- Confirm "Operations → Trucks" and "Operations → Trailers" appear in the sidebar with the truck and container icons.
-- Click each; the page should load without the ProtectedRoute redirect.
+## Verification
+
+1. Sign in as a maintenance user (or simulate the role from an owner account).
+2. `/trucks` lists the fleet; click **Edit** on a truck, change mileage and status, save — no RLS error, toast confirms save.
+3. `/trailers` same flow.
+4. Confirm the **+ New Truck** / **+ New Trailer** create action is still blocked (expected — INSERT not granted to maintenance).
 
 ## Out of scope
 
-- No edits to write/mutation permissions — this is view access only (the Trucks/Trailers pages already gate edit actions by role internally).
-- No RLS changes — read access to `trucks`/`trailers` for maintenance is already in place (the maintenance dashboard reads from `useTrucks()` today).
+- Granting INSERT/DELETE to maintenance — say the word and I'll add it.
+- Any changes to `service_schedules`, `work_orders`, `maintenance_logs`, or `parts_inventory` policies — those already allow the maintenance role.
