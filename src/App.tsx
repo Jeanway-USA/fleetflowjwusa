@@ -121,7 +121,8 @@ const App = () => {
 
                     {/* Fleet management */}
                     <Route path="/trucks" element={
-                      <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety']} requiredFeature="trucks">
+                      <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety', 'maintenance']} requiredFeature="trucks">
+
                         <Trucks />
                       </ProtectedRoute>
                     } />
