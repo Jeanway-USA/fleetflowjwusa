@@ -1,26 +1,14 @@
-## Fix Quick Actions button layout
+## Re-fix Quick Actions buttons — horizontal centered layout
 
-**File:** `src/pages/MaintenanceDashboardHome.tsx` (lines ~661–677, inside `QuickActionsCard`)
+The previous vertical stack overflowed the row's fixed height, pushing the icon above and helper text below the button. Switch back to a horizontal layout where the icon sits inline to the left and the label + helper text stack is vertically centered inside the button.
 
-The Quick Actions buttons currently use a horizontal layout (`justify-start` with `flex-col items-start` text block), which combined with the default Button styling pushes the icon to the left edge and stretches the text awkwardly. Switch to a centered vertical stack.
+**File:** `src/pages/MaintenanceDashboardHome.tsx` (~lines 661–677)
 
 ### Changes
 
-1. Update the `<Button>` className from:
-   ```
-   w-full justify-start gap-3 h-auto py-3
-   ```
-   to:
-   ```
-   w-full h-auto flex flex-col items-center justify-center text-center gap-2 py-4
-   ```
+1. Button className → `w-full h-auto min-h-[60px] flex flex-row items-center justify-center gap-3 py-3 px-4` (row layout, centered content, comfortable padding).
+2. Icon stays `h-5 w-5 shrink-0`, rendered inline before the text block.
+3. Inner text wrapper → `flex flex-col items-start justify-center text-left min-w-0` so the two text lines stack tightly and are vertically centered next to the icon.
+4. Keep label `text-sm font-semibold leading-tight` and helper `text-[11px] mt-0.5 leading-tight` (no truncate, so helper line is fully visible).
 
-2. Bump the icon size for better vertical balance (`h-5 w-5` instead of `h-4 w-4`) and drop the now-unneeded `shrink-0`.
-
-3. Replace the inner `<span className="flex flex-col items-start text-left min-w-0">` wrapper with a centered version: `flex flex-col items-center text-center min-w-0`.
-
-4. Remove `truncate` on the helper line so the two short text lines sit naturally with default `leading-tight`; keep `truncate` on the label only if needed for very long labels (or drop it too since the button is now tall enough to wrap).
-
-Result: icon sits just above the label, label and helper text are centered and close together, with even `py-4` padding top/bottom.
-
-No other files or logic change.
+Result: icon and text sit on the same baseline-centered row, text is vertically centered inside each button, nothing overflows the card row.

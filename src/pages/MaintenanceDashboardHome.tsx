@@ -662,10 +662,10 @@ function QuickActionsCard({ onCreateWorkOrder, onLogParts }: QuickActionsCardPro
               key={a.key}
               variant={a.variant}
               onClick={a.onClick}
-              className="w-full h-auto flex flex-col items-center justify-center text-center gap-2 py-4"
+              className="w-full h-auto min-h-[60px] flex flex-row items-center justify-center gap-3 py-3 px-4"
             >
-              <a.icon className="h-5 w-5" />
-              <span className="flex flex-col items-center text-center min-w-0">
+              <a.icon className="h-5 w-5 shrink-0" />
+              <span className="flex flex-col items-start justify-center text-left min-w-0">
                 <span className="text-sm font-semibold leading-tight">{a.label}</span>
                 <span className={cn(
                   'text-[11px] font-normal mt-0.5 leading-tight',
