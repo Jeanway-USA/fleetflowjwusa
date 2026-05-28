@@ -609,11 +609,16 @@ function UpcomingPMCard() {
 interface QuickActionsCardProps {
   onCreateWorkOrder: () => void;
   onLogParts: () => void;
+  onMessageDriver: () => void;
+  onUpdateTruck: () => void;
 }
 
-function QuickActionsCard({ onCreateWorkOrder, onLogParts }: QuickActionsCardProps) {
-  const navigate = useNavigate();
-
+function QuickActionsCard({
+  onCreateWorkOrder,
+  onLogParts,
+  onMessageDriver,
+  onUpdateTruck,
+}: QuickActionsCardProps) {
   const actions = [
     {
       key: 'create-wo',
@@ -637,7 +642,7 @@ function QuickActionsCard({ onCreateWorkOrder, onLogParts }: QuickActionsCardPro
       helper: 'Open driver fault report threads',
       icon: MessageSquare,
       variant: 'secondary' as const,
-      onClick: () => navigate('/maintenance'),
+      onClick: onMessageDriver,
     },
     {
       key: 'truck-status',
@@ -645,7 +650,7 @@ function QuickActionsCard({ onCreateWorkOrder, onLogParts }: QuickActionsCardPro
       helper: 'Mark trucks active, in-shop or down',
       icon: Truck,
       variant: 'outline' as const,
-      onClick: () => navigate('/trucks'),
+      onClick: onUpdateTruck,
     },
   ];
 
