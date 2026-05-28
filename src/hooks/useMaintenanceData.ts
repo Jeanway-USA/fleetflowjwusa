@@ -1500,3 +1500,183 @@ export function useDeletePart() {
     onSuccess: () => invalidatePartsQueries(queryClient),
   });
 }
+
+// ============================================================================
+// Quick Actions — supporting hooks
+// ============================================================================
+
+export interface ActiveDriverRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
+export function useActiveDrivers() {
+  return useQuery({
+    queryKey: ['active-drivers'],
+    queryFn: async (): Promise<ActiveDriverRow[]> => {
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('id, first_name, last_name, status')
+        .eq('status', 'active')
+        .order('first_name', { ascending: true });
+      if (error) throw error;
+      return (data || []) as ActiveDriverRow[];
+    },
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export interface LogPartUsageInput {
+  part_id: string;
+  quantity: number;
+  truck_id?: string | null;
+  truck_label?: string | null;
+  work_order_id?: string | null;
+}
+
+export function useLogPartUsage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: LogPartUsageInput) => {
+      const { data: current, error: fetchError } = await (supabase as any)
+        .from('parts_inventory')
+        .select('quantity_on_hand, notes, part_name')
+        .eq('id', input.part_id)
+        .single();
+      if (fetchError) throw fetchError;
+
+      const newQty = Math.max(0, Number(current.quantity_on_hand) - Number(input.quantity));
+      const stamp = new Date().toISOString().slice(0, 10);
+      const target =
+        input.work_order_id
+          ? `WO ${input.work_order_id.slice(0, 8)}`
+          : input.truck_label
+            ? `Truck ${input.truck_label}`
+            : input.truck_id
+              ? `Truck ${input.truck_id.slice(0, 8)}`
+              : 'unassigned';
+      const usageLine = `${stamp}: Used ${input.quantity} on ${target}`;
+      const notes = current.notes ? `${current.notes}\n${usageLine}` : usageLine;
+
+      const { error } = await (supabase as any)
+        .from('parts_inventory')
+        .update({ quantity_on_hand: newQty, notes })
+        .eq('id', input.part_id);
+      if (error) throw error;
+      return { id: input.part_id, newQty };
+    },
+    onSuccess: () => invalidatePartsQueries(queryClient),
+  });
+}
+
+export type TruckStatus = 'active' | 'in_shop' | 'out_of_service' | 'pending_inspection';
+
+export interface UpdateTruckStatusInput {
+  truck_id: string;
+  status: TruckStatus;
+}
+
+export function useUpdateTruckStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ truck_id, status }: UpdateTruckStatusInput) => {
+      const { error } = await supabase
+        .from('trucks')
+        .update({ status })
+        .eq('id', truck_id);
+      if (error) throw error;
+      return truck_id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trucks-list'] });
+      queryClient.invalidateQueries({ queryKey: ['fleet-availability'] });
+      queryClient.invalidateQueries({ queryKey: ['active-work-orders'] });
+    },
+  });
+}
+
+export interface MessageDriverInput {
+  driver_id: string;
+  body: string;
+}
+
+export function useMessageDriver() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ driver_id, body }: MessageDriverInput) => {
+      // 1. Try to find an existing open thread for this driver
+      const { data: existing, error: findErr } = await supabase
+        .from('maintenance_requests')
+        .select('id')
+        .eq('driver_id', driver_id)
+        .in('status', ['submitted', 'acknowledged', 'in_progress'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (findErr) throw findErr;
+
+      let requestId = existing && existing.length > 0 ? (existing[0] as any).id as string : null;
+
+      // 2. Otherwise create a fresh thread
+      if (!requestId) {
+        const org_id = await getCurrentOrgId();
+
+        // Find a truck for this driver (current_driver_id) or any truck in the org
+        const { data: assignedTruck } = await supabase
+          .from('trucks')
+          .select('id')
+          .eq('current_driver_id', driver_id)
+          .maybeSingle();
+        let truckId = assignedTruck?.id as string | undefined;
+        if (!truckId) {
+          const { data: anyTruck, error: truckErr } = await supabase
+            .from('trucks')
+            .select('id')
+            .eq('org_id', org_id)
+            .limit(1)
+            .maybeSingle();
+          if (truckErr) throw truckErr;
+          if (!anyTruck?.id) throw new Error('No truck available to start a thread.');
+          truckId = anyTruck.id as string;
+        }
+
+        const { data: created, error: insertErr } = await supabase
+          .from('maintenance_requests')
+          .insert({
+            driver_id,
+            truck_id: truckId,
+            org_id,
+            issue_type: 'other',
+            priority: 'medium',
+            description: 'Message from maintenance team',
+            status: 'acknowledged',
+          })
+          .select('id')
+          .single();
+        if (insertErr) throw insertErr;
+        requestId = created.id as string;
+      }
+
+      // 3. Post the chat message
+      const { error: msgErr } = await supabase
+        .from('maintenance_request_messages')
+        .insert({
+          request_id: requestId,
+          body,
+          sender_role: 'maintenance',
+          message_type: 'chat',
+        } as any);
+      if (msgErr) throw msgErr;
+
+      return requestId;
+    },
+    onSuccess: (requestId) => {
+      queryClient.invalidateQueries({ queryKey: ['driver-fault-reports'] });
+      queryClient.invalidateQueries({ queryKey: ['driver-maintenance-requests'] });
+      if (requestId) {
+        queryClient.invalidateQueries({ queryKey: ['maintenance-thread', requestId] });
+      }
+    },
+  });
+}
