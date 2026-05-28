@@ -127,7 +127,7 @@ const App = () => {
                       </ProtectedRoute>
                     } />
                     <Route path="/trailers" element={
-                      <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety']} requiredFeature="trailers">
+                      <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety', 'maintenance']} requiredFeature="trailers">
                         <Trailers />
                       </ProtectedRoute>
                     } />
