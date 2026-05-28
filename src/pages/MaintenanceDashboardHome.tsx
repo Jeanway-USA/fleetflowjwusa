@@ -828,6 +828,9 @@ function InventoryAlertsCard() {
 
 export default function MaintenanceDashboardHome() {
   const [woOpen, setWoOpen] = useState(false);
+  const [partsOpen, setPartsOpen] = useState(false);
+  const [messageOpen, setMessageOpen] = useState(false);
+  const [truckOpen, setTruckOpen] = useState(false);
 
   return (
     <>
@@ -868,11 +871,16 @@ export default function MaintenanceDashboardHome() {
 
         <QuickActionsCard
           onCreateWorkOrder={() => setWoOpen(true)}
-          onLogParts={() => setWoOpen(true)}
+          onLogParts={() => setPartsOpen(true)}
+          onMessageDriver={() => setMessageOpen(true)}
+          onUpdateTruck={() => setTruckOpen(true)}
         />
       </div>
 
       <NewWorkOrderSheet open={woOpen} onOpenChange={setWoOpen} />
+      <LogPartsUsageDialog open={partsOpen} onOpenChange={setPartsOpen} />
+      <MessageDriverDialog open={messageOpen} onOpenChange={setMessageOpen} />
+      <UpdateTruckStatusDialog open={truckOpen} onOpenChange={setTruckOpen} />
     </>
   );
 }
