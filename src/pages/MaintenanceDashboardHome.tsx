@@ -17,6 +17,9 @@ import {
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { NewWorkOrderSheet } from '@/components/maintenance/NewWorkOrderSheet';
+import { LogPartsUsageDialog } from '@/components/maintenance/LogPartsUsageDialog';
+import { MessageDriverDialog } from '@/components/maintenance/MessageDriverDialog';
+import { UpdateTruckStatusDialog } from '@/components/maintenance/UpdateTruckStatusDialog';
 import {
   useFleetAvailability,
   useActiveWorkOrders,
