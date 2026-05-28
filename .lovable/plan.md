@@ -1,12 +1,26 @@
-## Make Maintenance tabs respect `?tab=` query param
+## Fix Quick Actions button layout
 
-The "Manage inventory" link already navigates to `/maintenance?tab=inventory`, but `MaintenanceManagement.tsx` uses `<Tabs defaultValue="active">` and never reads the query param, so it always lands on Active Work Orders.
+**File:** `src/pages/MaintenanceDashboardHome.tsx` (lines ~661–677, inside `QuickActionsCard`)
 
-### Change
+The Quick Actions buttons currently use a horizontal layout (`justify-start` with `flex-col items-start` text block), which combined with the default Button styling pushes the icon to the left edge and stretches the text awkwardly. Switch to a centered vertical stack.
 
-In `src/pages/MaintenanceManagement.tsx`:
+### Changes
 
-1. Derive the active tab from `searchParams.get('tab')`, falling back to `'active'`. Allowed values: `active | pm | predictive | history | inventory`.
-2. Convert `<Tabs>` to controlled: pass `value={activeTab}` and `onValueChange` that updates the URL via `setSearchParams` (preserving other params, `replace: true`) so deep links and tab clicks stay in sync.
+1. Update the `<Button>` className from:
+   ```
+   w-full justify-start gap-3 h-auto py-3
+   ```
+   to:
+   ```
+   w-full h-auto flex flex-col items-center justify-center text-center gap-2 py-4
+   ```
 
-No other files need changes — the dashboard link already targets `?tab=inventory`.
+2. Bump the icon size for better vertical balance (`h-5 w-5` instead of `h-4 w-4`) and drop the now-unneeded `shrink-0`.
+
+3. Replace the inner `<span className="flex flex-col items-start text-left min-w-0">` wrapper with a centered version: `flex flex-col items-center text-center min-w-0`.
+
+4. Remove `truncate` on the helper line so the two short text lines sit naturally with default `leading-tight`; keep `truncate` on the label only if needed for very long labels (or drop it too since the button is now tall enough to wrap).
+
+Result: icon sits just above the label, label and helper text are centered and close together, with even `py-4` padding top/bottom.
+
+No other files or logic change.

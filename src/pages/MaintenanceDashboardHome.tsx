@@ -662,13 +662,13 @@ function QuickActionsCard({ onCreateWorkOrder, onLogParts }: QuickActionsCardPro
               key={a.key}
               variant={a.variant}
               onClick={a.onClick}
-              className="w-full justify-start gap-3 h-auto py-3"
+              className="w-full h-auto flex flex-col items-center justify-center text-center gap-2 py-4"
             >
-              <a.icon className="h-4 w-4 shrink-0" />
-              <span className="flex flex-col items-start text-left min-w-0">
-                <span className="text-sm font-semibold leading-tight truncate">{a.label}</span>
+              <a.icon className="h-5 w-5" />
+              <span className="flex flex-col items-center text-center min-w-0">
+                <span className="text-sm font-semibold leading-tight">{a.label}</span>
                 <span className={cn(
-                  'text-[11px] font-normal mt-0.5 truncate',
+                  'text-[11px] font-normal mt-0.5 leading-tight',
                   a.variant === 'default' ? 'text-primary-foreground/80' : 'text-muted-foreground',
                 )}>
                   {a.helper}
