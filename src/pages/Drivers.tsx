@@ -114,7 +114,8 @@ export default function Drivers() {
 
   const createMutation = useMutation({
     mutationFn: async (driver: any) => {
-      const { error } = await supabase.from('drivers').insert(driver);
+      if (!orgId) throw new Error('Organization not loaded yet. Please try again.');
+      const { error } = await supabase.from('drivers').insert({ ...driver, org_id: orgId });
       if (error) throw error;
     },
     onSuccess: () => {
