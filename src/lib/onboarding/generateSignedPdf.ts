@@ -25,6 +25,7 @@ export function generateSignedPdf({
   driverAddress,
   signature,
   driverName,
+  cdlNumber,
 }: GenerateSignedPdfArgs): Blob {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
