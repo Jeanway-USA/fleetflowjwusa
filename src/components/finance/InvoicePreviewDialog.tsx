@@ -116,13 +116,16 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
   const total = baseTotal + accessorialsTotal;
   const invoiceNumber = load.invoice_number || `INV-${format(new Date(), 'yyyyMMdd')}-${load.id.slice(0, 6).toUpperCase()}`;
 
+  const escapeHtml = (s: string) =>
+    String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
   const handlePrint = () => {
     const content = printRef.current;
     if (!content) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     printWindow.document.write(`
-      <html><head><title>Invoice ${invoiceNumber}</title>
+      <html><head><title>Invoice ${escapeHtml(invoiceNumber)}</title>
       <style>
         body { font-family: system-ui, -apple-system, sans-serif; padding: 40px; color: #1a1a1a; }
         table { width: 100%; border-collapse: collapse; margin-top: 16px; }
