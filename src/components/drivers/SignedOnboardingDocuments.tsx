@@ -26,7 +26,7 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('driver_signed_documents')
-        .select('id, document_type, file_path, signed_at')
+        .select('id, document_type, file_path, attachment_file_path, signed_at')
         .eq('driver_id', driverId)
         .order('signed_at', { ascending: false });
       if (error) throw error;
