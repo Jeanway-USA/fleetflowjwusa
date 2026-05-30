@@ -99,23 +99,41 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
                 Signed {format(new Date(d.signed_at), "MMM d, yyyy 'at' h:mm a")}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => openSignedUrl(d.file_path, d.document_type, 'preview')}
+                onClick={() => openSignedUrl(d.file_path, `${d.document_type}.pdf`, 'preview')}
               >
                 <Eye className="mr-1.5 h-4 w-4" />
                 Preview
               </Button>
               <Button
                 size="sm"
-                onClick={() => openSignedUrl(d.file_path, d.document_type, 'download')}
+                onClick={() => openSignedUrl(d.file_path, `${d.document_type}.pdf`, 'download')}
               >
                 <Download className="mr-1.5 h-4 w-4" />
                 Download
               </Button>
+              {d.attachment_file_path && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    const ext = d.attachment_file_path!.split('.').pop() || 'bin';
+                    openSignedUrl(
+                      d.attachment_file_path!,
+                      `${d.document_type}_attachment.${ext}`,
+                      'download',
+                    );
+                  }}
+                >
+                  <Download className="mr-1.5 h-4 w-4" />
+                  Attachment
+                </Button>
+              )}
             </div>
+
           </div>
         );
       })}
