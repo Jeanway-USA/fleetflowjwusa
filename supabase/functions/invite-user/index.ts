@@ -123,6 +123,7 @@ Deno.serve(async (req) => {
     const existingUser = existingUsers?.users?.find(u => u.email === email);
 
     let targetUserId: string | null = null;
+    let inviteActionLink: string | null = null;
 
     if (existingUser) {
       targetUserId = existingUser.id;
