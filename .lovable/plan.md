@@ -1,28 +1,25 @@
-## Plan: Add "Valid" Badge to Credentials & Compliance
+## Plan: Wire Phone Number into Onboarding (No Migration)
 
 ### Context
-The "Credentials & Compliance" section already exists in `src/pages/Drivers.tsx` and `src/pages/DriverSpectatorView.tsx` via the shared `src/components/drivers/CredentialsCompliance.tsx`, with red "Expired" and yellow "Expiring Soon" badges already wired through `StatusBadge`. The `drivers` query in `Drivers.tsx` already does `select('*')`, so all needed columns (`license_number`, `license_expiry`, `medical_card_expiry`, `endorsements`, `has_twic`, `twic_expiry`) are already returned.
-
-Note: the database columns use existing names (`license_expiry`, `medical_card_expiry`, `has_twic`, `twic_expiry`) per the project memory — no schema changes.
-
-`src/components/crm/ContactDetailSheet.tsx` is for CRM brokers/carriers and contains no driver references — it is not used for driver details and will not be modified.
+The `drivers` table already has a `phone` column (`text`, nullable) that is used throughout the admin UI, CSV import, and demo seed data. Per your decision, no new column will be added — the onboarding form just needs to read/write the existing `phone` field so drivers can self-serve their number during onboarding.
 
 ### Changes
 
-#### 1. `src/components/shared/StatusBadge.tsx`
-Add a `"valid"` entry mapped to `success` (green) so the shared badge can render the new healthy-credential state.
+#### 1. `src/components/onboarding/DriverCredentialsStep.tsx`
+Add an optional `phoneNumber` field to the Zod schema, the form UI, the payload type, and `buildDefaultValues`:
+- **Zod**: `phoneNumber: z.string().trim().min(10, 'Enter a valid phone number').max(20).optional().or(z.literal(''))` — accepts 10–20 chars, allows blank if the admin already filled it in.
+- **UI**: A new `Input` field labeled "Phone Number" rendered immediately after License Number, using the same `pl-4 sm:pl-3` padding standard and `inputMode="tel"` / `autoComplete="tel"`.
+- **Payload**: Extend `DriverCredentialsPayload` with `phone: string | null` and emit `v.phoneNumber?.trim() || null` from `submit()`.
+- **Defaults**: `buildDefaultValues` reads `row?.phone` and seeds the input with it.
 
-#### 2. `src/components/drivers/CredentialsCompliance.tsx`
-Update `ExpiryBadge` so that when a date is present and more than 30 days in the future, it returns a green `<StatusBadge status="valid" />` instead of `null`. Keep the existing rules:
-- Past date → red **"Expired"**
-- ≤ 30 days away → yellow **"Expiring Soon"**
-- > 30 days away → green **"Valid"** (new)
-- No date → no badge
-
-This change automatically flows to both the admin driver card grid (`Drivers.tsx`) and the spectator detail view (`DriverSpectatorView.tsx`).
+#### 2. `src/pages/DriverOnboarding.tsx`
+The existing `supabase.from('drivers').update(payload)` call in `handleContinue` automatically picks up the new `phone` field — no further changes needed. Just verify the driver query already includes `phone` (it uses `select('*')` per current code).
 
 ### Out of Scope
-- No database migrations.
-- No changes to the driver list query (already `select('*')`).
-- No changes to `ContactDetailSheet.tsx` (unrelated to drivers).
-- No changes to the Add/Edit driver form.
+- No database schema migration (column already exists).
+- No new `phone_number` column.
+- No changes to the admin Drivers page or CSV import (already use `phone`).
+
+### Technical Details
+- The Supabase types file (`src/integrations/supabase/types.ts`) is auto-generated and already includes `phone` — no edits.
+- Phone validation is intentionally light (length only) to accommodate international formats; full format validation can be added later if needed.
