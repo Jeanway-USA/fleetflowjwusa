@@ -56,7 +56,7 @@ function DriverAvatar({ avatarPath, initials }: { avatarPath: string | null; ini
 }
 
 export default function Drivers() {
-  const { isOwner } = useAuth();
+  const { isOwner, orgId } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,13 +91,15 @@ export default function Drivers() {
     },
   });
 
-  // Fetch all users/profiles for linking
+  // Fetch users/profiles in current org for linking
   const { data: users = [] } = useQuery({
-    queryKey: ['profiles-for-linking'],
+    queryKey: ['profiles-for-linking', orgId],
+    enabled: !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, user_id, email, first_name, last_name')
+        .eq('org_id', orgId)
         .order('email');
       if (error) throw error;
       return data;
