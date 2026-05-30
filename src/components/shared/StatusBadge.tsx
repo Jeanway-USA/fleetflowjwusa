@@ -29,6 +29,9 @@ const statusMap: Record<string, StatusType> = {
   // Payroll statuses
   approved: 'info',
   paid: 'success',
+  // Credential expiry statuses
+  expiring_soon: 'warning',
+  expired: 'error',
 };
 
 interface StatusBadgeProps {
