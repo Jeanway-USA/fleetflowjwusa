@@ -25,7 +25,9 @@ interface TemplateState {
   driverAddress: string;
   signature: string | null;
   cdlNumber: string;
+  attachment: File | null;
 }
+
 
 interface SignedResult {
   title: string;
