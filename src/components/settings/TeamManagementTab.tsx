@@ -153,19 +153,28 @@ export function TeamManagementTab() {
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail || !inviteRole) { toast.error('Please enter an email and select a role'); return; }
+    if (!inviteFirstName.trim() || !inviteLastName.trim()) { toast.error('Please enter a first and last name'); return; }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(inviteEmail)) { toast.error('Please enter a valid email address'); return; }
 
     setIsInviting(true);
     try {
       const response = await supabase.functions.invoke('invite-user', {
-        body: { email: inviteEmail, role: inviteRole, requires_onboarding: inviteRequiresOnboarding },
+        body: {
+          email: inviteEmail,
+          role: inviteRole,
+          first_name: inviteFirstName.trim(),
+          last_name: inviteLastName.trim(),
+          requires_onboarding: inviteRequiresOnboarding,
+        },
       });
       if (response.error) throw new Error(response.error.message || 'Failed to send invitation');
       if (response.data?.error) throw new Error(response.data.error);
       toast.success(`Invitation sent to ${inviteEmail}`);
       setInviteOpen(false);
       setInviteEmail('');
+      setInviteFirstName('');
+      setInviteLastName('');
       setInviteRole('driver');
       queryClient.invalidateQueries({ queryKey: ['users_with_roles'] });
     } catch (error: any) {
