@@ -1,104 +1,32 @@
-## Objective
-Add an automatic audit trail for `document_templates` changes, reusing the existing `audit_logs` table so we don't fork a second log store.
+## Plan: Add Activity Log to Onboarding & Documents Settings Tab
 
-## Note on existing schema
-`public.audit_logs` already exists with: `id`, `user_id`, `action`, `table_name`, `record_id`, `details (jsonb)`, `ip_address`, `created_at`, `org_id`. It maps 1:1 to the requested fields:
+### Goal
+Add an "Activity Log" section at the bottom of the "Onboarding & Documents" tab that displays recent audit trail entries for document template changes.
 
-| Requested | Existing column |
-|---|---|
-| admin_id | user_id |
-| action_type | action |
-| entity_type | table_name |
-| entity_id | record_id |
-| details | details |
-| created_at | created_at |
+### Approach
+Build a self-contained React component that queries the existing `audit_logs` table, resolves admin names via the `profiles` table, and renders a paginated activity feed.
 
-RLS already restricts reads to owners (`is_owner` + same org) and blocks client writes. We'll reuse it instead of creating a duplicate table.
+### Steps
 
-## Migration
+1. **Create `src/components/settings/AuditLogPanel.tsx`**
+   - Use TanStack Query (`useQuery`) to fetch `audit_logs` rows where `table_name = 'document_template'`, filtered to the current `org_id`, ordered by `created_at DESC`, with a page size of 10.
+   - Fetch the current org's `profiles` (id, first_name, last_name, email) to resolve `user_id` into a display name.
+   - Map `action` values to human-readable descriptions:
+     - `template_created` → "Created"
+     - `template_updated` → "Updated"
+     - `template_activated` → "Activated"
+     - `template_deactivated` → "Deactivated"
+     - `template_deleted` → "Deleted"
+   - Use the `details` JSONB field to extract the template `name` (e.g., "Updated Driver Agreement Template").
+   - Render a clean, dense data table with three columns: **Timestamp** (date + exact time), **Admin** (first/last name or email fallback), and **Action** (human-readable description).
+   - Implement offset-based pagination with a "Load More" button that fetches the next 10 older entries.
 
-Add a `SECURITY DEFINER` trigger on `public.document_templates` that writes one audit row per insert/update/delete:
+2. **Update `src/pages/Settings.tsx`**
+   - Import the new `AuditLogPanel` component.
+   - Insert `<AuditLogPanel />` at the bottom of the `TabsContent value="onboarding"` section, below `DocumentTemplatesPanel`.
 
-```sql
-CREATE OR REPLACE FUNCTION public.log_document_template_change()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_action text;
-  v_details jsonb;
-  v_record_id uuid;
-  v_org_id uuid;
-BEGIN
-  IF TG_OP = 'INSERT' THEN
-    v_action := 'template_created';
-    v_record_id := NEW.id;
-    v_org_id := NEW.org_id;
-    v_details := jsonb_build_object(
-      'document_type', NEW.document_type,
-      'name', NEW.name,
-      'is_active', NEW.is_active,
-      'version', NEW.version
-    );
-  ELSIF TG_OP = 'UPDATE' THEN
-    v_action := CASE
-      WHEN OLD.is_active IS DISTINCT FROM NEW.is_active
-        THEN CASE WHEN NEW.is_active THEN 'template_activated' ELSE 'template_deactivated' END
-      ELSE 'template_updated'
-    END;
-    v_record_id := NEW.id;
-    v_org_id := NEW.org_id;
-    v_details := jsonb_build_object(
-      'changed', jsonb_strip_nulls(jsonb_build_object(
-        'document_type', CASE WHEN OLD.document_type IS DISTINCT FROM NEW.document_type
-          THEN jsonb_build_object('from', OLD.document_type, 'to', NEW.document_type) END,
-        'name', CASE WHEN OLD.name IS DISTINCT FROM NEW.name
-          THEN jsonb_build_object('from', OLD.name, 'to', NEW.name) END,
-        'is_active', CASE WHEN OLD.is_active IS DISTINCT FROM NEW.is_active
-          THEN jsonb_build_object('from', OLD.is_active, 'to', NEW.is_active) END,
-        'content_changed', CASE WHEN OLD.content IS DISTINCT FROM NEW.content
-          THEN to_jsonb(true) END
-      ))
-    );
-  ELSE -- DELETE
-    v_action := 'template_deleted';
-    v_record_id := OLD.id;
-    v_org_id := OLD.org_id;
-    v_details := jsonb_build_object(
-      'document_type', OLD.document_type,
-      'name', OLD.name
-    );
-  END IF;
-
-  INSERT INTO public.audit_logs (user_id, action, table_name, record_id, details, org_id)
-  VALUES (
-    COALESCE(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid),
-    v_action,
-    'document_template',
-    v_record_id,
-    v_details,
-    v_org_id
-  );
-
-  RETURN COALESCE(NEW, OLD);
-END;
-$$;
-
-CREATE TRIGGER trg_audit_document_templates
-AFTER INSERT OR UPDATE OR DELETE ON public.document_templates
-FOR EACH ROW EXECUTE FUNCTION public.log_document_template_change();
-```
-
-No GRANT changes needed — function runs as definer, and audit_logs RLS already permits owners to read.
-
-## Verification
-- Edit a template via Settings → Onboarding & Documents → Save → row appears in `audit_logs` with `action = 'template_updated'`, `table_name = 'document_template'`, `record_id` = template id, `user_id` = signed-in admin.
-- Toggle Active off → row with `template_deactivated`.
-- Create new template → row with `template_created`.
-
-## Out of scope
-- No new `audit_logs` table (existing one already covers all requested fields).
-- No UI to view the audit trail — backend instrumentation only.
-- No app-side mutation changes — handled entirely at the DB level so every code path (including future ones) is logged automatically.
+### Technical Details
+- **Data source**: `audit_logs` (already populated by the existing DB trigger on `document_templates`).
+- **User resolution**: `profiles` table (`id` matches `audit_logs.user_id`). No new DB objects needed.
+- **Styling**: Follow existing project patterns — Card wrapper, Tailwind semantic tokens, and shadcn/ui Table or custom timeline markup.
+- **No backend changes required**: Reads only from existing tables.
