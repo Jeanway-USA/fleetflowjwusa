@@ -5,10 +5,11 @@ import remarkGfm from 'remark-gfm';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SignaturePad } from '@/components/driver/SignaturePad';
+import { extractStateFromAddress } from '@/lib/us-states';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|owner_signature|driver_signature)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature)\s*\}\}/g;
 
 export interface DocumentTemplateRendererProps {
   content: string;
@@ -17,6 +18,8 @@ export interface DocumentTemplateRendererProps {
   signature: string | null;
   onSignatureCapture: (dataUrl: string) => void;
   driverName?: string;
+  cdlNumber: string;
+  onCdlNumberChange: (value: string) => void;
 }
 
 type TextNode = { kind: 'text'; value: string };
