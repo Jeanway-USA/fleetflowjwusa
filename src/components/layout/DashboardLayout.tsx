@@ -112,22 +112,22 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <SidebarProvider>
-      <DashboardLayoutInner isDemoMode={isDemoMode} signOut={signOut} simulatedOrgId={simulatedOrgId} simulatedOrgName={simulatedOrgName} clearOrgSimulation={clearOrgSimulation} navigate={navigate}>
+      <DashboardLayoutInner isDemoMode={isDemoMode} signOut={signOut} simulatedOrgId={simulatedOrgId} simulatedOrgName={simulatedOrgName} clearOrgSimulation={clearOrgSimulation}>
         {children}
       </DashboardLayoutInner>
     </SidebarProvider>
   );
 }
 
-function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, simulatedOrgName, clearOrgSimulation, navigate }: {
+function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, simulatedOrgName, clearOrgSimulation }: {
   children: ReactNode;
   isDemoMode: boolean;
   signOut: () => Promise<void>;
   simulatedOrgId: string | null;
   simulatedOrgName: string | null;
   clearOrgSimulation: () => void;
-  navigate: (path: string) => void;
 }) {
+  const navigate = useNavigate();
   const { toggleSidebar } = useSidebar();
   const location = useLocation();
   const { tier } = useSubscriptionTier();
@@ -174,23 +174,32 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
       .then(({ data }) => {
         const seen = !!(data as any)?.has_completed_onboarding_tour;
         setHasSeenTour(seen);
+        // Mirror server flag into localStorage so the synchronous check below
+        // is authoritative on fresh devices.
+        tour.syncFromServer(seen);
         // Only show the legacy welcome modal on routes that don't have an auto-tour.
         if (!seen && !tourDef) setShowWelcome(true);
         setTourFlagLoaded(true);
       });
-  }, [user, isDemoMode, tourDef]);
+  }, [user, isDemoMode, tourDef, tour]);
 
   // Auto-start tour: (A) explicit signal from /driver/onboarding, or (B) has_seen_tour === false.
+  // localStorage is the synchronous source of truth — if it says completed, never auto-start,
+  // even if a stale server fetch hasn't settled yet.
   useEffect(() => {
     if (autoStartedRef.current || !tourDef || tour.isActive) return;
+    if (tour.hasCompleted()) {
+      autoStartedRef.current = true;
+      return;
+    }
     const fromOnboarding = (location.state as any)?.startTour === true;
     const flagSaysStart = tourFlagLoaded && hasSeenTour === false;
     if (!fromOnboarding && !flagSaysStart) return;
     autoStartedRef.current = true;
     tour.startTour();
     if (fromOnboarding) {
-      // Strip state so a refresh doesn't replay the tour.
-      navigate(location.pathname);
+      // Replace history entry so refresh / Back never resurfaces startTour state.
+      navigate(location.pathname, { replace: true, state: {} });
     }
   }, [tourDef, tour, tourFlagLoaded, hasSeenTour, location.state, location.pathname, navigate]);
 
