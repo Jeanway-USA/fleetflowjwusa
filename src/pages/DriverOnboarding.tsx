@@ -143,7 +143,9 @@ export default function DriverOnboarding() {
     // Resolve driver record
     const { data: driverRow, error: driverError } = await supabase
       .from('drivers')
-      .select('id, first_name, last_name')
+      .select(
+        'id, first_name, last_name, license_number, license_expiry, medical_card_expiry, endorsements, has_twic, twic_expiry',
+      )
       .eq('user_id', user.id)
       .eq('org_id', orgId)
       .maybeSingle();
