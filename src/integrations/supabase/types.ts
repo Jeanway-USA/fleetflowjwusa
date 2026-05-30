@@ -1412,6 +1412,7 @@ export type Database = {
       }
       driver_signed_documents: {
         Row: {
+          attachment_file_path: string | null
           created_at: string
           document_type: string
           driver_address: string | null
@@ -1424,6 +1425,7 @@ export type Database = {
           template_id: string | null
         }
         Insert: {
+          attachment_file_path?: string | null
           created_at?: string
           document_type: string
           driver_address?: string | null
@@ -1436,6 +1438,7 @@ export type Database = {
           template_id?: string | null
         }
         Update: {
+          attachment_file_path?: string | null
           created_at?: string
           document_type?: string
           driver_address?: string | null
@@ -1453,6 +1456,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          direct_deposit_attachment_url: string | null
           email: string | null
           endorsements: string[] | null
           first_name: string
@@ -1477,6 +1481,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          direct_deposit_attachment_url?: string | null
           email?: string | null
           endorsements?: string[] | null
           first_name: string
@@ -1501,6 +1506,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          direct_deposit_attachment_url?: string | null
           email?: string | null
           endorsements?: string[] | null
           first_name?: string
