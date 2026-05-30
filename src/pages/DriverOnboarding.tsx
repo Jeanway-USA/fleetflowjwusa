@@ -80,16 +80,22 @@ export default function DriverOnboarding() {
   const totalSteps = templates.length;
   const currentTemplate = templates[stepIndex];
   const currentState: TemplateState = currentTemplate
-    ? state[currentTemplate.id] ?? { driverAddress: '', signature: null }
-    : { driverAddress: '', signature: null };
+    ? state[currentTemplate.id] ?? { driverAddress: '', signature: null, cdlNumber: '' }
+    : { driverAddress: '', signature: null, cdlNumber: '' };
 
   const needsDriverAddress = useMemo(
     () => !!currentTemplate && /\{\{\s*driver_address\s*\}\}/.test(currentTemplate.content),
     [currentTemplate],
   );
+  const needsCdlNumber = useMemo(
+    () => !!currentTemplate && /\{\{\s*cdl_number\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
 
   const canContinue =
-    !!currentState.signature && (!needsDriverAddress || currentState.driverAddress.trim().length > 0);
+    !!currentState.signature &&
+    (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
+    (!needsCdlNumber || currentState.cdlNumber.trim().length > 0);
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
     if (!currentTemplate) return;
