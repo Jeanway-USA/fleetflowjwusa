@@ -1,62 +1,43 @@
 ## Objective
-Add a "Global Invite Preferences" section in the Settings → Onboarding & Documents tab with role-based default toggles, and wire those defaults into the Team invite flow so the new `requires_onboarding` checkbox auto-flips based on the selected role.
+Embed the existing `DocumentTemplates` editor directly inside the Settings → Onboarding & Documents tab, below the Global Invite Preferences card, so owners can manage templates without leaving Settings.
 
-## 1. Storage (no new table required)
-Reuse the existing `public.company_settings` table (key/value, scoped by `org_id`, already has RLS and a `(org_id, setting_key)` unique constraint). Two new setting keys:
+## Plan
 
-- `require_onboarding_driver` (default `"true"`)
-- `require_onboarding_dispatcher` (default `"false"`)
+### 1. Extract reusable panel
+Refactor `src/pages/admin/DocumentTemplates.tsx` by lifting its inner UI into a new component:
 
-Stored as text (`"true"` / `"false"`) to match the table's existing schema. No migration needed.
+- New file: `src/components/settings/DocumentTemplatesPanel.tsx`
+  - Exports `DocumentTemplatesPanel` — contains the entire master-detail editor (template `Select`, type/name inputs, Active switch, content `Textarea`, Save button, Variable Reference Guide sidebar, and the "New template" `Dialog`).
+  - Drops the page-level container (`container mx-auto p-4 sm:p-6` and big `h1` page header) so it composes cleanly inside a tab.
+  - Keeps all existing data hooks: `useQuery(['document_templates', orgId])`, save/create mutations, `VARIABLES` list, `copyToken` clipboard handler.
+  - Wraps its top section in a small header row: "Document Templates" subheading + `New template` button (matching the visual rhythm of `OnboardingPreferencesCard`).
 
-(Adding a new dedicated `organization_settings` table would duplicate `company_settings`; the user explicitly allowed "or similar global state".)
+- Update `src/pages/admin/DocumentTemplates.tsx` to be a thin page wrapper that renders `<PageHeader title="Document Templates" .../>` plus `<DocumentTemplatesPanel />`. This keeps the `/admin/document-templates` route working but makes the heavy component reusable.
 
-## 2. New component: `OnboardingPreferencesCard`
-File: `src/components/settings/OnboardingPreferencesCard.tsx`
-
-- TanStack `useQuery` for `company_settings` filtered by the two keys + `org_id`.
-- Two `Switch` rows inside a `Card`:
-  - **Require onboarding for new Drivers by default** — bound to `require_onboarding_driver`.
-  - **Require onboarding for new Dispatchers by default** — bound to `require_onboarding_dispatcher`.
-- `useMutation` upserts on toggle change using `onConflict: 'org_id,setting_key'`, with optimistic invalidation and `toast`.
-- Disabled (read-only) when `isDemoMode`.
-- Pure semantic Tailwind tokens.
-
-## 3. Settings page update
+### 2. Wire into Settings tab
 File: `src/pages/Settings.tsx`
 
-Inside `<TabsContent value="onboarding">`, render `<OnboardingPreferencesCard />` above the existing descriptive "no document templates yet" placeholder.
+- Import `DocumentTemplatesPanel` from `@/components/settings/DocumentTemplatesPanel`.
+- Inside `<TabsContent value="onboarding">`, replace the current "No document templates yet" placeholder `Card` with `<DocumentTemplatesPanel />`, leaving the descriptive intro card and `OnboardingPreferencesCard` above it untouched. Order: intro → preferences → templates panel.
 
-## 4. Invite User modal wiring
-File: `src/components/settings/TeamManagementTab.tsx`
+### 3. Variable reference + editor behaviour
+No behaviour changes — the existing panel already handles:
+- Rich text editing via large `Textarea` (markdown supported).
+- Variable Reference Guide listing `{{today_date}}`, `{{company_address}}`, `{{driver_address}}`, `{{owner_signature}}`, `{{driver_signature}}` with copy-to-clipboard buttons.
+- Edit, save (`saveMutation`), activate/deactivate (`is_active` Switch), and create-new (`createMutation`) — all already work against `document_templates` with existing RLS (`templates_manage_owner`).
 
-- Add a TanStack query `invite-onboarding-defaults` that loads the two `company_settings` rows for the current `orgId` once (5m staleTime). Returns `{ driver: boolean, dispatcher: boolean }`, defaulting to `{ driver: true, dispatcher: false }` when rows are missing.
-- New local state: `inviteRequiresOnboarding: boolean`.
-- When the Sheet opens OR when `inviteRole` changes, recompute the default:
-  - `driver` → use `defaults.driver`
-  - `dispatcher` → use `defaults.dispatcher`
-  - any other role → `false` (and disable the checkbox)
-- Render a shadcn `Checkbox` + label "Require onboarding before activation" inside the invite form, below the Role select. Helper text: "Defaults to your organization's preferences for this role. You can override for this invite."
-- Pass `requires_onboarding: inviteRequiresOnboarding` in the `invite-user` function body alongside `email` and `role`.
-
-## 5. Edge function (light touch)
-File: `supabase/functions/invite-user/index.ts`
-
-- Accept optional `requires_onboarding: boolean` in the request body (validated as boolean, defaults to the role-specific server-side fallback if absent).
-- For now the value is forwarded but not persisted to any column (no schema change here — drivers/profiles already drive onboarding via signed-docs presence). Future scope can wire this to a `requires_onboarding` column once needed.
-- This keeps the contract ready without expanding scope into schema migrations.
-
-## 6. Verification
-- Open Settings → Onboarding & Documents → toggle both switches → reload → values persist.
-- Open Team → Invite Member → select Driver → checkbox reflects driver default; switch to Dispatcher → checkbox flips to dispatcher default; switch to Safety → checkbox is `false` and disabled.
+### 4. Verification
+- Settings → Onboarding & Documents shows: intro card → Global Invite Preferences → Document Templates editor with sidebar.
+- Edit content + toggle Active + Save → toast success and value persists on reload.
+- Click "New template" → dialog → create → newly created template auto-selected.
+- `/admin/document-templates` route still loads the same editor via the page wrapper.
 
 ## Files touched
+- `src/components/settings/DocumentTemplatesPanel.tsx` (new — extracted from existing page)
+- `src/pages/admin/DocumentTemplates.tsx` (thin wrapper)
 - `src/pages/Settings.tsx`
-- `src/components/settings/OnboardingPreferencesCard.tsx` (new)
-- `src/components/settings/TeamManagementTab.tsx`
-- `supabase/functions/invite-user/index.ts`
 
 ## Out of scope
-- No new database table or columns.
-- No enforcement logic for `requires_onboarding` beyond the existing signed-docs onboarding check.
-- No changes to per-driver onboarding screens.
+- No DB schema changes (table, RLS, and grants already exist).
+- No swap to a WYSIWYG rich text editor — the current `Textarea` markdown editor with the variable guide stays.
+- No removal of the `/admin/document-templates` route.
