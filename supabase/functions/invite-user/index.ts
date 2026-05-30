@@ -81,8 +81,8 @@ Deno.serve(async (req) => {
     }
 
     // Get request body
-    const { email, role } = await req.json();
-    console.log('Inviting user:', email, 'with role:', role);
+    const { email, role, driver_id, first_name, last_name } = await req.json();
+    console.log('Inviting user:', email, 'with role:', role, 'driver_id:', driver_id);
 
     if (!email || !role) {
       return new Response(JSON.stringify({ error: 'Email and role are required' }), {
