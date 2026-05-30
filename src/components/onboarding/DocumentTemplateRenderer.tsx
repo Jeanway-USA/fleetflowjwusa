@@ -71,9 +71,12 @@ export function DocumentTemplateRenderer({
   signature,
   onSignatureCapture,
   driverName,
+  cdlNumber,
+  onCdlNumberChange,
 }: DocumentTemplateRendererProps) {
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
+  const contractorState = useMemo(() => extractStateFromAddress(driverAddress), [driverAddress]);
 
   return (
     <div className="text-foreground leading-relaxed">
