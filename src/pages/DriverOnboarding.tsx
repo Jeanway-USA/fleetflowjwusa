@@ -320,6 +320,8 @@ export default function DriverOnboarding() {
                 updateCurrent({ signature: dataUrl ? dataUrl : null })
               }
               driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
+              cdlNumber={currentState.cdlNumber}
+              onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
             />
           </div>
 
