@@ -39,14 +39,14 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
 
   const openSignedUrl = async (
     filePath: string,
-    documentType: string,
+    downloadName: string,
     mode: 'preview' | 'download',
   ) => {
     const { data, error } = await supabase.storage
       .from('signed-documents')
-      .createSignedUrl(filePath, 300, mode === 'download' ? { download: `${documentType}.pdf` } : undefined);
+      .createSignedUrl(filePath, 300, mode === 'download' ? { download: downloadName } : undefined);
     if (error || !data?.signedUrl) {
-      toast.error(error?.message ?? 'Could not open signed document');
+      toast.error(error?.message ?? 'Could not open document');
       return;
     }
     if (mode === 'preview') {
@@ -54,12 +54,13 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     } else {
       const a = document.createElement('a');
       a.href = data.signedUrl;
-      a.download = `${documentType}.pdf`;
+      a.download = downloadName;
       document.body.appendChild(a);
       a.click();
       a.remove();
     }
   };
+
 
   if (isLoading) {
     return (
