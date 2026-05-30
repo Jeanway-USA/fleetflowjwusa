@@ -1,0 +1,1 @@
+ALTER TABLE public.driver_locations REPLICA IDENTITY FULL;
