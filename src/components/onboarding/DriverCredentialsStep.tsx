@@ -85,6 +85,7 @@ export type DriverCredentialsValues = z.infer<typeof schema>;
 
 export interface DriverCredentialsPayload {
   license_number: string;
+  phone: string | null;
   license_expiry: string;
   medical_card_expiry: string;
   endorsements: string[];
@@ -112,6 +113,7 @@ function parseDate(value: string | null | undefined): Date | undefined {
 export const buildDefaultValues = (
   row?: {
     license_number?: string | null;
+    phone?: string | null;
     license_expiry?: string | null;
     medical_card_expiry?: string | null;
     endorsements?: string[] | null;
@@ -120,6 +122,7 @@ export const buildDefaultValues = (
   } | null,
 ): Partial<DriverCredentialsValues> => ({
   licenseNumber: row?.license_number ?? '',
+  phoneNumber: row?.phone ?? '',
   licenseExpiry: parseDate(row?.license_expiry),
   medicalCardExpiry: parseDate(row?.medical_card_expiry),
   endorsements:
@@ -137,6 +140,7 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
       mode: 'onChange',
       defaultValues: {
         licenseNumber: '',
+        phoneNumber: '',
         endorsements: [],
         ...defaultValues,
       },
