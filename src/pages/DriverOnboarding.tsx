@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -11,6 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DocumentTemplateRenderer } from '@/components/onboarding/DocumentTemplateRenderer';
+import {
+  DriverCredentialsStep,
+  buildDefaultValues,
+  type DriverCredentialsStepHandle,
+} from '@/components/onboarding/DriverCredentialsStep';
 import { generateSignedPdf } from '@/lib/onboarding/generateSignedPdf';
 
 const DOCUMENT_ORDER = ['driver_agreement', 'direct_deposit'] as const;
@@ -44,14 +49,18 @@ export default function DriverOnboarding() {
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
+  const credentialsRef = useRef<DriverCredentialsStepHandle>(null);
+  const [credentialsValid, setCredentialsValid] = useState(false);
 
-  const { data: driverRow, isLoading: driverLoading } = useQuery({
+  const { data: driverRow, isLoading: driverLoading, refetch: refetchDriver } = useQuery({
     queryKey: ['driver-self', user?.id, orgId],
     enabled: !!user && !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, first_name, last_name')
+        .select(
+          'id, first_name, last_name, license_number, license_expiry, medical_card_expiry, endorsements, has_twic, twic_expiry',
+        )
         .eq('user_id', user!.id)
         .eq('org_id', orgId!)
         .maybeSingle();
@@ -79,8 +88,12 @@ export default function DriverOnboarding() {
     },
   });
 
-  const totalSteps = templates.length;
-  const currentTemplate = templates[stepIndex];
+  // Step 0 = credentials, Steps 1..N = templates
+  const CREDENTIALS_STEP = 0;
+  const isCredentialsStep = stepIndex === CREDENTIALS_STEP;
+  const totalSteps = templates.length + 1;
+  const templateIndex = stepIndex - 1;
+  const currentTemplate = templateIndex >= 0 ? templates[templateIndex] : undefined;
   const currentState: TemplateState = currentTemplate
     ? state[currentTemplate.id] ?? { driverAddress: '', signature: null, cdlNumber: '', attachment: null }
     : { driverAddress: '', signature: null, cdlNumber: '', attachment: null };
@@ -105,11 +118,12 @@ export default function DriverOnboarding() {
   const isValidSignatureDataUrl = (s: string | null): s is string =>
     !!s && s.startsWith('data:image/');
 
-  const canContinue =
-    (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
-    (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
-    (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
-    (!needsFileUpload || currentState.attachment != null);
+  const canContinue = isCredentialsStep
+    ? credentialsValid
+    : (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
+      (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
+      (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
+      (!needsFileUpload || currentState.attachment != null);
 
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
@@ -220,6 +234,40 @@ export default function DriverOnboarding() {
   };
 
   const handleContinue = async () => {
+    // Step 0: validate + save driver credentials, then advance
+    if (isCredentialsStep) {
+      if (!driverRow || !orgId) {
+        toast.error('Driver profile not found.');
+        return;
+      }
+      const payload = await credentialsRef.current?.submit();
+      if (!payload) return;
+      setSubmitting(true);
+      try {
+        const { error } = await supabase
+          .from('drivers')
+          .update(payload)
+          .eq('id', driverRow.id)
+          .eq('org_id', orgId);
+        if (error) throw error;
+        await refetchDriver();
+        if (totalSteps > 1) {
+          setStepIndex(1);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          // No documents — credentials alone complete the flow
+          setSignedResults([]);
+          toast.success('Profile saved');
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : 'Failed to save credentials');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (stepIndex < totalSteps - 1) {
       setStepIndex((i) => i + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -310,31 +358,14 @@ export default function DriverOnboarding() {
     );
   }
 
-  if (totalSteps === 0) {
-    return (
-      <div className="container max-w-3xl py-10">
-        <Card>
-          <CardHeader>
-            <CardTitle>No documents to sign</CardTitle>
-            <CardDescription>
-              There are no active onboarding documents for your organization yet. Please contact
-              your dispatcher.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" onClick={() => navigate('/driver')}>
-              Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   const progress = ((stepIndex + 1) / totalSteps) * 100;
-  const docType = currentTemplate.document_type as DocumentTypeKey;
-  const title =
-    currentTemplate.name ?? DOCUMENT_LABELS[docType] ?? currentTemplate.document_type;
+  const docType = currentTemplate?.document_type as DocumentTypeKey | undefined;
+  const title = isCredentialsStep
+    ? 'Driver Profile & Credentials'
+    : currentTemplate?.name ??
+      (docType ? DOCUMENT_LABELS[docType] : undefined) ??
+      currentTemplate?.document_type ??
+      '';
 
   return (
     <div className="container max-w-3xl py-10">
@@ -349,28 +380,36 @@ export default function DriverOnboarding() {
         <CardHeader>
           <CardTitle>{title}</CardTitle>
           <CardDescription>
-            Please review the document below, fill in the required fields, and sign at the bottom.
+            {isCredentialsStep
+              ? 'Confirm your CDL, medical card, and TWIC details before reviewing onboarding documents.'
+              : 'Please review the document below, fill in the required fields, and sign at the bottom.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border bg-card p-6">
-            <DocumentTemplateRenderer
-              content={currentTemplate.content}
-              driverAddress={currentState.driverAddress}
-              onDriverAddressChange={(v) => updateCurrent({ driverAddress: v })}
-              signature={currentState.signature}
-              onSignatureCapture={(dataUrl) =>
-                updateCurrent({ signature: dataUrl ? dataUrl : null })
-              }
-              driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
-              cdlNumber={currentState.cdlNumber}
-              onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
-              
-              attachment={currentState.attachment}
-              onAttachmentChange={(file) => updateCurrent({ attachment: file })}
-
+          {isCredentialsStep ? (
+            <DriverCredentialsStep
+              ref={credentialsRef}
+              defaultValues={buildDefaultValues(driverRow)}
+              onValidityChange={setCredentialsValid}
             />
-          </div>
+          ) : currentTemplate ? (
+            <div className="rounded-md border bg-card p-6">
+              <DocumentTemplateRenderer
+                content={currentTemplate.content}
+                driverAddress={currentState.driverAddress}
+                onDriverAddressChange={(v) => updateCurrent({ driverAddress: v })}
+                signature={currentState.signature}
+                onSignatureCapture={(dataUrl) =>
+                  updateCurrent({ signature: dataUrl ? dataUrl : null })
+                }
+                driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
+                cdlNumber={currentState.cdlNumber}
+                onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
+                attachment={currentState.attachment}
+                onAttachmentChange={(file) => updateCurrent({ attachment: file })}
+              />
+            </div>
+          ) : null}
 
           <div className="mt-6 flex items-center justify-between">
             <Button
@@ -382,8 +421,10 @@ export default function DriverOnboarding() {
             </Button>
             <Button onClick={handleContinue} disabled={!canContinue || submitting}>
               {submitting
-                ? 'Submitting…'
-                : stepIndex === totalSteps - 1
+                ? isCredentialsStep
+                  ? 'Saving…'
+                  : 'Submitting…'
+                : stepIndex === totalSteps - 1 && !isCredentialsStep
                   ? 'Submit'
                   : 'Continue'}
             </Button>
