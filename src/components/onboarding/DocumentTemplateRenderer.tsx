@@ -77,7 +77,11 @@ export function DocumentTemplateRenderer({
   driverName,
   cdlNumber,
   onCdlNumberChange,
+  showAttachmentUpload = false,
+  attachment = null,
+  onAttachmentChange,
 }: DocumentTemplateRendererProps) {
+
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
   const contractorState = useMemo(() => extractStateFromAddress(driverAddress), [driverAddress]);
