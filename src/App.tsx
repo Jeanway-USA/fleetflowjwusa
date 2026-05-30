@@ -52,6 +52,7 @@ const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const DocumentTemplates = lazy(() => import("./pages/admin/DocumentTemplates"));
 
 const queryClient = new QueryClient({
   defaultOptions: {

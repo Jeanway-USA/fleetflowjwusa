@@ -1,49 +1,44 @@
 ## Goal
-Add a `document_templates` table that stores editable contract/form templates (markdown + placeholders), scoped per organization. Leave the prior invitation/onboarding work untouched.
+Add an owner-only admin page at `/admin/document-templates` for editing the org's `document_templates` rows with a placeholder-variable reference guide alongside the editor.
 
-## Migration
+## Files
 
-### New table: `public.document_templates`
-Columns:
-- `id` uuid PK, default `gen_random_uuid()`
-- `org_id` uuid NOT NULL — tenant scope (Core rule)
-- `document_type` text NOT NULL — e.g. `driver_agreement`, `direct_deposit`, `driver_profile`
-- `name` text NULL — optional human label (e.g. "2026 Driver Agreement v2")
-- `content` text NOT NULL — plain text / markdown with `{{placeholder}}` tokens
-- `is_active` boolean NOT NULL default `true`
-- `version` integer NOT NULL default `1` — supports future revisions
-- `created_by` uuid NULL — auth user who saved it
-- `created_at` timestamptz NOT NULL default `now()`
-- `updated_at` timestamptz NOT NULL default `now()`
+### New: `src/pages/admin/DocumentTemplates.tsx`
+- Owner-only page (route guarded). No `DashboardLayout` wrapper (per Core rule — `ProtectedRoute` handles layout).
+- Loads all `document_templates` for the current `orgId` via TanStack Query.
+- Left column (2/3): template list + editor
+  - Tabs or select dropdown of document types found in DB
+  - "New template" button — prompts for `document_type` + `name`, inserts empty content
+  - Inputs: `name`, `document_type` (text input), `is_active` (switch), large `<Textarea>` (min-h-[500px], monospace) for `content`
+  - Save button — `update` mutation on the selected row (or `insert` if new). Includes `org_id` in payload (Core rule for multi-tenant inserts). Invalidates query on success, shows `sonner` toast.
+- Right column (1/3, sticky): **Variable Reference Guide** card
+  - Title + intro: "Insert these tokens into your template — they'll be replaced when the document is rendered to the driver."
+  - List of 5 variables, each row: `<code>{{token}}</code>` + description + a "Copy" button that writes to clipboard and toasts
+    - `{{today_date}}` — Auto-fills today's date when the document is generated
+    - `{{company_address}}` — Auto-fills "4700 Diplomacy Rd, Fort Worth, TX 76155"
+    - `{{driver_address}}` — Renders an input field for the driver to fill in
+    - `{{owner_signature}}` — Placeholder signature block (signed off-platform for now)
+    - `{{driver_signature}}` — Renders the SignaturePad component for the driver to sign
+  - Small tip footer about case-sensitivity & exact double-brace syntax.
 
-Indexes:
-- `(org_id, document_type)` — fast lookup of templates by type within an org
-- Partial unique `(org_id, document_type) WHERE is_active` — exactly one active template per type per org (prevents ambiguity at invite-acceptance time)
+### Modified: `src/App.tsx`
+- Add lazy import: `const DocumentTemplates = lazy(() => import("./pages/admin/DocumentTemplates"));`
+- Add route under "Settings" section:
+  ```tsx
+  <Route path="/admin/document-templates" element={
+    <ProtectedRoute allowedRoles={['owner']}>
+      <DocumentTemplates />
+    </ProtectedRoute>
+  } />
+  ```
 
-### Placeholder convention (documented, not enforced)
-Content uses double-brace tokens that the frontend/edge function will interpolate at render time:
-`{{today_date}}`, `{{company_name}}`, `{{company_address}}`, `{{driver_name}}`, `{{driver_address}}`, `{{owner_signature}}`, `{{driver_signature}}`. No DB-side validation — kept flexible so new tokens can be added without schema changes.
-
-### GRANTs
-```
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.document_templates TO authenticated;
-GRANT ALL ON public.document_templates TO service_role;
-```
-No `anon` — templates are org-private.
-
-### RLS policies (multi-tenant, owner-managed)
-- `templates_select_org_staff` — any authenticated user in the org can read active templates (so a driver completing onboarding can fetch the agreement to sign): `org_id = get_user_org_id(auth.uid())`
-- `templates_manage_owner` — only owners can insert/update/delete: `is_owner(auth.uid()) AND org_id = get_user_org_id(auth.uid())`
-- `templates_super_admin` — `is_super_admin()` full access (cross-tenant)
-
-### Triggers
-- `update_document_templates_updated_at` BEFORE UPDATE → reuses existing `public.update_updated_at_column()`
-
-## Not changed
-- Previously added invitation state + driver onboarding fields (`onboarding_completed`, `signed_*_url`, `onboarding_completed_at`) remain as-is.
-- No frontend code changes in this task — `src/integrations/supabase/types.ts` auto-regenerates after migration.
+## Technical details
+- DB writes use the existing supabase client `from('document_templates')` with `org_id` + `created_by: user.id` on insert.
+- Uses semantic Tailwind tokens only (no raw colors).
+- Uses shadcn components: `Card`, `Button`, `Input`, `Textarea`, `Switch`, `Label`, `Tabs`, `Tooltip`. No rich text editor — plain `<Textarea>` keeps the `{{token}}` placeholders intact (a WYSIWYG would mangle them).
+- No nav link added in this task — page accessible via direct URL. (Can be linked from Settings later.)
 
 ## Out of scope
-- Template editor UI
-- Placeholder interpolation logic (will live in a future edge function or signing component)
-- Seeding default `driver_agreement` / `direct_deposit` / `driver_profile` content
+- Placeholder interpolation/rendering (handled later by the signing flow).
+- Seeding default templates.
+- Version history UI (column already exists; future enhancement).
