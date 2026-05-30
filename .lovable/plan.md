@@ -1,27 +1,21 @@
-## Plan: Add `{{phone_number}}` Template Variable
+## Plan: Add clickable phone number to driver profile card
 
-### Goal
-Allow admins to use a `{{phone_number}}` token in document templates so the driver’s phone number is auto-injected as plain text during driver onboarding.
+### Scope
+Update `src/pages/Drivers.tsx` to display the driver's phone number prominently with a clickable `tel:` link in the driver card header area.
+
+### Analysis
+- The Supabase query already fetches `*` from `drivers`, so the `phone` field is already included — no query change needed.
+- `ContactDetailSheet.tsx` is used only in `src/pages/CRM.tsx` (for broker/shipper contacts), not for driver profiles. It already has `tel:` links. No changes required there.
 
 ### Changes
 
-1. **Reference Guide** (`src/components/settings/DocumentTemplatesPanel.tsx`)
-   - Append `{ token: "{{phone_number}}", description: "Auto-fills the driver's phone number captured in onboarding Step 1." }` to the `VARIABLES` array.
-
-2. **Template Parser** (`src/components/onboarding/DocumentTemplateRenderer.tsx`)
-   - Add `phone_number` to the `TOKEN_REGEX` capture group.
-   - Add `phoneNumber?: string | null` to `DocumentTemplateRendererProps`.
-   - Add a `case 'phone_number':` branch that renders the number as plain text (or `[Not provided]` when blank).
-
-3. **Driver Onboarding** (`src/pages/DriverOnboarding.tsx`)
-   - Include `phone` in both `drivers` SELECT queries (the React Query fetcher and the `finalizeSubmission` fetcher).
-   - Pass `phoneNumber={driverRow?.phone}` to `<DocumentTemplateRenderer />`.
-
-### Out of Scope
-- No database migration needed (`phone` column already exists on `drivers`).
-- No changes to `generateSignedPdf` or admin CSV import.
+1. **`src/pages/Drivers.tsx`** — Move and enhance the phone display:
+   - In the card header area (near the driver's name/status), add a prominent phone number row with a `tel:` anchor tag.
+   - Keep the existing phone display in CardContent as a secondary fallback, or remove it to avoid duplication.
+   - The link format: `<a href="tel:${driver.phone}">` so dispatchers can tap-to-call from mobile devices.
 
 ### Acceptance Criteria
-- `{{phone_number}}` appears in the Admin Document Templates Variable Reference Guide.
-- When a template includes `{{phone_number}}`, the driver onboarding page displays the driver’s phone number as plain text.
-- If the driver has no phone number on file, the token renders as `[Not provided]`.
+- Phone number appears near the driver's name in the card header.
+- Phone number is wrapped in a clickable `tel:` anchor tag.
+- Existing card layout and other fields remain unchanged.
+- No database or query changes needed (column already fetched via `*`).
