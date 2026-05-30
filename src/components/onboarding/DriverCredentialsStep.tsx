@@ -161,6 +161,7 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
         const v = form.getValues();
         return {
           license_number: v.licenseNumber.trim(),
+          phone: v.phoneNumber?.trim() ? v.phoneNumber.trim() : null,
           license_expiry: format(v.licenseExpiry, 'yyyy-MM-dd'),
           medical_card_expiry: format(v.medicalCardExpiry, 'yyyy-MM-dd'),
           endorsements: v.endorsements,
