@@ -176,6 +176,70 @@ Deno.serve(async (req) => {
       }
     }
 
+    // For driver invites, ensure a drivers row exists and is linked to the auth user
+    if (targetUserId && role === 'driver' && orgId) {
+      try {
+        let linkedDriverId: string | null = null;
+
+        if (driver_id) {
+          // Link the provided driver row to this auth user (only if currently unlinked)
+          const { data: updated, error: updErr } = await supabaseAdmin
+            .from('drivers')
+            .update({ user_id: targetUserId })
+            .eq('id', driver_id)
+            .eq('org_id', orgId)
+            .is('user_id', null)
+            .select('id')
+            .maybeSingle();
+          if (updErr) console.error('Driver link error:', updErr.message);
+          linkedDriverId = updated?.id ?? driver_id;
+        } else {
+          // Try to find an existing driver row by email in this org
+          const { data: existingDriver } = await supabaseAdmin
+            .from('drivers')
+            .select('id, user_id')
+            .eq('org_id', orgId)
+            .ilike('email', email)
+            .maybeSingle();
+
+          if (existingDriver) {
+            if (!existingDriver.user_id) {
+              await supabaseAdmin
+                .from('drivers')
+                .update({ user_id: targetUserId })
+                .eq('id', existingDriver.id);
+            }
+            linkedDriverId = existingDriver.id;
+          } else {
+            // Create a new driver row linked to this user
+            const { data: inserted, error: insErr } = await supabaseAdmin
+              .from('drivers')
+              .insert({
+                org_id: orgId,
+                user_id: targetUserId,
+                first_name: first_name || email.split('@')[0],
+                last_name: last_name || '',
+                email,
+                status: 'active',
+                pay_type: 'percentage',
+                pay_rate: 0,
+              })
+              .select('id')
+              .single();
+            if (insErr) {
+              console.error('Driver create error:', insErr.message);
+            } else {
+              linkedDriverId = inserted?.id ?? null;
+            }
+          }
+        }
+
+        console.log('Driver record linked:', linkedDriverId);
+      } catch (driverLinkErr) {
+        console.error('Driver linking exception:', driverLinkErr);
+      }
+    }
+
     // Send custom email via Resend
     const appUrl = 'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app';
     const signUpLink = `${appUrl}/auth`;
