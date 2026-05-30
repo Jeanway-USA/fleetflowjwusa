@@ -62,6 +62,8 @@ export function TeamManagementTab() {
 
   // Form state
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteFirstName, setInviteFirstName] = useState('');
+  const [inviteLastName, setInviteLastName] = useState('');
   const [inviteRole, setInviteRole] = useState<AppRole>('driver');
   const [inviteRequiresOnboarding, setInviteRequiresOnboarding] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
@@ -151,19 +153,28 @@ export function TeamManagementTab() {
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail || !inviteRole) { toast.error('Please enter an email and select a role'); return; }
+    if (!inviteFirstName.trim() || !inviteLastName.trim()) { toast.error('Please enter a first and last name'); return; }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(inviteEmail)) { toast.error('Please enter a valid email address'); return; }
 
     setIsInviting(true);
     try {
       const response = await supabase.functions.invoke('invite-user', {
-        body: { email: inviteEmail, role: inviteRole, requires_onboarding: inviteRequiresOnboarding },
+        body: {
+          email: inviteEmail,
+          role: inviteRole,
+          first_name: inviteFirstName.trim(),
+          last_name: inviteLastName.trim(),
+          requires_onboarding: inviteRequiresOnboarding,
+        },
       });
       if (response.error) throw new Error(response.error.message || 'Failed to send invitation');
       if (response.data?.error) throw new Error(response.data.error);
       toast.success(`Invitation sent to ${inviteEmail}`);
       setInviteOpen(false);
       setInviteEmail('');
+      setInviteFirstName('');
+      setInviteLastName('');
       setInviteRole('driver');
       queryClient.invalidateQueries({ queryKey: ['users_with_roles'] });
     } catch (error: any) {
@@ -353,6 +364,16 @@ export function TeamManagementTab() {
             <SheetDescription>Send an email invitation to add a new member. They'll receive a link to create their account.</SheetDescription>
           </SheetHeader>
           <form onSubmit={handleInviteUser} className="space-y-6 mt-6">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="invite-first-name">First Name</Label>
+                <Input id="invite-first-name" type="text" placeholder="Jane" value={inviteFirstName} onChange={(e) => setInviteFirstName(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invite-last-name">Last Name</Label>
+                <Input id="invite-last-name" type="text" placeholder="Doe" value={inviteLastName} onChange={(e) => setInviteLastName(e.target.value)} required />
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="invite-email">Email Address</Label>
               <Input id="invite-email" type="email" placeholder="user@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
