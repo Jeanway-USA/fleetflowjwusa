@@ -228,6 +228,11 @@ const App = () => {
                         <Settings />
                       </ProtectedRoute>
                     } />
+                    <Route path="/admin/document-templates" element={
+                      <ProtectedRoute allowedRoles={['owner']}>
+                        <DocumentTemplates />
+                      </ProtectedRoute>
+                    } />
                     <Route path="/driver-settings" element={
                       <ProtectedRoute allowedRoles={['driver']}>
                         <DriverSettings />
