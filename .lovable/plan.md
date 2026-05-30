@@ -1,27 +1,48 @@
-## Goal
-Capture first and last name when inviting a user so their printed name (used in onboarding) is correct instead of falling back to their email prefix.
+# Supplemental Direct Deposit Attachment
 
-## Changes
+Currently, the direct-deposit step only generates a signed PDF stored in the `signed-documents` bucket and recorded in `driver_signed_documents.file_path`. We'll add support for a supplemental upload (e.g., voided check) that the driver attaches during onboarding.
 
-### 1. `src/components/settings/TeamManagementTab.tsx` (Invite sheet UI)
-- Add `inviteFirstName` and `inviteLastName` state.
-- Add two required `Input` fields ("First Name", "Last Name") above the email field in the Invite Team Member sheet.
-- Pass `first_name` and `last_name` in the `supabase.functions.invoke('invite-user', { body })` call.
-- Reset both fields on close/success.
+## 1. Database schema
 
-### 2. `supabase/functions/invite-user/index.ts`
-- Already accepts `first_name` / `last_name` in the body and uses them for the drivers row. Extend so it also:
-  - Passes them into `supabaseAdmin.auth.admin.generateLink({ options: { data: { invited_role, first_name, last_name } } })` so the existing `handle_new_user` trigger writes them onto the profile.
-  - After the invite (and for the "existing user" branch), upserts `first_name` / `last_name` directly into `public.profiles` for `targetUserId` when provided, so the profile has the correct name even if the trigger already ran.
+Migration adds one column to `driver_signed_documents`:
 
-### 3. `src/pages/AcceptInvite.tsx`
-- No name fields here — name comes from the invite. After `updateUser({ password })`, call a lightweight upsert into `profiles` only if `first_name`/`last_name` are still null (defensive; usually the edge function already set them). Optional; can skip if step 2 reliably writes the profile.
+- `attachment_file_path TEXT NULL` — stored path of supplemental upload (PDF/JPG/PNG).
+
+No new table. The existing row inserted at onboarding completion will carry both the generated signed PDF (`file_path`) and the supplemental attachment (`attachment_file_path`).
+
+For convenience on the driver record itself, also add to `drivers`:
+
+- `direct_deposit_attachment_url TEXT NULL` — last-known path for quick lookup on the driver profile.
+
+Both columns are nullable, no backfill needed. Existing RLS/GRANTs already cover the tables.
+
+## 2. Storage bucket
+
+Reuse the existing **private** `signed-documents` bucket — its path convention is already `{org_id}/{driver_id}/...` and storage policies enforce per-org/driver access. Supplemental uploads will go to:
+
+```
+{org_id}/{driver_id}/direct_deposit_attachment-{timestamp}.{ext}
+```
+
+Accepted MIME types enforced client-side: `application/pdf`, `image/jpeg`, `image/png`. Max ~10 MB. No new bucket or policy required.
+
+## 3. Onboarding UI + save logic
+
+- `src/components/onboarding/DocumentTemplateRenderer.tsx` — when the current template is `direct_deposit`, render a file input ("Attach voided check or bank letter (PDF/JPG/PNG)"). Expose `attachment: File | null` via a new `onAttachmentChange` callback.
+- `src/pages/DriverOnboarding.tsx`:
+  - Extend `TemplateState` with `attachment: File | null`.
+  - In `finalizeSubmission`, after uploading the generated signed PDF, if the template is `direct_deposit` and an attachment is present:
+    1. Upload to `signed-documents` at the path above.
+    2. Set `attachment_file_path` on the `driver_signed_documents` insert payload.
+    3. Update the driver row's `direct_deposit_attachment_url` with the same path.
+  - Make the attachment **required** for the `direct_deposit` step (extend `canContinue`).
+
+## 4. Display
+
+- `src/components/drivers/SignedOnboardingDocuments.tsx` — when a row has `attachment_file_path`, show a second "Download attachment" button alongside the signed PDF.
 
 ## Out of scope
-- No change to the public `/auth` self-signup flow (it already collects first/last name on signup and `handle_new_user` stores them).
-- No schema/RLS changes — `profiles.first_name` and `profiles.last_name` already exist.
-- No change to onboarding renderers; they read `profiles.first_name` + `profiles.last_name`, which will now be populated.
 
-## Result
-- Invited users have their real name on their profile from the moment the invite is accepted, so onboarding documents print the correct name instead of the email prefix.
-- Self-signups continue to use the names entered on the signup form.
+- No changes to PDF generation, templates, or the existing signed-PDF flow.
+- No new bucket; reusing `signed-documents`.
+- No edge function changes.
