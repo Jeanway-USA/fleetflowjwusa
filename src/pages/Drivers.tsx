@@ -181,6 +181,31 @@ export default function Drivers() {
     onError: (error: any) => toast.error(error.message),
   });
 
+  const inviteDriverMutation = useMutation({
+    mutationFn: async (driver: any) => {
+      if (!driver.email) throw new Error('Driver email is required to send an invitation');
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: {
+          email: driver.email,
+          role: 'driver',
+          driver_id: driver.id,
+          first_name: driver.first_name,
+          last_name: driver.last_name,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data;
+    },
+    onSuccess: (data: any) => {
+      toast.success(data?.message || 'Invitation sent');
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['profiles-for-linking', orgId] });
+    },
+    onError: (error: any) => toast.error(error.message || 'Failed to send invitation'),
+  });
+
+
   // Undoable delete hook
   const { deleteWithUndo } = useUndoableDelete<any>({
     onDelete: async (id) => {
