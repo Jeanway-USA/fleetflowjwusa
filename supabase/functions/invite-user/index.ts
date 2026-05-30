@@ -138,6 +138,18 @@ Deno.serve(async (req) => {
           .eq('user_id', targetUserId)
           .is('org_id', null);
       }
+
+      // Persist the requires_onboarding flag for re-invited users.
+      if (requiresOnboarding !== null) {
+        await supabaseAdmin
+          .from('profiles')
+          .update({
+            requires_onboarding: requiresOnboarding,
+            // Reset completion when we explicitly require onboarding again.
+            ...(requiresOnboarding ? { onboarding_completed: false } : {}),
+          })
+          .eq('user_id', targetUserId);
+      }
     } else {
       // Generate an invite link via Supabase Auth. This creates the auth user
       // (if needed) AND returns an action_link the recipient can use to set
@@ -153,6 +165,7 @@ Deno.serve(async (req) => {
             invited_role: role,
             first_name: first_name ?? null,
             last_name: last_name ?? null,
+            requires_onboarding: requiresOnboarding ?? false,
           },
           redirectTo: acceptUrl,
         },
@@ -167,11 +180,14 @@ Deno.serve(async (req) => {
       inviteActionLink = inviteData.properties?.action_link ?? null;
       console.log('User invited via Supabase:', targetUserId);
 
-      // Link profile to org
+      // Link profile to org + persist requires_onboarding flag.
       if (targetUserId && orgId) {
         await supabaseAdmin
           .from('profiles')
-          .update({ org_id: orgId })
+          .update({
+            org_id: orgId,
+            ...(requiresOnboarding !== null ? { requires_onboarding: requiresOnboarding } : {}),
+          })
           .eq('user_id', targetUserId);
       }
     }
