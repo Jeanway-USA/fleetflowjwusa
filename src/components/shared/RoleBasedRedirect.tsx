@@ -1,52 +1,23 @@
 import { Navigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import Landing from '@/pages/Landing';
 
 export function RoleBasedRedirect() {
-  const { user, loading, rolesLoading, orgLoading, hasRole, subscriptionTier, orgId, orgIsActive } = useAuth();
+  const {
+    user,
+    loading,
+    rolesLoading,
+    orgLoading,
+    hasRole,
+    subscriptionTier,
+    orgId,
+    orgIsActive,
+    requiresOnboarding,
+    onboardingCompleted,
+  } = useAuth();
 
-  const isDriver = !!user && hasRole('driver');
-
-  // For drivers: check if they still need to sign onboarding documents
-  const { data: driverOnboarding, isLoading: onboardingLoading } = useQuery({
-    queryKey: ['driver-onboarding-check', user?.id, orgId],
-    enabled: !!user && !!orgId && isDriver,
-    queryFn: async () => {
-      const [driverRes, templatesRes] = await Promise.all([
-        supabase
-          .from('drivers')
-          .select('id')
-          .eq('user_id', user!.id)
-          .eq('org_id', orgId!)
-          .maybeSingle(),
-        supabase
-          .from('document_templates')
-          .select('id', { count: 'exact', head: true })
-          .eq('org_id', orgId!)
-          .eq('is_active', true),
-      ]);
-
-      const driverId = driverRes.data?.id ?? null;
-      const activeTemplates = templatesRes.count ?? 0;
-
-      if (!driverId || activeTemplates === 0) {
-        return { needsOnboarding: false };
-      }
-
-      const { count: signedCount } = await supabase
-        .from('driver_signed_documents')
-        .select('id', { count: 'exact', head: true })
-        .eq('driver_id', driverId)
-        .eq('org_id', orgId!);
-
-      return { needsOnboarding: (signedCount ?? 0) === 0 };
-    },
-  });
-
-  if (loading || rolesLoading || orgLoading || (isDriver && !!orgId && onboardingLoading)) {
+  if (loading || rolesLoading || orgLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -66,6 +37,11 @@ export function RoleBasedRedirect() {
   // Organization deactivated — redirect to deactivation page
   if (!orgIsActive) {
     return <Navigate to="/account-deactivated" replace />;
+  }
+
+  // Drivers who still owe onboarding must finish it before anything else
+  if (hasRole('driver') && requiresOnboarding && !onboardingCompleted) {
+    return <Navigate to="/driver/onboarding" replace />;
   }
 
   // Owner routing — tier-aware
@@ -88,9 +64,6 @@ export function RoleBasedRedirect() {
   }
 
   if (hasRole('driver')) {
-    if (driverOnboarding?.needsOnboarding) {
-      return <Navigate to="/driver/onboarding" replace />;
-    }
     return <Navigate to="/driver-dashboard" replace />;
   }
 
