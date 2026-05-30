@@ -277,6 +277,11 @@ export default function DriverOnboarding() {
         } else {
           // No documents — credentials alone complete the flow
           setSignedResults([]);
+          await supabase
+            .from('profiles')
+            .update({ onboarding_completed: true })
+            .eq('user_id', user!.id);
+          await refreshOrgData();
           toast.success('Profile saved');
         }
       } catch (err) {
