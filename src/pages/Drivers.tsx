@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off, Eye, MoreHorizontal, FileSpreadsheet, FileSignature } from 'lucide-react';
 import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { SignedOnboardingDocuments } from '@/components/drivers/SignedOnboardingDocuments';
+import { CredentialsCompliance } from '@/components/drivers/CredentialsCompliance';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -445,27 +446,11 @@ export default function Drivers() {
                   </div>
                 )}
 
-                <div className="pt-2 border-t space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-2">
-                      <CreditCard className="h-4 w-4" />
-                      License
-                    </span>
-                    <span className={isExpiringSoon(driver.license_expiry) ? 'text-destructive font-medium' : ''}>
-                      {formatDate(driver.license_expiry)}
-                    </span>
-                  </div>
+                <div className="pt-2 border-t">
+                  <CredentialsCompliance driver={driver} variant="section" />
+                </div>
 
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-2">
-                      <Shield className="h-4 w-4" />
-                      Medical Card
-                    </span>
-                    <span className={isExpiringSoon(driver.medical_card_expiry) ? 'text-destructive font-medium' : ''}>
-                      {formatDate(driver.medical_card_expiry)}
-                    </span>
-                  </div>
-
+                {(driver as any).mvr_expiry && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-2">
                       <Shield className="h-4 w-4" />
@@ -475,39 +460,17 @@ export default function Drivers() {
                       {formatDate((driver as any).mvr_expiry)}
                     </span>
                   </div>
+                )}
 
-                  {driver.hazmat_expiry && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4" />
-                        HAZMAT
-                      </span>
-                      <span className={isExpiringSoon(driver.hazmat_expiry) ? 'text-destructive font-medium' : ''}>
-                        {formatDate(driver.hazmat_expiry)}
-                      </span>
-                    </div>
-                  )}
-
-                  {driver.has_twic && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">TWIC Card</span>
-                      <span className={isExpiringSoon(driver.twic_expiry) ? 'text-destructive font-medium' : ''}>
-                        {driver.twic_expiry ? formatDate(driver.twic_expiry) : 'Yes'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {driver.endorsements && driver.endorsements.length > 0 && (
-                  <div className="pt-2 border-t">
-                    <p className="text-xs text-muted-foreground mb-2">Endorsements</p>
-                    <div className="flex flex-wrap gap-1">
-                      {driver.endorsements.map((e: string) => (
-                        <Badge key={e} variant="secondary" className="text-xs">
-                          {e.split(' - ')[0]}
-                        </Badge>
-                      ))}
-                    </div>
+                {driver.hazmat_expiry && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      HAZMAT
+                    </span>
+                    <span className={isExpiringSoon(driver.hazmat_expiry) ? 'text-destructive font-medium' : ''}>
+                      {formatDate(driver.hazmat_expiry)}
+                    </span>
                   </div>
                 )}
 
