@@ -163,6 +163,29 @@ export function generateSignedPdf({
         }
         break;
       }
+      case 'license_number':
+        buffer += licenseNumber || '________________________';
+        break;
+      case 'license_expiry':
+        buffer += formatDateToken(licenseExpiry) || '________________________';
+        break;
+      case 'dot_medical_expiry':
+        buffer += formatDateToken(medicalCardExpiry) || '________________________';
+        break;
+      case 'endorsements_list':
+        buffer += endorsements && endorsements.length > 0 ? endorsements.join(', ') : 'None';
+        break;
+      case 'twic_status': {
+        if (hasTwic == null) {
+          buffer += '________________________';
+        } else if (!hasTwic) {
+          buffer += 'No';
+        } else {
+          const t = formatDateToken(twicExpiry);
+          buffer += t ? `Yes — expires ${t}` : 'Yes';
+        }
+        break;
+      }
     }
   }
   flush();
