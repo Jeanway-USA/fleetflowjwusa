@@ -26,6 +26,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const FORMATTING_EXAMPLES: Array<{ syntax: string; preview: React.ReactNode; label: string }> = [
+  { label: "Large header", syntax: "# Driver Agreement", preview: <h1 className="text-xl font-bold leading-tight">Driver Agreement</h1> },
+  { label: "Sub-header", syntax: "## Section title", preview: <h2 className="text-base font-semibold">Section title</h2> },
+  { label: "Bold text", syntax: "**important**", preview: <p className="text-sm"><strong className="font-semibold">important</strong></p> },
+  { label: "Italic text", syntax: "*emphasis*", preview: <p className="text-sm"><em>emphasis</em></p> },
+  { label: "Bullet list", syntax: "- First item\n- Second item", preview: <ul className="text-sm list-disc pl-5"><li>First item</li><li>Second item</li></ul> },
+  { label: "Numbered list", syntax: "1. Step one\n2. Step two", preview: <ol className="text-sm list-decimal pl-5"><li>Step one</li><li>Step two</li></ol> },
+  { label: "Horizontal divider", syntax: "---", preview: <hr className="border-border" /> },
+  { label: "Block quote", syntax: "> Notice text", preview: <blockquote className="text-sm border-l-2 border-primary pl-3 italic text-muted-foreground">Notice text</blockquote> },
+];
 
 interface DocumentTemplate {
   id: string;
@@ -325,37 +337,81 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
         <div className="lg:col-span-1">
           <Card className="lg:sticky lg:top-6">
             <CardHeader>
-              <CardTitle className="text-lg">Variable Reference Guide</CardTitle>
+              <CardTitle className="text-lg">Reference Guide</CardTitle>
               <CardDescription>
-                Insert these tokens into your template — they'll be replaced when the document is
-                rendered to the driver.
+                Use variables to inject data, and markdown formatting to control how the document
+                looks for the driver.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {VARIABLES.map((v) => (
-                <div
-                  key={v.token}
-                  className="rounded-md border bg-muted/30 p-3 space-y-2"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <code className="text-xs font-mono text-primary break-all">{v.token}</code>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 shrink-0"
-                      onClick={() => copyToken(v.token)}
+            <CardContent>
+              <Tabs defaultValue="variables" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="variables">Variables</TabsTrigger>
+                  <TabsTrigger value="formatting">Formatting</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="variables" className="space-y-3 mt-4">
+                  {VARIABLES.map((v) => (
+                    <div
+                      key={v.token}
+                      className="rounded-md border bg-muted/30 p-3 space-y-2"
                     >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{v.description}</p>
-                </div>
-              ))}
-              <p className="text-xs text-muted-foreground pt-2 border-t">
-                Tokens are case-sensitive. Use exact double-brace syntax — extra spaces inside the
-                braces will not be replaced.
-              </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <code className="text-xs font-mono text-primary break-all">{v.token}</code>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 shrink-0"
+                          onClick={() => copyToken(v.token)}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{v.description}</p>
+                    </div>
+                  ))}
+                  <p className="text-xs text-muted-foreground pt-2 border-t">
+                    Tokens are case-sensitive. Use exact double-brace syntax — extra spaces inside
+                    the braces will not be replaced.
+                  </p>
+                </TabsContent>
+
+                <TabsContent value="formatting" className="space-y-3 mt-4">
+                  <p className="text-xs text-muted-foreground">
+                    The content area is markdown. Anything you write here will render with the same
+                    styling on the driver's onboarding view.
+                  </p>
+                  {FORMATTING_EXAMPLES.map((f) => (
+                    <div
+                      key={f.label}
+                      className="rounded-md border bg-muted/30 p-3 space-y-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">{f.label}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 shrink-0"
+                          onClick={() => copyToken(f.syntax)}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <pre className="text-xs font-mono text-primary whitespace-pre-wrap break-words bg-background/60 rounded px-2 py-1.5 border">
+                        {f.syntax}
+                      </pre>
+                      <div className="pt-1">
+                        <span className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                          Renders as
+                        </span>
+                        <div className="rounded border bg-background px-3 py-2">{f.preview}</div>
+                      </div>
+                    </div>
+                  ))}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>
