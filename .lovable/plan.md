@@ -1,21 +1,22 @@
-# Scope link-to-user dropdown to current org
+# Fix "numeric field overflow" on driver pay_rate
 
 ## Problem
 
-On `/drivers`, the New/Edit Driver dialog's "Link to User Account" select lists profiles from every organization (demo, marvetos, etc.). It should only show users in the current org.
+`drivers.pay_rate` is defined as `numeric(5,2)` (max 999.99). Saving a flat-rate driver at 1700 throws Postgres error `22003 numeric field overflow`. The column also has to support per-mile rates (e.g. 0.65) and percentages (e.g. 75).
 
 ## Change
 
-In `src/pages/Drivers.tsx`:
+Single migration widening the column:
 
-1. Pull `orgId` from `useAuth()` (already imported).
-2. Update the `profiles-for-linking` query to:
-   - Include `orgId` in the queryKey
-   - Add `.eq('org_id', orgId)` to the Supabase select
-   - Gate with `enabled: !!orgId`
+```sql
+ALTER TABLE public.drivers
+  ALTER COLUMN pay_rate TYPE numeric(10,2);
+```
 
-That's the only change. No DB, RLS, or UI shape changes.
+`numeric(10,2)` covers up to 99,999,999.99, accommodates flat weekly/load rates, and preserves cent precision for per-mile and percentage values.
+
+No frontend changes needed — `Drivers.tsx` already submits the raw number.
 
 ## Verification
 
-Open the New Driver dialog as a JeanWay USA owner. The User Account dropdown should only contain JeanWay USA profiles (e.g. `andrew@jeanwayusa.com`, `hr@jeanwayusa.com`, `siadrak@jeanwayusa.com`) plus "No linked user" — no demo or marvetos entries.
+Create a new driver with Pay Type "Flat Rate" and Pay Rate 1700 — save succeeds and the driver appears in the list.
