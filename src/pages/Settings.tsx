@@ -12,6 +12,7 @@ import { BillingTab } from '@/components/settings/BillingTab';
 import { StorageTab } from '@/components/settings/StorageTab';
 import { TeamManagementTab } from '@/components/settings/TeamManagementTab';
 import { OnboardingPreferencesCard } from '@/components/settings/OnboardingPreferencesCard';
+import { DocumentTemplatesPanel } from '@/components/settings/DocumentTemplatesPanel';
 
 export default function Settings() {
   const { canSimulateRoles, isDemoMode } = useAuth();
@@ -193,17 +194,8 @@ export default function Settings() {
 
           <OnboardingPreferencesCard />
 
-          <Card className="card-elevated">
-            <CardContent className="pt-6">
-              <div className="rounded-lg border border-dashed border-border p-8 text-center">
-                <FileText className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-                <h3 className="text-base font-semibold mb-1">No document templates yet</h3>
-                <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  Template management and new hire workflows will appear here.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <DocumentTemplatesPanel />
+
         </TabsContent>
       </Tabs>
     </>
