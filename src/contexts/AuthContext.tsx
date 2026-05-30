@@ -95,9 +95,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchOrgData = async (userId: string) => {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('org_id, requires_onboarding, onboarding_completed')
       .eq('user_id', userId)
       .single();
+
+    setRequiresOnboarding(!!profile?.requires_onboarding);
+    setOnboardingCompleted(!!profile?.onboarding_completed);
 
     if (profile?.org_id) {
       setOrgId(profile.org_id);
