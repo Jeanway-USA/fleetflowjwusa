@@ -40,6 +40,12 @@ const schema = z
       .trim()
       .min(4, 'License number must be at least 4 characters')
       .max(30, 'License number must be under 30 characters'),
+    phoneNumber: z
+      .string()
+      .trim()
+      .max(20, 'Phone number must be under 20 characters')
+      .optional()
+      .or(z.literal('')),
     licenseExpiry: z
       .date({ required_error: 'License expiry date is required' })
       .refine((d) => d >= today(), 'License must not be expired'),
@@ -51,6 +57,13 @@ const schema = z
     twicExpiry: z.date().optional(),
   })
   .superRefine((val, ctx) => {
+    if (val.phoneNumber && val.phoneNumber.replace(/\D/g, '').length < 10) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['phoneNumber'],
+        message: 'Enter a valid phone number (at least 10 digits)',
+      });
+    }
     if (val.hasTwic === 'yes') {
       if (!val.twicExpiry) {
         ctx.addIssue({
@@ -72,6 +85,7 @@ export type DriverCredentialsValues = z.infer<typeof schema>;
 
 export interface DriverCredentialsPayload {
   license_number: string;
+  phone: string | null;
   license_expiry: string;
   medical_card_expiry: string;
   endorsements: string[];
@@ -99,6 +113,7 @@ function parseDate(value: string | null | undefined): Date | undefined {
 export const buildDefaultValues = (
   row?: {
     license_number?: string | null;
+    phone?: string | null;
     license_expiry?: string | null;
     medical_card_expiry?: string | null;
     endorsements?: string[] | null;
@@ -107,6 +122,7 @@ export const buildDefaultValues = (
   } | null,
 ): Partial<DriverCredentialsValues> => ({
   licenseNumber: row?.license_number ?? '',
+  phoneNumber: row?.phone ?? '',
   licenseExpiry: parseDate(row?.license_expiry),
   medicalCardExpiry: parseDate(row?.medical_card_expiry),
   endorsements:
@@ -124,6 +140,7 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
       mode: 'onChange',
       defaultValues: {
         licenseNumber: '',
+        phoneNumber: '',
         endorsements: [],
         ...defaultValues,
       },
@@ -144,6 +161,7 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
         const v = form.getValues();
         return {
           license_number: v.licenseNumber.trim(),
+          phone: v.phoneNumber?.trim() ? v.phoneNumber.trim() : null,
           license_expiry: format(v.licenseExpiry, 'yyyy-MM-dd'),
           medical_card_expiry: format(v.medicalCardExpiry, 'yyyy-MM-dd'),
           endorsements: v.endorsements,
@@ -188,6 +206,29 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="phoneNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="e.g. (555) 123-4567"
+                      className="pl-4 sm:pl-3"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <FormField
