@@ -1,21 +1,32 @@
-## Plan: Add clickable phone number to driver profile card
+## Plan: Verify driver onboarding routing and separation
 
-### Scope
-Update `src/pages/Drivers.tsx` to display the driver's phone number prominently with a clickable `tel:` link in the driver card header area.
+After auditing the codebase, all three requirements are already satisfied. No code changes are needed.
 
-### Analysis
-- The Supabase query already fetches `*` from `drivers`, so the `phone` field is already included — no query change needed.
-- `ContactDetailSheet.tsx` is used only in `src/pages/CRM.tsx` (for broker/shipper contacts), not for driver profiles. It already has `tel:` links. No changes required there.
+### Findings
 
-### Changes
+**1. Protected route exists (`src/App.tsx`)**
+```tsx
+<Route path="/driver/onboarding" element={
+  <ProtectedRoute allowedRoles={['driver']}>
+    <DriverOnboarding />
+  </ProtectedRoute>
+} />
+```
+Plus `RoleBasedRedirect.tsx` already redirects drivers with unsigned templates to `/driver/onboarding`.
 
-1. **`src/pages/Drivers.tsx`** — Move and enhance the phone display:
-   - In the card header area (near the driver's name/status), add a prominent phone number row with a `tel:` anchor tag.
-   - Keep the existing phone display in CardContent as a secondary fallback, or remove it to avoid duplication.
-   - The link format: `<a href="tel:${driver.phone}">` so dispatchers can tap-to-call from mobile devices.
+**2. Driver wizard logic lives in `src/pages/DriverOnboarding.tsx`**
+- Step-by-step state: `stepIndex`, `totalSteps`, progress bar
+- Step 1: `<DriverCredentialsStep>` (react-hook-form + zod, including `phone_number`)
+- Steps 2+: `<DocumentTemplateRenderer>` parsing `{{phone_number}}` and other tokens
+- Submission writes signed docs and updates the `drivers` row
 
-### Acceptance Criteria
-- Phone number appears near the driver's name in the card header.
-- Phone number is wrapped in a clickable `tel:` anchor tag.
-- Existing card layout and other fields remain unchanged.
-- No database or query changes needed (column already fetched via `*`).
+**3. `src/pages/Onboarding.tsx` is owner-only setup**
+Its three steps are `['Organization', 'Fleet Setup', 'Invite Team']` — no driver credentials, no document template parser, no `phone_number` field. It is the org owner's initial setup flow and is cleanly separated from the driver contract flow.
+
+### Recommendation
+
+Close this task as already-complete. If you'd like, I can instead:
+- Add a redirect from any legacy `/onboarding?role=driver`-style URL to `/driver/onboarding`, or
+- Add a test asserting the route + role guard,
+
+but neither is required by the current request.
