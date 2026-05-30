@@ -329,9 +329,10 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
           steps={tourDef.steps}
           currentStep={tour.currentStep}
           isActive={tour.isActive}
-          onNext={tour.nextStep}
+          onNext={handleTourNext}
           onPrev={tour.prevStep}
-          onSkip={tour.skipTour}
+          onSkip={handleTourSkip}
+
         />
       )}
       {user && (
