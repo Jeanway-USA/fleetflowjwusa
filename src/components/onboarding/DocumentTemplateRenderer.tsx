@@ -115,6 +115,24 @@ export function DocumentTemplateRenderer({
                 {driverName?.trim() ? driverName : <span className="text-muted-foreground italic">[Your name]</span>}
               </span>
             );
+          case 'cdl_number':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[200px] max-w-full">
+                <Input
+                  value={cdlNumber}
+                  onChange={(e) => onCdlNumberChange(e.target.value)}
+                  placeholder="CDL number"
+                  aria-label="CDL number"
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
+          case 'contractor_state':
+            return (
+              <span key={i} className="font-medium">
+                {contractorState ?? <span className="text-muted-foreground italic">[State]</span>}
+              </span>
+            );
           case 'owner_signature':
             return (
               <span
