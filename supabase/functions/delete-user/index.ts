@@ -63,6 +63,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Check if requesting user is a super_admin (bypass org check)
+    const { data: superAdminRow } = await supabaseAdmin
+      .from('super_admins')
+      .select('user_id')
+      .eq('user_id', requestingUser.id)
+      .maybeSingle();
+    const isSuperAdmin = !!superAdminRow;
+
     // Check if requesting user is an owner
     const { data: roleData } = await supabaseAdmin
       .from('user_roles')
@@ -71,7 +79,7 @@ Deno.serve(async (req) => {
       .eq('role', 'owner')
       .maybeSingle();
 
-    if (!roleData) {
+    if (!roleData && !isSuperAdmin) {
       console.log('User is not an owner:', requestingUser.id);
       return new Response(JSON.stringify({ error: 'Only owners can delete users' }), {
         status: 403,
@@ -97,25 +105,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Verify both users belong to the same organization
-    const { data: ownerProfile } = await supabaseAdmin
-      .from('profiles')
-      .select('org_id')
-      .eq('user_id', requestingUser.id)
-      .single();
+    if (!isSuperAdmin) {
+      // Verify org membership: same org, OR target is an orphan (no org_id yet)
+      const { data: ownerProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('org_id')
+        .eq('user_id', requestingUser.id)
+        .single();
 
-    const { data: targetProfile } = await supabaseAdmin
-      .from('profiles')
-      .select('org_id')
-      .eq('user_id', userId)
-      .single();
+      const { data: targetProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('org_id')
+        .eq('user_id', userId)
+        .maybeSingle();
 
-    if (!ownerProfile?.org_id || !targetProfile?.org_id || ownerProfile.org_id !== targetProfile.org_id) {
-      console.log('Cross-org deletion attempt blocked:', requestingUser.id, '->', userId);
-      return new Response(JSON.stringify({ error: 'Cannot delete users outside your organization' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const targetOrg = targetProfile?.org_id ?? null;
+      const sameOrg = !!ownerProfile?.org_id && targetOrg === ownerProfile.org_id;
+      const targetIsOrphan = targetOrg === null;
+
+      if (!sameOrg && !targetIsOrphan) {
+        console.log('Cross-org deletion attempt blocked:', requestingUser.id, '->', userId);
+        return new Response(JSON.stringify({ error: 'Cannot delete users outside your organization' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     console.log('Attempting to delete user:', userId);
