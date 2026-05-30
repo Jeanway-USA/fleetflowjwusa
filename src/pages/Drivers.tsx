@@ -624,6 +624,21 @@ export default function Drivers() {
         </DialogContent>
       </Dialog>
 
+      {isOwner && (
+        <Dialog open={!!signedDocsDriver} onOpenChange={(open) => !open && setSignedDocsDriver(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                Signed Onboarding Documents — {signedDocsDriver?.first_name} {signedDocsDriver?.last_name}
+              </DialogTitle>
+            </DialogHeader>
+            {signedDocsDriver && <SignedOnboardingDocuments driverId={signedDocsDriver.id} />}
+          </DialogContent>
+        </Dialog>
+      )}
+
+
+
       <CSVImportDialog
         open={csvImportOpen}
         onOpenChange={setCsvImportOpen}
