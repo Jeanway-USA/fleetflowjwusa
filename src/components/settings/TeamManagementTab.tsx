@@ -364,6 +364,16 @@ export function TeamManagementTab() {
             <SheetDescription>Send an email invitation to add a new member. They'll receive a link to create their account.</SheetDescription>
           </SheetHeader>
           <form onSubmit={handleInviteUser} className="space-y-6 mt-6">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="invite-first-name">First Name</Label>
+                <Input id="invite-first-name" type="text" placeholder="Jane" value={inviteFirstName} onChange={(e) => setInviteFirstName(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invite-last-name">Last Name</Label>
+                <Input id="invite-last-name" type="text" placeholder="Doe" value={inviteLastName} onChange={(e) => setInviteLastName(e.target.value)} required />
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="invite-email">Email Address</Label>
               <Input id="invite-email" type="email" placeholder="user@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
