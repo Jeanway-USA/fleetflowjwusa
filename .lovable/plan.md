@@ -1,55 +1,54 @@
-# Driver onboarding with dynamic document templates
+## Goal
 
-Create a new driver-facing page that fetches active `document_templates` from the database and renders them as interactive signing steps. The existing owner `Onboarding.tsx` is not touched.
+When a driver finishes signing the dynamic onboarding documents, generate a finalized PDF per document, persist references on the driver's profile, and surface a one-time "Download Signed PDF" button on a success screen only.
 
-## New files
+## Changes
 
-### `src/components/onboarding/DocumentTemplateRenderer.tsx`
-- Props: `content: string`, `driverAddress: string`, `onDriverAddressChange(v)`, `signature: string | null`, `onSignatureCapture(dataUrl)`.
-- Pure renderer that walks the template string with a single regex (`/(\{\{\s*(today_date|company_address|driver_address|owner_signature|driver_signature)\s*\}\})/g`) and splits the content into ordered nodes.
-- For each match it emits:
-  - `{{today_date}}` → today formatted via `format(new Date(), 'MMMM d, yyyy')`.
-  - `{{company_address}}` → literal `"4700 Diplomacy Rd, Fort Worth, TX 76155"`.
-  - `{{owner_signature}}` → dashed-border block with text "Owner Signature Pending" (muted).
-  - `{{driver_address}}` → inline `<Input>` bound to `driverAddress` (controlled).
-  - `{{driver_signature}}` → block-level `<SignaturePad onSignatureCapture={...} />`; once captured, replace with the rendered PNG inside a bordered card.
-- Plain prose between tags is rendered with whitespace preserved (`whitespace-pre-wrap`), so the layout flows naturally and unknown tags pass through verbatim.
+### 1. New table `driver_signed_documents`
+Stores one row per signed document (driver_agreement, direct_deposit, ...).
 
-### `src/pages/DriverOnboarding.tsx`
-- New page, no `DashboardLayout` (matches Page Layout core rule). Container with a Card + `Progress` bar.
-- Loads the driver's `orgId` from `useAuth` and queries:
-  ```ts
-  supabase
-    .from('document_templates')
-    .select('*')
-    .eq('org_id', orgId)
-    .eq('is_active', true)
-    .in('document_type', ['driver_agreement', 'direct_deposit'])
-    .order('document_type');
-  ```
-  Sort client-side so `driver_agreement` precedes `direct_deposit`.
-- Local state per template (keyed by `template.id`): `{ driverAddress: string, signature: string | null }`.
-- Stepper: one document per step. "Continue" disabled until that step's `signature` is captured (and `driverAddress` non-empty if the template contains `{{driver_address}}`).
-- Final step "Submit": inserts one row per template into a new `driver_document_signatures` table — **out of scope for this task**, so for now just toast "Documents submitted" and redirect to `/driver` (TODO comment noting future persistence step).
-- Empty state: if no active templates exist, show "No documents to sign — contact your dispatcher" with a back link.
+Columns: `id`, `org_id`, `driver_id`, `template_id`, `document_type`, `file_path` (storage path), `signature_data_url` (text), `driver_address` (text), `signed_at`, `created_at`.
 
-### `src/App.tsx`
-- Add lazy import + route:
-  ```tsx
-  const DriverOnboarding = lazy(() => import('./pages/DriverOnboarding'));
-  <Route
-    path="/driver/onboarding"
-    element={
-      <ProtectedRoute allowedRoles={['driver']}>
-        <DriverOnboarding />
-      </ProtectedRoute>
-    }
-  />
-  ```
+- Private storage bucket `signed-documents` with `{org_id}/{driver_id}/{document_type}-{timestamp}.pdf` path.
+- RLS: drivers can insert/select their own rows; owner/safety/payroll can select within org; service_role full.
+- Storage policies mirror the same prefix check used by other tenant buckets.
 
-## Out of scope (call out, do not build)
+### 2. Client-side PDF generation
+Use `jspdf` (small, already-friendly with Vite) to build a simple receipt-style PDF per template:
+- Header: document title + "Signed on {date}".
+- Body: the template content with tokens replaced inline as plain text:
+  - `{{today_date}}` → formatted date
+  - `{{company_address}}` → "4700 Diplomacy Rd, Fort Worth, TX 76155"
+  - `{{owner_signature}}` → "Owner Signature Pending"
+  - `{{driver_address}}` → entered address
+  - `{{driver_signature}}` → embedded PNG from the SignaturePad data URL (via `doc.addImage`)
+- Footer: driver name + signed timestamp.
 
-- Persisting signed documents (no `driver_document_signatures` table yet).
-- Auto-redirecting drivers to `/driver/onboarding` after invite acceptance.
-- PDF generation of the signed agreement.
-- Owner-side signing of `{{owner_signature}}` (placeholder only, per spec).
+New helper `src/lib/onboarding/generateSignedPdf.ts` exporting `generateSignedPdf({ template, driverAddress, signature, driverName }) => Blob`.
+
+### 3. Submission flow in `DriverOnboarding.tsx`
+On final "Submit":
+1. Resolve driver row (`drivers` table, `user_id = auth.uid()`) to get `driver_id` and name.
+2. For each template in state: generate PDF blob → upload to `signed-documents` bucket → insert row in `driver_signed_documents` with the returned path.
+3. Collect the storage paths + signed URLs (24h) into local state `signedResults`.
+4. Switch the page into a `submitted` view (no navigation away).
+
+### 4. Success screen (in-page, transient)
+- Replaces the stepper card once `submitted=true`.
+- Shows "All documents signed" confirmation, list of each document with a "Download Signed PDF" button that uses the in-memory signed URL (or re-creates one on click via `createSignedUrl`).
+- A "Go to Dashboard" button navigates to `/driver`.
+- Because the URLs/blobs live in component state only, the button does not appear anywhere else; the regular driver dashboard is untouched.
+
+### 5. No changes to driver dashboard
+Explicitly skip wiring any download UI into `/driver`. Drivers who want copies later would need a separate documents page (out of scope).
+
+## Out of scope
+- Owner countersigning workflow.
+- Re-download UI from the dashboard or a documents page.
+- Email delivery of signed PDFs.
+- PDF visual polish beyond a clean single-column receipt layout.
+
+## Technical notes
+- Adds dependency: `jspdf`.
+- Uses existing `supabase` client; uploads via `supabase.storage.from('signed-documents').upload(...)` and inserts via `from('driver_signed_documents').insert(...)`.
+- All inserts include `org_id` and `driver_id` to satisfy RLS.
