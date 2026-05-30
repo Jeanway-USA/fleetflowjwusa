@@ -1,9 +1,10 @@
 import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
+import { extractStateFromAddress } from '@/lib/us-states';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|owner_signature|driver_signature)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature)\s*\}\}/g;
 
 export interface GenerateSignedPdfArgs {
   title: string;
@@ -11,6 +12,7 @@ export interface GenerateSignedPdfArgs {
   driverAddress: string;
   signature: string | null;
   driverName: string;
+  cdlNumber: string;
 }
 
 /**
