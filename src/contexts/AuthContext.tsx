@@ -72,6 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(null);
   const [simulatedOrgName, setSimulatedOrgName] = useState<string | null>(null);
   const [simulatedOrgTier, setSimulatedOrgTier] = useState<string | null>(null);
+  const [requiresOnboarding, setRequiresOnboarding] = useState(false);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase
