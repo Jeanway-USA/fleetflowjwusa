@@ -88,8 +88,12 @@ export default function DriverOnboarding() {
     },
   });
 
-  const totalSteps = templates.length;
-  const currentTemplate = templates[stepIndex];
+  // Step 0 = credentials, Steps 1..N = templates
+  const CREDENTIALS_STEP = 0;
+  const isCredentialsStep = stepIndex === CREDENTIALS_STEP;
+  const totalSteps = templates.length + 1;
+  const templateIndex = stepIndex - 1;
+  const currentTemplate = templateIndex >= 0 ? templates[templateIndex] : undefined;
   const currentState: TemplateState = currentTemplate
     ? state[currentTemplate.id] ?? { driverAddress: '', signature: null, cdlNumber: '', attachment: null }
     : { driverAddress: '', signature: null, cdlNumber: '', attachment: null };
