@@ -354,6 +354,10 @@ export default function DriverOnboarding() {
               driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
               cdlNumber={currentState.cdlNumber}
               onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
+              showAttachmentUpload={isDirectDeposit}
+              attachment={currentState.attachment}
+              onAttachmentChange={(file) => updateCurrent({ attachment: file })}
+
             />
           </div>
 
