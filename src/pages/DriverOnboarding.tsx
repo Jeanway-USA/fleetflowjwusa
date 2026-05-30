@@ -373,10 +373,16 @@ export default function DriverOnboarding() {
               </div>
             ))}
             <div className="pt-4 flex justify-end">
-              <Button variant="outline" onClick={() => navigate('/driver')}>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  navigate('/driver-dashboard', { replace: true, state: { startTour: true } })
+                }
+              >
                 Go to Dashboard
               </Button>
             </div>
+
           </CardContent>
         </Card>
       </div>

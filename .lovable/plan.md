@@ -1,60 +1,67 @@
+## Current state
+
+- `DashboardLayout.tsx` mounts `<ProductTour>` and resolves `tourDef` via `getTourForRoute` (driver route is `/driver-dashboard`, tourId `driver_v1`).
+- The only auto-trigger today is `WelcomeBetaModal`, which opens when `profiles.has_completed_onboarding_tour` is false and asks the user to click "Start tour". The tour itself never auto-starts.
+- `useProductTour` persists completion only to `localStorage` (`tour_completed_<id>`), so a new device or cleared storage re-prompts forever; the server flag `has_completed_onboarding_tour` is only flipped by `WelcomeBetaModal`.
+- `DriverOnboarding.tsx` success screen calls `navigate('/driver')` — that route does not exist. The real route is `/driver-dashboard`. There is no signal carried over to start the tour.
+- The user's "`has_seen_tour`" maps to the existing `profiles.has_completed_onboarding_tour` column — no migration needed.
+
 ## Goal
 
-Create a new admin-facing driver profile sheet that surfaces completed onboarding data, parsed expiry badges, and signed document links. `src/components/crm/ContactDetailSheet.tsx` is intentionally left alone — it's built around `UnifiedContact` (brokers/shippers/agents/facilities/vendors) and has no driver concept. A dedicated component is the right home.
+A driver lands on `/driver-dashboard` and the product tour auto-starts when either:
 
-## Schema reconciliation
+1. They just finished `/driver/onboarding` (signal carried via router state), OR
+2. `profiles.has_completed_onboarding_tour` is `false` on their profile.
 
-The request used field names that don't match `public.drivers`. Mapping used in the implementation:
-
-| Requested | Actual column |
-|---|---|
-| `phone_number` | `phone` |
-| `license_expiry_date` | `license_expiry` |
-| `dot_medical_card_expiry_date` | `medical_card_expiry` |
-| `has_twic_card` | `has_twic` |
-| `twic_card_expiry_date` | `twic_expiry` |
-
-No DB migration needed.
+For everyone else (already-onboarded drivers, dispatchers, owners) nothing changes.
 
 ## Changes
 
-### 1. New file: `src/components/drivers/DriverDetailSheet.tsx`
+### 1. `src/pages/DriverOnboarding.tsx` — fix redirect and pass tour signal
 
-Sheet styled to mirror `ContactDetailSheet`:
+Replace the broken `navigate('/driver')` on the success screen with:
 
-- Props: `{ driver, open, onOpenChange, onEdit?, readOnly? }`.
-- Header: avatar + first/last name, status badge, hire date.
-- Top contact strip: `tel:` phone link, `mailto:` email link, license number quick glance.
-- **Credentials & Compliance** section: renders the existing `<CredentialsCompliance driver={driver} variant="section" />` — already uses `StatusBadge` (Valid / Expiring Soon / Expired) with the project's `T00:00:00` date-parse guard.
-- **Signed Documents** section at the bottom: renders `<SignedOnboardingDocuments driverId={driver.id} />`, but only when the viewer has admin privileges (see step 3). For non-admins the section is omitted entirely.
+```ts
+navigate('/driver-dashboard', { replace: true, state: { startTour: true } });
+```
 
-### 2. Wire it into `src/pages/Drivers.tsx`
+`replace: true` prevents back-nav into the one-time success screen. `state.startTour` is a one-shot, in-memory signal that survives only the SPA transition (cannot be forged across reloads — refresh drops it).
 
-- Replace the current "Documents for …" `Dialog` (driven by `selectedDriver`) with the new `DriverDetailSheet`. The dropdown row that currently calls `setSelectedDriver(driver)` ("View Documents") becomes "View Profile" and opens the sheet.
-- Keep the existing `signedDocsDriver` standalone dialog as-is for the dedicated owner action; the sheet duplicates the content but gated by admin role for the new in-context flow.
-- The drivers query already does `select('*')`, so `phone`, `license_*`, `medical_card_expiry`, `endorsements`, `has_twic`, `twic_expiry`, etc. are already loaded — no query change required.
+### 2. `src/components/layout/DashboardLayout.tsx` — auto-start + persistence
 
-### 3. Admin gating for signed documents (Owner + Safety + Payroll)
+In `DashboardLayoutInner`:
 
-`SignedOnboardingDocuments` currently early-returns when `!isOwner`. Update it to compute `canView = isOwner || hasRole('safety') || hasRole('payroll_admin')` and use that for both the query `enabled` flag and the early return. This matches the existing RLS policy `Owner safety payroll can view org signed documents` on `driver_signed_documents`, so safety/payroll roles will actually receive rows. The "Owner-only view" label is updated to "Admin view".
+- Read `useLocation()` (already imported). When `tourDef` exists and we haven't auto-started yet this mount, decide whether to start:
+  - **A.** If `location.state?.startTour === true` → call `tour.startTour()` and immediately `navigate(location.pathname, { replace: true, state: {} })` so a refresh won't replay it. Guard with a `useRef` so the effect runs once.
+  - **B.** Otherwise, when the profile fetch returns and `has_completed_onboarding_tour === false`, auto-start the tour for users whose current route has a `tourDef` (covers the driver dashboard case). Suppress the existing `WelcomeBetaModal` in this auto-start path (only show the modal when there is no tour for the current route, so non-tour pages still get the welcome CTA).
+- When the tour completes or is skipped on the driver route, also persist server-side. Wrap `tour.skipTour` and detect last-step `nextStep`:
 
-In `DriverDetailSheet`, also compute the same `canView` flag and skip rendering the entire "Signed Documents" section header when false (so non-admins don't see an empty block).
+```ts
+const completeTour = async () => {
+  if (user) {
+    await supabase
+      .from('profiles')
+      .update({ has_completed_onboarding_tour: true } as any)
+      .eq('user_id', user.id);
+  }
+};
+```
 
-## Technical notes
+Pass wrapped handlers into `<ProductTour onSkip={...} onNext={...}>` that call `completeTour()` when the tour ends.
 
-- Use `Sheet`/`SheetContent` with `w-full sm:max-w-lg` and the project's flex sheet structure (see `mem://technical/ui-sheet-structure`) — header + scrollable body.
-- All status colors come from `StatusBadge` semantic tokens — no raw color classes.
-- Dates parsed via the existing `parseDateSafe` in `CredentialsCompliance` (already `T00:00:00`-safe).
-- No new dependencies, no edge functions, no migration.
+### 3. No database migration
 
-## Files touched
-
-- **new** `src/components/drivers/DriverDetailSheet.tsx`
-- **edit** `src/pages/Drivers.tsx` (swap selectedDriver dialog → sheet, rename menu item)
-- **edit** `src/components/drivers/SignedOnboardingDocuments.tsx` (widen gate to owner/safety/payroll)
+`profiles.has_completed_onboarding_tour` already exists and is already part of the WelcomeBetaModal flow. We just start using it as the canonical "has_seen_tour" gate.
 
 ## Acceptance
 
-- Clicking "View Profile" on a driver row opens a right-side sheet showing phone (`tel:` link), email (`mailto:` link), credentials with colored expiry badges, and — for owner/safety/payroll only — preview/download buttons for the signed Driver Agreement, Direct Deposit, and any uploaded attachment (e.g. voided check).
-- Drivers/dispatchers viewing the sheet see credentials but no Signed Documents section.
-- Existing dedicated `signedDocsDriver` dialog continues to work for owners.
+- Finishing `/driver/onboarding` and clicking "Go to Dashboard" lands on `/driver-dashboard` (not the broken `/driver`), and the driver product tour auto-opens on first step.
+- A driver who has never seen the tour and arrives at `/driver-dashboard` by any other path also gets the tour auto-opened once.
+- Completing or skipping the tour flips `profiles.has_completed_onboarding_tour = true`, so subsequent visits and other devices do not re-trigger it.
+- Replaying via Help → "Replay Welcome Tour" still works (uses `tour.startTour` directly, ignores the flag).
+- Dispatchers, owners, and already-onboarded drivers see no change.
+
+## Files touched
+
+- `src/pages/DriverOnboarding.tsx` (one-line redirect change)
+- `src/components/layout/DashboardLayout.tsx` (auto-start effect + completion persistence)
