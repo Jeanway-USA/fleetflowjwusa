@@ -1,67 +1,47 @@
-## Current state
+# Fix: Direct Deposit step skipped during driver onboarding
 
-- `DashboardLayout.tsx` mounts `<ProductTour>` and resolves `tourDef` via `getTourForRoute` (driver route is `/driver-dashboard`, tourId `driver_v1`).
-- The only auto-trigger today is `WelcomeBetaModal`, which opens when `profiles.has_completed_onboarding_tour` is false and asks the user to click "Start tour". The tour itself never auto-starts.
-- `useProductTour` persists completion only to `localStorage` (`tour_completed_<id>`), so a new device or cleared storage re-prompts forever; the server flag `has_completed_onboarding_tour` is only flipped by `WelcomeBetaModal`.
-- `DriverOnboarding.tsx` success screen calls `navigate('/driver')` — that route does not exist. The real route is `/driver-dashboard`. There is no signal carried over to start the tour.
-- The user's "`has_seen_tour`" maps to the existing `profiles.has_completed_onboarding_tour` column — no migration needed.
+## Root cause
 
-## Goal
+The onboarding pagination logic in `src/pages/DriverOnboarding.tsx` is actually correct — `totalSteps = templates.length + 1` and `stepIndex === totalSteps - 1` properly advances through every fetched template. The real bug is upstream in the data fetch.
 
-A driver lands on `/driver-dashboard` and the product tour auto-starts when either:
+- `DOCUMENT_ORDER` (and the `.in('document_type', ...)` filter) expects: `['driver_agreement', 'direct_deposit']`
+- The actual row in `document_templates` uses `document_type = 'direct_deposit_form'`
+- Result: only the Driver Agreement is returned, `templates.length === 1`, so after signing it the flow correctly hits the last step and finalizes — there is no second template to advance to.
 
-1. They just finished `/driver/onboarding` (signal carried via router state), OR
-2. `profiles.has_completed_onboarding_tour` is `false` on their profile.
+The `DocumentTemplatesPanel` admin UI documents the canonical slug as `direct_deposit`, and `DriverOnboarding.tsx` keys off `direct_deposit` in three places (DOCUMENT_ORDER, DOCUMENT_LABELS, and the `direct_deposit_attachment_url` persistence branch). The DB row is the outlier.
 
-For everyone else (already-onboarded drivers, dispatchers, owners) nothing changes.
+## Fix
 
-## Changes
+Normalize the slug in the database so the existing code (which is already array-driven and already supports N templates) picks it up.
 
-### 1. `src/pages/DriverOnboarding.tsx` — fix redirect and pass tour signal
+### 1. Migration
 
-Replace the broken `navigate('/driver')` on the success screen with:
+Rename any stray `direct_deposit_form` rows to the canonical slug:
 
-```ts
-navigate('/driver-dashboard', { replace: true, state: { startTour: true } });
+```sql
+UPDATE public.document_templates
+SET document_type = 'direct_deposit'
+WHERE document_type = 'direct_deposit_form';
 ```
 
-`replace: true` prevents back-nav into the one-time success screen. `state.startTour` is a one-shot, in-memory signal that survives only the SPA transition (cannot be forged across reloads — refresh drops it).
+### 2. No code changes required
 
-### 2. `src/components/layout/DashboardLayout.tsx` — auto-start + persistence
+After verifying in the preview, confirm that:
 
-In `DashboardLayoutInner`:
+- `useQuery(['driver_onboarding_templates', orgId])` returns both templates.
+- `totalSteps` becomes 3 (credentials + 2 documents).
+- Submitting the Driver Agreement advances to Direct Deposit instead of finalizing.
+- Only after submitting Direct Deposit does `finalizeSubmission` run, write `profiles.onboarding_completed = true`, and render the success/download screen.
 
-- Read `useLocation()` (already imported). When `tourDef` exists and we haven't auto-started yet this mount, decide whether to start:
-  - **A.** If `location.state?.startTour === true` → call `tour.startTour()` and immediately `navigate(location.pathname, { replace: true, state: {} })` so a refresh won't replay it. Guard with a `useRef` so the effect runs once.
-  - **B.** Otherwise, when the profile fetch returns and `has_completed_onboarding_tour === false`, auto-start the tour for users whose current route has a `tourDef` (covers the driver dashboard case). Suppress the existing `WelcomeBetaModal` in this auto-start path (only show the modal when there is no tour for the current route, so non-tour pages still get the welcome CTA).
-- When the tour completes or is skipped on the driver route, also persist server-side. Wrap `tour.skipTour` and detect last-step `nextStep`:
+## Why not change the code constants instead
 
-```ts
-const completeTour = async () => {
-  if (user) {
-    await supabase
-      .from('profiles')
-      .update({ has_completed_onboarding_tour: true } as any)
-      .eq('user_id', user.id);
-  }
-};
-```
+Changing `DOCUMENT_ORDER`/labels to `direct_deposit_form` would also work, but:
+- The admin-facing docs in `DocumentTemplatesPanel.tsx` already advertise `direct_deposit` as the canonical type.
+- `direct_deposit_attachment_url` persistence is keyed off `direct_deposit`.
+- Any future template seeded through the admin UI will use `direct_deposit`, re-breaking the flow.
 
-Pass wrapped handlers into `<ProductTour onSkip={...} onNext={...}>` that call `completeTour()` when the tour ends.
+Normalizing the DB row is the durable fix.
 
-### 3. No database migration
+## Out of scope
 
-`profiles.has_completed_onboarding_tour` already exists and is already part of the WelcomeBetaModal flow. We just start using it as the canonical "has_seen_tour" gate.
-
-## Acceptance
-
-- Finishing `/driver/onboarding` and clicking "Go to Dashboard" lands on `/driver-dashboard` (not the broken `/driver`), and the driver product tour auto-opens on first step.
-- A driver who has never seen the tour and arrives at `/driver-dashboard` by any other path also gets the tour auto-opened once.
-- Completing or skipping the tour flips `profiles.has_completed_onboarding_tour = true`, so subsequent visits and other devices do not re-trigger it.
-- Replaying via Help → "Replay Welcome Tour" still works (uses `tour.startTour` directly, ignores the flag).
-- Dispatchers, owners, and already-onboarded drivers see no change.
-
-## Files touched
-
-- `src/pages/DriverOnboarding.tsx` (one-line redirect change)
-- `src/components/layout/DashboardLayout.tsx` (auto-start effect + completion persistence)
+No changes to pagination, success screen, `onboarding_completed` write, or storage paths — they are already correct once the second template is actually fetched.
