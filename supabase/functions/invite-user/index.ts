@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
 
     // Send custom email via Resend
     const appUrl = 'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app';
-    const signUpLink = `${appUrl}/auth`;
+    const signUpLink = inviteActionLink ?? `${appUrl}/auth`;
     const emailHtml = `
 <!DOCTYPE html>
 <html>
