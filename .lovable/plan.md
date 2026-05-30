@@ -1,54 +1,33 @@
 ## Goal
 
-When a driver finishes signing the dynamic onboarding documents, generate a finalized PDF per document, persist references on the driver's profile, and surface a one-time "Download Signed PDF" button on a success screen only.
+Owners (only) can view, preview, and download signed onboarding PDFs from a driver's row on `src/pages/Drivers.tsx`.
 
 ## Changes
 
-### 1. New table `driver_signed_documents`
-Stores one row per signed document (driver_agreement, direct_deposit, ...).
+### 1. New component `src/components/drivers/SignedOnboardingDocuments.tsx`
+- Props: `driverId: string`, `driverName: string`.
+- Internally guards on `useAuth().isOwner` — renders `null` if not an owner (defense-in-depth on top of menu gating).
+- Fetches `driver_signed_documents` for that driver with `useQuery`, ordered by `signed_at desc`. The new RLS policy already restricts to owner/safety/payroll within the org.
+- Renders a list of cards with: document type label, signed date.
+- Action buttons per row:
+  - **Preview** — calls `supabase.storage.from('signed-documents').createSignedUrl(file_path, 300)` then `window.open(url, '_blank')`.
+  - **Download** — same signed URL, triggers a hidden anchor with `download` attribute.
+- Empty state: "No signed onboarding documents yet."
+- Loading skeleton.
 
-Columns: `id`, `org_id`, `driver_id`, `template_id`, `document_type`, `file_path` (storage path), `signature_data_url` (text), `driver_address` (text), `signed_at`, `created_at`.
+### 2. `src/pages/Drivers.tsx` integration
+- Add a new dropdown menu item **"Signed Documents"** rendered only when `isOwner`, with a `ShieldCheck` icon, that opens a new dialog with `signedDocsDriver` state (separate from the existing generic Documents dialog so the two surfaces don't conflict).
+- New `<Dialog>` near the existing documents dialog: title "Signed Onboarding Documents — {first} {last}", content is `<SignedOnboardingDocuments driverId={...} driverName={...} />`.
+- All other behavior on Drivers.tsx unchanged.
 
-- Private storage bucket `signed-documents` with `{org_id}/{driver_id}/{document_type}-{timestamp}.pdf` path.
-- RLS: drivers can insert/select their own rows; owner/safety/payroll can select within org; service_role full.
-- Storage policies mirror the same prefix check used by other tenant buckets.
-
-### 2. Client-side PDF generation
-Use `jspdf` (small, already-friendly with Vite) to build a simple receipt-style PDF per template:
-- Header: document title + "Signed on {date}".
-- Body: the template content with tokens replaced inline as plain text:
-  - `{{today_date}}` → formatted date
-  - `{{company_address}}` → "4700 Diplomacy Rd, Fort Worth, TX 76155"
-  - `{{owner_signature}}` → "Owner Signature Pending"
-  - `{{driver_address}}` → entered address
-  - `{{driver_signature}}` → embedded PNG from the SignaturePad data URL (via `doc.addImage`)
-- Footer: driver name + signed timestamp.
-
-New helper `src/lib/onboarding/generateSignedPdf.ts` exporting `generateSignedPdf({ template, driverAddress, signature, driverName }) => Blob`.
-
-### 3. Submission flow in `DriverOnboarding.tsx`
-On final "Submit":
-1. Resolve driver row (`drivers` table, `user_id = auth.uid()`) to get `driver_id` and name.
-2. For each template in state: generate PDF blob → upload to `signed-documents` bucket → insert row in `driver_signed_documents` with the returned path.
-3. Collect the storage paths + signed URLs (24h) into local state `signedResults`.
-4. Switch the page into a `submitted` view (no navigation away).
-
-### 4. Success screen (in-page, transient)
-- Replaces the stepper card once `submitted=true`.
-- Shows "All documents signed" confirmation, list of each document with a "Download Signed PDF" button that uses the in-memory signed URL (or re-creates one on click via `createSignedUrl`).
-- A "Go to Dashboard" button navigates to `/driver`.
-- Because the URLs/blobs live in component state only, the button does not appear anywhere else; the regular driver dashboard is untouched.
-
-### 5. No changes to driver dashboard
-Explicitly skip wiring any download UI into `/driver`. Drivers who want copies later would need a separate documents page (out of scope).
+### 3. RBAC
+- Owner-only gating happens in three places:
+  1. Dropdown menu item wrapped in `{isOwner && ...}`.
+  2. The dialog only opens via that menu item.
+  3. The component itself returns `null` for non-owners.
+- Server-side, the existing RLS policy `Owner safety payroll can view org signed documents` enforces actual data isolation; the UI restriction is the owner-only product requirement.
 
 ## Out of scope
-- Owner countersigning workflow.
-- Re-download UI from the dashboard or a documents page.
-- Email delivery of signed PDFs.
-- PDF visual polish beyond a clean single-column receipt layout.
-
-## Technical notes
-- Adds dependency: `jspdf`.
-- Uses existing `supabase` client; uploads via `supabase.storage.from('signed-documents').upload(...)` and inserts via `from('driver_signed_documents').insert(...)`.
-- All inserts include `org_id` and `driver_id` to satisfy RLS.
+- Re-issuing or invalidating signed documents.
+- Bulk actions or filters.
+- Showing this section on the driver self-view.
