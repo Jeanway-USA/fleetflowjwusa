@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,11 +10,13 @@ import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
 import { UserPlus, Pencil, KeyRound, Trash2 } from 'lucide-react';
+import { useOnboardingDefaults, ONBOARDING_PREF_DEFAULTS } from '@/components/settings/OnboardingPreferencesCard';
 import type { Database } from '@/integrations/supabase/types';
 
 type AppRole = Database['public']['Enums']['app_role'];
@@ -61,7 +63,20 @@ export function TeamManagementTab() {
   // Form state
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<AppRole>('driver');
+  const [inviteRequiresOnboarding, setInviteRequiresOnboarding] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
+
+  const { data: onboardingDefaults } = useOnboardingDefaults();
+
+  const onboardingApplies = inviteRole === 'driver' || inviteRole === 'dispatcher';
+
+  // Auto-default the checkbox whenever role changes or sheet opens
+  useEffect(() => {
+    const defaults = onboardingDefaults ?? ONBOARDING_PREF_DEFAULTS;
+    if (inviteRole === 'driver') setInviteRequiresOnboarding(defaults.driver);
+    else if (inviteRole === 'dispatcher') setInviteRequiresOnboarding(defaults.dispatcher);
+    else setInviteRequiresOnboarding(false);
+  }, [inviteRole, onboardingDefaults, inviteOpen]);
 
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedRole, setSelectedRole] = useState<AppRole>('driver');
@@ -142,7 +157,7 @@ export function TeamManagementTab() {
     setIsInviting(true);
     try {
       const response = await supabase.functions.invoke('invite-user', {
-        body: { email: inviteEmail, role: inviteRole },
+        body: { email: inviteEmail, role: inviteRole, requires_onboarding: inviteRequiresOnboarding },
       });
       if (response.error) throw new Error(response.error.message || 'Failed to send invitation');
       if (response.data?.error) throw new Error(response.data.error);
@@ -356,6 +371,25 @@ export function TeamManagementTab() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">The user will be assigned this role when they accept the invitation</p>
+            </div>
+            <div className="flex items-start gap-3 rounded-lg border border-border p-4">
+              <Checkbox
+                id="invite-requires-onboarding"
+                checked={inviteRequiresOnboarding}
+                disabled={!onboardingApplies}
+                onCheckedChange={(checked) => setInviteRequiresOnboarding(checked === true)}
+                className="mt-0.5"
+              />
+              <div className="space-y-1">
+                <Label htmlFor="invite-requires-onboarding" className="font-medium cursor-pointer">
+                  Require onboarding before activation
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {onboardingApplies
+                    ? "Defaults to your organization's preferences for this role. You can override for this invite."
+                    : 'Onboarding requirements only apply to drivers and dispatchers.'}
+                </p>
+              </div>
             </div>
             <SheetFooter>
               <Button type="submit" className="w-full gradient-gold text-primary-foreground" disabled={isInviting}>

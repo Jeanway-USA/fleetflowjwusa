@@ -81,8 +81,9 @@ Deno.serve(async (req) => {
     }
 
     // Get request body
-    const { email, role, driver_id, first_name, last_name } = await req.json();
-    console.log('Inviting user:', email, 'with role:', role, 'driver_id:', driver_id);
+    const { email, role, driver_id, first_name, last_name, requires_onboarding } = await req.json();
+    const requiresOnboarding = typeof requires_onboarding === 'boolean' ? requires_onboarding : null;
+    console.log('Inviting user:', email, 'with role:', role, 'driver_id:', driver_id, 'requires_onboarding:', requiresOnboarding);
 
     if (!email || !role) {
       return new Response(JSON.stringify({ error: 'Email and role are required' }), {
