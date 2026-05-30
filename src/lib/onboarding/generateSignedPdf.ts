@@ -112,6 +112,12 @@ export function generateSignedPdf({
       case 'driver_name':
         buffer += driverName || '________________________';
         break;
+      case 'cdl_number':
+        buffer += cdlNumber || '________________________';
+        break;
+      case 'contractor_state':
+        buffer += extractStateFromAddress(driverAddress) || '____';
+        break;
       case 'owner_signature':
         buffer += '[Owner Signature Pending]';
         break;
