@@ -76,6 +76,14 @@ const VARIABLES: Array<{ token: string; description: string }> = [
     token: "{{driver_name}}",
     description: "Auto-fills with the printed full name of the driver signing the document.",
   },
+  {
+    token: "{{cdl_number}}",
+    description: "Renders an input field for the driver to fill in their CDL / license number.",
+  },
+  {
+    token: "{{contractor_state}}",
+    description: "Auto-derived from the state portion of {{driver_address}} (US 2-letter code).",
+  },
 ];
 
 interface DocumentTemplatesPanelProps {

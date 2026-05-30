@@ -24,6 +24,7 @@ const DOCUMENT_LABELS: Record<DocumentTypeKey, string> = {
 interface TemplateState {
   driverAddress: string;
   signature: string | null;
+  cdlNumber: string;
 }
 
 interface SignedResult {
@@ -79,16 +80,22 @@ export default function DriverOnboarding() {
   const totalSteps = templates.length;
   const currentTemplate = templates[stepIndex];
   const currentState: TemplateState = currentTemplate
-    ? state[currentTemplate.id] ?? { driverAddress: '', signature: null }
-    : { driverAddress: '', signature: null };
+    ? state[currentTemplate.id] ?? { driverAddress: '', signature: null, cdlNumber: '' }
+    : { driverAddress: '', signature: null, cdlNumber: '' };
 
   const needsDriverAddress = useMemo(
     () => !!currentTemplate && /\{\{\s*driver_address\s*\}\}/.test(currentTemplate.content),
     [currentTemplate],
   );
+  const needsCdlNumber = useMemo(
+    () => !!currentTemplate && /\{\{\s*cdl_number\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
 
   const canContinue =
-    !!currentState.signature && (!needsDriverAddress || currentState.driverAddress.trim().length > 0);
+    !!currentState.signature &&
+    (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
+    (!needsCdlNumber || currentState.cdlNumber.trim().length > 0);
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
     if (!currentTemplate) return;
@@ -119,7 +126,7 @@ export default function DriverOnboarding() {
     const results: SignedResult[] = [];
 
     for (const tmpl of templates) {
-      const tState = state[tmpl.id] ?? { driverAddress: '', signature: null };
+      const tState = state[tmpl.id] ?? { driverAddress: '', signature: null, cdlNumber: '' };
       const title =
         tmpl.name ??
         DOCUMENT_LABELS[tmpl.document_type as DocumentTypeKey] ??
@@ -131,6 +138,7 @@ export default function DriverOnboarding() {
         driverAddress: tState.driverAddress,
         signature: tState.signature,
         driverName,
+        cdlNumber: tState.cdlNumber,
       });
 
       const timestamp = Date.now();
@@ -312,6 +320,8 @@ export default function DriverOnboarding() {
                 updateCurrent({ signature: dataUrl ? dataUrl : null })
               }
               driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
+              cdlNumber={currentState.cdlNumber}
+              onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
             />
           </div>
 

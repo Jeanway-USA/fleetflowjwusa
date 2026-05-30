@@ -5,10 +5,11 @@ import remarkGfm from 'remark-gfm';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SignaturePad } from '@/components/driver/SignaturePad';
+import { extractStateFromAddress } from '@/lib/us-states';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|owner_signature|driver_signature)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature)\s*\}\}/g;
 
 export interface DocumentTemplateRendererProps {
   content: string;
@@ -17,6 +18,8 @@ export interface DocumentTemplateRendererProps {
   signature: string | null;
   onSignatureCapture: (dataUrl: string) => void;
   driverName?: string;
+  cdlNumber: string;
+  onCdlNumberChange: (value: string) => void;
 }
 
 type TextNode = { kind: 'text'; value: string };
@@ -68,9 +71,12 @@ export function DocumentTemplateRenderer({
   signature,
   onSignatureCapture,
   driverName,
+  cdlNumber,
+  onCdlNumberChange,
 }: DocumentTemplateRendererProps) {
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
+  const contractorState = useMemo(() => extractStateFromAddress(driverAddress), [driverAddress]);
 
   return (
     <div className="text-foreground leading-relaxed">
@@ -107,6 +113,24 @@ export function DocumentTemplateRenderer({
             return (
               <span key={i} className="font-medium">
                 {driverName?.trim() ? driverName : <span className="text-muted-foreground italic">[Your name]</span>}
+              </span>
+            );
+          case 'cdl_number':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[200px] max-w-full">
+                <Input
+                  value={cdlNumber}
+                  onChange={(e) => onCdlNumberChange(e.target.value)}
+                  placeholder="CDL number"
+                  aria-label="CDL number"
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
+          case 'contractor_state':
+            return (
+              <span key={i} className="font-medium">
+                {contractorState ?? <span className="text-muted-foreground italic">[State]</span>}
               </span>
             );
           case 'owner_signature':
