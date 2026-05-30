@@ -93,13 +93,23 @@ export default function DriverOnboarding() {
     () => !!currentTemplate && /\{\{\s*cdl_number\s*\}\}/.test(currentTemplate.content),
     [currentTemplate],
   );
-  const isDirectDeposit = currentTemplate?.document_type === 'direct_deposit';
+  const needsDriverSignature = useMemo(
+    () => !!currentTemplate && /\{\{\s*driver_signature\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsFileUpload = useMemo(
+    () => !!currentTemplate && /\{\{\s*file_upload\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+
+  const isValidSignatureDataUrl = (s: string | null): s is string =>
+    !!s && s.startsWith('data:image/');
 
   const canContinue =
-    !!currentState.signature &&
+    (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
     (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
     (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
-    (!isDirectDeposit || !!currentState.attachment);
+    (!needsFileUpload || currentState.attachment != null);
 
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
