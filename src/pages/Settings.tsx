@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Users, Shield, Sun, Moon, Building2, Palette, CreditCard, HardDrive } from 'lucide-react';
+import { Users, Shield, Sun, Moon, Building2, Palette, CreditCard, HardDrive, Settings as SettingsIcon, FileText } from 'lucide-react';
 import { CompanyTab } from '@/components/settings/CompanyTab';
 import { BrandingTab } from '@/components/settings/BrandingTab';
 import { BillingTab } from '@/components/settings/BillingTab';
@@ -67,98 +67,138 @@ export default function Settings() {
         </div>
       )}
 
-      <Tabs defaultValue="users" className="w-full">
+      <Tabs defaultValue="general" className="w-full">
         <TabsList className="mb-6 flex-wrap">
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Team
+          <TabsTrigger value="general" className="flex items-center gap-2">
+            <SettingsIcon className="h-4 w-4" />
+            General
           </TabsTrigger>
-          <TabsTrigger value="company" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Company
-          </TabsTrigger>
-          <TabsTrigger value="branding" className="flex items-center gap-2">
-            <Palette className="h-4 w-4" />
-            Branding
-          </TabsTrigger>
-          <TabsTrigger value="appearance" className="flex items-center gap-2">
-            <Sun className="h-4 w-4" />
-            Appearance
-          </TabsTrigger>
-          <TabsTrigger value="billing" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            Billing
-          </TabsTrigger>
-          <TabsTrigger value="storage" className="flex items-center gap-2">
-            <HardDrive className="h-4 w-4" />
-            Storage
+          <TabsTrigger value="onboarding" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Onboarding & Documents
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users" className="space-y-6">
-          <TeamManagementTab />
+        <TabsContent value="general" className="w-full">
+          <Tabs defaultValue="users" className="w-full">
+            <TabsList className="mb-6 flex-wrap">
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Team
+              </TabsTrigger>
+              <TabsTrigger value="company" className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Company
+              </TabsTrigger>
+              <TabsTrigger value="branding" className="flex items-center gap-2">
+                <Palette className="h-4 w-4" />
+                Branding
+              </TabsTrigger>
+              <TabsTrigger value="appearance" className="flex items-center gap-2">
+                <Sun className="h-4 w-4" />
+                Appearance
+              </TabsTrigger>
+              <TabsTrigger value="billing" className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Billing
+              </TabsTrigger>
+              <TabsTrigger value="storage" className="flex items-center gap-2">
+                <HardDrive className="h-4 w-4" />
+                Storage
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="users" className="space-y-6">
+              <TeamManagementTab />
+            </TabsContent>
+
+            <TabsContent value="appearance" className="space-y-6">
+              <Card className="card-elevated">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    {theme === 'dark' ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-primary" />}
+                    Theme
+                  </CardTitle>
+                  <CardDescription>Choose your preferred color scheme</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label htmlFor="theme-switch" className="font-medium">Dark Mode</Label>
+                      <p className="text-sm text-muted-foreground">Toggle between light and dark themes</p>
+                    </div>
+                    <Switch id="theme-switch" checked={theme === 'dark'} onCheckedChange={toggleTheme} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-4">
+                    <button
+                      onClick={() => theme !== 'light' && toggleTheme()}
+                      className={`p-4 rounded-lg border-2 transition-all ${theme === 'light' ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}`}
+                    >
+                      <div className="bg-white rounded-md p-3 mb-2 border">
+                        <div className="h-2 w-12 bg-amber-500 rounded mb-2" />
+                        <div className="h-2 w-20 bg-gray-200 rounded mb-1" />
+                        <div className="h-2 w-16 bg-gray-200 rounded" />
+                      </div>
+                      <span className="text-sm font-medium">Light</span>
+                    </button>
+                    <button
+                      onClick={() => theme !== 'dark' && toggleTheme()}
+                      className={`p-4 rounded-lg border-2 transition-all ${theme === 'dark' ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}`}
+                    >
+                      <div className="bg-zinc-900 rounded-md p-3 mb-2 border border-zinc-700">
+                        <div className="h-2 w-12 bg-amber-500 rounded mb-2" />
+                        <div className="h-2 w-20 bg-zinc-700 rounded mb-1" />
+                        <div className="h-2 w-16 bg-zinc-700 rounded" />
+                      </div>
+                      <span className="text-sm font-medium">Dark</span>
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="company">
+              <CompanyTab />
+            </TabsContent>
+
+            <TabsContent value="branding">
+              <BrandingTab />
+            </TabsContent>
+
+            <TabsContent value="billing">
+              <BillingTab />
+            </TabsContent>
+
+            <TabsContent value="storage">
+              <StorageTab />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
-        <TabsContent value="appearance" className="space-y-6">
+        <TabsContent value="onboarding" className="space-y-6">
           <Card className="card-elevated">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                {theme === 'dark' ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-primary" />}
-                Theme
+                <FileText className="h-5 w-5 text-primary" />
+                Onboarding & Documents
               </CardTitle>
-              <CardDescription>Choose your preferred color scheme</CardDescription>
+              <CardDescription>
+                Manage automated documents and new hire flows for your organization. Configure document templates,
+                track driver onboarding status, and enforce required signatures before drivers become active.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <Label htmlFor="theme-switch" className="font-medium">Dark Mode</Label>
-                  <p className="text-sm text-muted-foreground">Toggle between light and dark themes</p>
-                </div>
-                <Switch id="theme-switch" checked={theme === 'dark'} onCheckedChange={toggleTheme} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 pt-4">
-                <button
-                  onClick={() => theme !== 'light' && toggleTheme()}
-                  className={`p-4 rounded-lg border-2 transition-all ${theme === 'light' ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}`}
-                >
-                  <div className="bg-white rounded-md p-3 mb-2 border">
-                    <div className="h-2 w-12 bg-amber-500 rounded mb-2" />
-                    <div className="h-2 w-20 bg-gray-200 rounded mb-1" />
-                    <div className="h-2 w-16 bg-gray-200 rounded" />
-                  </div>
-                  <span className="text-sm font-medium">Light</span>
-                </button>
-                <button
-                  onClick={() => theme !== 'dark' && toggleTheme()}
-                  className={`p-4 rounded-lg border-2 transition-all ${theme === 'dark' ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'}`}
-                >
-                  <div className="bg-zinc-900 rounded-md p-3 mb-2 border border-zinc-700">
-                    <div className="h-2 w-12 bg-amber-500 rounded mb-2" />
-                    <div className="h-2 w-20 bg-zinc-700 rounded mb-1" />
-                    <div className="h-2 w-16 bg-zinc-700 rounded" />
-                  </div>
-                  <span className="text-sm font-medium">Dark</span>
-                </button>
+            <CardContent>
+              <div className="rounded-lg border border-dashed border-border p-8 text-center">
+                <FileText className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                <h3 className="text-base font-semibold mb-1">No document templates yet</h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  This is the central hub for managing onboarding paperwork. Template management and new hire
+                  workflows will appear here.
+                </p>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="company">
-          <CompanyTab />
-        </TabsContent>
-
-        <TabsContent value="branding">
-          <BrandingTab />
-        </TabsContent>
-
-        <TabsContent value="billing">
-          <BillingTab />
-        </TabsContent>
-
-        <TabsContent value="storage">
-          <StorageTab />
         </TabsContent>
       </Tabs>
     </>

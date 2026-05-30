@@ -1,45 +1,36 @@
-## Problem
-
-When you create a login for a new driver (via Invite User with role = driver), three things break:
-
-1. **No `drivers` row is created or linked.** `invite-user` only creates the auth user, sets `profiles.org_id`, and assigns the `driver` role. The `DriverOnboarding` page requires a row in `public.drivers` where `user_id = auth.uid()`, so the new driver hits *"Driver profile not found for your account."*
-2. **Nothing routes the driver into onboarding.** After login, `RoleBasedRedirect` sends drivers straight to `/driver-dashboard`. They never see `/driver/onboarding`.
-3. **No onboarding status on the Drivers page.** The owner can't see whether a driver has logged in, started signing, or finished onboarding.
+## Objective
+Restructure `src/pages/Settings.tsx` into a two-tab layout using shadcn/ui Tabs, grouping all existing settings under a "General" tab and adding a new "Onboarding & Documents" tab as the foundation for future document-template and new-hire configuration.
 
 ## Plan
 
-### 1. Extend `invite-user` edge function
-- Accept an optional `driver_id` and optional `first_name` / `last_name` in the request body.
-- When `role === 'driver'`:
-  - If `driver_id` is provided → update that drivers row to set `user_id = targetUserId` (only if its `user_id` is currently null and `org_id` matches).
-  - Else, look up an existing `drivers` row in the org by email (matching `auth.users.email`); link it if found.
-  - Else, insert a new `drivers` row with `{ org_id, user_id: targetUserId, first_name, last_name, email, status: 'active', pay_type: 'percentage', pay_rate: 0 }`.
-- Idempotent: re-inviting an already-linked driver is a no-op for the drivers table.
+### 1. Top-level tab structure
+- Wrap the page content in a shadcn/ui `<Tabs>` component with two top-level triggers: **"General"** and **"Onboarding & Documents"**.
+- Use a `<Settings className="h-4 w-4" />` (or `Sliders`) icon for "General" and a `<FileText className="h-4 w-4" />` icon for "Onboarding & Documents".
 
-### 2. Update the Drivers page (`src/pages/Drivers.tsx`)
-- Add an **"Invite to log in"** button on each driver card that has no `user_id`. It opens a small dialog (prefilled with the driver's email), calls `invite-user` with `{ email, role: 'driver', driver_id, first_name, last_name }`, then refreshes the list.
-- After a successful invite, show a toast and the card flips to a "Invitation sent" state.
-- Add an **onboarding status badge** to each driver card with three states, computed from a new lightweight query:
-  - `Not invited` — `user_id` is null.
-  - `Onboarding pending` — `user_id` set but no rows in `driver_signed_documents` for that driver.
-  - `Onboarded` — at least one row in `driver_signed_documents` exists (or matches the count of active templates — TBD, start with "any row").
+### 2. "General" tab (`value="general"`)
+- Move the **entire existing tab interface** (Team, Company, Branding, Appearance, Billing, Storage) into `TabsContent value="general"`.
+- The existing 6 sub-tabs remain nested inside "General" so current UX is preserved.
+- Update the `<Tabs defaultValue="...">` inside "General" so it still defaults to `users`.
 
-### 3. Force first-login onboarding for drivers
-- In `RoleBasedRedirect.tsx`, when the user has the `driver` role:
-  - Run a quick query: count of `driver_signed_documents` for the linked driver vs. count of active `document_templates` in the org.
-  - If the driver has no signed docs yet **and** there is at least one active template, redirect to `/driver/onboarding` instead of `/driver-dashboard`.
-  - Otherwise keep the existing redirect to `/driver-dashboard`.
-- Add a loading state while this check resolves to avoid a flash of the dashboard.
-- Also harden `DriverOnboarding.tsx` to render a friendlier "Your driver profile isn't linked yet — please contact your administrator" empty state instead of throwing when no `drivers` row exists.
+### 3. "Onboarding & Documents" tab (`value="onboarding"`)
+- Create a new `TabsContent value="onboarding"` containing a single descriptive card.
+- Card header:
+  - Title: "Onboarding & Documents"
+  - Description: "Manage automated documents and new hire flows for your organization. This section will let you configure document templates, track driver onboarding status, and enforce required signatures before drivers become active."
+- Use existing `Card`, `CardHeader`, `CardTitle`, `CardDescription` components.
+- Style with existing Tailwind semantic tokens (no hard-coded colors).
 
-### 4. Verification
-- Invite a brand-new email as a driver from `/drivers` → email arrives, user signs up, lands directly on `/driver/onboarding`, signs the docs, and is then routed to `/driver-dashboard` on next visit.
-- On the owner's `/drivers` page, the card shows `Invitation sent → Onboarding pending → Onboarded` as the driver progresses.
-- Re-inviting the same driver does not duplicate the drivers row.
+### 4. Non-owner view
+- The restricted non-owner view (theme toggle + "Admin Settings Restricted" card) stays unchanged; it does not need the top-level tabs because non-owners only see personal preferences.
 
-## Technical notes
+### 5. Responsive layout
+- `TabsList` uses `className="mb-6 flex-wrap"` so tabs wrap on narrow viewports.
+- Both top-level tab panels use `w-full` and spacing utilities for clean stacking.
 
-- No schema changes required: `drivers`, `driver_signed_documents`, `document_templates`, `profiles`, and `user_roles` already support this flow.
-- `invite-user` runs with the service role, so it can write `drivers` directly while still respecting org isolation in code.
-- The onboarding-completion check is intentionally lightweight (one count query keyed on `driverId` + `orgId`) so it doesn't slow down the post-login redirect.
-- Files touched: `supabase/functions/invite-user/index.ts`, `src/pages/Drivers.tsx`, `src/components/shared/RoleBasedRedirect.tsx`, `src/pages/DriverOnboarding.tsx` (empty-state copy only).
+## Files to modify
+- `src/pages/Settings.tsx` — restructure tabs, add new tab content, import `FileText` (and `Settings` or `Sliders`) from `lucide-react`.
+
+## Out of scope
+- No changes to settings tab components (`CompanyTab`, `BrandingTab`, etc.).
+- No database or backend changes.
+- No functional onboarding/document management UI yet — only the descriptive placeholder header.
