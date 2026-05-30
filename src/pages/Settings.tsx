@@ -12,6 +12,7 @@ import { BillingTab } from '@/components/settings/BillingTab';
 import { StorageTab } from '@/components/settings/StorageTab';
 import { TeamManagementTab } from '@/components/settings/TeamManagementTab';
 import { OnboardingPreferencesCard } from '@/components/settings/OnboardingPreferencesCard';
+import { DocumentTemplatesPanel } from '@/components/settings/DocumentTemplatesPanel';
 
 export default function Settings() {
   const { canSimulateRoles, isDemoMode } = useAuth();
