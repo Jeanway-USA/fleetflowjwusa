@@ -41,13 +41,8 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
   }
 
   // Drivers with outstanding onboarding cannot reach any protected page until they finish.
-  if (
-    hasRole('driver') &&
-    requiresOnboarding &&
-    !onboardingCompleted &&
-    !allowedRoles.every(r => r === 'driver' && false) // always evaluate; just keeps shape
-  ) {
-    // Allow the onboarding page itself through; everything else is blocked.
+  // (The /driver/onboarding route itself bypasses this guard by being the redirect target.)
+  if (hasRole('driver') && requiresOnboarding && !onboardingCompleted) {
     if (typeof window !== 'undefined' && window.location.pathname !== '/driver/onboarding') {
       return <Navigate to="/driver/onboarding" replace />;
     }
