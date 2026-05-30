@@ -88,6 +88,30 @@ const VARIABLES: Array<{ token: string; description: string }> = [
     token: "{{file_upload}}",
     description: "Renders a mandatory secure file upload box (e.g., for voided checks or bank letters).",
   },
+  {
+    token: "{{ssn}}",
+    description: "Renders a secure input for the driver's Social Security Number.",
+  },
+  {
+    token: "{{email}}",
+    description: "Auto-fills the driver's email from their user profile.",
+  },
+  {
+    token: "{{bank_account_type}}",
+    description: "Renders a dropdown for Checking or Savings.",
+  },
+  {
+    token: "{{bank_name}}",
+    description: "Renders a text input for the Bank Name.",
+  },
+  {
+    token: "{{routing_number}}",
+    description: "Renders a text input for the Routing Number.",
+  },
+  {
+    token: "{{account_number}}",
+    description: "Renders a text input for the Account Number.",
+  },
 ];
 
 interface DocumentTemplatesPanelProps {
