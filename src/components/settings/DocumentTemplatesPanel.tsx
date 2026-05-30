@@ -84,6 +84,10 @@ const VARIABLES: Array<{ token: string; description: string }> = [
     token: "{{contractor_state}}",
     description: "Auto-derived from the state portion of {{driver_address}} (US 2-letter code).",
   },
+  {
+    token: "{{file_upload}}",
+    description: "Renders a mandatory secure file upload box (e.g., for voided checks or bank letters).",
+  },
 ];
 
 interface DocumentTemplatesPanelProps {
