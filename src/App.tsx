@@ -120,6 +120,11 @@ const App = () => {
                         <DriverDashboard />
                       </ProtectedRoute>
                     } />
+                    <Route path="/driver/onboarding" element={
+                      <ProtectedRoute allowedRoles={['driver']}>
+                        <DriverOnboarding />
+                      </ProtectedRoute>
+                    } />
 
                     {/* Fleet management */}
                     <Route path="/trucks" element={
