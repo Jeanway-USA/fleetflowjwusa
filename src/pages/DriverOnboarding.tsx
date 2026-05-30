@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -11,6 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DocumentTemplateRenderer } from '@/components/onboarding/DocumentTemplateRenderer';
+import {
+  DriverCredentialsStep,
+  buildDefaultValues,
+  type DriverCredentialsStepHandle,
+} from '@/components/onboarding/DriverCredentialsStep';
 import { generateSignedPdf } from '@/lib/onboarding/generateSignedPdf';
 
 const DOCUMENT_ORDER = ['driver_agreement', 'direct_deposit'] as const;
