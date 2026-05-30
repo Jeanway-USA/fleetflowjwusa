@@ -106,6 +106,9 @@ export function generateSignedPdf({
       case 'driver_address':
         buffer += driverAddress || '________________________';
         break;
+      case 'driver_name':
+        buffer += driverName || '________________________';
+        break;
       case 'owner_signature':
         buffer += '[Owner Signature Pending]';
         break;
