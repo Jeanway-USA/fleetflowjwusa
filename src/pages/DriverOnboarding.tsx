@@ -24,6 +24,7 @@ const DOCUMENT_LABELS: Record<DocumentTypeKey, string> = {
 interface TemplateState {
   driverAddress: string;
   signature: string | null;
+  cdlNumber: string;
 }
 
 interface SignedResult {
