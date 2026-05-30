@@ -171,6 +171,12 @@ export default function DriverOnboarding() {
         signature: tState.signature,
         driverName,
         cdlNumber: tState.cdlNumber,
+        licenseNumber: driverRow.license_number,
+        licenseExpiry: driverRow.license_expiry,
+        medicalCardExpiry: driverRow.medical_card_expiry,
+        endorsements: driverRow.endorsements,
+        hasTwic: driverRow.has_twic,
+        twicExpiry: driverRow.twic_expiry,
       });
 
       const timestamp = Date.now();
