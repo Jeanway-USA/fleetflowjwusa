@@ -91,11 +91,30 @@ export function DocumentTemplateRenderer({
   onCdlNumberChange,
   attachment = null,
   onAttachmentChange,
+  licenseNumber,
+  licenseExpiry,
+  medicalCardExpiry,
+  endorsements,
+  hasTwic,
+  twicExpiry,
 }: DocumentTemplateRendererProps) {
 
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
   const contractorState = useMemo(() => extractStateFromAddress(driverAddress), [driverAddress]);
+
+  const licenseExpiryText = useMemo(() => formatDateToken(licenseExpiry), [licenseExpiry]);
+  const medicalExpiryText = useMemo(() => formatDateToken(medicalCardExpiry), [medicalCardExpiry]);
+  const twicExpiryText = useMemo(() => formatDateToken(twicExpiry), [twicExpiry]);
+  const endorsementsText = useMemo(
+    () => (endorsements && endorsements.length > 0 ? endorsements.join(', ') : 'None'),
+    [endorsements],
+  );
+  const twicStatusText = useMemo(() => {
+    if (hasTwic == null) return null;
+    if (!hasTwic) return 'No';
+    return twicExpiryText ? `Yes — expires ${twicExpiryText}` : 'Yes';
+  }, [hasTwic, twicExpiryText]);
 
   return (
     <div className="text-foreground leading-relaxed">
