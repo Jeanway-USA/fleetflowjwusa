@@ -143,7 +143,9 @@ export default function DriverOnboarding() {
     // Resolve driver record
     const { data: driverRow, error: driverError } = await supabase
       .from('drivers')
-      .select('id, first_name, last_name')
+      .select(
+        'id, first_name, last_name, license_number, license_expiry, medical_card_expiry, endorsements, has_twic, twic_expiry',
+      )
       .eq('user_id', user.id)
       .eq('org_id', orgId)
       .maybeSingle();
@@ -169,6 +171,12 @@ export default function DriverOnboarding() {
         signature: tState.signature,
         driverName,
         cdlNumber: tState.cdlNumber,
+        licenseNumber: driverRow.license_number,
+        licenseExpiry: driverRow.license_expiry,
+        medicalCardExpiry: driverRow.medical_card_expiry,
+        endorsements: driverRow.endorsements,
+        hasTwic: driverRow.has_twic,
+        twicExpiry: driverRow.twic_expiry,
       });
 
       const timestamp = Date.now();
@@ -407,6 +415,12 @@ export default function DriverOnboarding() {
                 onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
                 attachment={currentState.attachment}
                 onAttachmentChange={(file) => updateCurrent({ attachment: file })}
+                licenseNumber={driverRow?.license_number}
+                licenseExpiry={driverRow?.license_expiry}
+                medicalCardExpiry={driverRow?.medical_card_expiry}
+                endorsements={driverRow?.endorsements}
+                hasTwic={driverRow?.has_twic}
+                twicExpiry={driverRow?.twic_expiry}
               />
             </div>
           ) : null}

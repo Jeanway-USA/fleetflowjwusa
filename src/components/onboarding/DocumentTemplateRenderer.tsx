@@ -9,7 +9,7 @@ import { extractStateFromAddress } from '@/lib/us-states';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|file_upload)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|file_upload|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status)\s*\}\}/g;
 
 export interface DocumentTemplateRendererProps {
   content: string;
@@ -22,6 +22,19 @@ export interface DocumentTemplateRendererProps {
   onCdlNumberChange: (value: string) => void;
   attachment?: File | null;
   onAttachmentChange?: (file: File | null) => void;
+  licenseNumber?: string | null;
+  licenseExpiry?: string | null;
+  medicalCardExpiry?: string | null;
+  endorsements?: string[] | null;
+  hasTwic?: boolean | null;
+  twicExpiry?: string | null;
+}
+
+function formatDateToken(value?: string | null): string | null {
+  if (!value) return null;
+  const d = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return format(d, 'MMMM d, yyyy');
 }
 
 
@@ -78,11 +91,30 @@ export function DocumentTemplateRenderer({
   onCdlNumberChange,
   attachment = null,
   onAttachmentChange,
+  licenseNumber,
+  licenseExpiry,
+  medicalCardExpiry,
+  endorsements,
+  hasTwic,
+  twicExpiry,
 }: DocumentTemplateRendererProps) {
 
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
   const contractorState = useMemo(() => extractStateFromAddress(driverAddress), [driverAddress]);
+
+  const licenseExpiryText = useMemo(() => formatDateToken(licenseExpiry), [licenseExpiry]);
+  const medicalExpiryText = useMemo(() => formatDateToken(medicalCardExpiry), [medicalCardExpiry]);
+  const twicExpiryText = useMemo(() => formatDateToken(twicExpiry), [twicExpiry]);
+  const endorsementsText = useMemo(
+    () => (endorsements && endorsements.length > 0 ? endorsements.join(', ') : 'None'),
+    [endorsements],
+  );
+  const twicStatusText = useMemo(() => {
+    if (hasTwic == null) return null;
+    if (!hasTwic) return 'No';
+    return twicExpiryText ? `Yes — expires ${twicExpiryText}` : 'Yes';
+  }, [hasTwic, twicExpiryText]);
 
   return (
     <div className="text-foreground leading-relaxed">
@@ -216,6 +248,38 @@ export function DocumentTemplateRenderer({
                   </p>
                 )}
               </div>
+            );
+          case 'license_number':
+            return (
+              <span key={i} className="font-medium">
+                {licenseNumber?.trim()
+                  ? licenseNumber
+                  : <span className="text-muted-foreground italic">[Not provided]</span>}
+              </span>
+            );
+          case 'license_expiry':
+            return (
+              <span key={i} className="font-medium">
+                {licenseExpiryText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
+              </span>
+            );
+          case 'dot_medical_expiry':
+            return (
+              <span key={i} className="font-medium">
+                {medicalExpiryText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
+              </span>
+            );
+          case 'endorsements_list':
+            return (
+              <span key={i} className="font-medium">
+                {endorsementsText}
+              </span>
+            );
+          case 'twic_status':
+            return (
+              <span key={i} className="font-medium">
+                {twicStatusText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
+              </span>
             );
           default:
             return <span key={i}>{`{{${node.name}}}`}</span>;

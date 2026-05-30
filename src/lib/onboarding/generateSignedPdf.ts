@@ -4,7 +4,7 @@ import { extractStateFromAddress } from '@/lib/us-states';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status)\s*\}\}/g;
 
 export interface GenerateSignedPdfArgs {
   title: string;
@@ -13,6 +13,19 @@ export interface GenerateSignedPdfArgs {
   signature: string | null;
   driverName: string;
   cdlNumber: string;
+  licenseNumber?: string | null;
+  licenseExpiry?: string | null;
+  medicalCardExpiry?: string | null;
+  endorsements?: string[] | null;
+  hasTwic?: boolean | null;
+  twicExpiry?: string | null;
+}
+
+function formatDateToken(value?: string | null): string | null {
+  if (!value) return null;
+  const d = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return format(d, 'MMMM d, yyyy');
 }
 
 /**
@@ -26,6 +39,12 @@ export function generateSignedPdf({
   signature,
   driverName,
   cdlNumber,
+  licenseNumber,
+  licenseExpiry,
+  medicalCardExpiry,
+  endorsements,
+  hasTwic,
+  twicExpiry,
 }: GenerateSignedPdfArgs): Blob {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -141,6 +160,29 @@ export function generateSignedPdf({
         } else {
           doc.text('________________________', marginX, y + 20);
           y += 30;
+        }
+        break;
+      }
+      case 'license_number':
+        buffer += licenseNumber || '________________________';
+        break;
+      case 'license_expiry':
+        buffer += formatDateToken(licenseExpiry) || '________________________';
+        break;
+      case 'dot_medical_expiry':
+        buffer += formatDateToken(medicalCardExpiry) || '________________________';
+        break;
+      case 'endorsements_list':
+        buffer += endorsements && endorsements.length > 0 ? endorsements.join(', ') : 'None';
+        break;
+      case 'twic_status': {
+        if (hasTwic == null) {
+          buffer += '________________________';
+        } else if (!hasTwic) {
+          buffer += 'No';
+        } else {
+          const t = formatDateToken(twicExpiry);
+          buffer += t ? `Yes — expires ${t}` : 'Yes';
         }
         break;
       }

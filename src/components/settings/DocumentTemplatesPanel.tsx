@@ -112,6 +112,26 @@ const VARIABLES: Array<{ token: string; description: string }> = [
     token: "{{account_number}}",
     description: "Renders a text input for the Account Number.",
   },
+  {
+    token: "{{license_number}}",
+    description: "Auto-fills the driver's CDL number captured in onboarding Step 1.",
+  },
+  {
+    token: "{{license_expiry}}",
+    description: "Auto-fills the driver's CDL expiry date (Step 1).",
+  },
+  {
+    token: "{{dot_medical_expiry}}",
+    description: "Auto-fills the driver's DOT medical card expiry date (Step 1).",
+  },
+  {
+    token: "{{endorsements_list}}",
+    description: "Auto-fills the driver's CDL endorsements (comma-separated, e.g. H, P, X). Shows 'None' when blank.",
+  },
+  {
+    token: "{{twic_status}}",
+    description: "Auto-fills TWIC status: 'Yes — expires <date>' or 'No' (Step 1).",
+  },
 ];
 
 interface DocumentTemplatesPanelProps {
