@@ -311,6 +311,7 @@ export default function DriverOnboarding() {
               onSignatureCapture={(dataUrl) =>
                 updateCurrent({ signature: dataUrl ? dataUrl : null })
               }
+              driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
             />
           </div>
 
