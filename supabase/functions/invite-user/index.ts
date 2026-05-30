@@ -137,10 +137,18 @@ Deno.serve(async (req) => {
           .is('org_id', null);
       }
     } else {
-      // Invite the user via Supabase Auth
-      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        data: {
-          invited_role: role,
+      // Generate an invite link via Supabase Auth. This creates the auth user
+      // (if needed) AND returns an action_link the recipient can use to set
+      // their password. Using generateLink (instead of inviteUserByEmail) lets
+      // us send our own branded email while still getting a working
+      // password-setup token.
+      const acceptUrl = `${appUrl}/auth/accept-invite`;
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'invite',
+        email,
+        options: {
+          data: { invited_role: role },
+          redirectTo: acceptUrl,
         },
       });
 
@@ -150,6 +158,7 @@ Deno.serve(async (req) => {
       }
 
       targetUserId = inviteData.user?.id ?? null;
+      inviteActionLink = inviteData.properties?.action_link ?? null;
       console.log('User invited via Supabase:', targetUserId);
 
       // Link profile to org
