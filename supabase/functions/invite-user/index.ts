@@ -117,6 +117,7 @@ Deno.serve(async (req) => {
       .single();
 
     const orgId = reqProfile?.org_id;
+    const appUrl = 'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app';
 
     // Check if user already exists in auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
