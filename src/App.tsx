@@ -16,6 +16,7 @@ import { Loader2 } from "lucide-react";
 // Lazy-loaded pages
 const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const Trucks = lazy(() => import("./pages/Trucks"));
 const Trailers = lazy(() => import("./pages/Trailers"));
 const Drivers = lazy(() => import("./pages/Drivers"));
