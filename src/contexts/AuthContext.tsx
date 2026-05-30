@@ -25,6 +25,8 @@ interface AuthContextType {
   isDemoMode: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: Error | null }>;
+  requiresOnboarding: boolean;
+  onboardingCompleted: boolean;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
   /** 
