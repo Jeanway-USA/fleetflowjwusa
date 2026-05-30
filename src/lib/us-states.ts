@@ -42,3 +42,31 @@ export function extractJurisdictionFromVendor(vendor: string | null): string | n
   
   return null;
 }
+
+/**
+ * Extract a US state abbreviation from a free-form mailing address string.
+ * Prefers the ", ST ZIP" pattern (typical end-of-address), then falls back
+ * to the last valid 2-letter US state token in the string.
+ */
+export function extractStateFromAddress(address: string | null | undefined): string | null {
+  if (!address) return null;
+  const upper = address.toUpperCase().trim();
+
+  // Prefer ", ST 12345" or ", ST 12345-6789"
+  const zipMatch = upper.match(/,\s*([A-Z]{2})\s+\d{5}(?:-\d{4})?\b/);
+  if (zipMatch && US_STATES.includes(zipMatch[1] as any)) {
+    return zipMatch[1];
+  }
+
+  // Fall back to last 2-letter state token in the string
+  const allMatches = upper.match(/\b([A-Z]{2})\b/g);
+  if (allMatches) {
+    for (let i = allMatches.length - 1; i >= 0; i--) {
+      if (US_STATES.includes(allMatches[i] as any)) {
+        return allMatches[i];
+      }
+    }
+  }
+
+  return null;
+}
