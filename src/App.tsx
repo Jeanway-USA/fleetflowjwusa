@@ -52,6 +52,7 @@ const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const DocumentTemplates = lazy(() => import("./pages/admin/DocumentTemplates"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -225,6 +226,11 @@ const App = () => {
                     <Route path="/settings" element={
                       <ProtectedRoute allowedRoles={['owner']}>
                         <Settings />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/admin/document-templates" element={
+                      <ProtectedRoute allowedRoles={['owner']}>
+                        <DocumentTemplates />
                       </ProtectedRoute>
                     } />
                     <Route path="/driver-settings" element={
