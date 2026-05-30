@@ -93,6 +93,7 @@ const App = () => {
                     <Route path="/" element={<RoleBasedRedirect />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/auth/accept-invite" element={<AcceptInvite />} />
                     <Route path="/pending-access" element={<PendingAccess />} />
                     <Route path="/landing" element={<Navigate to="/" replace />} />
                     <Route path="/pricing" element={<Pricing />} />
