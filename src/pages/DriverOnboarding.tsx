@@ -42,6 +42,21 @@ export default function DriverOnboarding() {
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
 
+  const { data: driverRow, isLoading: driverLoading } = useQuery({
+    queryKey: ['driver-self', user?.id, orgId],
+    enabled: !!user && !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('id')
+        .eq('user_id', user!.id)
+        .eq('org_id', orgId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['driver_onboarding_templates', orgId],
     enabled: !!orgId,
