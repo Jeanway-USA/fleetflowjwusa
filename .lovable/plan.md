@@ -1,60 +1,39 @@
-## Goal
+## Problem
 
-1. Make org-owner user deletion fully remove the account site-wide (auth + all data references).
-2. Delete the account `ajb06.jrb07@gmail.com` (id `e089acf0-2a1b-498d-ad04-fa39b40d05e1`) now.
+When an owner invites a new user (e.g. a driver) via the Team / Drivers screen, the `invite-user` edge function calls `supabase.auth.admin.inviteUserByEmail(email)`. That creates an `auth.users` row in **invited state with no password set**.
 
-## Why the previous attempt failed
+Our custom Resend email then sends them to `/auth`, where they "sign up" with a password. But because the email is already registered, Supabase's `signUp()` silently no-ops (Supabase obfuscates "user exists" by returning a fake user). No password is ever stored. The session you see immediately after is just the leftover invite session — once they sign out, password login fails with `invalid_credentials` (which is exactly what the auth logs show for `ajb06.jrb07@gmail.com`).
 
-The edge function tried `supabase.auth.admin.deleteUser(userId)` but it returned `Database error deleting user`. Postgres logged:
+## Fix
 
-```
-null value in column "user_id" of relation "audit_logs" violates not-null constraint
-```
+Switch the invite flow to **generate a real Supabase invite/recovery link** and route the user through a password-setup page, instead of relying on a plain `/auth` signup.
 
-`audit_logs.user_id` has since been made nullable (prior migration), so that specific cause is fixed. However the `delete-user` function still doesn't clean up other tables that reference the user before calling auth deletion, and there are a few FK paths that don't cascade automatically:
+### 1. `supabase/functions/invite-user/index.ts`
 
-- `public.changelog.created_by` → `auth.users(id)` with **no ON DELETE action** (blocks deletion if user authored any changelog).
-- `public.documents.uploaded_by`, `public.drivers.user_id`, `public.load_status_logs.changed_by` → ON DELETE SET NULL (safe, but leave orphan rows).
-- `public.crm_activities.user_id`, `public.maintenance_request_messages.sender_user_id`, `public.user_feedback.user_id`, `public.document_templates.created_by`, `public.super_admin_audit_logs.user_id` → no FK to `auth.users`, become dangling references.
-- `public.profiles`, `public.user_roles`, `public.super_admins` already CASCADE.
+- Replace `auth.admin.inviteUserByEmail(email, {...})` with `auth.admin.generateLink({ type: 'invite', email, options: { data: { invited_role: role }, redirectTo: `${appUrl}/auth/accept-invite` } })`.
+- Use the returned `properties.action_link` as the button URL in the Resend email (instead of the static `/auth` link). This token, when opened, establishes a Supabase recovery session that lets the user set a password.
+- Keep the existing "user already exists" branch unchanged (still just assigns role + org, no email link rewrite needed — but optionally send a "you've been added" notice without an invite link).
 
-## Plan
+### 2. New page `src/pages/AcceptInvite.tsx` (route `/auth/accept-invite`)
 
-### 1. Harden `supabase/functions/delete-user/index.ts`
+- Public route. On mount, Supabase auto-parses the `#access_token` / `type=invite` hash and creates a session.
+- Render a "Set your password" form → `supabase.auth.updateUser({ password })`.
+- On success, redirect via `<RoleBasedRedirect />` (or push to `/`).
 
-Before calling `auth.admin.deleteUser`, perform a full purge with the service-role client, in this order (each wrapped in try/catch with logging so a single failure doesn't abort the rest):
+### 3. `src/App.tsx`
 
-1. `DELETE FROM crm_activities WHERE user_id = $userId`
-2. `DELETE FROM maintenance_request_messages WHERE sender_user_id = $userId`
-3. `DELETE FROM user_feedback WHERE user_id = $userId`
-4. `UPDATE documents SET uploaded_by = NULL WHERE uploaded_by = $userId`
-5. `UPDATE document_templates SET created_by = NULL WHERE created_by = $userId`
-6. `UPDATE changelog SET created_by = NULL WHERE created_by = $userId` (or delete, depending on org scope)
-7. `UPDATE drivers SET user_id = NULL WHERE user_id = $userId` (driver record stays so historical loads/payroll keep working)
-8. `DELETE FROM super_admin_audit_logs WHERE user_id = $userId`
-9. `DELETE FROM super_admins WHERE user_id = $userId`
-10. `DELETE FROM user_roles WHERE user_id = $userId` (already there)
-11. `DELETE FROM profiles WHERE user_id = $userId` (already there)
-12. `auth.admin.deleteUser(userId)` — finally remove from `auth.users`. The remaining `auth.identities/sessions/...` rows cascade automatically.
+- Register the new public route `/auth/accept-invite` → `AcceptInvite`.
 
-Also: add an audit-log entry attributing the deletion to `requestingUser.id` (with `action='user_deleted'`, target `userId`) so we keep a record after the row vanishes.
+### 4. (Optional cleanup) `src/pages/Auth.tsx`
 
-### 2. Fix the dangling FK so future deletions can't be blocked
+- No changes required for the bug fix. We can leave the existing signup tab working for self-serve owner signups; only invited users will go through the new accept-invite page.
 
-New migration:
-```sql
-ALTER TABLE public.changelog
-  DROP CONSTRAINT changelog_created_by_fkey,
-  ADD CONSTRAINT changelog_created_by_fkey
-    FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-```
+## What this does NOT change
 
-### 3. Delete `ajb06.jrb07@gmail.com` now
+- No DB schema or RLS changes.
+- No change to role assignment / driver linking logic — those still happen inside `invite-user` at invite-send time.
+- No change to existing successfully-onboarded users.
 
-After the function is redeployed, call it (or run the equivalent SQL + `auth.admin.deleteUser`) for user id `e089acf0-2a1b-498d-ad04-fa39b40d05e1`. If anything still blocks, capture the new Postgres error and add that table to the purge list.
+## Note on the already-broken account
 
-## Out of scope
-
-- No UI changes — the existing "Delete user" button keeps calling the same edge function.
-- No changes to RLS or to the owner/super-admin authorization checks already in the function.
-- Org-level data (loads, expenses, trucks, etc.) is **not** deleted — those belong to the organization, not the individual user. Only personal/auth records and dangling user references are removed.
+`ajb06.jrb07@gmail.com` was already deleted in the previous turn and re-invited; it is now stuck in the same broken state. After deploying the fix, the simplest recovery is: delete that auth row again and re-send the invite, which will then arrive with a working set-password link.

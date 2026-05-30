@@ -117,12 +117,14 @@ Deno.serve(async (req) => {
       .single();
 
     const orgId = reqProfile?.org_id;
+    const appUrl = 'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app';
 
     // Check if user already exists in auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(u => u.email === email);
 
     let targetUserId: string | null = null;
+    let inviteActionLink: string | null = null;
 
     if (existingUser) {
       targetUserId = existingUser.id;
@@ -137,10 +139,18 @@ Deno.serve(async (req) => {
           .is('org_id', null);
       }
     } else {
-      // Invite the user via Supabase Auth
-      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-        data: {
-          invited_role: role,
+      // Generate an invite link via Supabase Auth. This creates the auth user
+      // (if needed) AND returns an action_link the recipient can use to set
+      // their password. Using generateLink (instead of inviteUserByEmail) lets
+      // us send our own branded email while still getting a working
+      // password-setup token.
+      const acceptUrl = `${appUrl}/auth/accept-invite`;
+      const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'invite',
+        email,
+        options: {
+          data: { invited_role: role },
+          redirectTo: acceptUrl,
         },
       });
 
@@ -150,6 +160,7 @@ Deno.serve(async (req) => {
       }
 
       targetUserId = inviteData.user?.id ?? null;
+      inviteActionLink = inviteData.properties?.action_link ?? null;
       console.log('User invited via Supabase:', targetUserId);
 
       // Link profile to org
@@ -242,8 +253,7 @@ Deno.serve(async (req) => {
     }
 
     // Send custom email via Resend
-    const appUrl = 'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app';
-    const signUpLink = `${appUrl}/auth`;
+    const signUpLink = inviteActionLink ?? `${appUrl}/auth`;
     const emailHtml = `
 <!DOCTYPE html>
 <html>

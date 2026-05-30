@@ -16,6 +16,7 @@ import { Loader2 } from "lucide-react";
 // Lazy-loaded pages
 const Auth = lazy(() => import("./pages/Auth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const Trucks = lazy(() => import("./pages/Trucks"));
 const Trailers = lazy(() => import("./pages/Trailers"));
 const Drivers = lazy(() => import("./pages/Drivers"));
@@ -92,6 +93,7 @@ const App = () => {
                     <Route path="/" element={<RoleBasedRedirect />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/auth/accept-invite" element={<AcceptInvite />} />
                     <Route path="/pending-access" element={<PendingAccess />} />
                     <Route path="/landing" element={<Navigate to="/" replace />} />
                     <Route path="/pricing" element={<Pricing />} />
