@@ -9,7 +9,7 @@ import { extractStateFromAddress } from '@/lib/us-states';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|file_upload|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|file_upload|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status|phone_number)\s*\}\}/g;
 
 export interface DocumentTemplateRendererProps {
   content: string;
@@ -28,6 +28,7 @@ export interface DocumentTemplateRendererProps {
   endorsements?: string[] | null;
   hasTwic?: boolean | null;
   twicExpiry?: string | null;
+  phoneNumber?: string | null;
 }
 
 function formatDateToken(value?: string | null): string | null {
@@ -97,6 +98,7 @@ export function DocumentTemplateRenderer({
   endorsements,
   hasTwic,
   twicExpiry,
+  phoneNumber,
 }: DocumentTemplateRendererProps) {
 
   const nodes = useMemo(() => tokenize(content), [content]);
@@ -279,6 +281,14 @@ export function DocumentTemplateRenderer({
             return (
               <span key={i} className="font-medium">
                 {twicStatusText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
+              </span>
+            );
+          case 'phone_number':
+            return (
+              <span key={i} className="font-medium">
+                {phoneNumber?.trim()
+                  ? phoneNumber
+                  : <span className="text-muted-foreground italic">[Not provided]</span>}
               </span>
             );
           default:

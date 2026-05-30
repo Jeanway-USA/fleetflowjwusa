@@ -132,6 +132,10 @@ const VARIABLES: Array<{ token: string; description: string }> = [
     token: "{{twic_status}}",
     description: "Auto-fills TWIC status: 'Yes — expires <date>' or 'No' (Step 1).",
   },
+  {
+    token: "{{phone_number}}",
+    description: "Auto-fills the driver's phone number captured in onboarding Step 1.",
+  },
 ];
 
 interface DocumentTemplatesPanelProps {
