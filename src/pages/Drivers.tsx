@@ -106,6 +106,48 @@ export default function Drivers() {
     },
   });
 
+  // Onboarding status: counts of signed docs per driver + active template count for org
+  const { data: signedDocCounts = {} } = useQuery({
+    queryKey: ['driver-signed-doc-counts', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_signed_documents')
+        .select('driver_id')
+        .eq('org_id', orgId!);
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      for (const row of data ?? []) {
+        counts[row.driver_id] = (counts[row.driver_id] ?? 0) + 1;
+      }
+      return counts;
+    },
+  });
+
+  const { data: activeTemplateCount = 0 } = useQuery({
+    queryKey: ['active-template-count', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('document_templates')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', orgId!)
+        .eq('is_active', true);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
+  const getOnboardingStatus = (driver: any): { label: string; tone: 'muted' | 'warn' | 'ok' } => {
+    if (!driver.user_id) return { label: 'Not invited', tone: 'muted' };
+    if (activeTemplateCount === 0) return { label: 'Login active', tone: 'ok' };
+    const signed = signedDocCounts[driver.id] ?? 0;
+    if (signed === 0) return { label: 'Onboarding pending', tone: 'warn' };
+    if (signed >= activeTemplateCount) return { label: 'Onboarded', tone: 'ok' };
+    return { label: `Onboarding ${signed}/${activeTemplateCount}`, tone: 'warn' };
+  };
+
+
   // Get linked user info for display
   const getLinkedUser = (userId: string | null) => {
     if (!userId) return null;
