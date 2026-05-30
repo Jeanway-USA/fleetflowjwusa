@@ -15,7 +15,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles, requiredFeature }: ProtectedRouteProps) {
-  const { user, loading, rolesLoading, orgLoading, hasRole, orgIsActive, orgId } = useAuth();
+  const { user, loading, rolesLoading, orgLoading, hasRole, orgIsActive, orgId, requiresOnboarding, onboardingCompleted } = useAuth();
 
   if (loading || rolesLoading || orgLoading) {
     return (
@@ -38,6 +38,14 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
   const hasAccess = allowedRoles.some(role => hasRole(role));
   if (!hasAccess) {
     return <Navigate to="/" replace />;
+  }
+
+  // Drivers with outstanding onboarding cannot reach any protected page until they finish.
+  // (The /driver/onboarding route itself bypasses this guard by being the redirect target.)
+  if (hasRole('driver') && requiresOnboarding && !onboardingCompleted) {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/driver/onboarding') {
+      return <Navigate to="/driver/onboarding" replace />;
+    }
   }
 
   // Wrap in layout, then optionally gate by tier feature

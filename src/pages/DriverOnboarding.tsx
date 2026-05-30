@@ -43,7 +43,7 @@ interface SignedResult {
 
 export default function DriverOnboarding() {
   const navigate = useNavigate();
-  const { user, orgId } = useAuth();
+  const { user, orgId, refreshOrgData } = useAuth();
 
   const [stepIndex, setStepIndex] = useState(0);
   const [state, setState] = useState<Record<string, TemplateState>>({});
@@ -238,6 +238,18 @@ export default function DriverOnboarding() {
 
 
     setSignedResults(results);
+
+    // Mark onboarding complete on the user's profile so guards unlock the dashboard.
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ onboarding_completed: true })
+      .eq('user_id', user.id);
+    if (profileError) {
+      console.error('Failed to mark onboarding complete:', profileError);
+    } else {
+      await refreshOrgData();
+    }
+
     toast.success('Documents submitted successfully');
   };
 
@@ -265,6 +277,11 @@ export default function DriverOnboarding() {
         } else {
           // No documents — credentials alone complete the flow
           setSignedResults([]);
+          await supabase
+            .from('profiles')
+            .update({ onboarding_completed: true })
+            .eq('user_id', user!.id);
+          await refreshOrgData();
           toast.success('Profile saved');
         }
       } catch (err) {

@@ -25,6 +25,8 @@ interface AuthContextType {
   isDemoMode: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: Error | null }>;
+  requiresOnboarding: boolean;
+  onboardingCompleted: boolean;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
   /** 
@@ -70,6 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(null);
   const [simulatedOrgName, setSimulatedOrgName] = useState<string | null>(null);
   const [simulatedOrgTier, setSimulatedOrgTier] = useState<string | null>(null);
+  const [requiresOnboarding, setRequiresOnboarding] = useState(false);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
 
   const fetchUserRoles = async (userId: string) => {
     const { data, error } = await supabase
@@ -91,9 +95,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchOrgData = async (userId: string) => {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('org_id, requires_onboarding, onboarding_completed')
       .eq('user_id', userId)
       .single();
+
+    setRequiresOnboarding(!!profile?.requires_onboarding);
+    setOnboardingCompleted(!!profile?.onboarding_completed);
 
     if (profile?.org_id) {
       setOrgId(profile.org_id);
@@ -367,6 +374,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       simulatedOrgName,
       clearOrgSimulation,
       isSuperAdmin,
+      requiresOnboarding,
+      onboardingCompleted,
     }}>
       {children}
     </AuthContext.Provider>
