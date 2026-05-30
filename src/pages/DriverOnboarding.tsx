@@ -118,11 +118,12 @@ export default function DriverOnboarding() {
   const isValidSignatureDataUrl = (s: string | null): s is string =>
     !!s && s.startsWith('data:image/');
 
-  const canContinue =
-    (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
-    (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
-    (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
-    (!needsFileUpload || currentState.attachment != null);
+  const canContinue = isCredentialsStep
+    ? credentialsValid
+    : (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
+      (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
+      (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
+      (!needsFileUpload || currentState.attachment != null);
 
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
