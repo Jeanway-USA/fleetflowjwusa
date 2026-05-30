@@ -134,22 +134,67 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
   const tourDef = getTourForRoute(location.pathname);
   const tour = useProductTour({ tourId: tourDef?.id || 'none', totalSteps: tourDef?.steps.length || 0 });
   const [showWelcome, setShowWelcome] = useState(false);
+  const [tourFlagLoaded, setTourFlagLoaded] = useState(false);
+  const [hasSeenTour, setHasSeenTour] = useState<boolean | null>(null);
   const { user } = useAuth();
+  const autoStartedRef = useRef(false);
 
-  // Check if user has completed onboarding tour
+  // Persist tour completion server-side so it doesn't re-trigger on other devices.
+  const persistTourCompletion = useCallback(async () => {
+    if (!user) return;
+    setHasSeenTour(true);
+    await supabase
+      .from('profiles')
+      .update({ has_completed_onboarding_tour: true } as any)
+      .eq('user_id', user.id);
+  }, [user]);
+
+  const handleTourSkip = useCallback(() => {
+    tour.skipTour();
+    void persistTourCompletion();
+  }, [tour, persistTourCompletion]);
+
+  const handleTourNext = useCallback(() => {
+    const isLast = tour.currentStep >= (tourDef?.steps.length ?? 0) - 1;
+    tour.nextStep();
+    if (isLast) void persistTourCompletion();
+  }, [tour, tourDef, persistTourCompletion]);
+
+  // Load the has_seen_tour flag once per user.
   useEffect(() => {
-    if (!user || isDemoMode) return;
+    if (!user || isDemoMode) {
+      setTourFlagLoaded(true);
+      return;
+    }
     supabase
       .from('profiles')
       .select('has_completed_onboarding_tour')
       .eq('user_id', user.id)
       .single()
       .then(({ data }) => {
-        if (data && !(data as any).has_completed_onboarding_tour) {
-          setShowWelcome(true);
-        }
+        const seen = !!(data as any)?.has_completed_onboarding_tour;
+        setHasSeenTour(seen);
+        // Only show the legacy welcome modal on routes that don't have an auto-tour.
+        if (!seen && !tourDef) setShowWelcome(true);
+        setTourFlagLoaded(true);
       });
-  }, [user, isDemoMode]);
+  }, [user, isDemoMode, tourDef]);
+
+  // Auto-start tour: (A) explicit signal from /driver/onboarding, or (B) has_seen_tour === false.
+  useEffect(() => {
+    if (autoStartedRef.current || !tourDef || tour.isActive) return;
+    const fromOnboarding = (location.state as any)?.startTour === true;
+    const flagSaysStart = tourFlagLoaded && hasSeenTour === false;
+    if (!fromOnboarding && !flagSaysStart) return;
+    autoStartedRef.current = true;
+    tour.startTour();
+    if (fromOnboarding) {
+      // Strip state so a refresh doesn't replay the tour.
+      navigate(location.pathname);
+    }
+  }, [tourDef, tour, tourFlagLoaded, hasSeenTour, location.state, location.pathname, navigate]);
+
+
 
   // Keyboard shortcut: Ctrl/Cmd + B to toggle sidebar
   useEffect(() => {
