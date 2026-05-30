@@ -76,7 +76,6 @@ export function DocumentTemplateRenderer({
   driverName,
   cdlNumber,
   onCdlNumberChange,
-  showAttachmentUpload = false,
   attachment = null,
   onAttachmentChange,
 }: DocumentTemplateRendererProps) {
