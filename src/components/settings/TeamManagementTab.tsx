@@ -372,6 +372,25 @@ export function TeamManagementTab() {
               </Select>
               <p className="text-xs text-muted-foreground">The user will be assigned this role when they accept the invitation</p>
             </div>
+            <div className="flex items-start gap-3 rounded-lg border border-border p-4">
+              <Checkbox
+                id="invite-requires-onboarding"
+                checked={inviteRequiresOnboarding}
+                disabled={!onboardingApplies}
+                onCheckedChange={(checked) => setInviteRequiresOnboarding(checked === true)}
+                className="mt-0.5"
+              />
+              <div className="space-y-1">
+                <Label htmlFor="invite-requires-onboarding" className="font-medium cursor-pointer">
+                  Require onboarding before activation
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {onboardingApplies
+                    ? "Defaults to your organization's preferences for this role. You can override for this invite."
+                    : 'Onboarding requirements only apply to drivers and dispatchers.'}
+                </p>
+              </div>
+            </div>
             <SheetFooter>
               <Button type="submit" className="w-full gradient-gold text-primary-foreground" disabled={isInviting}>
                 {isInviting ? 'Sending...' : 'Send Invitation'}
