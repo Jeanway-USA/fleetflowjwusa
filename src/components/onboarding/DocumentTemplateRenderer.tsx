@@ -67,6 +67,7 @@ export function DocumentTemplateRenderer({
   onDriverAddressChange,
   signature,
   onSignatureCapture,
+  driverName,
 }: DocumentTemplateRendererProps) {
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
