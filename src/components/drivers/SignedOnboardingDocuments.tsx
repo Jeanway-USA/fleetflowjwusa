@@ -18,11 +18,12 @@ interface Props {
 }
 
 export function SignedOnboardingDocuments({ driverId }: Props) {
-  const { isOwner } = useAuth();
+  const { isOwner, hasRole } = useAuth();
+  const canView = isOwner || hasRole('safety') || hasRole('payroll_admin');
 
   const { data: docs, isLoading } = useQuery({
     queryKey: ['driver_signed_documents', driverId],
-    enabled: isOwner && !!driverId,
+    enabled: canView && !!driverId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('driver_signed_documents')
@@ -34,8 +35,9 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     },
   });
 
-  // Defense-in-depth: hide entirely for non-owners
-  if (!isOwner) return null;
+  // Defense-in-depth: hide entirely for non-admins
+  if (!canView) return null;
+
 
   const openSignedUrl = async (
     filePath: string,
@@ -84,8 +86,9 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-        Owner-only view
+        Admin view
       </div>
+
       {docs.map((d) => {
         const label = DOCUMENT_LABELS[d.document_type] ?? d.document_type;
         return (

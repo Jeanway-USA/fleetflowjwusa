@@ -24,6 +24,8 @@ import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Up
 import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { SignedOnboardingDocuments } from '@/components/drivers/SignedOnboardingDocuments';
 import { CredentialsCompliance } from '@/components/drivers/CredentialsCompliance';
+import { DriverDetailSheet } from '@/components/drivers/DriverDetailSheet';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,6 +70,8 @@ export default function Drivers() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [signedDocsDriver, setSignedDocsDriver] = useState<any>(null);
+  const [profileDriver, setProfileDriver] = useState<any>(null);
+
 
   const driverFields = [
     { key: 'first_name', label: 'First Name', required: true },
@@ -382,10 +386,15 @@ export default function Drivers() {
                           View Dashboard
                         </DropdownMenuItem>
                       )}
+                      <DropdownMenuItem onClick={() => setProfileDriver(driver)}>
+                        <User className="h-4 w-4 mr-2" />
+                        View Profile
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setSelectedDriver(driver)}>
                         <FileText className="h-4 w-4 mr-2" />
                         Documents
                       </DropdownMenuItem>
+
                       {isOwner && (
                         <DropdownMenuItem onClick={() => setSignedDocsDriver(driver)}>
                           <FileSignature className="h-4 w-4 mr-2" />
@@ -696,10 +705,21 @@ export default function Drivers() {
 
 
 
+      <DriverDetailSheet
+        driver={profileDriver}
+        open={!!profileDriver}
+        onOpenChange={(open) => !open && setProfileDriver(null)}
+        onEdit={(d) => {
+          setProfileDriver(null);
+          openDialog(d);
+        }}
+      />
+
       <CSVImportDialog
         open={csvImportOpen}
         onOpenChange={setCsvImportOpen}
         tableName="drivers"
+
         fields={driverFields}
         queryKey={['drivers']}
         title="Import Drivers from CSV"
