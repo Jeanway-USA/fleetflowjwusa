@@ -33,7 +33,7 @@ function ExpiryBadge({ date }: { date: string | null | undefined }) {
   const days = differenceInCalendarDays(parsed, new Date());
   if (days < 0) return <StatusBadge status="expired" />;
   if (days <= 30) return <StatusBadge status="expiring_soon" />;
-  return null;
+  return <StatusBadge status="valid" />;
 }
 
 function formatDate(date: string | null | undefined) {

@@ -32,6 +32,7 @@ const statusMap: Record<string, StatusType> = {
   // Credential expiry statuses
   expiring_soon: 'warning',
   expired: 'error',
+  valid: 'success',
 };
 
 interface StatusBadgeProps {
