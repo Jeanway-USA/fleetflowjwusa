@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Copy, Loader2, Plus, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const FORMATTING_EXAMPLES: Array<{ syntax: string; preview: React.ReactNode; label: string }> = [
+const FORMATTING_EXAMPLES: Array<{ syntax: string; preview: ReactNode; label: string }> = [
   { label: "Large header", syntax: "# Driver Agreement", preview: <h1 className="text-xl font-bold leading-tight">Driver Agreement</h1> },
   { label: "Sub-header", syntax: "## Section title", preview: <h2 className="text-base font-semibold">Section title</h2> },
   { label: "Bold text", syntax: "**important**", preview: <p className="text-sm"><strong className="font-semibold">important</strong></p> },
