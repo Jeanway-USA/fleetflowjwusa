@@ -1,36 +1,62 @@
 ## Objective
-Restructure `src/pages/Settings.tsx` into a two-tab layout using shadcn/ui Tabs, grouping all existing settings under a "General" tab and adding a new "Onboarding & Documents" tab as the foundation for future document-template and new-hire configuration.
+Add a "Global Invite Preferences" section in the Settings → Onboarding & Documents tab with role-based default toggles, and wire those defaults into the Team invite flow so the new `requires_onboarding` checkbox auto-flips based on the selected role.
 
-## Plan
+## 1. Storage (no new table required)
+Reuse the existing `public.company_settings` table (key/value, scoped by `org_id`, already has RLS and a `(org_id, setting_key)` unique constraint). Two new setting keys:
 
-### 1. Top-level tab structure
-- Wrap the page content in a shadcn/ui `<Tabs>` component with two top-level triggers: **"General"** and **"Onboarding & Documents"**.
-- Use a `<Settings className="h-4 w-4" />` (or `Sliders`) icon for "General" and a `<FileText className="h-4 w-4" />` icon for "Onboarding & Documents".
+- `require_onboarding_driver` (default `"true"`)
+- `require_onboarding_dispatcher` (default `"false"`)
 
-### 2. "General" tab (`value="general"`)
-- Move the **entire existing tab interface** (Team, Company, Branding, Appearance, Billing, Storage) into `TabsContent value="general"`.
-- The existing 6 sub-tabs remain nested inside "General" so current UX is preserved.
-- Update the `<Tabs defaultValue="...">` inside "General" so it still defaults to `users`.
+Stored as text (`"true"` / `"false"`) to match the table's existing schema. No migration needed.
 
-### 3. "Onboarding & Documents" tab (`value="onboarding"`)
-- Create a new `TabsContent value="onboarding"` containing a single descriptive card.
-- Card header:
-  - Title: "Onboarding & Documents"
-  - Description: "Manage automated documents and new hire flows for your organization. This section will let you configure document templates, track driver onboarding status, and enforce required signatures before drivers become active."
-- Use existing `Card`, `CardHeader`, `CardTitle`, `CardDescription` components.
-- Style with existing Tailwind semantic tokens (no hard-coded colors).
+(Adding a new dedicated `organization_settings` table would duplicate `company_settings`; the user explicitly allowed "or similar global state".)
 
-### 4. Non-owner view
-- The restricted non-owner view (theme toggle + "Admin Settings Restricted" card) stays unchanged; it does not need the top-level tabs because non-owners only see personal preferences.
+## 2. New component: `OnboardingPreferencesCard`
+File: `src/components/settings/OnboardingPreferencesCard.tsx`
 
-### 5. Responsive layout
-- `TabsList` uses `className="mb-6 flex-wrap"` so tabs wrap on narrow viewports.
-- Both top-level tab panels use `w-full` and spacing utilities for clean stacking.
+- TanStack `useQuery` for `company_settings` filtered by the two keys + `org_id`.
+- Two `Switch` rows inside a `Card`:
+  - **Require onboarding for new Drivers by default** — bound to `require_onboarding_driver`.
+  - **Require onboarding for new Dispatchers by default** — bound to `require_onboarding_dispatcher`.
+- `useMutation` upserts on toggle change using `onConflict: 'org_id,setting_key'`, with optimistic invalidation and `toast`.
+- Disabled (read-only) when `isDemoMode`.
+- Pure semantic Tailwind tokens.
 
-## Files to modify
-- `src/pages/Settings.tsx` — restructure tabs, add new tab content, import `FileText` (and `Settings` or `Sliders`) from `lucide-react`.
+## 3. Settings page update
+File: `src/pages/Settings.tsx`
+
+Inside `<TabsContent value="onboarding">`, render `<OnboardingPreferencesCard />` above the existing descriptive "no document templates yet" placeholder.
+
+## 4. Invite User modal wiring
+File: `src/components/settings/TeamManagementTab.tsx`
+
+- Add a TanStack query `invite-onboarding-defaults` that loads the two `company_settings` rows for the current `orgId` once (5m staleTime). Returns `{ driver: boolean, dispatcher: boolean }`, defaulting to `{ driver: true, dispatcher: false }` when rows are missing.
+- New local state: `inviteRequiresOnboarding: boolean`.
+- When the Sheet opens OR when `inviteRole` changes, recompute the default:
+  - `driver` → use `defaults.driver`
+  - `dispatcher` → use `defaults.dispatcher`
+  - any other role → `false` (and disable the checkbox)
+- Render a shadcn `Checkbox` + label "Require onboarding before activation" inside the invite form, below the Role select. Helper text: "Defaults to your organization's preferences for this role. You can override for this invite."
+- Pass `requires_onboarding: inviteRequiresOnboarding` in the `invite-user` function body alongside `email` and `role`.
+
+## 5. Edge function (light touch)
+File: `supabase/functions/invite-user/index.ts`
+
+- Accept optional `requires_onboarding: boolean` in the request body (validated as boolean, defaults to the role-specific server-side fallback if absent).
+- For now the value is forwarded but not persisted to any column (no schema change here — drivers/profiles already drive onboarding via signed-docs presence). Future scope can wire this to a `requires_onboarding` column once needed.
+- This keeps the contract ready without expanding scope into schema migrations.
+
+## 6. Verification
+- Open Settings → Onboarding & Documents → toggle both switches → reload → values persist.
+- Open Team → Invite Member → select Driver → checkbox reflects driver default; switch to Dispatcher → checkbox flips to dispatcher default; switch to Safety → checkbox is `false` and disabled.
+
+## Files touched
+- `src/pages/Settings.tsx`
+- `src/components/settings/OnboardingPreferencesCard.tsx` (new)
+- `src/components/settings/TeamManagementTab.tsx`
+- `supabase/functions/invite-user/index.ts`
 
 ## Out of scope
-- No changes to settings tab components (`CompanyTab`, `BrandingTab`, etc.).
-- No database or backend changes.
-- No functional onboarding/document management UI yet — only the descriptive placeholder header.
+- No new database table or columns.
+- No enforcement logic for `requires_onboarding` beyond the existing signed-docs onboarding check.
+- No changes to per-driver onboarding screens.
