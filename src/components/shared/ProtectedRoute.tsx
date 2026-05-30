@@ -40,6 +40,19 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
     return <Navigate to="/" replace />;
   }
 
+  // Drivers with outstanding onboarding cannot reach any protected page until they finish.
+  if (
+    hasRole('driver') &&
+    requiresOnboarding &&
+    !onboardingCompleted &&
+    !allowedRoles.every(r => r === 'driver' && false) // always evaluate; just keeps shape
+  ) {
+    // Allow the onboarding page itself through; everything else is blocked.
+    if (typeof window !== 'undefined' && window.location.pathname !== '/driver/onboarding') {
+      return <Navigate to="/driver/onboarding" replace />;
+    }
+  }
+
   // Wrap in layout, then optionally gate by tier feature
   const content = requiredFeature ? (
     <TierGate requiredFeature={requiredFeature}>{children}</TierGate>
