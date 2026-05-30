@@ -1,25 +1,3 @@
-## Objective
-Add an automatic audit trail for `document_templates` changes, reusing the existing `audit_logs` table so we don't fork a second log store.
-
-## Note on existing schema
-`public.audit_logs` already exists with: `id`, `user_id`, `action`, `table_name`, `record_id`, `details (jsonb)`, `ip_address`, `created_at`, `org_id`. It maps 1:1 to the requested fields:
-
-| Requested | Existing column |
-|---|---|
-| admin_id | user_id |
-| action_type | action |
-| entity_type | table_name |
-| entity_id | record_id |
-| details | details |
-| created_at | created_at |
-
-RLS already restricts reads to owners (`is_owner` + same org) and blocks client writes. We'll reuse it instead of creating a duplicate table.
-
-## Migration
-
-Add a `SECURITY DEFINER` trigger on `public.document_templates` that writes one audit row per insert/update/delete:
-
-```sql
 CREATE OR REPLACE FUNCTION public.log_document_template_change()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -62,7 +40,7 @@ BEGIN
           THEN to_jsonb(true) END
       ))
     );
-  ELSE -- DELETE
+  ELSE
     v_action := 'template_deleted';
     v_record_id := OLD.id;
     v_org_id := OLD.org_id;
@@ -86,19 +64,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_audit_document_templates ON public.document_templates;
 CREATE TRIGGER trg_audit_document_templates
 AFTER INSERT OR UPDATE OR DELETE ON public.document_templates
 FOR EACH ROW EXECUTE FUNCTION public.log_document_template_change();
-```
-
-No GRANT changes needed — function runs as definer, and audit_logs RLS already permits owners to read.
-
-## Verification
-- Edit a template via Settings → Onboarding & Documents → Save → row appears in `audit_logs` with `action = 'template_updated'`, `table_name = 'document_template'`, `record_id` = template id, `user_id` = signed-in admin.
-- Toggle Active off → row with `template_deactivated`.
-- Create new template → row with `template_created`.
-
-## Out of scope
-- No new `audit_logs` table (existing one already covers all requested fields).
-- No UI to view the audit trail — backend instrumentation only.
-- No app-side mutation changes — handled entirely at the DB level so every code path (including future ones) is logged automatically.
