@@ -1,47 +1,41 @@
-# Fix: Direct Deposit step skipped during driver onboarding
+# Fix: Driver tour requires two finish/skips before it stops appearing
 
 ## Root cause
 
-The onboarding pagination logic in `src/pages/DriverOnboarding.tsx` is actually correct — `totalSteps = templates.length + 1` and `stepIndex === totalSteps - 1` properly advances through every fetched template. The real bug is upstream in the data fetch.
+The tour completion flag is split across two stores:
+- `useProductTour` writes `tour_completed_<id>` to `localStorage` synchronously on finish/skip — this part is already correct.
+- `DashboardLayout` persists `profiles.has_completed_onboarding_tour` to the database, but the **auto-start `useEffect` only checks the server flag**, never the synchronous local flag.
 
-- `DOCUMENT_ORDER` (and the `.in('document_type', ...)` filter) expects: `['driver_agreement', 'direct_deposit']`
-- The actual row in `document_templates` uses `document_type = 'direct_deposit_form'`
-- Result: only the Driver Agreement is returned, `templates.length === 1`, so after signing it the flow correctly hits the last step and finalizes — there is no second template to advance to.
+Consequence: when the layout remounts (driver navigates away and back, refresh, or React Strict mode double-mount) before the DB write settles, the server-side `hasSeenTour` still reads `false`, `autoStartedRef.current` is freshly `false`, and the tour starts a second time. The user has to finish/skip again to push the server flag through.
 
-The `DocumentTemplatesPanel` admin UI documents the canonical slug as `direct_deposit`, and `DriverOnboarding.tsx` keys off `direct_deposit` in three places (DOCUMENT_ORDER, DOCUMENT_LABELS, and the `direct_deposit_attachment_url` persistence branch). The DB row is the outlier.
+Two secondary issues compound it:
+1. After auto-start from `/driver/onboarding`, we call `navigate(location.pathname)` without `{ replace: true }`. This **pushes** a new history entry instead of replacing the one carrying `state.startTour`, so a Back navigation re-triggers the tour.
+2. There is no server → local reconciliation, so a driver on a fresh device (or after clearing localStorage) who *has* completed the tour on the server will get it again until the profile fetch resolves.
 
 ## Fix
 
-Normalize the slug in the database so the existing code (which is already array-driven and already supports N templates) picks it up.
+### `src/hooks/useProductTour.ts`
+- Add a `markCompleted()` helper that writes `localStorage.setItem(storageKey, 'true')` and clears active state. Have `nextStep` (on last step) and `skipTour` both delegate to it so the synchronous flag write is guaranteed before any async work.
+- Expose `hasCompleted` as a stable callback (already returns the localStorage value) and a `syncFromServer(seen: boolean)` helper that writes `'true'` into localStorage when the server says the tour is done — this rehydrates new devices.
 
-### 1. Migration
+### `src/components/layout/DashboardLayout.tsx`
+- In the profile-load effect, after reading `has_completed_onboarding_tour`, call `tour.syncFromServer(seen)` so the local flag mirrors the server flag immediately on every mount.
+- In the auto-start effect, gate startup on **both** flags: `if (tour.hasCompleted()) return;` before evaluating `fromOnboarding` or `flagSaysStart`. This makes the synchronous localStorage value authoritative and eliminates the remount race.
+- Change the state-stripping navigation to `navigate(location.pathname, { replace: true, state: {} })` so refresh and Back never resurface `startTour`. Widen the `navigate` prop type accordingly (or just call `useNavigate` directly inside `DashboardLayoutInner` to get the full signature).
+- In `handleTourSkip` and the `isLast` branch of `handleTourNext`, write to localStorage *first* (the hook now does this) and fire `persistTourCompletion` as a follow-up. Keep `autoStartedRef.current = true` set even on completion so any same-mount re-render is also blocked.
 
-Rename any stray `direct_deposit_form` rows to the canonical slug:
+### No DB migration
+`profiles.has_completed_onboarding_tour` already exists.
 
-```sql
-UPDATE public.document_templates
-SET document_type = 'direct_deposit'
-WHERE document_type = 'direct_deposit_form';
-```
+## Acceptance criteria
 
-### 2. No code changes required
-
-After verifying in the preview, confirm that:
-
-- `useQuery(['driver_onboarding_templates', orgId])` returns both templates.
-- `totalSteps` becomes 3 (credentials + 2 documents).
-- Submitting the Driver Agreement advances to Direct Deposit instead of finalizing.
-- Only after submitting Direct Deposit does `finalizeSubmission` run, write `profiles.onboarding_completed = true`, and render the success/download screen.
-
-## Why not change the code constants instead
-
-Changing `DOCUMENT_ORDER`/labels to `direct_deposit_form` would also work, but:
-- The admin-facing docs in `DocumentTemplatesPanel.tsx` already advertise `direct_deposit` as the canonical type.
-- `direct_deposit_attachment_url` persistence is keyed off `direct_deposit`.
-- Any future template seeded through the admin UI will use `direct_deposit`, re-breaking the flow.
-
-Normalizing the DB row is the durable fix.
+- Clicking **Finish** or **Skip** once permanently dismisses the tour for that browser, even if the user immediately navigates away and back, refreshes, or the DB write is slow/fails.
+- Pressing browser **Back** after auto-start does not re-trigger the tour (history entry replaced).
+- A driver who completed the tour on another device gets `localStorage` rehydrated from the server flag on next dashboard mount and is not shown the tour again.
+- "Replay Welcome Tour" from the Help menu still works (calls `tour.startTour()` directly and bypasses both flags).
+- Dispatchers, owners, and routes without a `tourDef` continue to use `WelcomeBetaModal` unchanged.
 
 ## Out of scope
 
-No changes to pagination, success screen, `onboarding_completed` write, or storage paths — they are already correct once the second template is actually fetched.
+- Switching the onboarding handoff from `location.state` to a `?onboarding=complete` query param. The current `state.startTour` mechanism is functionally equivalent once `replace: true` is applied; introducing a query param would force a second navigation and is not needed to fix the double-prompt bug. (Happy to do it in a follow-up if you'd prefer the URL-based handshake.)
+- Changes to tour step content or `ProductTour.tsx` rendering.
