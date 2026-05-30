@@ -70,6 +70,8 @@ export default function Drivers() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [signedDocsDriver, setSignedDocsDriver] = useState<any>(null);
+  const [profileDriver, setProfileDriver] = useState<any>(null);
+
 
   const driverFields = [
     { key: 'first_name', label: 'First Name', required: true },
