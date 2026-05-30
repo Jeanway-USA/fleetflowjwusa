@@ -149,7 +149,11 @@ Deno.serve(async (req) => {
         type: 'invite',
         email,
         options: {
-          data: { invited_role: role },
+          data: {
+            invited_role: role,
+            first_name: first_name ?? null,
+            last_name: last_name ?? null,
+          },
           redirectTo: acceptUrl,
         },
       });
@@ -170,6 +174,19 @@ Deno.serve(async (req) => {
           .update({ org_id: orgId })
           .eq('user_id', targetUserId);
       }
+    }
+
+    // Ensure first/last name are stored on the profile so onboarding renders
+    // the correct printed name instead of falling back to the email prefix.
+    if (targetUserId && (first_name || last_name)) {
+      const profileUpdates: Record<string, string> = {};
+      if (first_name) profileUpdates.first_name = first_name;
+      if (last_name) profileUpdates.last_name = last_name;
+      const { error: nameError } = await supabaseAdmin
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('user_id', targetUserId);
+      if (nameError) console.error('Profile name update error:', nameError.message);
     }
 
     // Assign role (upsert to avoid duplicates)
