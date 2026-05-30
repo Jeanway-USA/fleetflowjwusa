@@ -395,6 +395,16 @@ export default function Drivers() {
                         <Pencil className="h-4 w-4 mr-2" />
                         Edit
                       </DropdownMenuItem>
+                      {isOwner && !driver.user_id && (
+                        <DropdownMenuItem
+                          disabled={!driver.email || inviteDriverMutation.isPending}
+                          onClick={() => inviteDriverMutation.mutate(driver)}
+                        >
+                          <Mail className="h-4 w-4 mr-2" />
+                          {driver.email ? 'Invite to log in' : 'Add email to invite'}
+                        </DropdownMenuItem>
+                      )}
+
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(driver)}>
                         <Trash2 className="h-4 w-4 mr-2" />
