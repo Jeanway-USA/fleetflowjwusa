@@ -1,5 +1,7 @@
 import { Fragment, useMemo } from 'react';
 import { format } from 'date-fns';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SignaturePad } from '@/components/driver/SignaturePad';
@@ -38,6 +40,26 @@ function tokenize(content: string): Node[] {
   return nodes;
 }
 
+const MARKDOWN_COMPONENTS = {
+  h1: (props: any) => <h1 className="text-2xl font-bold tracking-tight mt-4 mb-2" {...props} />,
+  h2: (props: any) => <h2 className="text-xl font-semibold tracking-tight mt-4 mb-2" {...props} />,
+  h3: (props: any) => <h3 className="text-lg font-semibold mt-3 mb-2" {...props} />,
+  p: (props: any) => <p className="my-2 leading-relaxed whitespace-pre-wrap" {...props} />,
+  ul: (props: any) => <ul className="list-disc pl-6 my-2 space-y-1" {...props} />,
+  ol: (props: any) => <ol className="list-decimal pl-6 my-2 space-y-1" {...props} />,
+  li: (props: any) => <li className="leading-relaxed" {...props} />,
+  strong: (props: any) => <strong className="font-semibold" {...props} />,
+  em: (props: any) => <em className="italic" {...props} />,
+  hr: (props: any) => <hr className="my-4 border-border" {...props} />,
+  blockquote: (props: any) => (
+    <blockquote className="border-l-2 border-primary pl-3 italic text-muted-foreground my-3" {...props} />
+  ),
+  a: (props: any) => <a className="text-primary underline underline-offset-2" {...props} />,
+  code: (props: any) => (
+    <code className="rounded bg-muted px-1 py-0.5 font-mono text-sm" {...props} />
+  ),
+};
+
 export function DocumentTemplateRenderer({
   content,
   driverAddress,
@@ -52,10 +74,17 @@ export function DocumentTemplateRenderer({
     <div className="text-foreground leading-relaxed">
       {nodes.map((node, i) => {
         if (node.kind === 'text') {
+          if (!node.value.trim()) {
+            return <span key={i} className="whitespace-pre-wrap">{node.value}</span>;
+          }
           return (
-            <span key={i} className="whitespace-pre-wrap">
+            <ReactMarkdown
+              key={i}
+              remarkPlugins={[remarkGfm]}
+              components={MARKDOWN_COMPONENTS}
+            >
               {node.value}
-            </span>
+            </ReactMarkdown>
           );
         }
 
