@@ -53,6 +53,7 @@ const Contact = lazy(() => import("./pages/Contact"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const DocumentTemplates = lazy(() => import("./pages/admin/DocumentTemplates"));
+const DriverOnboarding = lazy(() => import("./pages/DriverOnboarding"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -117,6 +118,11 @@ const App = () => {
                     <Route path="/driver-dashboard" element={
                       <ProtectedRoute allowedRoles={['owner', 'driver']}>
                         <DriverDashboard />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/driver/onboarding" element={
+                      <ProtectedRoute allowedRoles={['driver']}>
+                        <DriverOnboarding />
                       </ProtectedRoute>
                     } />
 

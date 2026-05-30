@@ -1,29 +1,55 @@
-# Fix Team tab showing users from other organizations
+# Driver onboarding with dynamic document templates
 
-## Root cause
+Create a new driver-facing page that fetches active `document_templates` from the database and renders them as interactive signing steps. The existing owner `Onboarding.tsx` is not touched.
 
-`src/components/settings/TeamManagementTab.tsx` runs:
+## New files
 
-- `supabase.from('profiles').select('*')`
-- `supabase.from('user_roles').select('*')`
+### `src/components/onboarding/DocumentTemplateRenderer.tsx`
+- Props: `content: string`, `driverAddress: string`, `onDriverAddressChange(v)`, `signature: string | null`, `onSignatureCapture(dataUrl)`.
+- Pure renderer that walks the template string with a single regex (`/(\{\{\s*(today_date|company_address|driver_address|owner_signature|driver_signature)\s*\}\})/g`) and splits the content into ordered nodes.
+- For each match it emits:
+  - `{{today_date}}` → today formatted via `format(new Date(), 'MMMM d, yyyy')`.
+  - `{{company_address}}` → literal `"4700 Diplomacy Rd, Fort Worth, TX 76155"`.
+  - `{{owner_signature}}` → dashed-border block with text "Owner Signature Pending" (muted).
+  - `{{driver_address}}` → inline `<Input>` bound to `driverAddress` (controlled).
+  - `{{driver_signature}}` → block-level `<SignaturePad onSignatureCapture={...} />`; once captured, replace with the rendered PNG inside a bordered card.
+- Plain prose between tags is rendered with whitespace preserved (`whitespace-pre-wrap`), so the layout flows naturally and unknown tags pass through verbatim.
 
-Neither query filters by `org_id`. RLS on `profiles`/`user_roles` correctly restricts owners to their own org — **but** the signed-in user (`andrew@jeanwayusa.com`) is also a `super_admin`. The `profiles_select_super_admin` / equivalent role policies return every row across every tenant, including orphan profiles with `org_id = null` (e.g. `wesmootiv@gmail.com`, `abc123@email.com`). That's why unrelated accounts appear in the JeanWay team list.
+### `src/pages/DriverOnboarding.tsx`
+- New page, no `DashboardLayout` (matches Page Layout core rule). Container with a Card + `Progress` bar.
+- Loads the driver's `orgId` from `useAuth` and queries:
+  ```ts
+  supabase
+    .from('document_templates')
+    .select('*')
+    .eq('org_id', orgId)
+    .eq('is_active', true)
+    .in('document_type', ['driver_agreement', 'direct_deposit'])
+    .order('document_type');
+  ```
+  Sort client-side so `driver_agreement` precedes `direct_deposit`.
+- Local state per template (keyed by `template.id`): `{ driverAddress: string, signature: string | null }`.
+- Stepper: one document per step. "Continue" disabled until that step's `signature` is captured (and `driverAddress` non-empty if the template contains `{{driver_address}}`).
+- Final step "Submit": inserts one row per template into a new `driver_document_signatures` table — **out of scope for this task**, so for now just toast "Documents submitted" and redirect to `/driver` (TODO comment noting future persistence step).
+- Empty state: if no active templates exist, show "No documents to sign — contact your dispatcher" with a back link.
 
-## Change
+### `src/App.tsx`
+- Add lazy import + route:
+  ```tsx
+  const DriverOnboarding = lazy(() => import('./pages/DriverOnboarding'));
+  <Route
+    path="/driver/onboarding"
+    element={
+      <ProtectedRoute allowedRoles={['driver']}>
+        <DriverOnboarding />
+      </ProtectedRoute>
+    }
+  />
+  ```
 
-Scope the Team tab queries to the currently active org, regardless of super-admin privileges.
+## Out of scope (call out, do not build)
 
-1. In `TeamManagementTab.tsx`, before fetching:
-   - Read the current `org_id` from `AuthContext` (`profile.org_id`) — same source the rest of Settings uses.
-   - If `org_id` is missing, render the existing empty state and skip the fetch.
-2. Update both queries:
-   - `supabase.from('profiles').select('*').eq('org_id', orgId)`
-   - `supabase.from('user_roles').select('*').eq('org_id', orgId)`
-3. Add `orgId` to the TanStack Query `queryKey` so cached data is per-org (matters when a super-admin switches into impersonation mode).
-4. No RLS or backend changes — the policies are already correct; this is purely a client-side scoping fix.
-
-## Out of scope
-
-- Impersonation mode UI (already uses its own org context elsewhere).
-- Cleaning up the orphan profiles with `org_id = null` — separate housekeeping task.
-- Any change to `delete-user` edge function (just fixed).
+- Persisting signed documents (no `driver_document_signatures` table yet).
+- Auto-redirecting drivers to `/driver/onboarding` after invite acceptance.
+- PDF generation of the signed agreement.
+- Owner-side signing of `{{owner_signature}}` (placeholder only, per spec).
