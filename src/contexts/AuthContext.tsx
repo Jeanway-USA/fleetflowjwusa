@@ -374,6 +374,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       simulatedOrgName,
       clearOrgSimulation,
       isSuperAdmin,
+      requiresOnboarding,
+      onboardingCompleted,
     }}>
       {children}
     </AuthContext.Provider>
