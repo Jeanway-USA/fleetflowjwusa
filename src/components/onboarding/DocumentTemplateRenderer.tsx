@@ -103,6 +103,12 @@ export function DocumentTemplateRenderer({
                 {COMPANY_ADDRESS}
               </span>
             );
+          case 'driver_name':
+            return (
+              <span key={i} className="font-medium">
+                {driverName?.trim() ? driverName : <span className="text-muted-foreground italic">[Your name]</span>}
+              </span>
+            );
           case 'owner_signature':
             return (
               <span
