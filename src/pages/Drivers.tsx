@@ -386,10 +386,15 @@ export default function Drivers() {
                           View Dashboard
                         </DropdownMenuItem>
                       )}
+                      <DropdownMenuItem onClick={() => setProfileDriver(driver)}>
+                        <User className="h-4 w-4 mr-2" />
+                        View Profile
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setSelectedDriver(driver)}>
                         <FileText className="h-4 w-4 mr-2" />
                         Documents
                       </DropdownMenuItem>
+
                       {isOwner && (
                         <DropdownMenuItem onClick={() => setSignedDocsDriver(driver)}>
                           <FileSignature className="h-4 w-4 mr-2" />
