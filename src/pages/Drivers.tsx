@@ -705,10 +705,21 @@ export default function Drivers() {
 
 
 
+      <DriverDetailSheet
+        driver={profileDriver}
+        open={!!profileDriver}
+        onOpenChange={(open) => !open && setProfileDriver(null)}
+        onEdit={(d) => {
+          setProfileDriver(null);
+          openDialog(d);
+        }}
+      />
+
       <CSVImportDialog
         open={csvImportOpen}
         onOpenChange={setCsvImportOpen}
         tableName="drivers"
+
         fields={driverFields}
         queryKey={['drivers']}
         title="Import Drivers from CSV"
