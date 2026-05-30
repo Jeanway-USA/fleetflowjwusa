@@ -1,99 +1,49 @@
-# Profiles RLS Audit & Rewrite
+## Goal
+Add a `document_templates` table that stores editable contract/form templates (markdown + placeholders), scoped per organization. Leave the prior invitation/onboarding work untouched.
 
-Confirmed scope: **owner = all profiles in their own org only**. Cross-tenant remains `super_admin` only. Tenant isolation preserved.
+## Migration
 
-## Final role mapping
+### New table: `public.document_templates`
+Columns:
+- `id` uuid PK, default `gen_random_uuid()`
+- `org_id` uuid NOT NULL — tenant scope (Core rule)
+- `document_type` text NOT NULL — e.g. `driver_agreement`, `direct_deposit`, `driver_profile`
+- `name` text NULL — optional human label (e.g. "2026 Driver Agreement v2")
+- `content` text NOT NULL — plain text / markdown with `{{placeholder}}` tokens
+- `is_active` boolean NOT NULL default `true`
+- `version` integer NOT NULL default `1` — supports future revisions
+- `created_by` uuid NULL — auth user who saved it
+- `created_at` timestamptz NOT NULL default `now()`
+- `updated_at` timestamptz NOT NULL default `now()`
 
-| Capability | Roles |
-|---|---|
-| Read own profile | every authenticated user |
-| Insert own profile on signup (no `org_id` yet) | self |
-| Update own profile (cannot change `org_id`) | self |
-| Read all profiles in same org | `owner`, `dispatcher`, `maintenance`, `safety` |
-| Update all profiles in same org | `owner` |
-| Delete profiles in same org (cannot self-delete) | `owner` |
-| Cross-tenant read / update / delete | `super_admin` |
+Indexes:
+- `(org_id, document_type)` — fast lookup of templates by type within an org
+- Partial unique `(org_id, document_type) WHERE is_active` — exactly one active template per type per org (prevents ambiguity at invite-acceptance time)
 
-`payroll_admin` and `driver` fall back to self-only on profiles. Flag if finance/driver flows need broader read.
+### Placeholder convention (documented, not enforced)
+Content uses double-brace tokens that the frontend/edge function will interpolate at render time:
+`{{today_date}}`, `{{company_name}}`, `{{company_address}}`, `{{driver_name}}`, `{{driver_address}}`, `{{owner_signature}}`, `{{driver_signature}}`. No DB-side validation — kept flexible so new tokens can be added without schema changes.
 
-## Migration (single transaction)
-
-Drops all 6 existing `public.profiles` policies and installs an explicit, named set.
-
-```sql
-DROP POLICY IF EXISTS "Users can view their own profile"             ON public.profiles;
-DROP POLICY IF EXISTS "Admins can view org profiles"                 ON public.profiles;
-DROP POLICY IF EXISTS "Operations can view org profiles"             ON public.profiles;
-DROP POLICY IF EXISTS "Users can insert their own profile on signup" ON public.profiles;
-DROP POLICY IF EXISTS "Users can update their own profile"           ON public.profiles;
-DROP POLICY IF EXISTS "Owners can update org profiles"               ON public.profiles;
-
--- SELECT
-CREATE POLICY "profiles_select_self"
-  ON public.profiles FOR SELECT TO authenticated
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "profiles_select_org_staff"
-  ON public.profiles FOR SELECT TO authenticated
-  USING (
-    org_id = public.get_user_org_id(auth.uid())
-    AND (
-      public.has_role(auth.uid(), 'owner')
-      OR public.has_role(auth.uid(), 'dispatcher')
-      OR public.has_role(auth.uid(), 'maintenance')
-      OR public.has_role(auth.uid(), 'safety')
-    )
-  );
-
-CREATE POLICY "profiles_select_super_admin"
-  ON public.profiles FOR SELECT TO authenticated
-  USING (public.is_super_admin());
-
--- INSERT (signup only)
-CREATE POLICY "profiles_insert_self_signup"
-  ON public.profiles FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = user_id AND org_id IS NULL);
-
--- UPDATE
-CREATE POLICY "profiles_update_self"
-  ON public.profiles FOR UPDATE TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (
-    auth.uid() = user_id
-    AND org_id IS NOT DISTINCT FROM public.get_user_org_id(auth.uid())
-  );
-
-CREATE POLICY "profiles_update_owner"
-  ON public.profiles FOR UPDATE TO authenticated
-  USING (
-    public.is_owner(auth.uid())
-    AND org_id = public.get_user_org_id(auth.uid())
-  )
-  WITH CHECK (org_id = public.get_user_org_id(auth.uid()));
-
-CREATE POLICY "profiles_update_super_admin"
-  ON public.profiles FOR UPDATE TO authenticated
-  USING (public.is_super_admin())
-  WITH CHECK (public.is_super_admin());
-
--- DELETE
-CREATE POLICY "profiles_delete_owner"
-  ON public.profiles FOR DELETE TO authenticated
-  USING (
-    public.is_owner(auth.uid())
-    AND org_id = public.get_user_org_id(auth.uid())
-    AND user_id <> auth.uid()
-  );
-
-CREATE POLICY "profiles_delete_super_admin"
-  ON public.profiles FOR DELETE TO authenticated
-  USING (public.is_super_admin());
+### GRANTs
 ```
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.document_templates TO authenticated;
+GRANT ALL ON public.document_templates TO service_role;
+```
+No `anon` — templates are org-private.
 
-## Notes
+### RLS policies (multi-tenant, owner-managed)
+- `templates_select_org_staff` — any authenticated user in the org can read active templates (so a driver completing onboarding can fetch the agreement to sign): `org_id = get_user_org_id(auth.uid())`
+- `templates_manage_owner` — only owners can insert/update/delete: `is_owner(auth.uid()) AND org_id = get_user_org_id(auth.uid())`
+- `templates_super_admin` — `is_super_admin()` full access (cross-tenant)
 
-- Uses existing security-definer helpers (`has_role`, `is_owner`, `get_user_org_id`, `is_super_admin`) — no recursion risk on `profiles`.
-- All policies scoped `TO authenticated`; `anon` gets nothing.
-- Deleting a profile row does **not** delete the `auth.users` account. Full account deletion is an edge-function admin task — out of scope here; tell me if you want it added.
-- No application code changes required — existing queries already go through these helpers or self-scoped paths.
-- After approval I'll run the migration and verify with the Supabase linter.
+### Triggers
+- `update_document_templates_updated_at` BEFORE UPDATE → reuses existing `public.update_updated_at_column()`
+
+## Not changed
+- Previously added invitation state + driver onboarding fields (`onboarding_completed`, `signed_*_url`, `onboarding_completed_at`) remain as-is.
+- No frontend code changes in this task — `src/integrations/supabase/types.ts` auto-regenerates after migration.
+
+## Out of scope
+- Template editor UI
+- Placeholder interpolation logic (will live in a future edge function or signing component)
+- Seeding default `driver_agreement` / `direct_deposit` / `driver_profile` content
