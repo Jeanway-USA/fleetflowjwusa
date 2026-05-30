@@ -62,6 +62,8 @@ export function TeamManagementTab() {
 
   // Form state
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteFirstName, setInviteFirstName] = useState('');
+  const [inviteLastName, setInviteLastName] = useState('');
   const [inviteRole, setInviteRole] = useState<AppRole>('driver');
   const [inviteRequiresOnboarding, setInviteRequiresOnboarding] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
