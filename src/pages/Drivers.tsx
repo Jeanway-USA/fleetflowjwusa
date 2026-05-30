@@ -106,6 +106,48 @@ export default function Drivers() {
     },
   });
 
+  // Onboarding status: counts of signed docs per driver + active template count for org
+  const { data: signedDocCounts = {} } = useQuery({
+    queryKey: ['driver-signed-doc-counts', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_signed_documents')
+        .select('driver_id')
+        .eq('org_id', orgId!);
+      if (error) throw error;
+      const counts: Record<string, number> = {};
+      for (const row of data ?? []) {
+        counts[row.driver_id] = (counts[row.driver_id] ?? 0) + 1;
+      }
+      return counts;
+    },
+  });
+
+  const { data: activeTemplateCount = 0 } = useQuery({
+    queryKey: ['active-template-count', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('document_templates')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', orgId!)
+        .eq('is_active', true);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
+  const getOnboardingStatus = (driver: any): { label: string; tone: 'muted' | 'warn' | 'ok' } => {
+    if (!driver.user_id) return { label: 'Not invited', tone: 'muted' };
+    if (activeTemplateCount === 0) return { label: 'Login active', tone: 'ok' };
+    const signed = signedDocCounts[driver.id] ?? 0;
+    if (signed === 0) return { label: 'Onboarding pending', tone: 'warn' };
+    if (signed >= activeTemplateCount) return { label: 'Onboarded', tone: 'ok' };
+    return { label: `Onboarding ${signed}/${activeTemplateCount}`, tone: 'warn' };
+  };
+
+
   // Get linked user info for display
   const getLinkedUser = (userId: string | null) => {
     if (!userId) return null;
@@ -138,6 +180,31 @@ export default function Drivers() {
     },
     onError: (error: any) => toast.error(error.message),
   });
+
+  const inviteDriverMutation = useMutation({
+    mutationFn: async (driver: any) => {
+      if (!driver.email) throw new Error('Driver email is required to send an invitation');
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: {
+          email: driver.email,
+          role: 'driver',
+          driver_id: driver.id,
+          first_name: driver.first_name,
+          last_name: driver.last_name,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      return data;
+    },
+    onSuccess: (data: any) => {
+      toast.success(data?.message || 'Invitation sent');
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['profiles-for-linking', orgId] });
+    },
+    onError: (error: any) => toast.error(error.message || 'Failed to send invitation'),
+  });
+
 
   // Undoable delete hook
   const { deleteWithUndo } = useUndoableDelete<any>({
@@ -290,8 +357,16 @@ export default function Drivers() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg">{driver.first_name} {driver.last_name}</h3>
-                      <StatusBadge status={driver.status} />
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
+                        <StatusBadge status={driver.status} />
+                        {(() => {
+                          const s = getOnboardingStatus(driver);
+                          const variant = s.tone === 'ok' ? 'default' : s.tone === 'warn' ? 'secondary' : 'outline';
+                          return <Badge variant={variant as any} className="text-xs">{s.label}</Badge>;
+                        })()}
+                      </div>
                     </div>
+
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -320,6 +395,16 @@ export default function Drivers() {
                         <Pencil className="h-4 w-4 mr-2" />
                         Edit
                       </DropdownMenuItem>
+                      {isOwner && !driver.user_id && (
+                        <DropdownMenuItem
+                          disabled={!driver.email || inviteDriverMutation.isPending}
+                          onClick={() => inviteDriverMutation.mutate(driver)}
+                        >
+                          <Mail className="h-4 w-4 mr-2" />
+                          {driver.email ? 'Invite to log in' : 'Add email to invite'}
+                        </DropdownMenuItem>
+                      )}
+
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(driver)}>
                         <Trash2 className="h-4 w-4 mr-2" />
