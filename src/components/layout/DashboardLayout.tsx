@@ -112,22 +112,22 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <SidebarProvider>
-      <DashboardLayoutInner isDemoMode={isDemoMode} signOut={signOut} simulatedOrgId={simulatedOrgId} simulatedOrgName={simulatedOrgName} clearOrgSimulation={clearOrgSimulation} navigate={navigate}>
+      <DashboardLayoutInner isDemoMode={isDemoMode} signOut={signOut} simulatedOrgId={simulatedOrgId} simulatedOrgName={simulatedOrgName} clearOrgSimulation={clearOrgSimulation}>
         {children}
       </DashboardLayoutInner>
     </SidebarProvider>
   );
 }
 
-function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, simulatedOrgName, clearOrgSimulation, navigate }: {
+function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, simulatedOrgName, clearOrgSimulation }: {
   children: ReactNode;
   isDemoMode: boolean;
   signOut: () => Promise<void>;
   simulatedOrgId: string | null;
   simulatedOrgName: string | null;
   clearOrgSimulation: () => void;
-  navigate: (path: string) => void;
 }) {
+  const navigate = useNavigate();
   const { toggleSidebar } = useSidebar();
   const location = useLocation();
   const { tier } = useSubscriptionTier();
