@@ -234,6 +234,40 @@ export default function DriverOnboarding() {
   };
 
   const handleContinue = async () => {
+    // Step 0: validate + save driver credentials, then advance
+    if (isCredentialsStep) {
+      if (!driverRow || !orgId) {
+        toast.error('Driver profile not found.');
+        return;
+      }
+      const payload = await credentialsRef.current?.submit();
+      if (!payload) return;
+      setSubmitting(true);
+      try {
+        const { error } = await supabase
+          .from('drivers')
+          .update(payload)
+          .eq('id', driverRow.id)
+          .eq('org_id', orgId);
+        if (error) throw error;
+        await refetchDriver();
+        if (totalSteps > 1) {
+          setStepIndex(1);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          // No documents — credentials alone complete the flow
+          setSignedResults([]);
+          toast.success('Profile saved');
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : 'Failed to save credentials');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (stepIndex < totalSteps - 1) {
       setStepIndex((i) => i + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
