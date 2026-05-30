@@ -49,7 +49,7 @@ const roleBadgeVariant: Record<AppRole, 'default' | 'secondary' | 'outline'> = {
 
 export function TeamManagementTab() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, orgId } = useAuth();
 
   // Sheet / Dialog state
   const [inviteOpen, setInviteOpen] = useState(false);
