@@ -20,7 +20,11 @@ export interface DocumentTemplateRendererProps {
   driverName?: string;
   cdlNumber: string;
   onCdlNumberChange: (value: string) => void;
+  showAttachmentUpload?: boolean;
+  attachment?: File | null;
+  onAttachmentChange?: (file: File | null) => void;
 }
+
 
 type TextNode = { kind: 'text'; value: string };
 type TokenNode = { kind: 'token'; name: string };
