@@ -1,0 +1,1 @@
+ALTER TABLE public.drivers ALTER COLUMN pay_rate TYPE numeric(10,2);
