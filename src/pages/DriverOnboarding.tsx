@@ -126,7 +126,7 @@ export default function DriverOnboarding() {
     const results: SignedResult[] = [];
 
     for (const tmpl of templates) {
-      const tState = state[tmpl.id] ?? { driverAddress: '', signature: null };
+      const tState = state[tmpl.id] ?? { driverAddress: '', signature: null, cdlNumber: '' };
       const title =
         tmpl.name ??
         DOCUMENT_LABELS[tmpl.document_type as DocumentTypeKey] ??
@@ -138,6 +138,7 @@ export default function DriverOnboarding() {
         driverAddress: tState.driverAddress,
         signature: tState.signature,
         driverName,
+        cdlNumber: tState.cdlNumber,
       });
 
       const timestamp = Date.now();
