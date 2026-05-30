@@ -1,32 +1,62 @@
-## Plan: Verify driver onboarding routing and separation
+## Plan: Persist onboarding flags and hard-gate the driver dashboard
 
-After auditing the codebase, all three requirements are already satisfied. No code changes are needed.
+### Current state
 
-### Findings
+- `TeamManagementTab` already sends `requires_onboarding: boolean` to the `invite-user` edge function.
+- `invite-user/index.ts` reads it but only logs it — **the flag is never persisted** anywhere.
+- `profiles` has no `requires_onboarding` or `onboarding_completed` column.
+- Today, `RoleBasedRedirect` infers "needs onboarding" indirectly by counting unsigned templates. `ProtectedRoute` on `/driver-dashboard` (the actual path; `/driver/dashboard` does not exist) does not block access — a driver who navigates there directly is not redirected.
 
-**1. Protected route exists (`src/App.tsx`)**
-```tsx
-<Route path="/driver/onboarding" element={
-  <ProtectedRoute allowedRoles={['driver']}>
-    <DriverOnboarding />
-  </ProtectedRoute>
-} />
-```
-Plus `RoleBasedRedirect.tsx` already redirects drivers with unsigned templates to `/driver/onboarding`.
+The user wants explicit, durable flags + a hard block on the dashboard.
 
-**2. Driver wizard logic lives in `src/pages/DriverOnboarding.tsx`**
-- Step-by-step state: `stepIndex`, `totalSteps`, progress bar
-- Step 1: `<DriverCredentialsStep>` (react-hook-form + zod, including `phone_number`)
-- Steps 2+: `<DocumentTemplateRenderer>` parsing `{{phone_number}}` and other tokens
-- Submission writes signed docs and updates the `drivers` row
+### Database changes (one migration)
 
-**3. `src/pages/Onboarding.tsx` is owner-only setup**
-Its three steps are `['Organization', 'Fleet Setup', 'Invite Team']` — no driver credentials, no document template parser, no `phone_number` field. It is the org owner's initial setup flow and is cleanly separated from the driver contract flow.
+Add two columns to `public.profiles`:
 
-### Recommendation
+- `requires_onboarding boolean NOT NULL DEFAULT false` — set true when an invited driver needs to sign onboarding docs.
+- `onboarding_completed boolean NOT NULL DEFAULT false` — flipped to true the moment `DriverOnboarding` finishes its final submission.
 
-Close this task as already-complete. If you'd like, I can instead:
-- Add a redirect from any legacy `/onboarding?role=driver`-style URL to `/driver/onboarding`, or
-- Add a test asserting the route + role guard,
+Backfill existing drivers so we don't accidentally lock anyone out:
+- For every profile whose user has the `driver` role AND already has ≥1 row in `driver_signed_documents`, set `onboarding_completed = true`.
+- All other existing driver profiles get `requires_onboarding = true, onboarding_completed = false` (so legacy drivers without signed docs are sent through the new flow).
 
-but neither is required by the current request.
+No new RLS policies needed — existing profile policies already cover these columns.
+
+### Invite pipeline
+
+1. **`supabase/functions/invite-user/index.ts`** — persist the flag:
+   - For brand-new invites: pass `requires_onboarding` inside `options.data` so it lands in `auth.users.raw_user_meta_data`, AND upsert it onto the profile row after the user accepts and a profile is created.
+   - For existing users being re-assigned to an org: directly update `profiles.requires_onboarding` alongside the existing `org_id` update.
+
+2. **Signup trigger / profile bootstrap** — wherever the profile is auto-created on first login (likely `handle_new_user` trigger), copy `requires_onboarding` from `raw_user_meta_data` into the profile row. If no such trigger exists, do the upsert in `AuthContext` right after profile fetch.
+
+### Auth & routing changes
+
+3. **`src/contexts/AuthContext.tsx`** — extend `fetchOrgData` to also select `requires_onboarding, onboarding_completed`. Expose them on the context: `requiresOnboarding: boolean`, `onboardingCompleted: boolean`.
+
+4. **`src/components/shared/RoleBasedRedirect.tsx`** — replace the "count unsigned templates" check with a direct flag check:
+   ```ts
+   if (hasRole('driver') && requiresOnboarding && !onboardingCompleted) {
+     return <Navigate to="/driver/onboarding" replace />;
+   }
+   ```
+   Keep the existing fallback for drivers whose flags are both false (legacy / non-onboarding drivers).
+
+5. **`src/components/shared/ProtectedRoute.tsx`** — add a hard guard: if the user is a driver and `requiresOnboarding && !onboardingCompleted`, redirect to `/driver/onboarding` regardless of which protected route they tried to load. This is what closes the "type the URL directly" loophole on `/driver-dashboard` and any other driver-accessible page.
+
+6. **`src/pages/DriverOnboarding.tsx`** — inside `finalizeSubmission`, after all signed-document rows insert successfully, update the current user's profile: `onboarding_completed = true`. Then `navigate('/driver-dashboard')`.
+
+### Acceptance criteria
+
+- Inviting a driver with the "requires onboarding" checkbox stores `requires_onboarding = true` on their profile by the time they first sign in.
+- That driver is auto-redirected to `/driver/onboarding` from `/`, from `/driver-dashboard`, and from any other protected page until they finish.
+- Completing the final step of `DriverOnboarding` sets `onboarding_completed = true` and unblocks `/driver-dashboard`.
+- Existing drivers with prior signed docs are not locked out (backfill handles this).
+- Owners, dispatchers, payroll, safety, etc. are unaffected — the guard only applies when the driver role is present and `requires_onboarding` is true.
+
+### Technical notes
+
+- One Supabase migration adds the columns + backfill in a single transaction.
+- Edge-function changes deploy automatically — no manual deploy step.
+- The new ProtectedRoute guard runs only after `orgLoading` resolves, so it doesn't flash on first paint.
+- Path is `/driver-dashboard` (hyphen), not `/driver/dashboard` as written in the request; the guard covers all driver-reachable routes either way.

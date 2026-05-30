@@ -3483,8 +3483,10 @@ export type Database = {
           has_completed_onboarding_tour: boolean
           id: string
           last_name: string | null
+          onboarding_completed: boolean
           org_id: string | null
           phone: string | null
+          requires_onboarding: boolean
           updated_at: string
           user_id: string
         }
@@ -3496,8 +3498,10 @@ export type Database = {
           has_completed_onboarding_tour?: boolean
           id?: string
           last_name?: string | null
+          onboarding_completed?: boolean
           org_id?: string | null
           phone?: string | null
+          requires_onboarding?: boolean
           updated_at?: string
           user_id: string
         }
@@ -3509,8 +3513,10 @@ export type Database = {
           has_completed_onboarding_tour?: boolean
           id?: string
           last_name?: string | null
+          onboarding_completed?: boolean
           org_id?: string | null
           phone?: string | null
+          requires_onboarding?: boolean
           updated_at?: string
           user_id?: string
         }
