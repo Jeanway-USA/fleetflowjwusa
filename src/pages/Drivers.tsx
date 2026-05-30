@@ -357,8 +357,16 @@ export default function Drivers() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-lg">{driver.first_name} {driver.last_name}</h3>
-                      <StatusBadge status={driver.status} />
+                      <div className="flex items-center gap-2 flex-wrap mt-1">
+                        <StatusBadge status={driver.status} />
+                        {(() => {
+                          const s = getOnboardingStatus(driver);
+                          const variant = s.tone === 'ok' ? 'default' : s.tone === 'warn' ? 'secondary' : 'outline';
+                          return <Badge variant={variant as any} className="text-xs">{s.label}</Badge>;
+                        })()}
+                      </div>
                     </div>
+
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
