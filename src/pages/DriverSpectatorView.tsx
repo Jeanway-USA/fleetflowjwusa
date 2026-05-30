@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, Eye, Truck, MapPin, Phone, Mail, Clock, Home, CalendarDays, Wrench } from 'lucide-react';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
+import { CredentialsCompliance } from '@/components/drivers/CredentialsCompliance';
 
 type RequestType = 'detention' | 'home_time' | 'pto' | 'maintenance';
 
@@ -224,6 +225,10 @@ export default function DriverSpectatorView() {
         <div className="text-xs text-muted-foreground text-center bg-muted/50 rounded-md py-2">
           Viewing driver dashboard in read-only mode. Actions are disabled.
         </div>
+
+        {/* Credentials & Compliance */}
+        <CredentialsCompliance driver={driver} />
+
 
         {/* Active Load Card (read-only) */}
         <ActiveLoadCard 
