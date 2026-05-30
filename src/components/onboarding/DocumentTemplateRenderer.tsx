@@ -20,7 +20,11 @@ export interface DocumentTemplateRendererProps {
   driverName?: string;
   cdlNumber: string;
   onCdlNumberChange: (value: string) => void;
+  showAttachmentUpload?: boolean;
+  attachment?: File | null;
+  onAttachmentChange?: (file: File | null) => void;
 }
+
 
 type TextNode = { kind: 'text'; value: string };
 type TokenNode = { kind: 'token'; name: string };
@@ -73,7 +77,11 @@ export function DocumentTemplateRenderer({
   driverName,
   cdlNumber,
   onCdlNumberChange,
+  showAttachmentUpload = false,
+  attachment = null,
+  onAttachmentChange,
 }: DocumentTemplateRendererProps) {
+
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
   const contractorState = useMemo(() => extractStateFromAddress(driverAddress), [driverAddress]);
@@ -184,6 +192,38 @@ export function DocumentTemplateRenderer({
             return <span key={i}>{`{{${node.name}}}`}</span>;
         }
       })}
+
+      {showAttachmentUpload && (
+        <div className="mt-6 rounded-md border border-dashed bg-muted/30 p-4 not-prose">
+          <Label htmlFor="dd-attachment" className="block text-sm font-medium">
+            Attach voided check or bank letter
+          </Label>
+          <p className="text-xs text-muted-foreground mt-1 mb-3">
+            Required. Accepted formats: PDF, JPG, PNG (max 10 MB).
+          </p>
+          <Input
+            id="dd-attachment"
+            type="file"
+            accept="application/pdf,image/jpeg,image/png"
+            onChange={(e) => {
+              const file = e.target.files?.[0] ?? null;
+              if (file && file.size > 10 * 1024 * 1024) {
+                onAttachmentChange?.(null);
+                e.target.value = '';
+                return;
+              }
+              onAttachmentChange?.(file);
+            }}
+          />
+          {attachment && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Selected: <span className="font-medium text-foreground">{attachment.name}</span>{' '}
+              ({(attachment.size / 1024).toFixed(0)} KB)
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+

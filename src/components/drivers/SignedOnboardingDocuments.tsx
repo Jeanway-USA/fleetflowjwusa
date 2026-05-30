@@ -26,7 +26,7 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('driver_signed_documents')
-        .select('id, document_type, file_path, signed_at')
+        .select('id, document_type, file_path, attachment_file_path, signed_at')
         .eq('driver_id', driverId)
         .order('signed_at', { ascending: false });
       if (error) throw error;
@@ -39,14 +39,14 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
 
   const openSignedUrl = async (
     filePath: string,
-    documentType: string,
+    downloadName: string,
     mode: 'preview' | 'download',
   ) => {
     const { data, error } = await supabase.storage
       .from('signed-documents')
-      .createSignedUrl(filePath, 300, mode === 'download' ? { download: `${documentType}.pdf` } : undefined);
+      .createSignedUrl(filePath, 300, mode === 'download' ? { download: downloadName } : undefined);
     if (error || !data?.signedUrl) {
-      toast.error(error?.message ?? 'Could not open signed document');
+      toast.error(error?.message ?? 'Could not open document');
       return;
     }
     if (mode === 'preview') {
@@ -54,12 +54,13 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     } else {
       const a = document.createElement('a');
       a.href = data.signedUrl;
-      a.download = `${documentType}.pdf`;
+      a.download = downloadName;
       document.body.appendChild(a);
       a.click();
       a.remove();
     }
   };
+
 
   if (isLoading) {
     return (
@@ -98,23 +99,41 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
                 Signed {format(new Date(d.signed_at), "MMM d, yyyy 'at' h:mm a")}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => openSignedUrl(d.file_path, d.document_type, 'preview')}
+                onClick={() => openSignedUrl(d.file_path, `${d.document_type}.pdf`, 'preview')}
               >
                 <Eye className="mr-1.5 h-4 w-4" />
                 Preview
               </Button>
               <Button
                 size="sm"
-                onClick={() => openSignedUrl(d.file_path, d.document_type, 'download')}
+                onClick={() => openSignedUrl(d.file_path, `${d.document_type}.pdf`, 'download')}
               >
                 <Download className="mr-1.5 h-4 w-4" />
                 Download
               </Button>
+              {d.attachment_file_path && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    const ext = d.attachment_file_path!.split('.').pop() || 'bin';
+                    openSignedUrl(
+                      d.attachment_file_path!,
+                      `${d.document_type}_attachment.${ext}`,
+                      'download',
+                    );
+                  }}
+                >
+                  <Download className="mr-1.5 h-4 w-4" />
+                  Attachment
+                </Button>
+              )}
             </div>
+
           </div>
         );
       })}

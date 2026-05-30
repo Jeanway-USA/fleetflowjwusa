@@ -25,7 +25,9 @@ interface TemplateState {
   driverAddress: string;
   signature: string | null;
   cdlNumber: string;
+  attachment: File | null;
 }
+
 
 interface SignedResult {
   title: string;
@@ -80,8 +82,8 @@ export default function DriverOnboarding() {
   const totalSteps = templates.length;
   const currentTemplate = templates[stepIndex];
   const currentState: TemplateState = currentTemplate
-    ? state[currentTemplate.id] ?? { driverAddress: '', signature: null, cdlNumber: '' }
-    : { driverAddress: '', signature: null, cdlNumber: '' };
+    ? state[currentTemplate.id] ?? { driverAddress: '', signature: null, cdlNumber: '', attachment: null }
+    : { driverAddress: '', signature: null, cdlNumber: '', attachment: null };
 
   const needsDriverAddress = useMemo(
     () => !!currentTemplate && /\{\{\s*driver_address\s*\}\}/.test(currentTemplate.content),
@@ -91,11 +93,14 @@ export default function DriverOnboarding() {
     () => !!currentTemplate && /\{\{\s*cdl_number\s*\}\}/.test(currentTemplate.content),
     [currentTemplate],
   );
+  const isDirectDeposit = currentTemplate?.document_type === 'direct_deposit';
 
   const canContinue =
     !!currentState.signature &&
     (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
-    (!needsCdlNumber || currentState.cdlNumber.trim().length > 0);
+    (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
+    (!isDirectDeposit || !!currentState.attachment);
+
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
     if (!currentTemplate) return;
@@ -126,7 +131,8 @@ export default function DriverOnboarding() {
     const results: SignedResult[] = [];
 
     for (const tmpl of templates) {
-      const tState = state[tmpl.id] ?? { driverAddress: '', signature: null, cdlNumber: '' };
+      const tState: TemplateState =
+        state[tmpl.id] ?? { driverAddress: '', signature: null, cdlNumber: '', attachment: null };
       const title =
         tmpl.name ??
         DOCUMENT_LABELS[tmpl.document_type as DocumentTypeKey] ??
@@ -153,16 +159,41 @@ export default function DriverOnboarding() {
         });
       if (uploadError) throw uploadError;
 
+      // Upload supplemental attachment (e.g., voided check) for direct deposit
+      let attachmentPath: string | null = null;
+      if (tmpl.document_type === 'direct_deposit' && tState.attachment) {
+        const file = tState.attachment;
+        const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
+        attachmentPath = `${orgId}/${driverRow.id}/${safeType}_attachment-${timestamp}.${ext}`;
+        const { error: attachErr } = await supabase.storage
+          .from('signed-documents')
+          .upload(attachmentPath, file, {
+            contentType: file.type || 'application/octet-stream',
+            upsert: false,
+          });
+        if (attachErr) throw attachErr;
+      }
+
       const { error: insertError } = await supabase.from('driver_signed_documents').insert({
         org_id: orgId,
         driver_id: driverRow.id,
         template_id: tmpl.id,
         document_type: tmpl.document_type,
         file_path: filePath,
+        attachment_file_path: attachmentPath,
         driver_address: tState.driverAddress || null,
         signature_data_url: tState.signature,
       });
       if (insertError) throw insertError;
+
+      // Persist latest direct deposit attachment path on the driver record
+      if (attachmentPath) {
+        const { error: driverUpdateErr } = await supabase
+          .from('drivers')
+          .update({ direct_deposit_attachment_url: attachmentPath })
+          .eq('id', driverRow.id);
+        if (driverUpdateErr) throw driverUpdateErr;
+      }
 
       results.push({
         title,
@@ -171,6 +202,7 @@ export default function DriverOnboarding() {
         blobUrl: URL.createObjectURL(blob),
       });
     }
+
 
     setSignedResults(results);
     toast.success('Documents submitted successfully');
@@ -322,6 +354,10 @@ export default function DriverOnboarding() {
               driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
               cdlNumber={currentState.cdlNumber}
               onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
+              showAttachmentUpload={isDirectDeposit}
+              attachment={currentState.attachment}
+              onAttachmentChange={(file) => updateCurrent({ attachment: file })}
+
             />
           </div>
 
