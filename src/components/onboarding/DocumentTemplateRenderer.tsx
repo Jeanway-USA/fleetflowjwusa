@@ -9,7 +9,7 @@ import { extractStateFromAddress } from '@/lib/us-states';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|file_upload)\s*\}\}/g;
 
 export interface DocumentTemplateRendererProps {
   content: string;
@@ -20,7 +20,6 @@ export interface DocumentTemplateRendererProps {
   driverName?: string;
   cdlNumber: string;
   onCdlNumberChange: (value: string) => void;
-  showAttachmentUpload?: boolean;
   attachment?: File | null;
   onAttachmentChange?: (file: File | null) => void;
 }
@@ -77,7 +76,6 @@ export function DocumentTemplateRenderer({
   driverName,
   cdlNumber,
   onCdlNumberChange,
-  showAttachmentUpload = false,
   attachment = null,
   onAttachmentChange,
 }: DocumentTemplateRendererProps) {
@@ -188,41 +186,41 @@ export function DocumentTemplateRenderer({
                 </div>
               </Fragment>
             );
+          case 'file_upload':
+            return (
+              <div key={i} className="my-4 rounded-md border border-dashed bg-muted/30 p-4 not-prose">
+                <Label htmlFor={`file-upload-${i}`} className="block text-sm font-medium">
+                  Attach voided check or bank letter
+                </Label>
+                <p className="text-xs text-muted-foreground mt-1 mb-3">
+                  Required. Accepted formats: PDF, JPG, PNG (max 10 MB).
+                </p>
+                <Input
+                  id={`file-upload-${i}`}
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    if (file && file.size > 10 * 1024 * 1024) {
+                      onAttachmentChange?.(null);
+                      e.target.value = '';
+                      return;
+                    }
+                    onAttachmentChange?.(file);
+                  }}
+                />
+                {attachment && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Selected: <span className="font-medium text-foreground">{attachment.name}</span>{' '}
+                    ({(attachment.size / 1024).toFixed(0)} KB)
+                  </p>
+                )}
+              </div>
+            );
           default:
             return <span key={i}>{`{{${node.name}}}`}</span>;
         }
       })}
-
-      {showAttachmentUpload && (
-        <div className="mt-6 rounded-md border border-dashed bg-muted/30 p-4 not-prose">
-          <Label htmlFor="dd-attachment" className="block text-sm font-medium">
-            Attach voided check or bank letter
-          </Label>
-          <p className="text-xs text-muted-foreground mt-1 mb-3">
-            Required. Accepted formats: PDF, JPG, PNG (max 10 MB).
-          </p>
-          <Input
-            id="dd-attachment"
-            type="file"
-            accept="application/pdf,image/jpeg,image/png"
-            onChange={(e) => {
-              const file = e.target.files?.[0] ?? null;
-              if (file && file.size > 10 * 1024 * 1024) {
-                onAttachmentChange?.(null);
-                e.target.value = '';
-                return;
-              }
-              onAttachmentChange?.(file);
-            }}
-          />
-          {attachment && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Selected: <span className="font-medium text-foreground">{attachment.name}</span>{' '}
-              ({(attachment.size / 1024).toFixed(0)} KB)
-            </p>
-          )}
-        </div>
-      )}
     </div>
   );
 }

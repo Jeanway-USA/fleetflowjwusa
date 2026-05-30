@@ -93,13 +93,23 @@ export default function DriverOnboarding() {
     () => !!currentTemplate && /\{\{\s*cdl_number\s*\}\}/.test(currentTemplate.content),
     [currentTemplate],
   );
-  const isDirectDeposit = currentTemplate?.document_type === 'direct_deposit';
+  const needsDriverSignature = useMemo(
+    () => !!currentTemplate && /\{\{\s*driver_signature\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsFileUpload = useMemo(
+    () => !!currentTemplate && /\{\{\s*file_upload\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+
+  const isValidSignatureDataUrl = (s: string | null): s is string =>
+    !!s && s.startsWith('data:image/');
 
   const canContinue =
-    !!currentState.signature &&
+    (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
     (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
     (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
-    (!isDirectDeposit || !!currentState.attachment);
+    (!needsFileUpload || currentState.attachment != null);
 
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
@@ -159,9 +169,10 @@ export default function DriverOnboarding() {
         });
       if (uploadError) throw uploadError;
 
-      // Upload supplemental attachment (e.g., voided check) for direct deposit
+      // Upload supplemental attachment when the template includes a {{file_upload}} token
+      const templateHasFileUpload = /\{\{\s*file_upload\s*\}\}/.test(tmpl.content);
       let attachmentPath: string | null = null;
-      if (tmpl.document_type === 'direct_deposit' && tState.attachment) {
+      if (templateHasFileUpload && tState.attachment) {
         const file = tState.attachment;
         const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
         attachmentPath = `${orgId}/${driverRow.id}/${safeType}_attachment-${timestamp}.${ext}`;
@@ -187,7 +198,7 @@ export default function DriverOnboarding() {
       if (insertError) throw insertError;
 
       // Persist latest direct deposit attachment path on the driver record
-      if (attachmentPath) {
+      if (attachmentPath && tmpl.document_type === 'direct_deposit') {
         const { error: driverUpdateErr } = await supabase
           .from('drivers')
           .update({ direct_deposit_attachment_url: attachmentPath })
@@ -354,7 +365,7 @@ export default function DriverOnboarding() {
               driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
               cdlNumber={currentState.cdlNumber}
               onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
-              showAttachmentUpload={isDirectDeposit}
+              
               attachment={currentState.attachment}
               onAttachmentChange={(file) => updateCurrent({ attachment: file })}
 
