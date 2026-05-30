@@ -9,7 +9,7 @@ import { extractStateFromAddress } from '@/lib/us-states';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|file_upload)\s*\}\}/g;
 
 export interface DocumentTemplateRendererProps {
   content: string;
@@ -20,7 +20,6 @@ export interface DocumentTemplateRendererProps {
   driverName?: string;
   cdlNumber: string;
   onCdlNumberChange: (value: string) => void;
-  showAttachmentUpload?: boolean;
   attachment?: File | null;
   onAttachmentChange?: (file: File | null) => void;
 }
