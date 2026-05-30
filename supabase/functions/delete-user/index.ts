@@ -134,24 +134,42 @@ Deno.serve(async (req) => {
 
     console.log('Attempting to delete user:', userId);
 
-    // Delete user role first
-    const { error: roleDeleteError } = await supabaseAdmin
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userId);
+    // Purge / null-out all references to this user before deleting the auth row.
+    // Each step is logged but non-fatal so one failure doesn't abort the rest.
+    const purgeSteps: Array<[string, () => Promise<{ error: unknown }>]> = [
+      ['crm_activities', () => supabaseAdmin.from('crm_activities').delete().eq('user_id', userId)],
+      ['maintenance_request_messages', () => supabaseAdmin.from('maintenance_request_messages').delete().eq('sender_user_id', userId)],
+      ['user_feedback', () => supabaseAdmin.from('user_feedback').delete().eq('user_id', userId)],
+      ['documents.uploaded_by', () => supabaseAdmin.from('documents').update({ uploaded_by: null }).eq('uploaded_by', userId)],
+      ['document_templates.created_by', () => supabaseAdmin.from('document_templates').update({ created_by: null }).eq('created_by', userId)],
+      ['changelog.created_by', () => supabaseAdmin.from('changelog').update({ created_by: null }).eq('created_by', userId)],
+      ['drivers.user_id', () => supabaseAdmin.from('drivers').update({ user_id: null }).eq('user_id', userId)],
+      ['super_admin_audit_logs', () => supabaseAdmin.from('super_admin_audit_logs').delete().eq('user_id', userId)],
+      ['super_admins', () => supabaseAdmin.from('super_admins').delete().eq('user_id', userId)],
+      ['user_roles', () => supabaseAdmin.from('user_roles').delete().eq('user_id', userId)],
+      ['profiles', () => supabaseAdmin.from('profiles').delete().eq('user_id', userId)],
+    ];
 
-    if (roleDeleteError) {
-      console.log('Error deleting user role:', roleDeleteError.message);
+    for (const [label, fn] of purgeSteps) {
+      try {
+        const { error } = await fn();
+        if (error) console.log(`Purge warning [${label}]:`, (error as { message?: string }).message);
+      } catch (e) {
+        console.log(`Purge exception [${label}]:`, (e as Error).message);
+      }
     }
 
-    // Delete user profile
-    const { error: profileDeleteError } = await supabaseAdmin
-      .from('profiles')
-      .delete()
-      .eq('user_id', userId);
-
-    if (profileDeleteError) {
-      console.log('Error deleting profile:', profileDeleteError.message);
+    // Record the deletion in audit_logs (attributed to the requesting owner)
+    try {
+      await supabaseAdmin.from('audit_logs').insert({
+        user_id: requestingUser.id,
+        action: 'user_deleted',
+        table_name: 'auth.users',
+        record_id: userId,
+        details: { deleted_by: requestingUser.id, deleted_user_id: userId },
+      });
+    } catch (e) {
+      console.log('Audit log insert failed:', (e as Error).message);
     }
 
     // Delete the user from auth.users
