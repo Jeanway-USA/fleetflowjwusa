@@ -82,8 +82,8 @@ export default function DriverOnboarding() {
   const totalSteps = templates.length;
   const currentTemplate = templates[stepIndex];
   const currentState: TemplateState = currentTemplate
-    ? state[currentTemplate.id] ?? { driverAddress: '', signature: null, cdlNumber: '' }
-    : { driverAddress: '', signature: null, cdlNumber: '' };
+    ? state[currentTemplate.id] ?? { driverAddress: '', signature: null, cdlNumber: '', attachment: null }
+    : { driverAddress: '', signature: null, cdlNumber: '', attachment: null };
 
   const needsDriverAddress = useMemo(
     () => !!currentTemplate && /\{\{\s*driver_address\s*\}\}/.test(currentTemplate.content),
@@ -93,11 +93,14 @@ export default function DriverOnboarding() {
     () => !!currentTemplate && /\{\{\s*cdl_number\s*\}\}/.test(currentTemplate.content),
     [currentTemplate],
   );
+  const isDirectDeposit = currentTemplate?.document_type === 'direct_deposit';
 
   const canContinue =
     !!currentState.signature &&
     (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
-    (!needsCdlNumber || currentState.cdlNumber.trim().length > 0);
+    (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
+    (!isDirectDeposit || !!currentState.attachment);
+
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
     if (!currentTemplate) return;
