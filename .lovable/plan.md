@@ -1,98 +1,72 @@
-# Driver Profile & Credentials — Step 1 of Driver Onboarding
+# Wire Step 1 credentials into the document template parser
 
-Add a new first step to `src/pages/DriverOnboarding.tsx` that collects the driver's CDL/medical/TWIC credentials and saves them to the existing `drivers` row before the document-signing steps begin.
+## Note on file targeting
 
-## Scope
+The parser doesn't actually live in `src/pages/Onboarding.tsx` (that's the org-owner wizard). The dynamic template parser is split across two files and is invoked from `DriverOnboarding.tsx` (the file where Step 1 credentials were just added). I'll update the real parser locations, plus the admin reference guide:
 
-- File: `src/pages/DriverOnboarding.tsx` (existing driver-facing wizard).
-- New file: `src/components/onboarding/DriverCredentialsStep.tsx` (the form component, kept separate to keep the wizard file readable).
-- No DB migration — the `drivers` table already has every needed column (`license_number`, `license_expiry`, `medical_card_expiry`, `endorsements`, `has_twic`, `twic_expiry`).
-- No changes to `src/pages/Onboarding.tsx` (owner wizard) or to document templates.
+- `src/components/onboarding/DocumentTemplateRenderer.tsx` — on-screen renderer for the driver-facing wizard.
+- `src/lib/onboarding/generateSignedPdf.ts` — final PDF generator.
+- `src/pages/DriverOnboarding.tsx` — pass the new credential values down.
+- `src/components/settings/DocumentTemplatesPanel.tsx` — the `VARIABLES` array that powers the admin reference guide rendered by `src/pages/admin/DocumentTemplates.tsx`.
 
-## UX flow
+## New tokens
 
-```
-[ Step 1: Driver Profile & Credentials ]  ← NEW
-        ↓ Save to drivers row
-[ Step 2..N: existing document templates ]
-        ↓
-[ Success screen with signed PDFs ]
-```
+| Token | Source (drivers row) | Rendered as |
+|---|---|---|
+| `{{license_number}}` | `license_number` | plain text, italic placeholder if blank |
+| `{{license_expiry}}` | `license_expiry` (date) | formatted `MMMM d, yyyy` |
+| `{{dot_medical_expiry}}` | `medical_card_expiry` | formatted `MMMM d, yyyy` |
+| `{{endorsements_list}}` | `endorsements` (string[]) | comma-joined (e.g. `H, P, X`), or `None` if empty |
+| `{{twic_status}}` | `has_twic` + `twic_expiry` | `Yes — expires Mar 5, 2027` when has_twic; `No` otherwise |
 
-- Total step count becomes `templates.length + 1`.
-- Progress bar and "Step X of Y" label include the new step.
-- Back/Continue buttons follow the same pattern already in the file.
-- If the driver's row already has these values populated (e.g. they return mid-flow), prefill the form from `driverRow`.
+All five render as plain inline text in the renderer (`<span className="font-medium">…</span>`) — no inputs, since Step 1 already captured them. Dates parsed via the project convention `new Date(value + 'T00:00:00')` to avoid TZ drift.
 
-## Step 1 form contents (shadcn/ui)
+## Changes per file
 
-Wrapped in a single `<Card>` matching the styling of the existing document step.
+### 1. `DocumentTemplatesPanel.tsx`
 
-1. **License Number** — `<Input>` (required, 4–30 chars).
-2. **License Expiry Date** — shadcn DatePicker (Popover + Calendar, `pointer-events-auto`). Required, must be ≥ today.
-3. **DOT Medical Card Expiration Date** — same DatePicker. Required, must be ≥ today.
-4. **Endorsements** — grid of 6 `<Checkbox>` controls inside a `<FormItem>` group, options `H, P, T, N, S, X`. Multi-select, no minimum (drivers may have none). Stored as `string[]`.
-5. **TWIC Card?** — shadcn `<RadioGroup>` with two options (Yes / No). Required.
-6. **TWIC Expiry Date** — DatePicker, **only rendered when** `hasTwic === 'yes'`. Required + must be ≥ today only in that branch (zod `superRefine`).
-
-All fields use `<Form>` / `<FormField>` / `<FormControl>` / `<FormMessage>` for inline errors.
-
-## Validation (zod schema)
+Append 5 entries to the `VARIABLES` array, matching the existing format/wording:
 
 ```ts
-const endorsementSchema = z.enum(['H','P','T','N','S','X']);
-const schema = z.object({
-  licenseNumber: z.string().trim().min(4).max(30),
-  licenseExpiry: z.date({ required_error: 'License expiry is required' })
-                  .refine(d => d >= startOfToday(), 'License must not be expired'),
-  medicalCardExpiry: z.date({ required_error: 'Medical card expiry is required' })
-                      .refine(d => d >= startOfToday(), 'Medical card must not be expired'),
-  endorsements: z.array(endorsementSchema).default([]),
-  hasTwic: z.enum(['yes','no'], { required_error: 'Please select an option' }),
-  twicExpiry: z.date().optional(),
-}).superRefine((val, ctx) => {
-  if (val.hasTwic === 'yes') {
-    if (!val.twicExpiry) ctx.addIssue({ code: 'custom', path: ['twicExpiry'], message: 'TWIC expiry is required' });
-    else if (val.twicExpiry < startOfToday()) ctx.addIssue({ code: 'custom', path: ['twicExpiry'], message: 'TWIC card must not be expired' });
-  }
-});
+{ token: '{{license_number}}', description: "Auto-fills the driver's CDL number captured in onboarding Step 1." },
+{ token: '{{license_expiry}}', description: "Auto-fills the driver's CDL expiry date (Step 1)." },
+{ token: '{{dot_medical_expiry}}', description: "Auto-fills the driver's DOT medical card expiry date (Step 1)." },
+{ token: '{{endorsements_list}}', description: "Auto-fills the driver's CDL endorsements (comma-separated, e.g. H, P, X). Shows 'None' when blank." },
+{ token: '{{twic_status}}', description: "Auto-fills TWIC status: 'Yes — expires <date>' or 'No' (Step 1)." },
 ```
 
-`form.formState.isValid` (with `mode: 'onChange'`) drives the Continue button's `disabled` state, matching the existing `canContinue` pattern in the file.
+### 2. `DocumentTemplateRenderer.tsx`
 
-## Save on Continue
+- Extend `TOKEN_REGEX` to include `license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status`.
+- Extend `DocumentTemplateRendererProps` with optional fields:
+  ```ts
+  licenseNumber?: string | null;
+  licenseExpiry?: string | null;        // 'yyyy-MM-dd'
+  medicalCardExpiry?: string | null;    // 'yyyy-MM-dd'
+  endorsements?: string[] | null;
+  hasTwic?: boolean | null;
+  twicExpiry?: string | null;           // 'yyyy-MM-dd'
+  ```
+- Add a small `formatDateToken(value)` helper using the `T00:00:00` rule, returning `'—'` (or italic `[Not provided]`) when missing.
+- Add five new `case` branches in the switch — all render `<span className="font-medium">…</span>`, no inputs.
 
-When the user clicks Continue on Step 1, before advancing `stepIndex`:
+### 3. `generateSignedPdf.ts`
 
-```ts
-await supabase
-  .from('drivers')
-  .update({
-    license_number: values.licenseNumber,
-    license_expiry: format(values.licenseExpiry, 'yyyy-MM-dd'),
-    medical_card_expiry: format(values.medicalCardExpiry, 'yyyy-MM-dd'),
-    endorsements: values.endorsements,
-    has_twic: values.hasTwic === 'yes',
-    twic_expiry: values.hasTwic === 'yes' ? format(values.twicExpiry!, 'yyyy-MM-dd') : null,
-  })
-  .eq('id', driverRow.id)
-  .eq('org_id', orgId);
-```
+- Extend its `TOKEN_REGEX` with the same five token names.
+- Extend `GenerateSignedPdfArgs` with the same six optional fields.
+- Add matching `case` branches that append to the `buffer` as plain text (using the same formatter), falling back to `________________________` when missing — mirrors the existing fallback for empty driver-filled tokens.
 
-- Dates formatted as `yyyy-MM-dd` (no timezone shift — matches the project's date-handling rule).
-- If `has_twic` flips to "no", `twic_expiry` is explicitly nulled.
-- Errors surface via `toast.error` and the step does not advance.
-- On success, advance to step index 1 (first document template).
+### 4. `DriverOnboarding.tsx`
 
-## Integration with existing wizard
+The Step 1 query already selects `license_number, license_expiry, medical_card_expiry, endorsements, has_twic, twic_expiry`. Pipe those fields from `driverRow` into:
 
-- `totalSteps = templates.length + 1` and `stepIndex === 0` renders the new credentials card; otherwise the existing template renderer runs with `templates[stepIndex - 1]`.
-- Final-submit logic (`stepIndex === totalSteps - 1` → `finalizeSubmission`) keeps working unchanged because the offset only affects the first step.
-- The "no documents to sign" empty state is preserved (we still render the credentials step even if `templates.length === 0`, then submit directly).
+- `<DocumentTemplateRenderer …>` — pass the six new props.
+- `generateSignedPdf({ …, licenseNumber, licenseExpiry, medicalCardExpiry, endorsements, hasTwic, twicExpiry })` inside `finalizeSubmission`.
+
+Because credentials are saved on Continue from Step 1 (and `refetchDriver()` runs right after), the values are guaranteed to be present in `driverRow` by the time any template step renders.
 
 ## Out of scope
 
-- No changes to `Onboarding.tsx` (owner wizard).
-- No new DB columns; no migration.
-- No changes to document templates, signed-PDF generation, or storage.
-- No changes to RLS (existing "Drivers can view their own record" + owner manage policies cover updates by the driver via service flows; we update through the driver's authenticated session which is allowed by the owner/payroll policy chain — if the update is rejected by RLS in practice we will surface a clear toast and revisit policies in a follow-up).
+- No DB changes, no migration — all source fields already exist on `drivers`.
+- No new Step-1 inputs; this is purely making already-collected data flowable into templates.
+- No changes to `src/pages/Onboarding.tsx` (org-owner wizard), to `pages/admin/DocumentTemplates.tsx` (it just hosts the panel), or to existing tokens.
