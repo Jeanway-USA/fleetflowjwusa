@@ -1,25 +1,27 @@
-## Plan: Wire Phone Number into Onboarding (No Migration)
+## Plan: Add `{{phone_number}}` Template Variable
 
-### Context
-The `drivers` table already has a `phone` column (`text`, nullable) that is used throughout the admin UI, CSV import, and demo seed data. Per your decision, no new column will be added — the onboarding form just needs to read/write the existing `phone` field so drivers can self-serve their number during onboarding.
+### Goal
+Allow admins to use a `{{phone_number}}` token in document templates so the driver’s phone number is auto-injected as plain text during driver onboarding.
 
 ### Changes
 
-#### 1. `src/components/onboarding/DriverCredentialsStep.tsx`
-Add an optional `phoneNumber` field to the Zod schema, the form UI, the payload type, and `buildDefaultValues`:
-- **Zod**: `phoneNumber: z.string().trim().min(10, 'Enter a valid phone number').max(20).optional().or(z.literal(''))` — accepts 10–20 chars, allows blank if the admin already filled it in.
-- **UI**: A new `Input` field labeled "Phone Number" rendered immediately after License Number, using the same `pl-4 sm:pl-3` padding standard and `inputMode="tel"` / `autoComplete="tel"`.
-- **Payload**: Extend `DriverCredentialsPayload` with `phone: string | null` and emit `v.phoneNumber?.trim() || null` from `submit()`.
-- **Defaults**: `buildDefaultValues` reads `row?.phone` and seeds the input with it.
+1. **Reference Guide** (`src/components/settings/DocumentTemplatesPanel.tsx`)
+   - Append `{ token: "{{phone_number}}", description: "Auto-fills the driver's phone number captured in onboarding Step 1." }` to the `VARIABLES` array.
 
-#### 2. `src/pages/DriverOnboarding.tsx`
-The existing `supabase.from('drivers').update(payload)` call in `handleContinue` automatically picks up the new `phone` field — no further changes needed. Just verify the driver query already includes `phone` (it uses `select('*')` per current code).
+2. **Template Parser** (`src/components/onboarding/DocumentTemplateRenderer.tsx`)
+   - Add `phone_number` to the `TOKEN_REGEX` capture group.
+   - Add `phoneNumber?: string | null` to `DocumentTemplateRendererProps`.
+   - Add a `case 'phone_number':` branch that renders the number as plain text (or `[Not provided]` when blank).
+
+3. **Driver Onboarding** (`src/pages/DriverOnboarding.tsx`)
+   - Include `phone` in both `drivers` SELECT queries (the React Query fetcher and the `finalizeSubmission` fetcher).
+   - Pass `phoneNumber={driverRow?.phone}` to `<DocumentTemplateRenderer />`.
 
 ### Out of Scope
-- No database schema migration (column already exists).
-- No new `phone_number` column.
-- No changes to the admin Drivers page or CSV import (already use `phone`).
+- No database migration needed (`phone` column already exists on `drivers`).
+- No changes to `generateSignedPdf` or admin CSV import.
 
-### Technical Details
-- The Supabase types file (`src/integrations/supabase/types.ts`) is auto-generated and already includes `phone` — no edits.
-- Phone validation is intentionally light (length only) to accommodate international formats; full format validation can be added later if needed.
+### Acceptance Criteria
+- `{{phone_number}}` appears in the Admin Document Templates Variable Reference Guide.
+- When a template includes `{{phone_number}}`, the driver onboarding page displays the driver’s phone number as plain text.
+- If the driver has no phone number on file, the token renders as `[Not provided]`.
