@@ -415,6 +415,12 @@ export default function DriverOnboarding() {
                 onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
                 attachment={currentState.attachment}
                 onAttachmentChange={(file) => updateCurrent({ attachment: file })}
+                licenseNumber={driverRow?.license_number}
+                licenseExpiry={driverRow?.license_expiry}
+                medicalCardExpiry={driverRow?.medical_card_expiry}
+                endorsements={driverRow?.endorsements}
+                hasTwic={driverRow?.has_twic}
+                twicExpiry={driverRow?.twic_expiry}
               />
             </div>
           ) : null}
