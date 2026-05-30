@@ -49,14 +49,18 @@ export default function DriverOnboarding() {
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
+  const credentialsRef = useRef<DriverCredentialsStepHandle>(null);
+  const [credentialsValid, setCredentialsValid] = useState(false);
 
-  const { data: driverRow, isLoading: driverLoading } = useQuery({
+  const { data: driverRow, isLoading: driverLoading, refetch: refetchDriver } = useQuery({
     queryKey: ['driver-self', user?.id, orgId],
     enabled: !!user && !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, first_name, last_name')
+        .select(
+          'id, first_name, last_name, license_number, license_expiry, medical_card_expiry, endorsements, has_twic, twic_expiry',
+        )
         .eq('user_id', user!.id)
         .eq('org_id', orgId!)
         .maybeSingle();
