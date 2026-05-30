@@ -43,7 +43,7 @@ interface SignedResult {
 
 export default function DriverOnboarding() {
   const navigate = useNavigate();
-  const { user, orgId } = useAuth();
+  const { user, orgId, refreshOrgData } = useAuth();
 
   const [stepIndex, setStepIndex] = useState(0);
   const [state, setState] = useState<Record<string, TemplateState>>({});
