@@ -40,6 +40,12 @@ const schema = z
       .trim()
       .min(4, 'License number must be at least 4 characters')
       .max(30, 'License number must be under 30 characters'),
+    phoneNumber: z
+      .string()
+      .trim()
+      .max(20, 'Phone number must be under 20 characters')
+      .optional()
+      .or(z.literal('')),
     licenseExpiry: z
       .date({ required_error: 'License expiry date is required' })
       .refine((d) => d >= today(), 'License must not be expired'),
@@ -51,6 +57,13 @@ const schema = z
     twicExpiry: z.date().optional(),
   })
   .superRefine((val, ctx) => {
+    if (val.phoneNumber && val.phoneNumber.replace(/\D/g, '').length < 10) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['phoneNumber'],
+        message: 'Enter a valid phone number (at least 10 digits)',
+      });
+    }
     if (val.hasTwic === 'yes') {
       if (!val.twicExpiry) {
         ctx.addIssue({
