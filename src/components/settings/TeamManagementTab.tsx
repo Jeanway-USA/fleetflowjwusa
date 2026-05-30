@@ -80,12 +80,21 @@ export function TeamManagementTab() {
 
   // ── Query ──
   const { data: usersWithRoles = [], isLoading } = useQuery({
-    queryKey: ['users_with_roles'],
+    queryKey: ['users_with_roles', orgId],
+    enabled: !!orgId,
     queryFn: async () => {
-      const { data: profiles, error: profilesError } = await supabase.from('profiles').select('*');
+      if (!orgId) return [] as UserWithRole[];
+
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('org_id', orgId);
       if (profilesError) throw profilesError;
 
-      const { data: roles, error: rolesError } = await supabase.from('user_roles').select('*');
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('org_id', orgId);
       if (rolesError) throw rolesError;
 
       return profiles.map(p => {
