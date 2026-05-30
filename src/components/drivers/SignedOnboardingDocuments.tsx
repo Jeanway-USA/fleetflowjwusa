@@ -86,8 +86,9 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-        Owner-only view
+        Admin view
       </div>
+
       {docs.map((d) => {
         const label = DOCUMENT_LABELS[d.document_type] ?? d.document_type;
         return (
