@@ -1,40 +1,28 @@
-## Plan: Credentials & Compliance Section in Admin Driver Views
+## Plan: Add "Valid" Badge to Credentials & Compliance
 
-### Problem
-Driver credential data (license, medical card, TWIC, endorsements) is either mixed into general cards without clear grouping (`Drivers.tsx`) or entirely absent (`DriverSpectatorView.tsx`). Expiry warnings are minimal text-color changes, not the required StatusBadge visual helpers.
+### Context
+The "Credentials & Compliance" section already exists in `src/pages/Drivers.tsx` and `src/pages/DriverSpectatorView.tsx` via the shared `src/components/drivers/CredentialsCompliance.tsx`, with red "Expired" and yellow "Expiring Soon" badges already wired through `StatusBadge`. The `drivers` query in `Drivers.tsx` already does `select('*')`, so all needed columns (`license_number`, `license_expiry`, `medical_card_expiry`, `endorsements`, `has_twic`, `twic_expiry`) are already returned.
+
+Note: the database columns use existing names (`license_expiry`, `medical_card_expiry`, `has_twic`, `twic_expiry`) per the project memory — no schema changes.
+
+`src/components/crm/ContactDetailSheet.tsx` is for CRM brokers/carriers and contains no driver references — it is not used for driver details and will not be modified.
 
 ### Changes
 
 #### 1. `src/components/shared/StatusBadge.tsx`
-Extend the `statusMap` so the shared badge component can render credential expiry states:
-- `"expiring_soon"` → `warning` (yellow)
-- `"expired"` → `error` (red)
+Add a `"valid"` entry mapped to `success` (green) so the shared badge can render the new healthy-credential state.
 
-#### 2. `src/pages/Drivers.tsx` — Admin driver card grid
-Replace the current scattered credential rows with a clear **"Credentials & Compliance"** bordered section inside each driver card.
+#### 2. `src/components/drivers/CredentialsCompliance.tsx`
+Update `ExpiryBadge` so that when a date is present and more than 30 days in the future, it returns a green `<StatusBadge status="valid" />` instead of `null`. Keep the existing rules:
+- Past date → red **"Expired"**
+- ≤ 30 days away → yellow **"Expiring Soon"**
+- > 30 days away → green **"Valid"** (new)
+- No date → no badge
 
-**Display fields:**
-- License Number
-- Endorsements (as existing compact badges)
-- TWIC status: "Yes" or "No"
-- License Expiry Date
-- DOT Medical Card Expiry Date
-- TWIC Expiry Date (only if `has_twic`)
-
-**Date status logic:**
-- If date is in the past → red `StatusBadge` label: **"Expired"**
-- If date is within 30 days of today → yellow `StatusBadge` label: **"Expiring Soon"**
-- Otherwise → no badge
-
-#### 3. `src/pages/DriverSpectatorView.tsx` — Read-only detail view
-Add a new `Card` titled **"Credentials & Compliance"** below the header banner. Show the same six fields and identical date-status badge logic as above.
+This change automatically flows to both the admin driver card grid (`Drivers.tsx`) and the spectator detail view (`DriverSpectatorView.tsx`).
 
 ### Out of Scope
-- No database migrations (columns already exist).
-- No changes to the Add/Edit driver dialog form.
-- No changes to the onboarding wizard or document templates.
-
-### Technical Details
-- Reuse existing `isExpiringSoon()` logic but split it to distinguish `expired` (past) from `expiring_soon` (≤30 days).
-- Use `parseISO` and `isBefore`/`isAfter` from `date-fns` for date comparisons.
-- Reuse the existing `formatDate()` helper in `Drivers.tsx`.
+- No database migrations.
+- No changes to the driver list query (already `select('*')`).
+- No changes to `ContactDetailSheet.tsx` (unrelated to drivers).
+- No changes to the Add/Edit driver form.
