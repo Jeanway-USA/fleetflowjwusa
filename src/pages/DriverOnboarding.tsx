@@ -358,31 +358,14 @@ export default function DriverOnboarding() {
     );
   }
 
-  if (totalSteps === 0) {
-    return (
-      <div className="container max-w-3xl py-10">
-        <Card>
-          <CardHeader>
-            <CardTitle>No documents to sign</CardTitle>
-            <CardDescription>
-              There are no active onboarding documents for your organization yet. Please contact
-              your dispatcher.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button variant="outline" onClick={() => navigate('/driver')}>
-              Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   const progress = ((stepIndex + 1) / totalSteps) * 100;
-  const docType = currentTemplate.document_type as DocumentTypeKey;
-  const title =
-    currentTemplate.name ?? DOCUMENT_LABELS[docType] ?? currentTemplate.document_type;
+  const docType = currentTemplate?.document_type as DocumentTypeKey | undefined;
+  const title = isCredentialsStep
+    ? 'Driver Profile & Credentials'
+    : currentTemplate?.name ??
+      (docType ? DOCUMENT_LABELS[docType] : undefined) ??
+      currentTemplate?.document_type ??
+      '';
 
   return (
     <div className="container max-w-3xl py-10">
@@ -397,28 +380,36 @@ export default function DriverOnboarding() {
         <CardHeader>
           <CardTitle>{title}</CardTitle>
           <CardDescription>
-            Please review the document below, fill in the required fields, and sign at the bottom.
+            {isCredentialsStep
+              ? 'Confirm your CDL, medical card, and TWIC details before reviewing onboarding documents.'
+              : 'Please review the document below, fill in the required fields, and sign at the bottom.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border bg-card p-6">
-            <DocumentTemplateRenderer
-              content={currentTemplate.content}
-              driverAddress={currentState.driverAddress}
-              onDriverAddressChange={(v) => updateCurrent({ driverAddress: v })}
-              signature={currentState.signature}
-              onSignatureCapture={(dataUrl) =>
-                updateCurrent({ signature: dataUrl ? dataUrl : null })
-              }
-              driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
-              cdlNumber={currentState.cdlNumber}
-              onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
-              
-              attachment={currentState.attachment}
-              onAttachmentChange={(file) => updateCurrent({ attachment: file })}
-
+          {isCredentialsStep ? (
+            <DriverCredentialsStep
+              ref={credentialsRef}
+              defaultValues={buildDefaultValues(driverRow)}
+              onValidityChange={setCredentialsValid}
             />
-          </div>
+          ) : currentTemplate ? (
+            <div className="rounded-md border bg-card p-6">
+              <DocumentTemplateRenderer
+                content={currentTemplate.content}
+                driverAddress={currentState.driverAddress}
+                onDriverAddressChange={(v) => updateCurrent({ driverAddress: v })}
+                signature={currentState.signature}
+                onSignatureCapture={(dataUrl) =>
+                  updateCurrent({ signature: dataUrl ? dataUrl : null })
+                }
+                driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
+                cdlNumber={currentState.cdlNumber}
+                onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
+                attachment={currentState.attachment}
+                onAttachmentChange={(file) => updateCurrent({ attachment: file })}
+              />
+            </div>
+          ) : null}
 
           <div className="mt-6 flex items-center justify-between">
             <Button
@@ -430,8 +421,10 @@ export default function DriverOnboarding() {
             </Button>
             <Button onClick={handleContinue} disabled={!canContinue || submitting}>
               {submitting
-                ? 'Submitting…'
-                : stepIndex === totalSteps - 1
+                ? isCredentialsStep
+                  ? 'Saving…'
+                  : 'Submitting…'
+                : stepIndex === totalSteps - 1 && !isCredentialsStep
                   ? 'Submit'
                   : 'Continue'}
             </Button>
