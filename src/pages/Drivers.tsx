@@ -20,8 +20,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off, Eye, MoreHorizontal, FileSpreadsheet } from 'lucide-react';
+import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off, Eye, MoreHorizontal, FileSpreadsheet, FileSignature } from 'lucide-react';
 import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
+import { SignedOnboardingDocuments } from '@/components/drivers/SignedOnboardingDocuments';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,6 +66,7 @@ export default function Drivers() {
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [signedDocsDriver, setSignedDocsDriver] = useState<any>(null);
 
   const driverFields = [
     { key: 'first_name', label: 'First Name', required: true },
@@ -305,6 +307,12 @@ export default function Drivers() {
                         <FileText className="h-4 w-4 mr-2" />
                         Documents
                       </DropdownMenuItem>
+                      {isOwner && (
+                        <DropdownMenuItem onClick={() => setSignedDocsDriver(driver)}>
+                          <FileSignature className="h-4 w-4 mr-2" />
+                          Signed Documents
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => openDialog(driver)}>
                         <Pencil className="h-4 w-4 mr-2" />
                         Edit
