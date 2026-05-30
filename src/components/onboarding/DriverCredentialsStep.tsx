@@ -130,13 +130,11 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
     });
 
     const hasTwic = form.watch('hasTwic');
+    const isValid = form.formState.isValid;
 
-    // Notify parent when validity changes
-    if (onValidityChange) {
-      // Subscribe via watch effect-style — react-hook-form updates isValid synchronously after onChange
-      const isValid = form.formState.isValid;
-      queueMicrotask(() => onValidityChange(isValid));
-    }
+    useEffect(() => {
+      onValidityChange?.(isValid);
+    }, [isValid, onValidityChange]);
 
     useImperativeHandle(ref, () => ({
       isValid: form.formState.isValid,
