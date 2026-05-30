@@ -1410,6 +1410,45 @@ export type Database = {
           },
         ]
       }
+      driver_signed_documents: {
+        Row: {
+          created_at: string
+          document_type: string
+          driver_address: string | null
+          driver_id: string
+          file_path: string
+          id: string
+          org_id: string
+          signature_data_url: string | null
+          signed_at: string
+          template_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          document_type: string
+          driver_address?: string | null
+          driver_id: string
+          file_path: string
+          id?: string
+          org_id: string
+          signature_data_url?: string | null
+          signed_at?: string
+          template_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          document_type?: string
+          driver_address?: string | null
+          driver_id?: string
+          file_path?: string
+          id?: string
+          org_id?: string
+          signature_data_url?: string | null
+          signed_at?: string
+          template_id?: string | null
+        }
+        Relationships: []
+      }
       drivers: {
         Row: {
           avatar_url: string | null
