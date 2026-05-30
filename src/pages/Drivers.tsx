@@ -434,16 +434,22 @@ export default function Drivers() {
                 </div>
 
                 {driver.phone && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <a
+                    href={`tel:${driver.phone}`}
+                    className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                  >
                     <Phone className="h-4 w-4" />
                     <span>{driver.phone}</span>
-                  </div>
+                  </a>
                 )}
                 {driver.email && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <a
+                    href={`mailto:${driver.email}`}
+                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                  >
                     <Mail className="h-4 w-4" />
                     <span className="truncate">{driver.email}</span>
-                  </div>
+                  </a>
                 )}
 
                 <div className="pt-2 border-t">
