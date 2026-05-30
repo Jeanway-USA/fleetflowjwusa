@@ -4,7 +4,7 @@ import { extractStateFromAddress } from '@/lib/us-states';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status)\s*\}\}/g;
 
 export interface GenerateSignedPdfArgs {
   title: string;
@@ -13,6 +13,19 @@ export interface GenerateSignedPdfArgs {
   signature: string | null;
   driverName: string;
   cdlNumber: string;
+  licenseNumber?: string | null;
+  licenseExpiry?: string | null;
+  medicalCardExpiry?: string | null;
+  endorsements?: string[] | null;
+  hasTwic?: boolean | null;
+  twicExpiry?: string | null;
+}
+
+function formatDateToken(value?: string | null): string | null {
+  if (!value) return null;
+  const d = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return format(d, 'MMMM d, yyyy');
 }
 
 /**
