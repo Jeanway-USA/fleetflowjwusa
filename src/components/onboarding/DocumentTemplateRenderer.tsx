@@ -249,6 +249,38 @@ export function DocumentTemplateRenderer({
                 )}
               </div>
             );
+          case 'license_number':
+            return (
+              <span key={i} className="font-medium">
+                {licenseNumber?.trim()
+                  ? licenseNumber
+                  : <span className="text-muted-foreground italic">[Not provided]</span>}
+              </span>
+            );
+          case 'license_expiry':
+            return (
+              <span key={i} className="font-medium">
+                {licenseExpiryText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
+              </span>
+            );
+          case 'dot_medical_expiry':
+            return (
+              <span key={i} className="font-medium">
+                {medicalExpiryText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
+              </span>
+            );
+          case 'endorsements_list':
+            return (
+              <span key={i} className="font-medium">
+                {endorsementsText}
+              </span>
+            );
+          case 'twic_status':
+            return (
+              <span key={i} className="font-medium">
+                {twicStatusText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
+              </span>
+            );
           default:
             return <span key={i}>{`{{${node.name}}}`}</span>;
         }
