@@ -194,7 +194,7 @@ export default function DriverOnboarding() {
     a.remove();
   };
 
-  if (isLoading) {
+  if (isLoading || driverLoading) {
     return (
       <div className="container max-w-3xl py-10">
         <Skeleton className="h-8 w-1/3 mb-4" />
@@ -202,6 +202,23 @@ export default function DriverOnboarding() {
       </div>
     );
   }
+
+  if (!driverRow) {
+    return (
+      <div className="container max-w-3xl py-10">
+        <Card>
+          <CardHeader>
+            <CardTitle>Driver profile not linked</CardTitle>
+            <CardDescription>
+              Your account isn't linked to a driver record yet. Please contact your administrator
+              to finish setting up your profile before completing onboarding.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
 
   // Success screen — shown only here, not on the regular dashboard
   if (signedResults) {
