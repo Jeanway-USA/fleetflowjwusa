@@ -48,7 +48,7 @@ export default function DriverOnboarding() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('drivers')
-        .select('id')
+        .select('id, first_name, last_name')
         .eq('user_id', user!.id)
         .eq('org_id', orgId!)
         .maybeSingle();
@@ -311,6 +311,7 @@ export default function DriverOnboarding() {
               onSignatureCapture={(dataUrl) =>
                 updateCurrent({ signature: dataUrl ? dataUrl : null })
               }
+              driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
             />
           </div>
 

@@ -72,6 +72,10 @@ const VARIABLES: Array<{ token: string; description: string }> = [
     token: "{{driver_signature}}",
     description: "Renders the SignaturePad component for the driver to sign.",
   },
+  {
+    token: "{{driver_name}}",
+    description: "Auto-fills with the printed full name of the driver signing the document.",
+  },
 ];
 
 interface DocumentTemplatesPanelProps {

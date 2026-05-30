@@ -8,7 +8,7 @@ import { SignaturePad } from '@/components/driver/SignaturePad';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|owner_signature|driver_signature)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|owner_signature|driver_signature)\s*\}\}/g;
 
 export interface DocumentTemplateRendererProps {
   content: string;
@@ -16,6 +16,7 @@ export interface DocumentTemplateRendererProps {
   onDriverAddressChange: (value: string) => void;
   signature: string | null;
   onSignatureCapture: (dataUrl: string) => void;
+  driverName?: string;
 }
 
 type TextNode = { kind: 'text'; value: string };
@@ -66,6 +67,7 @@ export function DocumentTemplateRenderer({
   onDriverAddressChange,
   signature,
   onSignatureCapture,
+  driverName,
 }: DocumentTemplateRendererProps) {
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
@@ -99,6 +101,12 @@ export function DocumentTemplateRenderer({
             return (
               <span key={i} className="font-medium">
                 {COMPANY_ADDRESS}
+              </span>
+            );
+          case 'driver_name':
+            return (
+              <span key={i} className="font-medium">
+                {driverName?.trim() ? driverName : <span className="text-muted-foreground italic">[Your name]</span>}
               </span>
             );
           case 'owner_signature':
