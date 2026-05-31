@@ -492,6 +492,18 @@ export default function DriverOnboarding() {
         <Progress value={progress} />
       </div>
 
+      {driverRow?.pay_type && (
+        <div className="mb-4 rounded-md border bg-muted/30 p-3 flex items-center justify-between text-sm">
+          <div>
+            <span className="text-muted-foreground">Contract Terms: </span>
+            <span className="font-medium">{payTypeLabel(driverRow.pay_type)}</span>
+          </div>
+          <div className="font-semibold">{formatPayRate(driverRow.pay_type, driverRow.pay_rate)}</div>
+        </div>
+      )}
+
+
+
       <Card>
         <CardHeader>
           <CardTitle>{title}</CardTitle>
