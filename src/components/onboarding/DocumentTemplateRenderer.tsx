@@ -31,7 +31,20 @@ export interface DocumentTemplateRendererProps {
   hasTwic?: boolean | null;
   twicExpiry?: string | null;
   phoneNumber?: string | null;
+  ssn?: string;
+  onSsnChange?: (value: string) => void;
+  email?: string;
+  onEmailChange?: (value: string) => void;
+  bankName?: string;
+  onBankNameChange?: (value: string) => void;
+  routingNumber?: string;
+  onRoutingNumberChange?: (value: string) => void;
+  accountNumber?: string;
+  onAccountNumberChange?: (value: string) => void;
+  bankAccountType?: 'checking' | 'savings' | '';
+  onBankAccountTypeChange?: (value: 'checking' | 'savings') => void;
 }
+
 
 function formatDateToken(value?: string | null): string | null {
   if (!value) return null;
