@@ -36,9 +36,86 @@ function formatDateToken(value?: string | null): string | null {
   return format(d, 'MMMM d, yyyy');
 }
 
+// --- Markdown rendering constants ---
+const BODY_SIZE = 11;
+const H1_SIZE = 18;
+const H2_SIZE = 15;
+const H3_SIZE = 13;
+const BODY_LH = 16;
+const H1_LH = 24;
+const H2_LH = 20;
+const H3_LH = 18;
+const PARAGRAPH_GAP = 6;
+const LIST_INDENT = 18;
+const QUOTE_INDENT = 14;
+const HR_COLOR = 200;
+
+type InlineStyle = { bold: boolean; italic: boolean; code: boolean };
+type InlineRun = { text: string; style: InlineStyle };
+
+/** Parse inline markdown (bold/italic/code, with escapes) into styled runs. */
+function parseInline(text: string): InlineRun[] {
+  const runs: InlineRun[] = [];
+  let i = 0;
+  let bold = false;
+  let italic = false;
+  let code = false;
+  let buf = '';
+  const flush = () => {
+    if (buf) {
+      runs.push({ text: buf, style: { bold, italic, code } });
+      buf = '';
+    }
+  };
+  while (i < text.length) {
+    const ch = text[i];
+    // Escape
+    if (ch === '\\' && i + 1 < text.length) {
+      buf += text[i + 1];
+      i += 2;
+      continue;
+    }
+    if (ch === '`') {
+      flush();
+      code = !code;
+      i += 1;
+      continue;
+    }
+    if (!code) {
+      // ***bold+italic***
+      if (text.startsWith('***', i)) {
+        flush();
+        bold = !bold;
+        italic = !italic;
+        i += 3;
+        continue;
+      }
+      // **bold** or __bold__
+      if (text.startsWith('**', i) || text.startsWith('__', i)) {
+        flush();
+        bold = !bold;
+        i += 2;
+        continue;
+      }
+      // *italic* or _italic_
+      if (ch === '*' || ch === '_') {
+        flush();
+        italic = !italic;
+        i += 1;
+        continue;
+      }
+    }
+    buf += ch;
+    i += 1;
+  }
+  flush();
+  return runs;
+}
+
 /**
  * Build a PDF where template tokens are replaced with the captured values.
  * `{{driver_signature}}` is embedded as a PNG; other tokens render as inline text.
+ * Markdown formatting (#, **, *, -, 1., ---, >, `) is rendered, not shown literally.
  */
 export function generateSignedPdf({
   title,
@@ -68,7 +145,6 @@ export function generateSignedPdf({
   const marginTop = 60;
   const marginBottom = 60;
   const maxWidth = pageWidth - marginX * 2;
-  const lineHeight = 16;
   const todayFormatted = format(new Date(), 'MMMM d, yyyy');
   const signedAt = format(new Date(), "MMMM d, yyyy 'at' h:mm a");
 
@@ -85,7 +161,7 @@ export function generateSignedPdf({
   doc.text(`Signed on ${signedAt}`, marginX, y);
   y += 24;
   doc.setTextColor(0);
-  doc.setFontSize(11);
+  doc.setFontSize(BODY_SIZE);
 
   const ensureRoom = (needed: number) => {
     if (y + needed > pageHeight - marginBottom) {
@@ -94,13 +170,185 @@ export function generateSignedPdf({
     }
   };
 
-  const writeText = (text: string) => {
-    if (!text) return;
-    const lines = doc.splitTextToSize(text, maxWidth) as string[];
-    for (const line of lines) {
-      ensureRoom(lineHeight);
-      doc.text(line, marginX, y);
+  const applyFont = (size: number, style: InlineStyle, blockBold = false) => {
+    if (style.code) {
+      doc.setFont('courier', style.bold || blockBold ? 'bold' : 'normal');
+    } else {
+      const wantBold = style.bold || blockBold;
+      const wantItalic = style.italic;
+      const variant = wantBold && wantItalic
+        ? 'bolditalic'
+        : wantBold
+          ? 'bold'
+          : wantItalic
+            ? 'italic'
+            : 'normal';
+      doc.setFont('helvetica', variant);
+    }
+    doc.setFontSize(size);
+  };
+
+  /** Draw a sequence of inline runs, wrapping within [x0, x0+width]. */
+  const drawRuns = (
+    runs: InlineRun[],
+    opts: {
+      size: number;
+      lineHeight: number;
+      x0: number;
+      width: number;
+      blockBold?: boolean;
+      hangingIndent?: number;
+    },
+  ) => {
+    const { size, lineHeight, x0, width, blockBold = false, hangingIndent = 0 } = opts;
+    let cursorX = x0;
+    let firstLine = true;
+    const lineLimit = x0 + width;
+    ensureRoom(lineHeight);
+
+    const newline = () => {
       y += lineHeight;
+      ensureRoom(lineHeight);
+      cursorX = firstLine ? x0 + hangingIndent : x0 + hangingIndent;
+      firstLine = false;
+    };
+
+    for (const run of runs) {
+      if (!run.text) continue;
+      applyFont(size, run.style, blockBold);
+      // Split run on spaces while preserving them, so we can wrap by word.
+      const parts = run.text.split(/(\s+)/);
+      for (const part of parts) {
+        if (!part) continue;
+        const w = doc.getTextWidth(part);
+        if (cursorX + w > lineLimit && cursorX > x0 + (firstLine ? 0 : hangingIndent)) {
+          // wrap
+          if (/^\s+$/.test(part)) {
+            newline();
+            continue;
+          }
+          newline();
+        }
+        // If a single word exceeds the line, draw it anyway.
+        doc.text(part, cursorX, y);
+        cursorX += w;
+      }
+    }
+    y += lineHeight;
+  };
+
+  /** Render a markdown string as block-level content. */
+  const renderMarkdown = (md: string) => {
+    if (!md) return;
+    // Normalize CRLF and split into lines (preserve blank lines).
+    const lines = md.replace(/\r\n?/g, '\n').split('\n');
+    let inList = false;
+
+    for (let idx = 0; idx < lines.length; idx++) {
+      const raw = lines[idx];
+      const line = raw.replace(/\s+$/, '');
+
+      // Blank line → paragraph break
+      if (line.trim() === '') {
+        y += PARAGRAPH_GAP;
+        inList = false;
+        continue;
+      }
+
+      // Horizontal rule
+      if (/^\s*(?:-\s*-\s*-+|\*\s*\*\s*\*+|_\s*_\s*_+)\s*$/.test(line)) {
+        y += 6;
+        ensureRoom(12);
+        doc.setDrawColor(HR_COLOR);
+        doc.line(marginX, y, marginX + maxWidth, y);
+        y += 10;
+        inList = false;
+        continue;
+      }
+
+      // Headings
+      const hMatch = /^(#{1,3})\s+(.*)$/.exec(line);
+      if (hMatch) {
+        const level = hMatch[1].length;
+        const size = level === 1 ? H1_SIZE : level === 2 ? H2_SIZE : H3_SIZE;
+        const lh = level === 1 ? H1_LH : level === 2 ? H2_LH : H3_LH;
+        y += 4;
+        drawRuns(parseInline(hMatch[2]), {
+          size,
+          lineHeight: lh,
+          x0: marginX,
+          width: maxWidth,
+          blockBold: true,
+        });
+        y += 2;
+        inList = false;
+        continue;
+      }
+
+      // Blockquote
+      const qMatch = /^\s*>\s?(.*)$/.exec(line);
+      if (qMatch) {
+        const lineStartY = y;
+        applyFont(BODY_SIZE, { bold: false, italic: true, code: false });
+        drawRuns(
+          parseInline(qMatch[1]).map((r) => ({ ...r, style: { ...r.style, italic: true } })),
+          {
+            size: BODY_SIZE,
+            lineHeight: BODY_LH,
+            x0: marginX + QUOTE_INDENT,
+            width: maxWidth - QUOTE_INDENT,
+          },
+        );
+        // Left bar
+        doc.setDrawColor(180);
+        doc.setLineWidth(2);
+        doc.line(marginX + 4, lineStartY - BODY_LH + 4, marginX + 4, y - 2);
+        doc.setLineWidth(0.2);
+        inList = false;
+        continue;
+      }
+
+      // Unordered list
+      const ulMatch = /^\s*[-*+]\s+(.*)$/.exec(line);
+      if (ulMatch) {
+        applyFont(BODY_SIZE, { bold: false, italic: false, code: false });
+        ensureRoom(BODY_LH);
+        doc.text('•', marginX + 4, y);
+        drawRuns(parseInline(ulMatch[1]), {
+          size: BODY_SIZE,
+          lineHeight: BODY_LH,
+          x0: marginX + LIST_INDENT,
+          width: maxWidth - LIST_INDENT,
+        });
+        inList = true;
+        continue;
+      }
+
+      // Ordered list
+      const olMatch = /^\s*(\d+)\.\s+(.*)$/.exec(line);
+      if (olMatch) {
+        applyFont(BODY_SIZE, { bold: false, italic: false, code: false });
+        ensureRoom(BODY_LH);
+        const marker = `${olMatch[1]}.`;
+        doc.text(marker, marginX + 2, y);
+        drawRuns(parseInline(olMatch[2]), {
+          size: BODY_SIZE,
+          lineHeight: BODY_LH,
+          x0: marginX + LIST_INDENT + 4,
+          width: maxWidth - LIST_INDENT - 4,
+        });
+        inList = true;
+        continue;
+      }
+
+      // Default paragraph line
+      drawRuns(parseInline(line), {
+        size: BODY_SIZE,
+        lineHeight: BODY_LH,
+        x0: marginX,
+        width: maxWidth,
+      });
+      inList = false;
     }
   };
 
@@ -123,7 +371,7 @@ export function generateSignedPdf({
   let buffer = '';
   const flush = () => {
     if (buffer) {
-      writeText(buffer);
+      renderMarkdown(buffer);
       buffer = '';
     }
   };
@@ -164,7 +412,7 @@ export function generateSignedPdf({
         doc.text('Driver Signature:', marginX, y);
         y += 6;
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(11);
+        doc.setFontSize(BODY_SIZE);
         if (signature) {
           try {
             doc.addImage(signature, 'PNG', marginX, y, 200, 70);
@@ -244,6 +492,7 @@ export function generateSignedPdf({
   doc.setDrawColor(200);
   doc.line(marginX, y, pageWidth - marginX, y);
   y += 16;
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(120);
   doc.text(`Signed by: ${driverName}`, marginX, y);
