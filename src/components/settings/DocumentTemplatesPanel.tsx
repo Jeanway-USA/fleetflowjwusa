@@ -137,6 +137,16 @@ const VARIABLES: Array<{ token: string; description: string }> = [
     description: "Auto-fills the driver's phone number captured in onboarding Step 1.",
   },
   {
+    token: "{{pay_type}}",
+    description:
+      "Auto-fills with the compensation terms set by the Administrator on the Drivers page. This is strictly read-only for the driver.",
+  },
+  {
+    token: "{{pay_rate}}",
+    description:
+      "Auto-fills with the compensation terms set by the Administrator on the Drivers page. This is strictly read-only for the driver.",
+  },
+  {
     token: "{{page_break}}",
     description:
       "Splits this document into multiple readable pages for the driver, and enforces a hard page break when the final PDF is generated.",
