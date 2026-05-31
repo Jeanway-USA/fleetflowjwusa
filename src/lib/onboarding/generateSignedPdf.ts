@@ -53,6 +53,13 @@ export function generateSignedPdf({
   endorsements,
   hasTwic,
   twicExpiry,
+  ssn,
+  email,
+  bankName,
+  routingNumber,
+  accountNumber,
+  bankAccountType,
+
 }: GenerateSignedPdfArgs): Blob {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
