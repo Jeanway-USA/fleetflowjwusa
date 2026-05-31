@@ -201,7 +201,40 @@ export function generateSignedPdf({
         }
         break;
       }
+      case 'ssn': {
+        const digits = (ssn || '').replace(/\D/g, '');
+        if (digits.length >= 4) {
+          buffer += `***-**-${digits.slice(-4)}`;
+        } else {
+          buffer += '________________________';
+        }
+        break;
+      }
+      case 'email':
+        buffer += email || '________________________';
+        break;
+      case 'bank_name':
+        buffer += bankName || '________________________';
+        break;
+      case 'bank_account_type':
+        buffer += bankAccountType
+          ? bankAccountType.charAt(0).toUpperCase() + bankAccountType.slice(1)
+          : '________________________';
+        break;
+      case 'routing_number':
+        buffer += routingNumber || '________________________';
+        break;
+      case 'account_number': {
+        const digits = (accountNumber || '').replace(/\D/g, '');
+        if (digits.length >= 4) {
+          buffer += `****${digits.slice(-4)}`;
+        } else {
+          buffer += '________________________';
+        }
+        break;
+      }
     }
+
   }
   flush();
 
