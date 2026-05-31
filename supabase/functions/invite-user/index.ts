@@ -124,9 +124,29 @@ Deno.serve(async (req) => {
     // localhost). Recipients should never land on a preview URL.
     const appUrl = 'https://tms.jeanwayusa.com';
 
-    // Check if user already exists in auth
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === email);
+    // Check if user already exists in auth. listUsers() is paginated (default 50/page),
+    // so iterate until we find a match or run out of pages — otherwise users beyond the
+    // first page would fall through to the "new user" branch and bypass the cross-org
+    // hijack guard below.
+    let existingUser: { id: string; email?: string | null } | null = null;
+    const PER_PAGE = 1000;
+    for (let page = 1; page <= 100; page++) {
+      const { data: pageData, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage: PER_PAGE,
+      });
+      if (listErr) {
+        console.error('listUsers error:', listErr.message);
+        break;
+      }
+      const users = pageData?.users ?? [];
+      const match = users.find((u) => (u.email ?? '').toLowerCase() === email.toLowerCase());
+      if (match) {
+        existingUser = match;
+        break;
+      }
+      if (users.length < PER_PAGE) break; // last page
+    }
 
     let targetUserId: string | null = null;
     let inviteActionLink: string | null = null;
@@ -202,17 +222,41 @@ Deno.serve(async (req) => {
       inviteActionLink = inviteData.properties?.action_link ?? null;
       console.log('User invited via Supabase:', targetUserId);
 
-      // Link profile to org + persist requires_onboarding flag.
-      if (targetUserId && orgId) {
-        await supabaseAdmin
+      // Defense in depth: generateLink can return an existing user if pagination
+      // somehow missed them. Re-check their profile before touching org_id.
+      if (targetUserId) {
+        const { data: targetProfile } = await supabaseAdmin
           .from('profiles')
-          .update({
-            org_id: orgId,
-            ...(requiresOnboarding !== null ? { requires_onboarding: requiresOnboarding } : {}),
-          })
-          .eq('user_id', targetUserId);
+          .select('org_id')
+          .eq('user_id', targetUserId)
+          .maybeSingle();
+
+        if (targetProfile?.org_id && orgId && targetProfile.org_id !== orgId) {
+          return new Response(
+            JSON.stringify({ error: 'This user already belongs to another organization.' }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Link profile to org only if not already linked elsewhere.
+        if (orgId) {
+          await supabaseAdmin
+            .from('profiles')
+            .update({ org_id: orgId })
+            .eq('user_id', targetUserId)
+            .is('org_id', null);
+        }
+
+        // Persist requires_onboarding flag separately (does not touch org_id).
+        if (requiresOnboarding !== null) {
+          await supabaseAdmin
+            .from('profiles')
+            .update({ requires_onboarding: requiresOnboarding })
+            .eq('user_id', targetUserId);
+        }
       }
     }
+
 
     // Ensure first/last name are stored on the profile so onboarding renders
     // the correct printed name instead of falling back to the email prefix.
