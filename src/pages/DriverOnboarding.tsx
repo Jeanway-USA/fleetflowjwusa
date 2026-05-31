@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -69,8 +69,13 @@ export default function DriverOnboarding() {
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
+  const [currentSubPageIndex, setCurrentSubPageIndex] = useState(0);
   const credentialsRef = useRef<DriverCredentialsStepHandle>(null);
   const [credentialsValid, setCredentialsValid] = useState(false);
+
+  useEffect(() => {
+    setCurrentSubPageIndex(0);
+  }, [stepIndex]);
 
   const { data: driverRow, isLoading: driverLoading, refetch: refetchDriver } = useQuery({
     queryKey: ['driver-self', user?.id, orgId],
@@ -117,6 +122,16 @@ export default function DriverOnboarding() {
   const currentState: TemplateState = currentTemplate
     ? state[currentTemplate.id] ?? EMPTY_TEMPLATE_STATE
     : EMPTY_TEMPLATE_STATE;
+
+  const chunks = useMemo(() => {
+    if (!currentTemplate) return [] as string[];
+    return currentTemplate.content.split(/\{\{\s*page_break\s*\}\}/);
+  }, [currentTemplate]);
+  const chunkCount = Math.max(chunks.length, 1);
+  const safeSubPageIndex = Math.min(currentSubPageIndex, chunkCount - 1);
+  const currentChunk = chunks[safeSubPageIndex] ?? '';
+  const isLastSubPage = safeSubPageIndex >= chunkCount - 1;
+  const isLastTemplateStep = stepIndex === totalSteps - 1;
 
 
   const needsDriverAddress = useMemo(
@@ -495,7 +510,7 @@ export default function DriverOnboarding() {
           ) : currentTemplate ? (
             <div className="rounded-md border bg-card p-6">
               <DocumentTemplateRenderer
-                content={currentTemplate.content}
+                content={currentChunk}
                 driverAddress={currentState.driverAddress}
                 onDriverAddressChange={(v) => updateCurrent({ driverAddress: v })}
                 signature={currentState.signature}
@@ -531,23 +546,57 @@ export default function DriverOnboarding() {
             </div>
           ) : null}
 
-          <div className="mt-6 flex items-center justify-between">
-            <Button
-              variant="ghost"
-              onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
-              disabled={stepIndex === 0 || submitting}
-            >
-              Back
-            </Button>
-            <Button onClick={handleContinue} disabled={!canContinue || submitting}>
-              {submitting
-                ? isCredentialsStep
-                  ? 'Saving…'
-                  : 'Submitting…'
-                : stepIndex === totalSteps - 1 && !isCredentialsStep
-                  ? 'Submit'
-                  : 'Continue'}
-            </Button>
+          {!isCredentialsStep && chunkCount > 1 && (
+            <p className="mt-4 text-xs text-muted-foreground text-right">
+              Page {safeSubPageIndex + 1} of {chunkCount}
+            </p>
+          )}
+
+          <div className="mt-6 flex items-center justify-between gap-2">
+            {!isCredentialsStep && safeSubPageIndex > 0 ? (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setCurrentSubPageIndex((i) => Math.max(0, i - 1));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={submitting}
+              >
+                Previous Page
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+                disabled={stepIndex === 0 || submitting}
+              >
+                Back
+              </Button>
+            )}
+
+            {!isCredentialsStep && !isLastSubPage ? (
+              <Button
+                onClick={() => {
+                  setCurrentSubPageIndex((i) => i + 1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                disabled={submitting}
+              >
+                Next Page
+              </Button>
+            ) : (
+              <Button onClick={handleContinue} disabled={!canContinue || submitting}>
+                {submitting
+                  ? isCredentialsStep
+                    ? 'Saving…'
+                    : 'Submitting…'
+                  : isCredentialsStep
+                    ? 'Continue'
+                    : isLastTemplateStep
+                      ? 'Sign & Submit Document'
+                      : 'Continue'}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
