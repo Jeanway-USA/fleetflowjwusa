@@ -1,63 +1,61 @@
-# Plan: Intelligent invite handling for existing users
+# Invitation Acceptance Flow
 
-## Overview
+## Goal
+When an existing user clicks the "You've been invited" email link (`/auth/accept-invite?token=...`), consume the invitation, move them onto the new organization, reset their onboarding state, and route them to `/driver/onboarding` when the invite requires it.
 
-Update `supabase/functions/invite-user/index.ts` so that when an invited email already belongs to an existing auth user, we **don't** create a new auth user and **don't** auto-add them to the org. Instead, we write a pending row to a new `public.invitations` table and send a tailored "you've been invited to a new organization" email. New users continue through the existing Supabase invite flow.
+## Important note on "signed document URLs"
+The request mentions clearing `signed_driver_agreement_url` on the profile. That column (and siblings) does not exist on `public.profiles`. Signed documents live in `public.driver_signed_documents`, keyed by `driver_id` + `org_id`. Because RLS isolates those rows by `org_id`, switching the user's `org_id` already hides the old org's signed docs and naturally forces re-signing for the new org. So **no destructive delete is needed** — the onboarding gate will trigger from `requires_onboarding = true` alone. If you want hard cleanup of old-org docs, that should be a separate explicit decision (they may be retained for compliance).
 
-## 1. New table: `public.invitations`
+## Scope of changes
 
-Created via migration with full GRANTs and RLS.
+### 1. New edge function `accept-invitation` (`supabase/functions/accept-invitation/index.ts`)
+Token lookup + cross-org profile mutation must run with `service_role` (the user's JWT can't update an `invitations` row owned by a different org, and they can't bypass `profiles` policies for an org-switch).
 
-Columns:
-- `id uuid pk default gen_random_uuid()`
-- `email text not null` (lowercased)
-- `org_id uuid not null`
-- `role app_role not null`
-- `driver_id uuid null` — when inviting an existing driver row
-- `requires_onboarding boolean not null default false`
-- `status text not null default 'pending'` — `pending | accepted | revoked | expired`
-- `token uuid not null unique default gen_random_uuid()` — used in accept-invite link
-- `invited_by uuid not null` — auth user id of the owner
-- `invited_user_id uuid null` — set when the invitee already has an auth account
-- `is_existing_user boolean not null default false`
-- `expires_at timestamptz not null default now() + interval '14 days'`
-- `accepted_at timestamptz null`
-- `created_at timestamptz not null default now()`
-- Partial unique index on `(lower(email), org_id) where status = 'pending'` to prevent duplicate live invites.
+Flow:
+1. Require auth header; resolve calling user via `getClaims`.
+2. Read body `{ token: string }`.
+3. Fetch invitation by `token`. Validate: `status = 'pending'`, not expired, and `lower(email) === lower(user.email)`. Otherwise return 400 with reason (`invalid | expired | email_mismatch | already_accepted`).
+4. With service-role client:
+   - `update profiles set org_id = invitation.org_id, requires_onboarding = invitation.requires_onboarding, onboarding_completed = false where user_id = auth_user.id`.
+   - Replace `user_roles` for this user: delete existing rows, insert `(user_id, role = invitation.role)`. (Roles are per-org in this app's model; matches current invite-user behavior.)
+   - If `invitation.driver_id` present, set `drivers.user_id = auth_user.id` for that driver row (scoped to invitation.org_id).
+   - `update invitations set status='accepted', accepted_at=now(), invited_user_id=auth_user.id where id = invitation.id`.
+5. Return `{ success: true, requires_onboarding, org_id }`.
 
-RLS:
-- `GRANT SELECT, INSERT, UPDATE ON public.invitations TO authenticated`; `GRANT ALL ... TO service_role`. No `anon` grant.
-- Owners can manage invitations for their own org (`is_owner(auth.uid()) AND org_id = get_user_org_id(auth.uid())`).
-- An invitee can SELECT their own invitations by `lower(email) = lower(auth.email())` so the accept-invite page can show pending invites for the logged-in user.
+`supabase/config.toml`: add `[functions.accept-invitation] verify_jwt = true` block (we need the caller's identity).
 
-## 2. Edge function changes — `supabase/functions/invite-user/index.ts`
+### 2. `src/pages/AcceptInvite.tsx` rework
+Today this page only handles the "set password" flow for brand-new auth users. Extend it to also handle the existing-user token flow.
 
-Keep current: CORS, auth header → `getClaims`, owner check, body parsing/validation, org_id lookup.
+Behavior:
+- Read `token` from `useSearchParams()`.
+- Wait for session via existing `onAuthStateChange` / `getSession`.
+- Branching:
+  - **No `token` param** → existing behavior (set password for invited new user).
+  - **`token` present + no session** → show "Sign in to accept this invitation" card with a button that routes to `/auth?redirect=/auth/accept-invite?token=...` (preserve token through login).
+  - **`token` present + session ready** → auto-call `supabase.functions.invoke('accept-invitation', { body: { token } })` once. While running, show "Joining {org}..." spinner state.
+    - On success: call `refreshOrgData()` + `refreshRoles()` from `useAuth()`, toast "You've joined {orgName}", then `navigate(requires_onboarding ? '/driver/onboarding' : '/', { replace: true })`.
+    - On `email_mismatch`: show error card "This invite was sent to a different email. Sign out and sign in as {email}." with a Sign-out button.
+    - On `expired` / `already_accepted` / `invalid`: friendly error card with a "Back to dashboard" button.
 
-New branching after we have `existingUser` (from the existing paginated `listUsers` loop) and a parallel lookup in `profiles` by lowercased email (to catch a profile that exists even if the auth user lookup is flaky):
+### 3. `src/contexts/AuthContext.tsx`
+- Export `refreshOrgData` and `refreshRoles` are already available — confirm they're in the context value. If not, add them. No other changes.
 
-**A. Existing user path (auth user OR profiles row found):**
-1. Skip `generateLink` entirely — no new auth user.
-2. Skip cross-org auto-link of `profiles.org_id` and skip `user_roles` upsert.
-3. Insert a row into `public.invitations` with `is_existing_user = true`, `invited_user_id` set if known, `requires_onboarding`, `role`, `driver_id`, `org_id`, `invited_by = requestingUser.id`. If a `pending` row already exists for `(email, org_id)`, refresh its `expires_at`, `role`, `requires_onboarding` instead of inserting a duplicate.
-4. Send a tailored Resend email: subject `You've been invited to join <Org> on Fleet Flow TMS`, body explains they already have an account and a button links to `${appUrl}/auth/accept-invite?token=<invitations.token>`.
-5. Return `200` with `{ success: true, is_existing_user: true, invitation_id, message }`.
+### 4. `src/App.tsx`
+No route changes (`/auth/accept-invite` already exists). Ensure the route is reachable without `ProtectedRoute` (it already is).
 
-**B. New user path (no auth user, no profile):**
-- Unchanged from current code: `generateLink({ type: 'invite' })`, link profile org, set `requires_onboarding`, assign role, create/link driver row, send existing branded Resend invite email.
-- Return existing `200` response, plus `is_existing_user: false`.
+### 5. Auth page redirect support (`src/pages/Auth.tsx`)
+After successful sign-in, honor a `?redirect=` query param so users following the invite email after logging out land back on `/auth/accept-invite?token=...`. Small addition; only if not already supported.
 
-Driver linking for existing-user invites is deferred to invitation acceptance (handled later in `AcceptInvite.tsx`) so it isn't covered in this change beyond storing `driver_id` on the invitation row.
+## Out of scope
+- Deleting historical `driver_signed_documents` rows from the prior org.
+- UI for a user to see/manage multiple pending invitations.
+- Multi-org membership (this flow continues the single-active-org model — accepting an invite moves the user, it does not add a membership).
+- Cron to expire stale invitations.
 
-## 3. What's NOT in this change
-
-- The `AcceptInvite.tsx` flow that consumes invitation tokens (assigns role, links profile/driver, marks invitation accepted) — flagged as the natural follow-up but out of scope here.
-- Cron job to expire stale invitations.
-- UI to list pending invitations in Settings.
-
-## Technical notes
-
-- Tailored email reuses the existing inline HTML template style; only header copy and CTA URL change.
-- Resend send is wrapped in try/catch — invitation row is still created if email fails (matches current behavior).
-- Cross-org hijack guard from the current code is preserved but only relevant on the new-user branch's defensive re-check.
-- `lower(email)` everywhere to keep matching consistent with the existing `ilike` driver lookup.
+## Files touched
+- `supabase/functions/accept-invitation/index.ts` (new)
+- `supabase/config.toml` (add function block)
+- `src/pages/AcceptInvite.tsx` (extend)
+- `src/pages/Auth.tsx` (honor `?redirect=` after login, if missing)
+- `src/contexts/AuthContext.tsx` (only if `refreshOrgData`/`refreshRoles` aren't exposed)

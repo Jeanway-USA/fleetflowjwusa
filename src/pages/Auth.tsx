@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -48,10 +48,13 @@ export default function Auth() {
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const { signIn, signUp, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectParam = searchParams.get('redirect');
+  const safeRedirect = redirectParam && redirectParam.startsWith('/') ? redirectParam : '/';
 
   useEffect(() => {
-    if (!authLoading && user) navigate('/');
-  }, [user, authLoading, navigate]);
+    if (!authLoading && user) navigate(safeRedirect, { replace: true });
+  }, [user, authLoading, navigate, safeRedirect]);
 
   if (authLoading) {
     return (
@@ -83,7 +86,7 @@ export default function Auth() {
       toast.error(error.message.includes('Invalid login') ? 'Invalid email or password' : error.message);
     } else {
       toast.success('Welcome back!');
-      navigate('/');
+      navigate(safeRedirect, { replace: true });
     }
   };
 
@@ -100,7 +103,7 @@ export default function Auth() {
     }
     setFormLoading(false);
     toast.success('Account created! Welcome aboard.');
-    navigate('/');
+    navigate(safeRedirect, { replace: true });
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
