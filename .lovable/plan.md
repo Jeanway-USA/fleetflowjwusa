@@ -1,70 +1,103 @@
-## Plan: Safety & Performance Bonus Settings UI
+# Inline Fill-in-the-Blank Template Inputs
 
-### Where it lives
+The actual parser lives in `src/components/onboarding/DocumentTemplateRenderer.tsx` (used by `DriverOnboarding.tsx`). The line-break bug comes from two things:
 
-Create a new component `src/components/finance/SafetyBonusSettings.tsx` and render it inside the Finance page's existing "Settings" tab, directly below `<CompensationSettingsTab />` in `src/pages/Finance.tsx`. This matches the existing pattern (CompensationSettingsTab is already the home for pay-related config) and avoids touching the unrelated `/settings` page tabs.
+1. Editable tokens (`cdl_number`, `driver_address`, `ssn`, `email`, `bank_*`, `routing_number`, `account_number`) wrap `<Input>` / `<Select>` in a `<span class="inline-block ...">`, but the `Input` itself is a block-level `<input>` with `h-12 sm:h-10`, full borders, and `rounded-md`. Combined with `MARKDOWN_COMPONENTS.p` re-wrapping every text chunk in a `<p>`, each input visually breaks the paragraph and forces a new line.
+2. Read-only tokens (`today_date`, `company_address`, `pay_rate`, etc.) are already inline `<span>`s and just need to stay as subtle bold inline text — no change needed beyond confirming styling.
 
-### Component shape
+## Scope
 
-`<SafetyBonusSettings />` — self-contained, no props. Uses `useAuth()` for `org_id` and TanStack Query for fetching/saving.
+Single file: `src/components/onboarding/DocumentTemplateRenderer.tsx`.
+No changes to `Input`/`Select` primitives, no DB or hook changes, no other components.
 
-#### Data fetching
+## Changes
 
-Single query keyed `['safety-bonus-config', orgId]` that returns `{ settings, tiers }`:
-- Loads `safety_bonus_settings` row for the org (`maybeSingle`).
-- If a settings row exists, loads `safety_bonus_tiers` filtered by `setting_id`, ordered by `min_miles asc`.
-- If no settings row exists yet, returns sensible defaults so the form renders a "first-time setup" state.
+### 1. New shared fill-in className
 
-#### Local form state
+Define one constant at module top:
 
-- `globalRules`: `{ max_bonus_amount, period_length_days, requires_zero_accidents, requires_zero_csa_points, requires_zero_service_failures }`.
-- `tiers`: array of `{ id?, min_miles, max_miles, rate_per_mile, _isNew?, _toDelete? }` (string inputs, parsed on save).
+```ts
+const FILL_IN_INPUT_CLASS =
+  "inline-block h-7 sm:h-7 align-baseline w-auto min-w-0 " +
+  "px-1 py-0 rounded-none border-0 border-b-2 border-blue-600 " +
+  "bg-blue-50/60 dark:bg-blue-950/30 " +
+  "text-base sm:text-sm font-medium text-foreground " +
+  "focus-visible:ring-0 focus-visible:ring-offset-0 " +
+  "focus-visible:border-blue-700 focus-visible:bg-blue-50 " +
+  "placeholder:text-muted-foreground/60 placeholder:font-normal";
+```
 
-Hydrated from the query via `useEffect`. Dirty-state detection: simple JSON-diff against the last loaded snapshot to toggle a "Save Changes" button.
+Notes:
+- `h-7` overrides the default `h-12 sm:h-10` so the input matches surrounding line-height.
+- `rounded-none border-0 border-b-2 border-blue-600` removes the bulky box and gives the "fillable line" look.
+- `bg-blue-50/60` gives the soft tint (light blue picks up the theme; works in both modes).
+- Tailwind class merging via `cn` inside `Input` means passing this through `className` cleanly overrides defaults (`h-12`, `pl-4`, `border`, `rounded-md`).
 
-### Card UI
+### 2. Replace each editable token's wrapper + Input
 
-One `Card` titled "Safety & Performance Bonus Configuration" with `ShieldCheck` icon, broken into two sections separated by `<Separator />`:
+For every editable case (`cdl_number`, `driver_address`, `ssn`, `email`, `bank_name`, `routing_number`, `account_number`), change:
 
-**Global Rules**
-- 3-column responsive grid:
-  - "Max Bonus Amount ($)" — numeric `Input`, step `0.01`.
-  - "Period Length (Days)" — numeric `Input`, step `1`, min `1`.
-- Three `Switch` rows (with `Label`):
-  - Zero Accidents Required
-  - Zero CSA Citations Required
-  - Zero Service Failures Required
+```tsx
+<span className="inline-block align-middle mx-1 min-w-[200px] max-w-full">
+  <Input ... className="h-9 inline-block" />
+</span>
+```
 
-**Mileage Tiers**
-- Section header with subtitle ("Drivers earn the rate from the tier matching their period miles") and an "Add Tier" button (`Plus` icon).
-- For each tier: a row with three inputs (`Min Miles`, `Max Miles (blank = ∞)`, `Rate Per Mile $`) plus a destructive `Trash2` icon button to mark for delete. Rows marked `_toDelete` render with `opacity-50` and a small "Will be removed" badge, with an undo button.
-- Validation hints (inline `text-destructive` text, no toast spam):
-  - `max_miles` (when set) must be greater than `min_miles`.
-  - Tiers should not overlap — warn but don't hard-block.
-- Empty state: helper text + a single "Add your first tier" button when `tiers.length === 0`.
+to:
 
-### Save flow (single mutation)
+```tsx
+<Input
+  ...
+  className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[18ch]")}  // width tuned per field
+/>
+```
 
-`onSave`:
-1. Validate: `max_bonus_amount >= 0`, `period_length_days >= 1`, every tier has numeric `min_miles` and `rate_per_mile`, and every set `max_miles > min_miles`. Abort with `toast.error` if invalid.
-2. **Upsert settings**: if `settings.id` exists, `update` by id; else `insert` with `org_id`. Capture `setting_id` returned from insert. Use `.select().single()` to get the id back.
-3. **Reconcile tiers** in parallel:
-   - Delete: any tier with `id` and `_toDelete === true` → `.delete().eq('id', id)`.
-   - Insert: any tier with `_isNew && !_toDelete` → `.insert({ setting_id, org_id, min_miles, max_miles, rate_per_mile })`.
-   - Update: existing tier rows that changed → `.update(...).eq('id', id)`.
-4. On success: `queryClient.invalidateQueries({ queryKey: ['safety-bonus-config', orgId] })`, also invalidate `['safety-bonus']` so any driver-side `useSafetyBonus` consumers refetch. Toast success.
+Per-token widths (using `ch` so they auto-size to text):
+- `cdl_number` — `w-[16ch]`
+- `driver_address` — `w-[28ch]`
+- `ssn` — `w-[12ch]`
+- `email` — `w-[22ch]`
+- `bank_name` — `w-[20ch]`
+- `routing_number` — `w-[11ch]`
+- `account_number` — `w-[16ch]`
 
-All writes include `org_id` per the multi-tenant payload rule.
+Drop the outer `<span class="inline-block ...">` entirely — the input itself is now inline-block and sits on the text baseline.
 
-### Permissions / loading / edge
+### 3. `bank_account_type` Select
 
-- RLS already restricts management to owners; show the card to everyone allowed to see this Finance tab (UI access is already gated by the parent route).
-- Loading: render the card shell with `Skeleton` rows.
-- Errors: `toast.error(error.message)`.
+Apply the same look to `SelectTrigger` via className override:
 
-### Files touched
+```tsx
+<SelectTrigger
+  className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[14ch] inline-flex")}
+  aria-label="Bank account type"
+>
+  <SelectValue placeholder="Account type" />
+</SelectTrigger>
+```
 
-- **New**: `src/components/finance/SafetyBonusSettings.tsx`
-- **Edited**: `src/pages/Finance.tsx` — add one import and render `<SafetyBonusSettings />` below `<CompensationSettingsTab getSetting={getSetting} />` inside the existing Settings `TabsContent`.
+Drop its outer wrapper span as well.
 
-No DB migrations, no other component changes.
+### 4. Read-only tokens
+
+Audit the existing `<span className="font-medium">` renderings for `today_date`, `company_address`, `driver_name`, `contractor_state`, `license_number`, `license_expiry`, `dot_medical_expiry`, `endorsements_list`, `twic_status`, `phone_number`, `pay_type`, `pay_rate`. They are already inline + slightly bold — leave as is. Keep the destructive `[TERMS NOT SET...]` and italic `[Not provided]` fallbacks unchanged.
+
+### 5. Paragraph wrapping fix
+
+`MARKDOWN_COMPONENTS.p` currently has `whitespace-pre-wrap` which is fine, but token nodes are rendered as siblings to ReactMarkdown blocks — that's already inline at the React level. The real wrap-cause is the input's block sizing, which step 2 fixes. No structural change to `nodes.map` needed.
+
+### 6. Import `cn`
+
+Add `import { cn } from '@/lib/utils';` at the top of the file.
+
+## Files
+
+- **Edited**: `src/components/onboarding/DocumentTemplateRenderer.tsx`
+
+## Verification
+
+After build, open Driver Onboarding → a document with `{{driver_address}}`, `{{ssn}}`, `{{bank_account_type}}` tokens. Confirm:
+- Inputs sit inline within the sentence, no forced line break.
+- Underline-only style with soft blue tint visible.
+- Read-only tokens like `{{company_address}}` render as bold inline prose.
+- Both light and dark themes look correct.
