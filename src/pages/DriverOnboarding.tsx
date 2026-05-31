@@ -123,6 +123,16 @@ export default function DriverOnboarding() {
     ? state[currentTemplate.id] ?? EMPTY_TEMPLATE_STATE
     : EMPTY_TEMPLATE_STATE;
 
+  const chunks = useMemo(() => {
+    if (!currentTemplate) return [] as string[];
+    return currentTemplate.content.split(/\{\{\s*page_break\s*\}\}/);
+  }, [currentTemplate]);
+  const chunkCount = Math.max(chunks.length, 1);
+  const safeSubPageIndex = Math.min(currentSubPageIndex, chunkCount - 1);
+  const currentChunk = chunks[safeSubPageIndex] ?? '';
+  const isLastSubPage = safeSubPageIndex >= chunkCount - 1;
+  const isLastTemplateStep = stepIndex === totalSteps - 1;
+
 
   const needsDriverAddress = useMemo(
     () => !!currentTemplate && /\{\{\s*driver_address\s*\}\}/.test(currentTemplate.content),
