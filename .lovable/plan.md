@@ -1,59 +1,39 @@
-## Goal
+## Problem
 
-When drivers sign onboarding documents, the generated PDF currently shows raw markdown (`**bold**`, `# Heading`, `- item`, etc.) as literal characters. The on-screen renderer already converts markdown to styled HTML via `react-markdown`. Make the PDF do the same — present formatted text with larger headings, bold/italic emphasis, bullet/numbered lists, and horizontal rules — never the raw markdown symbols.
+The View Profile sheet for a driver (Drivers list → "View Profile") reads `license_number`, `license_expiry`, `medical_card_expiry`, `endorsements`, `has_twic`, `twic_expiry`, and `phone` directly from the `drivers` row. The sheet renders them correctly already — but for drivers who just finished onboarding, those columns are empty.
 
-## Scope
+Root cause: `drivers` RLS only lets **owners / payroll_admin** UPDATE. When a driver completes the "Driver Profile & Credentials" step, `DriverOnboarding.tsx` runs
 
-Single file: `src/lib/onboarding/generateSignedPdf.ts`.
+```ts
+supabase.from('drivers').update(payload).eq('id', driverRow.id).eq('org_id', orgId)
+```
 
-No template content changes, no DB changes, no UI changes elsewhere. Token replacement (`{{driver_name}}`, `{{driver_signature}}`, etc.) keeps working exactly as today.
+as the driver. PostgREST returns no error (0 rows affected is not an error), so the UI advances and the row silently stays blank. Verified against the database: the most-recently-onboarded driver has `license_number=NULL`, `endorsements=NULL`, etc., while a manually-created sibling row is fully populated.
 
-## Approach
+## Fix
 
-Replace the current plain `writeText` flow with a small markdown renderer built on top of jsPDF. Token substitution happens first (as today), producing a final string; then that string is parsed and drawn block-by-block.
+Allow a driver to update **only their own credential fields** on their own `drivers` row. Implement via a new RLS UPDATE policy plus a `BEFORE UPDATE` trigger that blocks the driver from changing any sensitive column (pay, status, hire date, identity, org). No UI changes are needed because `DriverDetailSheet` + `CredentialsCompliance` already render every onboarding field.
 
-### Block-level handling (line-based)
+### Migration (single)
 
-Processed in this order per line:
+1. New RLS policy on `public.drivers`:
+   ```sql
+   CREATE POLICY "Drivers can update their own credentials"
+   ON public.drivers
+   FOR UPDATE
+   USING  (user_id = auth.uid() AND org_id = get_user_org_id(auth.uid()))
+   WITH CHECK (user_id = auth.uid() AND org_id = get_user_org_id(auth.uid()));
+   ```
+2. Trigger function `public.prevent_driver_self_sensitive_update()` (SECURITY DEFINER, `search_path = public`) that, when the actor is the row's own driver (i.e. not owner/payroll), raises if any of these change:
+   `pay_rate, pay_type, status, hire_date, user_id, org_id, first_name, last_name, avatar_url, direct_deposit_attachment_url`.
+   Allowed self-edit columns: `phone, license_number, license_expiry, medical_card_expiry, endorsements, has_twic, twic_expiry, hazmat_expiry, mvr_expiry, email, updated_at`.
+3. `CREATE TRIGGER drivers_self_update_guard BEFORE UPDATE ON public.drivers FOR EACH ROW EXECUTE FUNCTION public.prevent_driver_self_sensitive_update();`
 
-- `# Heading` → 18pt bold, extra top/bottom spacing
-- `## Heading` → 15pt bold
-- `### Heading` → 13pt bold
-- `---` or `***` on its own line → horizontal rule (light gray line, vertical spacing)
-- `> quote` → indented italic, light-gray left bar
-- `- item` / `* item` → bullet ("•") with hanging indent
-- `1.` / `2.` etc. → numbered list with hanging indent
-- Blank line → paragraph break
-- Anything else → normal 11pt paragraph, wrapped to page width
+### Client tweak
 
-Driver signature block (rendered when the `{{driver_signature}}` token is hit) stays exactly as today.
+In `src/pages/DriverOnboarding.tsx`, after the credentials `update(...)` call, also check that exactly one row was affected (`.select('id').maybeSingle()`) and surface a toast on silent RLS failure, so this class of bug can't regress unnoticed.
 
-### Inline handling (within a line)
+### Out of scope
 
-A small tokenizer splits each line into runs with style flags before drawing, so emphasis renders correctly even mid-sentence:
-
-- `**text**` or `__text__` → bold
-- `*text*` or `_text_` → italic
-- `***text***` → bold + italic
-- `` `code` `` → monospace (courier)
-- Escaped `\*`, `\_`, `\\` → literal character
-
-Each run is measured with `doc.getTextWidth`, then drawn at the current x cursor. When the cursor would overflow `maxWidth`, the renderer wraps to the next line preserving the active style. Existing `ensureRoom` page-break logic is reused so wrapping across pages still works.
-
-### Order of operations (unchanged externally)
-
-1. Walk template segments (text vs token) — same as today.
-2. For token segments that produce inline text (names, dates, addresses, masked SSN, etc.), append into a buffer — same as today.
-3. For `driver_signature`, flush the buffer through the new markdown renderer, then draw the signature image block — same placement as today.
-4. At the end, flush remaining buffer through the markdown renderer, then draw the footer (signed-by line + timestamp) — same as today.
-
-### Technical notes
-
-- Pure jsPDF; no new dependencies. Built-in `helvetica` (normal/bold/italic/bolditalic) and `courier` cover all styles.
-- Heading sizes, line height, indent widths, and HR color defined as small constants at the top of the renderer for easy tuning.
-- The existing `TOKEN_REGEX`, page margins, `ensureRoom`, header, and footer code remain untouched.
-
-## Out of scope
-
-- Tables, images inside markdown, links as clickable annotations, nested lists deeper than one level. (None of these appear in the current onboarding templates.)
-- Changing the on-screen renderer or the editor UI in `DocumentTemplatesPanel`.
+- No changes to `DriverDetailSheet`, `CredentialsCompliance`, or the onboarding form UI.
+- No changes to direct-deposit/PII fields (those still flow to signed PDFs, not the driver row).
