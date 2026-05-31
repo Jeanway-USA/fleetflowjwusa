@@ -117,6 +117,8 @@ export function DocumentTemplateRenderer({
   hasTwic,
   twicExpiry,
   phoneNumber,
+  payType = null,
+  payRate = null,
   ssn = '',
   onSsnChange,
   email = '',
