@@ -654,7 +654,8 @@ Deno.serve(async (req) => {
         } catch (err) {
           failed++;
           const msg = err instanceof Error ? err.message : String(err);
-          errors.push(`${bucket}/${storedPath}: ${msg}`);
+          // Do not leak file paths or internal error details to the client
+          errors.push('A file failed to migrate');
           console.error(`Migration failed for ${bucket}/${storedPath}:`, msg);
         }
       }
