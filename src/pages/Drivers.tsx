@@ -25,6 +25,8 @@ import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { SignedOnboardingDocuments } from '@/components/drivers/SignedOnboardingDocuments';
 import { CredentialsCompliance } from '@/components/drivers/CredentialsCompliance';
 import { DriverDetailSheet } from '@/components/drivers/DriverDetailSheet';
+import { formatPayRate } from '@/lib/pay-format';
+
 
 import {
   DropdownMenu,
@@ -492,9 +494,10 @@ export default function Drivers() {
                 <div className="pt-2 border-t flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Pay Rate</span>
                   <span className="font-medium">
-                    {driver.pay_type === 'percentage' ? `${driver.pay_rate}%` : `$${driver.pay_rate}`}
+                    {formatPayRate(driver.pay_type, driver.pay_rate)}
                   </span>
                 </div>
+
               </CardContent>
             </Card>
           ))}
@@ -632,11 +635,13 @@ export default function Drivers() {
                   <Select value={formData.pay_type || 'percentage'} onValueChange={(v) => setFormData({ ...formData, pay_type: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="percentage">Percentage</SelectItem>
-                      <SelectItem value="per_mile">Per Mile</SelectItem>
+                      <SelectItem value="cpm">CPM (Cents per Mile)</SelectItem>
                       <SelectItem value="flat">Flat Rate</SelectItem>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="hourly">Hourly</SelectItem>
                     </SelectContent>
                   </Select>
+
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="pay_rate">Pay Rate</Label>

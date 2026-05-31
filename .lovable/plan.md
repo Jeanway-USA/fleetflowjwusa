@@ -1,24 +1,37 @@
-## Plan
+## Context
 
-The active PDF path is jsPDF (string-based), not html-to-pdf. Tailwind print classes won't help that path, so the page break has to be implemented inside the generator. I'll also add the requested print classes in the interactive renderer so anyone using the browser's Print dialog gets matching breaks.
+The `drivers` table already has both columns:
+- `pay_type` (text, default `'percentage'`)
+- `pay_rate` (numeric, default `0`)
 
-### 1. Hard page break in generated PDFs
-**File:** `src/lib/onboarding/generateSignedPdf.ts`
+Existing RLS already gives admins (owner + payroll_admin) full manage rights, and drivers can read their own row. **No migration is needed** — this is a pure UI task to expose the predefined contract terms.
 
-- Before the existing `TOKEN_REGEX` tokenizer loop, split `content` on `/\{\{\s*page_break\s*\}\}/`.
-- Render each chunk through the existing markdown/token pipeline (extract the per-chunk rendering into a small inner helper so the current logic is reused unchanged).
-- Between chunks, call `doc.addPage()` and reset `y = marginTop`. This guarantees each chunk starts on a fresh PDF sheet, matching the sections the driver saw during onboarding.
-- Footer logic remains a single trailing block on the final page (current behavior preserved).
+## Changes
 
-### 2. Print-friendly DOM breaks (browser Print → PDF path)
-**File:** `src/pages/DriverOnboarding.tsx`
+### 1. `src/pages/Drivers.tsx` — admin edit dialog
+Update the Pay Type `<Select>` (around line 631–639) to use the four predefined contract terms:
+- `cpm` → "CPM (Cents per Mile)"
+- `flat` → "Flat Rate"
+- `percentage` → "Percentage"
+- `hourly` → "Hourly"
 
-- In the success screen and in the document step rendering, add the `print:break-after-page` class to a wrapper around each chunk so that if anyone uses browser Print on the page, each chunk lands on its own sheet.
-- For the interactive document step, additionally render the other (non-current) chunks inside a `hidden print:block print:break-after-page` wrapper so all chunks appear in print output, not just the page the driver is viewing.
+Keep the existing `flat` and `percentage` values to preserve current data; rename `per_mile` → `cpm` only in the UI label set and add a one-time mapping when reading (`per_mile` displays as CPM). Add `hourly` as a new option.
 
-### 3. No changes needed in `SignedOnboardingDocuments.tsx`
-That admin view opens the already-generated PDF via a signed URL; the fix in step 1 means those stored PDFs already contain the hard page breaks.
+Update the row display formatter (line 495) and the `DriverSettings.tsx` display (line 459-461) to show the correct unit per type:
+- `percentage` → `{rate}%`
+- `cpm` / `per_mile` → `${rate}/mile`
+- `flat` → `${rate} flat`
+- `hourly` → `${rate}/hr`
 
-### Out of scope
-- Re-rendering historical signed PDFs that were generated before this change (they were created without page breaks; only newly signed documents benefit).
-- Building a full DOM-based preview component for the success/admin screens (no such component exists today).
+### 2. `src/pages/DriverOnboarding.tsx` — read-only surface
+Add a small "Contract Terms" read-only line in the onboarding summary/success step showing the driver's assigned `pay_type` and `pay_rate` (fetched from the driver row that's already loaded). Drivers cannot edit it — it's informational only.
+
+### 3. No schema/migration changes
+Per your selection, we keep the schema as-is. RLS already enforces:
+- Drivers: SELECT own row only
+- Owner + payroll_admin: full ALL access
+
+## Out of scope
+- DB-level enum/CHECK constraint on `pay_type`
+- Backfilling existing `per_mile` → `cpm` values (handled at the display layer instead)
+- Editing pay terms from `DriverDetailSheet` (you chose dashboard dialog only)

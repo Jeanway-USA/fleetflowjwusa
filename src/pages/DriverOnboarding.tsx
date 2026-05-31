@@ -17,6 +17,8 @@ import {
   type DriverCredentialsStepHandle,
 } from '@/components/onboarding/DriverCredentialsStep';
 import { generateSignedPdf } from '@/lib/onboarding/generateSignedPdf';
+import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
+
 
 const DOCUMENT_ORDER = ['driver_agreement', 'direct_deposit'] as const;
 type DocumentTypeKey = (typeof DOCUMENT_ORDER)[number];
@@ -84,7 +86,8 @@ export default function DriverOnboarding() {
       const { data, error } = await supabase
         .from('drivers')
         .select(
-          'id, first_name, last_name, phone, license_number, license_expiry, medical_card_expiry, endorsements, has_twic, twic_expiry',
+          'id, first_name, last_name, phone, license_number, license_expiry, medical_card_expiry, endorsements, has_twic, twic_expiry, pay_type, pay_rate',
+
         )
         .eq('user_id', user!.id)
         .eq('org_id', orgId!)
@@ -490,6 +493,18 @@ export default function DriverOnboarding() {
         </p>
         <Progress value={progress} />
       </div>
+
+      {driverRow?.pay_type && (
+        <div className="mb-4 rounded-md border bg-muted/30 p-3 flex items-center justify-between text-sm">
+          <div>
+            <span className="text-muted-foreground">Contract Terms: </span>
+            <span className="font-medium">{payTypeLabel(driverRow.pay_type)}</span>
+          </div>
+          <div className="font-semibold">{formatPayRate(driverRow.pay_type, driverRow.pay_rate)}</div>
+        </div>
+      )}
+
+
 
       <Card>
         <CardHeader>
