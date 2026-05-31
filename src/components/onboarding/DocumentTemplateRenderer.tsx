@@ -346,88 +346,85 @@ export function DocumentTemplateRenderer({
             );
           case 'ssn':
             return (
-              <span key={i} className="inline-block align-middle mx-1 min-w-[180px] max-w-full">
-                <Input
-                  value={ssn}
-                  onChange={(e) => onSsnChange?.(e.target.value)}
-                  placeholder="SSN (XXX-XX-XXXX)"
-                  aria-label="Social Security Number"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  className="h-9 inline-block"
-                />
-              </span>
+              <Input
+                key={i}
+                value={ssn}
+                onChange={(e) => onSsnChange?.(e.target.value)}
+                placeholder="SSN (XXX-XX-XXXX)"
+                aria-label="Social Security Number"
+                inputMode="numeric"
+                autoComplete="off"
+                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[14ch]")}
+              />
             );
           case 'email':
             return (
-              <span key={i} className="inline-block align-middle mx-1 min-w-[220px] max-w-full">
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => onEmailChange?.(e.target.value)}
-                  placeholder="Email address"
-                  aria-label="Email address"
-                  className="h-9 inline-block"
-                />
-              </span>
+              <Input
+                key={i}
+                type="email"
+                value={email}
+                onChange={(e) => onEmailChange?.(e.target.value)}
+                placeholder="Email address"
+                aria-label="Email address"
+                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[22ch]")}
+              />
             );
           case 'bank_account_type':
             return (
-              <span key={i} className="inline-block align-middle mx-1 min-w-[160px] max-w-full">
-                <Select
-                  value={bankAccountType || undefined}
-                  onValueChange={(v) => onBankAccountTypeChange?.(v as 'checking' | 'savings')}
+              <Select
+                key={i}
+                value={bankAccountType || undefined}
+                onValueChange={(v) => onBankAccountTypeChange?.(v as 'checking' | 'savings')}
+              >
+                <SelectTrigger
+                  className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[14ch] inline-flex")}
+                  aria-label="Bank account type"
                 >
-                  <SelectTrigger className="h-9 inline-flex" aria-label="Bank account type">
-                    <SelectValue placeholder="Account type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="checking">Checking</SelectItem>
-                    <SelectItem value="savings">Savings</SelectItem>
-                  </SelectContent>
-                </Select>
-              </span>
+                  <SelectValue placeholder="Account type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="checking">Checking</SelectItem>
+                  <SelectItem value="savings">Savings</SelectItem>
+                </SelectContent>
+              </Select>
             );
           case 'bank_name':
             return (
-              <span key={i} className="inline-block align-middle mx-1 min-w-[220px] max-w-full">
-                <Input
-                  value={bankName}
-                  onChange={(e) => onBankNameChange?.(e.target.value)}
-                  placeholder="Bank name"
-                  aria-label="Bank name"
-                  className="h-9 inline-block"
-                />
-              </span>
+              <Input
+                key={i}
+                value={bankName}
+                onChange={(e) => onBankNameChange?.(e.target.value)}
+                placeholder="Bank name"
+                aria-label="Bank name"
+                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[20ch]")}
+              />
             );
           case 'routing_number':
             return (
-              <span key={i} className="inline-block align-middle mx-1 min-w-[180px] max-w-full">
-                <Input
-                  value={routingNumber}
-                  onChange={(e) => onRoutingNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder="Routing number"
-                  aria-label="Routing number"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  maxLength={9}
-                  className="h-9 inline-block"
-                />
-              </span>
+              <Input
+                key={i}
+                value={routingNumber}
+                onChange={(e) => onRoutingNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="Routing number"
+                aria-label="Routing number"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={9}
+                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[11ch]")}
+              />
             );
           case 'account_number':
             return (
-              <span key={i} className="inline-block align-middle mx-1 min-w-[200px] max-w-full">
-                <Input
-                  value={accountNumber}
-                  onChange={(e) => onAccountNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder="Account number"
-                  aria-label="Account number"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  className="h-9 inline-block"
-                />
-              </span>
+              <Input
+                key={i}
+                value={accountNumber}
+                onChange={(e) => onAccountNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="Account number"
+                aria-label="Account number"
+                inputMode="numeric"
+                autoComplete="off"
+                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[16ch]")}
+              />
             );
           default:
             return <span key={i}>{`{{${node.name}}}`}</span>;
