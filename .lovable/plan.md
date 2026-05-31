@@ -1,35 +1,70 @@
-## Plan: Rebuild `MonthlyBonusWidget` around `useSafetyBonus`
+## Plan: Safety & Performance Bonus Settings UI
 
-Replace the current `monthly_bonus_miles` / hardcoded $0.05 logic in `src/components/driver/MonthlyBonusWidget.tsx` with the new tier-driven `useSafetyBonus(driverId)` hook. Keep the existing component name and props (`{ driverId }`) so all Driver Dashboard call sites keep working with no other changes.
+### Where it lives
 
-### Behavior
+Create a new component `src/components/finance/SafetyBonusSettings.tsx` and render it inside the Finance page's existing "Settings" tab, directly below `<CompensationSettingsTab />` in `src/pages/Finance.tsx`. This matches the existing pattern (CompensationSettingsTab is already the home for pay-related config) and avoids touching the unrelated `/settings` page tabs.
 
-- **Loading**: render the card shell with a `Skeleton` for the bonus amount + progress bar.
-- **No settings configured** (`hasSettings === false`): render a muted "Bonus program not set up yet" state so the widget gracefully no-ops for orgs that haven't configured tiers.
-- **Disqualified** (`isEligible === false`): destructive-tinted card.
-  - Icon: `ShieldAlert` in `text-destructive`.
-  - Heading: "Bonus paused for this period".
-  - Body: list which disqualifier(s) tripped (accident / CSA citation / service failure) from `disqualifiers`.
-  - Encouragement: "Your next 4-week period resets in N days — clean record from then earns the full bonus." `N` = days between today and `periodEnd + 1 day`.
-- **Eligible** (`isEligible === true`):
-  - Large currency display of `currentEarnedBonus` (`Intl.NumberFormat` USD) with `Trophy`/`Sparkles` icon.
-  - Sub-heading: `{formatMiles(currentSafeMiles)} safe miles this period`.
-  - Progress bar (shadcn `Progress`) toward the next tier:
-    - `value = (currentSafeMiles / (currentSafeMiles + nextTierMiles)) * 100` when `nextTierMiles != null`.
-    - When at top tier (`nextTierMiles == null`): show `value = 100`, label "Top tier reached".
-  - Helper line under the bar: `"X mi to next rate jump"` (or "Max tier") and `Period ends {date}`.
-  - Footer line: `Current rate: $0.05/mile · Max bonus: $500.00` (formatted from `currentRate` and `maxBonus`).
-  - Keep the existing confetti effect, but trigger when `currentEarnedBonus >= maxBonus` (cap hit) instead of the old miles target — once per mount via `useRef`.
+### Component shape
 
-### Visual
+`<SafetyBonusSettings />` — self-contained, no props. Uses `useAuth()` for `org_id` and TanStack Query for fetching/saving.
 
-- Use semantic tokens only — `border-primary/20`, `text-primary`, `text-destructive`, `bg-destructive/10`, `text-muted-foreground`. No raw colors.
-- Card structure stays the same (`Card` → `CardHeader` with title → `CardContent` with stacked sections, `space-y-3`).
-- Currency: `Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })`.
-- Miles: existing `formatMiles` helper.
+#### Data fetching
+
+Single query keyed `['safety-bonus-config', orgId]` that returns `{ settings, tiers }`:
+- Loads `safety_bonus_settings` row for the org (`maybeSingle`).
+- If a settings row exists, loads `safety_bonus_tiers` filtered by `setting_id`, ordered by `min_miles asc`.
+- If no settings row exists yet, returns sensible defaults so the form renders a "first-time setup" state.
+
+#### Local form state
+
+- `globalRules`: `{ max_bonus_amount, period_length_days, requires_zero_accidents, requires_zero_csa_points, requires_zero_service_failures }`.
+- `tiers`: array of `{ id?, min_miles, max_miles, rate_per_mile, _isNew?, _toDelete? }` (string inputs, parsed on save).
+
+Hydrated from the query via `useEffect`. Dirty-state detection: simple JSON-diff against the last loaded snapshot to toggle a "Save Changes" button.
+
+### Card UI
+
+One `Card` titled "Safety & Performance Bonus Configuration" with `ShieldCheck` icon, broken into two sections separated by `<Separator />`:
+
+**Global Rules**
+- 3-column responsive grid:
+  - "Max Bonus Amount ($)" — numeric `Input`, step `0.01`.
+  - "Period Length (Days)" — numeric `Input`, step `1`, min `1`.
+- Three `Switch` rows (with `Label`):
+  - Zero Accidents Required
+  - Zero CSA Citations Required
+  - Zero Service Failures Required
+
+**Mileage Tiers**
+- Section header with subtitle ("Drivers earn the rate from the tier matching their period miles") and an "Add Tier" button (`Plus` icon).
+- For each tier: a row with three inputs (`Min Miles`, `Max Miles (blank = ∞)`, `Rate Per Mile $`) plus a destructive `Trash2` icon button to mark for delete. Rows marked `_toDelete` render with `opacity-50` and a small "Will be removed" badge, with an undo button.
+- Validation hints (inline `text-destructive` text, no toast spam):
+  - `max_miles` (when set) must be greater than `min_miles`.
+  - Tiers should not overlap — warn but don't hard-block.
+- Empty state: helper text + a single "Add your first tier" button when `tiers.length === 0`.
+
+### Save flow (single mutation)
+
+`onSave`:
+1. Validate: `max_bonus_amount >= 0`, `period_length_days >= 1`, every tier has numeric `min_miles` and `rate_per_mile`, and every set `max_miles > min_miles`. Abort with `toast.error` if invalid.
+2. **Upsert settings**: if `settings.id` exists, `update` by id; else `insert` with `org_id`. Capture `setting_id` returned from insert. Use `.select().single()` to get the id back.
+3. **Reconcile tiers** in parallel:
+   - Delete: any tier with `id` and `_toDelete === true` → `.delete().eq('id', id)`.
+   - Insert: any tier with `_isNew && !_toDelete` → `.insert({ setting_id, org_id, min_miles, max_miles, rate_per_mile })`.
+   - Update: existing tier rows that changed → `.update(...).eq('id', id)`.
+4. On success: `queryClient.invalidateQueries({ queryKey: ['safety-bonus-config', orgId] })`, also invalidate `['safety-bonus']` so any driver-side `useSafetyBonus` consumers refetch. Toast success.
+
+All writes include `org_id` per the multi-tenant payload rule.
+
+### Permissions / loading / edge
+
+- RLS already restricts management to owners; show the card to everyone allowed to see this Finance tab (UI access is already gated by the parent route).
+- Loading: render the card shell with `Skeleton` rows.
+- Errors: `toast.error(error.message)`.
 
 ### Files touched
 
-- `src/components/driver/MonthlyBonusWidget.tsx` — full rewrite of internals; props and export signature unchanged.
+- **New**: `src/components/finance/SafetyBonusSettings.tsx`
+- **Edited**: `src/pages/Finance.tsx` — add one import and render `<SafetyBonusSettings />` below `<CompensationSettingsTab getSetting={getSetting} />` inside the existing Settings `TabsContent`.
 
-No other files, hooks, or DB changes needed.
+No DB migrations, no other component changes.
