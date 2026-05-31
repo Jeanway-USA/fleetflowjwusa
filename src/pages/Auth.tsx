@@ -48,10 +48,13 @@ export default function Auth() {
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const { signIn, signUp, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectParam = searchParams.get('redirect');
+  const safeRedirect = redirectParam && redirectParam.startsWith('/') ? redirectParam : '/';
 
   useEffect(() => {
-    if (!authLoading && user) navigate('/');
-  }, [user, authLoading, navigate]);
+    if (!authLoading && user) navigate(safeRedirect, { replace: true });
+  }, [user, authLoading, navigate, safeRedirect]);
 
   if (authLoading) {
     return (
