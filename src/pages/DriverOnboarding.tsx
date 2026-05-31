@@ -135,16 +135,50 @@ export default function DriverOnboarding() {
     () => !!currentTemplate && /\{\{\s*file_upload\s*\}\}/.test(currentTemplate.content),
     [currentTemplate],
   );
+  const needsSsn = useMemo(
+    () => !!currentTemplate && /\{\{\s*ssn\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsEmail = useMemo(
+    () => !!currentTemplate && /\{\{\s*email\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsBankName = useMemo(
+    () => !!currentTemplate && /\{\{\s*bank_name\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsBankAccountType = useMemo(
+    () => !!currentTemplate && /\{\{\s*bank_account_type\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsRoutingNumber = useMemo(
+    () => !!currentTemplate && /\{\{\s*routing_number\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsAccountNumber = useMemo(
+    () => !!currentTemplate && /\{\{\s*account_number\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
 
   const isValidSignatureDataUrl = (s: string | null): s is string =>
     !!s && s.startsWith('data:image/');
+
+  const ssnDigits = currentState.ssn.replace(/\D/g, '');
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(currentState.email.trim());
 
   const canContinue = isCredentialsStep
     ? credentialsValid
     : (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
       (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
       (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
-      (!needsFileUpload || currentState.attachment != null);
+      (!needsFileUpload || currentState.attachment != null) &&
+      (!needsSsn || ssnDigits.length === 9) &&
+      (!needsEmail || emailValid) &&
+      (!needsBankName || currentState.bankName.trim().length > 0) &&
+      (!needsBankAccountType || currentState.bankAccountType !== '') &&
+      (!needsRoutingNumber || currentState.routingNumber.length === 9) &&
+      (!needsAccountNumber || currentState.accountNumber.length >= 4);
+
 
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
