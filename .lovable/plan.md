@@ -1,30 +1,15 @@
-## Fix line-breaking around inline fill-in inputs
+## Fix unreadable Clear button on the white document page
 
-**File:** `src/components/onboarding/DocumentTemplateRenderer.tsx`
+**File:** `src/components/driver/SignaturePad.tsx` (lines 137–146)
 
 ### Root cause
-
-Today the renderer tokenizes the template first, then runs each surrounding text chunk through `ReactMarkdown`. ReactMarkdown wraps every text chunk in a block-level `<p>`, so a sentence like:
-
-```
-...notwithstanding that the Contractor resides in {{driver_address}}. Any legal action...
-```
-
-becomes three siblings: `<p>...resides in</p>`, `<Input/>`, `<p>. Any legal action...</p>`. Two `<p>` blocks force the input onto its own line, exactly what the screenshot shows.
+The Clear button uses shadcn's `variant="outline"`, which pulls `bg-background` / `text-foreground` from the active theme. The SignaturePad now lives inside the document renderer that forces a fixed white page (`text-slate-900`), so in dark mode the button renders as a dark box with dark text on white paper — exactly the unreadable "black box" in the screenshot.
 
 ### Fix
+Pin the Clear button to explicit light colors so it always reads on the white document page, matching the rest of the document body:
 
-Restructure rendering so paragraph boundaries come from the template (blank lines), not from each text chunk:
+```tsx
+className="w-full sm:w-auto bg-white text-slate-900 border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+```
 
-1. **Split first by paragraph** (blank line / `\n\n`), preserving block-level constructs (headings starting with `#`, lists starting with `-`/`1.`, `---`, `>` blockquotes, `{{driver_signature}}`, `{{file_upload}}`, `{{owner_signature}}` — these stay block).
-2. **For each paragraph block**, tokenize tokens within it and render as a single inline flow inside one `<p className="my-2 leading-relaxed">…</p>`:
-   - Text segments are rendered with `ReactMarkdown` configured with `p: Fragment` (or `unwrapDisallowed`) so inline markdown (`**bold**`, `*italic*`, `` `code` `` , links) still works but no extra block wrappers are added.
-   - Token nodes (Input, span, Select) are emitted as inline siblings between the text runs.
-3. **Block-level tokens** (`driver_signature`, `file_upload`, `owner_signature`) and block markdown (headings, lists, hr, blockquote) break out of the current paragraph — flush the in-progress `<p>` first, render the block, then start a new `<p>` for following inline content.
-4. Keep `FILL_IN_INPUT_CLASS` as-is (`inline-block … align-baseline`) — it's already correct; the bug is the surrounding `<p>` wrappers, not the input itself.
-
-### Result
-
-The token-bearing sentence renders as one continuous wrapping line of text + inline input + text, matching the "fill in the blank" expectation. Headings, lists, and standalone signature/upload blocks still render as their own blocks.
-
-No other files change. No business logic changes. PDF generator (`generateSignedPdf.ts`) is unaffected — it already renders tokens inline.
+One className change, on the Clear button only. The Confirm button is unaffected (its gold gradient already reads on white). No other files, no logic changes.
