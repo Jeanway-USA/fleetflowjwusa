@@ -162,7 +162,7 @@ export function DocumentTemplateRenderer({
   }, [hasTwic, twicExpiryText]);
 
   return (
-    <div className="text-foreground leading-relaxed">
+    <div className="text-slate-900 leading-relaxed">
       {nodes.map((node, i) => {
         if (node.kind === 'text') {
           if (!node.value.trim()) {
