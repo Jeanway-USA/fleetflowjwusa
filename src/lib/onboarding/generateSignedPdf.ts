@@ -133,6 +133,8 @@ export function generateSignedPdf({
   endorsements,
   hasTwic,
   twicExpiry,
+  payType = null,
+  payRate = null,
   ssn,
   email,
   bankName,
