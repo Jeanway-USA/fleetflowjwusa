@@ -195,11 +195,11 @@ export function SafetyBonusSettings() {
         };
 
         if (t.id && t._toDelete) {
-          ops.push(supabase.from('safety_bonus_tiers').delete().eq('id', t.id));
+          ops.push(Promise.resolve(supabase.from('safety_bonus_tiers').delete().eq('id', t.id)));
         } else if (t._isNew && !t._toDelete) {
-          ops.push(supabase.from('safety_bonus_tiers').insert(payload));
+          ops.push(Promise.resolve(supabase.from('safety_bonus_tiers').insert(payload)));
         } else if (t.id && !t._toDelete) {
-          ops.push(supabase.from('safety_bonus_tiers').update(payload).eq('id', t.id));
+          ops.push(Promise.resolve(supabase.from('safety_bonus_tiers').update(payload).eq('id', t.id)));
         }
       }
       const results = await Promise.all(ops);
