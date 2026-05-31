@@ -14,6 +14,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Target, Sun, Moon, DollarSign, Route, Loader2, Fuel, Eye, EyeOff, ShieldCheck, CalendarClock } from 'lucide-react';
+import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
+
 
 const DAY_OPTIONS = [
   { value: 0, label: 'Sunday' },
