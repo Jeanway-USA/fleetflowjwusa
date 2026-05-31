@@ -327,12 +327,18 @@ export default function DriverOnboarding() {
       if (!payload) return;
       setSubmitting(true);
       try {
-        const { error } = await supabase
+        const { data: updated, error } = await supabase
           .from('drivers')
           .update(payload)
           .eq('id', driverRow.id)
-          .eq('org_id', orgId);
+          .eq('org_id', orgId)
+          .select('id');
         if (error) throw error;
+        if (!updated || updated.length === 0) {
+          throw new Error(
+            'Could not save your credentials. Please contact your administrator.',
+          );
+        }
         await refetchDriver();
         if (totalSteps > 1) {
           setStepIndex(1);
