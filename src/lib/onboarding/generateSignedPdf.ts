@@ -352,139 +352,149 @@ export function generateSignedPdf({
     }
   };
 
-  // Walk template, replacing tokens
-  const segments: Array<{ kind: 'text' | 'token'; value: string }> = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  TOKEN_REGEX.lastIndex = 0;
-  while ((match = TOKEN_REGEX.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      segments.push({ kind: 'text', value: content.slice(lastIndex, match.index) });
-    }
-    segments.push({ kind: 'token', value: match[1] });
-    lastIndex = match.index + match[0].length;
-  }
-  if (lastIndex < content.length) {
-    segments.push({ kind: 'text', value: content.slice(lastIndex) });
-  }
+  // Split content on {{page_break}} so each chunk becomes a fresh PDF page.
+  const chunks = content.split(/\{\{\s*page_break\s*\}\}/);
 
-  let buffer = '';
-  const flush = () => {
-    if (buffer) {
-      renderMarkdown(buffer);
-      buffer = '';
+  for (let chunkIdx = 0; chunkIdx < chunks.length; chunkIdx++) {
+    if (chunkIdx > 0) {
+      doc.addPage();
+      y = marginTop;
     }
-  };
+    const chunkContent = chunks[chunkIdx];
 
-  for (const seg of segments) {
-    if (seg.kind === 'text') {
-      buffer += seg.value;
-      continue;
+    // Walk template chunk, replacing tokens
+    const segments: Array<{ kind: 'text' | 'token'; value: string }> = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    TOKEN_REGEX.lastIndex = 0;
+    while ((match = TOKEN_REGEX.exec(chunkContent)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push({ kind: 'text', value: chunkContent.slice(lastIndex, match.index) });
+      }
+      segments.push({ kind: 'token', value: match[1] });
+      lastIndex = match.index + match[0].length;
     }
-    switch (seg.value) {
-      case 'today_date':
-        buffer += todayFormatted;
-        break;
-      case 'company_address':
-        buffer += COMPANY_ADDRESS;
-        break;
-      case 'driver_address':
-        buffer += driverAddress || '________________________';
-        break;
-      case 'driver_name':
-        buffer += driverName || '________________________';
-        break;
-      case 'cdl_number':
-        buffer += cdlNumber || '________________________';
-        break;
-      case 'contractor_state':
-        buffer += extractStateFromAddress(driverAddress) || '____';
-        break;
-      case 'owner_signature':
-        buffer += '[Owner Signature Pending]';
-        break;
-      case 'driver_signature': {
-        flush();
-        y += 8;
-        ensureRoom(90);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.text('Driver Signature:', marginX, y);
-        y += 6;
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(BODY_SIZE);
-        if (signature) {
-          try {
-            doc.addImage(signature, 'PNG', marginX, y, 200, 70);
-          } catch {
-            doc.text('[signature]', marginX, y + 20);
+    if (lastIndex < chunkContent.length) {
+      segments.push({ kind: 'text', value: chunkContent.slice(lastIndex) });
+    }
+
+    let buffer = '';
+    const flush = () => {
+      if (buffer) {
+        renderMarkdown(buffer);
+        buffer = '';
+      }
+    };
+
+    for (const seg of segments) {
+      if (seg.kind === 'text') {
+        buffer += seg.value;
+        continue;
+      }
+      switch (seg.value) {
+        case 'today_date':
+          buffer += todayFormatted;
+          break;
+        case 'company_address':
+          buffer += COMPANY_ADDRESS;
+          break;
+        case 'driver_address':
+          buffer += driverAddress || '________________________';
+          break;
+        case 'driver_name':
+          buffer += driverName || '________________________';
+          break;
+        case 'cdl_number':
+          buffer += cdlNumber || '________________________';
+          break;
+        case 'contractor_state':
+          buffer += extractStateFromAddress(driverAddress) || '____';
+          break;
+        case 'owner_signature':
+          buffer += '[Owner Signature Pending]';
+          break;
+        case 'driver_signature': {
+          flush();
+          y += 8;
+          ensureRoom(90);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(10);
+          doc.text('Driver Signature:', marginX, y);
+          y += 6;
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(BODY_SIZE);
+          if (signature) {
+            try {
+              doc.addImage(signature, 'PNG', marginX, y, 200, 70);
+            } catch {
+              doc.text('[signature]', marginX, y + 20);
+            }
+            y += 78;
+          } else {
+            doc.text('________________________', marginX, y + 20);
+            y += 30;
           }
-          y += 78;
-        } else {
-          doc.text('________________________', marginX, y + 20);
-          y += 30;
+          break;
         }
-        break;
-      }
-      case 'license_number':
-        buffer += licenseNumber || '________________________';
-        break;
-      case 'license_expiry':
-        buffer += formatDateToken(licenseExpiry) || '________________________';
-        break;
-      case 'dot_medical_expiry':
-        buffer += formatDateToken(medicalCardExpiry) || '________________________';
-        break;
-      case 'endorsements_list':
-        buffer += endorsements && endorsements.length > 0 ? endorsements.join(', ') : 'None';
-        break;
-      case 'twic_status': {
-        if (hasTwic == null) {
-          buffer += '________________________';
-        } else if (!hasTwic) {
-          buffer += 'No';
-        } else {
-          const t = formatDateToken(twicExpiry);
-          buffer += t ? `Yes — expires ${t}` : 'Yes';
+        case 'license_number':
+          buffer += licenseNumber || '________________________';
+          break;
+        case 'license_expiry':
+          buffer += formatDateToken(licenseExpiry) || '________________________';
+          break;
+        case 'dot_medical_expiry':
+          buffer += formatDateToken(medicalCardExpiry) || '________________________';
+          break;
+        case 'endorsements_list':
+          buffer += endorsements && endorsements.length > 0 ? endorsements.join(', ') : 'None';
+          break;
+        case 'twic_status': {
+          if (hasTwic == null) {
+            buffer += '________________________';
+          } else if (!hasTwic) {
+            buffer += 'No';
+          } else {
+            const t = formatDateToken(twicExpiry);
+            buffer += t ? `Yes — expires ${t}` : 'Yes';
+          }
+          break;
         }
-        break;
-      }
-      case 'ssn': {
-        const digits = (ssn || '').replace(/\D/g, '');
-        if (digits.length >= 4) {
-          buffer += `***-**-${digits.slice(-4)}`;
-        } else {
-          buffer += '________________________';
+        case 'ssn': {
+          const digits = (ssn || '').replace(/\D/g, '');
+          if (digits.length >= 4) {
+            buffer += `***-**-${digits.slice(-4)}`;
+          } else {
+            buffer += '________________________';
+          }
+          break;
         }
-        break;
-      }
-      case 'email':
-        buffer += email || '________________________';
-        break;
-      case 'bank_name':
-        buffer += bankName || '________________________';
-        break;
-      case 'bank_account_type':
-        buffer += bankAccountType
-          ? bankAccountType.charAt(0).toUpperCase() + bankAccountType.slice(1)
-          : '________________________';
-        break;
-      case 'routing_number':
-        buffer += routingNumber || '________________________';
-        break;
-      case 'account_number': {
-        const digits = (accountNumber || '').replace(/\D/g, '');
-        if (digits.length >= 4) {
-          buffer += `****${digits.slice(-4)}`;
-        } else {
-          buffer += '________________________';
+        case 'email':
+          buffer += email || '________________________';
+          break;
+        case 'bank_name':
+          buffer += bankName || '________________________';
+          break;
+        case 'bank_account_type':
+          buffer += bankAccountType
+            ? bankAccountType.charAt(0).toUpperCase() + bankAccountType.slice(1)
+            : '________________________';
+          break;
+        case 'routing_number':
+          buffer += routingNumber || '________________________';
+          break;
+        case 'account_number': {
+          const digits = (accountNumber || '').replace(/\D/g, '');
+          if (digits.length >= 4) {
+            buffer += `****${digits.slice(-4)}`;
+          } else {
+            buffer += '________________________';
+          }
+          break;
         }
-        break;
       }
     }
-
+    flush();
   }
-  flush();
 
   // Footer
   y += 24;
