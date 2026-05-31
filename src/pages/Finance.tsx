@@ -994,6 +994,7 @@ export default function Finance() {
         <TabsContent value="settings">
           <div className="space-y-6 animate-in fade-in-50">
             <CompensationSettingsTab getSetting={getSetting} />
+            <SafetyBonusSettings />
           </div>
         </TabsContent>
       </Tabs>
