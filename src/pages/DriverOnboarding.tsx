@@ -651,13 +651,27 @@ export default function DriverOnboarding() {
           </Button>
         )}
 
-        <div className="hidden sm:block text-xs text-muted-foreground">
-          {isCredentialsStep
-            ? `Step ${stepIndex + 1} of ${totalSteps}`
-            : chunkCount > 1
-              ? `Page ${safeSubPageIndex + 1} of ${chunkCount} · Step ${stepIndex + 1}/${totalSteps}`
-              : `Step ${stepIndex + 1} of ${totalSteps}`}
+        <div className="hidden sm:flex flex-col items-center text-xs leading-tight">
+          <span className="text-muted-foreground">
+            {isCredentialsStep
+              ? `Step ${stepIndex + 1} of ${totalSteps}`
+              : chunkCount > 1
+                ? `Page ${safeSubPageIndex + 1} of ${chunkCount} · Step ${stepIndex + 1}/${totalSteps}`
+                : `Step ${stepIndex + 1} of ${totalSteps}`}
+          </span>
+          {!isCredentialsStep && (
+            fieldsRemaining > 0 ? (
+              <span className="text-orange-600 dark:text-orange-400 font-medium mt-0.5">
+                Fields remaining: {fieldsRemaining}
+              </span>
+            ) : (
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+                Document ready to sign!
+              </span>
+            )
+          )}
         </div>
+
 
         {!isCredentialsStep && !isLastSubPage ? (
           <Button
