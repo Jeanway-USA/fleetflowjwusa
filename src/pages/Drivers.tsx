@@ -633,11 +633,13 @@ export default function Drivers() {
                   <Select value={formData.pay_type || 'percentage'} onValueChange={(v) => setFormData({ ...formData, pay_type: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="percentage">Percentage</SelectItem>
-                      <SelectItem value="per_mile">Per Mile</SelectItem>
+                      <SelectItem value="cpm">CPM (Cents per Mile)</SelectItem>
                       <SelectItem value="flat">Flat Rate</SelectItem>
+                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="hourly">Hourly</SelectItem>
                     </SelectContent>
                   </Select>
+
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="pay_rate">Pay Rate</Label>
