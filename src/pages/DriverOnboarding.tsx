@@ -526,7 +526,7 @@ export default function DriverOnboarding() {
               onValidityChange={setCredentialsValid}
             />
           ) : currentTemplate ? (
-            <div className="rounded-md border bg-card p-6 print:break-after-page">
+            <div className="rounded-sm bg-white text-slate-900 shadow-2xl p-8 md:p-12 lg:px-16 lg:py-14 max-w-4xl mx-auto font-serif leading-relaxed print:shadow-none print:p-0 print:break-after-page">
               <DocumentTemplateRenderer
                 content={currentChunk}
                 driverAddress={currentState.driverAddress}
