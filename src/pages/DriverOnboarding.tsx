@@ -488,7 +488,8 @@ export default function DriverOnboarding() {
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-background">
-    <div className="container max-w-4xl py-10">
+    <div className="container max-w-4xl py-10 pb-32">
+
 
       <div className="mb-6">
         <p className="text-sm text-muted-foreground mb-2">
@@ -605,61 +606,67 @@ export default function DriverOnboarding() {
             </div>
           ) : null}
 
-          {!isCredentialsStep && chunkCount > 1 && (
-            <p className="mt-4 text-xs text-muted-foreground text-right">
-              Page {safeSubPageIndex + 1} of {chunkCount}
-            </p>
-          )}
-
-          <div className="mt-6 flex items-center justify-between gap-2">
-            {!isCredentialsStep && safeSubPageIndex > 0 ? (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setCurrentSubPageIndex((i) => Math.max(0, i - 1));
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                disabled={submitting}
-              >
-                Previous Page
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
-                disabled={stepIndex === 0 || submitting}
-              >
-                Back
-              </Button>
-            )}
-
-            {!isCredentialsStep && !isLastSubPage ? (
-              <Button
-                onClick={() => {
-                  setCurrentSubPageIndex((i) => i + 1);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                disabled={submitting}
-              >
-                Next Page
-              </Button>
-            ) : (
-              <Button onClick={handleContinue} disabled={!canContinue || submitting}>
-                {submitting
-                  ? isCredentialsStep
-                    ? 'Saving…'
-                    : 'Submitting…'
-                  : isCredentialsStep
-                    ? 'Continue'
-                    : isLastTemplateStep
-                      ? 'Sign & Submit Document'
-                      : 'Continue'}
-              </Button>
-            )}
-          </div>
         </CardContent>
       </Card>
     </div>
+
+    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-white dark:bg-background shadow-[0_-2px_8px_-4px_rgba(0,0,0,0.08)]">
+      <div className="container max-w-4xl flex items-center justify-between gap-3 py-3 px-4">
+        {!isCredentialsStep && safeSubPageIndex > 0 ? (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setCurrentSubPageIndex((i) => Math.max(0, i - 1));
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            disabled={submitting}
+          >
+            Previous Page
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+            disabled={stepIndex === 0 || submitting}
+          >
+            Back
+          </Button>
+        )}
+
+        <div className="hidden sm:block text-xs text-muted-foreground">
+          {isCredentialsStep
+            ? `Step ${stepIndex + 1} of ${totalSteps}`
+            : chunkCount > 1
+              ? `Page ${safeSubPageIndex + 1} of ${chunkCount} · Step ${stepIndex + 1}/${totalSteps}`
+              : `Step ${stepIndex + 1} of ${totalSteps}`}
+        </div>
+
+        {!isCredentialsStep && !isLastSubPage ? (
+          <Button
+            onClick={() => {
+              setCurrentSubPageIndex((i) => i + 1);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            disabled={submitting}
+          >
+            Next Page
+          </Button>
+        ) : (
+          <Button onClick={handleContinue} disabled={!canContinue || submitting}>
+            {submitting
+              ? isCredentialsStep
+                ? 'Saving…'
+                : 'Submitting…'
+              : isCredentialsStep
+                ? 'Continue'
+                : isLastTemplateStep
+                  ? 'Submit Document'
+                  : 'Continue'}
+          </Button>
+        )}
+      </div>
+    </div>
+
     </div>
   );
 }
