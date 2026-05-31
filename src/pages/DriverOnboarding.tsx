@@ -31,7 +31,27 @@ interface TemplateState {
   signature: string | null;
   cdlNumber: string;
   attachment: File | null;
+  ssn: string;
+  email: string;
+  bankName: string;
+  routingNumber: string;
+  accountNumber: string;
+  bankAccountType: 'checking' | 'savings' | '';
 }
+
+const EMPTY_TEMPLATE_STATE: TemplateState = {
+  driverAddress: '',
+  signature: null,
+  cdlNumber: '',
+  attachment: null,
+  ssn: '',
+  email: '',
+  bankName: '',
+  routingNumber: '',
+  accountNumber: '',
+  bankAccountType: '',
+};
+
 
 
 interface SignedResult {
