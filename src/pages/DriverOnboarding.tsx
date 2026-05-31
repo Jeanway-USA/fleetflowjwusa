@@ -508,7 +508,20 @@ export default function DriverOnboarding() {
                 hasTwic={driverRow?.has_twic}
                 twicExpiry={driverRow?.twic_expiry}
                 phoneNumber={driverRow?.phone}
+                ssn={currentState.ssn}
+                onSsnChange={(v) => updateCurrent({ ssn: v })}
+                email={currentState.email}
+                onEmailChange={(v) => updateCurrent({ email: v })}
+                bankName={currentState.bankName}
+                onBankNameChange={(v) => updateCurrent({ bankName: v })}
+                routingNumber={currentState.routingNumber}
+                onRoutingNumberChange={(v) => updateCurrent({ routingNumber: v })}
+                accountNumber={currentState.accountNumber}
+                onAccountNumberChange={(v) => updateCurrent({ accountNumber: v })}
+                bankAccountType={currentState.bankAccountType}
+                onBankAccountTypeChange={(v) => updateCurrent({ bankAccountType: v })}
               />
+
             </div>
           ) : null}
 
