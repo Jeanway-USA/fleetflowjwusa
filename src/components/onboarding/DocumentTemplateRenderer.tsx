@@ -324,6 +324,18 @@ export function DocumentTemplateRenderer({
                   : <span className="text-muted-foreground italic">[Not provided]</span>}
               </span>
             );
+          case 'pay_type':
+            return payType ? (
+              <span key={i} className="font-medium">{payTypeLabel(payType)}</span>
+            ) : (
+              <span key={i} className="font-bold text-destructive">[TERMS NOT SET - CONTACT HIRING MANAGER]</span>
+            );
+          case 'pay_rate':
+            return payType && payRate != null ? (
+              <span key={i} className="font-medium">{formatPayRate(payType, payRate)}</span>
+            ) : (
+              <span key={i} className="font-bold text-destructive">[TERMS NOT SET - CONTACT HIRING MANAGER]</span>
+            );
           case 'ssn':
             return (
               <span key={i} className="inline-block align-middle mx-1 min-w-[180px] max-w-full">
