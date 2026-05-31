@@ -487,7 +487,9 @@ export default function DriverOnboarding() {
       '';
 
   return (
+    <div className="min-h-screen bg-slate-100 dark:bg-background">
     <div className="container max-w-4xl py-10">
+
       <div className="mb-6">
         <p className="text-sm text-muted-foreground mb-2">
           Step {stepIndex + 1} of {totalSteps}
