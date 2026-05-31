@@ -3640,6 +3640,83 @@ export type Database = {
         }
         Relationships: []
       }
+      safety_bonus_settings: {
+        Row: {
+          created_at: string
+          id: string
+          max_bonus_amount: number
+          org_id: string
+          period_length_days: number
+          requires_zero_accidents: boolean
+          requires_zero_csa_points: boolean
+          requires_zero_service_failures: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          max_bonus_amount?: number
+          org_id: string
+          period_length_days?: number
+          requires_zero_accidents?: boolean
+          requires_zero_csa_points?: boolean
+          requires_zero_service_failures?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          max_bonus_amount?: number
+          org_id?: string
+          period_length_days?: number
+          requires_zero_accidents?: boolean
+          requires_zero_csa_points?: boolean
+          requires_zero_service_failures?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      safety_bonus_tiers: {
+        Row: {
+          created_at: string
+          id: string
+          max_miles: number | null
+          min_miles: number
+          org_id: string
+          rate_per_mile: number
+          setting_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          max_miles?: number | null
+          min_miles: number
+          org_id: string
+          rate_per_mile?: number
+          setting_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          max_miles?: number | null
+          min_miles?: number
+          org_id?: string
+          rate_per_mile?: number
+          setting_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_bonus_tiers_setting_id_fkey"
+            columns: ["setting_id"]
+            isOneToOne: false
+            referencedRelation: "safety_bonus_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       service_schedules: {
         Row: {
           created_at: string
