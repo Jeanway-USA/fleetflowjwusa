@@ -233,7 +233,14 @@ export default function DriverOnboarding() {
         endorsements: driverRow.endorsements,
         hasTwic: driverRow.has_twic,
         twicExpiry: driverRow.twic_expiry,
+        ssn: tState.ssn,
+        email: tState.email,
+        bankName: tState.bankName,
+        routingNumber: tState.routingNumber,
+        accountNumber: tState.accountNumber,
+        bankAccountType: tState.bankAccountType,
       });
+
 
       const timestamp = Date.now();
       const safeType = tmpl.document_type.replace(/[^a-z0-9_-]/gi, '_');
