@@ -200,15 +200,14 @@ export function DocumentTemplateRenderer({
             );
           case 'cdl_number':
             return (
-              <span key={i} className="inline-block align-middle mx-1 min-w-[200px] max-w-full">
-                <Input
-                  value={cdlNumber}
-                  onChange={(e) => onCdlNumberChange(e.target.value)}
-                  placeholder="CDL number"
-                  aria-label="CDL number"
-                  className="h-9 inline-block"
-                />
-              </span>
+              <Input
+                key={i}
+                value={cdlNumber}
+                onChange={(e) => onCdlNumberChange(e.target.value)}
+                placeholder="CDL number"
+                aria-label="CDL number"
+                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[16ch]")}
+              />
             );
           case 'contractor_state':
             return (
