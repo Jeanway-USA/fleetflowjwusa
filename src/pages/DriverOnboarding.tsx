@@ -17,6 +17,8 @@ import {
   type DriverCredentialsStepHandle,
 } from '@/components/onboarding/DriverCredentialsStep';
 import { generateSignedPdf } from '@/lib/onboarding/generateSignedPdf';
+import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
+
 
 const DOCUMENT_ORDER = ['driver_agreement', 'direct_deposit'] as const;
 type DocumentTypeKey = (typeof DOCUMENT_ORDER)[number];
