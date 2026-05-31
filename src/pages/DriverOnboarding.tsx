@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -69,8 +69,13 @@ export default function DriverOnboarding() {
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
+  const [currentSubPageIndex, setCurrentSubPageIndex] = useState(0);
   const credentialsRef = useRef<DriverCredentialsStepHandle>(null);
   const [credentialsValid, setCredentialsValid] = useState(false);
+
+  useEffect(() => {
+    setCurrentSubPageIndex(0);
+  }, [stepIndex]);
 
   const { data: driverRow, isLoading: driverLoading, refetch: refetchDriver } = useQuery({
     queryKey: ['driver-self', user?.id, orgId],
