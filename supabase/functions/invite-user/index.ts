@@ -135,6 +135,23 @@ Deno.serve(async (req) => {
       targetUserId = existingUser.id;
       console.log('User already exists, assigning role to existing user:', targetUserId);
 
+      // Guard against cross-org hijack: if the existing user already belongs
+      // to a different organization, refuse to re-assign them. Upserting their
+      // user_roles row would otherwise silently move their org_id and strip
+      // their role in their original org.
+      const { data: targetProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('org_id')
+        .eq('user_id', targetUserId)
+        .maybeSingle();
+
+      if (targetProfile?.org_id && orgId && targetProfile.org_id !== orgId) {
+        return new Response(
+          JSON.stringify({ error: 'This user already belongs to another organization.' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Link their profile to this org if not already linked
       if (orgId) {
         await supabaseAdmin

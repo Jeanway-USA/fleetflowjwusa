@@ -179,7 +179,7 @@ serve(async (req) => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ error: "An internal error occurred." }), {
       headers: { "Content-Type": "application/json" },
       status: 500,
     });
