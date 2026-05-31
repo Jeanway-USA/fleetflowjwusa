@@ -21,6 +21,8 @@ export interface GenerateSignedPdfArgs {
   endorsements?: string[] | null;
   hasTwic?: boolean | null;
   twicExpiry?: string | null;
+  payType?: DriverPayType;
+  payRate?: number | null;
   ssn?: string;
   email?: string;
   bankName?: string;
