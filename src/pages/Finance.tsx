@@ -29,6 +29,7 @@ import { RevenueTab } from '@/components/finance/RevenueTab';
 import { PayrollTab } from '@/components/finance/PayrollTab';
 import { CommissionsTab } from '@/components/finance/CommissionsTab';
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
+import { SafetyBonusSettings } from '@/components/finance/SafetyBonusSettings';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { InvoicingTab } from '@/components/finance/InvoicingTab';
@@ -993,6 +994,7 @@ export default function Finance() {
         <TabsContent value="settings">
           <div className="space-y-6 animate-in fade-in-50">
             <CompensationSettingsTab getSetting={getSetting} />
+            <SafetyBonusSettings />
           </div>
         </TabsContent>
       </Tabs>
