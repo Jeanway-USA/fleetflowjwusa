@@ -389,12 +389,32 @@ Deno.serve(async (req) => {
     const { data: callerProfile } = await supabase
       .from('profiles').select('org_id').eq('user_id', user.id).single();
     const { data: targetDriver } = await supabase
-      .from('drivers').select('org_id').eq('id', driver_id).maybeSingle();
+      .from('drivers').select('org_id, user_id').eq('id', driver_id).maybeSingle();
 
     if (!callerProfile?.org_id || !targetDriver || targetDriver.org_id !== callerProfile.org_id) {
       return new Response(JSON.stringify({ error: 'Access denied' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
+    // Only allow the driver themselves OR an owner/dispatcher in the same org
+    // to use this driver's stored Landstar credentials.
+    const isSelf = targetDriver.user_id === user.id;
+    let isPrivileged = false;
+    if (!isSelf) {
+      const { data: roleRow } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('org_id', callerProfile.org_id)
+        .in('role', ['owner', 'dispatcher'])
+        .maybeSingle();
+      isPrivileged = !!roleRow;
+    }
+    if (!isSelf && !isPrivileged) {
+      return new Response(JSON.stringify({ error: 'Access denied' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const tripMiles = booked_miles || haversineDistance(origin_lat, origin_lng, dest_lat, dest_lng);
     const estimatedGallons = tripMiles / 6.5;
     const now = new Date().toISOString();

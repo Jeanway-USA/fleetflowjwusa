@@ -1,15 +1,36 @@
 import { Resend } from 'https://esm.sh/resend@4.0.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const ALLOWED_ORIGINS = [
+  'https://tms.jeanwayusa.com',
+  'https://fleetflowjwusa.lovable.app',
+  'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app',
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+
+function buildCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') || '';
+  const isAllowed =
+    !!origin &&
+    (ALLOWED_ORIGINS.includes(origin) ||
+      origin.endsWith('.lovable.app') ||
+      origin.endsWith('.lovableproject.com'));
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : ALLOWED_ORIGINS[0],
+    'Vary': 'Origin',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+}
 
 Deno.serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+
 
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
