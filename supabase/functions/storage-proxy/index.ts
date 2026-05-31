@@ -282,6 +282,42 @@ Deno.serve(async (req) => {
 
     const orgId = profile.org_id;
 
+    // Role-based authorization: only roles allowed to write to the documents bucket
+    // (matches storage.objects RLS policies). Drivers and other roles are forbidden
+    // from upload/delete/migrate even though the proxy uses the service role key.
+    const url = new URL(req.url);
+    const action = url.searchParams.get('action');
+    const isMutatingAction =
+      (req.method === 'POST' && (action === 'upload' || action === 'delete' || action === 'migrate')) ||
+      req.method === 'DELETE';
+
+    let callerRole: string | null = null;
+    if (isMutatingAction) {
+      const { data: roleRows } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('org_id', orgId);
+
+      const roles = (roleRows || []).map((r: any) => r.role);
+      callerRole = roles[0] || null;
+      const allowed = ['owner', 'dispatcher', 'safety', 'payroll_admin'];
+      const hasAllowedRole = roles.some((r: string) => allowed.includes(r));
+
+      if (!hasAllowedRole) {
+        return new Response(JSON.stringify({ error: 'Forbidden: insufficient role' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Migrate is owner-only (org-wide data movement)
+      if (action === 'migrate' && !roles.includes('owner')) {
+        return new Response(JSON.stringify({ error: 'Forbidden: owner role required' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // IDOR guard for built-in storage paths.
     // - documents bucket: must start with `${orgId}/`
     // - dvir-photos / dvir-signatures / branding-assets / beta_feedback: must start with `${user.id}/`
@@ -307,8 +343,8 @@ Deno.serve(async (req) => {
       .eq('is_active', true)
       .maybeSingle();
 
-    const url = new URL(req.url);
-    const action = url.searchParams.get('action'); // upload, download, delete
+    // (url and action already parsed above for role gating)
+
 
     // ===== UPLOAD =====
     if (req.method === 'POST' && action === 'upload') {
@@ -618,7 +654,8 @@ Deno.serve(async (req) => {
         } catch (err) {
           failed++;
           const msg = err instanceof Error ? err.message : String(err);
-          errors.push(`${bucket}/${storedPath}: ${msg}`);
+          // Do not leak file paths or internal error details to the client
+          errors.push('A file failed to migrate');
           console.error(`Migration failed for ${bucket}/${storedPath}:`, msg);
         }
       }
