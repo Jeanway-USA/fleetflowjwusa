@@ -251,6 +251,8 @@ export default function DriverOnboarding() {
         endorsements: driverRow.endorsements,
         hasTwic: driverRow.has_twic,
         twicExpiry: driverRow.twic_expiry,
+        payType: driverRow.pay_type,
+        payRate: driverRow.pay_rate,
         ssn: tState.ssn,
         email: tState.email,
         bankName: tState.bankName,
