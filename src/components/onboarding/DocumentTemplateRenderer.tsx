@@ -319,8 +319,94 @@ export function DocumentTemplateRenderer({
                   : <span className="text-muted-foreground italic">[Not provided]</span>}
               </span>
             );
+          case 'ssn':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[180px] max-w-full">
+                <Input
+                  value={ssn}
+                  onChange={(e) => onSsnChange?.(e.target.value)}
+                  placeholder="SSN (XXX-XX-XXXX)"
+                  aria-label="Social Security Number"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
+          case 'email':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[220px] max-w-full">
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => onEmailChange?.(e.target.value)}
+                  placeholder="Email address"
+                  aria-label="Email address"
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
+          case 'bank_account_type':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[160px] max-w-full">
+                <Select
+                  value={bankAccountType || undefined}
+                  onValueChange={(v) => onBankAccountTypeChange?.(v as 'checking' | 'savings')}
+                >
+                  <SelectTrigger className="h-9 inline-flex" aria-label="Bank account type">
+                    <SelectValue placeholder="Account type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="checking">Checking</SelectItem>
+                    <SelectItem value="savings">Savings</SelectItem>
+                  </SelectContent>
+                </Select>
+              </span>
+            );
+          case 'bank_name':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[220px] max-w-full">
+                <Input
+                  value={bankName}
+                  onChange={(e) => onBankNameChange?.(e.target.value)}
+                  placeholder="Bank name"
+                  aria-label="Bank name"
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
+          case 'routing_number':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[180px] max-w-full">
+                <Input
+                  value={routingNumber}
+                  onChange={(e) => onRoutingNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="Routing number"
+                  aria-label="Routing number"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={9}
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
+          case 'account_number':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[200px] max-w-full">
+                <Input
+                  value={accountNumber}
+                  onChange={(e) => onAccountNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="Account number"
+                  aria-label="Account number"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
           default:
             return <span key={i}>{`{{${node.name}}}`}</span>;
+
         }
       })}
     </div>
