@@ -660,5 +660,7 @@ export default function DriverOnboarding() {
         </CardContent>
       </Card>
     </div>
+    </div>
   );
 }
+
