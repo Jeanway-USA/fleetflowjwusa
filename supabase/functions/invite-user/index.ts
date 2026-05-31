@@ -148,56 +148,191 @@ Deno.serve(async (req) => {
       if (users.length < PER_PAGE) break; // last page
     }
 
+    // Defense-in-depth: also look up by email in profiles, in case auth.listUsers
+    // pagination missed them but a profile already exists.
+    let existingProfileUserId: string | null = null;
+    if (!existingUser) {
+      const { data: profileMatch } = await supabaseAdmin
+        .from('profiles')
+        .select('user_id')
+        .ilike('email', email)
+        .maybeSingle();
+      existingProfileUserId = profileMatch?.user_id ?? null;
+    }
+
+    const isExistingUser = !!existingUser || !!existingProfileUserId;
+    const existingUserId = existingUser?.id ?? existingProfileUserId ?? null;
+
     let targetUserId: string | null = null;
     let inviteActionLink: string | null = null;
 
-    if (existingUser) {
-      targetUserId = existingUser.id;
-      console.log('User already exists, assigning role to existing user:', targetUserId);
-
-      // Guard against cross-org hijack: if the existing user already belongs
-      // to a different organization, refuse to re-assign them. Upserting their
-      // user_roles row would otherwise silently move their org_id and strip
-      // their role in their original org.
-      const { data: targetProfile } = await supabaseAdmin
-        .from('profiles')
-        .select('org_id')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
-
-      if (targetProfile?.org_id && orgId && targetProfile.org_id !== orgId) {
+    // ─────────────────────────────────────────────────────────────
+    // EXISTING USER PATH: create a pending invitation row and send
+    // a tailored email. Do NOT auto-add to org or assign roles —
+    // that happens when they accept the invitation.
+    // ─────────────────────────────────────────────────────────────
+    if (isExistingUser) {
+      if (!orgId) {
         return new Response(
-          JSON.stringify({ error: 'This user already belongs to another organization.' }),
-          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: 'Inviting user has no organization.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Link their profile to this org if not already linked
-      if (orgId) {
-        await supabaseAdmin
-          .from('profiles')
-          .update({ org_id: orgId })
-          .eq('user_id', targetUserId)
-          .is('org_id', null);
+      console.log('Existing user detected — creating pending invitation:', email);
+
+      // Upsert-like behavior: if a pending invitation already exists for
+      // (email, org_id), refresh it instead of failing on the unique index.
+      const { data: existingPending } = await supabaseAdmin
+        .from('invitations')
+        .select('id, token')
+        .eq('org_id', orgId)
+        .ilike('email', email)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      let invitationId: string | null = null;
+      let invitationToken: string | null = null;
+
+      if (existingPending) {
+        const { data: updated, error: updErr } = await supabaseAdmin
+          .from('invitations')
+          .update({
+            role,
+            driver_id: driver_id ?? null,
+            requires_onboarding: requiresOnboarding ?? false,
+            invited_user_id: existingUserId,
+            is_existing_user: true,
+            invited_by: requestingUser.id,
+            expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          })
+          .eq('id', existingPending.id)
+          .select('id, token')
+          .single();
+        if (updErr) {
+          console.error('Invitation refresh error:', updErr.message);
+          throw updErr;
+        }
+        invitationId = updated.id;
+        invitationToken = updated.token;
+      } else {
+        const { data: inserted, error: insErr } = await supabaseAdmin
+          .from('invitations')
+          .insert({
+            email: email.toLowerCase(),
+            org_id: orgId,
+            role,
+            driver_id: driver_id ?? null,
+            requires_onboarding: requiresOnboarding ?? false,
+            invited_by: requestingUser.id,
+            invited_user_id: existingUserId,
+            is_existing_user: true,
+          })
+          .select('id, token')
+          .single();
+        if (insErr) {
+          console.error('Invitation insert error:', insErr.message);
+          throw insErr;
+        }
+        invitationId = inserted.id;
+        invitationToken = inserted.token;
       }
 
-      // Persist the requires_onboarding flag for re-invited users.
-      if (requiresOnboarding !== null) {
-        await supabaseAdmin
-          .from('profiles')
-          .update({
-            requires_onboarding: requiresOnboarding,
-            // Reset completion when we explicitly require onboarding again.
-            ...(requiresOnboarding ? { onboarding_completed: false } : {}),
-          })
-          .eq('user_id', targetUserId);
+      // Tailored email for existing users.
+      const acceptLink = `${appUrl}/auth/accept-invite?token=${invitationToken}`;
+      const existingUserHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); border-radius: 12px 12px 0 0;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">Fleet Flow TMS</h1>
+              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">by JeanWayUSA</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 16px; color: #1a1a1a; font-size: 24px; font-weight: 600;">You've been invited to a new organization</h2>
+              <p style="margin: 0 0 24px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
+                Good news — you already have a Fleet Flow TMS account. An administrator has invited you to join their organization as a <strong style="color: #D97706;">${roleLabels[role]}</strong>.
+              </p>
+              <p style="margin: 0 0 32px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
+                Sign in with your existing credentials and confirm the invitation to get access:
+              </p>
+              <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td align="center">
+                    <a href="${acceptLink}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);">
+                      Review Invitation
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin: 32px 0 0; color: #6a6a6a; font-size: 14px; line-height: 1.6;">
+                This invitation expires in 14 days. If you weren't expecting it, you can safely ignore this email.
+              </p>
+              <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e5e5;">
+              <p style="margin: 0; color: #9a9a9a; font-size: 12px; line-height: 1.6;">
+                If you have questions, please contact the administrator who invited you.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 12px 12px; text-align: center;">
+              <p style="margin: 0; color: #9a9a9a; font-size: 12px;">
+                © ${new Date().getFullYear()} Fleet Flow TMS by JeanWayUSA. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+      `;
+
+      let existingResendId: string | null = null;
+      try {
+        const emailResponse = await resend.emails.send({
+          from: 'Fleet Flow TMS <no-reply@jeanwayusa.com>',
+          to: [email],
+          subject: `You've been invited to join a new organization on Fleet Flow TMS`,
+          html: existingUserHtml,
+        });
+        // @ts-ignore
+        existingResendId = emailResponse?.data?.id ?? null;
+        // @ts-ignore
+        if (emailResponse?.error) console.error('Resend error (existing user):', emailResponse.error);
+      } catch (emailError) {
+        console.error('Resend email error (existing user, thrown):', emailError);
       }
-    } else {
-      // Generate an invite link via Supabase Auth. This creates the auth user
-      // (if needed) AND returns an action_link the recipient can use to set
-      // their password. Using generateLink (instead of inviteUserByEmail) lets
-      // us send our own branded email while still getting a working
-      // password-setup token.
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          is_existing_user: true,
+          invitation_id: invitationId,
+          message: `Invitation sent to ${email}. They'll need to accept it to join your organization.`,
+          resend_message_id: existingResendId,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // NEW USER PATH: create auth user via generateLink, link org,
+    // assign role, send standard branded invite email.
+    // ─────────────────────────────────────────────────────────────
+    {
       const acceptUrl = `${appUrl}/auth/accept-invite`;
       const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.generateLink({
         type: 'invite',
@@ -222,8 +357,6 @@ Deno.serve(async (req) => {
       inviteActionLink = inviteData.properties?.action_link ?? null;
       console.log('User invited via Supabase:', targetUserId);
 
-      // Defense in depth: generateLink can return an existing user if pagination
-      // somehow missed them. Re-check their profile before touching org_id.
       if (targetUserId) {
         const { data: targetProfile } = await supabaseAdmin
           .from('profiles')
@@ -238,7 +371,6 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Link profile to org only if not already linked elsewhere.
         if (orgId) {
           await supabaseAdmin
             .from('profiles')
@@ -247,7 +379,6 @@ Deno.serve(async (req) => {
             .is('org_id', null);
         }
 
-        // Persist requires_onboarding flag separately (does not touch org_id).
         if (requiresOnboarding !== null) {
           await supabaseAdmin
             .from('profiles')
