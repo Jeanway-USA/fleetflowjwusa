@@ -8,6 +8,16 @@ import { SignaturePad } from '@/components/driver/SignaturePad';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { extractStateFromAddress } from '@/lib/us-states';
 import { formatPayRate, payTypeLabel, type DriverPayType } from '@/lib/pay-format';
+import { cn } from '@/lib/utils';
+
+const FILL_IN_INPUT_CLASS =
+  "inline-block h-7 sm:h-7 align-baseline w-auto min-w-0 " +
+  "px-1 py-0 rounded-none border-0 border-b-2 border-blue-600 " +
+  "bg-blue-50/60 dark:bg-blue-950/30 " +
+  "text-base sm:text-sm font-medium text-foreground " +
+  "focus-visible:ring-0 focus-visible:ring-offset-0 " +
+  "focus-visible:border-blue-700 focus-visible:bg-blue-50 dark:focus-visible:bg-blue-950/50 " +
+  "placeholder:text-muted-foreground/60 placeholder:font-normal";
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
