@@ -584,11 +584,10 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      message: existingUser
-        ? `${email} has been added to your organization as ${roleLabels[role]}`
-        : `Invitation sent to ${email}`,
+      is_existing_user: false,
+      message: `Invitation sent to ${email}`,
       user_id: targetUserId,
-      already_registered: !!existingUser,
+      already_registered: false,
       resend_message_id: resendMessageId,
     }), {
       status: 200,
