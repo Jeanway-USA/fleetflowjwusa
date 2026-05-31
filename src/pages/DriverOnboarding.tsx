@@ -196,6 +196,24 @@ export default function DriverOnboarding() {
       (!needsRoutingNumber || currentState.routingNumber.length === 9) &&
       (!needsAccountNumber || currentState.accountNumber.length >= 4);
 
+  const fieldsRemaining = useMemo(() => {
+    if (isCredentialsStep || !currentTemplate) return 0;
+    const c = currentChunk;
+    let n = 0;
+    if (/\{\{\s*driver_address\s*\}\}/.test(c) && !currentState.driverAddress.trim()) n++;
+    if (/\{\{\s*cdl_number\s*\}\}/.test(c) && !currentState.cdlNumber.trim()) n++;
+    if (/\{\{\s*ssn\s*\}\}/.test(c) && ssnDigits.length !== 9) n++;
+    if (/\{\{\s*email\s*\}\}/.test(c) && !emailValid) n++;
+    if (/\{\{\s*bank_name\s*\}\}/.test(c) && !currentState.bankName.trim()) n++;
+    if (/\{\{\s*bank_account_type\s*\}\}/.test(c) && currentState.bankAccountType === '') n++;
+    if (/\{\{\s*routing_number\s*\}\}/.test(c) && currentState.routingNumber.length !== 9) n++;
+    if (/\{\{\s*account_number\s*\}\}/.test(c) && currentState.accountNumber.length < 4) n++;
+    if (/\{\{\s*file_upload\s*\}\}/.test(c) && !currentState.attachment) n++;
+    if (/\{\{\s*driver_signature\s*\}\}/.test(c) && !isValidSignatureDataUrl(currentState.signature)) n++;
+    return n;
+  }, [isCredentialsStep, currentTemplate, currentChunk, currentState, ssnDigits, emailValid]);
+
+
 
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
@@ -633,13 +651,27 @@ export default function DriverOnboarding() {
           </Button>
         )}
 
-        <div className="hidden sm:block text-xs text-muted-foreground">
-          {isCredentialsStep
-            ? `Step ${stepIndex + 1} of ${totalSteps}`
-            : chunkCount > 1
-              ? `Page ${safeSubPageIndex + 1} of ${chunkCount} · Step ${stepIndex + 1}/${totalSteps}`
-              : `Step ${stepIndex + 1} of ${totalSteps}`}
+        <div className="hidden sm:flex flex-col items-center text-xs leading-tight">
+          <span className="text-muted-foreground">
+            {isCredentialsStep
+              ? `Step ${stepIndex + 1} of ${totalSteps}`
+              : chunkCount > 1
+                ? `Page ${safeSubPageIndex + 1} of ${chunkCount} · Step ${stepIndex + 1}/${totalSteps}`
+                : `Step ${stepIndex + 1} of ${totalSteps}`}
+          </span>
+          {!isCredentialsStep && (
+            fieldsRemaining > 0 ? (
+              <span className="text-orange-600 dark:text-orange-400 font-medium mt-0.5">
+                Fields remaining: {fieldsRemaining}
+              </span>
+            ) : (
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+                Document ready to sign!
+              </span>
+            )
+          )}
         </div>
+
 
         {!isCredentialsStep && !isLastSubPage ? (
           <Button
