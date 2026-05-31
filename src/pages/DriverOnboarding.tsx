@@ -179,7 +179,8 @@ export default function DriverOnboarding() {
 
     for (const tmpl of templates) {
       const tState: TemplateState =
-        state[tmpl.id] ?? { driverAddress: '', signature: null, cdlNumber: '', attachment: null };
+        state[tmpl.id] ?? EMPTY_TEMPLATE_STATE;
+
       const title =
         tmpl.name ??
         DOCUMENT_LABELS[tmpl.document_type as DocumentTypeKey] ??
