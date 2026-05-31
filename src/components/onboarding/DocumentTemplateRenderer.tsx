@@ -109,6 +109,33 @@ const MARKDOWN_COMPONENTS = {
   ),
 };
 
+// Same as MARKDOWN_COMPONENTS but unwraps the outer <p> so its content can
+// render as inline children inside an enclosing paragraph (used when a
+// paragraph contains fill-in tokens that must stay on the same line as the
+// surrounding text).
+const INLINE_MARKDOWN_COMPONENTS = {
+  ...MARKDOWN_COMPONENTS,
+  p: ({ children }: any) => <>{children}</>,
+};
+
+// Tokens that render as their own block (not inline within a sentence).
+const BLOCK_TOKENS = new Set(['driver_signature', 'file_upload', 'owner_signature']);
+
+// Detect block-level markdown so the whole block routes through
+// MARKDOWN_COMPONENTS (headings, lists, hr, blockquotes, code fences) instead
+// of being wrapped in an inline paragraph.
+function isBlockMarkdown(text: string): boolean {
+  const first = text.trim().split('\n')[0] ?? '';
+  return /^(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|---|\*\*\*|___|```)/.test(first);
+}
+
+// Detect inline markdown syntax. When absent we render the text as a plain
+// <span> so adjacent whitespace is preserved exactly (so "resides in " stays
+// glued to the input that follows it).
+function hasInlineMarkdown(text: string): boolean {
+  return /(\*\*|__|`|\[[^\]]+\]\([^)]+\)|~~)/.test(text);
+}
+
 export function DocumentTemplateRenderer({
   content,
   driverAddress,
@@ -161,275 +188,323 @@ export function DocumentTemplateRenderer({
     return twicExpiryText ? `Yes — expires ${twicExpiryText}` : 'Yes';
   }, [hasTwic, twicExpiryText]);
 
+  // Renders a single token as an inline element.
+  const renderToken = (name: string, key: string) => {
+    switch (name) {
+      case 'today_date':
+        return <span key={key} className="font-medium">{todayFormatted}</span>;
+      case 'company_address':
+        return <span key={key} className="font-medium">{COMPANY_ADDRESS}</span>;
+      case 'driver_name':
+        return (
+          <span key={key} className="font-medium">
+            {driverName?.trim() ? driverName : <span className="text-muted-foreground italic">[Your name]</span>}
+          </span>
+        );
+      case 'cdl_number':
+        return (
+          <Input
+            key={key}
+            value={cdlNumber}
+            onChange={(e) => onCdlNumberChange(e.target.value)}
+            placeholder="CDL number"
+            aria-label="CDL number"
+            className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[16ch]")}
+          />
+        );
+      case 'contractor_state':
+        return (
+          <span key={key} className="font-medium">
+            {contractorState ?? <span className="text-muted-foreground italic">[State]</span>}
+          </span>
+        );
+      case 'owner_signature':
+        return (
+          <span
+            key={key}
+            className="my-3 inline-flex min-w-[240px] items-center justify-center rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+          >
+            Owner Signature Pending
+          </span>
+        );
+      case 'driver_address':
+        return (
+          <Input
+            key={key}
+            value={driverAddress}
+            onChange={(e) => onDriverAddressChange(e.target.value)}
+            placeholder="Your address"
+            aria-label="Driver address"
+            className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[28ch]")}
+          />
+        );
+      case 'driver_signature':
+        return (
+          <div key={key} className="my-4 not-prose">
+            <Label className="mb-2 block text-sm font-medium">Driver Signature</Label>
+            {signature ? (
+              <div className="rounded-md border bg-card p-3">
+                <img
+                  src={signature}
+                  alt="Driver signature"
+                  className="h-24 w-auto object-contain"
+                />
+                <button
+                  type="button"
+                  onClick={() => onSignatureCapture('')}
+                  className="mt-2 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                >
+                  Clear &amp; re-sign
+                </button>
+              </div>
+            ) : (
+              <SignaturePad onSignatureCapture={onSignatureCapture} />
+            )}
+          </div>
+        );
+      case 'file_upload':
+        return (
+          <div key={key} className="my-4 rounded-md border border-dashed bg-muted/30 p-4 not-prose">
+            <Label htmlFor={`file-upload-${key}`} className="block text-sm font-medium">
+              Attach voided check or bank letter
+            </Label>
+            <p className="text-xs text-muted-foreground mt-1 mb-3">
+              Required. Accepted formats: PDF, JPG, PNG (max 10 MB).
+            </p>
+            <Input
+              id={`file-upload-${key}`}
+              type="file"
+              accept="application/pdf,image/jpeg,image/png"
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                if (file && file.size > 10 * 1024 * 1024) {
+                  onAttachmentChange?.(null);
+                  e.target.value = '';
+                  return;
+                }
+                onAttachmentChange?.(file);
+              }}
+            />
+            {attachment && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Selected: <span className="font-medium text-foreground">{attachment.name}</span>{' '}
+                ({(attachment.size / 1024).toFixed(0)} KB)
+              </p>
+            )}
+          </div>
+        );
+      case 'license_number':
+        return (
+          <span key={key} className="font-medium">
+            {licenseNumber?.trim() ? licenseNumber : <span className="text-muted-foreground italic">[Not provided]</span>}
+          </span>
+        );
+      case 'license_expiry':
+        return (
+          <span key={key} className="font-medium">
+            {licenseExpiryText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
+          </span>
+        );
+      case 'dot_medical_expiry':
+        return (
+          <span key={key} className="font-medium">
+            {medicalExpiryText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
+          </span>
+        );
+      case 'endorsements_list':
+        return <span key={key} className="font-medium">{endorsementsText}</span>;
+      case 'twic_status':
+        return (
+          <span key={key} className="font-medium">
+            {twicStatusText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
+          </span>
+        );
+      case 'phone_number':
+        return (
+          <span key={key} className="font-medium">
+            {phoneNumber?.trim() ? phoneNumber : <span className="text-muted-foreground italic">[Not provided]</span>}
+          </span>
+        );
+      case 'pay_type':
+        return payType ? (
+          <span key={key} className="font-medium">{payTypeLabel(payType)}</span>
+        ) : (
+          <span key={key} className="font-bold text-destructive">[TERMS NOT SET - CONTACT HIRING MANAGER]</span>
+        );
+      case 'pay_rate':
+        return payType && payRate != null ? (
+          <span key={key} className="font-medium">{formatPayRate(payType, payRate)}</span>
+        ) : (
+          <span key={key} className="font-bold text-destructive">[TERMS NOT SET - CONTACT HIRING MANAGER]</span>
+        );
+      case 'ssn':
+        return (
+          <Input
+            key={key}
+            value={ssn}
+            onChange={(e) => onSsnChange?.(e.target.value)}
+            placeholder="SSN (XXX-XX-XXXX)"
+            aria-label="Social Security Number"
+            inputMode="numeric"
+            autoComplete="off"
+            className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[14ch]")}
+          />
+        );
+      case 'email':
+        return (
+          <Input
+            key={key}
+            type="email"
+            value={email}
+            onChange={(e) => onEmailChange?.(e.target.value)}
+            placeholder="Email address"
+            aria-label="Email address"
+            className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[22ch]")}
+          />
+        );
+      case 'bank_account_type':
+        return (
+          <Select
+            key={key}
+            value={bankAccountType || undefined}
+            onValueChange={(v) => onBankAccountTypeChange?.(v as 'checking' | 'savings')}
+          >
+            <SelectTrigger
+              className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[14ch] inline-flex")}
+              aria-label="Bank account type"
+            >
+              <SelectValue placeholder="Account type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="checking">Checking</SelectItem>
+              <SelectItem value="savings">Savings</SelectItem>
+            </SelectContent>
+          </Select>
+        );
+      case 'bank_name':
+        return (
+          <Input
+            key={key}
+            value={bankName}
+            onChange={(e) => onBankNameChange?.(e.target.value)}
+            placeholder="Bank name"
+            aria-label="Bank name"
+            className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[20ch]")}
+          />
+        );
+      case 'routing_number':
+        return (
+          <Input
+            key={key}
+            value={routingNumber}
+            onChange={(e) => onRoutingNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
+            placeholder="Routing number"
+            aria-label="Routing number"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={9}
+            className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[11ch]")}
+          />
+        );
+      case 'account_number':
+        return (
+          <Input
+            key={key}
+            value={accountNumber}
+            onChange={(e) => onAccountNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
+            placeholder="Account number"
+            aria-label="Account number"
+            inputMode="numeric"
+            autoComplete="off"
+            className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[16ch]")}
+          />
+        );
+      default:
+        return <span key={key}>{`{{${name}}}`}</span>;
+    }
+  };
+
+  // Group the flat node stream into paragraph groups separated by blank lines
+  // (\n\n+ inside text nodes). Block-level tokens (signature, file upload,
+  // owner-signature) also force a paragraph break so they render on their own.
+  const blocks = useMemo(() => {
+    const groups: Node[][] = [[]];
+    const pushText = (value: string) => {
+      const parts = value.split(/\n[ \t]*\n+/);
+      parts.forEach((part, idx) => {
+        if (idx > 0) groups.push([]);
+        if (part.length > 0) {
+          groups[groups.length - 1].push({ kind: 'text', value: part });
+        }
+      });
+    };
+    for (const node of nodes) {
+      if (node.kind === 'text') {
+        pushText(node.value);
+      } else if (BLOCK_TOKENS.has(node.name)) {
+        groups.push([node]);
+        groups.push([]);
+      } else {
+        groups[groups.length - 1].push(node);
+      }
+    }
+    return groups.filter((g) => g.length > 0);
+  }, [nodes]);
+
   return (
     <div className="text-slate-900 leading-relaxed">
-      {nodes.map((node, i) => {
-        if (node.kind === 'text') {
-          if (!node.value.trim()) {
-            return <span key={i} className="whitespace-pre-wrap">{node.value}</span>;
+      {blocks.map((group, gi) => {
+        // Solo block token → render the block element directly.
+        if (group.length === 1 && group[0].kind === 'token' && BLOCK_TOKENS.has(group[0].name)) {
+          return renderToken(group[0].name, `b-${gi}`);
+        }
+
+        // All-text block with block-level markdown (heading, list, hr, …) →
+        // use full ReactMarkdown so headings/lists render correctly.
+        const onlyText = group.every((n) => n.kind === 'text');
+        if (onlyText) {
+          const text = group.map((n) => (n as TextNode).value).join('');
+          if (isBlockMarkdown(text)) {
+            return (
+              <ReactMarkdown
+                key={`b-${gi}`}
+                remarkPlugins={[remarkGfm]}
+                components={MARKDOWN_COMPONENTS}
+              >
+                {text}
+              </ReactMarkdown>
+            );
           }
-          return (
-            <ReactMarkdown
-              key={i}
-              remarkPlugins={[remarkGfm]}
-              components={MARKDOWN_COMPONENTS}
-            >
-              {node.value}
-            </ReactMarkdown>
-          );
         }
 
-        switch (node.name) {
-          case 'today_date':
-            return (
-              <span key={i} className="font-medium">
-                {todayFormatted}
-              </span>
-            );
-          case 'company_address':
-            return (
-              <span key={i} className="font-medium">
-                {COMPANY_ADDRESS}
-              </span>
-            );
-          case 'driver_name':
-            return (
-              <span key={i} className="font-medium">
-                {driverName?.trim() ? driverName : <span className="text-muted-foreground italic">[Your name]</span>}
-              </span>
-            );
-          case 'cdl_number':
-            return (
-              <Input
-                key={i}
-                value={cdlNumber}
-                onChange={(e) => onCdlNumberChange(e.target.value)}
-                placeholder="CDL number"
-                aria-label="CDL number"
-                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[16ch]")}
-              />
-            );
-          case 'contractor_state':
-            return (
-              <span key={i} className="font-medium">
-                {contractorState ?? <span className="text-muted-foreground italic">[State]</span>}
-              </span>
-            );
-          case 'owner_signature':
-            return (
-              <span
-                key={i}
-                className="my-3 inline-flex min-w-[240px] items-center justify-center rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
-              >
-                Owner Signature Pending
-              </span>
-            );
-          case 'driver_address':
-            return (
-              <Input
-                key={i}
-                value={driverAddress}
-                onChange={(e) => onDriverAddressChange(e.target.value)}
-                placeholder="Your address"
-                aria-label="Driver address"
-                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[28ch]")}
-              />
-            );
-          case 'driver_signature':
-            return (
-              <Fragment key={i}>
-                <div className="my-4 not-prose">
-                  <Label className="mb-2 block text-sm font-medium">Driver Signature</Label>
-                  {signature ? (
-                    <div className="rounded-md border bg-card p-3">
-                      <img
-                        src={signature}
-                        alt="Driver signature"
-                        className="h-24 w-auto object-contain"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => onSignatureCapture('')}
-                        className="mt-2 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                      >
-                        Clear &amp; re-sign
-                      </button>
-                    </div>
-                  ) : (
-                    <SignaturePad onSignatureCapture={onSignatureCapture} />
-                  )}
-                </div>
-              </Fragment>
-            );
-          case 'file_upload':
-            return (
-              <div key={i} className="my-4 rounded-md border border-dashed bg-muted/30 p-4 not-prose">
-                <Label htmlFor={`file-upload-${i}`} className="block text-sm font-medium">
-                  Attach voided check or bank letter
-                </Label>
-                <p className="text-xs text-muted-foreground mt-1 mb-3">
-                  Required. Accepted formats: PDF, JPG, PNG (max 10 MB).
-                </p>
-                <Input
-                  id={`file-upload-${i}`}
-                  type="file"
-                  accept="application/pdf,image/jpeg,image/png"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0] ?? null;
-                    if (file && file.size > 10 * 1024 * 1024) {
-                      onAttachmentChange?.(null);
-                      e.target.value = '';
-                      return;
-                    }
-                    onAttachmentChange?.(file);
-                  }}
-                />
-                {attachment && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Selected: <span className="font-medium text-foreground">{attachment.name}</span>{' '}
-                    ({(attachment.size / 1024).toFixed(0)} KB)
-                  </p>
-                )}
-              </div>
-            );
-          case 'license_number':
-            return (
-              <span key={i} className="font-medium">
-                {licenseNumber?.trim()
-                  ? licenseNumber
-                  : <span className="text-muted-foreground italic">[Not provided]</span>}
-              </span>
-            );
-          case 'license_expiry':
-            return (
-              <span key={i} className="font-medium">
-                {licenseExpiryText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
-              </span>
-            );
-          case 'dot_medical_expiry':
-            return (
-              <span key={i} className="font-medium">
-                {medicalExpiryText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
-              </span>
-            );
-          case 'endorsements_list':
-            return (
-              <span key={i} className="font-medium">
-                {endorsementsText}
-              </span>
-            );
-          case 'twic_status':
-            return (
-              <span key={i} className="font-medium">
-                {twicStatusText ?? <span className="text-muted-foreground italic">[Not provided]</span>}
-              </span>
-            );
-          case 'phone_number':
-            return (
-              <span key={i} className="font-medium">
-                {phoneNumber?.trim()
-                  ? phoneNumber
-                  : <span className="text-muted-foreground italic">[Not provided]</span>}
-              </span>
-            );
-          case 'pay_type':
-            return payType ? (
-              <span key={i} className="font-medium">{payTypeLabel(payType)}</span>
-            ) : (
-              <span key={i} className="font-bold text-destructive">[TERMS NOT SET - CONTACT HIRING MANAGER]</span>
-            );
-          case 'pay_rate':
-            return payType && payRate != null ? (
-              <span key={i} className="font-medium">{formatPayRate(payType, payRate)}</span>
-            ) : (
-              <span key={i} className="font-bold text-destructive">[TERMS NOT SET - CONTACT HIRING MANAGER]</span>
-            );
-          case 'ssn':
-            return (
-              <Input
-                key={i}
-                value={ssn}
-                onChange={(e) => onSsnChange?.(e.target.value)}
-                placeholder="SSN (XXX-XX-XXXX)"
-                aria-label="Social Security Number"
-                inputMode="numeric"
-                autoComplete="off"
-                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[14ch]")}
-              />
-            );
-          case 'email':
-            return (
-              <Input
-                key={i}
-                type="email"
-                value={email}
-                onChange={(e) => onEmailChange?.(e.target.value)}
-                placeholder="Email address"
-                aria-label="Email address"
-                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[22ch]")}
-              />
-            );
-          case 'bank_account_type':
-            return (
-              <Select
-                key={i}
-                value={bankAccountType || undefined}
-                onValueChange={(v) => onBankAccountTypeChange?.(v as 'checking' | 'savings')}
-              >
-                <SelectTrigger
-                  className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[14ch] inline-flex")}
-                  aria-label="Bank account type"
-                >
-                  <SelectValue placeholder="Account type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="checking">Checking</SelectItem>
-                  <SelectItem value="savings">Savings</SelectItem>
-                </SelectContent>
-              </Select>
-            );
-          case 'bank_name':
-            return (
-              <Input
-                key={i}
-                value={bankName}
-                onChange={(e) => onBankNameChange?.(e.target.value)}
-                placeholder="Bank name"
-                aria-label="Bank name"
-                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[20ch]")}
-              />
-            );
-          case 'routing_number':
-            return (
-              <Input
-                key={i}
-                value={routingNumber}
-                onChange={(e) => onRoutingNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
-                placeholder="Routing number"
-                aria-label="Routing number"
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={9}
-                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[11ch]")}
-              />
-            );
-          case 'account_number':
-            return (
-              <Input
-                key={i}
-                value={accountNumber}
-                onChange={(e) => onAccountNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
-                placeholder="Account number"
-                aria-label="Account number"
-                inputMode="numeric"
-                autoComplete="off"
-                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[16ch]")}
-              />
-            );
-          default:
-            return <span key={i}>{`{{${node.name}}}`}</span>;
-
-        }
+        // Inline paragraph: text + inline tokens, all on the same wrapping line.
+        return (
+          <p key={`b-${gi}`} className="my-2 leading-relaxed">
+            {group.map((node, ni) => {
+              if (node.kind === 'text') {
+                if (hasInlineMarkdown(node.value)) {
+                  return (
+                    <ReactMarkdown
+                      key={`b-${gi}-n-${ni}`}
+                      remarkPlugins={[remarkGfm]}
+                      components={INLINE_MARKDOWN_COMPONENTS}
+                    >
+                      {node.value}
+                    </ReactMarkdown>
+                  );
+                }
+                // Plain text: render as span so adjacent whitespace is preserved
+                // exactly (newlines collapse to a single space like normal HTML).
+                return (
+                  <span key={`b-${gi}-n-${ni}`}>
+                    {node.value.replace(/\s*\n\s*/g, ' ')}
+                  </span>
+                );
+              }
+              return renderToken(node.name, `b-${gi}-n-${ni}`);
+            })}
+          </p>
+        );
       })}
     </div>
   );
