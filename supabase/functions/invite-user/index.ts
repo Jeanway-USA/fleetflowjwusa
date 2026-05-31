@@ -119,14 +119,10 @@ Deno.serve(async (req) => {
       .single();
 
     const orgId = reqProfile?.org_id;
-    const FALLBACK_APP_URL = 'https://tms.jeanwayusa.com';
-    const requestOrigin = req.headers.get('Origin') || '';
-    const isValidOrigin =
-      !!requestOrigin &&
-      (ALLOWED_ORIGINS.includes(requestOrigin) ||
-        requestOrigin.endsWith('.lovable.app') ||
-        requestOrigin.endsWith('.lovableproject.com'));
-    const appUrl = isValidOrigin ? requestOrigin : FALLBACK_APP_URL;
+    // Invite links must ALWAYS point to the production custom domain,
+    // regardless of where the owner sent the invite from (preview, editor,
+    // localhost). Recipients should never land on a preview URL.
+    const appUrl = 'https://tms.jeanwayusa.com';
 
     // Check if user already exists in auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
