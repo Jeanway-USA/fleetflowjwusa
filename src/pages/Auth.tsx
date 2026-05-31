@@ -86,7 +86,7 @@ export default function Auth() {
       toast.error(error.message.includes('Invalid login') ? 'Invalid email or password' : error.message);
     } else {
       toast.success('Welcome back!');
-      navigate('/');
+      navigate(safeRedirect, { replace: true });
     }
   };
 
