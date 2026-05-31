@@ -226,15 +226,14 @@ export function DocumentTemplateRenderer({
             );
           case 'driver_address':
             return (
-              <span key={i} className="inline-block align-middle mx-1 min-w-[260px] max-w-full">
-                <Input
-                  value={driverAddress}
-                  onChange={(e) => onDriverAddressChange(e.target.value)}
-                  placeholder="Your address"
-                  aria-label="Driver address"
-                  className="h-9 inline-block"
-                />
-              </span>
+              <Input
+                key={i}
+                value={driverAddress}
+                onChange={(e) => onDriverAddressChange(e.target.value)}
+                placeholder="Your address"
+                aria-label="Driver address"
+                className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[28ch]")}
+              />
             );
           case 'driver_signature':
             return (
