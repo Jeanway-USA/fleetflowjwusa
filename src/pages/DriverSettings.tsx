@@ -456,10 +456,9 @@ export default function DriverSettings() {
               <div>
                 <Label className="text-muted-foreground">Pay Rate</Label>
                 <p className="font-medium">
-                  {driver.pay_type === 'percentage' 
-                    ? `${driver.pay_rate}%` 
-                    : `$${driver.pay_rate?.toFixed(2)}/mile`}
+                  {formatPayRate(driver.pay_type, driver.pay_rate)}
                 </p>
+
               </div>
             </div>
           </CardContent>
