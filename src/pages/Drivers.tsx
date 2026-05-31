@@ -25,6 +25,8 @@ import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { SignedOnboardingDocuments } from '@/components/drivers/SignedOnboardingDocuments';
 import { CredentialsCompliance } from '@/components/drivers/CredentialsCompliance';
 import { DriverDetailSheet } from '@/components/drivers/DriverDetailSheet';
+import { formatPayRate } from '@/lib/pay-format';
+
 
 import {
   DropdownMenu,
