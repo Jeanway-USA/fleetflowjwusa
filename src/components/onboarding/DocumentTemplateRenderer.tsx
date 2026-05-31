@@ -5,11 +5,13 @@ import remarkGfm from 'remark-gfm';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SignaturePad } from '@/components/driver/SignaturePad';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { extractStateFromAddress } from '@/lib/us-states';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|file_upload|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status|phone_number)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|file_upload|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status|phone_number|ssn|email|bank_account_type|bank_name|routing_number|account_number)\s*\}\}/g;
+
 
 export interface DocumentTemplateRendererProps {
   content: string;
@@ -29,7 +31,20 @@ export interface DocumentTemplateRendererProps {
   hasTwic?: boolean | null;
   twicExpiry?: string | null;
   phoneNumber?: string | null;
+  ssn?: string;
+  onSsnChange?: (value: string) => void;
+  email?: string;
+  onEmailChange?: (value: string) => void;
+  bankName?: string;
+  onBankNameChange?: (value: string) => void;
+  routingNumber?: string;
+  onRoutingNumberChange?: (value: string) => void;
+  accountNumber?: string;
+  onAccountNumberChange?: (value: string) => void;
+  bankAccountType?: 'checking' | 'savings' | '';
+  onBankAccountTypeChange?: (value: 'checking' | 'savings') => void;
 }
+
 
 function formatDateToken(value?: string | null): string | null {
   if (!value) return null;
@@ -99,7 +114,20 @@ export function DocumentTemplateRenderer({
   hasTwic,
   twicExpiry,
   phoneNumber,
+  ssn = '',
+  onSsnChange,
+  email = '',
+  onEmailChange,
+  bankName = '',
+  onBankNameChange,
+  routingNumber = '',
+  onRoutingNumberChange,
+  accountNumber = '',
+  onAccountNumberChange,
+  bankAccountType = '',
+  onBankAccountTypeChange,
 }: DocumentTemplateRendererProps) {
+
 
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
@@ -291,8 +319,94 @@ export function DocumentTemplateRenderer({
                   : <span className="text-muted-foreground italic">[Not provided]</span>}
               </span>
             );
+          case 'ssn':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[180px] max-w-full">
+                <Input
+                  value={ssn}
+                  onChange={(e) => onSsnChange?.(e.target.value)}
+                  placeholder="SSN (XXX-XX-XXXX)"
+                  aria-label="Social Security Number"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
+          case 'email':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[220px] max-w-full">
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => onEmailChange?.(e.target.value)}
+                  placeholder="Email address"
+                  aria-label="Email address"
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
+          case 'bank_account_type':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[160px] max-w-full">
+                <Select
+                  value={bankAccountType || undefined}
+                  onValueChange={(v) => onBankAccountTypeChange?.(v as 'checking' | 'savings')}
+                >
+                  <SelectTrigger className="h-9 inline-flex" aria-label="Bank account type">
+                    <SelectValue placeholder="Account type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="checking">Checking</SelectItem>
+                    <SelectItem value="savings">Savings</SelectItem>
+                  </SelectContent>
+                </Select>
+              </span>
+            );
+          case 'bank_name':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[220px] max-w-full">
+                <Input
+                  value={bankName}
+                  onChange={(e) => onBankNameChange?.(e.target.value)}
+                  placeholder="Bank name"
+                  aria-label="Bank name"
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
+          case 'routing_number':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[180px] max-w-full">
+                <Input
+                  value={routingNumber}
+                  onChange={(e) => onRoutingNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="Routing number"
+                  aria-label="Routing number"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={9}
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
+          case 'account_number':
+            return (
+              <span key={i} className="inline-block align-middle mx-1 min-w-[200px] max-w-full">
+                <Input
+                  value={accountNumber}
+                  onChange={(e) => onAccountNumberChange?.(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="Account number"
+                  aria-label="Account number"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="h-9 inline-block"
+                />
+              </span>
+            );
           default:
             return <span key={i}>{`{{${node.name}}}`}</span>;
+
         }
       })}
     </div>

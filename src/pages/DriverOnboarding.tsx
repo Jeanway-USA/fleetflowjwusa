@@ -31,7 +31,27 @@ interface TemplateState {
   signature: string | null;
   cdlNumber: string;
   attachment: File | null;
+  ssn: string;
+  email: string;
+  bankName: string;
+  routingNumber: string;
+  accountNumber: string;
+  bankAccountType: 'checking' | 'savings' | '';
 }
+
+const EMPTY_TEMPLATE_STATE: TemplateState = {
+  driverAddress: '',
+  signature: null,
+  cdlNumber: '',
+  attachment: null,
+  ssn: '',
+  email: '',
+  bankName: '',
+  routingNumber: '',
+  accountNumber: '',
+  bankAccountType: '',
+};
+
 
 
 interface SignedResult {
@@ -95,8 +115,9 @@ export default function DriverOnboarding() {
   const templateIndex = stepIndex - 1;
   const currentTemplate = templateIndex >= 0 ? templates[templateIndex] : undefined;
   const currentState: TemplateState = currentTemplate
-    ? state[currentTemplate.id] ?? { driverAddress: '', signature: null, cdlNumber: '', attachment: null }
-    : { driverAddress: '', signature: null, cdlNumber: '', attachment: null };
+    ? state[currentTemplate.id] ?? EMPTY_TEMPLATE_STATE
+    : EMPTY_TEMPLATE_STATE;
+
 
   const needsDriverAddress = useMemo(
     () => !!currentTemplate && /\{\{\s*driver_address\s*\}\}/.test(currentTemplate.content),
@@ -114,16 +135,50 @@ export default function DriverOnboarding() {
     () => !!currentTemplate && /\{\{\s*file_upload\s*\}\}/.test(currentTemplate.content),
     [currentTemplate],
   );
+  const needsSsn = useMemo(
+    () => !!currentTemplate && /\{\{\s*ssn\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsEmail = useMemo(
+    () => !!currentTemplate && /\{\{\s*email\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsBankName = useMemo(
+    () => !!currentTemplate && /\{\{\s*bank_name\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsBankAccountType = useMemo(
+    () => !!currentTemplate && /\{\{\s*bank_account_type\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsRoutingNumber = useMemo(
+    () => !!currentTemplate && /\{\{\s*routing_number\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
+  const needsAccountNumber = useMemo(
+    () => !!currentTemplate && /\{\{\s*account_number\s*\}\}/.test(currentTemplate.content),
+    [currentTemplate],
+  );
 
   const isValidSignatureDataUrl = (s: string | null): s is string =>
     !!s && s.startsWith('data:image/');
+
+  const ssnDigits = currentState.ssn.replace(/\D/g, '');
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(currentState.email.trim());
 
   const canContinue = isCredentialsStep
     ? credentialsValid
     : (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
       (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
       (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
-      (!needsFileUpload || currentState.attachment != null);
+      (!needsFileUpload || currentState.attachment != null) &&
+      (!needsSsn || ssnDigits.length === 9) &&
+      (!needsEmail || emailValid) &&
+      (!needsBankName || currentState.bankName.trim().length > 0) &&
+      (!needsBankAccountType || currentState.bankAccountType !== '') &&
+      (!needsRoutingNumber || currentState.routingNumber.length === 9) &&
+      (!needsAccountNumber || currentState.accountNumber.length >= 4);
+
 
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
@@ -158,7 +213,8 @@ export default function DriverOnboarding() {
 
     for (const tmpl of templates) {
       const tState: TemplateState =
-        state[tmpl.id] ?? { driverAddress: '', signature: null, cdlNumber: '', attachment: null };
+        state[tmpl.id] ?? EMPTY_TEMPLATE_STATE;
+
       const title =
         tmpl.name ??
         DOCUMENT_LABELS[tmpl.document_type as DocumentTypeKey] ??
@@ -177,7 +233,14 @@ export default function DriverOnboarding() {
         endorsements: driverRow.endorsements,
         hasTwic: driverRow.has_twic,
         twicExpiry: driverRow.twic_expiry,
+        ssn: tState.ssn,
+        email: tState.email,
+        bankName: tState.bankName,
+        routingNumber: tState.routingNumber,
+        accountNumber: tState.accountNumber,
+        bankAccountType: tState.bankAccountType,
       });
+
 
       const timestamp = Date.now();
       const safeType = tmpl.document_type.replace(/[^a-z0-9_-]/gi, '_');
@@ -445,7 +508,20 @@ export default function DriverOnboarding() {
                 hasTwic={driverRow?.has_twic}
                 twicExpiry={driverRow?.twic_expiry}
                 phoneNumber={driverRow?.phone}
+                ssn={currentState.ssn}
+                onSsnChange={(v) => updateCurrent({ ssn: v })}
+                email={currentState.email}
+                onEmailChange={(v) => updateCurrent({ email: v })}
+                bankName={currentState.bankName}
+                onBankNameChange={(v) => updateCurrent({ bankName: v })}
+                routingNumber={currentState.routingNumber}
+                onRoutingNumberChange={(v) => updateCurrent({ routingNumber: v })}
+                accountNumber={currentState.accountNumber}
+                onAccountNumberChange={(v) => updateCurrent({ accountNumber: v })}
+                bankAccountType={currentState.bankAccountType}
+                onBankAccountTypeChange={(v) => updateCurrent({ bankAccountType: v })}
               />
+
             </div>
           ) : null}
 

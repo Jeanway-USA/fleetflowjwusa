@@ -4,7 +4,8 @@ import { extractStateFromAddress } from '@/lib/us-states';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status|ssn|email|bank_account_type|bank_name|routing_number|account_number)\s*\}\}/g;
+
 
 export interface GenerateSignedPdfArgs {
   title: string;
@@ -19,7 +20,14 @@ export interface GenerateSignedPdfArgs {
   endorsements?: string[] | null;
   hasTwic?: boolean | null;
   twicExpiry?: string | null;
+  ssn?: string;
+  email?: string;
+  bankName?: string;
+  routingNumber?: string;
+  accountNumber?: string;
+  bankAccountType?: 'checking' | 'savings' | '';
 }
+
 
 function formatDateToken(value?: string | null): string | null {
   if (!value) return null;
@@ -45,6 +53,13 @@ export function generateSignedPdf({
   endorsements,
   hasTwic,
   twicExpiry,
+  ssn,
+  email,
+  bankName,
+  routingNumber,
+  accountNumber,
+  bankAccountType,
+
 }: GenerateSignedPdfArgs): Blob {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -186,7 +201,40 @@ export function generateSignedPdf({
         }
         break;
       }
+      case 'ssn': {
+        const digits = (ssn || '').replace(/\D/g, '');
+        if (digits.length >= 4) {
+          buffer += `***-**-${digits.slice(-4)}`;
+        } else {
+          buffer += '________________________';
+        }
+        break;
+      }
+      case 'email':
+        buffer += email || '________________________';
+        break;
+      case 'bank_name':
+        buffer += bankName || '________________________';
+        break;
+      case 'bank_account_type':
+        buffer += bankAccountType
+          ? bankAccountType.charAt(0).toUpperCase() + bankAccountType.slice(1)
+          : '________________________';
+        break;
+      case 'routing_number':
+        buffer += routingNumber || '________________________';
+        break;
+      case 'account_number': {
+        const digits = (accountNumber || '').replace(/\D/g, '');
+        if (digits.length >= 4) {
+          buffer += `****${digits.slice(-4)}`;
+        } else {
+          buffer += '________________________';
+        }
+        break;
+      }
     }
+
   }
   flush();
 
