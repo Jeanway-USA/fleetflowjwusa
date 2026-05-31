@@ -196,6 +196,24 @@ export default function DriverOnboarding() {
       (!needsRoutingNumber || currentState.routingNumber.length === 9) &&
       (!needsAccountNumber || currentState.accountNumber.length >= 4);
 
+  const fieldsRemaining = useMemo(() => {
+    if (isCredentialsStep || !currentTemplate) return 0;
+    const c = currentChunk;
+    let n = 0;
+    if (/\{\{\s*driver_address\s*\}\}/.test(c) && !currentState.driverAddress.trim()) n++;
+    if (/\{\{\s*cdl_number\s*\}\}/.test(c) && !currentState.cdlNumber.trim()) n++;
+    if (/\{\{\s*ssn\s*\}\}/.test(c) && ssnDigits.length !== 9) n++;
+    if (/\{\{\s*email\s*\}\}/.test(c) && !emailValid) n++;
+    if (/\{\{\s*bank_name\s*\}\}/.test(c) && !currentState.bankName.trim()) n++;
+    if (/\{\{\s*bank_account_type\s*\}\}/.test(c) && currentState.bankAccountType === '') n++;
+    if (/\{\{\s*routing_number\s*\}\}/.test(c) && currentState.routingNumber.length !== 9) n++;
+    if (/\{\{\s*account_number\s*\}\}/.test(c) && currentState.accountNumber.length < 4) n++;
+    if (/\{\{\s*file_upload\s*\}\}/.test(c) && !currentState.attachment) n++;
+    if (/\{\{\s*driver_signature\s*\}\}/.test(c) && !isValidSignatureDataUrl(currentState.signature)) n++;
+    return n;
+  }, [isCredentialsStep, currentTemplate, currentChunk, currentState, ssnDigits, emailValid]);
+
+
 
 
   const updateCurrent = (patch: Partial<TemplateState>) => {
