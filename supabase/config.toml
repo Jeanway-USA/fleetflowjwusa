@@ -48,3 +48,6 @@ verify_jwt = false
 [functions.contact-form]
 verify_jwt = false
 
+
+[functions.accept-invitation]
+verify_jwt = true
