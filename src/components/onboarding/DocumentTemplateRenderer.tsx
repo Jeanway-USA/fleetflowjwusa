@@ -114,7 +114,20 @@ export function DocumentTemplateRenderer({
   hasTwic,
   twicExpiry,
   phoneNumber,
+  ssn = '',
+  onSsnChange,
+  email = '',
+  onEmailChange,
+  bankName = '',
+  onBankNameChange,
+  routingNumber = '',
+  onRoutingNumberChange,
+  accountNumber = '',
+  onAccountNumberChange,
+  bankAccountType = '',
+  onBankAccountTypeChange,
 }: DocumentTemplateRendererProps) {
+
 
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
