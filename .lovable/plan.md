@@ -1,15 +1,23 @@
-## Fix unreadable Clear button on the white document page
+## Change
 
-**File:** `src/components/driver/SignaturePad.tsx` (lines 137–146)
+Replace the blue/grey fill-in input styling in `src/components/onboarding/DocumentTemplateRenderer.tsx` (the `FILL_IN_INPUT_CLASS` constant, lines 13-20) with a look that matches the rest of the site's gold/primary brand on the white document page.
 
-### Root cause
-The Clear button uses shadcn's `variant="outline"`, which pulls `bg-background` / `text-foreground` from the active theme. The SignaturePad now lives inside the document renderer that forces a fixed white page (`text-slate-900`), so in dark mode the button renders as a dark box with dark text on white paper — exactly the unreadable "black box" in the screenshot.
+### New styling
 
-### Fix
-Pin the Clear button to explicit light colors so it always reads on the white document page, matching the rest of the document body:
+- Transparent background (no grey fill) so it sits cleanly on the white paper
+- Gold underline using the brand primary color instead of blue
+- Slate-900 text to stay readable on white
+- Subtle gold tint on focus instead of blue background
 
 ```tsx
-className="w-full sm:w-auto bg-white text-slate-900 border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+const FILL_IN_INPUT_CLASS =
+  "inline-block h-7 sm:h-7 align-baseline w-auto min-w-0 " +
+  "px-1 py-0 rounded-none border-0 border-b-2 border-primary/70 " +
+  "bg-transparent " +
+  "text-base sm:text-sm font-medium text-slate-900 " +
+  "focus-visible:ring-0 focus-visible:ring-offset-0 " +
+  "focus-visible:border-primary focus-visible:bg-primary/5 " +
+  "placeholder:text-slate-400 placeholder:font-normal";
 ```
 
-One className change, on the Clear button only. The Confirm button is unaffected (its gold gradient already reads on white). No other files, no logic changes.
+No other files change. No logic changes.
