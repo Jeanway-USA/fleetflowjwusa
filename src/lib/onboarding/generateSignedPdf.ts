@@ -1,10 +1,11 @@
 import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
 import { extractStateFromAddress } from '@/lib/us-states';
+import { formatPayRate, payTypeLabel, type DriverPayType } from '@/lib/pay-format';
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status|ssn|email|bank_account_type|bank_name|routing_number|account_number)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status|pay_type|pay_rate|ssn|email|bank_account_type|bank_name|routing_number|account_number)\s*\}\}/g;
 
 
 export interface GenerateSignedPdfArgs {
@@ -20,6 +21,8 @@ export interface GenerateSignedPdfArgs {
   endorsements?: string[] | null;
   hasTwic?: boolean | null;
   twicExpiry?: string | null;
+  payType?: DriverPayType;
+  payRate?: number | null;
   ssn?: string;
   email?: string;
   bankName?: string;
@@ -130,6 +133,8 @@ export function generateSignedPdf({
   endorsements,
   hasTwic,
   twicExpiry,
+  payType = null,
+  payRate = null,
   ssn,
   email,
   bankName,
@@ -459,6 +464,14 @@ export function generateSignedPdf({
           }
           break;
         }
+        case 'pay_type':
+          buffer += payType ? payTypeLabel(payType) : '[TERMS NOT SET - CONTACT HIRING MANAGER]';
+          break;
+        case 'pay_rate':
+          buffer += payType && payRate != null
+            ? formatPayRate(payType, payRate)
+            : '[TERMS NOT SET - CONTACT HIRING MANAGER]';
+          break;
         case 'ssn': {
           const digits = (ssn || '').replace(/\D/g, '');
           if (digits.length >= 4) {
