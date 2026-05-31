@@ -115,8 +115,9 @@ export default function DriverOnboarding() {
   const templateIndex = stepIndex - 1;
   const currentTemplate = templateIndex >= 0 ? templates[templateIndex] : undefined;
   const currentState: TemplateState = currentTemplate
-    ? state[currentTemplate.id] ?? { driverAddress: '', signature: null, cdlNumber: '', attachment: null }
-    : { driverAddress: '', signature: null, cdlNumber: '', attachment: null };
+    ? state[currentTemplate.id] ?? EMPTY_TEMPLATE_STATE
+    : EMPTY_TEMPLATE_STATE;
+
 
   const needsDriverAddress = useMemo(
     () => !!currentTemplate && /\{\{\s*driver_address\s*\}\}/.test(currentTemplate.content),
