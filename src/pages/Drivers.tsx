@@ -492,9 +492,10 @@ export default function Drivers() {
                 <div className="pt-2 border-t flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Pay Rate</span>
                   <span className="font-medium">
-                    {driver.pay_type === 'percentage' ? `${driver.pay_rate}%` : `$${driver.pay_rate}`}
+                    {formatPayRate(driver.pay_type, driver.pay_rate)}
                   </span>
                 </div>
+
               </CardContent>
             </Card>
           ))}
