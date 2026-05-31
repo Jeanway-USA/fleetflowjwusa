@@ -109,6 +109,33 @@ const MARKDOWN_COMPONENTS = {
   ),
 };
 
+// Same as MARKDOWN_COMPONENTS but unwraps the outer <p> so its content can
+// render as inline children inside an enclosing paragraph (used when a
+// paragraph contains fill-in tokens that must stay on the same line as the
+// surrounding text).
+const INLINE_MARKDOWN_COMPONENTS = {
+  ...MARKDOWN_COMPONENTS,
+  p: ({ children }: any) => <>{children}</>,
+};
+
+// Tokens that render as their own block (not inline within a sentence).
+const BLOCK_TOKENS = new Set(['driver_signature', 'file_upload', 'owner_signature']);
+
+// Detect block-level markdown so the whole block routes through
+// MARKDOWN_COMPONENTS (headings, lists, hr, blockquotes, code fences) instead
+// of being wrapped in an inline paragraph.
+function isBlockMarkdown(text: string): boolean {
+  const first = text.trim().split('\n')[0] ?? '';
+  return /^(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|---|\*\*\*|___|```)/.test(first);
+}
+
+// Detect inline markdown syntax. When absent we render the text as a plain
+// <span> so adjacent whitespace is preserved exactly (so "resides in " stays
+// glued to the input that follows it).
+function hasInlineMarkdown(text: string): boolean {
+  return /(\*\*|__|`|\[[^\]]+\]\([^)]+\)|~~)/.test(text);
+}
+
 export function DocumentTemplateRenderer({
   content,
   driverAddress,
