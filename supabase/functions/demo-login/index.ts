@@ -28,6 +28,7 @@ const DEMO_EMAIL = "demo@fleetflow-tms.com";
 const DEMO_ORG_NAME = "Demo Trucking Co.";
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
