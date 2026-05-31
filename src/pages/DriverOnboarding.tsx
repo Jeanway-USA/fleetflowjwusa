@@ -389,7 +389,7 @@ export default function DriverOnboarding() {
 
   if (isLoading || driverLoading) {
     return (
-      <div className="container max-w-3xl py-10">
+      <div className="container max-w-4xl py-10">
         <Skeleton className="h-8 w-1/3 mb-4" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -398,7 +398,7 @@ export default function DriverOnboarding() {
 
   if (!driverRow) {
     return (
-      <div className="container max-w-3xl py-10">
+      <div className="container max-w-4xl py-10">
         <Card>
           <CardHeader>
             <CardTitle>Driver profile not linked</CardTitle>
@@ -416,7 +416,7 @@ export default function DriverOnboarding() {
   // Success screen — shown only here, not on the regular dashboard
   if (signedResults) {
     return (
-      <div className="container max-w-3xl py-10">
+      <div className="container max-w-4xl py-10">
         <Card>
           <CardHeader className="text-center">
             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -468,7 +468,7 @@ export default function DriverOnboarding() {
       '';
 
   return (
-    <div className="container max-w-3xl py-10">
+    <div className="container max-w-4xl py-10">
       <div className="mb-6">
         <p className="text-sm text-muted-foreground mb-2">
           Step {stepIndex + 1} of {totalSteps}
