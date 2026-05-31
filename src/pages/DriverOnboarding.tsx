@@ -216,7 +216,7 @@ export default function DriverOnboarding() {
     const { data: driverRow, error: driverError } = await supabase
       .from('drivers')
       .select(
-        'id, first_name, last_name, phone, license_number, license_expiry, medical_card_expiry, endorsements, has_twic, twic_expiry',
+        'id, first_name, last_name, phone, license_number, license_expiry, medical_card_expiry, endorsements, has_twic, twic_expiry, pay_type, pay_rate',
       )
       .eq('user_id', user.id)
       .eq('org_id', orgId)
