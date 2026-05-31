@@ -464,6 +464,14 @@ export function generateSignedPdf({
           }
           break;
         }
+        case 'pay_type':
+          buffer += payType ? payTypeLabel(payType) : '[TERMS NOT SET - CONTACT HIRING MANAGER]';
+          break;
+        case 'pay_rate':
+          buffer += payType && payRate != null
+            ? formatPayRate(payType, payRate)
+            : '[TERMS NOT SET - CONTACT HIRING MANAGER]';
+          break;
         case 'ssn': {
           const digits = (ssn || '').replace(/\D/g, '');
           if (digits.length >= 4) {
