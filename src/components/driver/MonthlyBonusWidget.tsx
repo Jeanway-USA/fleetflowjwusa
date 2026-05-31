@@ -1,151 +1,188 @@
-import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Trophy, Sparkles } from 'lucide-react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Trophy, Sparkles, ShieldAlert, ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useSafetyBonus } from '@/hooks/useSafetyBonus';
 
 interface MonthlyBonusWidgetProps {
   driverId: string;
 }
 
-const DEFAULT_TARGET_MILES = 12000;
+const currency = (n: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0);
+const rate = (n: number) =>
+  `$${(n || 0).toFixed(2)}/mile`;
+const formatMiles = (m: number) =>
+  new Intl.NumberFormat('en-US').format(Math.round(m || 0));
 
 export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
-  const hasTriggeredConfetti = useRef(false);
-  const now = new Date();
-  const monthStart = format(startOfMonth(now), 'yyyy-MM-dd');
-  const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd');
-  const currentMonth = format(now, 'MMMM yyyy');
+  const hasFired = useRef(false);
+  const {
+    isLoading,
+    hasSettings,
+    isEligible,
+    currentSafeMiles,
+    currentEarnedBonus,
+    currentRate,
+    nextTierMiles,
+    maxBonus,
+    periodEnd,
+    disqualifiers,
+  } = useSafetyBonus(driverId);
 
-  // Fetch configurable bonus goal from company_settings
-  const { data: targetMiles = DEFAULT_TARGET_MILES } = useQuery({
-    queryKey: ['company-setting', 'monthly_bonus_miles'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('company_settings')
-        .select('setting_value')
-        .eq('setting_key', 'monthly_bonus_miles')
-        .maybeSingle();
+  const capHit = isEligible && maxBonus > 0 && currentEarnedBonus >= maxBonus;
 
-      if (error) throw error;
-      const parsed = Number(data?.setting_value);
-      return parsed > 0 ? parsed : DEFAULT_TARGET_MILES;
-    },
-  });
-
-  const { data: monthlyMiles = 0, isLoading } = useQuery({
-    queryKey: ['driver-monthly-miles', driverId, monthStart],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fleet_loads')
-        .select('actual_miles, booked_miles')
-        .eq('driver_id', driverId)
-        .eq('status', 'delivered')
-        .gte('delivery_date', monthStart)
-        .lte('delivery_date', monthEnd);
-
-      if (error) throw error;
-
-      // Use actual_miles if available, otherwise fall back to booked_miles
-      return data?.reduce((sum, load) => sum + (load.actual_miles || load.booked_miles || 0), 0) || 0;
-    },
-    enabled: !!driverId,
-  });
-
-  const percentage = Math.min((monthlyMiles / targetMiles) * 100, 100);
-  const actualPercentage = (monthlyMiles / targetMiles) * 100;
-  const bonusUnlocked = actualPercentage >= 100;
-
-  // Trigger confetti when bonus is unlocked
   useEffect(() => {
-    if (bonusUnlocked && !hasTriggeredConfetti.current && !isLoading) {
-      hasTriggeredConfetti.current = true;
-      
-      // Fire confetti from both sides
-      const fireConfetti = () => {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { x: 0.1, y: 0.6 },
-          colors: ['#22c55e', '#16a34a', '#4ade80', '#fbbf24', '#f59e0b'],
-        });
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { x: 0.9, y: 0.6 },
-          colors: ['#22c55e', '#16a34a', '#4ade80', '#fbbf24', '#f59e0b'],
-        });
+    if (capHit && !hasFired.current && !isLoading) {
+      hasFired.current = true;
+      const fire = () => {
+        confetti({ particleCount: 100, spread: 70, origin: { x: 0.1, y: 0.6 } });
+        confetti({ particleCount: 100, spread: 70, origin: { x: 0.9, y: 0.6 } });
       };
-      
-      // Fire immediately and again after a short delay for extra celebration
-      fireConfetti();
-      setTimeout(fireConfetti, 250);
+      fire();
+      setTimeout(fire, 250);
     }
-  }, [bonusUnlocked, isLoading]);
+  }, [capHit, isLoading]);
 
-  // Determine color and label based on percentage
-  let progressColorClass = '';
-  let label = '';
-  let badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' = 'secondary';
+  // Days until period reset (periodEnd is YYYY-MM-DD)
+  const daysToReset = (() => {
+    if (!periodEnd) return null;
+    const end = new Date(`${periodEnd}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(diff, 0);
+  })();
 
-  if (bonusUnlocked) {
-    progressColorClass = 'bg-green-500';
-    label = 'BONUS UNLOCKED 🎉';
-    badgeVariant = 'default';
-  } else if (actualPercentage >= 75) {
-    progressColorClass = 'bg-orange-500';
-    label = 'Almost There!';
-    badgeVariant = 'outline';
-  } else {
-    progressColorClass = 'bg-yellow-500';
-    label = 'Keep Pushing';
-    badgeVariant = 'secondary';
+  // ---------- Loading ----------
+  if (isLoading) {
+    return (
+      <Card className="border-primary/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-primary" />
+            Safety &amp; Performance Bonus
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-10 w-32" />
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-4 w-2/3" />
+        </CardContent>
+      </Card>
+    );
   }
 
-  const formatMiles = (miles: number) => {
-    return new Intl.NumberFormat('en-US').format(Math.round(miles));
-  };
+  // ---------- No program configured ----------
+  if (!hasSettings) {
+    return (
+      <Card className="border-muted">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2 text-muted-foreground">
+            <Trophy className="h-5 w-5" />
+            Safety &amp; Performance Bonus
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Bonus program isn’t set up yet. Check back once your fleet enables it.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ---------- Disqualified ----------
+  if (!isEligible) {
+    const reasons: string[] = [];
+    if (disqualifiers.accidents) reasons.push('a reported accident');
+    if (disqualifiers.csaPoints) reasons.push('a CSA citation');
+    if (disqualifiers.serviceFailures) reasons.push('a service failure');
+    const reasonText =
+      reasons.length === 0
+        ? 'a disqualifying event'
+        : reasons.length === 1
+        ? reasons[0]
+        : reasons.slice(0, -1).join(', ') + ' and ' + reasons.slice(-1);
+
+    return (
+      <Card className="border-destructive/40 bg-destructive/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2 text-destructive">
+            <ShieldAlert className="h-5 w-5" />
+            Bonus paused this period
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <p className="text-sm text-foreground">
+            You aren’t eligible for the Safety &amp; Performance bonus this period because of{' '}
+            <span className="font-medium">{reasonText}</span>.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Hang in there —{' '}
+            <span className="font-medium text-foreground">
+              {daysToReset === 0
+                ? 'a fresh period starts tomorrow'
+                : `your next period resets in ${daysToReset} day${daysToReset === 1 ? '' : 's'}`}
+            </span>
+            . A clean record from then earns the full {currency(maxBonus)} bonus.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // ---------- Eligible ----------
+  const atTopTier = nextTierMiles == null;
+  const denom = atTopTier ? currentSafeMiles || 1 : currentSafeMiles + (nextTierMiles ?? 0);
+  const progressPct = atTopTier ? 100 : Math.min((currentSafeMiles / denom) * 100, 100);
 
   return (
     <Card className="border-primary/20">
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
-          {bonusUnlocked ? (
-            <Sparkles className="h-5 w-5 text-green-500 animate-pulse" />
+          {capHit ? (
+            <Sparkles className="h-5 w-5 text-primary animate-pulse" />
           ) : (
-            <Trophy className="h-5 w-5 text-primary" />
+            <ShieldCheck className="h-5 w-5 text-primary" />
           )}
-          Monthly Bonus Goal
+          Safety &amp; Performance Bonus
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Drive {formatMiles(targetMiles)} miles this month to unlock a{' '}
-          <span className="font-semibold text-primary">$0.05/mile bonus</span> — every mile counts!
+      <CardContent className="space-y-4">
+        <div>
+          <div className="text-4xl font-bold tracking-tight text-primary">
+            {currency(currentEarnedBonus)}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            {formatMiles(currentSafeMiles)} safe miles this period
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Progress value={progressPct} className="h-3" />
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              {atTopTier
+                ? 'Top tier reached'
+                : `${formatMiles(nextTierMiles ?? 0)} mi to next rate jump`}
+            </span>
+            {daysToReset != null && (
+              <span>
+                {daysToReset === 0 ? 'Resets tomorrow' : `${daysToReset}d left in period`}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Current rate:{' '}
+          <span className="font-medium text-foreground">{rate(currentRate)}</span>
+          {' · '}Max bonus:{' '}
+          <span className="font-medium text-foreground">{currency(maxBonus)}</span>
         </p>
-
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-medium">
-            {isLoading ? '...' : formatMiles(monthlyMiles)} / {formatMiles(targetMiles)} mi
-          </span>
-          <Badge variant={badgeVariant} className={bonusUnlocked ? 'bg-green-500 text-white animate-pulse' : ''}>
-            {label}
-          </Badge>
-        </div>
-
-        <div className="relative">
-          <Progress value={percentage} className="h-3" />
-          <div
-            className={`absolute top-0 left-0 h-3 rounded-full transition-all ${progressColorClass}`}
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
-
-        <p className="text-xs text-muted-foreground text-right">{currentMonth}</p>
       </CardContent>
     </Card>
   );
