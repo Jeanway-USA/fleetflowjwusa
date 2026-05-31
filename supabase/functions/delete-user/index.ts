@@ -2,6 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Allowed origins for CORS - restrict to known domains
 const ALLOWED_ORIGINS = [
+  'https://tms.jeanwayusa.com',
+  'https://fleetflowjwusa.lovable.app',
   'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app',
   'http://localhost:5173',
   'http://localhost:8080',
