@@ -545,6 +545,8 @@ export default function DriverOnboarding() {
                 hasTwic={driverRow?.has_twic}
                 twicExpiry={driverRow?.twic_expiry}
                 phoneNumber={driverRow?.phone}
+                payType={driverRow?.pay_type}
+                payRate={driverRow?.pay_rate}
                 ssn={currentState.ssn}
                 onSsnChange={(v) => updateCurrent({ ssn: v })}
                 email={currentState.email}
