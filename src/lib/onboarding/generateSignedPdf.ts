@@ -20,7 +20,14 @@ export interface GenerateSignedPdfArgs {
   endorsements?: string[] | null;
   hasTwic?: boolean | null;
   twicExpiry?: string | null;
+  ssn?: string;
+  email?: string;
+  bankName?: string;
+  routingNumber?: string;
+  accountNumber?: string;
+  bankAccountType?: 'checking' | 'savings' | '';
 }
+
 
 function formatDateToken(value?: string | null): string | null {
   if (!value) return null;
