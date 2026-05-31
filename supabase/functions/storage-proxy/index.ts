@@ -343,8 +343,8 @@ Deno.serve(async (req) => {
       .eq('is_active', true)
       .maybeSingle();
 
-    const url = new URL(req.url);
-    const action = url.searchParams.get('action'); // upload, download, delete
+    // (url and action already parsed above for role gating)
+
 
     // ===== UPLOAD =====
     if (req.method === 'POST' && action === 'upload') {
