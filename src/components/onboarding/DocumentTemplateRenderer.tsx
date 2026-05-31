@@ -32,6 +32,8 @@ export interface DocumentTemplateRendererProps {
   hasTwic?: boolean | null;
   twicExpiry?: string | null;
   phoneNumber?: string | null;
+  payType?: DriverPayType;
+  payRate?: number | null;
   ssn?: string;
   onSsnChange?: (value: string) => void;
   email?: string;
