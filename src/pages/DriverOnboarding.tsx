@@ -508,7 +508,7 @@ export default function DriverOnboarding() {
               onValidityChange={setCredentialsValid}
             />
           ) : currentTemplate ? (
-            <div className="rounded-md border bg-card p-6">
+            <div className="rounded-md border bg-card p-6 print:break-after-page">
               <DocumentTemplateRenderer
                 content={currentChunk}
                 driverAddress={currentState.driverAddress}
@@ -543,6 +543,43 @@ export default function DriverOnboarding() {
                 onBankAccountTypeChange={(v) => updateCurrent({ bankAccountType: v })}
               />
 
+              {chunkCount > 1 && (
+                <div className="hidden print:block">
+                  {chunks.map((chunk, idx) =>
+                    idx === safeSubPageIndex ? null : (
+                      <div
+                        key={`print-chunk-${idx}`}
+                        className="print:break-before-page print:break-after-page"
+                      >
+                        <DocumentTemplateRenderer
+                          content={chunk}
+                          driverAddress={currentState.driverAddress}
+                          onDriverAddressChange={() => {}}
+                          signature={currentState.signature}
+                          onSignatureCapture={() => {}}
+                          driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
+                          cdlNumber={currentState.cdlNumber}
+                          onCdlNumberChange={() => {}}
+                          attachment={currentState.attachment}
+                          licenseNumber={driverRow?.license_number}
+                          licenseExpiry={driverRow?.license_expiry}
+                          medicalCardExpiry={driverRow?.medical_card_expiry}
+                          endorsements={driverRow?.endorsements}
+                          hasTwic={driverRow?.has_twic}
+                          twicExpiry={driverRow?.twic_expiry}
+                          phoneNumber={driverRow?.phone}
+                          ssn={currentState.ssn}
+                          email={currentState.email}
+                          bankName={currentState.bankName}
+                          routingNumber={currentState.routingNumber}
+                          accountNumber={currentState.accountNumber}
+                          bankAccountType={currentState.bankAccountType}
+                        />
+                      </div>
+                    ),
+                  )}
+                </div>
+              )}
             </div>
           ) : null}
 
