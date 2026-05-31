@@ -1,31 +1,33 @@
-# Fix Direct Deposit Template Tokens
+# Fix invite redirect URL using request Origin
 
 ## Problem
-The tokens `{{ssn}}`, `{{email}}`, `{{bank_account_type}}`, `{{bank_name}}`, `{{routing_number}}`, `{{account_number}}` render as plain text because `DocumentTemplateRenderer.tsx` (and `generateSignedPdf.ts`) only recognize a fixed allowlist of token names in their `TOKEN_REGEX`. Any token not in that list falls through to the default branch and is shown literally.
+`supabase/functions/invite-user/index.ts` line 122 hardcodes:
+```ts
+const appUrl = 'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app';
+```
+This URL is then used to build the invite `acceptUrl` (`${appUrl}/auth/accept-invite`) passed as `redirectTo` to `supabase.auth.admin.generateLink`. Result: every invite email lands on the preview domain regardless of where the owner sent it from (e.g. `tms.jeanwayusa.com`).
 
 ## Fix
+Derive `appUrl` from the request `Origin` header (which is already validated by the CORS allowlist earlier in the function), and fall back to the production custom domain if the origin is missing.
 
-### 1. `src/components/onboarding/DocumentTemplateRenderer.tsx`
-- Extend `TOKEN_REGEX` to include the 6 new tokens.
-- Extend `DocumentTemplateRendererProps` with controlled values + change handlers:
-  - `ssn`, `email`, `bankName`, `routingNumber`, `accountNumber` (string + onChange)
-  - `bankAccountType` ('checking' | 'savings' + onChange) — rendered with a `Select` (Checking / Savings)
-- Add render cases for each new token using `Input` (and `Select` for account type), styled consistently with existing inline-input tokens (`min-w-[...] inline-block align-middle mx-1`, `h-9`). Use `type="password"` / `inputMode="numeric"` where appropriate (SSN, routing, account).
+### Edit `supabase/functions/invite-user/index.ts`
+Replace the hardcoded `appUrl` with:
+```ts
+const FALLBACK_APP_URL = 'https://tms.jeanwayusa.com';
+const requestOrigin = req.headers.get('Origin') || '';
+const isValidOrigin =
+  requestOrigin &&
+  (ALLOWED_ORIGINS.includes(requestOrigin) ||
+    requestOrigin.endsWith('.lovable.app') ||
+    requestOrigin.endsWith('.lovableproject.com'));
+const appUrl = isValidOrigin ? requestOrigin : FALLBACK_APP_URL;
+```
+No other changes — `acceptUrl` and `redirectTo` already use `appUrl`, and the branded invite email body uses the same variable.
 
-### 2. `src/pages/DriverOnboarding.tsx`
-- Add local state for the 6 fields.
-- Pass values + setters into `DocumentTemplateRenderer`.
-- Include them in the submission payload for the Direct Deposit document (saved alongside the signed PDF / form record the way existing document submissions are stored).
-- Require the bank fields before allowing submit on the Direct Deposit step (mirror existing validation pattern for signature/address).
-
-### 3. `src/lib/onboarding/generateSignedPdf.ts`
-- Extend `TOKEN_REGEX` and `GenerateSignedPdfArgs` with the same 6 fields.
-- In the token switch, write the captured values into the PDF text buffer. Mask SSN as `***-**-####` and account number as `****####` in the PDF for safety; routing/bank name/email/account type print as entered.
-- Pass these values through from `DriverOnboarding.tsx` when generating the signed Direct Deposit PDF.
+### Redeploy
+Deploy `invite-user` after the edit.
 
 ## Out of scope
-- No DB schema changes — direct deposit values are stored in the existing document submission record (JSON metadata field) the same way other dynamic form data is stored. If you'd rather persist them to a dedicated `driver_banking` table instead, say so and I'll add a migration.
-- No changes to the Driver Agreement flow or pagination logic.
-
-## Open question
-Do you want the captured banking info stored as part of the signed-document submission metadata (current plan), or written to a dedicated, encrypted `driver_banking` table with strict RLS? The second is more secure for SSN/account numbers but requires a migration.
+- No DB/config changes.
+- No changes to other edge functions (their redirect logic, if any, can be audited separately if needed).
+- Supabase Auth's "Site URL" / "Redirect URLs" allowlist must already include `https://tms.jeanwayusa.com/auth/accept-invite` (and the preview URL). If invites still bounce after this fix, that allowlist is the next thing to check.

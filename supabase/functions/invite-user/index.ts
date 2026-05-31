@@ -119,7 +119,14 @@ Deno.serve(async (req) => {
       .single();
 
     const orgId = reqProfile?.org_id;
-    const appUrl = 'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app';
+    const FALLBACK_APP_URL = 'https://tms.jeanwayusa.com';
+    const requestOrigin = req.headers.get('Origin') || '';
+    const isValidOrigin =
+      !!requestOrigin &&
+      (ALLOWED_ORIGINS.includes(requestOrigin) ||
+        requestOrigin.endsWith('.lovable.app') ||
+        requestOrigin.endsWith('.lovableproject.com'));
+    const appUrl = isValidOrigin ? requestOrigin : FALLBACK_APP_URL;
 
     // Check if user already exists in auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
