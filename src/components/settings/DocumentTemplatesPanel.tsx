@@ -136,6 +136,11 @@ const VARIABLES: Array<{ token: string; description: string }> = [
     token: "{{phone_number}}",
     description: "Auto-fills the driver's phone number captured in onboarding Step 1.",
   },
+  {
+    token: "{{page_break}}",
+    description:
+      "Splits this document into multiple readable pages for the driver, and enforces a hard page break when the final PDF is generated.",
+  },
 ];
 
 interface DocumentTemplatesPanelProps {
