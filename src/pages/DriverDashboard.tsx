@@ -161,7 +161,8 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
             <ErrorBoundary compact>
-              <div id="tour-notifications">
+              <div id="tour-notifications" className="flex items-center gap-1">
+                <DriverMessages />
                 <DriverNotifications driverId={driver.id} />
               </div>
             </ErrorBoundary>
