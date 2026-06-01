@@ -319,13 +319,34 @@ export default function DriverOnboarding() {
       });
       if (insertError) throw insertError;
 
-      // Persist latest direct deposit attachment path on the driver record
-      if (attachmentPath && tmpl.document_type === 'direct_deposit') {
-        const { error: driverUpdateErr } = await supabase
-          .from('drivers')
-          .update({ direct_deposit_attachment_url: attachmentPath })
-          .eq('id', driverRow.id);
-        if (driverUpdateErr) throw driverUpdateErr;
+      // Persist latest direct deposit attachment + banking info on direct_deposit step
+      if (tmpl.document_type === 'direct_deposit') {
+        if (attachmentPath) {
+          const { error: driverUpdateErr } = await supabase
+            .from('drivers')
+            .update({ direct_deposit_attachment_url: attachmentPath })
+            .eq('id', driverRow.id);
+          if (driverUpdateErr) throw driverUpdateErr;
+        }
+
+        if (
+          tState.bankName ||
+          tState.routingNumber ||
+          tState.accountNumber ||
+          tState.bankAccountType
+        ) {
+          const { error: bankingErr } = await supabase.rpc('upsert_driver_banking', {
+            _driver_id: driverRow.id,
+            _bank_name: tState.bankName || '',
+            _account_type: tState.bankAccountType || '',
+            _routing_number: tState.routingNumber || '',
+            _account_number: tState.accountNumber || '',
+          });
+          if (bankingErr) {
+            console.error('Failed to save banking info:', bankingErr);
+            toast.error('Banking info could not be saved securely. Please contact your admin.');
+          }
+        }
       }
 
       results.push({
