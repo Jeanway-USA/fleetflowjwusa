@@ -14,8 +14,6 @@ import {
   Route, 
   DollarSign, 
   Calendar,
-  CheckCircle,
-  Clock,
   TrendingUp,
   Package,
   Gauge,
