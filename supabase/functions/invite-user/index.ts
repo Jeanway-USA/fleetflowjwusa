@@ -61,11 +61,18 @@ Deno.serve(async (req) => {
     
     if (authError || !requestingUser) {
       console.log('Invalid token:', authError?.message);
-      return new Response(JSON.stringify({ error: 'Invalid token' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          error: 'session_expired',
+          message: 'Your session is no longer valid. Please sign in again.',
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      );
     }
+
 
     // Check if requesting user is an owner
     const { data: roleData } = await supabaseAdmin

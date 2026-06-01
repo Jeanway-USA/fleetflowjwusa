@@ -1,10 +1,13 @@
-import { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { ReactNode, useEffect } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TierGate } from '@/components/shared/TierGate';
 import { Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
+
 
 type AppRole = Database['public']['Enums']['app_role'];
 
@@ -16,6 +19,23 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, allowedRoles, requiredFeature }: ProtectedRouteProps) {
   const { user, loading, rolesLoading, orgLoading, hasRole, orgIsActive, orgId, requiresOnboarding, onboardingCompleted } = useAuth();
+  const navigate = useNavigate();
+
+  // Catch zombie sessions: if Supabase reports the user was signed out elsewhere
+  // (admin deletion, session revoked from another tab, token refresh failure),
+  // surface a clear message and bounce to /auth instead of letting subsequent
+  // edge-function calls fail with cryptic "non-2xx" errors.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' || (event as string) === 'USER_DELETED') {
+        toast.error('Your session expired. Please sign in again.');
+        navigate('/auth', { replace: true });
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+
 
   if (loading || rolesLoading || orgLoading) {
     return (

@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { invokeWithAuth } from '@/lib/invoke-with-auth';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -177,7 +179,7 @@ export function TeamManagementTab() {
 
     setIsInviting(true);
     try {
-      const response = await supabase.functions.invoke('invite-user', {
+      const response = await invokeWithAuth<{ error?: string }>('invite-user', {
         body: {
           email: inviteEmail,
           role: inviteRole,
@@ -186,8 +188,10 @@ export function TeamManagementTab() {
           requires_onboarding: inviteRequiresOnboarding,
         },
       });
+      if (response.sessionExpired) return;
       if (response.error) throw new Error(response.error.message || 'Failed to send invitation');
       if (response.data?.error) throw new Error(response.data.error);
+
       toast.success(`Invitation sent to ${inviteEmail}`);
       setInviteOpen(false);
       setInviteEmail('');
@@ -238,9 +242,11 @@ export function TeamManagementTab() {
     if (!userToDelete) return;
     setIsDeleting(true);
     try {
-      const response = await supabase.functions.invoke('delete-user', { body: { userId: userToDelete.user_id } });
+      const response = await invokeWithAuth<{ error?: string }>('delete-user', { body: { userId: userToDelete.user_id } });
+      if (response.sessionExpired) return;
       if (response.error) throw new Error(response.error.message || 'Failed to delete user');
       if (response.data?.error) throw new Error(response.data.error);
+
       toast.success('User deleted successfully');
       setDeleteDialogOpen(false);
       setUserToDelete(null);
