@@ -1,15 +1,17 @@
+import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Phone, Mail, Edit2, CreditCard, Calendar, FileSignature } from 'lucide-react';
+import { Phone, Mail, Edit2, CreditCard, Calendar, FileSignature, MessageSquare } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { CredentialsCompliance } from './CredentialsCompliance';
 import { SignedOnboardingDocuments } from './SignedOnboardingDocuments';
 import { DriverBankingDetails } from './DriverBankingDetails';
+import { DriverChatSheet } from './DriverChatSheet';
 
 interface DriverDetailSheetProps {
   driver: any | null;
