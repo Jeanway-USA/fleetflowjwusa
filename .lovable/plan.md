@@ -1,43 +1,40 @@
 ## Goal
 
-Extend driver goal settings to support a goal **type** (financial vs mileage) and an explicit `target_miles` column, while keeping the existing revenue/miles goal fields intact for backward compatibility.
+Make the Weekly Goals section of Driver Settings adapt to the driver's `pay_type`, and ensure saves persist `goal_type` and `target_miles` correctly.
 
-## Schema changes (`driver_settings` table)
+## Behavior
 
-There is no `weekly_goals` table in this project — driver goals live on `public.driver_settings` (read via the `driver_settings_safe` view). Changes will be applied there.
+`driver.pay_type` values in this codebase: `'flat'`, `'cpm'` / `'per_mile'`, `'percentage'`, `'hourly'`. The "Flat Rate" label corresponds to `pay_type === 'flat'`.
 
-Add two columns:
+In `src/pages/DriverSettings.tsx`:
 
-1. `goal_type text not null default 'financial'`
-   - CHECK via validation trigger (per project convention — no CHECK constraints) limiting values to `'financial'` or `'mileage'`.
-2. `target_miles integer` (nullable, no default)
+1. The `driver` query already returns `pay_type` (uses `select('*')`). No fetch change needed beyond reading `driver.pay_type`.
 
-Keep existing columns untouched:
-- `weekly_miles_goal` (int)
-- `weekly_revenue_goal` (int)
-- `pay_week_start_day` (int)
+2. Replace the existing two-column grid (Miles Goal + Revenue Goal) and the separate Target Miles input with conditional rendering driven by `pay_type`:
 
-Also update the `driver_settings_safe` view to expose `goal_type` and `target_miles` so the client (which reads from the safe view) can see them. Re-grant SELECT on the view to `authenticated`.
+   - **Flat Rate (`pay_type === 'flat'`)**
+     - Hide the dollar-amount (Weekly Revenue Goal) input entirely.
+     - Show a single **"Weekly Mileage Target"** number input bound to `targetMiles` (with miles suffix).
+     - Subtext under it: *"Pace yourself to hit 2,500 safe miles per week to ensure you unlock your 10,000-mile monthly safety bonus."*
+     - Also hide the "Primary Goal Type" selector (force `goalType = 'mileage'` for flat drivers; not user-selectable).
+     - Keep the existing `weeklyMilesGoal` state in sync with `targetMiles` so legacy reads still work.
 
-No RLS/GRANT changes needed on the base table — existing policies already cover it.
+   - **All other pay types (CPM/per_mile, percentage, hourly)**
+     - Keep the current layout: Primary Goal Type selector + both Miles Goal and Revenue Goal inputs + Target Miles input (shown when Goal Type = Mileage, otherwise the Revenue Goal is the primary).
+     - To reduce clutter, only show the input that matches the selected goal type, plus the goal-type selector — i.e. Mileage → Target Miles; Financial → Weekly Revenue Goal. Drop the redundant "Weekly Miles Goal" field (its value is preserved in DB; UI keeps it equal to `targetMiles`).
 
-## Code changes
+3. **Save** (`saveGoalsMutation`) — already wired to write `goal_type` and `target_miles`. Adjust `handleSaveGoals` so that:
+   - For flat drivers: force `goal_type = 'mileage'`, set `weekly_miles_goal = targetMiles`, and leave `weekly_revenue_goal` as the previously loaded value (or 0 if absent).
+   - For other drivers: send the user-selected `goalType` and current input values.
 
-1. **`src/pages/DriverSettings.tsx`** — `saveGoalsMutation`
-   - Add `goalType` state (`'financial' | 'mileage'`) and `targetMiles` state.
-   - Load from `settings.goal_type` / `settings.target_miles` in the `useEffect`.
-   - Include `goal_type` and `target_miles` in both `.update()` and `.insert()` payloads.
-   - Add a small UI control (Select) for "Goal Type" in the Weekly Goals card, and conditionally emphasize the miles vs revenue input based on selection (both inputs remain editable so historical values are preserved).
-   - Select the new fields in the settings query.
+4. Update the on-load `useEffect` so flat drivers default `goalType` to `'mileage'` and `targetMiles` to `settings.target_miles ?? settings.weekly_miles_goal ?? 2500` regardless of stored goal type.
 
-2. **`src/components/driver/DriverPayWidget.tsx`**
-   - Select `goal_type` and `target_miles` alongside the existing goals.
-   - When `goal_type === 'mileage'`, use `target_miles ?? weekly_miles_goal` as the progress goal and force progress to be miles-based; otherwise keep the current pay-type-driven behavior (financial uses `weekly_revenue_goal`).
+## Files touched
 
-3. **`src/integrations/supabase/types.ts`** — auto-regenerates after the migration runs; no manual edit.
+- `src/pages/DriverSettings.tsx` — only file changed.
 
 ## Verification
 
-- Open Driver Settings as a driver, toggle Goal Type, set values, Save → no RLS error, row persists with new fields.
-- Driver Dashboard pay widget reflects the chosen goal type in the progress bar and label.
-- Existing drivers (no `goal_type` row yet) default to `'financial'` and continue to behave as today.
+- Driver with `pay_type = 'flat'`: Weekly Goals shows just the Mileage Target input + safety-bonus subtext; Save persists `goal_type='mileage'` and `target_miles`.
+- Driver with `pay_type = 'percentage'` or `'cpm'`: sees goal-type selector and the matching single input; Save persists chosen `goal_type` plus the corresponding numeric target.
+- Existing data on the dashboard pay widget continues to render correctly (it already reads `goal_type` / `target_miles`).
