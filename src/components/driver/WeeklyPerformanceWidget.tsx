@@ -1,16 +1,37 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Gauge, Truck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Gauge, Truck, Receipt } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek } from 'date-fns';
+import { useState } from 'react';
+import { MyPaystubsDialog } from './MyPaystubsDialog';
 
 interface WeeklyPerformanceWidgetProps {
   driverId: string;
+  payRate?: number | null;
+  payType?: string | null;
 }
 
-export function WeeklyPerformanceWidget({ driverId }: WeeklyPerformanceWidgetProps) {
+export function WeeklyPerformanceWidget({ driverId, payRate = null, payType = null }: WeeklyPerformanceWidgetProps) {
+  const [paystubsOpen, setPaystubsOpen] = useState(false);
+
+  const { data: driverRow } = useQuery({
+    queryKey: ['driver-name', driverId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('first_name, last_name')
+        .eq('id', driverId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!driverId,
+  });
+
   const { data: driverSettings } = useQuery({
     queryKey: ['driver-settings', driverId],
     queryFn: async () => {
@@ -54,11 +75,20 @@ export function WeeklyPerformanceWidget({ driverId }: WeeklyPerformanceWidgetPro
 
   return (
     <Card className="h-full">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="flex items-center gap-2 text-base">
           <Gauge className="h-4 w-4 text-primary" />
           Weekly Performance
         </CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 text-xs"
+          onClick={() => setPaystubsOpen(true)}
+        >
+          <Receipt className="h-3.5 w-3.5 mr-1.5" />
+          My Paystubs
+        </Button>
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Miles this week */}
@@ -96,6 +126,15 @@ export function WeeklyPerformanceWidget({ driverId }: WeeklyPerformanceWidgetPro
           </TooltipProvider>
         </div>
       </CardContent>
+
+      <MyPaystubsDialog
+        open={paystubsOpen}
+        onOpenChange={setPaystubsOpen}
+        driverId={driverId}
+        driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim() || 'Driver'}
+        payType={payType}
+        payRate={payRate}
+      />
     </Card>
   );
 }
