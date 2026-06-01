@@ -38,7 +38,14 @@ import {
 import { format, parseISO } from 'date-fns';
 
 
-const endorsementOptions = ['H - Hazmat', 'N - Tank', 'P - Passenger', 'S - School Bus', 'T - Double/Triple', 'X - Hazmat + Tank'];
+const endorsementOptions = [
+  { value: 'H', label: 'H — Hazmat' },
+  { value: 'N', label: 'N — Tank' },
+  { value: 'P', label: 'P — Passenger' },
+  { value: 'S', label: 'S — School Bus' },
+  { value: 'T', label: 'T — Double/Triple' },
+  { value: 'X', label: 'X — Hazmat + Tank' },
+];
 
 // Component for avatar with signed URL support
 function DriverAvatar({ avatarPath, initials }: { avatarPath: string | null; initials: string }) {
