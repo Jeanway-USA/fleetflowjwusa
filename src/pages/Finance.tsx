@@ -952,26 +952,14 @@ export default function Finance() {
           </div>
         </TabsContent>
 
-        <TabsContent value="payroll">
+        <TabsContent value="driver-settlements">
           <div className="space-y-6 animate-in fade-in-50">
-            <PayrollTab
-              filteredPayrolls={filteredPayrolls}
-              payrollTotals={payrollTotals}
-              payrollsLoading={payrollsLoading}
-              drivers={drivers}
-              getDriverName={getDriverName}
-            />
+            <DriverSettlementsTab />
             <CommissionsTab
               filteredCommissions={filteredCommissions}
               commissionTotals={commissionTotals}
               commissionsLoading={commissionsLoading}
             />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="settlements">
-          <div className="space-y-6 animate-in fade-in-50">
-            <SettlementsTab />
           </div>
         </TabsContent>
 
