@@ -120,7 +120,7 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Weekly Progress</span>
             <span className="font-medium">
-              {payType === 'per_mile' 
+              {isMileageGoal
                 ? `${totalMiles.toLocaleString()} / ${weeklyGoal.toLocaleString()} mi`
                 : `$${weeklyEarnings.toLocaleString(undefined, { maximumFractionDigits: 0 })} / $${weeklyGoal.toLocaleString()}`
               }
