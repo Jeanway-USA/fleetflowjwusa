@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const DISCORD_URL = 'https://discord.gg/HAQA8fACan';
 const STORAGE_KEY = 'discord-banner-dismissed';
