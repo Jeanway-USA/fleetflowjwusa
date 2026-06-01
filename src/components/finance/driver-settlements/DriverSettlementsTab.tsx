@@ -415,32 +415,45 @@ function GeneratePaystubDialog({
   orgId: string | null | undefined;
   onCreated: () => void;
 }) {
-  const estimated = driver ? estimatePay(driver, loads) : 0;
+  const isFlat = (driver?.pay_type || '').toLowerCase() === 'flat';
+  const includedLoads = isFlat ? [] : loads;
+  const estimated = driver ? estimatePay(driver, includedLoads) : 0;
+
   const [basePay, setBasePay] = useState<string>('');
   const [bonusPay, setBonusPay] = useState<string>('0');
-  const [deductions, setDeductions] = useState<string>('0');
-  const [status, setStatus] = useState<'draft' | 'approved' | 'paid'>('draft');
   const [notes, setNotes] = useState<string>('');
 
-  // Reset whenever driver changes
-  useMemo(() => {
-    if (driver) {
+  // Reset whenever driver changes or dialog opens
+  useEffect(() => {
+    if (driver && open) {
       setBasePay(estimated.toFixed(2));
       setBonusPay('0');
-      setDeductions('0');
-      setStatus('draft');
       setNotes('');
     }
-  }, [driver?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driver?.id, open]);
 
   const base = Number(basePay) || 0;
   const bonus = Number(bonusPay) || 0;
-  const ded = Number(deductions) || 0;
-  const net = base + bonus - ded;
+  const net = base + bonus;
 
-  const create = useMutation({
-    mutationFn: async () => {
-      if (!driver || !orgId) throw new Error('Missing driver or organization');
+  const payTypeLabel = (() => {
+    if (!driver) return '';
+    const pt = (driver.pay_type || '').toLowerCase();
+    const rate = Number(driver.pay_rate ?? 0);
+    if (pt === 'flat') return `Flat Rate · ${formatCurrency(rate)}`;
+    if (pt === 'percentage') return `Percentage @ ${rate}%`;
+    if (pt === 'per_mile') return `Per Mile @ $${rate}`;
+    return driver.pay_type || 'Unknown';
+  })();
+
+  const submit = async (targetStatus: 'draft' | 'approved') => {
+    if (!driver || !orgId) {
+      toast.error('Missing driver or organization');
+      return;
+    }
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
       const { data: row, error } = await supabase
         .from('driver_settlements')
         .insert({
@@ -450,18 +463,18 @@ function GeneratePaystubDialog({
           period_end: periodEnd,
           base_pay: base,
           bonus_pay: bonus,
-          deductions: ded,
-          status,
+          deductions: 0,
+          status: targetStatus,
           notes: notes || null,
-          approved_at: status !== 'draft' ? new Date().toISOString() : null,
-          paid_at: status === 'paid' ? new Date().toISOString() : null,
+          approved_at: targetStatus === 'approved' ? new Date().toISOString() : null,
+          approved_by: targetStatus === 'approved' ? (userRes.user?.id ?? null) : null,
         })
         .select('id')
         .single();
       if (error) throw error;
 
-      if (loads.length > 0) {
-        const items = loads.map((l) => ({
+      if (includedLoads.length > 0) {
+        const items = includedLoads.map((l) => ({
           org_id: orgId,
           settlement_id: row.id,
           item_type: 'load',
@@ -472,13 +485,20 @@ function GeneratePaystubDialog({
         const { error: itemsErr } = await supabase.from('driver_settlement_items').insert(items);
         if (itemsErr) throw itemsErr;
       }
-    },
-    onSuccess: () => {
-      toast.success('Paystub generated');
+
+      toast.success(
+        targetStatus === 'approved'
+          ? 'Paystub approved — driver notified'
+          : 'Paystub saved as draft',
+      );
       onCreated();
-    },
-    onError: (e: any) => toast.error(e.message),
-  });
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [approving, setApproving] = useState(false);
 
   if (!driver) return null;
 
@@ -494,7 +514,12 @@ function GeneratePaystubDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 overflow-y-auto pr-1">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+            <span className="text-sm text-muted-foreground">Pay Type</span>
+            <Badge variant="secondary" className="font-medium">{payTypeLabel}</Badge>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Base Pay ($)</Label>
               <Input
@@ -503,42 +528,29 @@ function GeneratePaystubDialog({
                 value={basePay}
                 onChange={(e) => setBasePay(e.target.value)}
               />
+              {isFlat && (
+                <p className="text-xs text-muted-foreground">Flat rate — loads ignored.</p>
+              )}
             </div>
             <div className="space-y-2">
-              <Label>Bonus ($)</Label>
+              <Label>Bonus Pay ($)</Label>
               <Input
                 type="number"
                 step="0.01"
                 value={bonusPay}
                 onChange={(e) => setBonusPay(e.target.value)}
+                placeholder="0.00"
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Deductions ($)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={deductions}
-                onChange={(e) => setDeductions(e.target.value)}
-              />
+              <p className="text-xs text-muted-foreground">Safety bonus, referral, etc.</p>
             </div>
           </div>
 
           <div className="flex justify-between items-center bg-primary/10 rounded-lg px-4 py-3">
-            <span className="font-medium">Net Pay</span>
+            <div>
+              <p className="text-sm font-medium">Net Pay</p>
+              <p className="text-xs text-muted-foreground">Base + Bonus</p>
+            </div>
             <span className="text-2xl font-bold text-primary">{formatCurrency(net)}</span>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as any)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">
@@ -546,11 +558,11 @@ function GeneratePaystubDialog({
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes…" />
           </div>
 
-          {loads.length > 0 && (
+          {!isFlat && includedLoads.length > 0 && (
             <div className="rounded-lg border border-border p-3">
               <p className="text-sm font-medium mb-2">Loads in this paystub</p>
               <ul className="text-sm text-muted-foreground space-y-1 max-h-32 overflow-y-auto">
-                {loads.map((l) => (
+                {includedLoads.map((l) => (
                   <li key={l.id} className="flex justify-between">
                     <span>{l.delivery_date ?? l.pickup_date ?? '—'}</span>
                     <span>{formatCurrency(Number(l.gross_revenue ?? l.rate ?? 0))}</span>
@@ -560,14 +572,29 @@ function GeneratePaystubDialog({
             </div>
           )}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button variant="ghost" onClick={onClose} className="mr-auto">Cancel</Button>
+          <LoadingButton
+            variant="outline"
+            loading={savingDraft}
+            onClick={async () => {
+              setSavingDraft(true);
+              await submit('draft');
+              setSavingDraft(false);
+            }}
+          >
+            Save as Draft
+          </LoadingButton>
           <LoadingButton
             className="gradient-gold text-primary-foreground"
-            loading={create.isPending}
-            onClick={() => create.mutate()}
+            loading={approving}
+            onClick={async () => {
+              setApproving(true);
+              await submit('approved');
+              setApproving(false);
+            }}
           >
-            Generate
+            <CheckCircle2 className="h-4 w-4 mr-2" /> Approve & Send to Driver
           </LoadingButton>
         </DialogFooter>
       </DialogContent>
