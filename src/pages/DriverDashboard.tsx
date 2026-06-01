@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ActiveLoadCard } from '@/components/driver/ActiveLoadCard';
-import { TripFuelPlanner } from '@/components/driver/TripFuelPlanner';
+
 import { GeofenceArrivalDrawer } from '@/components/driver/GeofenceArrivalDrawer';
 import { useGeofenceStatus } from '@/hooks/useGeofenceStatus';
 import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
@@ -186,18 +186,6 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
           />
         </ErrorBoundary>
 
-        {/* Fuel Trip Planner - shows when there's an active/upcoming load */}
-        {activeLoad && (
-          <ErrorBoundary compact>
-            <TripFuelPlanner
-              driverId={driver.id}
-              origin={activeLoad.origin}
-              destination={activeLoad.destination}
-              bookedMiles={activeLoad.booked_miles}
-              notes={activeLoad.notes}
-            />
-          </ErrorBoundary>
-        )}
 
         {/* Next Load Preview */}
         {nextLoad && <NextLoadPreview load={nextLoad} />}
