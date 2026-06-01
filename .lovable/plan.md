@@ -1,23 +1,34 @@
-## Change
+# Remove Fuel Planning Feature
 
-Replace the blue/grey fill-in input styling in `src/components/onboarding/DocumentTemplateRenderer.tsx` (the `FILL_IN_INPUT_CLASS` constant, lines 13-20) with a look that matches the rest of the site's gold/primary brand on the white document page.
+Completely remove the Fuel Planning / Trip Fuel Planner feature from the app.
 
-### New styling
+## Frontend
 
-- Transparent background (no grey fill) so it sits cleanly on the white paper
-- Gold underline using the brand primary color instead of blue
-- Slate-900 text to stay readable on white
-- Subtle gold tint on focus instead of blue background
+- `src/components/driver/TripFuelPlanner.tsx` — delete file
+- `src/components/driver/fuel-planner/FuelPlannerMap.tsx` — delete file (and the empty `fuel-planner/` folder)
+- `src/pages/DriverDashboard.tsx` — remove `TripFuelPlanner` import and the `{activeLoad && <TripFuelPlanner ... />}` block
+- `src/components/shared/CommandPalette.tsx` — remove `'fuel_planner'` from each tier's feature Set
+- `src/components/layout/AppSidebar.tsx` — remove `'fuel_planner'` from each tier feature list
+- `src/hooks/useSubscriptionTier.ts` — remove `'fuel_planner'` from each tier's TIER_FEATURES array
+- `src/pages/DriverSettings.tsx` — remove the "Landstar Portal Credentials" card (lines ~355–415) plus the related query, mutation, and state (`landstar-credentials` query, `setLandstarUsername`, save/clear handlers). This section exists solely to feed LCAPP fuel discounts to the planner; with the planner gone it has no purpose.
 
-```tsx
-const FILL_IN_INPUT_CLASS =
-  "inline-block h-7 sm:h-7 align-baseline w-auto min-w-0 " +
-  "px-1 py-0 rounded-none border-0 border-b-2 border-primary/70 " +
-  "bg-transparent " +
-  "text-base sm:text-sm font-medium text-slate-900 " +
-  "focus-visible:ring-0 focus-visible:ring-offset-0 " +
-  "focus-visible:border-primary focus-visible:bg-primary/5 " +
-  "placeholder:text-slate-400 placeholder:font-normal";
-```
+## Backend
 
-No other files change. No logic changes.
+- `supabase/functions/landstar-fuel-stops/` — delete the edge function code, then call `supabase--delete_edge_functions` for `landstar-fuel-stops`
+- `supabase/config.toml` — remove the `[functions.landstar-fuel-stops]` block
+- `supabase/functions/manage-credentials/` — used only for storing Landstar credentials for the planner. Delete the function and its config, and call `supabase--delete_edge_functions` for `manage-credentials`.
+
+## Database
+
+No destructive migration. The `driver_credentials`-style table (if any) and stored encrypted creds will simply go unused. Leaving the table in place avoids data loss and keeps the migration list clean. If you'd rather drop the table too, say so and I'll add a migration.
+
+## Memory
+
+Update `mem://features/driver/fuel-trip-planner` and the corresponding line in `mem://index.md` to mark the feature as removed (or delete the memory file and its index entry).
+
+## Out of scope
+
+- IFTA fuel purchases/tracking — unrelated, stays as is.
+- Driver `DocumentScanButton`, GPS sharing, pay widgets — untouched.
+
+Confirm and I'll implement.
