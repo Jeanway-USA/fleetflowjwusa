@@ -1616,6 +1616,7 @@ export type Database = {
           last_name: string
           license_expiry: string | null
           license_number: string | null
+          license_state: string | null
           medical_card_expiry: string | null
           mvr_expiry: string | null
           org_id: string
@@ -1641,6 +1642,7 @@ export type Database = {
           last_name: string
           license_expiry?: string | null
           license_number?: string | null
+          license_state?: string | null
           medical_card_expiry?: string | null
           mvr_expiry?: string | null
           org_id: string
@@ -1666,6 +1668,7 @@ export type Database = {
           last_name?: string
           license_expiry?: string | null
           license_number?: string | null
+          license_state?: string | null
           medical_card_expiry?: string | null
           mvr_expiry?: string | null
           org_id?: string
