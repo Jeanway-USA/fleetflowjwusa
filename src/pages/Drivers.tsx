@@ -38,7 +38,14 @@ import {
 import { format, parseISO } from 'date-fns';
 
 
-const endorsementOptions = ['H - Hazmat', 'N - Tank', 'P - Passenger', 'S - School Bus', 'T - Double/Triple', 'X - Hazmat + Tank'];
+const endorsementOptions = [
+  { value: 'H', label: 'H — Hazmat' },
+  { value: 'N', label: 'N — Tank' },
+  { value: 'P', label: 'P — Passenger' },
+  { value: 'S', label: 'S — School Bus' },
+  { value: 'T', label: 'T — Double/Triple' },
+  { value: 'X', label: 'X — Hazmat + Tank' },
+];
 
 // Component for avatar with signed URL support
 function DriverAvatar({ avatarPath, initials }: { avatarPath: string | null; initials: string }) {
@@ -287,8 +294,8 @@ export default function Drivers() {
       ? current.filter((e: string) => e !== endorsement)
       : [...current, endorsement];
     
-    // Clear hazmat_expiry if removing HAZMAT endorsement
-    if (isRemoving && endorsement.includes('Hazmat')) {
+    // Clear hazmat_expiry if removing HAZMAT endorsement (H or X)
+    if (isRemoving && (endorsement === 'H' || endorsement === 'X')) {
       setFormData({ ...formData, endorsements: updated, hazmat_expiry: null });
     } else {
       setFormData({ ...formData, endorsements: updated });
@@ -590,18 +597,18 @@ export default function Drivers() {
             <div className="border-t pt-4">
               <h4 className="font-medium mb-3">Endorsements & HAZMAT</h4>
               <div className="grid grid-cols-2 gap-2 mb-4">
-                {endorsementOptions.map((endorsement) => (
-                  <div key={endorsement} className="flex items-center space-x-2">
+                {endorsementOptions.map((opt) => (
+                  <div key={opt.value} className="flex items-center space-x-2">
                     <Checkbox
-                      id={endorsement}
-                      checked={(formData.endorsements || []).includes(endorsement)}
-                      onCheckedChange={() => toggleEndorsement(endorsement)}
+                      id={opt.value}
+                      checked={(formData.endorsements || []).includes(opt.value)}
+                      onCheckedChange={() => toggleEndorsement(opt.value)}
                     />
-                    <Label htmlFor={endorsement} className="text-sm font-normal cursor-pointer">{endorsement}</Label>
+                    <Label htmlFor={opt.value} className="text-sm font-normal cursor-pointer">{opt.label}</Label>
                   </div>
                 ))}
               </div>
-              {(formData.endorsements || []).some((e: string) => e.includes('Hazmat')) && (
+              {(formData.endorsements || []).some((e: string) => e === 'H' || e === 'X') && (
                 <div className="space-y-2">
                   <Label htmlFor="hazmat_expiry">HAZMAT Certification Expiry</Label>
                   <Input id="hazmat_expiry" type="date" value={formData.hazmat_expiry || ''} onChange={(e) => setFormData({ ...formData, hazmat_expiry: e.target.value })} />

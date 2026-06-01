@@ -53,6 +53,7 @@ const schema = z
       .date({ required_error: 'Medical card expiry date is required' })
       .refine((d) => d >= today(), 'Medical card must not be expired'),
     endorsements: z.array(z.enum(['H', 'P', 'T', 'N', 'S', 'X'])).default([]),
+    hazmatExpiry: z.date().optional(),
     hasTwic: z.enum(['yes', 'no'], { required_error: 'Please select an option' }),
     twicExpiry: z.date().optional(),
   })
@@ -63,6 +64,22 @@ const schema = z
         path: ['phoneNumber'],
         message: 'Enter a valid phone number (at least 10 digits)',
       });
+    }
+    const hasHazmat = val.endorsements.includes('H') || val.endorsements.includes('X');
+    if (hasHazmat) {
+      if (!val.hazmatExpiry) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['hazmatExpiry'],
+          message: 'HAZMAT expiry date is required',
+        });
+      } else if (val.hazmatExpiry < today()) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['hazmatExpiry'],
+          message: 'HAZMAT certification must not be expired',
+        });
+      }
     }
     if (val.hasTwic === 'yes') {
       if (!val.twicExpiry) {
@@ -89,6 +106,7 @@ export interface DriverCredentialsPayload {
   license_expiry: string;
   medical_card_expiry: string;
   endorsements: string[];
+  hazmat_expiry: string | null;
   has_twic: boolean;
   twic_expiry: string | null;
 }
@@ -117,6 +135,7 @@ export const buildDefaultValues = (
     license_expiry?: string | null;
     medical_card_expiry?: string | null;
     endorsements?: string[] | null;
+    hazmat_expiry?: string | null;
     has_twic?: boolean | null;
     twic_expiry?: string | null;
   } | null,
@@ -129,6 +148,7 @@ export const buildDefaultValues = (
     (row?.endorsements?.filter((e): e is 'H' | 'P' | 'T' | 'N' | 'S' | 'X' =>
       ['H', 'P', 'T', 'N', 'S', 'X'].includes(e),
     ) as DriverCredentialsValues['endorsements']) ?? [],
+  hazmatExpiry: parseDate(row?.hazmat_expiry),
   hasTwic: row?.has_twic === true ? 'yes' : row?.has_twic === false ? 'no' : undefined,
   twicExpiry: parseDate(row?.twic_expiry),
 });
@@ -147,6 +167,9 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
     });
 
     const hasTwic = form.watch('hasTwic');
+    const watchedEndorsements = form.watch('endorsements');
+    const showHazmatExpiry =
+      watchedEndorsements?.includes('H') || watchedEndorsements?.includes('X');
     const isValid = form.formState.isValid;
 
     useEffect(() => {
@@ -165,6 +188,10 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
           license_expiry: format(v.licenseExpiry, 'yyyy-MM-dd'),
           medical_card_expiry: format(v.medicalCardExpiry, 'yyyy-MM-dd'),
           endorsements: v.endorsements,
+          hazmat_expiry:
+            (v.endorsements.includes('H') || v.endorsements.includes('X')) && v.hazmatExpiry
+              ? format(v.hazmatExpiry, 'yyyy-MM-dd')
+              : null,
           has_twic: v.hasTwic === 'yes',
           twic_expiry:
             v.hasTwic === 'yes' && v.twicExpiry ? format(v.twicExpiry, 'yyyy-MM-dd') : null,
@@ -347,6 +374,46 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
                 </FormItem>
               )}
             />
+
+            {showHazmatExpiry && (
+              <FormField
+                control={form.control}
+                name="hazmatExpiry"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>HAZMAT Certification Expiration Date *</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              'h-12 w-full justify-start pl-3 text-left font-normal sm:w-[280px]',
+                              !field.value && 'text-muted-foreground',
+                            )}
+                          >
+                            {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(d) => d < today()}
+                          initialFocus
+                          className={cn('p-3 pointer-events-auto')}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
 
             <FormField
               control={form.control}
