@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
       let parsed: URL;
       try { parsed = new URL(uri); } catch { return false; }
       // Only allow our known callback path
-      if (parsed.pathname !== '/settings/storage/callback') return false;
+      if (parsed.pathname !== '/settings') return false;
       const originOnly = `${parsed.protocol}//${parsed.host}`;
       const isAllowed = ALLOWED_ORIGINS.includes(originOnly)
         || parsed.host.endsWith('.lovable.app')
