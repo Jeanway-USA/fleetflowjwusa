@@ -159,7 +159,9 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
             <ErrorBoundary compact>
-              <DriverNotifications driverId={driver.id} />
+              <div id="tour-notifications">
+                <DriverNotifications driverId={driver.id} />
+              </div>
             </ErrorBoundary>
             <span className="text-sm text-muted-foreground">
               {format(new Date(), 'EEE, MMM d')}
@@ -176,22 +178,26 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
         )}
 
         {/* Active Load Card */}
-        <ErrorBoundary compact>
-          <ActiveLoadCard 
-            load={activeLoad} 
-            payRate={driver.pay_rate} 
-            payType={driver.pay_type}
-            driverId={driver.id}
-            onStatusUpdate={refetchLoads}
-          />
-        </ErrorBoundary>
+        <div id="tour-active-load">
+          <ErrorBoundary compact>
+            <ActiveLoadCard 
+              load={activeLoad} 
+              payRate={driver.pay_rate} 
+              payType={driver.pay_type}
+              driverId={driver.id}
+              onStatusUpdate={refetchLoads}
+            />
+          </ErrorBoundary>
+        </div>
 
 
         {/* Next Load Preview */}
         {nextLoad && <NextLoadPreview load={nextLoad} />}
 
         {/* Scan Doc Button */}
-        <DocumentScanButton driverId={driver.id} />
+        <div id="tour-document-scan">
+          <DocumentScanButton driverId={driver.id} />
+        </div>
 
         {/* GPS + Pay in one row on larger screens */}
         <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
@@ -202,38 +208,44 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
               loadId={activeLoad?.id}
             />
           </ErrorBoundary>
-          <ErrorBoundary compact>
-            <DriverPayWidget 
-              driverId={driver.id} 
-              payRate={driver.pay_rate} 
-              payType={driver.pay_type} 
-            />
-          </ErrorBoundary>
+          <div id="tour-pay-widget">
+            <ErrorBoundary compact>
+              <DriverPayWidget 
+                driverId={driver.id} 
+                payRate={driver.pay_rate} 
+                payType={driver.pay_type} 
+              />
+            </ErrorBoundary>
+          </div>
         </div>
 
         {/* Monthly Bonus Goal */}
-        <MonthlyBonusWidget driverId={driver.id} />
+        <div id="tour-safety-bonus">
+          <MonthlyBonusWidget driverId={driver.id} />
+        </div>
 
         {/* Driver Leaderboard */}
         <DriverLeaderboard readOnly />
 
-        {/* Unified Driver Requests */}
-        <ErrorBoundary compact>
-          <DriverRequestsCard 
-            driverId={driver.id}
-            truckId={assignedTruck?.id}
-            activeLoadId={activeLoad?.id}
-            activeLoadNumber={activeLoad?.landstar_load_id}
-          />
-        </ErrorBoundary>
+        {/* Unified Driver Requests & Maintenance */}
+        <div id="tour-driver-requests" className="space-y-3">
+          <ErrorBoundary compact>
+            <DriverRequestsCard 
+              driverId={driver.id}
+              truckId={assignedTruck?.id}
+              activeLoadId={activeLoad?.id}
+              activeLoadNumber={activeLoad?.landstar_load_id}
+            />
+          </ErrorBoundary>
 
-        {/* Maintenance Requests & Shop Chat */}
-        <ErrorBoundary compact>
-          <MaintenanceRequestCard
-            driverId={driver.id}
-            truckId={assignedTruck?.id}
-          />
-        </ErrorBoundary>
+          <ErrorBoundary compact>
+            <MaintenanceRequestCard
+              driverId={driver.id}
+              truckId={assignedTruck?.id}
+            />
+          </ErrorBoundary>
+        </div>
+
       </div>
 
       {/* Geofence Arrival Drawer */}
