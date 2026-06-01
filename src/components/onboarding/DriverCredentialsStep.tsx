@@ -167,6 +167,9 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
     });
 
     const hasTwic = form.watch('hasTwic');
+    const watchedEndorsements = form.watch('endorsements');
+    const showHazmatExpiry =
+      watchedEndorsements?.includes('H') || watchedEndorsements?.includes('X');
     const isValid = form.formState.isValid;
 
     useEffect(() => {
