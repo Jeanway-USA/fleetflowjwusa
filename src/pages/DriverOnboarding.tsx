@@ -331,7 +331,10 @@ export default function DriverOnboarding() {
             .from('drivers')
             .update({ direct_deposit_attachment_url: attachmentPath })
             .eq('id', driverRow.id);
-          if (driverUpdateErr) throw driverUpdateErr;
+          if (driverUpdateErr) {
+            console.error('Failed to attach direct deposit form to driver:', driverUpdateErr);
+            toast.error('Direct deposit attachment could not be linked to your profile. Please contact your admin.');
+          }
         }
 
         if (
