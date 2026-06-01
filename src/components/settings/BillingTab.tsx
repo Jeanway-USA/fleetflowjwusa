@@ -49,7 +49,7 @@ export function BillingTab() {
       if (!orgId) return null;
       const { data, error } = await supabase
         .from('organizations')
-        .select('name, subscription_tier, trial_ends_at, is_active, created_at, is_complimentary, complimentary_ends_at, stripe_customer_id, stripe_subscription_id, subscription_status, subscription_period_end')
+        .select('name, subscription_tier, trial_ends_at, is_active, created_at, is_complimentary, complimentary_ends_at, subscription_status, subscription_period_end')
         .eq('id', orgId)
         .single();
       if (error) throw error;
@@ -61,8 +61,6 @@ export function BillingTab() {
         created_at: string;
         is_complimentary: boolean | null;
         complimentary_ends_at: string | null;
-        stripe_customer_id: string | null;
-        stripe_subscription_id: string | null;
         subscription_status: string | null;
         subscription_period_end: string | null;
       };
