@@ -1,35 +1,62 @@
-## Problem
+# Unified Driver Settlements Tab
 
-The driver is on iPhone uploading a photo from the camera roll for the Direct Deposit step. iPhone photos default to **HEIC** format, which the current file input rejects (`accept="application/pdf,image/jpeg,image/png"`). Depending on the iOS version, the file is either silently dropped, or the >10MB check silently clears it with no feedback, leaving the driver stuck on "file failing to upload."
+Replace the **Payroll & Commissions** and **Settlements** tabs in `src/pages/Finance.tsx` with a single **Driver Settlements** tab containing two sections: Pending Drivers and Generated Paystubs.
 
-Additionally, when an upload error does fire, the toast shows the raw Supabase message but we have no inline UI feedback at the file input itself.
+## File structure
 
-## Fix (frontend only — `src/components/onboarding/DocumentTemplateRenderer.tsx` and `src/pages/DriverOnboarding.tsx`)
+```
+src/components/finance/driver-settlements/
+├── DriverSettlementsTab.tsx        # orchestrator
+├── PendingDriversTable.tsx         # top section
+├── GeneratePaystubDialog.tsx       # opened from row action
+└── GeneratedPaystubsTable.tsx      # bottom section
+```
 
-1. **Broaden the file input** in `DocumentTemplateRenderer.tsx` (the `file_upload` case):
-   - Change `accept` to `application/pdf,image/*,.heic,.heif` so iOS does not filter camera-roll HEIC photos out of the picker.
-   - Add `capture="environment"` so iPhone users get an obvious "Take Photo" option in addition to the library picker.
+`PayrollTab.tsx` and `SettlementsTab.tsx` are removed from the Finance routing (files kept on disk, not imported).
 
-2. **Show inline validation errors** (instead of silently nulling the file):
-   - Track a local `uploadError` string state in the renderer.
-   - If `file.size > 10 MB` → set error "File is too large (max 10 MB)."
-   - If the file is HEIC/HEIF (`file.type === 'image/heic' || 'image/heif'` or name ends in `.heic`/`.heif`) → set error: "iPhone HEIC photos aren't supported. In Settings → Camera → Formats choose 'Most Compatible', or upload a PDF/JPG/PNG instead."
-   - Render the error in red below the input so the driver sees exactly why it didn't attach.
+## Layout
 
-3. **Make the storage upload more forgiving** in `DriverOnboarding.tsx` (`handleSubmit` attachment branch around line 297–307):
-   - Fall back to `contentType: file.type || 'application/octet-stream'` (already done) but also default the file extension to `jpg` when missing/unknown so the path is always valid.
-   - Wrap the attachment upload in its own try/catch so the toast shows: `"Couldn't upload attachment: <supabase error>. Try a PDF or JPG."` instead of the generic submit-failure message — gives the driver and us a real diagnostic next time.
+```text
+┌─ Driver Settlements ──────────────────────────────────────────┐
+│ Week selector  (Mon–Sun current pay cycle, prev/next nav)     │
+├───────────────────────────────────────────────────────────────┤
+│ PENDING / UNSETTLED DRIVERS  (this week)                      │
+│ ┌───────────────────────────────────────────────────────────┐ │
+│ │ Driver | Loads | Gross | Est. Pay | Pay Type | [Generate]│ │
+│ └───────────────────────────────────────────────────────────┘ │
+├───────────────────────────────────────────────────────────────┤
+│ GENERATED PAYSTUBS         filters: [All|Draft|Approved|Paid] │
+│ ┌───────────────────────────────────────────────────────────┐ │
+│ │ Driver | Period | Base | Bonus | Deduct | Net | Status   │ │
+│ └───────────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────────────┘
+```
 
-4. **No backend/RLS/bucket changes.** The `signed-documents` bucket already accepts any MIME (no allow-list) and the existing RLS policy `Drivers can upload their own signed documents` already covers the path `${orgId}/${driverId}/...`. The failure is purely client-side: HEIC file getting blocked by the input + silent failure UX.
+## Behavior
+
+### Pending Drivers (top)
+- Query active drivers in org. For each, count delivered loads in the selected week that are **not yet attached to a `driver_settlement_items` row**.
+- Compute estimated pay using each driver's `pay_type` (percentage / per-mile / flat) — same formulas already used in `DriverPayWidget`.
+- Row action **Generate Paystub** opens `GeneratePaystubDialog`.
+
+### Generate Paystub dialog
+- Pre-fills: `driver_id`, `period_start`/`period_end` (selected week), `base_pay` (from loads), `bonus_pay` (0 or auto-filled safety bonus), `deductions` (sum of driver advances/fees this period).
+- Lists settled loads as editable line items; allow adding manual adjustments.
+- Submit → insert one `driver_settlements` row (status `draft`) plus `driver_settlement_items` rows for each load and deduction. Driver disappears from Pending list, appears in Generated Paystubs.
+
+### Generated Paystubs (bottom)
+- Query `driver_settlements` ordered by `period_end desc`, filterable by status (All / Draft / Approved / Paid).
+- Row actions: **View / Edit** (draft only), **Approve** (draft → approved, sets `approved_by`/`approved_at`), **Mark Paid** (approved → paid, sets `paid_at`).
+
+## Other changes in `Finance.tsx`
+- Remove `<TabsTrigger value="payroll">` and `<TabsTrigger value="settlements">` plus their `<TabsContent>`.
+- Add `<TabsTrigger value="driver-settlements">Driver Settlements</TabsTrigger>` and matching content.
+- Move `CommissionsTab` into the Overview tab (commissions are agent earnings, separate concept from driver pay).
+- Update top KPI card `totalPayroll` to source from `driver_settlements` (status in approved/paid) instead of legacy `driver_payroll`.
+- Add memory entry `mem://features/finance/driver-settlements` documenting the unified tab.
 
 ## Out of scope
-
-- Server-side HEIC → JPEG conversion (would require an edge function + heavy decoder; the broader `accept` + clear messaging covers the real-world case).
-- Changing the bucket's MIME allow-list (it has none — not the cause).
-- Touching the re-onboarding flow or any other upload surface.
-
-## Verification
-
-- Confirm the file input on the Direct Deposit step now shows the iPhone "Photo Library / Take Photo / Choose File" sheet with HEIC images selectable.
-- Confirm uploading a >10 MB file shows an inline red error.
-- Confirm uploading a JPG/PNG/PDF still succeeds end-to-end and writes the row to `driver_signed_documents` with `attachment_file_path` set and `drivers.direct_deposit_attachment_url` updated.
+- Landstar statement importer (untouched, no longer surfaced in Finance tabs).
+- PDF paystub rendering / email delivery (placeholder).
+- Backfill of historical `driver_payroll` rows.
+- Removing legacy `driver_payroll` / `settlements` tables.
