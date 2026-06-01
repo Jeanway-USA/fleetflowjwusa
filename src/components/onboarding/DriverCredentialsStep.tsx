@@ -106,6 +106,7 @@ export interface DriverCredentialsPayload {
   license_expiry: string;
   medical_card_expiry: string;
   endorsements: string[];
+  hazmat_expiry: string | null;
   has_twic: boolean;
   twic_expiry: string | null;
 }
@@ -134,6 +135,7 @@ export const buildDefaultValues = (
     license_expiry?: string | null;
     medical_card_expiry?: string | null;
     endorsements?: string[] | null;
+    hazmat_expiry?: string | null;
     has_twic?: boolean | null;
     twic_expiry?: string | null;
   } | null,
@@ -146,6 +148,7 @@ export const buildDefaultValues = (
     (row?.endorsements?.filter((e): e is 'H' | 'P' | 'T' | 'N' | 'S' | 'X' =>
       ['H', 'P', 'T', 'N', 'S', 'X'].includes(e),
     ) as DriverCredentialsValues['endorsements']) ?? [],
+  hazmatExpiry: parseDate(row?.hazmat_expiry),
   hasTwic: row?.has_twic === true ? 'yes' : row?.has_twic === false ? 'no' : undefined,
   twicExpiry: parseDate(row?.twic_expiry),
 });
