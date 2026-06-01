@@ -53,6 +53,7 @@ const schema = z
       .date({ required_error: 'Medical card expiry date is required' })
       .refine((d) => d >= today(), 'Medical card must not be expired'),
     endorsements: z.array(z.enum(['H', 'P', 'T', 'N', 'S', 'X'])).default([]),
+    hazmatExpiry: z.date().optional(),
     hasTwic: z.enum(['yes', 'no'], { required_error: 'Please select an option' }),
     twicExpiry: z.date().optional(),
   })
@@ -63,6 +64,22 @@ const schema = z
         path: ['phoneNumber'],
         message: 'Enter a valid phone number (at least 10 digits)',
       });
+    }
+    const hasHazmat = val.endorsements.includes('H') || val.endorsements.includes('X');
+    if (hasHazmat) {
+      if (!val.hazmatExpiry) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['hazmatExpiry'],
+          message: 'HAZMAT expiry date is required',
+        });
+      } else if (val.hazmatExpiry < today()) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['hazmatExpiry'],
+          message: 'HAZMAT certification must not be expired',
+        });
+      }
     }
     if (val.hasTwic === 'yes') {
       if (!val.twicExpiry) {
