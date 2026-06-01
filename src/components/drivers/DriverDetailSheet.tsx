@@ -4,14 +4,40 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Phone, Mail, Edit2, CreditCard, Calendar, FileSignature, MessageSquare } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  Phone,
+  Mail,
+  Edit2,
+  CreditCard,
+  Calendar,
+  FileSignature,
+  MessageSquare,
+  AlertTriangle,
+  RotateCcw,
+  Loader2,
+} from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { CredentialsCompliance } from './CredentialsCompliance';
 import { SignedOnboardingDocuments } from './SignedOnboardingDocuments';
 import { DriverBankingDetails } from './DriverBankingDetails';
 import { DriverChatSheet } from './DriverChatSheet';
+
 
 interface DriverDetailSheetProps {
   driver: any | null;
