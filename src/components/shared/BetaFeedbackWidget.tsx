@@ -45,6 +45,7 @@ export function BetaFeedbackWidget() {
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const { user, orgId } = useAuth();
+  const { pathname } = useLocation();
 
   const form = useForm<FeedbackForm>({
     resolver: zodResolver(feedbackSchema),
