@@ -296,7 +296,8 @@ export default function DriverOnboarding() {
       let attachmentPath: string | null = null;
       if (templateHasFileUpload && tState.attachment) {
         const file = tState.attachment;
-        const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const rawExt = (file.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const ext = rawExt || (file.type.startsWith('image/') ? 'jpg' : 'bin');
         attachmentPath = `${orgId}/${driverRow.id}/${safeType}_attachment-${timestamp}.${ext}`;
         const { error: attachErr } = await supabase.storage
           .from('signed-documents')
@@ -304,7 +305,11 @@ export default function DriverOnboarding() {
             contentType: file.type || 'application/octet-stream',
             upsert: false,
           });
-        if (attachErr) throw attachErr;
+        if (attachErr) {
+          throw new Error(
+            `Couldn't upload your attachment: ${attachErr.message}. Try a PDF or JPG photo under 10 MB.`
+          );
+        }
       }
 
       const { error: insertError } = await supabase.from('driver_signed_documents').insert({

@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -170,6 +170,7 @@ export function DocumentTemplateRenderer({
   onBankAccountTypeChange,
 }: DocumentTemplateRendererProps) {
 
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
@@ -274,21 +275,48 @@ export function DocumentTemplateRenderer({
             <Input
               id={`file-upload-${key}`}
               type="file"
-              accept="application/pdf,image/jpeg,image/png"
+              accept="application/pdf,image/*,.heic,.heif"
               onChange={(e) => {
                 const file = e.target.files?.[0] ?? null;
-                if (file && file.size > 10 * 1024 * 1024) {
+                if (!file) {
+                  setAttachmentError(null);
+                  onAttachmentChange?.(null);
+                  return;
+                }
+                const name = (file.name || '').toLowerCase();
+                const type = (file.type || '').toLowerCase();
+                const isHeic =
+                  type === 'image/heic' ||
+                  type === 'image/heif' ||
+                  name.endsWith('.heic') ||
+                  name.endsWith('.heif');
+                if (isHeic) {
+                  setAttachmentError(
+                    "iPhone HEIC photos aren't supported. On your iPhone, open Settings → Camera → Formats and pick 'Most Compatible', then retake the photo. Or upload a PDF/JPG/PNG."
+                  );
                   onAttachmentChange?.(null);
                   e.target.value = '';
                   return;
                 }
+                if (file.size > 10 * 1024 * 1024) {
+                  setAttachmentError('File is too large (max 10 MB). Please choose a smaller photo or PDF.');
+                  onAttachmentChange?.(null);
+                  e.target.value = '';
+                  return;
+                }
+                setAttachmentError(null);
                 onAttachmentChange?.(file);
               }}
             />
-            {attachment && (
+            {attachment && !attachmentError && (
               <p className="mt-2 text-xs text-muted-foreground">
                 Selected: <span className="font-medium text-foreground">{attachment.name}</span>{' '}
                 ({(attachment.size / 1024).toFixed(0)} KB)
+              </p>
+            )}
+            {attachmentError && (
+              <p className="mt-2 text-xs font-medium text-destructive">
+                {attachmentError}
               </p>
             )}
           </div>
