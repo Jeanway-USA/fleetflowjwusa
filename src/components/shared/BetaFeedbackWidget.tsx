@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -44,6 +45,7 @@ export function BetaFeedbackWidget() {
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const { user, orgId } = useAuth();
+  const { pathname } = useLocation();
 
   const form = useForm<FeedbackForm>({
     resolver: zodResolver(feedbackSchema),
@@ -134,6 +136,7 @@ export function BetaFeedbackWidget() {
   };
 
   if (!user) return null;
+  if (pathname.startsWith('/driver/onboarding') || pathname === '/onboarding') return null;
 
   const includeScreenshot = form.watch('include_screenshot');
 
