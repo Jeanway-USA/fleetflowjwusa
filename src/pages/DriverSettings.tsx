@@ -201,7 +201,7 @@ export default function DriverSettings() {
             <div className="grid grid-cols-2 gap-3">
               <Button
                 variant={theme === 'light' ? 'default' : 'outline'}
-                className="flex flex-col gap-2 h-auto py-4"
+                className="flex flex-col items-center justify-center gap-2 h-auto min-h-[72px] px-4 py-4"
                 onClick={() => setTheme('light')}
               >
                 <Sun className="h-5 w-5" />
@@ -209,7 +209,7 @@ export default function DriverSettings() {
               </Button>
               <Button
                 variant={theme === 'dark' ? 'default' : 'outline'}
-                className="flex flex-col gap-2 h-auto py-4"
+                className="flex flex-col items-center justify-center gap-2 h-auto min-h-[72px] px-4 py-4"
                 onClick={() => setTheme('dark')}
               >
                 <Moon className="h-5 w-5" />
