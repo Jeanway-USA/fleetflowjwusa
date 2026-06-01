@@ -567,17 +567,32 @@ export default function Drivers() {
 
             <div className="border-t pt-4">
               <h4 className="font-medium mb-3">License & Credentials</h4>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="license_number">License Number</Label>
                   <Input id="license_number" value={formData.license_number || ''} onChange={(e) => setFormData({ ...formData, license_number: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="license_state">License State</Label>
+                  <Select
+                    value={(formData as any).license_state || 'none'}
+                    onValueChange={(v) => setFormData({ ...formData, license_state: v === 'none' ? null : v })}
+                  >
+                    <SelectTrigger id="license_state"><SelectValue placeholder="Select state" /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      <SelectItem value="none">—</SelectItem>
+                      {US_STATES.map((st) => (
+                        <SelectItem key={st} value={st}>{st}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="license_expiry">License Expiry</Label>
                   <Input id="license_expiry" type="date" value={formData.license_expiry || ''} onChange={(e) => setFormData({ ...formData, license_expiry: e.target.value })} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="medical_card_expiry">DOT Medical Card Expiry</Label>
                   <Input id="medical_card_expiry" type="date" value={formData.medical_card_expiry || ''} onChange={(e) => setFormData({ ...formData, medical_card_expiry: e.target.value })} />
@@ -587,7 +602,7 @@ export default function Drivers() {
                   <Input id="mvr_expiry" type="date" value={(formData as any).mvr_expiry || ''} onChange={(e) => setFormData({ ...formData, mvr_expiry: e.target.value })} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="hire_date">Hire Date</Label>
                   <Input id="hire_date" type="date" value={formData.hire_date || ''} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} />
