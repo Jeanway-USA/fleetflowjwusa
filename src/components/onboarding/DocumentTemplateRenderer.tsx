@@ -170,6 +170,7 @@ export function DocumentTemplateRenderer({
   onBankAccountTypeChange,
 }: DocumentTemplateRendererProps) {
 
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const nodes = useMemo(() => tokenize(content), [content]);
   const todayFormatted = useMemo(() => format(new Date(), 'MMMM d, yyyy'), []);
