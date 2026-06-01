@@ -81,12 +81,6 @@ const driverTour: TourDefinition = {
       description: 'View your current assignment — pickup/delivery details, route info, and status controls.',
     },
     {
-      id: 'dvir-buttons',
-      targetSelector: '[data-tour="dvir-buttons"]',
-      title: 'DVIR Inspections',
-      description: 'Complete your pre-trip and post-trip inspections here. Stay compliant with one tap.',
-    },
-    {
       id: 'driver-pay',
       targetSelector: '[data-tour="driver-pay"]',
       title: 'Pay & Earnings',

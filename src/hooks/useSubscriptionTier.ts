@@ -5,7 +5,7 @@ export type { SubscriptionTier };
 const TIER_FEATURES: Record<SubscriptionTier, string[]> = {
   open_beta: [
     'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
-    'dvir', 'crm_basic',
+    'crm_basic',
     'drivers', 'dispatch', 'settlements', 'fleet_analytics',
     'gps_tracking', 'payroll', 'driver_performance', 'maintenance_full',
     'trucks', 'trailers', 'incidents', 'safety', 'executive_dashboard',
@@ -14,11 +14,11 @@ const TIER_FEATURES: Record<SubscriptionTier, string[]> = {
   ],
   solo_bco: [
     'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
-    'dvir', 'crm_basic',
+    'crm_basic',
   ],
   fleet_owner: [
     'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
-    'dvir', 'crm_basic',
+    'crm_basic',
     'drivers', 'dispatch', 'settlements', 'fleet_analytics',
     'gps_tracking', 'payroll', 'driver_performance', 'maintenance_full',
     'trucks', 'trailers', 'incidents', 'safety', 'executive_dashboard',
@@ -29,7 +29,7 @@ const TIER_FEATURES: Record<SubscriptionTier, string[]> = {
   ],
   all_in_one: [
     'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
-    'dvir', 'crm_basic',
+    'crm_basic',
     'drivers', 'dispatch', 'settlements', 'fleet_analytics',
     'gps_tracking', 'payroll', 'driver_performance', 'maintenance_full',
     'trucks', 'trailers', 'incidents', 'safety', 'executive_dashboard',

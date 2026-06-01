@@ -71,7 +71,7 @@ interface NavItem {
 const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
   open_beta: new Set([
     'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
-    'dvir', 'crm_basic',
+    'crm_basic',
     'drivers', 'dispatch', 'settlements', 'fleet_analytics',
     'gps_tracking', 'payroll', 'driver_performance', 'maintenance_full',
     'trucks', 'trailers', 'incidents', 'safety', 'executive_dashboard',
@@ -79,11 +79,11 @@ const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
   ]),
   solo_bco: new Set([
     'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
-    'dvir', 'crm_basic',
+    'crm_basic',
   ]),
   fleet_owner: new Set([
     'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
-    'dvir', 'crm_basic',
+    'crm_basic',
     'drivers', 'dispatch', 'settlements', 'fleet_analytics',
     'gps_tracking', 'payroll', 'driver_performance', 'maintenance_full',
     'trucks', 'trailers', 'incidents', 'safety', 'executive_dashboard',
@@ -94,7 +94,7 @@ const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
   ]),
   all_in_one: new Set([
     'loads', 'ifta', 'maintenance_basic', 'documents', 'profit_loss',
-    'dvir', 'crm_basic',
+    'crm_basic',
     'drivers', 'dispatch', 'settlements', 'fleet_analytics',
     'gps_tracking', 'payroll', 'driver_performance', 'maintenance_full',
     'trucks', 'trailers', 'incidents', 'safety', 'executive_dashboard',
