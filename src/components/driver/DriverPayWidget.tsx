@@ -22,7 +22,7 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
     queryKey: ['driver-settings', driverId],
     queryFn: async () => {
       const { data, error } = await (supabase.from('driver_settings_safe' as any) as any)
-        .select('weekly_miles_goal, weekly_revenue_goal, pay_week_start_day')
+        .select('weekly_miles_goal, weekly_revenue_goal, pay_week_start_day, goal_type, target_miles')
         .eq('driver_id', driverId)
         .maybeSingle();
       if (error) throw error;
@@ -73,11 +73,14 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
   // Weekly goals from driver settings
   const weeklyMilesGoal = driverSettings?.weekly_miles_goal || 2500;
   const weeklyRevenueGoal = driverSettings?.weekly_revenue_goal || 3000;
-  
-  const weeklyGoal = payType === 'per_mile' ? weeklyMilesGoal : weeklyRevenueGoal;
-  const progress = payType === 'per_mile' 
-    ? (totalMiles / weeklyGoal) * 100 
-    : (weeklyEarnings / weeklyGoal) * 100;
+  const goalType: 'financial' | 'mileage' = driverSettings?.goal_type || (payType === 'per_mile' ? 'mileage' : 'financial');
+  const targetMiles = driverSettings?.target_miles ?? weeklyMilesGoal;
+
+  const isMileageGoal = goalType === 'mileage';
+  const weeklyGoal = isMileageGoal ? targetMiles : weeklyRevenueGoal;
+  const progress = isMileageGoal
+    ? (totalMiles / Math.max(weeklyGoal, 1)) * 100
+    : (weeklyEarnings / Math.max(weeklyGoal, 1)) * 100;
 
   const deliveredCount = weeklyLoads.length;
 
@@ -117,7 +120,7 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Weekly Progress</span>
             <span className="font-medium">
-              {payType === 'per_mile' 
+              {isMileageGoal
                 ? `${totalMiles.toLocaleString()} / ${weeklyGoal.toLocaleString()} mi`
                 : `$${weeklyEarnings.toLocaleString(undefined, { maximumFractionDigits: 0 })} / $${weeklyGoal.toLocaleString()}`
               }

@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Target, Sun, Moon, DollarSign, Route, Loader2, CalendarClock } from 'lucide-react';
+import { Target, Sun, Moon, DollarSign, Route, Loader2, CalendarClock, Flag } from 'lucide-react';
 import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
 
 
@@ -35,6 +35,8 @@ export default function DriverSettings() {
   const [weeklyMilesGoal, setWeeklyMilesGoal] = useState(2500);
   const [weeklyRevenueGoal, setWeeklyRevenueGoal] = useState(2000);
   const [payWeekStartDay, setPayWeekStartDay] = useState(0);
+  const [goalType, setGoalType] = useState<'financial' | 'mileage'>('financial');
+  const [targetMiles, setTargetMiles] = useState<number>(2500);
 
   // Fetch driver profile
   const { data: driver, isLoading: driverLoading } = useQuery({
@@ -56,7 +58,7 @@ export default function DriverSettings() {
     queryKey: ['driver-settings', driver?.id],
     queryFn: async () => {
       const { data, error } = await (supabase.from('driver_settings_safe' as any) as any)
-        .select('weekly_miles_goal, weekly_revenue_goal, pay_week_start_day')
+        .select('weekly_miles_goal, weekly_revenue_goal, pay_week_start_day, goal_type, target_miles')
         .eq('driver_id', driver?.id)
         .maybeSingle();
       if (error) throw error;
@@ -71,12 +73,20 @@ export default function DriverSettings() {
       setWeeklyMilesGoal(settings.weekly_miles_goal || 2500);
       setWeeklyRevenueGoal(settings.weekly_revenue_goal || 2000);
       setPayWeekStartDay(settings.pay_week_start_day ?? 0);
+      setGoalType((settings.goal_type as 'financial' | 'mileage') || 'financial');
+      setTargetMiles(settings.target_miles ?? settings.weekly_miles_goal ?? 2500);
     }
   }, [settings]);
 
   // Save goals mutation (direct DB update - no sensitive data)
   const saveGoalsMutation = useMutation({
-    mutationFn: async (data: { weekly_miles_goal: number; weekly_revenue_goal: number; pay_week_start_day: number }) => {
+    mutationFn: async (data: {
+      weekly_miles_goal: number;
+      weekly_revenue_goal: number;
+      pay_week_start_day: number;
+      goal_type: 'financial' | 'mileage';
+      target_miles: number;
+    }) => {
       if (!driver?.id) throw new Error('Driver not found');
       if (!driver?.org_id) throw new Error('Driver organization not found');
 
@@ -91,6 +101,8 @@ export default function DriverSettings() {
             weekly_miles_goal: data.weekly_miles_goal,
             weekly_revenue_goal: data.weekly_revenue_goal,
             pay_week_start_day: data.pay_week_start_day,
+            goal_type: data.goal_type,
+            target_miles: data.target_miles,
             org_id: driver.org_id,
           })
           .eq('driver_id', driver.id);
@@ -103,6 +115,8 @@ export default function DriverSettings() {
             weekly_miles_goal: data.weekly_miles_goal,
             weekly_revenue_goal: data.weekly_revenue_goal,
             pay_week_start_day: data.pay_week_start_day,
+            goal_type: data.goal_type,
+            target_miles: data.target_miles,
           });
         if (error) throw error;
       }
@@ -122,6 +136,8 @@ export default function DriverSettings() {
       weekly_miles_goal: weeklyMilesGoal,
       weekly_revenue_goal: weeklyRevenueGoal,
       pay_week_start_day: payWeekStartDay,
+      goal_type: goalType,
+      target_miles: targetMiles,
     });
   };
 
@@ -211,6 +227,49 @@ export default function DriverSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Goal Type */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Flag className="h-4 w-4" />
+                Primary Goal Type
+              </Label>
+              <Select value={goalType} onValueChange={(val) => setGoalType(val as 'financial' | 'mileage')}>
+                <SelectTrigger className="w-full sm:w-64">
+                  <SelectValue placeholder="Select goal type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="financial">Financial (Revenue)</SelectItem>
+                  <SelectItem value="mileage">Mileage</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Choose which goal drives the progress bar on your dashboard.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="targetMiles" className="flex items-center gap-2">
+                <Route className="h-4 w-4" />
+                Target Miles (Mileage Goal)
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="targetMiles"
+                  type="number"
+                  value={targetMiles}
+                  onChange={(e) => setTargetMiles(parseInt(e.target.value) || 0)}
+                  min={0}
+                  step={100}
+                  className="w-full sm:w-64"
+                />
+                <span className="text-sm text-muted-foreground whitespace-nowrap">miles</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Used when your primary goal is set to Mileage.
+              </p>
+            </div>
+
+            <Separator />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="milesGoal" className="flex items-center gap-2">
