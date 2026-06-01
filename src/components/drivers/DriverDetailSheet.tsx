@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { CredentialsCompliance } from './CredentialsCompliance';
 import { SignedOnboardingDocuments } from './SignedOnboardingDocuments';
+import { DriverBankingDetails } from './DriverBankingDetails';
 
 interface DriverDetailSheetProps {
   driver: any | null;
