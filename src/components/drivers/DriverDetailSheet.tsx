@@ -62,8 +62,9 @@ export function DriverDetailSheet({
   const hireDate = parseDateSafe(driver.hire_date);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg flex flex-col overflow-y-auto">
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full sm:max-w-lg flex flex-col overflow-y-auto">
         <SheetHeader className="pb-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
