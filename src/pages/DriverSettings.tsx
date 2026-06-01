@@ -58,7 +58,7 @@ export default function DriverSettings() {
     queryKey: ['driver-settings', driver?.id],
     queryFn: async () => {
       const { data, error } = await (supabase.from('driver_settings_safe' as any) as any)
-        .select('weekly_miles_goal, weekly_revenue_goal, pay_week_start_day')
+        .select('weekly_miles_goal, weekly_revenue_goal, pay_week_start_day, goal_type, target_miles')
         .eq('driver_id', driver?.id)
         .maybeSingle();
       if (error) throw error;
@@ -73,6 +73,8 @@ export default function DriverSettings() {
       setWeeklyMilesGoal(settings.weekly_miles_goal || 2500);
       setWeeklyRevenueGoal(settings.weekly_revenue_goal || 2000);
       setPayWeekStartDay(settings.pay_week_start_day ?? 0);
+      setGoalType((settings.goal_type as 'financial' | 'mileage') || 'financial');
+      setTargetMiles(settings.target_miles ?? settings.weekly_miles_goal ?? 2500);
     }
   }, [settings]);
 
