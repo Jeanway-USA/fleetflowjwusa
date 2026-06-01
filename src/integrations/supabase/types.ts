@@ -1452,6 +1452,113 @@ export type Database = {
           },
         ]
       }
+      driver_settlement_items: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          expense_id: string | null
+          id: string
+          item_type: string
+          load_id: string | null
+          org_id: string
+          quantity: number | null
+          rate: number | null
+          settlement_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          expense_id?: string | null
+          id?: string
+          item_type: string
+          load_id?: string | null
+          org_id: string
+          quantity?: number | null
+          rate?: number | null
+          settlement_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          expense_id?: string | null
+          id?: string
+          item_type?: string
+          load_id?: string | null
+          org_id?: string
+          quantity?: number | null
+          rate?: number | null
+          settlement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_settlement_items_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "driver_settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_settlements: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          base_pay: number
+          bonus_pay: number
+          created_at: string
+          deductions: number
+          driver_id: string
+          id: string
+          net_pay: number | null
+          notes: string | null
+          org_id: string
+          paid_at: string | null
+          period_end: string
+          period_start: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          base_pay?: number
+          bonus_pay?: number
+          created_at?: string
+          deductions?: number
+          driver_id: string
+          id?: string
+          net_pay?: number | null
+          notes?: string | null
+          org_id: string
+          paid_at?: string | null
+          period_end: string
+          period_start: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          base_pay?: number
+          bonus_pay?: number
+          created_at?: string
+          deductions?: number
+          driver_id?: string
+          id?: string
+          net_pay?: number | null
+          notes?: string | null
+          org_id?: string
+          paid_at?: string | null
+          period_end?: string
+          period_start?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       driver_signed_documents: {
         Row: {
           attachment_file_path: string | null
