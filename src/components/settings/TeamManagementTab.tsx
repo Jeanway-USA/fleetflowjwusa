@@ -132,12 +132,13 @@ export function TeamManagementTab() {
   // ── Mutations ──
   const assignRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      const { data: existing } = await supabase.from('user_roles').select('*').eq('user_id', userId).maybeSingle();
+      if (!orgId) throw new Error('No organization context');
+      const { data: existing } = await supabase.from('user_roles').select('*').eq('user_id', userId).eq('org_id', orgId).maybeSingle();
       if (existing) {
-        const { error } = await supabase.from('user_roles').update({ role }).eq('id', existing.id);
+        const { error } = await supabase.from('user_roles').update({ role, org_id: orgId }).eq('id', existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('user_roles').insert({ user_id: userId, role });
+        const { error } = await supabase.from('user_roles').insert({ user_id: userId, role, org_id: orgId });
         if (error) throw error;
       }
     },
@@ -196,11 +197,12 @@ export function TeamManagementTab() {
       if (profileError) throw profileError;
 
       if (editRole !== userToEdit.role) {
+        if (!orgId) throw new Error('No organization context');
         if (userToEdit.role_id) {
-          const { error } = await supabase.from('user_roles').update({ role: editRole }).eq('id', userToEdit.role_id);
+          const { error } = await supabase.from('user_roles').update({ role: editRole, org_id: orgId }).eq('id', userToEdit.role_id);
           if (error) throw error;
         } else {
-          const { error } = await supabase.from('user_roles').insert({ user_id: userToEdit.user_id, role: editRole });
+          const { error } = await supabase.from('user_roles').insert({ user_id: userToEdit.user_id, role: editRole, org_id: orgId });
           if (error) throw error;
         }
       }
