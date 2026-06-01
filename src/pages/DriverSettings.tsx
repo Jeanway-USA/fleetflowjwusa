@@ -135,11 +135,12 @@ export default function DriverSettings() {
   });
 
   const handleSaveGoals = () => {
+    const effectiveGoalType: 'financial' | 'mileage' = isFlatRate ? 'mileage' : goalType;
     saveGoalsMutation.mutate({
-      weekly_miles_goal: weeklyMilesGoal,
+      weekly_miles_goal: isFlatRate ? targetMiles : weeklyMilesGoal,
       weekly_revenue_goal: weeklyRevenueGoal,
       pay_week_start_day: payWeekStartDay,
-      goal_type: goalType,
+      goal_type: effectiveGoalType,
       target_miles: targetMiles,
     });
   };
