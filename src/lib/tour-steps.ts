@@ -72,22 +72,53 @@ const bcoTour: TourDefinition = {
 };
 
 const driverTour: TourDefinition = {
-  id: 'driver_v1',
+  id: 'driver_v2',
   steps: [
     {
-      id: 'active-load',
-      targetSelector: '[data-tour="active-load"]',
-      title: 'Your Active Load',
-      description: 'View your current assignment — pickup/delivery details, route info, and status controls.',
+      id: 'welcome',
+      targetSelector: 'body',
+      title: 'Welcome to FleetFlow!',
+      description: "You're all set! This dashboard is your central hub for everything you need on the road. Let's take a quick tour of how to use it.",
     },
     {
-      id: 'driver-pay',
-      targetSelector: '[data-tour="driver-pay"]',
-      title: 'Pay & Earnings',
-      description: 'Track your weekly earnings, bonuses, and settlement details in real time.',
+      id: 'active-load',
+      targetSelector: '#tour-active-load',
+      title: 'Your Current Dispatch',
+      description: 'Here is your active load. You can view pickup/delivery times, routing details, and update your status (like Arrived or Loaded) right from this card.',
+    },
+    {
+      id: 'document-scan',
+      targetSelector: '#tour-document-scan',
+      title: 'Instant Document Upload',
+      description: "No more waiting to turn in paperwork. Use this to instantly scan and upload BOLs, weight tickets, or lumper receipts using your phone's camera. Getting paperwork in faster means getting paid faster!",
+    },
+    {
+      id: 'safety-bonus',
+      targetSelector: '#tour-safety-bonus',
+      title: 'Track Your Bonus',
+      description: 'Drive safe, earn more. This widget tracks your safe miles in real-time for the current 4-week period. Watch your bonus grow as you complete loads without incidents.',
+    },
+    {
+      id: 'pay-widget',
+      targetSelector: '#tour-pay-widget',
+      title: 'Your Earnings',
+      description: 'Transparency is key. Track your current weekly settlements, year-to-date earnings, and view detailed pay stubs directly from this panel.',
+    },
+    {
+      id: 'driver-requests',
+      targetSelector: '#tour-driver-requests',
+      title: 'Support & Requests',
+      description: 'Need a cash advance, home time, or truck maintenance? Submit requests directly to dispatch from here. No need to wait on hold.',
+    },
+    {
+      id: 'notifications',
+      targetSelector: '#tour-notifications',
+      title: 'Alerts & Messages',
+      description: 'Important updates from dispatch, weather alerts, or routing changes will appear here. Keep an eye out for unread badges!',
     },
   ],
 };
+
 
 // Map route prefixes to tour definitions
 const TOUR_MAP: Record<string, TourDefinition> = {
