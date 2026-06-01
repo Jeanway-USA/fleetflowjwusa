@@ -1,29 +1,26 @@
-## Audit & Fix Driver Stats Page
+## Fix: Driver tutorial not appearing after onboarding
 
-Reviewed `src/pages/DriverStats.tsx`. Found several accuracy issues — all data inputs exist in the schema, but several calculations are wrong or misleading.
+### Root causes
 
-### Issues
+Read the auto-start logic in `DashboardLayout.tsx` (lines 186–204) and the onboarding completion handoff in `DriverOnboarding.tsx` (line 485). Three problems compound:
 
-1. **On-Time Rate is broken.** Code compares `load.updated_at` (last row update — any field change) to `delivery_date` parsed as midnight. There's no actual delivery timestamp captured anywhere; this card shows misleading numbers.
-2. **Earnings miss Flat Rate drivers.** Only `'percentage'` and `'per_mile'` produce earnings; `'flat'` falls through to $0, which is wrong.
-3. **Pay week ignores driver's custom pay-week start day.** Hardcoded `weekStartsOn: 1` (Monday). Other widgets read `driver_settings.pay_week_start_day`.
-4. **Earnings calc diverges from DriverPayWidget.** Pay widget uses `booked_miles` and excludes `fuel_surcharge`; stats page uses `actual_miles` fallback and adds `fuel_surcharge`. Payroll pays on the widget formula, so stats should match.
-5. **MPG and Cost/Mile divide by loaded miles only.** Trucks burn fuel on empty miles too — industry MPG = total miles ÷ gallons.
-6. **Unused query.** `allTimeLoads` query runs every render and is never read.
+1. **`tour.hasCompleted()` (localStorage) short-circuits before the onboarding signal is checked.** If the localStorage key `tour_completed_driver_v2` is `true` from a prior test run, the explicit `state: { startTour: true }` from onboarding is ignored.
+2. **Shared server flag bleeds into per-tour localStorage.** `profiles.has_completed_onboarding_tour` is one global boolean for every tour. `syncFromServer(true)` writes `tour_completed_driver_v2=true` even if the driver never saw the driver tour (e.g. flag was already set during testing or by an admin role). This permanently suppresses the tour.
+3. **In-memory `location.state` is fragile.** If `ProtectedRoute` redirects through `/driver/onboarding` while auth state is still catching up (or the user reloads), `state.startTour` is dropped and the tour never auto-starts.
 
-### Fix Plan (frontend only)
+### Fix plan (frontend only)
 
-In `src/pages/DriverStats.tsx`:
+**`src/pages/DriverOnboarding.tsx`**
+- On the "Go to Dashboard" click, also write `localStorage.setItem('pending_driver_tour', '1')` before navigating. This persistent flag survives any intermediate redirects or refreshes.
 
-- Fetch `driver_settings_safe` for `pay_week_start_day`; use it when `period === 'weekly'` instead of hardcoded Monday.
-- Replace earnings formula to mirror `DriverPayWidget`:
-  - `'percentage'`: `(rate + accessorials) * payRate/100` using `booked_miles` semantics (no fuel_surcharge).
-  - `'per_mile'`: `booked_miles * payRate`.
-  - `'flat'`: leave earnings = 0 and render "—" with hint "Flat-rate pay — see payroll".
-- Remove the On-Time Rate card and replace it with **Avg Revenue per Mile** ($/loaded mile), which is reliable.
-- Drop on-time fields from `calculateStats`.
-- Change MPG and Cost/Mile to use `totalMiles` (loaded + empty) rather than loaded only; update helper caption accordingly.
-- Delete the unused `allTimeLoads` query and the `Clock` icon import if no longer needed.
-- Keep equipment, mileage breakdown, fuel section, and period summary layouts unchanged.
+**`src/hooks/useProductTour.ts`**
+- Remove `syncFromServer` (or make it a no-op for driver tour) — the global `has_completed_onboarding_tour` flag is the wrong signal to mirror into a per-tour key. Completion will still be persisted server-side by the existing `persistTourCompletion` write, and the dashboard already reads `hasSeenTour` directly.
 
-No DB/schema changes needed.
+**`src/components/layout/DashboardLayout.tsx`**
+- In the auto-start effect, check explicit signals first and reorder logic:
+  1. Compute `fromOnboarding = location.state?.startTour === true || localStorage.getItem('pending_driver_tour') === '1'`.
+  2. If `fromOnboarding` → call `tour.resetTour()` (clears stale localStorage), then `tour.startTour()`, clear the `pending_driver_tour` key, and replace history state. Do this **before** the `tour.hasCompleted()` check so onboarding always wins.
+  3. Otherwise, keep the existing `flagSaysStart` (server `has_completed_onboarding_tour === false`) auto-start path, gated by `tour.hasCompleted()`.
+- Stop calling `tour.syncFromServer(seen)` so the global server flag never poisons the per-tour localStorage key.
+
+No DB or RLS changes. No changes to tour step content or anchors (verified all `#tour-*` anchors render unconditionally in `DriverDashboard.tsx`).
