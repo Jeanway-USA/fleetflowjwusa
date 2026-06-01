@@ -14,8 +14,6 @@ import {
   Route, 
   DollarSign, 
   Calendar,
-  CheckCircle,
-  Clock,
   TrendingUp,
   Package,
   Gauge,
@@ -30,14 +28,30 @@ export default function DriverStats() {
   const { user } = useAuth();
   const [period, setPeriod] = useState<PeriodType>('weekly');
 
+  // Fetch driver settings for custom pay-week start day
+  const { data: driverSettings } = useQuery({
+    queryKey: ['driver-stats-settings', user?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from('driver_settings_safe' as any) as any)
+        .select('pay_week_start_day')
+        .eq('user_id', user?.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  const weekStartsOn = (driverSettings?.pay_week_start_day ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
   // Get date range based on period
   const getDateRange = (periodType: PeriodType) => {
     const now = new Date();
     switch (periodType) {
       case 'weekly':
         return {
-          start: format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
-          end: format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
+          start: format(startOfWeek(now, { weekStartsOn }), 'yyyy-MM-dd'),
+          end: format(endOfWeek(now, { weekStartsOn }), 'yyyy-MM-dd'),
         };
       case 'monthly':
         return {
@@ -136,67 +150,38 @@ export default function DriverStats() {
     enabled: !!driver?.id,
   });
 
-  // Fetch all-time stats for comparison
-  const { data: allTimeLoads = [] } = useQuery({
-    queryKey: ['driver-stats-alltime', driver?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fleet_loads')
-        .select('actual_miles, booked_miles, empty_miles, delivery_date, pickup_date, delivery_time, pickup_time')
-        .eq('driver_id', driver?.id)
-        .eq('status', 'delivered');
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!driver?.id,
-  });
-
   // Calculate statistics
   const calculateStats = () => {
     let totalLoadedMiles = 0;
     let totalEmptyMiles = 0;
     let totalEarnings = 0;
-    let onTimeDeliveries = 0;
-    let lateDeliveries = 0;
 
     periodLoads.forEach((load: any) => {
-      // Miles - use actual if available, otherwise booked
-      const loadedMiles = (load.actual_miles && load.actual_miles > 0) 
-        ? load.actual_miles 
+      // Loaded miles: prefer actual when available
+      const loadedMiles = (load.actual_miles && load.actual_miles > 0)
+        ? load.actual_miles
         : (load.booked_miles || 0);
       totalLoadedMiles += loadedMiles;
       totalEmptyMiles += load.empty_miles || 0;
 
-      // Earnings calculation
+      // Earnings — mirror DriverPayWidget so stats match payroll
       const accessorialsTotal = load.load_accessorials?.reduce(
         (sum: number, a: any) => sum + (a.amount || 0), 0
       ) || 0;
+      const payMiles = load.booked_miles || 0;
 
-      if (driver?.pay_type === 'percentage' && load.rate && driver?.pay_rate) {
-        totalEarnings += (load.rate + accessorialsTotal + (load.fuel_surcharge || 0)) * (driver.pay_rate / 100);
+      if (driver?.pay_type === 'percentage' && driver?.pay_rate) {
+        totalEarnings += ((load.rate || 0) + accessorialsTotal) * (driver.pay_rate / 100);
       } else if (driver?.pay_type === 'per_mile' && driver?.pay_rate) {
-        totalEarnings += loadedMiles * driver.pay_rate;
+        totalEarnings += payMiles * driver.pay_rate;
       }
-
-      // On-time calculation
-      if (load.delivery_date) {
-        const deliveryDate = parseISO(load.delivery_date + 'T00:00:00');
-        const actualDelivery = load.updated_at ? new Date(load.updated_at) : new Date();
-        // If delivered on or before delivery_date, count as on-time
-        if (actualDelivery <= deliveryDate || actualDelivery.toDateString() === deliveryDate.toDateString()) {
-          onTimeDeliveries++;
-        } else {
-          lateDeliveries++;
-        }
-      } else {
-        onTimeDeliveries++; // If no date specified, assume on-time
-      }
+      // 'flat' pay type: earnings not derivable per-load, leave at 0
     });
 
     const totalLoads = periodLoads.length;
-    const onTimeRate = totalLoads > 0 ? (onTimeDeliveries / totalLoads) * 100 : 100;
     const totalMiles = totalLoadedMiles + totalEmptyMiles;
     const loadedPercentage = totalMiles > 0 ? (totalLoadedMiles / totalMiles) * 100 : 100;
+    const revenuePerLoadedMile = totalLoadedMiles > 0 ? totalEarnings / totalLoadedMiles : 0;
 
     return {
       totalLoads,
@@ -204,22 +189,22 @@ export default function DriverStats() {
       totalEmptyMiles,
       totalMiles,
       totalEarnings,
-      onTimeDeliveries,
-      lateDeliveries,
-      onTimeRate,
       loadedPercentage,
+      revenuePerLoadedMile,
     };
   };
 
   const stats = calculateStats();
+
+  const isFlatPay = driver?.pay_type === 'flat';
 
   // Calculate fuel statistics
   const fuelStats = (() => {
     const totalGallons = fuelPurchases.reduce((sum: number, fp: any) => sum + (fp.gallons || 0), 0);
     const totalFuelCost = fuelPurchases.reduce((sum: number, fp: any) => sum + (fp.total_cost || 0), 0);
     const avgPricePerGallon = totalGallons > 0 ? totalFuelCost / totalGallons : 0;
-    const mpg = totalGallons > 0 ? stats.totalLoadedMiles / totalGallons : 0;
-    const costPerMile = stats.totalLoadedMiles > 0 ? totalFuelCost / stats.totalLoadedMiles : 0;
+    const mpg = totalGallons > 0 ? stats.totalMiles / totalGallons : 0;
+    const costPerMile = stats.totalMiles > 0 ? totalFuelCost / stats.totalMiles : 0;
 
     let mpgColor = 'text-destructive';
     let mpgLabel = 'Poor';
@@ -359,25 +344,37 @@ export default function DriverStats() {
                 <DollarSign className="h-4 w-4" />
                 <span className="text-sm">Earnings</span>
               </div>
-              <p className="text-3xl font-bold text-success">
-                ${stats.totalEarnings.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              {isFlatPay ? (
+                <>
+                  <p className="text-3xl font-bold text-muted-foreground">—</p>
+                  <p className="text-xs text-muted-foreground mt-1">Flat-rate pay — see payroll</p>
+                </>
+              ) : (
+                <p className="text-3xl font-bold text-success">
+                  ${stats.totalEarnings.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Revenue per Loaded Mile */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <TrendingUp className="h-4 w-4" />
+                <span className="text-sm">Pay / Loaded Mile</span>
+              </div>
+              {isFlatPay || stats.totalLoadedMiles === 0 ? (
+                <p className="text-3xl font-bold text-muted-foreground">—</p>
+              ) : (
+                <p className="text-3xl font-bold">${stats.revenuePerLoadedMile.toFixed(2)}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Earnings ÷ loaded miles
               </p>
             </CardContent>
           </Card>
 
-          {/* On-Time Rate */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <CheckCircle className="h-4 w-4" />
-                <span className="text-sm">On-Time Rate</span>
-              </div>
-              <p className="text-3xl font-bold">{stats.onTimeRate.toFixed(0)}%</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats.onTimeDeliveries} on-time / {stats.lateDeliveries} late
-              </p>
-            </CardContent>
-          </Card>
 
           {/* Total Miles */}
           <Card>
@@ -492,7 +489,7 @@ export default function DriverStats() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  MPG is calculated from loaded miles ÷ gallons purchased. Target: 6.5+ MPG for semi-trucks.
+                  MPG is calculated from total miles (loaded + empty) ÷ gallons purchased. Target: 6.5+ MPG for semi-trucks.
                 </p>
               </>
             )}
