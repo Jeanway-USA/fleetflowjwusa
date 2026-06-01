@@ -84,8 +84,8 @@ export function DriverRequestsCard({ driverId, truckId, activeLoadId, activeLoad
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Quick action buttons */}
-          <div className="grid grid-cols-4 gap-1.5">
-            {(['detention', 'home_time', 'pto', 'maintenance'] as RequestType[]).map((type) => {
+          <div className="grid grid-cols-3 gap-1.5">
+            {(['detention', 'home_time', 'pto'] as RequestType[]).map((type) => {
               const meta = TYPE_META[type];
               return (
                 <button
