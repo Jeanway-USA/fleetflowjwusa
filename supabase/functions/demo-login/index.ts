@@ -69,20 +69,47 @@ serve(async (req) => {
         .single();
 
       if (!profile?.org_id) {
-        console.log("Demo user missing org linkage, re-creating");
-        const { data: orgData, error: orgError } = await adminClient
-          .from("organizations")
-          .insert({ name: DEMO_ORG_NAME, subscription_tier: "all_in_one" })
-          .select("id")
-          .single();
-        if (orgError) throw new Error(`Org creation failed: ${orgError.message}`);
+        console.log("Demo user missing org linkage, attempting to reuse existing demo org");
+
+        // Prefer reusing an existing org the demo user already owns to prevent
+        // unbounded demo-org proliferation if profile.org_id is ever cleared.
+        let demoOrgId: string | null = null;
+        const { data: existingRole } = await adminClient
+          .from("user_roles")
+          .select("org_id")
+          .eq("user_id", userId)
+          .eq("role", "owner")
+          .limit(1)
+          .maybeSingle();
+        if (existingRole?.org_id) {
+          demoOrgId = existingRole.org_id;
+        } else {
+          const { data: existingOrg } = await adminClient
+            .from("organizations")
+            .select("id")
+            .eq("name", DEMO_ORG_NAME)
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          demoOrgId = existingOrg?.id ?? null;
+        }
+
+        if (!demoOrgId) {
+          const { data: orgData, error: orgError } = await adminClient
+            .from("organizations")
+            .insert({ name: DEMO_ORG_NAME, subscription_tier: "all_in_one" })
+            .select("id")
+            .single();
+          if (orgError) throw new Error(`Org creation failed: ${orgError.message}`);
+          demoOrgId = orgData.id;
+        }
 
         await adminClient
           .from("profiles")
-          .upsert({ user_id: userId, org_id: orgData.id, email: DEMO_EMAIL, first_name: "Demo", last_name: "User" }, { onConflict: "user_id" });
+          .upsert({ user_id: userId, org_id: demoOrgId, email: DEMO_EMAIL, first_name: "Demo", last_name: "User" }, { onConflict: "user_id" });
 
         await adminClient.from("user_roles").upsert(
-          { user_id: userId, role: "owner", org_id: orgData.id },
+          { user_id: userId, role: "owner", org_id: demoOrgId },
           { onConflict: "user_id,role" }
         );
       } else {
@@ -92,6 +119,7 @@ serve(async (req) => {
           { onConflict: "user_id,role" }
         );
       }
+
 
       return new Response(
         JSON.stringify({ session: signInData.session }),

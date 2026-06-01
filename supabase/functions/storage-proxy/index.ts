@@ -335,6 +335,30 @@ Deno.serve(async (req) => {
       return null;
     }
 
+    // For Google Drive file refs (`gdrive:<id>`), defense-in-depth check that
+    // the file id is referenced by a DB record owned by the caller's org.
+    async function assertOwnsDriveFile(fileRef: string): Promise<string | null> {
+      if (!fileRef.startsWith('gdrive:')) return null;
+      const driveId = fileRef.slice(7);
+      if (!driveId) return 'Invalid file reference';
+
+      const checks = await Promise.all([
+        supabase.from('documents').select('id', { head: true, count: 'exact' })
+          .eq('org_id', orgId).eq('file_path', fileRef),
+        supabase.from('driver_inspections').select('id', { head: true, count: 'exact' })
+          .eq('org_id', orgId).eq('signature_url', fileRef),
+        supabase.from('company_settings').select('id', { head: true, count: 'exact' })
+          .eq('org_id', orgId).eq('setting_value', fileRef),
+        supabase.from('organizations').select('id', { head: true, count: 'exact' })
+          .eq('id', orgId).or(`logo_url.eq.${fileRef},banner_url.eq.${fileRef}`),
+      ]);
+
+      const found = checks.some((c: any) => (c?.count ?? 0) > 0);
+      if (!found) return 'Forbidden: file does not belong to your organization';
+      return null;
+    }
+
+
     // Check org storage config
     const { data: storageConfig } = await supabase
       .from('org_storage_config')
@@ -435,6 +459,13 @@ Deno.serve(async (req) => {
         if (!storageConfig?.encrypted_credentials) {
           return new Response(JSON.stringify({ error: 'Google Drive not configured' }), {
             status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const driveOwnDenied = await assertOwnsDriveFile(fileRef);
+        if (driveOwnDenied) {
+          return new Response(JSON.stringify({ error: driveOwnDenied }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
 
@@ -544,6 +575,13 @@ Deno.serve(async (req) => {
         if (!storageConfig?.encrypted_credentials) {
           return new Response(JSON.stringify({ error: 'Google Drive not configured' }), {
             status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const driveOwnDenied = await assertOwnsDriveFile(fileRef);
+        if (driveOwnDenied) {
+          return new Response(JSON.stringify({ error: driveOwnDenied }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
 

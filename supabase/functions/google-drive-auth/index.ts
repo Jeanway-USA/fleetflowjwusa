@@ -115,11 +115,26 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action } = body;
 
+    // Server-side allowlist for OAuth redirect_uri. Must exactly match an
+    // origin in ALLOWED_ORIGINS and end with the known callback path.
+    function isAllowedRedirectUri(uri: unknown): uri is string {
+      if (typeof uri !== 'string') return false;
+      let parsed: URL;
+      try { parsed = new URL(uri); } catch { return false; }
+      // Only allow our known callback path
+      if (parsed.pathname !== '/settings') return false;
+      const originOnly = `${parsed.protocol}//${parsed.host}`;
+      const isAllowed = ALLOWED_ORIGINS.includes(originOnly)
+        || parsed.host.endsWith('.lovable.app')
+        || parsed.host.endsWith('.lovableproject.com');
+      return isAllowed;
+    }
+
     // ===== GET AUTH URL =====
     if (action === 'get_auth_url') {
       const { redirect_uri } = body;
-      if (!redirect_uri) {
-        return new Response(JSON.stringify({ error: 'Missing redirect_uri' }), {
+      if (!isAllowedRedirectUri(redirect_uri)) {
+        return new Response(JSON.stringify({ error: 'Invalid redirect_uri' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -138,12 +153,13 @@ Deno.serve(async (req) => {
       });
     }
 
+
     // ===== EXCHANGE AUTH CODE =====
     if (action === 'exchange_code') {
       const { code, redirect_uri } = body;
 
-      if (!code || !redirect_uri) {
-        return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+      if (!code || !isAllowedRedirectUri(redirect_uri)) {
+        return new Response(JSON.stringify({ error: 'Missing or invalid fields' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
