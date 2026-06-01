@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Target, Sun, Moon, DollarSign, Route, Loader2, Fuel, Eye, EyeOff, ShieldCheck, CalendarClock } from 'lucide-react';
+import { Target, Sun, Moon, DollarSign, Route, Loader2, CalendarClock } from 'lucide-react';
 import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
 
 
@@ -35,9 +35,6 @@ export default function DriverSettings() {
   const [weeklyMilesGoal, setWeeklyMilesGoal] = useState(2500);
   const [weeklyRevenueGoal, setWeeklyRevenueGoal] = useState(2000);
   const [payWeekStartDay, setPayWeekStartDay] = useState(0);
-  const [landstarUsername, setLandstarUsername] = useState('');
-  const [landstarPassword, setLandstarPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
   // Fetch driver profile
   const { data: driver, isLoading: driverLoading } = useQuery({
@@ -68,19 +65,6 @@ export default function DriverSettings() {
     enabled: !!driver?.id,
   });
 
-  // Fetch credential status via edge function (never returns plaintext password)
-  const { data: credentialStatus } = useQuery({
-    queryKey: ['landstar-credentials', driver?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('manage-credentials', {
-        method: 'GET',
-      });
-      if (error) throw error;
-      return data as { has_credentials: boolean; landstar_username: string };
-    },
-    enabled: !!driver?.id,
-  });
-
   // Update local state when settings load
   useEffect(() => {
     if (settings) {
@@ -89,13 +73,6 @@ export default function DriverSettings() {
       setPayWeekStartDay(settings.pay_week_start_day ?? 0);
     }
   }, [settings]);
-
-  useEffect(() => {
-    if (credentialStatus) {
-      setLandstarUsername(credentialStatus.landstar_username || '');
-      // Never pre-fill password - it's encrypted server-side
-    }
-  }, [credentialStatus]);
 
   // Save goals mutation (direct DB update - no sensitive data)
   const saveGoalsMutation = useMutation({
@@ -136,42 +113,11 @@ export default function DriverSettings() {
     },
   });
 
-  // Save credentials via edge function (encrypted server-side)
-  const saveCredentialsMutation = useMutation({
-    mutationFn: async (data: { landstar_username: string; landstar_password: string }) => {
-      const { data: result, error } = await supabase.functions.invoke('manage-credentials', {
-        method: 'POST',
-        body: data,
-      });
-      if (error) throw error;
-      return result;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['landstar-credentials'] });
-      setLandstarPassword(''); // Clear password field after save
-      toast.success('Credentials saved securely');
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to save credentials');
-    },
-  });
-
   const handleSaveGoals = () => {
     saveGoalsMutation.mutate({
       weekly_miles_goal: weeklyMilesGoal,
       weekly_revenue_goal: weeklyRevenueGoal,
       pay_week_start_day: payWeekStartDay,
-    });
-  };
-
-  const handleSaveCredentials = () => {
-    if (!landstarUsername && !landstarPassword) {
-      toast.error('Please enter at least a username');
-      return;
-    }
-    saveCredentialsMutation.mutate({
-      landstar_username: landstarUsername,
-      landstar_password: landstarPassword,
     });
   };
 
@@ -352,86 +298,6 @@ export default function DriverSettings() {
           </CardContent>
         </Card>
 
-        {/* Landstar Portal Credentials */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Fuel className="h-5 w-5" />
-              Landstar Portal
-            </CardTitle>
-            <CardDescription>
-              Enter your LandstarOne credentials to access LCAPP fuel discounts in the trip planner
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {credentialStatus?.has_credentials && (
-              <div className="flex items-center gap-2 text-sm text-success bg-success/10 rounded-md px-3 py-2">
-                <ShieldCheck className="h-4 w-4" />
-                Credentials saved and encrypted
-              </div>
-            )}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="landstarUsername">Landstar Username</Label>
-                <Input
-                  id="landstarUsername"
-                  type="text"
-                  value={landstarUsername}
-                  onChange={(e) => setLandstarUsername(e.target.value)}
-                  placeholder="Your LandstarOne username"
-                  autoComplete="off"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="landstarPassword">
-                  {credentialStatus?.has_credentials ? 'New Password (leave blank to keep current)' : 'Landstar Password'}
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="landstarPassword"
-                    type={showPassword ? 'text' : 'password'}
-                    value={landstarPassword}
-                    onChange={(e) => setLandstarPassword(e.target.value)}
-                    placeholder={credentialStatus?.has_credentials ? '••••••••' : 'Your LandstarOne password'}
-                    autoComplete="off"
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Your credentials are encrypted before storage and only decrypted server-side when fetching fuel discounts. They are never sent back to your browser.
-            </p>
-
-            <Separator />
-
-            <div className="flex justify-end">
-              <Button 
-                onClick={handleSaveCredentials} 
-                disabled={saveCredentialsMutation.isPending}
-                className="gradient-gold text-primary-foreground"
-              >
-                {saveCredentialsMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Encrypting & Saving...
-                  </>
-                ) : (
-                  'Save Credentials'
-                )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Profile Info (Read-only) */}
         <Card>
