@@ -78,6 +78,7 @@ export default function DriverSettings() {
   const saveGoalsMutation = useMutation({
     mutationFn: async (data: { weekly_miles_goal: number; weekly_revenue_goal: number; pay_week_start_day: number }) => {
       if (!driver?.id) throw new Error('Driver not found');
+      if (!driver?.org_id) throw new Error('Driver organization not found');
 
       const { data: existing } = await (supabase.from('driver_settings_safe' as any) as any)
         .select('id')
@@ -90,6 +91,7 @@ export default function DriverSettings() {
             weekly_miles_goal: data.weekly_miles_goal,
             weekly_revenue_goal: data.weekly_revenue_goal,
             pay_week_start_day: data.pay_week_start_day,
+            org_id: driver.org_id,
           })
           .eq('driver_id', driver.id);
         if (error) throw error;
@@ -97,12 +99,14 @@ export default function DriverSettings() {
         const { error } = await (supabase.from('driver_settings' as any) as any)
           .insert({
             driver_id: driver.id,
+            org_id: driver.org_id,
             weekly_miles_goal: data.weekly_miles_goal,
             weekly_revenue_goal: data.weekly_revenue_goal,
             pay_week_start_day: data.pay_week_start_day,
           });
         if (error) throw error;
       }
+
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['driver-settings'] });
