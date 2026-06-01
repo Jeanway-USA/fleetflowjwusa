@@ -1,50 +1,33 @@
-# Fix "WebSocket not available: The operation is insecure" on Driver Dashboard
+## Why banking info is blank today
 
-## Root cause
+The driver profile's banking card reads from `driver_banking_info`, but that table has **zero rows** for all 3 current drivers — even though they signed the Direct Deposit form. The onboarding flow calls `upsert_driver_banking` only inside the same submit loop that writes signed PDFs, and any RPC failure is swallowed into a toast and never retried. The raw bank values entered during onboarding are not stored anywhere else (the PDF embeds them visually, but they're not in `driver_signed_documents`), so there's no automatic way to recover the existing drivers' details without asking them again.
 
-The error is thrown by Supabase Realtime (`@supabase/supabase-js`) when the browser refuses to open a WebSocket. On `tms.jeanwayusa.com` the driver was almost certainly using an **in-app browser** (Instagram/Facebook/Gmail webview) or a privacy-hardened mobile browser. In those environments `new WebSocket(...)` throws a `SecurityError: The operation is insecure`, and supabase-js re-throws it from `.channel(...).subscribe()`.
+## Fix in two parts
 
-`DriverNotifications` already wraps the call in `try/catch`, but **`DriverMessages` does not** — its `subscribe()` throws synchronously, the render bubbles into the surrounding `ErrorBoundary`, and the user sees the red "Something went wrong loading this section" banner in the dashboard header.
+### 1. Let the admin enter banking once on the driver profile (no driver re-onboarding)
 
-Other components on the driver dashboard (`useDriverMaintenanceRequests`, `MaintenanceRequestCard`, etc.) and a few dispatcher components have the same unguarded pattern and will crash the same way for any user on a websocket-blocked browser.
+Add an inline "Edit banking" editor inside `DriverBankingDetails` that owners / payroll admins can use to type in bank name, account type, routing #, and account #. It saves through the existing `upsert_driver_banking` RPC (already supports owner/payroll role). After save, the card refreshes and shows the new metadata + last-4. This unblocks the 3 current drivers — the owner can fill it in for them from a voided check or their existing signed PDF without re-running onboarding.
 
-Importantly: **realtime is only a "nice to have"** here — every query already refetches on mount/visibility change. Losing realtime should silently downgrade to polling-on-focus, not break the page.
+- Adds: edit/save/cancel buttons next to the existing Reveal button
+- Validates: routing = 9 digits, account ≥ 4 digits, type = checking/savings
+- On success: invalidates `driver_banking` and `driver_banking_meta` queries
 
-## Plan
+### 2. Stop the silent failure on future onboardings
 
-### 1. New helper: `src/lib/safe-channel.ts`
-Tiny wrapper that creates a Supabase channel inside `try/catch` and returns `null` if the WS handshake throws. Also returns a no-op cleanup so call sites don't need their own null-check ceremony.
+Harden `DriverOnboarding.tsx` so the banking step can't quietly fail:
 
-```ts
-export function safeChannel(name: string, build: (ch) => ch) { ... }
-// returns { channel, cleanup }
-```
+- If `upsert_driver_banking` returns an error, **abort the submit** (throw) instead of just toasting and moving on, so the driver sees the real error and the admin gets a chance to retry.
+- Log the error payload to the console with the driver id and a clear prefix so we can diagnose if it recurs.
+- Same treatment for the `drivers.direct_deposit_attachment_url` update (only block when an attachment was expected).
 
-When it catches `SecurityError` / "WebSocket" / "insecure", it logs once via `console.warn` (not error) so the ErrorBoundary is never triggered.
+No DB migration is required — `upsert_driver_banking` and RLS are already correct, and the encryption key is in place.
 
-### 2. Wrap existing realtime call sites
-Apply `safeChannel` (or a localized `try/catch` mirroring `DriverNotifications`) to:
+## Files touched
 
-- `src/components/driver/DriverMessages.tsx` (the actual culprit in the screenshot)
-- `src/hooks/useDriverMaintenanceRequests.ts`
-- `src/hooks/useMaintenanceThread.ts`
-- `src/hooks/usePMNotifications.ts`
-- `src/components/drivers/DriverChatSheet.tsx`
-- `src/components/dispatcher/DispatcherAlerts.tsx`
-- `src/components/dispatcher/ActiveLoadsBoard.tsx`
-- `src/components/dispatcher/FleetMapView.tsx`
-- `src/pages/DispatcherDashboard.tsx`
-
-No behavior change when WebSockets work; on failure each component just skips realtime and keeps relying on the existing TanStack Query refetch.
-
-### 3. Friendlier ErrorBoundary copy (optional, low risk)
-In `src/components/shared/ErrorBoundary.tsx` (compact mode), detect error messages containing `WebSocket` / `insecure` and render a small muted notice ("Live updates unavailable in this browser") instead of the red "Try Again" banner. Prevents future regressions from looking alarming.
+- `src/components/drivers/DriverBankingDetails.tsx` — add admin edit form + mutation
+- `src/pages/DriverOnboarding.tsx` — fail loudly on banking RPC errors
 
 ## Out of scope
-- No changes to Supabase client config, auth, or RLS.
-- No changes to query/refresh intervals.
-- Won't "enable" realtime in in-app browsers — that's a browser limitation; goal is just to prevent the crash.
 
-## Manual verification after build
-1. Open driver dashboard normally in Chrome/Safari → header is clean, realtime still works.
-2. Open in an in-app browser (or Firefox with strict ETP) → no red error banner; console shows a single "Realtime unavailable" warning.
+- No changes to the encryption scheme, RLS, or the `direct_deposit` template itself.
+- No automated PDF-text extraction to backfill the 3 existing drivers — owner enters them manually from the existing signed forms once.
