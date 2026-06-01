@@ -32,6 +32,7 @@ export function DriverBankingDetails({ driverId }: Props) {
   const canEdit = canView;
   const [revealed, setRevealed] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [form, setForm] = useState({
     bank_name: '',
     account_type: '' as '' | 'checking' | 'savings',
@@ -39,6 +40,20 @@ export function DriverBankingDetails({ driverId }: Props) {
     account_number: '',
   });
   const qc = useQueryClient();
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['driver_banking_meta', driverId] }),
+        qc.invalidateQueries({ queryKey: ['driver_banking', driverId] }),
+        qc.invalidateQueries({ queryKey: ['driver_dd_attachment', driverId] }),
+      ]);
+      toast.success('Banking info refreshed');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['driver_banking', driverId, revealed],
