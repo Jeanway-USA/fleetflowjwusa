@@ -275,21 +275,48 @@ export function DocumentTemplateRenderer({
             <Input
               id={`file-upload-${key}`}
               type="file"
-              accept="application/pdf,image/jpeg,image/png"
+              accept="application/pdf,image/*,.heic,.heif"
               onChange={(e) => {
                 const file = e.target.files?.[0] ?? null;
-                if (file && file.size > 10 * 1024 * 1024) {
+                if (!file) {
+                  setAttachmentError(null);
+                  onAttachmentChange?.(null);
+                  return;
+                }
+                const name = (file.name || '').toLowerCase();
+                const type = (file.type || '').toLowerCase();
+                const isHeic =
+                  type === 'image/heic' ||
+                  type === 'image/heif' ||
+                  name.endsWith('.heic') ||
+                  name.endsWith('.heif');
+                if (isHeic) {
+                  setAttachmentError(
+                    "iPhone HEIC photos aren't supported. On your iPhone, open Settings → Camera → Formats and pick 'Most Compatible', then retake the photo. Or upload a PDF/JPG/PNG."
+                  );
                   onAttachmentChange?.(null);
                   e.target.value = '';
                   return;
                 }
+                if (file.size > 10 * 1024 * 1024) {
+                  setAttachmentError('File is too large (max 10 MB). Please choose a smaller photo or PDF.');
+                  onAttachmentChange?.(null);
+                  e.target.value = '';
+                  return;
+                }
+                setAttachmentError(null);
                 onAttachmentChange?.(file);
               }}
             />
-            {attachment && (
+            {attachment && !attachmentError && (
               <p className="mt-2 text-xs text-muted-foreground">
                 Selected: <span className="font-medium text-foreground">{attachment.name}</span>{' '}
                 ({(attachment.size / 1024).toFixed(0)} KB)
+              </p>
+            )}
+            {attachmentError && (
+              <p className="mt-2 text-xs font-medium text-destructive">
+                {attachmentError}
               </p>
             )}
           </div>
