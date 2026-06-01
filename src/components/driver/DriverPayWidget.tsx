@@ -2,11 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, TrendingUp, ChevronDown, Clock, Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { DollarSign, TrendingUp, ChevronDown, Clock, Package, Receipt } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
 import { useState } from 'react';
+import { MyPaystubsDialog } from './MyPaystubsDialog';
 
 interface DriverPayWidgetProps {
   driverId: string;
@@ -16,6 +18,21 @@ interface DriverPayWidgetProps {
 
 export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetProps) {
   const [accessorialsOpen, setAccessorialsOpen] = useState(false);
+  const [paystubsOpen, setPaystubsOpen] = useState(false);
+
+  const { data: driverRow } = useQuery({
+    queryKey: ['driver-name', driverId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('first_name, last_name')
+        .eq('id', driverId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!driverId,
+  });
 
   // Get driver settings for goals and pay week start day
   const { data: driverSettings } = useQuery({
@@ -86,11 +103,20 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
 
   return (
     <Card>
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
           <DollarSign className="h-5 w-5 text-primary" />
           My Pay This Week
         </CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 text-xs"
+          onClick={() => setPaystubsOpen(true)}
+        >
+          <Receipt className="h-3.5 w-3.5 mr-1.5" />
+          My Paystubs
+        </Button>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -181,6 +207,15 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
           }
         </div>
       </CardContent>
+
+      <MyPaystubsDialog
+        open={paystubsOpen}
+        onOpenChange={setPaystubsOpen}
+        driverId={driverId}
+        driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim() || 'Driver'}
+        payType={payType}
+        payRate={payRate}
+      />
     </Card>
   );
 }
