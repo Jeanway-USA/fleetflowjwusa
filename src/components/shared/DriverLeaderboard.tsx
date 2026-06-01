@@ -2,9 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trophy, Medal, Award, TrendingUp, Route } from 'lucide-react';
+import { Trophy, Medal, Award } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface DriverLeaderboardProps {
   readOnly?: boolean;
@@ -15,7 +14,6 @@ interface DriverRanking {
   firstName: string;
   lastName: string;
   totalMiles: number;
-  totalRevenue: number;
 }
 
 const RANK_STYLES = [
@@ -53,10 +51,6 @@ function RankRow({ rank, name, value }: { rank: number; name: string; value: str
   );
 }
 
-function formatCurrency(v: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v);
-}
-
 export function DriverLeaderboard({ readOnly }: DriverLeaderboardProps) {
   const now = new Date();
   const monthStart = startOfMonth(now).toISOString();
@@ -68,21 +62,20 @@ export function DriverLeaderboard({ readOnly }: DriverLeaderboardProps) {
     queryFn: async () => {
       const [{ data: drivers }, { data: loads }] = await Promise.all([
         supabase.from('drivers_public_view').select('id, first_name, last_name').eq('status', 'active'),
-        supabase.from('fleet_loads').select('driver_id, actual_miles, net_revenue').eq('status', 'delivered').gte('delivery_date', monthStart).lte('delivery_date', monthEnd),
+        supabase.from('fleet_loads').select('driver_id, actual_miles').eq('status', 'delivered').gte('delivery_date', monthStart).lte('delivery_date', monthEnd),
       ]);
 
       if (!drivers?.length) return [];
 
       const map = new Map<string, DriverRanking>();
       for (const d of drivers) {
-        map.set(d.id, { driverId: d.id, firstName: d.first_name, lastName: d.last_name, totalMiles: 0, totalRevenue: 0 });
+        map.set(d.id, { driverId: d.id, firstName: d.first_name, lastName: d.last_name, totalMiles: 0 });
       }
 
       for (const l of loads ?? []) {
         const entry = l.driver_id ? map.get(l.driver_id) : null;
         if (entry) {
           entry.totalMiles += Number(l.actual_miles ?? 0);
-          entry.totalRevenue += Number(l.net_revenue ?? 0);
         }
       }
 
@@ -110,33 +103,8 @@ export function DriverLeaderboard({ readOnly }: DriverLeaderboardProps) {
   if (all.length === 0) return null;
 
   const byMiles = [...all].sort((a, b) => b.totalMiles - a.totalMiles);
-  const byRevenue = [...all].sort((a, b) => b.totalRevenue - a.totalRevenue);
-
-  const renderList = (sorted: DriverRanking[], formatValue: (d: DriverRanking) => string, label: string) => {
-    const top3 = sorted.slice(0, 3);
-    const rest = sorted.slice(3).filter((d) => formatValue(d) !== '$0' && formatValue(d) !== '0');
-
-    return (
-      <div className="space-y-2">
-        {top3.map((d, i) => (
-          <PodiumCard
-            key={d.driverId}
-            rank={i}
-            name={`${d.firstName} ${d.lastName}`}
-            value={formatValue(d)}
-            label={label}
-          />
-        ))}
-        {rest.length > 0 && (
-          <div className="border rounded-lg divide-y">
-            {rest.map((d, i) => (
-              <RankRow key={d.driverId} rank={i + 3} name={`${d.firstName} ${d.lastName}`} value={formatValue(d)} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
+  const top3 = byMiles.slice(0, 3);
+  const rest = byMiles.slice(3).filter((d) => d.totalMiles > 0);
 
   return (
     <Card className="card-elevated">
@@ -147,24 +115,24 @@ export function DriverLeaderboard({ readOnly }: DriverLeaderboardProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="miles" className="w-full">
-          <TabsList className="w-full mb-3">
-            <TabsTrigger value="miles" className="flex-1 gap-1.5">
-              <Route className="h-3.5 w-3.5" />
-              Miles
-            </TabsTrigger>
-            <TabsTrigger value="revenue" className="flex-1 gap-1.5">
-              <TrendingUp className="h-3.5 w-3.5" />
-              Revenue
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="miles">
-            {renderList(byMiles, (d) => d.totalMiles.toLocaleString(), 'miles driven')}
-          </TabsContent>
-          <TabsContent value="revenue">
-            {renderList(byRevenue, (d) => formatCurrency(d.totalRevenue), 'revenue generated')}
-          </TabsContent>
-        </Tabs>
+        <div className="space-y-2">
+          {top3.map((d, i) => (
+            <PodiumCard
+              key={d.driverId}
+              rank={i}
+              name={`${d.firstName} ${d.lastName}`}
+              value={d.totalMiles.toLocaleString()}
+              label="miles driven"
+            />
+          ))}
+          {rest.length > 0 && (
+            <div className="border rounded-lg divide-y">
+              {rest.map((d, i) => (
+                <RankRow key={d.driverId} rank={i + 3} name={`${d.firstName} ${d.lastName}`} value={d.totalMiles.toLocaleString()} />
+              ))}
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

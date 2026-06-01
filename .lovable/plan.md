@@ -1,9 +1,9 @@
-## Remove Monthly Bonus Pacing from WeeklyPerformanceWidget
+## Remove Revenue from Driver Leaderboard
 
-In `src/components/driver/WeeklyPerformanceWidget.tsx`:
+In `src/components/shared/DriverLeaderboard.tsx`:
 
-1. Remove the "Monthly Bonus Pacing" block (Target/TrendingUp section) entirely.
-2. Remove now-unused code: `monthlyLoads` query, `monthStart`/`monthEnd`, `monthMiles`, `daysElapsed`/`daysInMonth`, `dailyVelocity`, `projectedMonthMiles`, `paceLabel`/`paceVariant`/`paceBadgeClass`, `MONTHLY_BONUS_TARGET` constant.
-3. Remove unused imports: `Badge`, `Target`, `TrendingUp`, `startOfMonth`, `endOfMonth`, `getDate`, `getDaysInMonth`.
+- Remove Tabs/TabsList/TabsTrigger/TabsContent wrapping; render the miles list directly.
+- Remove `byRevenue`, revenue tab, `formatCurrency`, `totalRevenue` field, and the `net_revenue` from the query.
+- Drop unused imports (`Tabs*`, `TrendingUp`).
 
-Widget will then show only: Miles Driven This Week (with progress vs target) + Deadhead Percentage. The MonthlyBonusWidget below already covers safety/bonus tracking.
+Drivers will only see the miles ranking on the leaderboard.
