@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@4.0.0';
+import { buildFleetFlowEmail } from '../_shared/email-template.ts';
 
 // Allowed origins for CORS - restrict to known domains
 const ALLOWED_ORIGINS = [
