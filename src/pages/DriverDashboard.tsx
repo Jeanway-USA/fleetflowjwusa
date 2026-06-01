@@ -214,7 +214,11 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
           <div id="tour-pay-widget">
             <ErrorBoundary compact>
               {driver.pay_type === 'flat' ? (
-                <WeeklyPerformanceWidget driverId={driver.id} />
+                <WeeklyPerformanceWidget
+                  driverId={driver.id}
+                  payRate={driver.pay_rate}
+                  payType={driver.pay_type}
+                />
               ) : (
                 <DriverPayWidget
                   driverId={driver.id}
