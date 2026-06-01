@@ -23,11 +23,10 @@ import { Badge } from '@/components/ui/badge';
 import { StatementUpload } from '@/components/finance/StatementUpload';
 import { AuditReconciliation } from '@/components/finance/AuditReconciliation';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
-import { SettlementsTab } from '@/components/finance/SettlementsTab';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
 import { RevenueTab } from '@/components/finance/RevenueTab';
-import { PayrollTab } from '@/components/finance/PayrollTab';
 import { CommissionsTab } from '@/components/finance/CommissionsTab';
+import { DriverSettlementsTab } from '@/components/finance/driver-settlements/DriverSettlementsTab';
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
 import { SafetyBonusSettings } from '@/components/finance/SafetyBonusSettings';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
@@ -647,9 +646,8 @@ export default function Finance() {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="overview">Overview & P&L</TabsTrigger>
-          <TabsTrigger value="settlements">Settlements</TabsTrigger>
+          <TabsTrigger value="driver-settlements">Driver Settlements</TabsTrigger>
           <TabsTrigger value="invoicing">Invoicing & Factoring</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll & Commissions</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="profitability">Profitability</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -954,26 +952,14 @@ export default function Finance() {
           </div>
         </TabsContent>
 
-        <TabsContent value="payroll">
+        <TabsContent value="driver-settlements">
           <div className="space-y-6 animate-in fade-in-50">
-            <PayrollTab
-              filteredPayrolls={filteredPayrolls}
-              payrollTotals={payrollTotals}
-              payrollsLoading={payrollsLoading}
-              drivers={drivers}
-              getDriverName={getDriverName}
-            />
+            <DriverSettlementsTab />
             <CommissionsTab
               filteredCommissions={filteredCommissions}
               commissionTotals={commissionTotals}
               commissionsLoading={commissionsLoading}
             />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="settlements">
-          <div className="space-y-6 animate-in fade-in-50">
-            <SettlementsTab />
           </div>
         </TabsContent>
 
