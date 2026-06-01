@@ -158,8 +158,8 @@ Deno.serve(async (req) => {
     if (action === 'exchange_code') {
       const { code, redirect_uri } = body;
 
-      if (!code || !redirect_uri) {
-        return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+      if (!code || !isAllowedRedirectUri(redirect_uri)) {
+        return new Response(JSON.stringify({ error: 'Missing or invalid fields' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
