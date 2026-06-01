@@ -1,9 +1,10 @@
-## Remove Revenue from Driver Leaderboard
+## Remove Issue button from My Requests widget
 
-In `src/components/shared/DriverLeaderboard.tsx`:
+In `src/components/driver/DriverRequestsCard.tsx`:
+- Drop `'maintenance'` from the quick-action grid array and change grid from `grid-cols-4` to `grid-cols-3`.
+- Keep `maintenance` entry in `TYPE_META` so legacy maintenance requests in history still render correctly with the Wrench icon/label.
 
-- Remove Tabs/TabsList/TabsTrigger/TabsContent wrapping; render the miles list directly.
-- Remove `byRevenue`, revenue tab, `formatCurrency`, `totalRevenue` field, and the `net_revenue` from the query.
-- Drop unused imports (`Tabs*`, `TrendingUp`).
+Also in `src/components/driver/DriverRequestForm.tsx`:
+- Remove the `'maintenance' / Report Issue` option from the request-type selector so users can't manually pick it through the "New" button either.
 
-Drivers will only see the miles ranking on the leaderboard.
+Maintenance reporting remains available via the Maintenance Requests card directly below.

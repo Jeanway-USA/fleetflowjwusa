@@ -28,7 +28,7 @@ const REQUEST_TYPE_OPTIONS: { value: RequestType; label: string; icon: React.Rea
   { value: 'detention', label: 'Detention', icon: <Clock className="h-4 w-4" /> },
   { value: 'home_time', label: 'Home Time', icon: <Home className="h-4 w-4" /> },
   { value: 'pto', label: 'PTO', icon: <CalendarDays className="h-4 w-4" /> },
-  { value: 'maintenance', label: 'Report Issue', icon: <Wrench className="h-4 w-4" /> },
+  
 ];
 
 const ISSUE_TYPES = [
