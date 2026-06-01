@@ -84,10 +84,18 @@ export function DriverDetailSheet({
                 </div>
               </div>
             </div>
-            {!readOnly && onEdit && (
-              <Button variant="ghost" size="icon" onClick={() => onEdit(driver)}>
-                <Edit2 className="h-4 w-4" />
-              </Button>
+            {!readOnly && (
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" onClick={() => setChatOpen(true)} className="gap-1.5">
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="hidden sm:inline">Message</span>
+                </Button>
+                {onEdit && (
+                  <Button variant="ghost" size="icon" onClick={() => onEdit(driver)}>
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </SheetHeader>
