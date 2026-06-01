@@ -288,9 +288,8 @@ export default function DriverSpectatorView() {
         <ReadOnly>
           <DriverRequestsCard
             driverId={driver.id}
-            truckId={assignedTruck?.id ?? null}
+            truckId={assignedTruck?.id ?? undefined}
             activeLoadId={activeLoadId}
-            activeLoadNumber={activeLoadNumber}
           />
         </ReadOnly>
       </ErrorBoundary>
