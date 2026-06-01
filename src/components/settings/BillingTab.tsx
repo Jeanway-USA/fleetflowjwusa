@@ -293,11 +293,11 @@ export function BillingTab() {
               <dt className="text-sm text-muted-foreground">Billing Status</dt>
               <dd className="text-sm font-medium capitalize">{subscriptionStatus.replace('_', ' ')}</dd>
             </div>
-            {hasStripeSubscription && (
+            {hasStripeSubscription && subscriptionPeriodEnd && (
               <div className="flex justify-between">
-                <dt className="text-sm text-muted-foreground">Subscription ID</dt>
-                <dd className="text-sm font-mono text-muted-foreground">
-                  {org?.stripe_subscription_id?.slice(0, 20)}...
+                <dt className="text-sm text-muted-foreground">Renews</dt>
+                <dd className="text-sm font-medium">
+                  {format(subscriptionPeriodEnd, 'MMM d, yyyy')}
                 </dd>
               </div>
             )}
