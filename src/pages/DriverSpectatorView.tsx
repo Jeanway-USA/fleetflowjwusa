@@ -154,8 +154,7 @@ export default function DriverSpectatorView() {
 
   const initials = `${driver.first_name?.[0] || ''}${driver.last_name?.[0] || ''}`;
   const isFlatPay = driver.pay_type === 'flat';
-  const activeLoadId = activeLoad?.id ?? null;
-  const activeLoadNumber = activeLoad?.load_number ?? null;
+  const activeLoadId = activeLoad?.id ?? undefined;
 
   return (
     <div className="space-y-4 pb-6 max-w-4xl mx-auto">
