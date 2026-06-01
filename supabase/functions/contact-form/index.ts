@@ -1,4 +1,5 @@
 import { Resend } from 'https://esm.sh/resend@4.0.0';
+import { buildFleetFlowEmail } from '../_shared/email-template.ts';
 
 const ALLOWED_ORIGINS = [
   'https://tms.jeanwayusa.com',
@@ -23,14 +24,21 @@ function buildCorsHeaders(req: Request): Record<string, string> {
   };
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = buildCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-
-
 
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -42,7 +50,6 @@ Deno.serve(async (req) => {
   try {
     const { name, email, subject, message } = await req.json();
 
-    // Validate
     if (!name || typeof name !== 'string' || name.trim().length === 0 || name.length > 100) {
       return new Response(JSON.stringify({ error: 'Invalid name' }), {
         status: 400,
@@ -80,25 +87,45 @@ Deno.serve(async (req) => {
 
     const resend = new Resend(resendApiKey);
 
-    // Send notification to HR
+    const safeName = escapeHtml(name.trim());
+    const safeEmail = escapeHtml(email.trim());
+    const safeSubject = escapeHtml(subject.trim());
+    const safeMessage = escapeHtml(message.trim()).replace(/\n/g, '<br/>');
+
+    const bodyHtml = `
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; background: #fafafa; border: 1px solid #e4e4e7; border-radius: 8px; margin: 0 0 20px;">
+        <tr>
+          <td style="padding: 12px 14px; color: #71717a; font-size: 13px; width: 90px;">Name</td>
+          <td style="padding: 12px 14px; color: #18181b; font-size: 14px; font-weight: 500;">${safeName}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 14px; border-top: 1px solid #e4e4e7; color: #71717a; font-size: 13px;">Email</td>
+          <td style="padding: 12px 14px; border-top: 1px solid #e4e4e7; color: #18181b; font-size: 14px;"><a href="mailto:${safeEmail}" style="color: #2563eb; text-decoration: none;">${safeEmail}</a></td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 14px; border-top: 1px solid #e4e4e7; color: #71717a; font-size: 13px;">Subject</td>
+          <td style="padding: 12px 14px; border-top: 1px solid #e4e4e7; color: #18181b; font-size: 14px;">${safeSubject}</td>
+        </tr>
+      </table>
+
+      <p style="margin: 0 0 8px; color: #71717a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Message</p>
+      <div style="padding: 16px; background: #fafafa; border: 1px solid #e4e4e7; border-radius: 8px; color: #3f3f46; font-size: 14px; line-height: 1.6;">
+        ${safeMessage}
+      </div>
+    `;
+
+    const emailHtml = buildFleetFlowEmail({
+      previewText: `${name.trim()} — ${subject.trim()}`,
+      headline: 'New Contact Form Submission',
+      bodyText: bodyHtml,
+      footerContext: 'Sent from the FleetFlow public contact form.',
+    });
+
     await resend.emails.send({
       from: 'FleetFlow Contact <no-reply@jeanwayusa.com>',
       to: ['hr@jeanwayusa.com'],
       subject: `Contact Form: ${subject.trim()}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">New Contact Form Submission</h2>
-          <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-            <tr><td style="padding: 8px; font-weight: bold; color: #555;">Name</td><td style="padding: 8px;">${escapeHtml(name.trim())}</td></tr>
-            <tr style="background: #f9f9f9;"><td style="padding: 8px; font-weight: bold; color: #555;">Email</td><td style="padding: 8px;"><a href="mailto:${escapeHtml(email.trim())}">${escapeHtml(email.trim())}</a></td></tr>
-            <tr><td style="padding: 8px; font-weight: bold; color: #555;">Subject</td><td style="padding: 8px;">${escapeHtml(subject.trim())}</td></tr>
-          </table>
-          <div style="padding: 16px; background: #f5f5f5; border-radius: 8px; margin-top: 8px;">
-            <p style="margin: 0; white-space: pre-wrap;">${escapeHtml(message.trim())}</p>
-          </div>
-          <p style="margin-top: 24px; color: #999; font-size: 12px;">Sent from FleetFlow Contact Form</p>
-        </div>
-      `,
+      html: emailHtml,
       replyTo: email.trim(),
     });
 
@@ -114,12 +141,3 @@ Deno.serve(async (req) => {
     });
   }
 });
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
