@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Banknote, Eye, EyeOff, ShieldCheck, FileText, ExternalLink, Paperclip, Pencil, X, Save } from 'lucide-react';
+import { Banknote, Eye, EyeOff, ShieldCheck, FileText, ExternalLink, Paperclip, Pencil, X, Save, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { supabase } from '@/integrations/supabase/client';
