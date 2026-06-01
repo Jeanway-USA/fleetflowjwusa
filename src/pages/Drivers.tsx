@@ -518,7 +518,7 @@ export default function Drivers() {
             <DialogTitle>{editingDriver ? 'Edit Driver' : 'Add New Driver'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="first_name">First Name *</Label>
                 <Input id="first_name" value={formData.first_name || ''} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} required />
@@ -528,7 +528,7 @@ export default function Drivers() {
                 <Input id="last_name" value={formData.last_name || ''} onChange={(e) => setFormData({ ...formData, last_name: e.target.value })} required />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" value={formData.email || ''} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
@@ -544,6 +544,8 @@ export default function Drivers() {
               <div className="space-y-2">
                 <Label htmlFor="user_id">User Account</Label>
                 <Select 
+{/* ...keep-existing-select... */}
+PLACEHOLDER_DO_NOT_USE
                   value={formData.user_id || 'none'} 
                   onValueChange={(v) => setFormData({ ...formData, user_id: v === 'none' ? null : v })}
                 >
