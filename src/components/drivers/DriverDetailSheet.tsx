@@ -153,7 +153,9 @@ export function DriverDetailSheet({
             </div>
           </>
         )}
-      </SheetContent>
-    </Sheet>
+        </SheetContent>
+      </Sheet>
+      <DriverChatSheet driver={driver} open={chatOpen} onOpenChange={setChatOpen} />
+    </>
   );
 }
