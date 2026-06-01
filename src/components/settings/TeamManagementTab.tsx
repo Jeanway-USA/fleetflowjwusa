@@ -133,12 +133,29 @@ export function TeamManagementTab() {
   const assignRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
       if (!orgId) throw new Error('No organization context');
-      const { data: existing } = await supabase.from('user_roles').select('*').eq('user_id', userId).eq('org_id', orgId).maybeSingle();
-      if (existing) {
-        const { error } = await supabase.from('user_roles').update({ role, org_id: orgId }).eq('id', existing.id);
+
+      // Look for ANY existing role row for this user (regardless of org_id),
+      // because the (user_id, role) unique constraint will cause a duplicate-key
+      // error otherwise — including legacy rows where org_id was never set.
+      const { data: existingRows } = await supabase
+        .from('user_roles')
+        .select('id, role, org_id')
+        .eq('user_id', userId);
+
+      const sameRole = existingRows?.find((r) => r.role === role);
+      const orgScoped = existingRows?.find((r) => r.org_id === orgId);
+      const target = sameRole ?? orgScoped ?? null;
+
+      if (target) {
+        const { error } = await supabase
+          .from('user_roles')
+          .update({ role, org_id: orgId })
+          .eq('id', target.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('user_roles').insert({ user_id: userId, role, org_id: orgId });
+        const { error } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role, org_id: orgId });
         if (error) throw error;
       }
     },
