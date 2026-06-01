@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
     }
     const { error: insRoleErr } = await admin
       .from('user_roles')
-      .insert({ user_id: userId, role: invite.role });
+      .insert({ user_id: userId, role: invite.role, org_id: invite.org_id });
     if (insRoleErr) {
       console.error('roles insert failed:', insRoleErr.message);
       return json({ error: 'Invitation acceptance failed. Please try again.' }, 500);
