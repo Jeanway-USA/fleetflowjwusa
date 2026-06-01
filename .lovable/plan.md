@@ -1,47 +1,28 @@
-## What's out of date in the spectator
+## Hide Discord Promotion and Feedback Widget for JeanWay USA
 
-`src/pages/DriverSpectatorView.tsx` was built before the recent driver-dashboard work and is now missing several widgets and shows **$0 for flat-rate drivers** because it always renders `DriverPayWidget` (which only has math for `percentage` and `per_mile`). The real `src/pages/DriverDashboard.tsx` already routes flat-pay drivers to `WeeklyPerformanceWidget` — the spectator skips that swap.
+### Problem
+The Discord banner, Discord sidebar link, feedback floating button, and Discord link in the welcome modal should be hidden for users belonging to the JeanWay USA organization (org ID: `a0000000-0000-0000-0000-000000000001`). This org is the internal operator of the app and does not need beta feedback collection or Discord community advertising.
 
-## Fix
+### Changes
 
-Bring the spectator in line with the real dashboard, in read-only form.
+1. **`src/components/shared/DiscordBanner.tsx`**
+   - Import `useAuth` and read `orgName`.
+   - Add early-return guard: if `orgName` case-insensitively contains `"jeanway"`, render `null`.
 
-### 1. Weekly Goal widget — flat-rate handling
+2. **`src/components/shared/BetaFeedbackWidget.tsx`**
+   - Already imports `useAuth` for `user` and `orgId`. Read `orgName` as well.
+   - Add early-return guard: if `orgName` case-insensitively contains `"jeanway"`, render `null`.
 
-In `DriverSpectatorView.tsx`, mirror the dashboard's pattern:
-```ts
-{driver.pay_type === 'flat'
-  ? <WeeklyPerformanceWidget driverId={driver.id} weeklyFlatRate={driver.pay_rate ?? 0} readOnly />
-  : <DriverPayWidget payType={driver.pay_type} payRate={driver.pay_rate} driverId={driver.id} readOnly />}
-```
-`WeeklyPerformanceWidget` already shows mileage / loads progress, which is what a flat-paid driver should see (their pay isn't variable, so a $-goal bar is meaningless).
+3. **`src/components/shared/WelcomeBetaModal.tsx`**
+   - Import `useAuth` and read `orgName`.
+   - Conditionally render the Discord footer link only when org is **not** JeanWay USA.
 
-### 2. Missing widgets to add (read-only)
+4. **`src/components/layout/AppSidebar.tsx`**
+   - Read `orgName` from `useAuth()` (already used elsewhere in the file).
+   - Wrap the "Community & Support" Discord anchor in a conditional so it only renders when org is **not** JeanWay USA.
 
-- `DriverRequestsCard` — replace the bespoke inline list (lines 271–297) so categorized requests + future updates flow through automatically.
-- `MaintenanceRequestCard` — add below requests; pass a read-only flag so the "New request" button is hidden/disabled.
-- `DriverLeaderboard` — add with `readOnly`.
-- Pass `driverId` to `ActiveLoadCard` (currently omitted) and remove its `onStatusUpdate` so it stays read-only.
+### Why orgName and not orgId?
+`orgName` is already fetched and available in `AuthContext` without adding an extra database round-trip. A case-insensitive check on `"jeanway"` is robust against minor name variations.
 
-### 3. Stability
-
-Wrap each major widget in `<ErrorBoundary compact>` (same pattern the real dashboard already uses) so one widget failing doesn't blank the whole spectator page.
-
-### 4. Drop the stale bespoke GPS card
-
-Replace the hand-rolled GPS status block (lines 244–258) with the shared `LocationSharing` component in a read-only mode (no toggle, just status + last ping). If `LocationSharing` doesn't already accept a `readOnly` prop, add one that hides the start/stop button.
-
-### Intentionally not changing
-
-- Existing spectator banner, header, and access guard.
-- `DriverPayWidget` itself — flat-rate handling stays in the dashboard-level branching, matching how the real dashboard already does it.
-- Real `DriverDashboard.tsx` — no changes; only the spectator drifted.
-- HOS — already removed from both views.
-
-## Files touched
-
-- `src/pages/DriverSpectatorView.tsx` — main rewrite of the widget grid.
-- `src/components/driver/LocationSharing.tsx` — only if needed to add a `readOnly` prop.
-- `src/components/driver/DriverRequestsCard.tsx`, `MaintenanceRequestCard.tsx`, `DriverLeaderboard` — only if a `readOnly` prop needs to be added/honored (preferred over duplicating UI).
-
-No DB or RLS changes.
+### No database or backend changes required.
+All gating is done client-side using existing auth context data.

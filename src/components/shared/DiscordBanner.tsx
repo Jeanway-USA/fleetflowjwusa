@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const DISCORD_URL = 'https://discord.gg/HAQA8fACan';
 const STORAGE_KEY = 'discord-banner-dismissed';
@@ -12,11 +13,14 @@ const DiscordIcon = ({ className }: { className?: string }) => (
 );
 
 export function DiscordBanner() {
+  const { orgName } = useAuth();
   const [dismissed, setDismissed] = useState(
     () => localStorage.getItem(STORAGE_KEY) === 'true'
   );
 
   if (dismissed) return null;
+  if (orgName?.toLowerCase().includes('jeanway')) return null;
+
 
   const handleDismiss = () => {
     localStorage.setItem(STORAGE_KEY, 'true');
