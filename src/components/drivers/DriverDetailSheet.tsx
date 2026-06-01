@@ -54,6 +54,7 @@ export function DriverDetailSheet({
 }: DriverDetailSheetProps) {
   const { isOwner, hasRole } = useAuth();
   const canViewSignedDocs = isOwner || hasRole('safety') || hasRole('payroll_admin');
+  const [chatOpen, setChatOpen] = useState(false);
 
   if (!driver) return null;
 
