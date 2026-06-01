@@ -462,6 +462,13 @@ Deno.serve(async (req) => {
           });
         }
 
+        const driveOwnDenied = await assertOwnsDriveFile(fileRef);
+        if (driveOwnDenied) {
+          return new Response(JSON.stringify({ error: driveOwnDenied }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
         const driveFileId = fileRef.slice(7);
         const creds: DriveCredentials = JSON.parse(await decrypt(storageConfig.encrypted_credentials));
         const accessToken = await getAccessToken(creds, supabase, orgId);
