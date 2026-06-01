@@ -78,8 +78,9 @@ export function BillingTab() {
 
   const subscriptionStatus = org?.subscription_status || 'trialing';
   const subscriptionPeriodEnd = org?.subscription_period_end ? new Date(org.subscription_period_end) : null;
-  const hasStripeSubscription = !!org?.stripe_subscription_id;
-  const hasStripeCustomer = !!org?.stripe_customer_id;
+  const stripeStatuses = ['active', 'past_due', 'canceled', 'unpaid', 'incomplete', 'incomplete_expired'];
+  const hasStripeSubscription = !!org?.subscription_status && stripeStatuses.includes(org.subscription_status);
+  const hasStripeCustomer = hasStripeSubscription || !!org?.subscription_period_end;
 
   const statusBadge = STATUS_BADGES[subscriptionStatus] || STATUS_BADGES.trialing;
 
