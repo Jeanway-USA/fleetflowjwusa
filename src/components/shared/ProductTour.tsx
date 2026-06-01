@@ -84,6 +84,11 @@ export function ProductTour({ steps, currentStep, isActive, onNext, onPrev, onSk
 
   const measure = useCallback(() => {
     if (!step) return;
+    // Centered welcome/intro steps: no spotlight, tooltip centered on screen
+    if (step.targetSelector === 'body') {
+      setTargetRect(null);
+      return;
+    }
     const el = document.querySelector(step.targetSelector);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -96,6 +101,7 @@ export function ProductTour({ steps, currentStep, isActive, onNext, onPrev, onSk
       setTargetRect(null);
     }
   }, [step]);
+
 
   useEffect(() => {
     if (!isActive) return;
