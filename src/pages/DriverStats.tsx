@@ -344,25 +344,37 @@ export default function DriverStats() {
                 <DollarSign className="h-4 w-4" />
                 <span className="text-sm">Earnings</span>
               </div>
-              <p className="text-3xl font-bold text-success">
-                ${stats.totalEarnings.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              {isFlatPay ? (
+                <>
+                  <p className="text-3xl font-bold text-muted-foreground">—</p>
+                  <p className="text-xs text-muted-foreground mt-1">Flat-rate pay — see payroll</p>
+                </>
+              ) : (
+                <p className="text-3xl font-bold text-success">
+                  ${stats.totalEarnings.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Revenue per Loaded Mile */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                <TrendingUp className="h-4 w-4" />
+                <span className="text-sm">Pay / Loaded Mile</span>
+              </div>
+              {isFlatPay || stats.totalLoadedMiles === 0 ? (
+                <p className="text-3xl font-bold text-muted-foreground">—</p>
+              ) : (
+                <p className="text-3xl font-bold">${stats.revenuePerLoadedMile.toFixed(2)}</p>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Earnings ÷ loaded miles
               </p>
             </CardContent>
           </Card>
 
-          {/* On-Time Rate */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <CheckCircle className="h-4 w-4" />
-                <span className="text-sm">On-Time Rate</span>
-              </div>
-              <p className="text-3xl font-bold">{stats.onTimeRate.toFixed(0)}%</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stats.onTimeDeliveries} on-time / {stats.lateDeliveries} late
-              </p>
-            </CardContent>
-          </Card>
 
           {/* Total Miles */}
           <Card>
