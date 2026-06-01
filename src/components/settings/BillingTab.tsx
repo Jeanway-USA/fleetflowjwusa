@@ -49,7 +49,7 @@ export function BillingTab() {
       if (!orgId) return null;
       const { data, error } = await supabase
         .from('organizations')
-        .select('name, subscription_tier, trial_ends_at, is_active, created_at, is_complimentary, complimentary_ends_at, stripe_customer_id, stripe_subscription_id, subscription_status, subscription_period_end')
+        .select('name, subscription_tier, trial_ends_at, is_active, created_at, is_complimentary, complimentary_ends_at, subscription_status, subscription_period_end')
         .eq('id', orgId)
         .single();
       if (error) throw error;
@@ -61,8 +61,6 @@ export function BillingTab() {
         created_at: string;
         is_complimentary: boolean | null;
         complimentary_ends_at: string | null;
-        stripe_customer_id: string | null;
-        stripe_subscription_id: string | null;
         subscription_status: string | null;
         subscription_period_end: string | null;
       };
@@ -80,8 +78,9 @@ export function BillingTab() {
 
   const subscriptionStatus = org?.subscription_status || 'trialing';
   const subscriptionPeriodEnd = org?.subscription_period_end ? new Date(org.subscription_period_end) : null;
-  const hasStripeSubscription = !!org?.stripe_subscription_id;
-  const hasStripeCustomer = !!org?.stripe_customer_id;
+  const stripeStatuses = ['active', 'past_due', 'canceled', 'unpaid', 'incomplete', 'incomplete_expired'];
+  const hasStripeSubscription = !!org?.subscription_status && stripeStatuses.includes(org.subscription_status);
+  const hasStripeCustomer = hasStripeSubscription || !!org?.subscription_period_end;
 
   const statusBadge = STATUS_BADGES[subscriptionStatus] || STATUS_BADGES.trialing;
 
@@ -294,11 +293,11 @@ export function BillingTab() {
               <dt className="text-sm text-muted-foreground">Billing Status</dt>
               <dd className="text-sm font-medium capitalize">{subscriptionStatus.replace('_', ' ')}</dd>
             </div>
-            {hasStripeSubscription && (
+            {hasStripeSubscription && subscriptionPeriodEnd && (
               <div className="flex justify-between">
-                <dt className="text-sm text-muted-foreground">Subscription ID</dt>
-                <dd className="text-sm font-mono text-muted-foreground">
-                  {org?.stripe_subscription_id?.slice(0, 20)}...
+                <dt className="text-sm text-muted-foreground">Renews</dt>
+                <dd className="text-sm font-medium">
+                  {format(subscriptionPeriodEnd, 'MMM d, yyyy')}
                 </dd>
               </div>
             )}
