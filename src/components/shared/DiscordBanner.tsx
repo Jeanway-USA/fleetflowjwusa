@@ -13,11 +13,14 @@ const DiscordIcon = ({ className }: { className?: string }) => (
 );
 
 export function DiscordBanner() {
+  const { orgName } = useAuth();
   const [dismissed, setDismissed] = useState(
     () => localStorage.getItem(STORAGE_KEY) === 'true'
   );
 
   if (dismissed) return null;
+  if (orgName?.toLowerCase().includes('jeanway')) return null;
+
 
   const handleDismiss = () => {
     localStorage.setItem(STORAGE_KEY, 'true');
