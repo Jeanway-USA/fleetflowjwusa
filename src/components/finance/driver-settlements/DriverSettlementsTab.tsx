@@ -305,7 +305,6 @@ export function DriverSettlementsTab() {
                   <TableHead>Period</TableHead>
                   <TableHead className="text-right">Base</TableHead>
                   <TableHead className="text-right">Bonus</TableHead>
-                  <TableHead className="text-right">Deduct</TableHead>
                   <TableHead className="text-right">Net</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead></TableHead>
@@ -314,11 +313,11 @@ export function DriverSettlementsTab() {
               <TableBody>
                 {settlementsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">Loading…</TableCell>
+                    <TableCell colSpan={7} className="text-center py-8">Loading…</TableCell>
                   </TableRow>
                 ) : filteredSettlements.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No paystubs match this filter.
                     </TableCell>
                   </TableRow>
@@ -331,7 +330,6 @@ export function DriverSettlementsTab() {
                       </TableCell>
                       <TableCell className="text-right">{formatCurrency(Number(s.base_pay ?? 0))}</TableCell>
                       <TableCell className="text-right">{formatCurrency(Number(s.bonus_pay ?? 0))}</TableCell>
-                      <TableCell className="text-right text-destructive">{formatCurrency(Number(s.deductions ?? 0))}</TableCell>
                       <TableCell className="text-right font-semibold text-primary">{formatCurrency(Number(s.net_pay ?? 0))}</TableCell>
                       <TableCell><StatusBadge status={s.status} /></TableCell>
                       <TableCell>
