@@ -250,6 +250,9 @@ export function DriverBankingDetails({ driverId }: Props) {
           Banking · owner/payroll only
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={handleRefresh} disabled={refreshing} title="Refresh">
+            <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
           {canEdit && (
             <Button size="sm" variant="outline" onClick={startEdit}>
               <Pencil className="mr-1.5 h-4 w-4" />
