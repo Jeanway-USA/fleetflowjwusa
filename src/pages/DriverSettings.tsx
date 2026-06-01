@@ -67,16 +67,19 @@ export default function DriverSettings() {
     enabled: !!driver?.id,
   });
 
+  const isFlatRate = driver?.pay_type === 'flat';
+
   // Update local state when settings load
   useEffect(() => {
     if (settings) {
       setWeeklyMilesGoal(settings.weekly_miles_goal || 2500);
       setWeeklyRevenueGoal(settings.weekly_revenue_goal || 2000);
       setPayWeekStartDay(settings.pay_week_start_day ?? 0);
-      setGoalType((settings.goal_type as 'financial' | 'mileage') || 'financial');
+      const loadedGoalType = (settings.goal_type as 'financial' | 'mileage') || 'financial';
+      setGoalType(isFlatRate ? 'mileage' : loadedGoalType);
       setTargetMiles(settings.target_miles ?? settings.weekly_miles_goal ?? 2500);
     }
-  }, [settings]);
+  }, [settings, isFlatRate]);
 
   // Save goals mutation (direct DB update - no sensitive data)
   const saveGoalsMutation = useMutation({
