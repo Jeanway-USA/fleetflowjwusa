@@ -221,11 +221,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      // Validate that the cached session is still valid server-side.
+      // If an admin deleted the user, or the session was revoked elsewhere,
+      // getSession() will still return the cached JWT but getUser() will fail.
+      // We sign out in that case so the user gets a clean re-auth instead of
+      // running around the app with a zombie token that breaks edge functions.
+      if (session?.user) {
+        const { error: validateErr } = await supabase.auth.getUser();
+        if (validateErr) {
+          console.warn('[Auth] Cached session is invalid server-side, signing out:', validateErr.message);
+          try { await supabase.auth.signOut(); } catch { /* ignore */ }
+          setSession(null);
+          setUser(null);
+          currentUserIdRef.current = null;
+          setRoles([]);
+          setRolesLoading(false);
+          setOrgLoading(false);
+          setLoading(false);
+          return;
+        }
+      }
+
       setSession(session);
       setUser(session?.user ?? null);
       currentUserIdRef.current = session?.user?.id ?? null;
-      
+
       if (session?.user) {
         setRolesLoading(true);
         setOrgLoading(true);
@@ -238,9 +259,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRolesLoading(false);
         setOrgLoading(false);
       }
-      
+
       setLoading(false);
     });
+
 
     return () => subscription.unsubscribe();
   }, []);
