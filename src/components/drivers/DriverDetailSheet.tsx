@@ -4,14 +4,40 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Phone, Mail, Edit2, CreditCard, Calendar, FileSignature, MessageSquare } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  Phone,
+  Mail,
+  Edit2,
+  CreditCard,
+  Calendar,
+  FileSignature,
+  MessageSquare,
+  AlertTriangle,
+  RotateCcw,
+  Loader2,
+} from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { CredentialsCompliance } from './CredentialsCompliance';
 import { SignedOnboardingDocuments } from './SignedOnboardingDocuments';
 import { DriverBankingDetails } from './DriverBankingDetails';
 import { DriverChatSheet } from './DriverChatSheet';
+
 
 interface DriverDetailSheetProps {
   driver: any | null;
@@ -54,9 +80,47 @@ export function DriverDetailSheet({
 }: DriverDetailSheetProps) {
   const { isOwner, hasRole } = useAuth();
   const canViewSignedDocs = isOwner || hasRole('safety') || hasRole('payroll_admin');
+  const canForceReonboard = isOwner || hasRole('payroll_admin');
   const [chatOpen, setChatOpen] = useState(false);
+  const [confirmReonboardOpen, setConfirmReonboardOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const reonboardMutation = useMutation({
+    mutationFn: async () => {
+      if (!driver?.user_id) throw new Error('Driver has no linked account yet');
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ onboarding_completed: false })
+        .eq('user_id', driver.user_id);
+      if (profileError) throw new Error(`Profile reset failed: ${profileError.message}`);
+
+      const { error: docsError } = await supabase
+        .from('driver_signed_documents')
+        .delete()
+        .eq('driver_id', driver.id)
+        .eq('org_id', driver.org_id);
+      if (docsError) throw new Error(`Clearing signed documents failed: ${docsError.message}`);
+
+      const { error: driverError } = await supabase
+        .from('drivers')
+        .update({ direct_deposit_attachment_url: null })
+        .eq('id', driver.id);
+      if (driverError) throw new Error(`Driver record reset failed: ${driverError.message}`);
+    },
+    onSuccess: () => {
+      toast.success('Driver onboarding has been reset.');
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['signed-documents', driver.id] });
+      setConfirmReonboardOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || 'Failed to reset onboarding');
+    },
+  });
 
   if (!driver) return null;
+
 
   const initials = `${(driver.first_name?.[0] ?? '').toUpperCase()}${(driver.last_name?.[0] ?? '').toUpperCase()}` || 'D';
   const hireDate = parseDateSafe(driver.hire_date);
@@ -151,8 +215,74 @@ export function DriverDetailSheet({
                 <DriverBankingDetails driverId={driver.id} />
               )}
             </div>
+
+            {canForceReonboard && !readOnly && (
+              <>
+                <Separator />
+                <div className="pt-4 pb-2 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                    <h4 className="font-medium text-sm text-destructive">Danger Zone</h4>
+                  </div>
+                  {driver.user_id ? (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Reset this driver's onboarding. They will be locked out of their dashboard
+                        until they re-sign all required documents.
+                      </p>
+                      <AlertDialog open={confirmReonboardOpen} onOpenChange={setConfirmReonboardOpen}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={reonboardMutation.isPending}
+                            className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground gap-1.5"
+                          >
+                            {reonboardMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-4 w-4" />
+                            )}
+                            Force Re-Onboarding
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Force re-onboarding?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure? This will lock the driver out of their dashboard until
+                              they re-sign all documents for this organization.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel disabled={reonboardMutation.isPending}>
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={(e) => {
+                                e.preventDefault();
+                                reonboardMutation.mutate();
+                              }}
+                              disabled={reonboardMutation.isPending}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              {reonboardMutation.isPending ? 'Resetting…' : 'Continue'}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      This driver has no linked account yet — nothing to reset.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
+
         </SheetContent>
       </Sheet>
       <DriverChatSheet driver={driver} open={chatOpen} onOpenChange={setChatOpen} />

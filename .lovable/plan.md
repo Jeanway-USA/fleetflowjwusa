@@ -1,53 +1,47 @@
-## Driver Messages Widget
+## Force Re-Onboarding button
 
-Add a Messages button next to the existing notifications bell in the driver dashboard header, with an unread badge and a slide-out chat interface that mirrors the admin-side experience.
+Add a destructive admin action inside the existing `DriverDetailSheet` that resets a driver's onboarding so they're locked back into `/driver/onboarding` on next load.
 
-### New component: `src/components/driver/DriverMessages.tsx`
+### Where it lives
+In `src/components/drivers/DriverDetailSheet.tsx`, append a new "Danger zone" block under the existing "Signed Documents" section, inside the same `{canViewSignedDocs && …}` group (so only owner/payroll admins/safety with admin context see it). Gate the actual button to `isOwner || hasRole('payroll_admin')` to match who can manage driver records.
 
-Trigger (rendered inside the `tour-notifications` cluster, beside `DriverNotifications`):
-- Ghost icon `Button` (`h-8 w-8`) with `MessageSquare` icon.
-- Red unread `Badge` overlay (top-right, count or "9+") computed from a TanStack Query that counts rows in `messages` where `receiver_id = driver.user_id AND is_read = false`. 30s refetch + realtime invalidation.
+### UI
+- Section heading: "Danger Zone" with an `AlertTriangle` icon.
+- A short helper line explaining the consequence.
+- `Button variant="outline"` with `border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground`, label "Force Re-Onboarding", icon `RotateCcw`.
+- Disabled (with spinner) while the mutation runs; hidden when `driver.user_id` is null (no account yet, so nothing to lock out) and replaced with a muted note.
 
-Panel: a right-side `Sheet`, `w-full sm:max-w-md`, two-mode body:
+### Confirmation
+Use `AlertDialog` (shadcn). Title: "Force re-onboarding?". Description: "Are you sure? This will lock the driver out of their dashboard until they re-sign all documents for this organization." Cancel + destructive Continue button.
 
-**Mode A — conversation list (default):**
-- Group all messages involving the driver by counterpart `user_id` (the non-driver participant). For each thread show: counterpart name (from `profiles.first_name + last_name`, fallback email), last message preview, relative time, unread count badge.
-- Single query: select messages for the driver + a separate `profiles` select for counterpart names, joined client-side.
-- Tap a row → switch to Mode B for that counterpart.
+### Mutation (sequential, fail-fast)
+On confirm, run a single TanStack `useMutation` that performs three Supabase calls in order using `driver.user_id` / `driver.id` / `driver.org_id`:
 
-**Mode B — thread view:**
-- Header with back arrow, counterpart name, "Dispatch" subtitle.
-- Scrollable message list, chronological. Own messages: `bg-primary text-primary-foreground` right-aligned. Admin messages: `bg-muted` left-aligned. Relative timestamp under each bubble. Auto-scroll to bottom.
-- Composer: `Textarea` + `Send` button (Enter sends, Shift+Enter newline). Disabled while sending.
-- On entering this mode (and on every new incoming message in it), update `messages` set `is_read = true` for unread rows where `receiver_id = me AND sender_id = counterpart`. Then invalidate the unread-count query.
+1. `profiles` — `update({ onboarding_completed: false }).eq('user_id', driver.user_id)`
+2. `driver_signed_documents` — `delete().eq('driver_id', driver.id).eq('org_id', driver.org_id)` (RLS lets owner/payroll see them; deletion will go through a new policy — see Schema note below)
+3. `drivers` — `update({ direct_deposit_attachment_url: null }).eq('id', driver.id)`
 
-### Data layer
+Throw on the first error so the toast reflects the failing step. On success show `toast.success('Driver onboarding has been reset.')` and invalidate the `['drivers']` and `['signed-documents', driver.id]` query caches.
 
-- Auth: use `useAuth()` to get current user id (the driver's `user_id`).
-- Queries (TanStack):
-  - `['driver-msgs-unread', userId]` — `select id` count where `receiver_id = userId AND is_read = false`.
-  - `['driver-msgs-threads', userId]` — all messages involving driver (`or(sender_id.eq,receiver_id.eq)`), ordered desc; reduced client-side into threads. Joined with `profiles` lookup for distinct counterpart ids.
-  - `['driver-msgs-thread', userId, counterpartId]` — full thread, asc.
-- Send mutation: insert `{ sender_id: userId, receiver_id: counterpartId, content }` (cast `as any` because the trigger fills `org_id` and the generated TS type still requires it).
+### Schema note (one migration)
+`driver_signed_documents` currently has SELECT/INSERT policies only — admins cannot DELETE. Add one policy in a new migration:
 
-### Realtime
+```sql
+CREATE POLICY "Owner payroll can delete signed documents"
+ON public.driver_signed_documents
+FOR DELETE
+TO authenticated
+USING ((is_owner(auth.uid()) OR has_role(auth.uid(), 'payroll_admin'::app_role))
+       AND org_id = get_user_org_id(auth.uid()));
+```
 
-A single channel subscribed for the lifetime of the component (mounted whenever the panel is open):
-- `postgres_changes` INSERT on `public.messages` filtered `receiver_id=eq.${userId}`.
-- On payload: invalidate the unread count, update threads list cache, and if the open thread matches `sender_id`, append to that cache + mark read.
-- Also INSERT filtered `sender_id=eq.${userId}` so outgoing messages from other devices stay in sync.
-- Unsubscribe on close.
-
-### Wiring
-
-Edit `src/pages/DriverDashboard.tsx`:
-- Inside `<div id="tour-notifications">`, render `<DriverMessages />` next to `<DriverNotifications />` inside a small flex wrapper so they sit side-by-side.
+(No table-structure change, no new columns; the existing GRANTs already include DELETE for `authenticated`.)
 
 ### Out of scope
-- Push notifications / sound.
-- Group chats, attachments, typing indicators.
-- A separate full page route.
+- Audit log entry (could be added later via existing `audit_logs` table).
+- Removing stored files from storage buckets — only the DB pointers are cleared per the user's spec.
+- Notifying the driver via email.
 
 ### Files
-- New: `src/components/driver/DriverMessages.tsx`
-- Edit: `src/pages/DriverDashboard.tsx` (one-line addition inside tour-notifications)
+- New: `supabase/migrations/<timestamp>_driver_signed_docs_delete_policy.sql`
+- Edit: `src/components/drivers/DriverDetailSheet.tsx` (add Danger Zone block + AlertDialog + mutation)
