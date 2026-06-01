@@ -203,8 +203,8 @@ export default function DriverStats() {
     const totalGallons = fuelPurchases.reduce((sum: number, fp: any) => sum + (fp.gallons || 0), 0);
     const totalFuelCost = fuelPurchases.reduce((sum: number, fp: any) => sum + (fp.total_cost || 0), 0);
     const avgPricePerGallon = totalGallons > 0 ? totalFuelCost / totalGallons : 0;
-    const mpg = totalGallons > 0 ? stats.totalLoadedMiles / totalGallons : 0;
-    const costPerMile = stats.totalLoadedMiles > 0 ? totalFuelCost / stats.totalLoadedMiles : 0;
+    const mpg = totalGallons > 0 ? stats.totalMiles / totalGallons : 0;
+    const costPerMile = stats.totalMiles > 0 ? totalFuelCost / stats.totalMiles : 0;
 
     let mpgColor = 'text-destructive';
     let mpgLabel = 'Poor';
