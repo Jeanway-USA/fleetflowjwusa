@@ -1,40 +1,68 @@
 ## Goal
+Conditionally render a mileage-focused weekly widget on the Driver Dashboard for Flat Rate drivers, and keep the existing pay widget for everyone else.
 
-Make the Weekly Goals section of Driver Settings adapt to the driver's `pay_type`, and ensure saves persist `goal_type` and `target_miles` correctly.
+## Files
 
-## Behavior
+**New:** `src/components/driver/WeeklyPerformanceWidget.tsx`
+**Edit:** `src/pages/DriverDashboard.tsx`
 
-`driver.pay_type` values in this codebase: `'flat'`, `'cpm'` / `'per_mile'`, `'percentage'`, `'hourly'`. The "Flat Rate" label corresponds to `pay_type === 'flat'`.
+## Note on `pay_type` value
+Internally the driver's flat pay type is stored as `'flat'` (see `src/lib/pay-format.ts` and existing `DriverSettings.tsx` `isFlatRate` check). The user request says `'Flat Rate'` as the human label — the conditional will use `driver.pay_type === 'flat'` to match the DB/codebase convention. Display label remains "Flat Rate".
 
-In `src/pages/DriverSettings.tsx`:
+## DriverDashboard.tsx changes
+- Import `WeeklyPerformanceWidget`.
+- Where `<DriverPayWidget …/>` is rendered (line ~213), branch on `driver.pay_type`:
+  - `'flat'` → `<WeeklyPerformanceWidget driverId={driver.id} />`
+  - else → existing `<DriverPayWidget …/>` unchanged.
+- No other dashboard changes.
 
-1. The `driver` query already returns `pay_type` (uses `select('*')`). No fetch change needed beyond reading `driver.pay_type`.
+## WeeklyPerformanceWidget.tsx
 
-2. Replace the existing two-column grid (Miles Goal + Revenue Goal) and the separate Target Miles input with conditional rendering driven by `pay_type`:
+Props: `{ driverId: string }`
 
-   - **Flat Rate (`pay_type === 'flat'`)**
-     - Hide the dollar-amount (Weekly Revenue Goal) input entirely.
-     - Show a single **"Weekly Mileage Target"** number input bound to `targetMiles` (with miles suffix).
-     - Subtext under it: *"Pace yourself to hit 2,500 safe miles per week to ensure you unlock your 10,000-mile monthly safety bonus."*
-     - Also hide the "Primary Goal Type" selector (force `goalType = 'mileage'` for flat drivers; not user-selectable).
-     - Keep the existing `weeklyMilesGoal` state in sync with `targetMiles` so legacy reads still work.
+### Data fetched (TanStack Query, same patterns as DriverPayWidget)
+1. `driver_settings_safe` → `target_miles`, `pay_week_start_day` (for `target_miles` goal + week boundary).
+2. This week's `fleet_loads` for the driver where `delivery_date` is within current pay-week and `status = 'delivered'` — provides loaded miles & rate context.
+3. Driver's deadhead miles for the week: sum `deadhead_miles` (if present on `fleet_loads`) — if column missing we'll derive as 0 and surface a TODO; will verify column at build time.
+4. Month-to-date delivered miles for the driver (loads delivered between start of current month and today) — used for bonus pacing.
 
-   - **All other pay types (CPM/per_mile, percentage, hourly)**
-     - Keep the current layout: Primary Goal Type selector + both Miles Goal and Revenue Goal inputs + Target Miles input (shown when Goal Type = Mileage, otherwise the Revenue Goal is the primary).
-     - To reduce clutter, only show the input that matches the selected goal type, plus the goal-type selector — i.e. Mileage → Target Miles; Financial → Weekly Revenue Goal. Drop the redundant "Weekly Miles Goal" field (its value is preserved in DB; UI keeps it equal to `targetMiles`).
+### Derived values
+- `milesThisWeek` = sum of `booked_miles` for week's delivered loads.
+- `targetMiles` = `driver_settings_safe.target_miles ?? 2500`.
+- `weekProgressPct` = `min(100, milesThisWeek / targetMiles * 100)`.
+- `monthMiles` = sum of `booked_miles` for current month's delivered loads.
+- `daysElapsedInMonth` = today's day-of-month.
+- `dailyVelocity` = `monthMiles / daysElapsedInMonth`.
+- `projectedMonthMiles` = `dailyVelocity * daysInCurrentMonth`.
+- `bonusPaceStatus`:
+  - `>= 10000` projected → "On Pace" (success token).
+  - `>= 9000` and `< 10000` → "Slightly Behind" (warning token).
+  - `< 9000` → "Off Pace" (destructive token).
+- `loadedMiles` = `milesThisWeek`.
+- `deadheadMiles` = sum of `deadhead_miles` for week (fallback 0).
+- `deadheadPct` = `loadedMiles + deadheadMiles > 0 ? deadheadMiles / (loadedMiles + deadheadMiles) * 100 : 0`.
 
-3. **Save** (`saveGoalsMutation`) — already wired to write `goal_type` and `target_miles`. Adjust `handleSaveGoals` so that:
-   - For flat drivers: force `goal_type = 'mileage'`, set `weekly_miles_goal = targetMiles`, and leave `weekly_revenue_goal` as the previously loaded value (or 0 if absent).
-   - For other drivers: send the user-selected `goalType` and current input values.
+### UI (Card + semantic design tokens only)
+```text
+┌─ Weekly Performance ───────────────────────────┐
+│  MILES DRIVEN THIS WEEK                        │
+│  2,143  ← large bold number                    │
+│  of 2,500 mile target                          │
+│  [============------]  86%                     │
+│                                                │
+│  Monthly Bonus Pacing       [On Pace] badge    │
+│  Projected: 10,420 / 10,000 safe miles         │
+│                                                │
+│  Deadhead Percentage         8.4%              │
+│  120 empty / 1,423 loaded miles                │
+└────────────────────────────────────────────────┘
+```
+- Use `Card`, `CardHeader`, `CardTitle`, `CardContent`, `Progress`, `Badge`, lucide icons (`Gauge`, `Target`, `TrendingUp`).
+- All colors via Tailwind semantic tokens (`text-foreground`, `text-muted-foreground`, `bg-primary`, `bg-success`, `bg-warning`, `bg-destructive` etc.).
 
-4. Update the on-load `useEffect` so flat drivers default `goalType` to `'mileage'` and `targetMiles` to `settings.target_miles ?? settings.weekly_miles_goal ?? 2500` regardless of stored goal type.
+### Verification step during build
+Before final code, confirm whether `fleet_loads.deadhead_miles` exists; if not, render the deadhead row with a graceful "—" placeholder and a tooltip "Deadhead tracking coming soon" rather than fabricating data.
 
-## Files touched
-
-- `src/pages/DriverSettings.tsx` — only file changed.
-
-## Verification
-
-- Driver with `pay_type = 'flat'`: Weekly Goals shows just the Mileage Target input + safety-bonus subtext; Save persists `goal_type='mileage'` and `target_miles`.
-- Driver with `pay_type = 'percentage'` or `'cpm'`: sees goal-type selector and the matching single input; Save persists chosen `goal_type` plus the corresponding numeric target.
-- Existing data on the dashboard pay widget continues to render correctly (it already reads `goal_type` / `target_miles`).
+## Out of scope
+- No changes to `WeeklyPayWidget`, settings page, or DB schema.
+- No new edge functions or migrations.

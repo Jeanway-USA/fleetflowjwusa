@@ -10,6 +10,7 @@ import { GeofenceArrivalDrawer } from '@/components/driver/GeofenceArrivalDrawer
 import { useGeofenceStatus } from '@/hooks/useGeofenceStatus';
 import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
 import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
+import { WeeklyPerformanceWidget } from '@/components/driver/WeeklyPerformanceWidget';
 import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
 import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
 import { LocationSharing } from '@/components/driver/LocationSharing';
@@ -210,11 +211,15 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
           </ErrorBoundary>
           <div id="tour-pay-widget">
             <ErrorBoundary compact>
-              <DriverPayWidget 
-                driverId={driver.id} 
-                payRate={driver.pay_rate} 
-                payType={driver.pay_type} 
-              />
+              {driver.pay_type === 'flat' ? (
+                <WeeklyPerformanceWidget driverId={driver.id} />
+              ) : (
+                <DriverPayWidget
+                  driverId={driver.id}
+                  payRate={driver.pay_rate}
+                  payType={driver.pay_type}
+                />
+              )}
             </ErrorBoundary>
           </div>
         </div>
