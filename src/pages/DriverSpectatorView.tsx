@@ -297,7 +297,7 @@ export default function DriverSpectatorView() {
       {/* Maintenance Requests (read-only via overlay) */}
       <ErrorBoundary compact>
         <ReadOnly>
-          <MaintenanceRequestCard driverId={driver.id} truckId={assignedTruck?.id ?? null} />
+          <MaintenanceRequestCard driverId={driver.id} truckId={assignedTruck?.id ?? undefined} />
         </ReadOnly>
       </ErrorBoundary>
     </div>
