@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export type OfflineActionType = 'load_status_update' | 'fuel_receipt' | 'dvir_inspection';
+export type OfflineActionType = 'load_status_update' | 'fuel_receipt';
 
 export interface OfflineAction {
   id: string;
@@ -97,33 +97,6 @@ async function processAction(action: OfflineAction): Promise<void> {
       const { error } = await supabase
         .from('expenses')
         .insert(p as any);
-      if (error) throw error;
-      break;
-    }
-    case 'dvir_inspection': {
-      if (!isPlainObject(action.payload)) throw new Error('Invalid payload');
-      const p = action.payload;
-      if (typeof p.driver_id !== 'string' || !UUID_RE.test(p.driver_id)) {
-        throw new Error('Invalid driver_id');
-      }
-      if (p.truck_id !== undefined && p.truck_id !== null && (typeof p.truck_id !== 'string' || !UUID_RE.test(p.truck_id))) {
-        throw new Error('Invalid truck_id');
-      }
-      if (p.inspection_type !== undefined && typeof p.inspection_type !== 'string') {
-        throw new Error('Invalid inspection_type');
-      }
-      if (p.odometer_reading !== undefined && p.odometer_reading !== null) {
-        if (typeof p.odometer_reading !== 'number' || !isFinite(p.odometer_reading) || p.odometer_reading < 0) {
-          throw new Error('Invalid odometer_reading');
-        }
-      }
-      if (p.defect_notes !== undefined && p.defect_notes !== null) {
-        if (typeof p.defect_notes !== 'string' || p.defect_notes.length > 5000) {
-          throw new Error('Invalid defect_notes');
-        }
-      }
-      const { error } = await (supabase.from('driver_inspections' as any) as any)
-        .insert(p);
       if (error) throw error;
       break;
     }
