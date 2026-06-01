@@ -646,9 +646,8 @@ export default function Finance() {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="overview">Overview & P&L</TabsTrigger>
-          <TabsTrigger value="settlements">Settlements</TabsTrigger>
+          <TabsTrigger value="driver-settlements">Driver Settlements</TabsTrigger>
           <TabsTrigger value="invoicing">Invoicing & Factoring</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll & Commissions</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="profitability">Profitability</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
