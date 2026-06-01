@@ -242,9 +242,11 @@ export function TeamManagementTab() {
     if (!userToDelete) return;
     setIsDeleting(true);
     try {
-      const response = await supabase.functions.invoke('delete-user', { body: { userId: userToDelete.user_id } });
+      const response = await invokeWithAuth<{ error?: string }>('delete-user', { body: { userId: userToDelete.user_id } });
+      if (response.sessionExpired) return;
       if (response.error) throw new Error(response.error.message || 'Failed to delete user');
       if (response.data?.error) throw new Error(response.data.error);
+
       toast.success('User deleted successfully');
       setDeleteDialogOpen(false);
       setUserToDelete(null);
