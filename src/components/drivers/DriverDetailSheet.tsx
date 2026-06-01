@@ -80,9 +80,47 @@ export function DriverDetailSheet({
 }: DriverDetailSheetProps) {
   const { isOwner, hasRole } = useAuth();
   const canViewSignedDocs = isOwner || hasRole('safety') || hasRole('payroll_admin');
+  const canForceReonboard = isOwner || hasRole('payroll_admin');
   const [chatOpen, setChatOpen] = useState(false);
+  const [confirmReonboardOpen, setConfirmReonboardOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const reonboardMutation = useMutation({
+    mutationFn: async () => {
+      if (!driver?.user_id) throw new Error('Driver has no linked account yet');
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ onboarding_completed: false })
+        .eq('user_id', driver.user_id);
+      if (profileError) throw new Error(`Profile reset failed: ${profileError.message}`);
+
+      const { error: docsError } = await supabase
+        .from('driver_signed_documents')
+        .delete()
+        .eq('driver_id', driver.id)
+        .eq('org_id', driver.org_id);
+      if (docsError) throw new Error(`Clearing signed documents failed: ${docsError.message}`);
+
+      const { error: driverError } = await supabase
+        .from('drivers')
+        .update({ direct_deposit_attachment_url: null })
+        .eq('id', driver.id);
+      if (driverError) throw new Error(`Driver record reset failed: ${driverError.message}`);
+    },
+    onSuccess: () => {
+      toast.success('Driver onboarding has been reset.');
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['signed-documents', driver.id] });
+      setConfirmReonboardOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || 'Failed to reset onboarding');
+    },
+  });
 
   if (!driver) return null;
+
 
   const initials = `${(driver.first_name?.[0] ?? '').toUpperCase()}${(driver.last_name?.[0] ?? '').toUpperCase()}` || 'D';
   const hireDate = parseDateSafe(driver.hire_date);
