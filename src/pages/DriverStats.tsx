@@ -489,7 +489,7 @@ export default function DriverStats() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  MPG is calculated from loaded miles ÷ gallons purchased. Target: 6.5+ MPG for semi-trucks.
+                  MPG is calculated from total miles (loaded + empty) ÷ gallons purchased. Target: 6.5+ MPG for semi-trucks.
                 </p>
               </>
             )}
