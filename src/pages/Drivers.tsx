@@ -294,8 +294,8 @@ export default function Drivers() {
       ? current.filter((e: string) => e !== endorsement)
       : [...current, endorsement];
     
-    // Clear hazmat_expiry if removing HAZMAT endorsement
-    if (isRemoving && endorsement.includes('Hazmat')) {
+    // Clear hazmat_expiry if removing HAZMAT endorsement (H or X)
+    if (isRemoving && (endorsement === 'H' || endorsement === 'X')) {
       setFormData({ ...formData, endorsements: updated, hazmat_expiry: null });
     } else {
       setFormData({ ...formData, endorsements: updated });
