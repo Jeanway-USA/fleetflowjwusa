@@ -227,6 +227,49 @@ export default function DriverSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Goal Type */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Flag className="h-4 w-4" />
+                Primary Goal Type
+              </Label>
+              <Select value={goalType} onValueChange={(val) => setGoalType(val as 'financial' | 'mileage')}>
+                <SelectTrigger className="w-full sm:w-64">
+                  <SelectValue placeholder="Select goal type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="financial">Financial (Revenue)</SelectItem>
+                  <SelectItem value="mileage">Mileage</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Choose which goal drives the progress bar on your dashboard.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="targetMiles" className="flex items-center gap-2">
+                <Route className="h-4 w-4" />
+                Target Miles (Mileage Goal)
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="targetMiles"
+                  type="number"
+                  value={targetMiles}
+                  onChange={(e) => setTargetMiles(parseInt(e.target.value) || 0)}
+                  min={0}
+                  step={100}
+                  className="w-full sm:w-64"
+                />
+                <span className="text-sm text-muted-foreground whitespace-nowrap">miles</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Used when your primary goal is set to Mileage.
+              </p>
+            </div>
+
+            <Separator />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="milesGoal" className="flex items-center gap-2">
