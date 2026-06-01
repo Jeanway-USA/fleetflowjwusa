@@ -544,8 +544,6 @@ export default function Drivers() {
               <div className="space-y-2">
                 <Label htmlFor="user_id">User Account</Label>
                 <Select 
-{/* ...keep-existing-select... */}
-PLACEHOLDER_DO_NOT_USE
                   value={formData.user_id || 'none'} 
                   onValueChange={(v) => setFormData({ ...formData, user_id: v === 'none' ? null : v })}
                 >
