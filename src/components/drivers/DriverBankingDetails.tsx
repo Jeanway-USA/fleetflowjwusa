@@ -1,12 +1,21 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Banknote, Eye, EyeOff, ShieldCheck, FileText, ExternalLink, Paperclip } from 'lucide-react';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { Banknote, Eye, EyeOff, ShieldCheck, FileText, ExternalLink, Paperclip, Pencil, X, Save } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Props {
   driverId: string;
@@ -20,7 +29,16 @@ function getExt(path: string): string {
 export function DriverBankingDetails({ driverId }: Props) {
   const { isOwner, hasRole } = useAuth();
   const canView = isOwner || hasRole('payroll_admin');
+  const canEdit = canView;
   const [revealed, setRevealed] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    bank_name: '',
+    account_type: '' as '' | 'checking' | 'savings',
+    routing_number: '',
+    account_number: '',
+  });
+  const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['driver_banking', driverId, revealed],
@@ -37,7 +55,6 @@ export function DriverBankingDetails({ driverId }: Props) {
     },
   });
 
-  // Lightweight metadata read (last 4 only) — uses table RLS, no decrypt
   const { data: meta } = useQuery({
     queryKey: ['driver_banking_meta', driverId],
     enabled: canView && !!driverId,
@@ -52,7 +69,6 @@ export function DriverBankingDetails({ driverId }: Props) {
     },
   });
 
-  // Driver-provided attachment (voided check / DD form)
   const { data: attachment } = useQuery({
     queryKey: ['driver_dd_attachment', driverId],
     enabled: canView && !!driverId,
@@ -72,13 +88,133 @@ export function DriverBankingDetails({ driverId }: Props) {
     },
   });
 
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const routing = form.routing_number.replace(/\D/g, '');
+      const account = form.account_number.replace(/\D/g, '');
+      if (!form.bank_name.trim()) throw new Error('Bank name is required');
+      if (!form.account_type) throw new Error('Account type is required');
+      if (routing.length !== 9) throw new Error('Routing number must be 9 digits');
+      if (account.length < 4) throw new Error('Account number must be at least 4 digits');
+      const { error } = await supabase.rpc('upsert_driver_banking', {
+        _driver_id: driverId,
+        _bank_name: form.bank_name.trim(),
+        _account_type: form.account_type,
+        _routing_number: routing,
+        _account_number: account,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Banking info saved');
+      setEditing(false);
+      setForm({ bank_name: '', account_type: '', routing_number: '', account_number: '' });
+      qc.invalidateQueries({ queryKey: ['driver_banking_meta', driverId] });
+      qc.invalidateQueries({ queryKey: ['driver_banking', driverId] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'Failed to save banking info'),
+  });
+
   if (!canView) return null;
+
+  const startEdit = () => {
+    setForm({
+      bank_name: meta?.bank_name || '',
+      account_type: (meta?.account_type as 'checking' | 'savings') || '',
+      routing_number: '',
+      account_number: '',
+    });
+    setEditing(true);
+  };
+
+  if (editing) {
+    return (
+      <div className="space-y-3 rounded-md border p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+            Edit banking (encrypted on save)
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={saveMutation.isPending}>
+            <X className="mr-1.5 h-4 w-4" />
+            Cancel
+          </Button>
+        </div>
+
+        <div className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="dd-bank-name">Bank name</Label>
+            <Input
+              id="dd-bank-name"
+              value={form.bank_name}
+              onChange={(e) => setForm((f) => ({ ...f, bank_name: e.target.value }))}
+              placeholder="e.g. Chase"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Account type</Label>
+            <Select
+              value={form.account_type}
+              onValueChange={(v) => setForm((f) => ({ ...f, account_type: v as 'checking' | 'savings' }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="checking">Checking</SelectItem>
+                <SelectItem value="savings">Savings</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="dd-routing">Routing number</Label>
+            <Input
+              id="dd-routing"
+              inputMode="numeric"
+              maxLength={9}
+              value={form.routing_number}
+              onChange={(e) => setForm((f) => ({ ...f, routing_number: e.target.value.replace(/\D/g, '') }))}
+              placeholder="9 digits"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="dd-account">Account number</Label>
+            <Input
+              id="dd-account"
+              inputMode="numeric"
+              maxLength={20}
+              value={form.account_number}
+              onChange={(e) => setForm((f) => ({ ...f, account_number: e.target.value.replace(/\D/g, '') }))}
+              placeholder="Account number"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+            <Save className="mr-1.5 h-4 w-4" />
+            {saveMutation.isPending ? 'Saving…' : 'Save banking'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!meta && !attachment) {
     return (
-      <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-        <Banknote className="mx-auto mb-2 h-5 w-5 opacity-60" />
-        No banking info on file yet.
+      <div className="space-y-2">
+        <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+          <Banknote className="mx-auto mb-2 h-5 w-5 opacity-60" />
+          No banking info on file yet.
+        </div>
+        {canEdit && (
+          <div className="flex justify-end">
+            <Button size="sm" variant="outline" onClick={startEdit}>
+              <Pencil className="mr-1.5 h-4 w-4" />
+              Enter banking
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -94,14 +230,22 @@ export function DriverBankingDetails({ driverId }: Props) {
           <ShieldCheck className="h-3.5 w-3.5 text-primary" />
           Banking · owner/payroll only
         </div>
-        <Button
-          size="sm"
-          variant={revealed ? 'secondary' : 'outline'}
-          onClick={() => setRevealed((v) => !v)}
-        >
-          {revealed ? <EyeOff className="mr-1.5 h-4 w-4" /> : <Eye className="mr-1.5 h-4 w-4" />}
-          {revealed ? 'Hide' : 'Reveal'}
-        </Button>
+        <div className="flex items-center gap-2">
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={startEdit}>
+              <Pencil className="mr-1.5 h-4 w-4" />
+              {meta ? 'Edit' : 'Enter'}
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant={revealed ? 'secondary' : 'outline'}
+            onClick={() => setRevealed((v) => !v)}
+          >
+            {revealed ? <EyeOff className="mr-1.5 h-4 w-4" /> : <Eye className="mr-1.5 h-4 w-4" />}
+            {revealed ? 'Hide' : 'Reveal'}
+          </Button>
+        </div>
       </div>
 
       <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
