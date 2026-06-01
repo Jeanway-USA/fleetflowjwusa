@@ -26,6 +26,7 @@ import { SignedOnboardingDocuments } from '@/components/drivers/SignedOnboarding
 import { CredentialsCompliance } from '@/components/drivers/CredentialsCompliance';
 import { DriverDetailSheet } from '@/components/drivers/DriverDetailSheet';
 import { formatPayRate } from '@/lib/pay-format';
+import { US_STATES } from '@/lib/us-states';
 
 
 import {
