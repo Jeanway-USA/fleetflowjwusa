@@ -28,14 +28,30 @@ export default function DriverStats() {
   const { user } = useAuth();
   const [period, setPeriod] = useState<PeriodType>('weekly');
 
+  // Fetch driver settings for custom pay-week start day
+  const { data: driverSettings } = useQuery({
+    queryKey: ['driver-stats-settings', user?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from('driver_settings_safe' as any) as any)
+        .select('pay_week_start_day')
+        .eq('user_id', user?.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  const weekStartsOn = (driverSettings?.pay_week_start_day ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
   // Get date range based on period
   const getDateRange = (periodType: PeriodType) => {
     const now = new Date();
     switch (periodType) {
       case 'weekly':
         return {
-          start: format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
-          end: format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd'),
+          start: format(startOfWeek(now, { weekStartsOn }), 'yyyy-MM-dd'),
+          end: format(endOfWeek(now, { weekStartsOn }), 'yyyy-MM-dd'),
         };
       case 'monthly':
         return {
