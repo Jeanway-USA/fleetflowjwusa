@@ -1336,11 +1336,13 @@ export type Database = {
         Row: {
           created_at: string
           driver_id: string
+          goal_type: string
           id: string
           landstar_password: string | null
           landstar_username: string | null
           org_id: string | null
           pay_week_start_day: number
+          target_miles: number | null
           theme_preference: string | null
           updated_at: string
           weekly_miles_goal: number | null
@@ -1349,11 +1351,13 @@ export type Database = {
         Insert: {
           created_at?: string
           driver_id: string
+          goal_type?: string
           id?: string
           landstar_password?: string | null
           landstar_username?: string | null
           org_id?: string | null
           pay_week_start_day?: number
+          target_miles?: number | null
           theme_preference?: string | null
           updated_at?: string
           weekly_miles_goal?: number | null
@@ -1362,11 +1366,13 @@ export type Database = {
         Update: {
           created_at?: string
           driver_id?: string
+          goal_type?: string
           id?: string
           landstar_password?: string | null
           landstar_username?: string | null
           org_id?: string | null
           pay_week_start_day?: number
+          target_miles?: number | null
           theme_preference?: string | null
           updated_at?: string
           weekly_miles_goal?: number | null
@@ -4522,10 +4528,12 @@ export type Database = {
         Row: {
           created_at: string | null
           driver_id: string | null
+          goal_type: string | null
           id: string | null
           landstar_username: string | null
           org_id: string | null
           pay_week_start_day: number | null
+          target_miles: number | null
           theme_preference: string | null
           updated_at: string | null
           weekly_miles_goal: number | null
@@ -4534,10 +4542,12 @@ export type Database = {
         Insert: {
           created_at?: string | null
           driver_id?: string | null
+          goal_type?: string | null
           id?: string | null
           landstar_username?: string | null
           org_id?: string | null
           pay_week_start_day?: number | null
+          target_miles?: number | null
           theme_preference?: string | null
           updated_at?: string | null
           weekly_miles_goal?: number | null
@@ -4546,10 +4556,12 @@ export type Database = {
         Update: {
           created_at?: string | null
           driver_id?: string | null
+          goal_type?: string | null
           id?: string | null
           landstar_username?: string | null
           org_id?: string | null
           pay_week_start_day?: number | null
+          target_miles?: number | null
           theme_preference?: string | null
           updated_at?: string | null
           weekly_miles_goal?: number | null
