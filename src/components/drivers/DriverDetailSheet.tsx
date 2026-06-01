@@ -215,8 +215,74 @@ export function DriverDetailSheet({
                 <DriverBankingDetails driverId={driver.id} />
               )}
             </div>
+
+            {canForceReonboard && !readOnly && (
+              <>
+                <Separator />
+                <div className="pt-4 pb-2 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-destructive" />
+                    <h4 className="font-medium text-sm text-destructive">Danger Zone</h4>
+                  </div>
+                  {driver.user_id ? (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Reset this driver's onboarding. They will be locked out of their dashboard
+                        until they re-sign all required documents.
+                      </p>
+                      <AlertDialog open={confirmReonboardOpen} onOpenChange={setConfirmReonboardOpen}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={reonboardMutation.isPending}
+                            className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground gap-1.5"
+                          >
+                            {reonboardMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-4 w-4" />
+                            )}
+                            Force Re-Onboarding
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Force re-onboarding?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure? This will lock the driver out of their dashboard until
+                              they re-sign all documents for this organization.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel disabled={reonboardMutation.isPending}>
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={(e) => {
+                                e.preventDefault();
+                                reonboardMutation.mutate();
+                              }}
+                              disabled={reonboardMutation.isPending}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              {reonboardMutation.isPending ? 'Resetting…' : 'Continue'}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      This driver has no linked account yet — nothing to reset.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
+
         </SheetContent>
       </Sheet>
       <DriverChatSheet driver={driver} open={chatOpen} onOpenChange={setChatOpen} />
