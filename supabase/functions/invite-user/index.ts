@@ -120,6 +120,18 @@ Deno.serve(async (req) => {
       .single();
 
     const orgId = reqProfile?.org_id;
+
+    // Resolve the organization's display name for use in email content.
+    let orgName = 'your organization';
+    if (orgId) {
+      const { data: orgRow } = await supabaseAdmin
+        .from('organizations')
+        .select('name')
+        .eq('id', orgId)
+        .maybeSingle();
+      if (orgRow?.name) orgName = orgRow.name;
+    }
+
     // Invite links must ALWAYS point to the production custom domain,
     // regardless of where the owner sent the invite from (preview, editor,
     // localhost). Recipients should never land on a preview URL.
