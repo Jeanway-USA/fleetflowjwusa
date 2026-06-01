@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@4.0.0';
+import { buildFleetFlowEmail } from '../_shared/email-template.ts';
 
 // Allowed origins for CORS - restrict to known domains
 const ALLOWED_ORIGINS = [
@@ -24,7 +25,6 @@ function getCorsHeaders(request: Request): Record<string, string> {
   };
 }
 
-
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 }
@@ -39,16 +39,7 @@ function escapeHtml(s: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
-function safeUrl(u: string | null | undefined): string {
-  if (!u) return '';
-  const trimmed = String(u).trim();
-  if (/^https?:\/\//i.test(trimmed)) return escapeHtml(trimmed);
-  return '';
-}
-
-function buildInvoiceEmailHtml(params: {
-  orgName: string;
-  logoUrl: string | null;
+function buildInvoiceBodyHtml(params: {
   invoiceNumber: string;
   invoiceDate: string;
   loadDisplayId: string;
@@ -58,134 +49,79 @@ function buildInvoiceEmailHtml(params: {
   brokerName: string | null;
   lineItems: { label: string; amount: number }[];
   total: number;
+  orgName: string;
 }): string {
-  const { orgName, logoUrl, invoiceNumber, invoiceDate, loadDisplayId, origin, destination, deliveryDate, brokerName, lineItems, total } = params;
-
-  const safeOrgName = escapeHtml(orgName);
-  const safeLogoUrl = safeUrl(logoUrl);
-  const logoSection = safeLogoUrl
-    ? `<img src="${safeLogoUrl}" alt="${safeOrgName}" style="max-height: 48px; max-width: 160px; margin-bottom: 8px;" />`
-    : '';
+  const { invoiceNumber, invoiceDate, loadDisplayId, origin, destination, deliveryDate, brokerName, lineItems, total, orgName } = params;
 
   const lineItemRows = lineItems
     .filter(item => item.amount > 0)
     .map(item => `
       <tr>
-        <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; color: #333; font-size: 14px;">${escapeHtml(item.label)}</td>
-        <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; color: #333; font-size: 14px; text-align: right; font-weight: 500;">${formatCurrency(item.amount)}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e4e4e7; color: #3f3f46; font-size: 14px;">${escapeHtml(item.label)}</td>
+        <td style="padding: 10px 12px; border-bottom: 1px solid #e4e4e7; color: #18181b; font-size: 14px; text-align: right; font-weight: 500;">${formatCurrency(item.amount)}</td>
       </tr>
     `).join('');
 
-  const billToSection = brokerName
-    ? `<p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Bill To</p>
-       <p style="margin: 0; color: #1a1a1a; font-size: 15px; font-weight: 600;">${escapeHtml(brokerName)}</p>`
+  const billTo = brokerName
+    ? `<p style="margin: 0 0 4px; color: #71717a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Bill To</p>
+       <p style="margin: 0; color: #18181b; font-size: 15px; font-weight: 600;">${escapeHtml(brokerName)}</p>`
     : '';
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" style="width: 640px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);">
+  return `
+    <p style="margin: 0 0 20px; color: #3f3f46; font-size: 16px; line-height: 1.6;">
+      A new invoice has been issued by <strong>${escapeHtml(orgName)}</strong>. The full breakdown is below.
+    </p>
 
-          <!-- Header -->
-          <tr>
-            <td style="padding: 32px 40px 24px;">
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="vertical-align: top;">
-                    ${logoSection}
-                    <h2 style="margin: 0; color: #1a1a1a; font-size: 20px; font-weight: 700;">${safeOrgName}</h2>
-                  </td>
-                  <td style="text-align: right; vertical-align: top;">
-                    <p style="margin: 0; color: #1a1a1a; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">INVOICE</p>
-                    <p style="margin: 4px 0 0; color: #6B7280; font-size: 13px; font-family: monospace;">${escapeHtml(invoiceNumber)}</p>
-                    <p style="margin: 2px 0 0; color: #6B7280; font-size: 13px;">${escapeHtml(invoiceDate)}</p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; margin: 0 0 20px;">
+      <tr>
+        <td style="vertical-align: top; width: 50%;">
+          ${billTo}
+        </td>
+        <td style="vertical-align: top; width: 50%; text-align: right;">
+          <p style="margin: 0 0 4px; color: #71717a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Invoice</p>
+          <p style="margin: 0 0 8px; color: #18181b; font-size: 14px; font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;">${escapeHtml(invoiceNumber)}</p>
+          <p style="margin: 0; color: #71717a; font-size: 13px;">${escapeHtml(invoiceDate)}</p>
+        </td>
+      </tr>
+    </table>
 
-          <!-- Divider -->
-          <tr><td style="padding: 0 40px;"><hr style="border: none; border-top: 2px solid #F59E0B; margin: 0;" /></td></tr>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; margin: 0 0 20px; background: #fafafa; border: 1px solid #e4e4e7; border-radius: 8px;">
+      <tr>
+        <td style="padding: 14px 16px; border-bottom: 1px solid #e4e4e7;">
+          <div style="color: #71717a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Load Reference</div>
+          <div style="color: #18181b; font-size: 14px; font-weight: 600; margin-top: 2px;">${escapeHtml(loadDisplayId)}</div>
+        </td>
+        <td style="padding: 14px 16px; border-bottom: 1px solid #e4e4e7; text-align: right;">
+          <div style="color: #71717a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Delivery Date</div>
+          <div style="color: #18181b; font-size: 14px; margin-top: 2px;">${escapeHtml(deliveryDate)}</div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="padding: 14px 16px; border-bottom: 1px solid #e4e4e7;">
+          <div style="color: #71717a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Origin</div>
+          <div style="color: #18181b; font-size: 14px; margin-top: 2px;">${escapeHtml(origin)}</div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="padding: 14px 16px;">
+          <div style="color: #71717a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Destination</div>
+          <div style="color: #18181b; font-size: 14px; margin-top: 2px;">${escapeHtml(destination)}</div>
+        </td>
+      </tr>
+    </table>
 
-          <!-- Bill To + Load Details -->
-          <tr>
-            <td style="padding: 24px 40px;">
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="vertical-align: top; width: 50%;">
-                    ${billToSection}
-                  </td>
-                  <td style="vertical-align: top; width: 50%; text-align: right;">
-                    <p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Load Reference</p>
-                    <p style="margin: 0 0 12px; color: #1a1a1a; font-size: 15px; font-weight: 600;">${escapeHtml(loadDisplayId)}</p>
-                    <p style="margin: 0 0 4px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Delivery Date</p>
-                    <p style="margin: 0; color: #1a1a1a; font-size: 14px;">${escapeHtml(deliveryDate)}</p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Route -->
-          <tr>
-            <td style="padding: 0 40px 24px;">
-              <table role="presentation" style="width: 100%; border-collapse: collapse; background: #fafafa; border-radius: 8px; border: 1px solid #e8e8e8;">
-                <tr>
-                  <td style="padding: 14px 16px; border-bottom: 1px solid #e8e8e8;">
-                    <span style="color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Origin</span><br/>
-                    <span style="color: #1a1a1a; font-size: 14px; font-weight: 500;">${escapeHtml(origin)}</span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding: 14px 16px;">
-                    <span style="color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Destination</span><br/>
-                    <span style="color: #1a1a1a; font-size: 14px; font-weight: 500;">${escapeHtml(destination)}</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Line Items -->
-          <tr>
-            <td style="padding: 0 40px 24px;">
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr style="background: #f9fafb;">
-                  <th style="padding: 12px 16px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #6B7280; font-weight: 600; border-bottom: 2px solid #e5e7eb;">Description</th>
-                  <th style="padding: 12px 16px; text-align: right; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #6B7280; font-weight: 600; border-bottom: 2px solid #e5e7eb;">Amount</th>
-                </tr>
-                ${lineItemRows}
-                <tr>
-                  <td style="padding: 16px; font-size: 16px; font-weight: 700; color: #1a1a1a; border-top: 2px solid #1a1a1a;">Total</td>
-                  <td style="padding: 16px; font-size: 16px; font-weight: 700; color: #1a1a1a; text-align: right; border-top: 2px solid #1a1a1a;">${formatCurrency(total)}</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 12px 12px; text-align: center;">
-              <p style="margin: 0; color: #9a9a9a; font-size: 12px;">
-                © ${new Date().getFullYear()} ${safeOrgName}. All rights reserved.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; margin: 0 0 8px;">
+      <tr style="background: #f4f4f5;">
+        <th style="padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #71717a; font-weight: 600; border-bottom: 1px solid #e4e4e7;">Description</th>
+        <th style="padding: 10px 12px; text-align: right; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #71717a; font-weight: 600; border-bottom: 1px solid #e4e4e7;">Amount</th>
+      </tr>
+      ${lineItemRows}
+      <tr>
+        <td style="padding: 14px 12px; font-size: 15px; font-weight: 700; color: #18181b; border-top: 2px solid #18181b;">Total</td>
+        <td style="padding: 14px 12px; font-size: 15px; font-weight: 700; color: #18181b; text-align: right; border-top: 2px solid #18181b;">${formatCurrency(total)}</td>
+      </tr>
+    </table>
+  `;
 }
 
 Deno.serve(async (req) => {
@@ -289,15 +225,12 @@ Deno.serve(async (req) => {
       .single();
 
     const orgName = org?.name || 'Company';
-    const logoUrl = org?.logo_url || null;
 
     // Find broker/agent email from CRM contacts
-    // Fallback chain: override_email → load.invoice_email → CRM lookup
     let recipientEmail: string | null = override_email || load.invoice_email || null;
     let brokerName: string | null = null;
 
     if (!recipientEmail && load.agency_code) {
-      // Try crm_contacts first
       const { data: contact } = await supabaseAdmin
         .from('crm_contacts')
         .select('email, company_name, contact_name')
@@ -309,7 +242,6 @@ Deno.serve(async (req) => {
         recipientEmail = contact.email;
         brokerName = contact.contact_name || contact.company_name;
       } else {
-        // Fallback to company_resources
         const { data: resource } = await supabaseAdmin
           .from('company_resources')
           .select('email, name')
@@ -334,7 +266,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build line items — fetch itemized accessorials
+    // Build line items
     const { data: loadAccessorials } = await supabaseAdmin
       .from('load_accessorials')
       .select('accessorial_type, amount, percentage')
@@ -346,7 +278,6 @@ Deno.serve(async (req) => {
     ];
 
     if (loadAccessorials && loadAccessorials.length > 0) {
-      // Use itemized accessorials
       for (const acc of loadAccessorials) {
         const net = (acc.amount || 0) * ((acc.percentage || 100) / 100);
         if (net > 0) {
@@ -354,7 +285,6 @@ Deno.serve(async (req) => {
         }
       }
     } else {
-      // Fallback to legacy flat fields
       if (load.accessorials) lineItems.push({ label: 'Accessorials', amount: load.accessorials });
       if (load.detention_pay) lineItems.push({ label: 'Detention', amount: load.detention_pay });
       if (load.lumper) lineItems.push({ label: 'Lumper', amount: load.lumper });
@@ -373,9 +303,7 @@ Deno.serve(async (req) => {
       deliveryDate = new Date(load.delivery_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
-    const emailHtml = buildInvoiceEmailHtml({
-      orgName,
-      logoUrl,
+    const bodyHtml = buildInvoiceBodyHtml({
       invoiceNumber,
       invoiceDate,
       loadDisplayId,
@@ -385,6 +313,20 @@ Deno.serve(async (req) => {
       brokerName,
       lineItems,
       total,
+      orgName,
+    });
+
+    const trackingUrl = load.tracking_id
+      ? `https://fleetflowjwusa.lovable.app/track?tracking_id=${load.tracking_id}`
+      : undefined;
+
+    const emailHtml = buildFleetFlowEmail({
+      previewText: `Invoice ${invoiceNumber} for load ${loadDisplayId}`,
+      headline: `New Invoice from ${orgName}`,
+      bodyText: bodyHtml,
+      buttonText: trackingUrl ? 'View Load Details' : undefined,
+      buttonUrl: trackingUrl,
+      footerContext: `You're receiving this invoice because your agency code is linked to this load in ${orgName}'s TMS.`,
     });
 
     // Send via Resend
@@ -398,7 +340,6 @@ Deno.serve(async (req) => {
 
     console.log('Invoice email sent:', JSON.stringify(emailResponse));
 
-    // Persist the recipient email used for this invoice
     await supabaseAdmin
       .from('fleet_loads')
       .update({ invoice_email: recipientEmail })

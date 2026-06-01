@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@4.0.0';
+import { buildFleetFlowEmail } from '../_shared/email-template.ts';
 
-// Allowed origins for CORS - restrict to known domains
 const ALLOWED_ORIGINS = [
   'https://tms.jeanwayusa.com',
   'https://fleetflowjwusa.lovable.app',
@@ -24,102 +24,48 @@ function getCorsHeaders(request: Request): Record<string, string> {
   };
 }
 
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-function buildCarrierPacketHtml(params: {
-  orgName: string;
-  message: string;
-  documents: { label: string; url: string }[];
-}): string {
-  const { orgName, message, documents } = params;
+function safeUrl(u: string): string {
+  try {
+    const parsed = new URL(u);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '#';
+    return escapeHtml(parsed.toString());
+  } catch {
+    return '#';
+  }
+}
 
-  const escapeHtml = (s: string) =>
-    String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-
-  const safeUrl = (u: string) => {
-    try {
-      const parsed = new URL(u);
-      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '#';
-      return escapeHtml(parsed.toString());
-    } catch {
-      return '#';
-    }
-  };
-
-  const safeOrgName = escapeHtml(orgName);
+function buildCarrierPacketBody(message: string, documents: { label: string; url: string }[]): string {
+  const escapedMessage = escapeHtml(message).replace(/\n/g, '<br/>');
 
   const docLinks = documents
     .map(
       (d) => `
-      <tr>
-        <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0;">
-          <a href="${safeUrl(d.url)}" style="color: #2563eb; text-decoration: none; font-size: 14px; font-weight: 500;">${escapeHtml(d.label)}</a>
-          <br/><span style="color: #6B7280; font-size: 12px;">Click to download</span>
-        </td>
-      </tr>`
+        <tr>
+          <td style="padding: 12px 14px; border-bottom: 1px solid #e4e4e7;">
+            <a href="${safeUrl(d.url)}" style="color: #2563eb; text-decoration: none; font-size: 14px; font-weight: 500;">${escapeHtml(d.label)}</a>
+            <div style="color: #71717a; font-size: 12px; margin-top: 2px;">Click to download</div>
+          </td>
+        </tr>`
     )
     .join('');
 
-  const escapedMessage = message
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\n/g, '<br/>');
+  return `
+    <p style="margin: 0 0 20px; color: #3f3f46; font-size: 16px; line-height: 1.6;">${escapedMessage}</p>
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" style="width: 640px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 32px 40px 24px;">
-              <h2 style="margin: 0; color: #1a1a1a; font-size: 20px; font-weight: 700;">Carrier Packet from ${safeOrgName}</h2>
-            </td>
-          </tr>
-          <tr><td style="padding: 0 40px;"><hr style="border: none; border-top: 2px solid #F59E0B; margin: 0;" /></td></tr>
-
-          <!-- Message -->
-          <tr>
-            <td style="padding: 24px 40px;">
-              <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.6;">${escapedMessage}</p>
-            </td>
-          </tr>
-
-          <!-- Document Links -->
-          <tr>
-            <td style="padding: 0 40px 24px;">
-              <p style="margin: 0 0 12px; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Attached Documents</p>
-              <table role="presentation" style="width: 100%; border-collapse: collapse; background: #fafafa; border-radius: 8px; border: 1px solid #e8e8e8;">
-                ${docLinks}
-              </table>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 12px 12px; text-align: center;">
-              <p style="margin: 0; color: #9a9a9a; font-size: 12px;">
-                © ${new Date().getFullYear()} ${safeOrgName}. All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+    <p style="margin: 0 0 10px; color: #71717a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">Attached Documents</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: collapse; background: #fafafa; border: 1px solid #e4e4e7; border-radius: 8px;">
+      ${docLinks}
+    </table>
+  `;
 }
 
 Deno.serve(async (req) => {
@@ -133,7 +79,6 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const resendApiKey = Deno.env.get('RESEND_API_KEY')!;
 
-    // Authenticate the caller
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -158,7 +103,6 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Parse request
     const { recipientEmail, message, documentIds } = await req.json();
 
     if (!recipientEmail || typeof recipientEmail !== 'string') {
@@ -182,7 +126,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get user's org
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('org_id')
@@ -196,7 +139,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Authorization: only owners or dispatchers may send carrier packets
     const { data: roleRow } = await supabaseAdmin
       .from('user_roles')
       .select('role')
@@ -226,7 +168,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Generate signed URLs for each document (1 hour expiry)
     const docLinks: { label: string; url: string }[] = [];
     for (const doc of documents) {
       const { data: signedData, error: signError } = await supabaseAdmin
@@ -252,7 +193,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get org name
     const { data: org } = await supabaseAdmin
       .from('organizations')
       .select('name')
@@ -261,9 +201,13 @@ Deno.serve(async (req) => {
 
     const orgName = org?.name || 'Carrier';
 
-    const emailHtml = buildCarrierPacketHtml({ orgName, message, documents: docLinks });
+    const emailHtml = buildFleetFlowEmail({
+      previewText: `Carrier packet from ${orgName}`,
+      headline: 'Carrier Onboarding Packet',
+      bodyText: buildCarrierPacketBody(message, docLinks),
+      footerContext: 'Download links expire in 1 hour for security.',
+    });
 
-    // Send via Resend
     const resend = new Resend(resendApiKey);
     const emailResponse = await resend.emails.send({
       from: `${orgName} <no-reply@jeanwayusa.com>`,
