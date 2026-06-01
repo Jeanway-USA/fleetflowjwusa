@@ -67,16 +67,19 @@ export default function DriverSettings() {
     enabled: !!driver?.id,
   });
 
+  const isFlatRate = driver?.pay_type === 'flat';
+
   // Update local state when settings load
   useEffect(() => {
     if (settings) {
       setWeeklyMilesGoal(settings.weekly_miles_goal || 2500);
       setWeeklyRevenueGoal(settings.weekly_revenue_goal || 2000);
       setPayWeekStartDay(settings.pay_week_start_day ?? 0);
-      setGoalType((settings.goal_type as 'financial' | 'mileage') || 'financial');
+      const loadedGoalType = (settings.goal_type as 'financial' | 'mileage') || 'financial';
+      setGoalType(isFlatRate ? 'mileage' : loadedGoalType);
       setTargetMiles(settings.target_miles ?? settings.weekly_miles_goal ?? 2500);
     }
-  }, [settings]);
+  }, [settings, isFlatRate]);
 
   // Save goals mutation (direct DB update - no sensitive data)
   const saveGoalsMutation = useMutation({
@@ -132,11 +135,12 @@ export default function DriverSettings() {
   });
 
   const handleSaveGoals = () => {
+    const effectiveGoalType: 'financial' | 'mileage' = isFlatRate ? 'mileage' : goalType;
     saveGoalsMutation.mutate({
-      weekly_miles_goal: weeklyMilesGoal,
+      weekly_miles_goal: isFlatRate ? targetMiles : weeklyMilesGoal,
       weekly_revenue_goal: weeklyRevenueGoal,
       pay_week_start_day: payWeekStartDay,
-      goal_type: goalType,
+      goal_type: effectiveGoalType,
       target_miles: targetMiles,
     });
   };
@@ -227,92 +231,98 @@ export default function DriverSettings() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Goal Type */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Flag className="h-4 w-4" />
-                Primary Goal Type
-              </Label>
-              <Select value={goalType} onValueChange={(val) => setGoalType(val as 'financial' | 'mileage')}>
-                <SelectTrigger className="w-full sm:w-64">
-                  <SelectValue placeholder="Select goal type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="financial">Financial (Revenue)</SelectItem>
-                  <SelectItem value="mileage">Mileage</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Choose which goal drives the progress bar on your dashboard.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="targetMiles" className="flex items-center gap-2">
-                <Route className="h-4 w-4" />
-                Target Miles (Mileage Goal)
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="targetMiles"
-                  type="number"
-                  value={targetMiles}
-                  onChange={(e) => setTargetMiles(parseInt(e.target.value) || 0)}
-                  min={0}
-                  step={100}
-                  className="w-full sm:w-64"
-                />
-                <span className="text-sm text-muted-foreground whitespace-nowrap">miles</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Used when your primary goal is set to Mileage.
-              </p>
-            </div>
-
-            <Separator />
-            <div className="grid gap-4 sm:grid-cols-2">
+            {isFlatRate ? (
               <div className="space-y-2">
-                <Label htmlFor="milesGoal" className="flex items-center gap-2">
+                <Label htmlFor="targetMiles" className="flex items-center gap-2">
                   <Route className="h-4 w-4" />
-                  Weekly Miles Goal
+                  Weekly Mileage Target
                 </Label>
                 <div className="flex items-center gap-2">
                   <Input
-                    id="milesGoal"
+                    id="targetMiles"
                     type="number"
-                    value={weeklyMilesGoal}
-                    onChange={(e) => setWeeklyMilesGoal(parseInt(e.target.value) || 0)}
+                    value={targetMiles}
+                    onChange={(e) => setTargetMiles(parseInt(e.target.value) || 0)}
                     min={0}
                     step={100}
+                    className="w-full sm:w-64"
                   />
                   <span className="text-sm text-muted-foreground whitespace-nowrap">miles</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Your target miles to drive each week
+                  Pace yourself to hit 2,500 safe miles per week to ensure you unlock your 10,000-mile monthly safety bonus.
                 </p>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="revenueGoal" className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Weekly Revenue Goal
-                </Label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">$</span>
-                  <Input
-                    id="revenueGoal"
-                    type="number"
-                    value={weeklyRevenueGoal}
-                    onChange={(e) => setWeeklyRevenueGoal(parseInt(e.target.value) || 0)}
-                    min={0}
-                    step={100}
-                  />
+            ) : (
+              <>
+                {/* Goal Type */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Flag className="h-4 w-4" />
+                    Primary Goal Type
+                  </Label>
+                  <Select value={goalType} onValueChange={(val) => setGoalType(val as 'financial' | 'mileage')}>
+                    <SelectTrigger className="w-full sm:w-64">
+                      <SelectValue placeholder="Select goal type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="financial">Financial (Revenue)</SelectItem>
+                      <SelectItem value="mileage">Mileage</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Choose which goal drives the progress bar on your dashboard.
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Your target earnings each week
-                </p>
-              </div>
-            </div>
+
+                {goalType === 'mileage' ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="targetMiles" className="flex items-center gap-2">
+                      <Route className="h-4 w-4" />
+                      Weekly Mileage Target
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="targetMiles"
+                        type="number"
+                        value={targetMiles}
+                        onChange={(e) => setTargetMiles(parseInt(e.target.value) || 0)}
+                        min={0}
+                        step={100}
+                        className="w-full sm:w-64"
+                      />
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">miles</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Your target miles to drive each week.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="revenueGoal" className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Weekly Revenue Goal
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">$</span>
+                      <Input
+                        id="revenueGoal"
+                        type="number"
+                        value={weeklyRevenueGoal}
+                        onChange={(e) => setWeeklyRevenueGoal(parseInt(e.target.value) || 0)}
+                        min={0}
+                        step={100}
+                        className="w-full sm:w-64"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Your target earnings each week.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
 
             {/* Pay Week Start Day */}
             <div className="space-y-2">
