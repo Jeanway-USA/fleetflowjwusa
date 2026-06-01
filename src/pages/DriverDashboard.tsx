@@ -15,6 +15,7 @@ import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
 import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
 import { LocationSharing } from '@/components/driver/LocationSharing';
 import { DriverNotifications } from '@/components/driver/DriverNotifications';
+import { DriverMessages } from '@/components/driver/DriverMessages';
 import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
 import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
