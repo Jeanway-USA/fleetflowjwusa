@@ -375,6 +375,46 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
               )}
             />
 
+            {showHazmatExpiry && (
+              <FormField
+                control={form.control}
+                name="hazmatExpiry"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>HAZMAT Certification Expiration Date *</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              'h-12 w-full justify-start pl-3 text-left font-normal sm:w-[280px]',
+                              !field.value && 'text-muted-foreground',
+                            )}
+                          >
+                            {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(d) => d < today()}
+                          initialFocus
+                          className={cn('p-3 pointer-events-auto')}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+
             <FormField
               control={form.control}
               name="hasTwic"
