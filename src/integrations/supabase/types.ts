@@ -1338,7 +1338,6 @@ export type Database = {
           driver_id: string
           goal_type: string
           id: string
-          landstar_password: string | null
           landstar_username: string | null
           org_id: string | null
           pay_week_start_day: number
@@ -1353,7 +1352,6 @@ export type Database = {
           driver_id: string
           goal_type?: string
           id?: string
-          landstar_password?: string | null
           landstar_username?: string | null
           org_id?: string | null
           pay_week_start_day?: number
@@ -1368,7 +1366,6 @@ export type Database = {
           driver_id?: string
           goal_type?: string
           id?: string
-          landstar_password?: string | null
           landstar_username?: string | null
           org_id?: string | null
           pay_week_start_day?: number
