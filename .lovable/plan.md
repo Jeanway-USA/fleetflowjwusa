@@ -1,52 +1,44 @@
-# Refine Generate Paystub Dialog
+# Driver-facing "My Paystubs"
 
-Update `src/components/finance/driver-settlements/DriverSettlementsTab.tsx` to make the existing `GeneratePaystubDialog` match the spec.
+Add a paystubs viewer for drivers, sourced from the new `driver_settlements` table (the unified Driver Settlements model from the previous turn — not the legacy `settlements` table).
 
-## Changes to `GeneratePaystubDialog`
+## New component
 
-1. **Base Pay calculation** (`estimatePay` helper):
-   - `pay_type === 'flat'` → return `pay_rate` exactly, ignore loads.
-   - `pay_type === 'percentage'` → `sum(load.gross_revenue ?? load.rate) * (pay_rate / 100)`.
-   - `pay_type === 'per_mile'` → `sum(load.actual_miles ?? load.booked_miles) * pay_rate`.
-   - Fallback (unknown type) → 25 % of summed gross. Same as today.
+`src/components/driver/MyPaystubsDialog.tsx`
 
-2. **Dialog body**:
-   - Show driver name, period, load count, and pay-type chip ("Flat Rate" / "Percentage @ 75%" / "Per Mile @ $0.65") at the top.
-   - **Base Pay** input — pre-filled from the rule above; editable. For flat rate, display a small note "Flat rate — loads ignored".
-   - **Bonus Pay** input — editable, defaults to `0`. Label hints "Safety Bonus, etc."
-   - **Notes** textarea — optional.
-   - Live **Net Pay** readout: `net = base + bonus`. Big primary-colored amount.
-   - Loads-included list stays (read-only) for percentage/per_mile; hidden for flat.
+- Default-exports a single dialog with two states: list view + detail view.
+- Props: `driverId: string`, `payType: string | null`, `payRate: number | null`, trigger via `open` / `onOpenChange` controlled from parent.
 
-3. **Remove**:
-   - Deductions input.
-   - Status dropdown.
-   - The deductions row in the net-pay readout.
+### List view
+- Query `driver_settlements` filtered by `driver_id = driverId` and `status in ('approved', 'paid')`. Excludes `draft`.
+- Sort by `period_end DESC`.
+- Each row: period range (`MMM d – MMM d, yyyy`), status badge (Approved / Paid), and net pay amount (right-aligned, primary color). Whole row clickable → opens detail.
+- Empty state: "No paystubs yet."
 
-4. **Math invariant**: `net_pay = base_pay + bonus_pay`. The DB column `deductions` is always written as `0` so the generated `net_pay = base + bonus - 0` stays consistent.
+### Detail view
+- Header: "Paystub" + period range, back button to return to list.
+- Card with positive-only earnings layout:
+  - **Base Pay** — labeled "Flat Rate Guarantee" when `payType === 'flat'`, otherwise "Load Earnings". Show amount.
+  - **Bonuses** — single line `Bonus Pay` (only render if `> 0`). Subtitle: "Safety / Performance".
+  - Divider.
+  - **Net Pay** — large primary amount.
+- No deductions row. No negative numbers anywhere. The `deductions` column from DB is intentionally ignored in the UI.
+- "Download PDF" button (top-right of detail card).
+  - Uses `jspdf` directly (no html2canvas) to render a clean, vector paystub: company-style header, driver name, period, line items, net pay total, generated-on timestamp.
+  - Filename: `paystub-{period_start}-to-{period_end}.pdf`.
 
-5. **Footer — two actions**:
-   - **Save as Draft** (outline) → insert with `status = 'draft'`, `approved_at = null`, `paid_at = null`.
-   - **Approve & Send to Driver** (primary gradient) → insert with `status = 'approved'`, `approved_at = now()`, `approved_by = auth.uid()`. (Email "send" is a placeholder; toast confirms "Paystub approved — driver notified" but no actual email yet — out of scope, noted in memory.)
-   - Cancel button on the left.
+### Data fetched once
+- Driver name + company name fetched alongside settlements (single query joining `drivers` for name; org/company name from `company_settings` via existing helper if cheap, otherwise just driver name + "Driver Paystub" title).
 
-6. **Insert payload**:
-   ```ts
-   {
-     org_id, driver_id, period_start, period_end,
-     base_pay, bonus_pay,
-     deductions: 0,
-     status,                          // 'draft' | 'approved'
-     notes: notes || null,
-     approved_at, approved_by,
-   }
-   ```
-   Then insert one `driver_settlement_items` row per included load (skipped for flat-rate since loads list is irrelevant).
+## Entry point
 
-7. **State reset bug fix**: the current `useMemo` for resetting form state on driver change is incorrect — switch to a proper `useEffect` keyed on `driver?.id` and `open`.
+`src/components/driver/DriverPayWidget.tsx`
+- Add a small ghost button in the card header: `<Receipt /> My Paystubs` that opens the dialog.
+- No other changes to the widget's existing weekly-pay calculation logic.
 
 ## Out of scope
-- Actual email delivery to the driver (placeholder toast).
-- Editing an existing paystub from the dialog.
-- Deductions UI (explicitly excluded per spec).
-- Mark Paid action (already handled by the row dropdown in Generated Paystubs).
+
+- Editing or contesting paystubs from the driver side.
+- Email delivery of the PDF.
+- Showing draft paystubs.
+- Touching `WeeklyPerformanceWidget.tsx` — the entry point lives in `DriverPayWidget` which is the actual pay-focused widget (no `WeeklyPayWidget.tsx` exists).
