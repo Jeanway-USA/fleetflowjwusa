@@ -44,7 +44,7 @@ export function BetaFeedbackWidget() {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
-  const { user, orgId } = useAuth();
+  const { user, orgId, orgName } = useAuth();
   const { pathname } = useLocation();
 
   const form = useForm<FeedbackForm>({
@@ -136,6 +136,7 @@ export function BetaFeedbackWidget() {
   };
 
   if (!user) return null;
+  if (orgName?.toLowerCase().includes('jeanway')) return null;
   if (pathname.startsWith('/driver/onboarding') || pathname === '/onboarding') return null;
 
   const includeScreenshot = form.watch('include_screenshot');
