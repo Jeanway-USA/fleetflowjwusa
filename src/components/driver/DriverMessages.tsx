@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { safeChannel } from '@/lib/safe-channel';
 
 interface Message {
   id: string;
@@ -180,9 +181,8 @@ export function DriverMessages() {
   // ---------- Realtime ----------
   useEffect(() => {
     if (!me) return;
-    const channel = supabase
-      .channel(`driver-msgs-${me}`)
-      .on(
+    return safeChannel(`driver-msgs-${me}`, (ch) =>
+      ch.on(
         'postgres_changes',
         {
           event: 'INSERT',
@@ -200,12 +200,8 @@ export function DriverMessages() {
             );
           }
         },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      ),
+    );
   }, [me, open, activeCounterpart, queryClient, unreadQueryKey, threadsKey, threadKey]);
 
   // ---------- Send ----------

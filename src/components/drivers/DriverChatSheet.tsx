@@ -11,6 +11,7 @@ import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { safeChannel } from '@/lib/safe-channel';
 
 interface DriverChatSheetProps {
   driver: any | null;
@@ -96,9 +97,8 @@ export function DriverChatSheet({ driver, open, onOpenChange }: DriverChatSheetP
   // Realtime subscription
   useEffect(() => {
     if (!open || !canChat) return;
-    const channel = supabase
-      .channel(`direct-msgs-${me}-${driverUserId}`)
-      .on(
+    return safeChannel(`direct-msgs-${me}-${driverUserId}`, (ch) =>
+      ch.on(
         'postgres_changes',
         {
           event: 'INSERT',
@@ -113,12 +113,8 @@ export function DriverChatSheet({ driver, open, onOpenChange }: DriverChatSheetP
             prev.some((x) => x.id === m.id) ? prev : [...prev, m],
           );
         },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      ),
+    );
   }, [open, canChat, me, driverUserId, queryClient, queryKey]);
 
   const sendMutation = useMutation({

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { safeChannel } from '@/lib/safe-channel';
 
 export type ThreadSenderRole =
   | 'driver'
@@ -43,9 +44,8 @@ export function useMaintenanceThread(requestId: string | null | undefined) {
 
   useEffect(() => {
     if (!requestId) return;
-    const channel = supabase
-      .channel(`mrm-${requestId}`)
-      .on(
+    return safeChannel(`mrm-${requestId}`, (ch) =>
+      ch.on(
         'postgres_changes',
         {
           event: 'INSERT',
@@ -56,11 +56,8 @@ export function useMaintenanceThread(requestId: string | null | undefined) {
         () => {
           qc.invalidateQueries({ queryKey: ['maintenance-thread', requestId] });
         }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      ),
+    );
   }, [requestId, qc]);
 
   return query;
