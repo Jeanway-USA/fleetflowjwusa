@@ -772,6 +772,45 @@ export type Database = {
           },
         ]
       }
+      driver_banking_info: {
+        Row: {
+          account_number_encrypted: string | null
+          account_number_last4: string | null
+          account_type: string | null
+          bank_name: string | null
+          created_at: string
+          driver_id: string
+          id: string
+          org_id: string
+          routing_number_encrypted: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_number_encrypted?: string | null
+          account_number_last4?: string | null
+          account_type?: string | null
+          bank_name?: string | null
+          created_at?: string
+          driver_id: string
+          id?: string
+          org_id: string
+          routing_number_encrypted?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_number_encrypted?: string | null
+          account_number_last4?: string | null
+          account_type?: string | null
+          bank_name?: string | null
+          created_at?: string
+          driver_id?: string
+          id?: string
+          org_id?: string
+          routing_number_encrypted?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       driver_inspections: {
         Row: {
           created_at: string
@@ -4852,6 +4891,17 @@ export type Database = {
             Args: { _name: string; _tier?: string; _tms_mode?: string }
             Returns: string
           }
+      get_driver_banking: {
+        Args: { _driver_id: string }
+        Returns: {
+          account_number: string
+          account_number_last4: string
+          account_type: string
+          bank_name: string
+          routing_number: string
+          updated_at: string
+        }[]
+      }
       get_driver_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       has_admin_access: { Args: { _user_id: string }; Returns: boolean }
@@ -4893,6 +4943,16 @@ export type Database = {
           target_org_id: string
         }
         Returns: undefined
+      }
+      upsert_driver_banking: {
+        Args: {
+          _account_number: string
+          _account_type: string
+          _bank_name: string
+          _driver_id: string
+          _routing_number: string
+        }
+        Returns: string
       }
     }
     Enums: {
