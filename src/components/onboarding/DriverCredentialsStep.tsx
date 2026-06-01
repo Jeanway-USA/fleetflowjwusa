@@ -185,6 +185,10 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
           license_expiry: format(v.licenseExpiry, 'yyyy-MM-dd'),
           medical_card_expiry: format(v.medicalCardExpiry, 'yyyy-MM-dd'),
           endorsements: v.endorsements,
+          hazmat_expiry:
+            (v.endorsements.includes('H') || v.endorsements.includes('X')) && v.hazmatExpiry
+              ? format(v.hazmatExpiry, 'yyyy-MM-dd')
+              : null,
           has_twic: v.hasTwic === 'yes',
           twic_expiry:
             v.hasTwic === 'yes' && v.twicExpiry ? format(v.twicExpiry, 'yyyy-MM-dd') : null,
