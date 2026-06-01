@@ -223,7 +223,11 @@ export function DriverBankingDetails({ driverId }: Props) {
           No banking info on file yet.
         </div>
         {canEdit && (
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCcw className={`mr-1.5 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             <Button size="sm" variant="outline" onClick={startEdit}>
               <Pencil className="mr-1.5 h-4 w-4" />
               Enter banking
