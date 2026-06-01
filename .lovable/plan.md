@@ -1,34 +1,54 @@
-# Fix: Banking info not syncing from onboarding to driver profile
+## Goals
 
-## Root cause
+1. Stop showing cryptic "non-2xx" errors when the user's auth session has been invalidated server-side. Detect the stale session, surface a clear message, and force a clean re-login.
+2. Document the preview vs custom-domain auth split so you stop chasing it as a bug.
+3. Leave actual auth/login code paths untouched — they are working correctly on the custom domain.
 
-Verified against the database: of all drivers, **zero** rows in `driver_banking_info` and **zero** drivers with `direct_deposit_attachment_url` set — even though several `direct_deposit` signed documents were uploaded successfully (with valid `attachment_file_path` values).
+## What's NOT in scope
 
-In `src/pages/DriverOnboarding.tsx` (lines 327–355), after a `direct_deposit` template is signed, the code does two things in order:
-
-1. `UPDATE drivers SET direct_deposit_attachment_url = ...` for the current driver
-2. `rpc('upsert_driver_banking', ...)` to encrypt + store the routing/account numbers
-
-Step 1 fails because of the existing trigger `prevent_driver_self_sensitive_update`, whose forbidden-column list includes `direct_deposit_attachment_url`. The driver is signing in as themselves during onboarding, so the trigger raises `42501` (`Drivers are not permitted to modify ... assignment fields`). The code then `throw`s that error, which short-circuits the function before step 2 — so banking info never reaches `driver_banking_info` and `DriverBankingDetails.tsx` correctly shows "No banking info on file yet."
-
-`direct_deposit_attachment_url` is data the driver themselves provides during onboarding (their own voided check / DD form), not a sensitive admin-managed field like `pay_rate` or `status`, so the trigger should not block it.
+- No change to login/signup forms, redirect URIs, OAuth config, or `supabase/client.ts`.
+- No fix for "preview login goes to org creation" — that is an environmental property of Lovable Cloud Dev (Production users do not exist in Dev). The only workaround is to test logged-in flows on `tms.jeanwayusa.com`.
+- No retroactive fix for invites/deletions that already failed; those just need to be retried after re-login.
 
 ## Changes
 
-### 1. Database migration — relax the self-update trigger
+### 1. `src/contexts/AuthContext.tsx` — validate the cached session on boot
 
-Recreate `public.prevent_driver_self_sensitive_update` with `direct_deposit_attachment_url` removed from the forbidden-column comparison. All other forbidden fields (`pay_rate`, `pay_type`, `status`, `hire_date`, `user_id`, `org_id`, `first_name`, `last_name`, `avatar_url`) stay blocked. No schema change, no data backfill.
+After `supabase.auth.getSession()` returns a session, call `supabase.auth.getUser()` once to confirm the session is still valid on the server. If it returns `AuthSessionMissingError` / `session_not_found` / 403, call `supabase.auth.signOut()`, clear local state, and let the existing `RoleBasedRedirect` send the user to `/auth`. Do this in the initial `getSession().then(...)` block only — not on every `onAuthStateChange` (would break tab focus, see Core memory rule).
 
-### 2. `src/pages/DriverOnboarding.tsx` — make banking save resilient
+### 2. `src/components/shared/ProtectedRoute.tsx` — guard against zombie sessions mid-app
 
-In `finalizeSubmission`, inside the `if (tmpl.document_type === 'direct_deposit')` block:
+Add a lightweight `useEffect` that listens for `supabase.auth.onAuthStateChange` events `SIGNED_OUT` and `USER_DELETED` and, on those, redirects to `/auth` with a toast: "Your session expired — please sign in again." No change to the existing render logic.
 
-- Wrap the `drivers` update so a failure surfaces via `toast.error(...)` and `console.error(...)` but does **not** `throw`, so the subsequent `upsert_driver_banking` RPC still runs (defense in depth — if any other RLS/trigger ever rejects the column, we still capture the encrypted banking data).
-- Leave the banking RPC error handling as-is (already toasts + logs without throwing).
+### 3. `src/components/settings/TeamManagementTab.tsx` (and any other place that calls `supabase.functions.invoke('invite-user', ...)`) — friendly 401 handling
 
-No UI changes to `DriverBankingDetails.tsx` are required; once the data lands in `driver_banking_info` and `drivers.direct_deposit_attachment_url`, that component already renders bank name, account type, masked last 4, the Reveal button (decrypted via `get_driver_banking`), and the signed attachment preview.
+When the invoke returns `error` and the response status is 401 (or message contains `Invalid token` / `Unauthorized`), call `await supabase.auth.signOut()` + `toast.error('Your session expired. Please sign in again to continue.')` + `navigate('/auth')`. Keep the existing generic error toast for any other failure.
 
-## Out of scope
+I'll grep for `functions.invoke(` to apply the same handler in the small set of components that call protected functions (invite-user, delete-user, accept-invitation, create-checkout-session, create-portal-session). One shared helper in `src/lib/invoke-with-auth.ts` will wrap `supabase.functions.invoke` so the 401-recovery logic lives in one place.
 
-- No retro backfill of past onboardings (the encrypted account/routing numbers were never persisted and cannot be reconstructed). Affected drivers will need to re-enter their banking details, or an admin can fill them in via the existing edit flow.
-- No changes to the encryption or `get_driver_banking` decrypt path — those already work and remain owner/payroll-only.
+### 4. `supabase/functions/invite-user/index.ts` — clearer 401 body
+
+Change the `Invalid token` response body to `{ error: 'session_expired', message: 'Your session is no longer valid. Please sign in again.' }` so the client can detect it deterministically. No behavior change.
+
+### 5. No changes needed to `delete-user`
+
+That function is working as designed — when an admin deletes a user, Supabase invalidates that user's sessions, which is correct. The bug is only the client's failure to *notice* its own session was invalidated when the admin deletes themselves or when sessions get purged.
+
+## Why this fixes the reported errors
+
+- After step 1, opening the custom domain with a stale JWT will silently sign you out and re-prompt instead of letting you click around with an invalid token.
+- After step 3, if a session goes stale *during* a session (e.g. right after a super-admin delete), the next edge-function call surfaces "session expired — sign in again" instead of "non-2xx".
+- Step 2 covers cases where Supabase emits `SIGNED_OUT` from another tab or token refresh failure.
+
+## What you still need to do manually
+
+- Sign out of the custom domain and sign back in once after these changes deploy, to clear the current stale JWT in your browser.
+- Continue doing logged-in QA on `tms.jeanwayusa.com`, not on the preview iframe.
+
+## Files touched
+
+- `src/contexts/AuthContext.tsx` (small addition)
+- `src/components/shared/ProtectedRoute.tsx` (small addition)
+- `src/lib/invoke-with-auth.ts` (new, ~30 lines)
+- `src/components/settings/TeamManagementTab.tsx` and 3–5 other call sites (swap `supabase.functions.invoke` → `invokeWithAuth`)
+- `supabase/functions/invite-user/index.ts` (one response body)
