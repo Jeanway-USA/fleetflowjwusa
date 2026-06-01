@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Banknote, Eye, EyeOff, ShieldCheck, FileText, ExternalLink, Paperclip, Pencil, X, Save } from 'lucide-react';
+import { Banknote, Eye, EyeOff, ShieldCheck, FileText, ExternalLink, Paperclip, Pencil, X, Save, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +32,7 @@ export function DriverBankingDetails({ driverId }: Props) {
   const canEdit = canView;
   const [revealed, setRevealed] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [form, setForm] = useState({
     bank_name: '',
     account_type: '' as '' | 'checking' | 'savings',
@@ -39,6 +40,20 @@ export function DriverBankingDetails({ driverId }: Props) {
     account_number: '',
   });
   const qc = useQueryClient();
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['driver_banking_meta', driverId] }),
+        qc.invalidateQueries({ queryKey: ['driver_banking', driverId] }),
+        qc.invalidateQueries({ queryKey: ['driver_dd_attachment', driverId] }),
+      ]);
+      toast.success('Banking info refreshed');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['driver_banking', driverId, revealed],
@@ -208,7 +223,11 @@ export function DriverBankingDetails({ driverId }: Props) {
           No banking info on file yet.
         </div>
         {canEdit && (
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCcw className={`mr-1.5 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             <Button size="sm" variant="outline" onClick={startEdit}>
               <Pencil className="mr-1.5 h-4 w-4" />
               Enter banking
@@ -231,6 +250,9 @@ export function DriverBankingDetails({ driverId }: Props) {
           Banking · owner/payroll only
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={handleRefresh} disabled={refreshing} title="Refresh">
+            <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
           {canEdit && (
             <Button size="sm" variant="outline" onClick={startEdit}>
               <Pencil className="mr-1.5 h-4 w-4" />
