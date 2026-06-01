@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Target, Sun, Moon, DollarSign, Route, Loader2, CalendarClock } from 'lucide-react';
+import { Target, Sun, Moon, DollarSign, Route, Loader2, CalendarClock, Flag } from 'lucide-react';
 import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
 
 
