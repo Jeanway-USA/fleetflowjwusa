@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@4.0.0';
+import { buildFleetFlowEmail } from '../_shared/email-template.ts';
 
 // Allowed origins for CORS - restrict to known domains
 const ALLOWED_ORIGINS = [
@@ -119,6 +120,18 @@ Deno.serve(async (req) => {
       .single();
 
     const orgId = reqProfile?.org_id;
+
+    // Resolve the organization's display name for use in email content.
+    let orgName = 'your organization';
+    if (orgId) {
+      const { data: orgRow } = await supabaseAdmin
+        .from('organizations')
+        .select('name')
+        .eq('id', orgId)
+        .maybeSingle();
+      if (orgRow?.name) orgName = orgRow.name;
+    }
+
     // Invite links must ALWAYS point to the production custom domain,
     // regardless of where the owner sent the invite from (preview, editor,
     // localhost). Recipients should never land on a preview URL.
@@ -240,72 +253,21 @@ Deno.serve(async (req) => {
 
       // Tailored email for existing users.
       const acceptLink = `${appUrl}/auth/accept-invite?token=${invitationToken}`;
-      const existingUserHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 0;">
-        <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-          <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); border-radius: 12px 12px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">Fleet Flow TMS</h1>
-              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">by JeanWayUSA</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 40px;">
-              <h2 style="margin: 0 0 16px; color: #1a1a1a; font-size: 24px; font-weight: 600;">You've been invited to a new organization</h2>
-              <p style="margin: 0 0 24px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-                Good news — you already have a Fleet Flow TMS account. An administrator has invited you to join their organization as a <strong style="color: #D97706;">${roleLabels[role]}</strong>.
-              </p>
-              <p style="margin: 0 0 32px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-                Sign in with your existing credentials and confirm the invitation to get access:
-              </p>
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td align="center">
-                    <a href="${acceptLink}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);">
-                      Review Invitation
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              <p style="margin: 32px 0 0; color: #6a6a6a; font-size: 14px; line-height: 1.6;">
-                This invitation expires in 14 days. If you weren't expecting it, you can safely ignore this email.
-              </p>
-              <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e5e5;">
-              <p style="margin: 0; color: #9a9a9a; font-size: 12px; line-height: 1.6;">
-                If you have questions, please contact the administrator who invited you.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 12px 12px; text-align: center;">
-              <p style="margin: 0; color: #9a9a9a; font-size: 12px;">
-                © ${new Date().getFullYear()} Fleet Flow TMS by JeanWayUSA. All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-      `;
+      const existingUserHtml = buildFleetFlowEmail({
+        previewText: `Accept your invitation to join ${orgName}`,
+        headline: `You've been invited to join ${orgName}`,
+        bodyText: `You have been invited to join ${orgName} as a ${roleLabels[role]} on the FleetFlow TMS platform. Log in to accept the invitation and switch to this organization.`,
+        buttonText: 'Review Invitation',
+        buttonUrl: acceptLink,
+        footerContext: `This invitation expires in 14 days. If you weren't expecting it, you can safely ignore this email.`,
+      });
 
       let existingResendId: string | null = null;
       try {
         const emailResponse = await resend.emails.send({
           from: 'Fleet Flow TMS <no-reply@jeanwayusa.com>',
           to: [email],
-          subject: `You've been invited to join a new organization on Fleet Flow TMS`,
+          subject: `You've been invited to join ${orgName} on FleetFlow TMS`,
           html: existingUserHtml,
         });
         // @ts-ignore
@@ -484,76 +446,14 @@ Deno.serve(async (req) => {
 
     // Send custom email via Resend
     const signUpLink = inviteActionLink ?? `${appUrl}/auth`;
-    const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 0;">
-        <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); border-radius: 12px 12px 0 0;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700;">Fleet Flow TMS</h1>
-              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">by JeanWayUSA</p>
-            </td>
-          </tr>
-          
-          <!-- Body -->
-          <tr>
-            <td style="padding: 40px;">
-              <h2 style="margin: 0 0 16px; color: #1a1a1a; font-size: 24px; font-weight: 600;">You're Invited!</h2>
-              <p style="margin: 0 0 24px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-                You've been invited to join <strong>Fleet Flow TMS</strong> as a <strong style="color: #D97706;">${roleLabels[role]}</strong>.
-              </p>
-              
-              <p style="margin: 0 0 32px; color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-                Click the button below to accept your invitation and set up your account:
-              </p>
-              
-              <!-- CTA Button -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td align="center">
-                    <a href="${signUpLink}" style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 8px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);">
-                      Accept Invitation
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              
-              <p style="margin: 32px 0 0; color: #6a6a6a; font-size: 14px; line-height: 1.6;">
-                If you weren't expecting this invitation, you can safely ignore this email.
-              </p>
-              
-              <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e5e5;">
-              
-              <p style="margin: 0; color: #9a9a9a; font-size: 12px; line-height: 1.6;">
-                This invitation was sent by an administrator at Fleet Flow TMS. If you have questions, please contact your administrator.
-              </p>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 20px 40px; background-color: #f9f9f9; border-radius: 0 0 12px 12px; text-align: center;">
-              <p style="margin: 0; color: #9a9a9a; font-size: 12px;">
-                © ${new Date().getFullYear()} Fleet Flow TMS by JeanWayUSA. All rights reserved.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-    `;
+    const emailHtml = buildFleetFlowEmail({
+      previewText: `You've been invited to join ${orgName} on FleetFlow TMS`,
+      headline: `You've been invited to join ${orgName}`,
+      bodyText: `You have been invited to join ${orgName} as a ${roleLabels[role]} on the FleetFlow TMS platform. Click the button below to accept your invitation and set up your account.`,
+      buttonText: 'Accept Invitation',
+      buttonUrl: signUpLink,
+      footerContext: `If you weren't expecting this invitation, you can safely ignore this email.`,
+    });
 
     let resendMessageId: string | null = null;
 
@@ -561,7 +461,7 @@ Deno.serve(async (req) => {
       const emailResponse = await resend.emails.send({
         from: 'Fleet Flow TMS <no-reply@jeanwayusa.com>',
         to: [email],
-        subject: `You're invited to join Fleet Flow TMS`,
+        subject: `You've been invited to join ${orgName} on FleetFlow TMS`,
         html: emailHtml,
       });
 
