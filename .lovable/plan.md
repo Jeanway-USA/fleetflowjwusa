@@ -1,77 +1,44 @@
 ## Goal
+Eliminate Driver Vehicle Inspection Report (DVIR), Pre-Trip and Post-Trip functionality to avoid double-logging with the ELD.
 
-Unify the look of all Resend-sent emails by routing them through the shared `buildFleetFlowEmail` template in `supabase/functions/_shared/email-template.ts`, matching the pattern already established in `invite-user`.
+## Findings from exploration
+- `src/pages/DriverDashboard.tsx` currently does **not** import or render any of the DVIR components — no UI gap to repair there.
+- `src/components/layout/AppSidebar.tsx` has **no nav link** to Inspections/DVIR. The string `'dvir'` only appears inside tier feature-flag arrays.
+- Other DVIR-coupled code exists beyond the user's list:
+  - `src/components/safety/InspectionHistory.tsx` (DVIR history table on Safety page)
+  - `src/components/safety/DefectAlerts.tsx` (DVIR defect alerts on Safety page)
+  - `src/pages/Safety.tsx` renders both of the above and a "Work Order Sheet for DVIR conversion"
+  - `src/hooks/useOfflineSync.ts` + `src/hooks/useOfflineQueue.ts` queue `dvir_inspection` actions
+  - `src/lib/tour-steps.ts` has a driver-tour step targeting `[data-tour="dvir-buttons"]`
+  - `'dvir'` feature flag in `useSubscriptionTier.ts`, `AppSidebar.tsx`, `CommandPalette.tsx`
+  - Note: Safety.tsx also has annual DOT **truck inspection date** alerts (`next_inspection_date`) — these are *not* DVIR and will stay.
 
-## Functions to update
+## Plan
 
-1. `supabase/functions/send-invoice-email/index.ts`
-2. `supabase/functions/send-carrier-packet/index.ts`
-3. `supabase/functions/email-load-status/index.ts`
-4. `supabase/functions/contact-form/index.ts` (also calls Resend)
+### 1. Delete files (as requested)
+- `src/components/driver/DVIRButtons.tsx`
+- `src/components/driver/DVIRForm.tsx`
+- `src/components/driver/DVIRHistory.tsx`
+- `src/components/driver/PreTripForm.tsx`
+- `src/components/driver/PostTripForm.tsx`
 
-No business logic, auth, RLS, or DB queries change. Only the email HTML construction + subject framing.
+### 2. `src/pages/DriverDashboard.tsx`
+No DVIR imports currently present — no changes needed. (Will verify after deletions.)
 
-## Changes per function
+### 3. `src/components/layout/AppSidebar.tsx`
+No DVIR nav link exists. Remove `'dvir'` from the tier feature-flag arrays so it's no longer gated as a feature.
 
-### 1. `send-invoice-email`
-- Import `buildFleetFlowEmail` from `../_shared/email-template.ts`.
-- Delete the local `buildInvoiceEmailHtml` function.
-- Keep all existing data gathering (org, broker, line items, totals, dates).
-- Build an HTML body string that preserves the itemized invoice (Bill To, Load Reference, Origin/Destination, line-item table with Total) using the same minimal inline-styled table markup, then pass it as `bodyText` (it will be detected as HTML and rendered as-is).
-- Call:
-  - `headline`: `New Invoice from ${orgName}`
-  - `previewText`: `Invoice ${invoiceNumber} for load ${loadDisplayId}`
-  - `buttonText`: `View Load Details`
-  - `buttonUrl`: public tracking URL (`https://fleetflowjwusa.lovable.app/track?tracking_id=${load.tracking_id}`), only set if `load.tracking_id` exists; otherwise omit button
-  - `footerContext`: `You're receiving this invoice because your agency code is linked to this load in ${orgName}'s TMS.`
-- Subject unchanged: `Invoice ${invoiceNumber} — ${loadDisplayId} | ${orgName}`.
+### 4. Extended cleanup (to fully remove DVIR — beyond user's explicit list)
+- **Delete** `src/components/safety/InspectionHistory.tsx` and `src/components/safety/DefectAlerts.tsx`.
+- **Edit** `src/pages/Safety.tsx`: remove `InspectionHistory` import + render, remove DVIR work-order sheet bits, keep the DOT annual truck-inspection alerts.
+- **Edit** `src/lib/tour-steps.ts`: remove the `dvir-buttons` driver tour step.
+- **Edit** `src/hooks/useOfflineQueue.ts`: drop `'dvir_inspection'` from `OfflineActionType` and its case branch.
+- **Delete** `src/hooks/useOfflineSync.ts` (entirely DVIR-related) — or, if other imports exist, gut it to a no-op. Will verify usages before deleting.
+- **Edit** `src/hooks/useSubscriptionTier.ts` and `src/components/shared/CommandPalette.tsx`: remove `'dvir'` from feature-flag arrays.
 
-### 2. `send-carrier-packet`
-- Import `buildFleetFlowEmail`. Delete local `buildCarrierPacketHtml`.
-- Build HTML body containing: the sender's message (paragraphs with `<br/>` line breaks, escaped) followed by an "Attached Documents" section rendering each `docLinks` entry as `<a href="signedUrl">label</a>` list items.
-- Call:
-  - `headline`: `Carrier Onboarding Packet`
-  - `previewText`: `Carrier packet from ${orgName}`
-  - No `buttonText` / `buttonUrl` (per user choice — links live in the body)
-  - `footerContext`: `Download links expire in 1 hour for security.`
-- Subject unchanged: `Carrier Packet — ${orgName}`.
-
-### 3. `email-load-status`
-- Import `buildFleetFlowEmail`. Delete local `buildEmailHtml`.
-- Body content: greeting (if `agentName`), short "Status update for one of your loads" line, then an HTML block showing Load Ref, Current Status (plain text — drop the colored pill chip since the unified template is single-accent), Pickup, Delivery, and optional Driver Location.
-- Call:
-  - `headline`: `Load #${loadDisplayId} — ${statusLabel}`
-  - `previewText`: `Status update: ${statusLabel}`
-  - `buttonText`: `Track This Load Live`, `buttonUrl`: `trackingUrl` (only when present)
-  - `footerContext`: `Automated update from ${orgName} via FleetFlow TMS. To stop receiving these for this load, ask your dispatcher to disable Auto Email Updates.`
-- Drop the `STATUS_COLORS` map (no longer needed); keep `STATUS_LABELS`.
-- Subject unchanged: `Load #${loadDisplayId}: Status Update — ${statusLabel}`.
-
-### 4. `contact-form`
-- Import `buildFleetFlowEmail`.
-- Replace the inline HTML for the HR notification with `buildFleetFlowEmail`:
-  - `headline`: `New Contact Form Submission`
-  - `previewText`: `${name} — ${subject}`
-  - `bodyText`: HTML block with Name / Email / Subject rows + the message in a quoted block (escaped, `\n` → `<br/>`)
-  - No button.
-  - `footerContext`: `Sent from the FleetFlow public contact form.`
-- Subject unchanged: `Contact Form: ${subject}`.
-- Keep `replyTo: email.trim()`.
-
-## "Resend usage matches invite-user"
-
-`invite-user` already uses `new Resend(resendApiKey).emails.send({ from, to, subject, html, replyTo? })` after reading `RESEND_API_KEY` from env. The four target functions already follow this exact shape — no changes needed to the Resend call site itself other than swapping the `html` value to the unified template output. `from` addresses, auth checks, CORS, and error handling stay as-is.
-
-## Out of scope
-
-- No DB migrations.
-- No changes to `_shared/email-template.ts` (the existing `bodyText` HTML-passthrough behavior already supports the richer invoice/status/packet bodies).
-- No changes to callers in the frontend.
-- No switch to Lovable Emails / queue — request is explicitly to keep Resend.
+### 5. Out of scope (kept intentionally)
+- Database tables (`driver_inspections`, `dvir-photos`/`dvir-signatures` storage buckets) — left untouched to preserve historical records. Mention to the user; can be dropped in a follow-up migration if desired.
+- DOT annual truck inspection date tracking on Safety page — unrelated to DVIR.
 
 ## Verification
-
-After the edits, deploy the four functions and spot-check by reading the final files to confirm:
-- Each imports `buildFleetFlowEmail`.
-- No local `build*Html` helpers remain.
-- Resend `.emails.send({ html })` receives the template output.
+After edits, run a grep for `DVIR|dvir|PreTrip|PostTrip|pre_trip|post_trip` across `src/` and confirm only intentional references remain (e.g., DB type strings if any). Confirm build passes.
