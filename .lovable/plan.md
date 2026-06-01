@@ -1,62 +1,52 @@
-# Unified Driver Settlements Tab
+# Refine Generate Paystub Dialog
 
-Replace the **Payroll & Commissions** and **Settlements** tabs in `src/pages/Finance.tsx` with a single **Driver Settlements** tab containing two sections: Pending Drivers and Generated Paystubs.
+Update `src/components/finance/driver-settlements/DriverSettlementsTab.tsx` to make the existing `GeneratePaystubDialog` match the spec.
 
-## File structure
+## Changes to `GeneratePaystubDialog`
 
-```
-src/components/finance/driver-settlements/
-├── DriverSettlementsTab.tsx        # orchestrator
-├── PendingDriversTable.tsx         # top section
-├── GeneratePaystubDialog.tsx       # opened from row action
-└── GeneratedPaystubsTable.tsx      # bottom section
-```
+1. **Base Pay calculation** (`estimatePay` helper):
+   - `pay_type === 'flat'` → return `pay_rate` exactly, ignore loads.
+   - `pay_type === 'percentage'` → `sum(load.gross_revenue ?? load.rate) * (pay_rate / 100)`.
+   - `pay_type === 'per_mile'` → `sum(load.actual_miles ?? load.booked_miles) * pay_rate`.
+   - Fallback (unknown type) → 25 % of summed gross. Same as today.
 
-`PayrollTab.tsx` and `SettlementsTab.tsx` are removed from the Finance routing (files kept on disk, not imported).
+2. **Dialog body**:
+   - Show driver name, period, load count, and pay-type chip ("Flat Rate" / "Percentage @ 75%" / "Per Mile @ $0.65") at the top.
+   - **Base Pay** input — pre-filled from the rule above; editable. For flat rate, display a small note "Flat rate — loads ignored".
+   - **Bonus Pay** input — editable, defaults to `0`. Label hints "Safety Bonus, etc."
+   - **Notes** textarea — optional.
+   - Live **Net Pay** readout: `net = base + bonus`. Big primary-colored amount.
+   - Loads-included list stays (read-only) for percentage/per_mile; hidden for flat.
 
-## Layout
+3. **Remove**:
+   - Deductions input.
+   - Status dropdown.
+   - The deductions row in the net-pay readout.
 
-```text
-┌─ Driver Settlements ──────────────────────────────────────────┐
-│ Week selector  (Mon–Sun current pay cycle, prev/next nav)     │
-├───────────────────────────────────────────────────────────────┤
-│ PENDING / UNSETTLED DRIVERS  (this week)                      │
-│ ┌───────────────────────────────────────────────────────────┐ │
-│ │ Driver | Loads | Gross | Est. Pay | Pay Type | [Generate]│ │
-│ └───────────────────────────────────────────────────────────┘ │
-├───────────────────────────────────────────────────────────────┤
-│ GENERATED PAYSTUBS         filters: [All|Draft|Approved|Paid] │
-│ ┌───────────────────────────────────────────────────────────┐ │
-│ │ Driver | Period | Base | Bonus | Deduct | Net | Status   │ │
-│ └───────────────────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────────────────┘
-```
+4. **Math invariant**: `net_pay = base_pay + bonus_pay`. The DB column `deductions` is always written as `0` so the generated `net_pay = base + bonus - 0` stays consistent.
 
-## Behavior
+5. **Footer — two actions**:
+   - **Save as Draft** (outline) → insert with `status = 'draft'`, `approved_at = null`, `paid_at = null`.
+   - **Approve & Send to Driver** (primary gradient) → insert with `status = 'approved'`, `approved_at = now()`, `approved_by = auth.uid()`. (Email "send" is a placeholder; toast confirms "Paystub approved — driver notified" but no actual email yet — out of scope, noted in memory.)
+   - Cancel button on the left.
 
-### Pending Drivers (top)
-- Query active drivers in org. For each, count delivered loads in the selected week that are **not yet attached to a `driver_settlement_items` row**.
-- Compute estimated pay using each driver's `pay_type` (percentage / per-mile / flat) — same formulas already used in `DriverPayWidget`.
-- Row action **Generate Paystub** opens `GeneratePaystubDialog`.
+6. **Insert payload**:
+   ```ts
+   {
+     org_id, driver_id, period_start, period_end,
+     base_pay, bonus_pay,
+     deductions: 0,
+     status,                          // 'draft' | 'approved'
+     notes: notes || null,
+     approved_at, approved_by,
+   }
+   ```
+   Then insert one `driver_settlement_items` row per included load (skipped for flat-rate since loads list is irrelevant).
 
-### Generate Paystub dialog
-- Pre-fills: `driver_id`, `period_start`/`period_end` (selected week), `base_pay` (from loads), `bonus_pay` (0 or auto-filled safety bonus), `deductions` (sum of driver advances/fees this period).
-- Lists settled loads as editable line items; allow adding manual adjustments.
-- Submit → insert one `driver_settlements` row (status `draft`) plus `driver_settlement_items` rows for each load and deduction. Driver disappears from Pending list, appears in Generated Paystubs.
-
-### Generated Paystubs (bottom)
-- Query `driver_settlements` ordered by `period_end desc`, filterable by status (All / Draft / Approved / Paid).
-- Row actions: **View / Edit** (draft only), **Approve** (draft → approved, sets `approved_by`/`approved_at`), **Mark Paid** (approved → paid, sets `paid_at`).
-
-## Other changes in `Finance.tsx`
-- Remove `<TabsTrigger value="payroll">` and `<TabsTrigger value="settlements">` plus their `<TabsContent>`.
-- Add `<TabsTrigger value="driver-settlements">Driver Settlements</TabsTrigger>` and matching content.
-- Move `CommissionsTab` into the Overview tab (commissions are agent earnings, separate concept from driver pay).
-- Update top KPI card `totalPayroll` to source from `driver_settlements` (status in approved/paid) instead of legacy `driver_payroll`.
-- Add memory entry `mem://features/finance/driver-settlements` documenting the unified tab.
+7. **State reset bug fix**: the current `useMemo` for resetting form state on driver change is incorrect — switch to a proper `useEffect` keyed on `driver?.id` and `open`.
 
 ## Out of scope
-- Landstar statement importer (untouched, no longer surfaced in Finance tabs).
-- PDF paystub rendering / email delivery (placeholder).
-- Backfill of historical `driver_payroll` rows.
-- Removing legacy `driver_payroll` / `settlements` tables.
+- Actual email delivery to the driver (placeholder toast).
+- Editing an existing paystub from the dialog.
+- Deductions UI (explicitly excluded per spec).
+- Mark Paid action (already handled by the row dropdown in Generated Paystubs).
