@@ -481,9 +481,10 @@ export default function DriverOnboarding() {
             <div className="pt-4 flex justify-end">
               <Button
                 variant="outline"
-                onClick={() =>
-                  navigate('/driver-dashboard', { replace: true, state: { startTour: true } })
-                }
+                onClick={() => {
+                  try { localStorage.setItem('pending_driver_tour', '1'); } catch { /* ignore */ }
+                  navigate('/driver-dashboard', { replace: true, state: { startTour: true } });
+                }}
               >
                 Go to Dashboard
               </Button>

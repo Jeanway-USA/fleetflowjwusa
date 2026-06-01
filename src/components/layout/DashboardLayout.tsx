@@ -174,33 +174,49 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
       .then(({ data }) => {
         const seen = !!(data as any)?.has_completed_onboarding_tour;
         setHasSeenTour(seen);
-        // Mirror server flag into localStorage so the synchronous check below
-        // is authoritative on fresh devices.
-        tour.syncFromServer(seen);
+        // NOTE: intentionally do NOT mirror the global server flag into the
+        // per-tour localStorage key. The server flag is shared across every
+        // tour (driver, dispatcher, BCO) and would otherwise permanently
+        // suppress tours the user has never actually seen.
         // Only show the legacy welcome modal on routes that don't have an auto-tour.
         if (!seen && !tourDef) setShowWelcome(true);
         setTourFlagLoaded(true);
       });
-  }, [user, isDemoMode, tourDef, tour]);
+  }, [user, isDemoMode, tourDef]);
 
-  // Auto-start tour: (A) explicit signal from /driver/onboarding, or (B) has_seen_tour === false.
-  // localStorage is the synchronous source of truth — if it says completed, never auto-start,
-  // even if a stale server fetch hasn't settled yet.
+  // Auto-start tour: (A) explicit signal from /driver/onboarding (via location
+  // state OR persistent localStorage flag — survives ProtectedRoute redirects),
+  // or (B) server-side has_completed_onboarding_tour === false.
+  // Explicit onboarding signal ALWAYS wins, even if localStorage marks the
+  // tour completed from a prior test run.
   useEffect(() => {
     if (autoStartedRef.current || !tourDef || tour.isActive) return;
+
+    const stateSaysStart = (location.state as any)?.startTour === true;
+    let pendingFlag = false;
+    try { pendingFlag = localStorage.getItem('pending_driver_tour') === '1'; } catch { /* ignore */ }
+    const fromOnboarding = stateSaysStart || pendingFlag;
+
+    if (fromOnboarding) {
+      autoStartedRef.current = true;
+      tour.resetTour();      // clear stale completion so welcome restarts cleanly
+      tour.startTour();
+      try { localStorage.removeItem('pending_driver_tour'); } catch { /* ignore */ }
+      if (stateSaysStart) {
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+      return;
+    }
+
     if (tour.hasCompleted()) {
       autoStartedRef.current = true;
       return;
     }
-    const fromOnboarding = (location.state as any)?.startTour === true;
+
     const flagSaysStart = tourFlagLoaded && hasSeenTour === false;
-    if (!fromOnboarding && !flagSaysStart) return;
+    if (!flagSaysStart) return;
     autoStartedRef.current = true;
     tour.startTour();
-    if (fromOnboarding) {
-      // Replace history entry so refresh / Back never resurfaces startTour state.
-      navigate(location.pathname, { replace: true, state: {} });
-    }
   }, [tourDef, tour, tourFlagLoaded, hasSeenTour, location.state, location.pathname, navigate]);
 
 
