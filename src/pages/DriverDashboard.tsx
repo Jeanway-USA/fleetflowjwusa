@@ -15,6 +15,7 @@ import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
 import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
 import { LocationSharing } from '@/components/driver/LocationSharing';
 import { DriverNotifications } from '@/components/driver/DriverNotifications';
+import { DriverMessages } from '@/components/driver/DriverMessages';
 import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
 import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
@@ -160,7 +161,8 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
             <ErrorBoundary compact>
-              <div id="tour-notifications">
+              <div id="tour-notifications" className="flex items-center gap-1">
+                <DriverMessages />
                 <DriverNotifications driverId={driver.id} />
               </div>
             </ErrorBoundary>

@@ -1,42 +1,53 @@
-## Admin → Driver Chat on Driver Detail Sheet
+## Driver Messages Widget
 
-Add a "Message Driver" button to the driver detail sheet that opens a second Sheet containing a realtime 1:1 chat between the current admin user and the selected driver.
+Add a Messages button next to the existing notifications bell in the driver dashboard header, with an unread badge and a slide-out chat interface that mirrors the admin-side experience.
 
-### Components
+### New component: `src/components/driver/DriverMessages.tsx`
 
-**New: `src/components/drivers/DriverChatSheet.tsx`**
-- Props: `driver`, `open`, `onOpenChange`
-- A right-side `Sheet` (shadcn) with `w-full sm:max-w-md`, flex column layout, fixed header + scrollable thread + fixed composer (per existing dialog/sheet layout memory).
-- Header: avatar + driver name + "Direct message" subtitle.
-- Body: scrollable message list rendered chronologically (oldest → newest), with auto-scroll to bottom on new message. Sender vs receiver bubbles styled with semantic tokens (`bg-primary text-primary-foreground` for self, `bg-muted` for driver). Show `created_at` as relative time under each bubble.
-- Empty state: "No messages yet. Say hello."
-- Composer: `Textarea` + `Send` button. Enter sends, Shift+Enter newlines. Button disabled while empty or sending.
-- Missing-account state: if `driver.user_id` is null, render a notice ("This driver has no linked login account yet — they will see messages once they accept their invitation.") and disable the composer. (Drivers can exist without a user account in this schema.)
+Trigger (rendered inside the `tour-notifications` cluster, beside `DriverNotifications`):
+- Ghost icon `Button` (`h-8 w-8`) with `MessageSquare` icon.
+- Red unread `Badge` overlay (top-right, count or "9+") computed from a TanStack Query that counts rows in `messages` where `receiver_id = driver.user_id AND is_read = false`. 30s refetch + realtime invalidation.
 
-**Data layer:**
-- Fetch with TanStack Query, key `['driver-chat', authUser.id, driver.user_id]`.
-- Query: `messages` table where `(sender_id = me AND receiver_id = driver.user_id) OR (sender_id = driver.user_id AND receiver_id = me)`, ordered by `created_at asc`.
-- Send mutation: insert `{ sender_id: me, receiver_id: driver.user_id, content }`. `org_id` auto-fills via trigger. Optimistic append, rollback on error, toast on failure.
-- Mark-as-read effect: when sheet is open, update any messages where `receiver_id = me AND sender_id = driver.user_id AND is_read = false` to `is_read = true`.
+Panel: a right-side `Sheet`, `w-full sm:max-w-md`, two-mode body:
 
-**Realtime:**
-- On sheet open, subscribe to a channel `direct-msgs-${me}-${driver.user_id}` listening to `postgres_changes` on `public.messages` with `event: 'INSERT'`, filter `receiver_id=eq.${me}` (driver replies). On payload, if `sender_id` matches selected driver, append to cache and mark read.
-- Also listen for `event: 'UPDATE'` to reflect read-state changes if needed.
-- Unsubscribe on close/unmount.
+**Mode A — conversation list (default):**
+- Group all messages involving the driver by counterpart `user_id` (the non-driver participant). For each thread show: counterpart name (from `profiles.first_name + last_name`, fallback email), last message preview, relative time, unread count badge.
+- Single query: select messages for the driver + a separate `profiles` select for counterpart names, joined client-side.
+- Tap a row → switch to Mode B for that counterpart.
+
+**Mode B — thread view:**
+- Header with back arrow, counterpart name, "Dispatch" subtitle.
+- Scrollable message list, chronological. Own messages: `bg-primary text-primary-foreground` right-aligned. Admin messages: `bg-muted` left-aligned. Relative timestamp under each bubble. Auto-scroll to bottom.
+- Composer: `Textarea` + `Send` button (Enter sends, Shift+Enter newline). Disabled while sending.
+- On entering this mode (and on every new incoming message in it), update `messages` set `is_read = true` for unread rows where `receiver_id = me AND sender_id = counterpart`. Then invalidate the unread-count query.
+
+### Data layer
+
+- Auth: use `useAuth()` to get current user id (the driver's `user_id`).
+- Queries (TanStack):
+  - `['driver-msgs-unread', userId]` — `select id` count where `receiver_id = userId AND is_read = false`.
+  - `['driver-msgs-threads', userId]` — all messages involving driver (`or(sender_id.eq,receiver_id.eq)`), ordered desc; reduced client-side into threads. Joined with `profiles` lookup for distinct counterpart ids.
+  - `['driver-msgs-thread', userId, counterpartId]` — full thread, asc.
+- Send mutation: insert `{ sender_id: userId, receiver_id: counterpartId, content }` (cast `as any` because the trigger fills `org_id` and the generated TS type still requires it).
+
+### Realtime
+
+A single channel subscribed for the lifetime of the component (mounted whenever the panel is open):
+- `postgres_changes` INSERT on `public.messages` filtered `receiver_id=eq.${userId}`.
+- On payload: invalidate the unread count, update threads list cache, and if the open thread matches `sender_id`, append to that cache + mark read.
+- Also INSERT filtered `sender_id=eq.${userId}` so outgoing messages from other devices stay in sync.
+- Unsubscribe on close.
 
 ### Wiring
 
-**`src/components/drivers/DriverDetailSheet.tsx`**
-- Add `MessageSquare` icon button next to the existing Edit button in the header (gated by `!readOnly`).
-- Add local state `chatOpen` and render `<DriverChatSheet driver={driver} open={chatOpen} onOpenChange={setChatOpen} />` inside the component.
-- Button click sets `chatOpen=true`. (Both Sheets can coexist — Radix stacks them; the chat sheet slides over.)
+Edit `src/pages/DriverDashboard.tsx`:
+- Inside `<div id="tour-notifications">`, render `<DriverMessages />` next to `<DriverNotifications />` inside a small flex wrapper so they sit side-by-side.
 
 ### Out of scope
-- No new database schema (uses the `messages` table created in the previous task).
-- No unread badge on the driver list (can be a follow-up).
-- No file/image attachments.
-- Driver-side chat UI (mirror component on the driver dashboard) is a separate task.
+- Push notifications / sound.
+- Group chats, attachments, typing indicators.
+- A separate full page route.
 
-### Files touched
-- New: `src/components/drivers/DriverChatSheet.tsx`
-- Edit: `src/components/drivers/DriverDetailSheet.tsx` (add button + chat sheet wiring)
+### Files
+- New: `src/components/driver/DriverMessages.tsx`
+- Edit: `src/pages/DriverDashboard.tsx` (one-line addition inside tour-notifications)
