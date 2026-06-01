@@ -35,6 +35,8 @@ export default function DriverSettings() {
   const [weeklyMilesGoal, setWeeklyMilesGoal] = useState(2500);
   const [weeklyRevenueGoal, setWeeklyRevenueGoal] = useState(2000);
   const [payWeekStartDay, setPayWeekStartDay] = useState(0);
+  const [goalType, setGoalType] = useState<'financial' | 'mileage'>('financial');
+  const [targetMiles, setTargetMiles] = useState<number>(2500);
 
   // Fetch driver profile
   const { data: driver, isLoading: driverLoading } = useQuery({
