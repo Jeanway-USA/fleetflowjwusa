@@ -1,68 +1,30 @@
-## Goal
-Conditionally render a mileage-focused weekly widget on the Driver Dashboard for Flat Rate drivers, and keep the existing pay widget for everyone else.
+## Problem
 
-## Files
+On `/auth/accept-invite`, the "Set Your Password" form only accepts one character per keystroke before losing focus. The user has to click the input again for every letter.
 
-**New:** `src/components/driver/WeeklyPerformanceWidget.tsx`
-**Edit:** `src/pages/DriverDashboard.tsx`
+## Root cause
 
-## Note on `pay_type` value
-Internally the driver's flat pay type is stored as `'flat'` (see `src/lib/pay-format.ts` and existing `DriverSettings.tsx` `isFlatRate` check). The user request says `'Flat Rate'` as the human label — the conditional will use `driver.pay_type === 'flat'` to match the DB/codebase convention. Display label remains "Flat Rate".
+In `src/pages/AcceptInvite.tsx`, the `Shell` wrapper is declared **inside** the `AcceptInvite` component:
 
-## DriverDashboard.tsx changes
-- Import `WeeklyPerformanceWidget`.
-- Where `<DriverPayWidget …/>` is rendered (line ~213), branch on `driver.pay_type`:
-  - `'flat'` → `<WeeklyPerformanceWidget driverId={driver.id} />`
-  - else → existing `<DriverPayWidget …/>` unchanged.
-- No other dashboard changes.
-
-## WeeklyPerformanceWidget.tsx
-
-Props: `{ driverId: string }`
-
-### Data fetched (TanStack Query, same patterns as DriverPayWidget)
-1. `driver_settings_safe` → `target_miles`, `pay_week_start_day` (for `target_miles` goal + week boundary).
-2. This week's `fleet_loads` for the driver where `delivery_date` is within current pay-week and `status = 'delivered'` — provides loaded miles & rate context.
-3. Driver's deadhead miles for the week: sum `deadhead_miles` (if present on `fleet_loads`) — if column missing we'll derive as 0 and surface a TODO; will verify column at build time.
-4. Month-to-date delivered miles for the driver (loads delivered between start of current month and today) — used for bonus pacing.
-
-### Derived values
-- `milesThisWeek` = sum of `booked_miles` for week's delivered loads.
-- `targetMiles` = `driver_settings_safe.target_miles ?? 2500`.
-- `weekProgressPct` = `min(100, milesThisWeek / targetMiles * 100)`.
-- `monthMiles` = sum of `booked_miles` for current month's delivered loads.
-- `daysElapsedInMonth` = today's day-of-month.
-- `dailyVelocity` = `monthMiles / daysElapsedInMonth`.
-- `projectedMonthMiles` = `dailyVelocity * daysInCurrentMonth`.
-- `bonusPaceStatus`:
-  - `>= 10000` projected → "On Pace" (success token).
-  - `>= 9000` and `< 10000` → "Slightly Behind" (warning token).
-  - `< 9000` → "Off Pace" (destructive token).
-- `loadedMiles` = `milesThisWeek`.
-- `deadheadMiles` = sum of `deadhead_miles` for week (fallback 0).
-- `deadheadPct` = `loadedMiles + deadheadMiles > 0 ? deadheadMiles / (loadedMiles + deadheadMiles) * 100 : 0`.
-
-### UI (Card + semantic design tokens only)
-```text
-┌─ Weekly Performance ───────────────────────────┐
-│  MILES DRIVEN THIS WEEK                        │
-│  2,143  ← large bold number                    │
-│  of 2,500 mile target                          │
-│  [============------]  86%                     │
-│                                                │
-│  Monthly Bonus Pacing       [On Pace] badge    │
-│  Projected: 10,420 / 10,000 safe miles         │
-│                                                │
-│  Deadhead Percentage         8.4%              │
-│  120 empty / 1,423 loaded miles                │
-└────────────────────────────────────────────────┘
+```tsx
+const Shell = ({ children }) => ( ... );
 ```
-- Use `Card`, `CardHeader`, `CardTitle`, `CardContent`, `Progress`, `Badge`, lucide icons (`Gauge`, `Target`, `TrendingUp`).
-- All colors via Tailwind semantic tokens (`text-foreground`, `text-muted-foreground`, `bg-primary`, `bg-success`, `bg-warning`, `bg-destructive` etc.).
 
-### Verification step during build
-Before final code, confirm whether `fleet_loads.deadhead_miles` exists; if not, render the deadhead row with a graceful "—" placeholder and a tooltip "Deadhead tracking coming soon" rather than fabricating data.
+Because `Shell` is recreated on every render, React sees a brand-new component type each time `password` or `confirmPassword` state changes. That unmounts the entire subtree (including the `<Input>`), remounts a fresh one, and the input loses focus after each keystroke — exactly the "one letter at a time" symptom.
+
+`ResetPassword.tsx` does not have this bug because it inlines its JSX instead of wrapping it in an inner component.
+
+## Fix
+
+Move `Shell` out of the `AcceptInvite` function body so it's a stable component reference across renders.
+
+- File: `src/pages/AcceptInvite.tsx`
+- Extract `const Shell = ({ children }: { children: React.ReactNode }) => ( ... )` to module scope (above `export default function AcceptInvite`).
+- It only uses `children` and static imports (`Helmet`, `logoIcon`, `textLogo`), so no props/refactor needed beyond the move.
+
+No other files, styles, or behavior change. The token-acceptance flow, success/error states, and legacy set-password flow continue to render identically — they just stop remounting on each keystroke.
 
 ## Out of scope
-- No changes to `WeeklyPayWidget`, settings page, or DB schema.
-- No new edge functions or migrations.
+
+- No changes to auth logic, Supabase calls, routing, or the `Input` component.
+- No styling changes.

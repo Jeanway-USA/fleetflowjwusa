@@ -109,22 +109,6 @@ export default function AcceptInvite() {
     }
   };
 
-  const Shell = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <h1 className="sr-only">Accept your FleetFlow TMS invitation</h1>
-      <div className="w-full max-w-md">
-        <Helmet>
-          <title>Accept Invitation — FleetFlow TMS</title>
-          <meta name="robots" content="noindex" />
-        </Helmet>
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <img src={logoIcon} alt="" className="h-10 w-auto" />
-          <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
-        </div>
-        {children}
-      </div>
-    </div>
-  );
 
   // ---------- Token-based flow (existing user) ----------
   if (inviteToken) {
