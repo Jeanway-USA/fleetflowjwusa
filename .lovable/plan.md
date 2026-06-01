@@ -1,54 +1,42 @@
-## Add Direct Messaging Schema
+## Admin → Driver Chat on Driver Detail Sheet
 
-Create a `messages` table to support real-time 1:1 direct messaging between users in the same organization, with RLS scoped so users only see messages they sent or received.
+Add a "Message Driver" button to the driver detail sheet that opens a second Sheet containing a realtime 1:1 chat between the current admin user and the selected driver.
 
-### Schema
+### Components
 
-New table `public.messages`:
-- `id` uuid PK, default `gen_random_uuid()`
-- `sender_id` uuid NOT NULL (references `auth.users.id`)
-- `receiver_id` uuid NOT NULL (references `auth.users.id`)
-- `org_id` uuid NOT NULL — required for multi-tenant isolation (matches Core memory rule: all core tables carry `org_id`)
-- `content` text NOT NULL, with a CHECK to disallow empty strings
-- `is_read` boolean NOT NULL default `false`
-- `created_at` timestamptz NOT NULL default `now()`
+**New: `src/components/drivers/DriverChatSheet.tsx`**
+- Props: `driver`, `open`, `onOpenChange`
+- A right-side `Sheet` (shadcn) with `w-full sm:max-w-md`, flex column layout, fixed header + scrollable thread + fixed composer (per existing dialog/sheet layout memory).
+- Header: avatar + driver name + "Direct message" subtitle.
+- Body: scrollable message list rendered chronologically (oldest → newest), with auto-scroll to bottom on new message. Sender vs receiver bubbles styled with semantic tokens (`bg-primary text-primary-foreground` for self, `bg-muted` for driver). Show `created_at` as relative time under each bubble.
+- Empty state: "No messages yet. Say hello."
+- Composer: `Textarea` + `Send` button. Enter sends, Shift+Enter newlines. Button disabled while empty or sending.
+- Missing-account state: if `driver.user_id` is null, render a notice ("This driver has no linked login account yet — they will see messages once they accept their invitation.") and disable the composer. (Drivers can exist without a user account in this schema.)
 
-Indexes:
-- `(receiver_id, is_read)` for unread counts
-- `(sender_id, receiver_id, created_at desc)` for conversation threads
-- `(org_id)`
+**Data layer:**
+- Fetch with TanStack Query, key `['driver-chat', authUser.id, driver.user_id]`.
+- Query: `messages` table where `(sender_id = me AND receiver_id = driver.user_id) OR (sender_id = driver.user_id AND receiver_id = me)`, ordered by `created_at asc`.
+- Send mutation: insert `{ sender_id: me, receiver_id: driver.user_id, content }`. `org_id` auto-fills via trigger. Optimistic append, rollback on error, toast on failure.
+- Mark-as-read effect: when sheet is open, update any messages where `receiver_id = me AND sender_id = driver.user_id AND is_read = false` to `is_read = true`.
 
-### Grants & RLS
+**Realtime:**
+- On sheet open, subscribe to a channel `direct-msgs-${me}-${driver.user_id}` listening to `postgres_changes` on `public.messages` with `event: 'INSERT'`, filter `receiver_id=eq.${me}` (driver replies). On payload, if `sender_id` matches selected driver, append to cache and mark read.
+- Also listen for `event: 'UPDATE'` to reflect read-state changes if needed.
+- Unsubscribe on close/unmount.
 
-Grants (auth-only table, no anon):
-```
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.messages TO authenticated;
-GRANT ALL ON public.messages TO service_role;
-```
+### Wiring
 
-Enable RLS, then policies (all scoped to `authenticated`):
-- **SELECT**: `auth.uid() IN (sender_id, receiver_id)`
-- **INSERT** (WITH CHECK):
-  - `sender_id = auth.uid()`
-  - `org_id = public.get_user_org_id(auth.uid())`
-  - receiver must belong to same org (subquery against `profiles`)
-  - `sender_id <> receiver_id`
-- **UPDATE**: only the receiver may flip `is_read` → USING `receiver_id = auth.uid()`; a BEFORE UPDATE trigger blocks changes to any column other than `is_read` (defense in depth so receivers cannot rewrite content/sender/etc.)
-- **DELETE**: `sender_id = auth.uid()` (senders can retract; receivers cannot delete)
+**`src/components/drivers/DriverDetailSheet.tsx`**
+- Add `MessageSquare` icon button next to the existing Edit button in the header (gated by `!readOnly`).
+- Add local state `chatOpen` and render `<DriverChatSheet driver={driver} open={chatOpen} onOpenChange={setChatOpen} />` inside the component.
+- Button click sets `chatOpen=true`. (Both Sheets can coexist — Radix stacks them; the chat sheet slides over.)
 
-### Org auto-fill trigger
+### Out of scope
+- No new database schema (uses the `messages` table created in the previous task).
+- No unread badge on the driver list (can be a follow-up).
+- No file/image attachments.
+- Driver-side chat UI (mirror component on the driver dashboard) is a separate task.
 
-`set_messages_org_id()` BEFORE INSERT — if `org_id` is NULL, populate from `get_user_org_id(auth.uid())`. Mirrors existing `set_trucks_org_id` / `set_driver_request_org_id` patterns.
-
-### Realtime
-
-- `ALTER TABLE public.messages REPLICA IDENTITY FULL;`
-- `ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;`
-
-### Types
-
-`src/integrations/supabase/types.ts` regenerates automatically after the migration runs — no manual edits.
-
-### Out of scope for this task
-
-No UI, no edge function, no notifications wiring. This plan only delivers the schema, RLS, realtime publication, and types refresh.
+### Files touched
+- New: `src/components/drivers/DriverChatSheet.tsx`
+- Edit: `src/components/drivers/DriverDetailSheet.tsx` (add button + chat sheet wiring)
