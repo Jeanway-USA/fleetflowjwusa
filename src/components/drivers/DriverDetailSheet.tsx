@@ -1,15 +1,17 @@
+import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Phone, Mail, Edit2, CreditCard, Calendar, FileSignature } from 'lucide-react';
+import { Phone, Mail, Edit2, CreditCard, Calendar, FileSignature, MessageSquare } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { CredentialsCompliance } from './CredentialsCompliance';
 import { SignedOnboardingDocuments } from './SignedOnboardingDocuments';
 import { DriverBankingDetails } from './DriverBankingDetails';
+import { DriverChatSheet } from './DriverChatSheet';
 
 interface DriverDetailSheetProps {
   driver: any | null;
@@ -52,6 +54,7 @@ export function DriverDetailSheet({
 }: DriverDetailSheetProps) {
   const { isOwner, hasRole } = useAuth();
   const canViewSignedDocs = isOwner || hasRole('safety') || hasRole('payroll_admin');
+  const [chatOpen, setChatOpen] = useState(false);
 
   if (!driver) return null;
 
@@ -59,8 +62,9 @@ export function DriverDetailSheet({
   const hireDate = parseDateSafe(driver.hire_date);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg flex flex-col overflow-y-auto">
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full sm:max-w-lg flex flex-col overflow-y-auto">
         <SheetHeader className="pb-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
@@ -81,10 +85,18 @@ export function DriverDetailSheet({
                 </div>
               </div>
             </div>
-            {!readOnly && onEdit && (
-              <Button variant="ghost" size="icon" onClick={() => onEdit(driver)}>
-                <Edit2 className="h-4 w-4" />
-              </Button>
+            {!readOnly && (
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" onClick={() => setChatOpen(true)} className="gap-1.5">
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="hidden sm:inline">Message</span>
+                </Button>
+                {onEdit && (
+                  <Button variant="ghost" size="icon" onClick={() => onEdit(driver)}>
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         </SheetHeader>
@@ -141,7 +153,9 @@ export function DriverDetailSheet({
             </div>
           </>
         )}
-      </SheetContent>
-    </Sheet>
+        </SheetContent>
+      </Sheet>
+      <DriverChatSheet driver={driver} open={chatOpen} onOpenChange={setChatOpen} />
+    </>
   );
 }
