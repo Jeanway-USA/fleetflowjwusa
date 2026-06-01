@@ -81,6 +81,22 @@ serve(async (req) => {
 
     console.log("Authenticated user:", user.id);
 
+    // Role check: only owners and dispatchers may use AI parsing
+    const { data: roleRow, error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .in('role', ['owner', 'dispatcher'])
+      .maybeSingle();
+
+    if (roleError || !roleRow) {
+      console.warn("Role check failed for user", user.id, roleError);
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: insufficient permissions' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
