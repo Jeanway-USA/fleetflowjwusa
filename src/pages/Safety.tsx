@@ -6,8 +6,6 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DefectAlerts } from '@/components/safety/DefectAlerts';
-import { InspectionHistory } from '@/components/safety/InspectionHistory';
 import { DriverComplianceHub } from '@/components/safety/DriverComplianceHub';
 import { NewWorkOrderSheet, WorkOrderInitialData } from '@/components/maintenance/NewWorkOrderSheet';
 import { AlertTriangle, CheckCircle, Clock, Truck, Shield, Flame, CreditCard, User, ClipboardCheck, FileWarning, TrendingUp } from 'lucide-react';
@@ -57,12 +55,7 @@ function AlertList({ alerts, emptyMessage }: { alerts: AlertItem[]; emptyMessage
 
 export default function Safety() {
   const [workOrderOpen, setWorkOrderOpen] = useState(false);
-  const [workOrderInitialData, setWorkOrderInitialData] = useState<WorkOrderInitialData | undefined>();
-
-  const handleConvertToWorkOrder = (data: { truck_id: string; description: string }) => {
-    setWorkOrderInitialData({ truck_id: data.truck_id, description: data.description, service_types: ['repair'] });
-    setWorkOrderOpen(true);
-  };
+  const [workOrderInitialData] = useState<WorkOrderInitialData | undefined>();
 
   const { data: trucks = [] } = useQuery({
     queryKey: ['trucks'],
@@ -188,8 +181,7 @@ export default function Safety() {
     <>
       <PageHeader title="Safety Dashboard" description="Monitor inspections, compliance, incidents, and alerts" />
 
-      {/* Defect Alerts Banner */}
-      <DefectAlerts onConvertToWorkOrder={handleConvertToWorkOrder} />
+
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4 mb-6">
@@ -267,10 +259,9 @@ export default function Safety() {
       {/* Driver Compliance Hub */}
       <DriverComplianceHub />
 
-      {/* Two-column: Inspection History + Compliance Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* DVIR / Inspection History */}
-        <InspectionHistory showAllTrucks={true} />
+      {/* Compliance Alerts */}
+      <div className="mb-6">
+
 
         {/* Compliance Alerts */}
         <Card className="card-elevated">
@@ -368,13 +359,12 @@ export default function Safety() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Work Order Sheet for DVIR conversion */}
       <NewWorkOrderSheet
         open={workOrderOpen}
         onOpenChange={setWorkOrderOpen}
         initialData={workOrderInitialData}
       />
+
     </>
   );
 }
