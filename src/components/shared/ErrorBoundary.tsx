@@ -30,14 +30,25 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      const msg = this.state.error?.message ?? "";
+      const isWsIssue = /websocket|insecure/i.test(msg);
+
       if (this.props.compact) {
+        if (isWsIssue) {
+          // Live updates aren't critical — degrade gracefully instead of alarming the user.
+          return (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+              Live updates aren't available in this browser. Pull to refresh to see the latest.
+            </div>
+          );
+        }
         return (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground">Something went wrong loading this section</p>
-              {this.state.error?.message && (
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">{this.state.error.message}</p>
+              {msg && (
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">{msg}</p>
               )}
             </div>
             <Button variant="outline" size="sm" onClick={this.resetErrorBoundary} className="shrink-0 gap-1.5">

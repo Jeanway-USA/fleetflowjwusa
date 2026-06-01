@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { safeChannel } from '@/lib/safe-channel';
 
 interface Message {
   id: string;

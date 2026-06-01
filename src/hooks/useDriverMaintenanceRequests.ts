@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { safeChannel } from '@/lib/safe-channel';
 
 export interface DriverMaintenanceRequest {
   id: string;
@@ -34,9 +35,8 @@ export function useDriverMaintenanceRequests(driverId: string | undefined) {
 
   useEffect(() => {
     if (!driverId) return;
-    const channel = supabase
-      .channel(`driver-mr-${driverId}`)
-      .on(
+    return safeChannel(`driver-mr-${driverId}`, (ch) =>
+      ch.on(
         'postgres_changes',
         {
           event: '*',
@@ -47,11 +47,8 @@ export function useDriverMaintenanceRequests(driverId: string | undefined) {
         () => {
           qc.invalidateQueries({ queryKey: ['driver-maintenance-requests', driverId] });
         }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      ),
+    );
   }, [driverId, qc]);
 
   return query;
