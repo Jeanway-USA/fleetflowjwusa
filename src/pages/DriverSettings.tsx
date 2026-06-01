@@ -80,7 +80,13 @@ export default function DriverSettings() {
 
   // Save goals mutation (direct DB update - no sensitive data)
   const saveGoalsMutation = useMutation({
-    mutationFn: async (data: { weekly_miles_goal: number; weekly_revenue_goal: number; pay_week_start_day: number }) => {
+    mutationFn: async (data: {
+      weekly_miles_goal: number;
+      weekly_revenue_goal: number;
+      pay_week_start_day: number;
+      goal_type: 'financial' | 'mileage';
+      target_miles: number;
+    }) => {
       if (!driver?.id) throw new Error('Driver not found');
       if (!driver?.org_id) throw new Error('Driver organization not found');
 
@@ -95,6 +101,8 @@ export default function DriverSettings() {
             weekly_miles_goal: data.weekly_miles_goal,
             weekly_revenue_goal: data.weekly_revenue_goal,
             pay_week_start_day: data.pay_week_start_day,
+            goal_type: data.goal_type,
+            target_miles: data.target_miles,
             org_id: driver.org_id,
           })
           .eq('driver_id', driver.id);
@@ -107,6 +115,8 @@ export default function DriverSettings() {
             weekly_miles_goal: data.weekly_miles_goal,
             weekly_revenue_goal: data.weekly_revenue_goal,
             pay_week_start_day: data.pay_week_start_day,
+            goal_type: data.goal_type,
+            target_miles: data.target_miles,
           });
         if (error) throw error;
       }
@@ -126,6 +136,8 @@ export default function DriverSettings() {
       weekly_miles_goal: weeklyMilesGoal,
       weekly_revenue_goal: weeklyRevenueGoal,
       pay_week_start_day: payWeekStartDay,
+      goal_type: goalType,
+      target_miles: targetMiles,
     });
   };
 
