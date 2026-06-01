@@ -332,8 +332,8 @@ export default function DriverOnboarding() {
             .update({ direct_deposit_attachment_url: attachmentPath })
             .eq('id', driverRow.id);
           if (driverUpdateErr) {
-            console.error('Failed to attach direct deposit form to driver:', driverUpdateErr);
-            toast.error('Direct deposit attachment could not be linked to your profile. Please contact your admin.');
+            console.error('[onboarding] Failed to attach direct deposit form to driver', driverRow.id, driverUpdateErr);
+            throw new Error(`Couldn't link your direct deposit attachment: ${driverUpdateErr.message}`);
           }
         }
 
@@ -351,8 +351,8 @@ export default function DriverOnboarding() {
             _account_number: tState.accountNumber || '',
           });
           if (bankingErr) {
-            console.error('Failed to save banking info:', bankingErr);
-            toast.error('Banking info could not be saved securely. Please contact your admin.');
+            console.error('[onboarding] upsert_driver_banking failed for driver', driverRow.id, bankingErr);
+            throw new Error(`Couldn't save your banking info securely: ${bankingErr.message}. Please try again or contact your admin.`);
           }
         }
       }
