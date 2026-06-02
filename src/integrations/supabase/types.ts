@@ -3501,6 +3501,7 @@ export type Database = {
           factoring_fee_percentage: number | null
           factoring_provider_name: string | null
           factoring_remit_address: string | null
+          hide_promotions: boolean
           id: string
           is_active: boolean
           is_complimentary: boolean
@@ -3527,6 +3528,7 @@ export type Database = {
           factoring_fee_percentage?: number | null
           factoring_provider_name?: string | null
           factoring_remit_address?: string | null
+          hide_promotions?: boolean
           id?: string
           is_active?: boolean
           is_complimentary?: boolean
@@ -3553,6 +3555,7 @@ export type Database = {
           factoring_fee_percentage?: number | null
           factoring_provider_name?: string | null
           factoring_remit_address?: string | null
+          hide_promotions?: boolean
           id?: string
           is_active?: boolean
           is_complimentary?: boolean

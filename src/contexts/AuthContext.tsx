@@ -23,6 +23,7 @@ interface AuthContextType {
   primaryColor: string | null;
   logoUrl: string | null;
   bannerUrl: string | null;
+  hidePromotions: boolean;
   isDemoMode: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, firstName?: string, lastName?: string) => Promise<{ error: Error | null }>;
@@ -69,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [primaryColor, setPrimaryColor] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [hidePromotions, setHidePromotions] = useState(false);
   const [orgLoading, setOrgLoading] = useState(true);
   const [orgIsActive, setOrgIsActive] = useState(true);
   const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(null);
@@ -94,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPrimaryColor(null);
     setLogoUrl(null);
     setBannerUrl(null);
+    setHidePromotions(false);
     setOrgIsActive(true);
     setRequiresOnboarding(false);
     setOnboardingCompleted(false);
@@ -138,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOrgId(profile.org_id);
         const { data: orgData, error: orgErr } = await supabase
           .from('organizations')
-          .select('name, subscription_tier, primary_color, logo_url, banner_url, is_active, tms_mode')
+          .select('name, subscription_tier, primary_color, logo_url, banner_url, is_active, tms_mode, hide_promotions')
           .eq('id', profile.org_id)
           .maybeSingle();
 
@@ -153,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setPrimaryColor(orgData.primary_color || null);
           setLogoUrl(orgData.logo_url || null);
           setBannerUrl(orgData.banner_url || null);
+          setHidePromotions(!!orgData.hide_promotions);
         }
       } else {
         // No org yet — reset so previous user's tenant doesn't leak through.
@@ -164,6 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPrimaryColor(null);
         setLogoUrl(null);
         setBannerUrl(null);
+        setHidePromotions(false);
         setOrgIsActive(true);
       }
     } catch (err) {
@@ -535,6 +540,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       primaryColor,
       logoUrl,
       bannerUrl,
+      hidePromotions,
       refreshOrgData,
       refreshRoles,
       simulatedOrgId,
