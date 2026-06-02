@@ -183,89 +183,129 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isSuperAdmin]);
 
   useEffect(() => {
-    // Set up auth state listener first
+    // Set up auth state listener first. Wrap callback body so a malformed
+    // event from the SDK can never crash the provider.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        const previousUserId = currentUserIdRef.current;
-        setSession(session);
-        setUser(session?.user ?? null);
-        currentUserIdRef.current = session?.user?.id ?? null;
-        
-        if (session?.user) {
-          // Only re-fetch roles/org when the user actually changed
-          // (not on TOKEN_REFRESHED which fires on tab focus)
-          const userChanged = session.user.id !== previousUserId;
-          if (userChanged) {
-            setRolesLoading(true);
-            setOrgLoading(true);
-            setTimeout(() => {
-              fetchUserRoles(session.user.id).then((fetchedRoles) => {
-                setRoles(fetchedRoles);
-                setRolesLoading(false);
-              });
-              fetchOrgData(session.user.id).finally(() => setOrgLoading(false));
-            }, 0);
+        try {
+          const previousUserId = currentUserIdRef.current;
+          setSession(session);
+          setUser(session?.user ?? null);
+          currentUserIdRef.current = session?.user?.id ?? null;
+
+          if (session?.user) {
+            // Only re-fetch roles/org when the user actually changed
+            // (not on TOKEN_REFRESHED which fires on tab focus)
+            const userChanged = session.user.id !== previousUserId;
+            if (userChanged) {
+              setRolesLoading(true);
+              setOrgLoading(true);
+              setTimeout(() => {
+                fetchUserRoles(session.user.id)
+                  .then((fetchedRoles) => setRoles(fetchedRoles))
+                  .catch((err) => {
+                    console.warn('[Auth] fetchUserRoles failed:', err);
+                    setRoles([]);
+                  })
+                  .finally(() => setRolesLoading(false));
+                fetchOrgData(session.user.id)
+                  .catch((err) => console.warn('[Auth] fetchOrgData failed:', err))
+                  .finally(() => setOrgLoading(false));
+              }, 0);
+            }
+          } else {
+            setRoles([]);
+            setRolesLoading(false);
+            setSimulatedRole(null);
+            setOrgId(null);
+            setOrgName(null);
+            setSubscriptionTier('solo_bco');
+            setOrgLoading(false);
           }
-        } else {
-          setRoles([]);
+
+          setLoading(false);
+        } catch (err) {
+          console.warn('[Auth] onAuthStateChange handler error:', err);
+          setLoading(false);
           setRolesLoading(false);
-          setSimulatedRole(null);
-          setOrgId(null);
-          setOrgName(null);
-          setSubscriptionTier('solo_bco');
           setOrgLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
-    // Then check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      // Validate that the cached session is still valid server-side.
-      // If an admin deleted the user, or the session was revoked elsewhere,
-      // getSession() will still return the cached JWT but getUser() will fail.
-      // We sign out in that case so the user gets a clean re-auth instead of
-      // running around the app with a zombie token that breaks edge functions.
-      if (session?.user) {
-        const { error: validateErr } = await supabase.auth.getUser();
-        if (validateErr) {
-          console.warn('[Auth] Cached session is invalid server-side, signing out:', validateErr.message);
-          try { await supabase.auth.signOut(); } catch { /* ignore */ }
-          setSession(null);
-          setUser(null);
-          currentUserIdRef.current = null;
-          setRoles([]);
+    // Then check for existing session. Wrap the whole boot block so any
+    // SDK rejection (network, malformed cache, unclassified auth error)
+    // degrades gracefully to "logged out" instead of leaving the UI
+    // stuck on a spinner or surfacing an uncaught console error.
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        // Validate that the cached session is still valid server-side.
+        // getSession() returns cached JWTs even after the user is deleted
+        // or the session was revoked; getUser() re-validates with the
+        // Auth server. Sign out on failure so edge functions don't break.
+        if (session?.user) {
+          let validateErr: unknown = null;
+          try {
+            const { error } = await supabase.auth.getUser();
+            validateErr = error;
+          } catch (e) {
+            validateErr = e;
+          }
+          if (validateErr) {
+            const msg = (validateErr as { message?: string })?.message ?? String(validateErr);
+            console.warn('[Auth] Cached session is invalid server-side, signing out:', msg);
+            try { await supabase.auth.signOut(); } catch { /* ignore */ }
+            setSession(null);
+            setUser(null);
+            currentUserIdRef.current = null;
+            setRoles([]);
+            setRolesLoading(false);
+            setOrgLoading(false);
+            setLoading(false);
+            return;
+          }
+        }
+
+        setSession(session);
+        setUser(session?.user ?? null);
+        currentUserIdRef.current = session?.user?.id ?? null;
+
+        if (session?.user) {
+          setRolesLoading(true);
+          setOrgLoading(true);
+          fetchUserRoles(session.user.id)
+            .then((fetchedRoles) => setRoles(fetchedRoles))
+            .catch((err) => {
+              console.warn('[Auth] fetchUserRoles failed:', err);
+              setRoles([]);
+            })
+            .finally(() => setRolesLoading(false));
+          fetchOrgData(session.user.id)
+            .catch((err) => console.warn('[Auth] fetchOrgData failed:', err))
+            .finally(() => setOrgLoading(false));
+        } else {
           setRolesLoading(false);
           setOrgLoading(false);
-          setLoading(false);
-          return;
         }
-      }
-
-      setSession(session);
-      setUser(session?.user ?? null);
-      currentUserIdRef.current = session?.user?.id ?? null;
-
-      if (session?.user) {
-        setRolesLoading(true);
-        setOrgLoading(true);
-        fetchUserRoles(session.user.id).then((fetchedRoles) => {
-          setRoles(fetchedRoles);
-          setRolesLoading(false);
-        });
-        fetchOrgData(session.user.id).finally(() => setOrgLoading(false));
-      } else {
+      } catch (err) {
+        // Final safety net — never let an init error leave the app stuck.
+        console.warn('[Auth] Boot init failed, continuing as logged out:', err);
+        setSession(null);
+        setUser(null);
+        currentUserIdRef.current = null;
+        setRoles([]);
         setRolesLoading(false);
         setOrgLoading(false);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
-    });
-
+    })();
 
     return () => subscription.unsubscribe();
   }, []);
+
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
