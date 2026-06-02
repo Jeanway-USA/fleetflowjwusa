@@ -44,7 +44,7 @@ export function BetaFeedbackWidget() {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
-  const { user, orgId, orgName } = useAuth();
+  const { user, orgId, hidePromotions } = useAuth();
   const { pathname } = useLocation();
 
   const form = useForm<FeedbackForm>({
