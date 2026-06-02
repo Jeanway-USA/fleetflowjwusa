@@ -168,6 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPrimaryColor(null);
         setLogoUrl(null);
         setBannerUrl(null);
+        setHidePromotions(false);
         setOrgIsActive(true);
       }
     } catch (err) {
