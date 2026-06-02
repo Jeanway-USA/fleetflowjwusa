@@ -375,7 +375,10 @@ export default function Finance() {
 
   let deadheadMiles = 0;
   for (let i = 1; i < sortedLoads.length; i++) {
-    const gap = sortedLoads[i].start_miles - sortedLoads[i - 1].end_miles;
+    const start = sortedLoads[i].start_miles;
+    const prevEnd = sortedLoads[i - 1].end_miles;
+    if (start == null || prevEnd == null) continue;
+    const gap = start - prevEnd;
     if (gap > 0) deadheadMiles += gap;
   }
 
