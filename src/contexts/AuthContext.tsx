@@ -188,6 +188,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         try {
+          // Skip INITIAL_SESSION — the boot block below already handles
+          // the cached session (calls getSession + getUser + fetches
+          // roles/org). Letting this event also fetch causes a duplicate
+          // round-trip for every cold load.
+          if (event === 'INITIAL_SESSION') {
+            return;
+          }
+
           const previousUserId = currentUserIdRef.current;
           setSession(session);
           setUser(session?.user ?? null);
@@ -232,6 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     );
+
 
     // Then check for existing session. Wrap the whole boot block so any
     // SDK rejection (network, malformed cache, unclassified auth error)
