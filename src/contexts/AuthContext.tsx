@@ -96,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPrimaryColor(null);
     setLogoUrl(null);
     setBannerUrl(null);
+    setHidePromotions(false);
     setOrgIsActive(true);
     setRequiresOnboarding(false);
     setOnboardingCompleted(false);
