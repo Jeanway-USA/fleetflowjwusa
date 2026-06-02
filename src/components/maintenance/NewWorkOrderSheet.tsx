@@ -138,7 +138,8 @@ export function NewWorkOrderSheet({ open, onOpenChange, initialData }: NewWorkOr
 
   // Flatten for virtualizer
   const flattenedTruckItems = useMemo(() => {
-    const items: Array<{ type: 'header' | 'truck'; label?: string; truck?: typeof trucks extends (infer T)[] ? T : never }> = [];
+    type TruckRow = NonNullable<typeof trucks>[number];
+    const items: Array<{ type: 'header' | 'truck'; label?: string; truck?: TruckRow }> = [];
     Object.entries(groupedTrucks.groups).forEach(([make, truckList]) => {
       items.push({ type: 'header', label: make });
       truckList.forEach(truck => {
