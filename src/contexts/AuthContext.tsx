@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
+import { toast } from 'sonner';
 
 type AppRole = Database['public']['Enums']['app_role'];
 export type SubscriptionTier = 'solo_bco' | 'fleet_owner' | 'agency' | 'all_in_one' | 'open_beta';
@@ -55,6 +56,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [rolesLoading, setRolesLoading] = useState(true);
@@ -74,18 +76,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [simulatedOrgTier, setSimulatedOrgTier] = useState<string | null>(null);
   const [requiresOnboarding, setRequiresOnboarding] = useState(false);
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const superAdminCheckedRef = useRef<string | null>(null);
 
-  const fetchUserRoles = async (userId: string) => {
+  // Helpers that no-op after unmount to avoid setState-on-unmounted warnings
+  // and clobbering of a remounted provider's state by the discarded mount.
+  const safeSet = <T,>(setter: React.Dispatch<React.SetStateAction<T>>) =>
+    (value: React.SetStateAction<T>) => {
+      if (isMountedRef.current) setter(value);
+    };
+
+  const resetTenantState = useCallback(() => {
+    setOrgId(null);
+    setOrgName(null);
+    setSubscriptionTier('solo_bco');
+    setTmsMode(null);
+    setPrimaryColor(null);
+    setLogoUrl(null);
+    setBannerUrl(null);
+    setOrgIsActive(true);
+    setRequiresOnboarding(false);
+    setOnboardingCompleted(false);
+    setIsSuperAdmin(false);
+    setSimulatedRole(null);
+    superAdminCheckedRef.current = null;
+  }, []);
+
+  const fetchUserRoles = async (userId: string): Promise<AppRole[]> => {
     const { data, error } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', userId);
-    
+
     if (error) {
       console.error('Error fetching roles:', error);
       return [];
     }
-    
+
     return data?.map(r => r.role) || [];
   };
 
@@ -93,45 +120,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isDemoMode = user?.email === DEMO_EMAIL;
 
   const fetchOrgData = async (userId: string) => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('org_id, requires_onboarding, onboarding_completed')
-      .eq('user_id', userId)
-      .single();
+    try {
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('org_id, requires_onboarding, onboarding_completed')
+        .eq('user_id', userId)
+        .maybeSingle();
 
-    setRequiresOnboarding(!!profile?.requires_onboarding);
-    setOnboardingCompleted(!!profile?.onboarding_completed);
+      if (profileErr) throw profileErr;
 
-    if (profile?.org_id) {
-      setOrgId(profile.org_id);
-      const { data: orgData } = await supabase
-        .from('organizations')
-        .select('name, subscription_tier, primary_color, logo_url, banner_url, is_active, tms_mode')
-        .eq('id', profile.org_id)
-        .single();
+      if (!isMountedRef.current) return;
+      setRequiresOnboarding(!!profile?.requires_onboarding);
+      setOnboardingCompleted(!!profile?.onboarding_completed);
 
-      if (orgData) {
-        setOrgName(orgData.name);
-        setOrgIsActive(orgData.is_active !== false);
-        setSubscriptionTier((orgData.subscription_tier as SubscriptionTier) || 'solo_bco');
-        setTmsMode(orgData.tms_mode || 'landstar');
-        setPrimaryColor(orgData.primary_color || null);
-        setLogoUrl(orgData.logo_url || null);
-        setBannerUrl(orgData.banner_url || null);
+      if (profile?.org_id) {
+        if (!isMountedRef.current) return;
+        setOrgId(profile.org_id);
+        const { data: orgData, error: orgErr } = await supabase
+          .from('organizations')
+          .select('name, subscription_tier, primary_color, logo_url, banner_url, is_active, tms_mode')
+          .eq('id', profile.org_id)
+          .maybeSingle();
+
+        if (orgErr) throw orgErr;
+        if (!isMountedRef.current) return;
+
+        if (orgData) {
+          setOrgName(orgData.name);
+          setOrgIsActive(orgData.is_active !== false);
+          setSubscriptionTier((orgData.subscription_tier as SubscriptionTier) || 'solo_bco');
+          setTmsMode(orgData.tms_mode || 'landstar');
+          setPrimaryColor(orgData.primary_color || null);
+          setLogoUrl(orgData.logo_url || null);
+          setBannerUrl(orgData.banner_url || null);
+        }
+      } else {
+        // No org yet — reset so previous user's tenant doesn't leak through.
+        if (!isMountedRef.current) return;
+        setOrgId(null);
+        setOrgName(null);
+        setSubscriptionTier('solo_bco');
+        setTmsMode(null);
+        setPrimaryColor(null);
+        setLogoUrl(null);
+        setBannerUrl(null);
+        setOrgIsActive(true);
       }
+    } catch (err) {
+      console.warn('[Auth] fetchOrgData failed:', err);
+      if (!isMountedRef.current) return;
+      // On error, fall back to safe defaults rather than retaining prior user's values.
+      setRequiresOnboarding(false);
+      setOnboardingCompleted(false);
     }
   };
 
   const refreshOrgData = async () => {
-    if (user) {
+    if (!user) return;
+    setOrgLoading(true);
+    try {
       await fetchOrgData(user.id);
+    } finally {
+      if (isMountedRef.current) setOrgLoading(false);
     }
   };
 
   const refreshRoles = async () => {
-    if (user) {
+    if (!user) return;
+    setRolesLoading(true);
+    try {
       const fetchedRoles = await fetchUserRoles(user.id);
-      setRoles(fetchedRoles);
+      if (isMountedRef.current) setRoles(fetchedRoles);
+    } finally {
+      if (isMountedRef.current) setRolesLoading(false);
     }
   };
 
@@ -145,9 +206,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Super admin check via server-side RPC (no hardcoded emails)
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const superAdminCheckedRef = useRef<string | null>(null);
-
   useEffect(() => {
     const checkSuperAdmin = async () => {
       if (!user) {
@@ -158,6 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (superAdminCheckedRef.current === user.id) return;
       superAdminCheckedRef.current = user.id;
       const { data, error } = await supabase.rpc('is_super_admin');
+      if (!isMountedRef.current) return;
       setIsSuperAdmin(!error && data === true);
     };
     checkSuperAdmin();
@@ -183,78 +242,99 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isSuperAdmin]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     // Set up auth state listener first. Wrap callback body so a malformed
     // event from the SDK can never crash the provider.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      (event, nextSession) => {
         try {
-          // Skip INITIAL_SESSION — the boot block below already handles
-          // the cached session (calls getSession + getUser + fetches
-          // roles/org). Letting this event also fetch causes a duplicate
-          // round-trip for every cold load.
+          // Skip INITIAL_SESSION — the boot block below handles the cached
+          // session (calls getSession + getUser + fetches roles/org).
+          // Letting this event also fetch causes a duplicate round-trip.
           if (event === 'INITIAL_SESSION') {
             return;
           }
 
-          const previousUserId = currentUserIdRef.current;
-          setSession(session);
-          setUser(session?.user ?? null);
-          currentUserIdRef.current = session?.user?.id ?? null;
+          // Explicit SIGNED_OUT handling — covers revocations from other
+          // tabs, admin deletions, refresh-token failures. Reset all
+          // tenant state so the next sign-in starts clean.
+          if (event === 'SIGNED_OUT') {
+            if (!isMountedRef.current) return;
+            const wasSignedIn = currentUserIdRef.current !== null;
+            setSession(null);
+            setUser(null);
+            setRoles([]);
+            setRolesLoading(false);
+            setOrgLoading(false);
+            currentUserIdRef.current = null;
+            resetTenantState();
+            setLoading(false);
+            if (wasSignedIn) {
+              toast.error('Your session expired. Please sign in again.');
+            }
+            return;
+          }
 
-          if (session?.user) {
+          const previousUserId = currentUserIdRef.current;
+          if (!isMountedRef.current) return;
+          setSession(nextSession);
+          setUser(nextSession?.user ?? null);
+          currentUserIdRef.current = nextSession?.user?.id ?? null;
+
+          if (nextSession?.user) {
             // Only re-fetch roles/org when the user actually changed
-            // (not on TOKEN_REFRESHED which fires on tab focus)
-            const userChanged = session.user.id !== previousUserId;
+            // (not on TOKEN_REFRESHED which fires on tab focus).
+            const userChanged = nextSession.user.id !== previousUserId;
             if (userChanged) {
               setRolesLoading(true);
               setOrgLoading(true);
               setTimeout(() => {
-                fetchUserRoles(session.user.id)
-                  .then((fetchedRoles) => setRoles(fetchedRoles))
+                if (!isMountedRef.current) return;
+                fetchUserRoles(nextSession.user.id)
+                  .then((fetchedRoles) => { if (isMountedRef.current) setRoles(fetchedRoles); })
                   .catch((err) => {
                     console.warn('[Auth] fetchUserRoles failed:', err);
-                    setRoles([]);
+                    if (isMountedRef.current) setRoles([]);
                   })
-                  .finally(() => setRolesLoading(false));
-                fetchOrgData(session.user.id)
+                  .finally(() => { if (isMountedRef.current) setRolesLoading(false); });
+                fetchOrgData(nextSession.user.id)
                   .catch((err) => console.warn('[Auth] fetchOrgData failed:', err))
-                  .finally(() => setOrgLoading(false));
+                  .finally(() => { if (isMountedRef.current) setOrgLoading(false); });
               }, 0);
             }
           } else {
             setRoles([]);
             setRolesLoading(false);
-            setSimulatedRole(null);
-            setOrgId(null);
-            setOrgName(null);
-            setSubscriptionTier('solo_bco');
+            resetTenantState();
             setOrgLoading(false);
           }
 
           setLoading(false);
         } catch (err) {
           console.warn('[Auth] onAuthStateChange handler error:', err);
-          setLoading(false);
-          setRolesLoading(false);
-          setOrgLoading(false);
+          if (isMountedRef.current) {
+            setLoading(false);
+            setRolesLoading(false);
+            setOrgLoading(false);
+          }
         }
       }
     );
 
-
     // Then check for existing session. Wrap the whole boot block so any
     // SDK rejection (network, malformed cache, unclassified auth error)
     // degrades gracefully to "logged out" instead of leaving the UI
-    // stuck on a spinner or surfacing an uncaught console error.
+    // stuck on a spinner.
     (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session: bootSession } } = await supabase.auth.getSession();
 
         // Validate that the cached session is still valid server-side.
         // getSession() returns cached JWTs even after the user is deleted
         // or the session was revoked; getUser() re-validates with the
         // Auth server. Sign out on failure so edge functions don't break.
-        if (session?.user) {
+        if (bootSession?.user) {
           let validateErr: unknown = null;
           try {
             const { error } = await supabase.auth.getUser();
@@ -266,6 +346,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const msg = (validateErr as { message?: string })?.message ?? String(validateErr);
             console.warn('[Auth] Cached session is invalid server-side, signing out:', msg);
             try { await supabase.auth.signOut(); } catch { /* ignore */ }
+            if (!isMountedRef.current) return;
             setSession(null);
             setUser(null);
             currentUserIdRef.current = null;
@@ -277,30 +358,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        setSession(session);
-        setUser(session?.user ?? null);
-        currentUserIdRef.current = session?.user?.id ?? null;
+        if (!isMountedRef.current) return;
 
-        if (session?.user) {
+        // Concurrency guard: if a SIGNED_IN listener event already
+        // populated state for this same user while we were awaiting,
+        // skip the duplicate role/org fetch.
+        const alreadyHandledByListener =
+          currentUserIdRef.current !== null &&
+          currentUserIdRef.current === (bootSession?.user?.id ?? null);
+
+        setSession(bootSession);
+        setUser(bootSession?.user ?? null);
+        currentUserIdRef.current = bootSession?.user?.id ?? null;
+
+        if (bootSession?.user && !alreadyHandledByListener) {
           setRolesLoading(true);
           setOrgLoading(true);
-          fetchUserRoles(session.user.id)
-            .then((fetchedRoles) => setRoles(fetchedRoles))
+          fetchUserRoles(bootSession.user.id)
+            .then((fetchedRoles) => { if (isMountedRef.current) setRoles(fetchedRoles); })
             .catch((err) => {
               console.warn('[Auth] fetchUserRoles failed:', err);
-              setRoles([]);
+              if (isMountedRef.current) setRoles([]);
             })
-            .finally(() => setRolesLoading(false));
-          fetchOrgData(session.user.id)
+            .finally(() => { if (isMountedRef.current) setRolesLoading(false); });
+          fetchOrgData(bootSession.user.id)
             .catch((err) => console.warn('[Auth] fetchOrgData failed:', err))
-            .finally(() => setOrgLoading(false));
-        } else {
+            .finally(() => { if (isMountedRef.current) setOrgLoading(false); });
+        } else if (!bootSession?.user) {
           setRolesLoading(false);
           setOrgLoading(false);
         }
       } catch (err) {
         // Final safety net — never let an init error leave the app stuck.
         console.warn('[Auth] Boot init failed, continuing as logged out:', err);
+        if (!isMountedRef.current) return;
         setSession(null);
         setUser(null);
         currentUserIdRef.current = null;
@@ -308,12 +399,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRolesLoading(false);
         setOrgLoading(false);
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) setLoading(false);
       }
     })();
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      isMountedRef.current = false;
+      subscription.unsubscribe();
+    };
+  }, [resetTenantState]);
 
 
   const signIn = async (email: string, password: string) => {
@@ -350,16 +444,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     // Ensure the UI never gets stuck in a loading state if signOut is slow/fails.
     setLoading(true);
-    setSimulatedRole(null);
-    // Optimistically clear local auth state so protected routes redirect immediately.
+    // Optimistically clear ALL auth + tenant state so protected routes
+    // redirect immediately and the next account never sees prior branding.
     setSession(null);
     setUser(null);
     setRoles([]);
+    currentUserIdRef.current = null;
+    resetTenantState();
 
     try {
       await supabase.auth.signOut();
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     }
   };
 

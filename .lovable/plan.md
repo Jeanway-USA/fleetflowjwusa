@@ -1,37 +1,46 @@
-## Context
+## Audit findings — `src/contexts/AuthContext.tsx` + `ProtectedRoute.tsx`
 
-`src/App.tsx` already wraps `<Suspense>` in `<ErrorBoundary>`, and `src/components/shared/ErrorBoundary.tsx` exists. The real gap is that the boundary doesn't distinguish **chunk loading errors** (thrown by `React.lazy` when a dynamic `import()` fails — typically after a redeploy invalidates old hashed JS files in the user's tab) from generic render crashes. Today the user sees "Try Again", clicks it, the same broken chunk is requested again, and it fails again — effectively a soft white screen.
+### What's already correct
+- `ProtectedRoute` blocks on **all three** flags: `loading || rolesLoading || orgLoading`. A protected page cannot render or redirect until session, roles, and org are resolved. ✅
+- `INITIAL_SESSION` is skipped in the listener to avoid duplicating the boot block's fetches. ✅
+- `subscription.unsubscribe()` runs in the effect cleanup. ✅
+- `getUser()` re-validates cached JWTs server-side before trusting them. ✅
+- Boot block has try/finally so `loading` always flips off. ✅
 
-## Goal
+### Real issues to fix
 
-Detect chunk load failures and recover via a **hard reload** (`window.location.reload()`), which fetches fresh `index.html` with new chunk hashes. Keep current behavior for non-chunk render errors.
+1. **No `isMounted` guard around the async boot IIFE.** Under React StrictMode (dev) the provider mounts → unmounts → remounts. The first mount's async boot keeps running and calls `setSession/setUser/setRoles` after unmount, racing against the second mount's state and producing "setState on unmounted component" noise + can clobber the live user with stale data from the discarded mount.
 
-## Changes
+2. **Concurrent SIGNED_IN race during boot.** If a `SIGNED_IN` event fires while the boot block is still awaiting `getSession()`/`getUser()`, both paths fetch roles/org in parallel — the slower one's `setRoles`/org setters win and may overwrite the correct values. Need a single source of truth: skip the listener's fetch if `currentUserIdRef` is already pointing at that user (already done) **and** skip the boot fetch if the listener already populated state for the same user while boot was awaiting.
 
-### 1. `src/components/shared/ErrorBoundary.tsx`
-- Add a `isChunkLoadError(error)` helper that matches:
-  - `error.name === 'ChunkLoadError'`
-  - `/Loading chunk [\d]+ failed/i`
-  - `/Failed to fetch dynamically imported module/i`
-  - `/Importing a module script failed/i` (Safari)
-- In `componentDidCatch`, if it's a chunk error and we haven't already retried this session, set `sessionStorage['chunk-reload-attempted'] = '1'` and call `window.location.reload()` automatically (one-shot, so we don't infinite-loop on a genuinely broken deploy).
-- Render a dedicated fallback when `isChunkLoadError` is true (and the auto-reload already fired once):
-  - Friendly copy: "A new version of the app is available. Please reload to continue."
-  - Primary button: **Reload page** → `window.location.reload()` (clears the sessionStorage flag first).
-  - Secondary: small muted line with the error message for debugging.
-- Keep existing compact + generic fallbacks untouched for non-chunk errors.
+3. **Duplicate `onAuthStateChange` listener inside `ProtectedRoute`.** Every protected route mounts its own subscription (and there are ~30 protected routes). On navigation between protected pages this churns subscriptions, and on `SIGNED_OUT` the toast can fire from whichever listener resolves first. This belongs in `AuthProvider`, not in each route.
 
-### 2. `src/App.tsx`
-- No structural change needed — `<ErrorBoundary>` already wraps `<Suspense>`. Confirm placement stays outside `<Suspense>` so suspense fallback still renders during normal lazy loads.
+4. **`signOut` leaks org state.** It clears `session`, `user`, `roles`, and `simulatedRole`, but leaves `orgId`, `orgName`, `subscriptionTier`, `tmsMode`, `primaryColor`, `logoUrl`, `bannerUrl`, `orgIsActive`, `requiresOnboarding`, `onboardingCompleted`, `isSuperAdmin` populated. If a different account signs in next, there's a brief window where the previous tenant's branding/org is visible.
 
-## Out of scope
+5. **`fetchOrgData` uses `.single()` with no try/catch.** A missing profile row throws and silently rejects the promise — `orgLoading` does flip off (via `.finally`) but `requiresOnboarding`/`onboardingCompleted` retain whatever they had before, which is the previous user's values after a fast user switch.
 
-- Resetting the boundary on route change (separate concern; current behavior is acceptable since chunk recovery is a full reload anyway).
-- Service-worker cache busting (project intentionally has no SW per recent memory updates).
-- Telemetry/Sentry reporting.
+6. **`refreshOrgData` / `refreshRoles` don't flip their loading flags.** Callers that rely on `orgLoading` see stale `false` while a refresh is in flight. Minor — only matters if a consumer reads the flag during refresh.
 
-## Verification
+### Plan
 
-1. Run dev preview, navigate to `/executive-dashboard` — no regression, page loads.
-2. Simulate chunk error: in DevTools, throw `const e = new Error('Loading chunk 42 failed'); e.name = 'ChunkLoadError'; throw e;` from a lazy page, confirm one auto-reload fires, then on second occurrence the friendly "Reload page" UI appears with a working button.
-3. Throw a generic `throw new Error('boom')` from a page — confirm existing "Something went wrong" fallback still shows (no auto-reload).
+#### `src/contexts/AuthContext.tsx`
+- Add `isMountedRef = useRef(true)` set to `false` in the effect cleanup. Wrap every `setState` in the boot IIFE and the async `.then/.finally` callbacks of `fetchUserRoles` / `fetchOrgData` (in both boot and listener) with an `isMountedRef.current` check.
+- Add a "boot already handled this user" check: after boot finishes setting `currentUserIdRef`, compare against `previousUserIdRef` snapshot taken at boot start; if listener already advanced the ref to the same user, skip boot's role/org fetch (listener already fired them).
+- In `signOut`, clear org-related state (`orgId`, `orgName`, `subscriptionTier='solo_bco'`, `tmsMode`, `primaryColor`, `logoUrl`, `bannerUrl`, `orgIsActive=true`, `requiresOnboarding=false`, `onboardingCompleted=false`, `isSuperAdmin=false`, `simulatedRole=null`) alongside the existing clears.
+- Wrap `fetchOrgData` body in try/catch; reset `requiresOnboarding`/`onboardingCompleted`/org fields to defaults on failure so they can't carry over from a previous user.
+- Make `refreshOrgData` / `refreshRoles` flip their respective loading flags around the fetch.
+- Add `SIGNED_OUT` handling in the main listener: explicitly clear org state (same reset used by `signOut`) so it works for revocations from another tab.
+
+#### `src/components/shared/ProtectedRoute.tsx`
+- Remove the local `onAuthStateChange` subscription. Move that SIGNED_OUT toast + redirect logic into `AuthProvider` so it runs once globally. Use a `useNavigate`-free approach: dispatch the toast and let the provider's state change (`user → null`) cause `ProtectedRoute`'s existing `if (!user) return <Navigate to="/auth" />` to fire on the next render.
+
+### Out of scope
+- Memoizing `hasRole` / derived booleans (separate perf concern).
+- Migrating role storage (already correct via `user_roles` + RLS).
+- The duplicate-fetch in StrictMode dev (intentional React behavior, documented in previous QA pass).
+
+### Verification
+1. Open `/executive-dashboard`, hard refresh, watch Network: `user`, `user_roles`, `profiles`, `organizations` each fire once per StrictMode mount (still 2× in dev, but no extra race-induced duplicates).
+2. Sign out from a second tab → first tab shows toast and redirects to `/auth` once (not N times for N mounted protected routes).
+3. Sign in as user A, sign out, sign in as user B → branding/org name swap immediately with no flash of A's data.
+4. Console: no "setState on unmounted component" warnings during fast nav.
