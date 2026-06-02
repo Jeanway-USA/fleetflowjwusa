@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setOrgId(profile.org_id);
         const { data: orgData, error: orgErr } = await supabase
           .from('organizations')
-          .select('name, subscription_tier, primary_color, logo_url, banner_url, is_active, tms_mode')
+          .select('name, subscription_tier, primary_color, logo_url, banner_url, is_active, tms_mode, hide_promotions')
           .eq('id', profile.org_id)
           .maybeSingle();
 
@@ -156,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setPrimaryColor(orgData.primary_color || null);
           setLogoUrl(orgData.logo_url || null);
           setBannerUrl(orgData.banner_url || null);
+          setHidePromotions(!!orgData.hide_promotions);
         }
       } else {
         // No org yet — reset so previous user's tenant doesn't leak through.
