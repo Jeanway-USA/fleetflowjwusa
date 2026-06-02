@@ -539,6 +539,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       primaryColor,
       logoUrl,
       bannerUrl,
+      hidePromotions,
       refreshOrgData,
       refreshRoles,
       simulatedOrgId,
