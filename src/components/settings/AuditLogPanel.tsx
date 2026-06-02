@@ -46,7 +46,9 @@ export function AuditLogPanel() {
         .limit(limit + 1);
       if (error) throw error;
 
-      const userIds = Array.from(new Set((logs ?? []).map((l) => l.user_id).filter(Boolean)));
+      const userIds = Array.from(
+        new Set((logs ?? []).map((l) => l.user_id).filter((id): id is string => !!id))
+      );
       let profilesById: Record<string, { first_name: string | null; last_name: string | null; email: string | null }> = {};
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
@@ -59,7 +61,7 @@ export function AuditLogPanel() {
       const hasMore = (logs?.length ?? 0) > limit;
       const rows = (logs ?? []).slice(0, limit).map((l) => ({
         ...l,
-        profile: profilesById[l.user_id] ?? null,
+        profile: l.user_id ? profilesById[l.user_id] ?? null : null,
       }));
       return { rows, hasMore };
     },
