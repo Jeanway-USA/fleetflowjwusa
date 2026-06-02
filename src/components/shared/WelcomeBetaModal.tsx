@@ -12,8 +12,8 @@ interface WelcomeBetaModalProps {
 }
 
 export function WelcomeBetaModal({ open, userId, onStartTour, onClose }: WelcomeBetaModalProps) {
-  const { orgName } = useAuth();
-  const hideDiscord = orgName?.toLowerCase().includes('jeanway') ?? false;
+  const { hidePromotions } = useAuth();
+  const hideDiscord = hidePromotions;
   const markCompleted = async () => {
     await supabase
       .from('profiles')
