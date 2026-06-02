@@ -189,6 +189,11 @@ export function ReconciliationPreview({
       return;
     }
 
+    if (!orgId) {
+      toast.error('No organization context — please reload and try again');
+      return;
+    }
+
     setIsImporting(true);
     try {
       const newItems = validItems.filter(exp => !exp.duplicateId);
