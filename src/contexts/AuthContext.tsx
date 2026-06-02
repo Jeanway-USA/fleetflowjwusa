@@ -70,6 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [primaryColor, setPrimaryColor] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [hidePromotions, setHidePromotions] = useState(false);
   const [orgLoading, setOrgLoading] = useState(true);
   const [orgIsActive, setOrgIsActive] = useState(true);
   const [simulatedOrgId, setSimulatedOrgId] = useState<string | null>(null);
