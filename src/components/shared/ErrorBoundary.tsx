@@ -10,28 +10,88 @@ type Props = {
 type State = {
   hasError: boolean;
   error?: Error;
+  isChunkError?: boolean;
 };
+
+const CHUNK_RELOAD_KEY = "chunk-reload-attempted";
+
+function isChunkLoadError(error: unknown): boolean {
+  if (!error) return false;
+  const err = error as { name?: string; message?: string };
+  if (err.name === "ChunkLoadError") return true;
+  const msg = err.message ?? "";
+  return (
+    /Loading chunk [\w-]+ failed/i.test(msg) ||
+    /Failed to fetch dynamically imported module/i.test(msg) ||
+    /Importing a module script failed/i.test(msg) ||
+    /error loading dynamically imported module/i.test(msg)
+  );
+}
 
 export class ErrorBoundary extends React.Component<Props, State> {
   state: State = { hasError: false };
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, isChunkError: isChunkLoadError(error) };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("App crashed:", error);
     console.error("Component stack:", errorInfo.componentStack);
+
+    if (isChunkLoadError(error)) {
+      try {
+        const alreadyTried = sessionStorage.getItem(CHUNK_RELOAD_KEY) === "1";
+        if (!alreadyTried) {
+          sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+          window.location.reload();
+        }
+      } catch {
+        // sessionStorage may be unavailable (private mode); fall through to UI.
+      }
+    }
   }
 
   resetErrorBoundary = () => {
-    this.setState({ hasError: false, error: undefined });
+    this.setState({ hasError: false, error: undefined, isChunkError: false });
+  };
+
+  hardReload = () => {
+    try {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+    } catch {
+      // ignore
+    }
+    window.location.reload();
   };
 
   render() {
     if (this.state.hasError) {
       const msg = this.state.error?.message ?? "";
       const isWsIssue = /websocket|insecure/i.test(msg);
+
+      if (this.state.isChunkError) {
+        return (
+          <div className="min-h-[60vh] flex items-center justify-center px-6">
+            <div className="max-w-xl w-full rounded-lg border bg-card text-card-foreground p-6 space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+                <h1 className="text-lg font-semibold">A new version is available</h1>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                We couldn't load part of the app. This usually happens after an update. Reload the page to get the latest version.
+              </p>
+              {msg && (
+                <p className="text-xs text-muted-foreground/70 font-mono truncate">{msg}</p>
+              )}
+              <Button onClick={this.hardReload} className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Reload page
+              </Button>
+            </div>
+          </div>
+        );
+      }
 
       if (this.props.compact) {
         if (isWsIssue) {
