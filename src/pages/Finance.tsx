@@ -681,23 +681,27 @@ export default function Finance() {
               totalRevenueWithCommissions={totalRevenueWithCommissions}
               getSetting={getSetting}
             />
-            <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
+            <Suspense fallback={<ChartSkeleton height={320} />}>
+              <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
+            </Suspense>
           </div>
         </TabsContent>
 
         <TabsContent value="profitability">
           <div className="space-y-6 animate-in fade-in-50">
-            <LoadProfitabilityTab
-              deliveredLoads={deliveredLoads}
-              loadExpenses={loadExpenses}
-              drivers={drivers}
-              expenses={filteredExpenses}
-              totalExpenses={totalExpenses}
-              totalPayroll={totalPayroll}
-              revenueTotals={revenueTotals}
-              allLoads={loads}
-              isIndependent={isIndependent}
-            />
+            <Suspense fallback={<ChartSkeleton height={320} />}>
+              <LoadProfitabilityTab
+                deliveredLoads={deliveredLoads}
+                loadExpenses={loadExpenses}
+                drivers={drivers}
+                expenses={filteredExpenses}
+                totalExpenses={totalExpenses}
+                totalPayroll={totalPayroll}
+                revenueTotals={revenueTotals}
+                allLoads={loads}
+                isIndependent={isIndependent}
+              />
+            </Suspense>
           </div>
         </TabsContent>
 
@@ -1001,13 +1005,15 @@ export default function Finance() {
           <DialogHeader>
             <DialogTitle>Upload Statement</DialogTitle>
           </DialogHeader>
-          <StatementUpload
-            existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination }))}
-            trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
-            existingExpenses={expenses.map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id }))}
-            onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setUploadDialogOpen(false); }}
-            orgId={orgId}
-          />
+          <Suspense fallback={<DialogSkeleton />}>
+            <StatementUpload
+              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination }))}
+              trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
+              existingExpenses={expenses.map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id }))}
+              onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setUploadDialogOpen(false); }}
+              orgId={orgId}
+            />
+          </Suspense>
         </DialogContent>
       </Dialog>
 
