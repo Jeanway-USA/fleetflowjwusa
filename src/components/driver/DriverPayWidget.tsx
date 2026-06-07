@@ -4,7 +4,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DollarSign, TrendingUp, ChevronDown, Clock, Package, Receipt } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
 import { useState } from 'react';
@@ -32,6 +32,7 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
       return data;
     },
     enabled: !!driverId,
+    staleTime: 15 * 60 * 1000,
   });
 
   // Get driver settings for goals and pay week start day
@@ -46,6 +47,7 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
       return data;
     },
     enabled: !!driverId,
+    staleTime: 15 * 60 * 1000,
   });
 
   const weekStartsOn = (driverSettings?.pay_week_start_day ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -67,6 +69,8 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
       return data;
     },
     enabled: !!driverId,
+    staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 
   // Calculate earnings

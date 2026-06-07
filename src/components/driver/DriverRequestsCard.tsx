@@ -52,6 +52,7 @@ export function DriverRequestsCard({ driverId, truckId, activeLoadId, activeLoad
       return data;
     },
     enabled: !!driverId,
+    staleTime: 2 * 60 * 1000,
   });
 
   const openRequests = requests.filter((r) => r.status === 'pending');

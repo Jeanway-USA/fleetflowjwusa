@@ -28,6 +28,7 @@ export function DriverStatusGrid() {
 
   const { data: drivers, isLoading } = useQuery({
     queryKey: ['drivers-status-dispatcher'],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data: driversData, error: driversError } = await supabase
         .from('drivers')

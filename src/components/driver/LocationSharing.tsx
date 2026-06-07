@@ -42,6 +42,7 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
       return data;
     },
     enabled: !!user?.id,
+    staleTime: 15 * 60 * 1000,
   });
 
   // Get current location status from database
@@ -57,6 +58,7 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
       if (error) throw error;
       return data;
     },
+    staleTime: 30 * 1000,
   });
 
   // Mutation to update location (also sets is_sharing = true)

@@ -56,7 +56,9 @@ export function DriverMessages() {
   const { data: unreadCount = 0 } = useQuery({
     queryKey: unreadQueryKey,
     enabled: !!me,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30 * 1000,
     queryFn: async () => {
       if (!me) return 0;
       const { count, error } = await supabase
@@ -74,6 +76,7 @@ export function DriverMessages() {
   const { data: threads = [], isLoading: threadsLoading } = useQuery({
     queryKey: threadsKey,
     enabled: open && !!me,
+    staleTime: 60 * 1000,
     queryFn: async (): Promise<Thread[]> => {
       if (!me) return [];
       const { data: msgs, error } = await supabase
@@ -131,6 +134,7 @@ export function DriverMessages() {
   const { data: messages = [], isLoading: messagesLoading } = useQuery({
     queryKey: threadKey,
     enabled: open && !!me && !!activeCounterpart,
+    staleTime: 60 * 1000,
     queryFn: async (): Promise<Message[]> => {
       if (!me || !activeCounterpart) return [];
       const { data, error } = await supabase

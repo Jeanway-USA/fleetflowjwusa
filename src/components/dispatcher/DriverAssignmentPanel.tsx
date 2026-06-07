@@ -32,6 +32,7 @@ export function DriverAssignmentPanel() {
   // Fetch available drivers (not on active loads)
   const { data: availableDrivers, isLoading: driversLoading } = useQuery({
     queryKey: ['available-drivers-assignment'],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data: drivers } = await supabase
         .from('drivers_public_view')
@@ -52,6 +53,7 @@ export function DriverAssignmentPanel() {
   // Fetch unassigned loads (booked without driver)
   const { data: unassignedLoads, isLoading: loadsLoading } = useQuery({
     queryKey: ['unassigned-loads-assignment'],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fleet_loads')

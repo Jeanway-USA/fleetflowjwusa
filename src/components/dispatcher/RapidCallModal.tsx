@@ -47,6 +47,7 @@ export function RapidCallModal({ load, open, onOpenChange }: RapidCallModalProps
       return data;
     },
     enabled: !!load?.agency_code && open,
+    staleTime: 60 * 1000,
   });
 
   // Recent activities for this contact
@@ -63,6 +64,7 @@ export function RapidCallModal({ load, open, onOpenChange }: RapidCallModalProps
       return data || [];
     },
     enabled: !!contact?.id && open,
+    staleTime: 60 * 1000,
   });
 
   const logActivity = useMutation({
