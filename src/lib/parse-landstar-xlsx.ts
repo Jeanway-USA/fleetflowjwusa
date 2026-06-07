@@ -79,11 +79,11 @@ function parseAmount(raw: unknown): number {
   return parseFloat(raw.replace(/[^0-9.\-]/g, '')) || 0;
 }
 
-async function parseDate(raw: unknown): Promise<string | null> {
+function parseDate(raw: unknown, xlsx: XLSXModule): string | null {
   if (!raw) return null;
   if (typeof raw === 'number') {
     // Excel serial date
-    const d = XLSX.SSF.parse_date_code(raw);
+    const d = xlsx.SSF.parse_date_code(raw);
     if (d) {
       const yyyy = d.y;
       const mm = String(d.m).padStart(2, '0');
@@ -105,10 +105,11 @@ async function parseDate(raw: unknown): Promise<string | null> {
   return null;
 }
 
-export function parseLandstarXlsx(buffer: ArrayBuffer): ParsedStatement {
-  const workbook = XLSX.read(buffer, { type: 'array' });
+export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStatement> {
+  const xlsx = await loadXLSX();
+  const workbook = xlsx.read(buffer, { type: 'array' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+  const rows = xlsx.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
 
   if (rows.length === 0) {
     return { statement_type: 'contractor', period_start: null, period_end: null, unit_number: null, expenses: [] };
