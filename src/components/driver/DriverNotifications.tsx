@@ -48,6 +48,7 @@ export function DriverNotifications({ driverId }: DriverNotificationsProps) {
       return data as Notification[];
     },
     enabled: !!driverId,
+    staleTime: 60 * 1000,
   });
 
   // Subscribe to realtime notifications

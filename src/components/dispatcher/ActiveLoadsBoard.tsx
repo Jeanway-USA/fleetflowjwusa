@@ -147,6 +147,7 @@ export function ActiveLoadsBoard() {
       if (error) throw error;
       return data as ActiveLoad[];
     },
+    staleTime: 2 * 60 * 1000,
   });
 
   useEffect(() => {

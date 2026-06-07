@@ -368,6 +368,7 @@ export default function DriverLoadsView() {
       return data;
     },
     enabled: !!user?.id,
+    staleTime: 15 * 60 * 1000,
   });
 
   // Fetch driver's loads
@@ -383,6 +384,7 @@ export default function DriverLoadsView() {
       return data;
     },
     enabled: !!driverRecord?.id,
+    staleTime: 2 * 60 * 1000,
   });
 
   // Sort loads chronologically based on status

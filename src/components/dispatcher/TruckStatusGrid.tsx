@@ -27,6 +27,7 @@ export function TruckStatusGrid() {
 
   const { data: trucks, isLoading } = useQuery({
     queryKey: ['trucks-status-dispatcher'],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('trucks')

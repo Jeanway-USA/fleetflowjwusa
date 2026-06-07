@@ -35,6 +35,7 @@ export function UpcomingPickups() {
 
   const { data: loads, isLoading } = useQuery({
     queryKey: ['upcoming-pickups-dispatcher'],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const now = new Date();
       const in48Hours = addHours(now, 48);

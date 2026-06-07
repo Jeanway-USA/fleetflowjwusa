@@ -3,7 +3,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Gauge, Truck, Receipt } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek } from 'date-fns';
 import { useState } from 'react';
@@ -30,6 +30,7 @@ export function WeeklyPerformanceWidget({ driverId, payRate = null, payType = nu
       return data;
     },
     enabled: !!driverId,
+    staleTime: 15 * 60 * 1000,
   });
 
   const { data: driverSettings } = useQuery({
@@ -43,6 +44,7 @@ export function WeeklyPerformanceWidget({ driverId, payRate = null, payType = nu
       return data;
     },
     enabled: !!driverId,
+    staleTime: 15 * 60 * 1000,
   });
 
   const weekStartsOn = (driverSettings?.pay_week_start_day ?? 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -64,6 +66,8 @@ export function WeeklyPerformanceWidget({ driverId, payRate = null, payType = nu
       return data ?? [];
     },
     enabled: !!driverId,
+    staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 
   const milesThisWeek = weeklyLoads.reduce(
