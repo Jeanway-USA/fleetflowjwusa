@@ -199,7 +199,9 @@ export default function DispatcherDashboard() {
           {/* Map - Square, takes 1 column */}
           <div data-tour="fleet-map">
             <ErrorBoundary compact>
-              <FleetMapView />
+              <Suspense fallback={<MapSkeleton height={360} />}>
+                <FleetMapView />
+              </Suspense>
             </ErrorBoundary>
           </div>
 

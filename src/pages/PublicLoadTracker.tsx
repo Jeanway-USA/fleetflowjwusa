@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, MapPin, Truck, CheckCircle, Package, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { LoadRouteMap } from '@/components/driver/LoadRouteMap';
+const LoadRouteMap = lazy(() =>
+  import('@/components/driver/LoadRouteMap').then(m => ({ default: m.LoadRouteMap })),
+);
+import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { format, parseISO } from 'date-fns';
 
 interface TrackingData {
@@ -213,7 +216,9 @@ export default function PublicLoadTracker() {
         {/* Map */}
         <Card>
           <CardContent className="p-0 overflow-hidden rounded-lg">
-            <LoadRouteMap origin={data.origin_full} destination={data.destination_full} />
+            <Suspense fallback={<MapSkeleton height={320} />}>
+              <LoadRouteMap origin={data.origin_full} destination={data.destination_full} />
+            </Suspense>
           </CardContent>
         </Card>
 
