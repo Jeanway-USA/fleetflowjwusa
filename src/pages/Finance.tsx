@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationMode } from '@/hooks/useOrganizationMode';
@@ -20,11 +20,16 @@ import { toast } from 'sonner';
 import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, MapPin, Banknote, MoreHorizontal, Landmark, Upload } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { StatementUpload } from '@/components/finance/StatementUpload';
+const StatementUpload = lazy(() =>
+  import('@/components/finance/StatementUpload').then(m => ({ default: m.StatementUpload })),
+);
+import { ChartSkeleton, DialogSkeleton } from '@/components/shared/LazyFallbacks';
 import { AuditReconciliation } from '@/components/finance/AuditReconciliation';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
-import { RevenueTab } from '@/components/finance/RevenueTab';
+const RevenueTab = lazy(() =>
+  import('@/components/finance/RevenueTab').then(m => ({ default: m.RevenueTab })),
+);
 import { CommissionsTab } from '@/components/finance/CommissionsTab';
 import { DriverSettlementsTab } from '@/components/finance/driver-settlements/DriverSettlementsTab';
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
@@ -34,7 +39,9 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { InvoicingTab } from '@/components/finance/InvoicingTab';
 import { FactoringTab } from '@/components/finance/FactoringTab';
 
-import { LoadProfitabilityTab } from '@/components/finance/LoadProfitabilityTab';
+const LoadProfitabilityTab = lazy(() =>
+  import('@/components/finance/LoadProfitabilityTab').then(m => ({ default: m.LoadProfitabilityTab })),
+);
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
 import { US_STATES } from '@/lib/us-states';
