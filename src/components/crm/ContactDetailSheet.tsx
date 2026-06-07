@@ -5,7 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Phone, Mail, Globe, MapPin, Edit2, Clock, Info } from 'lucide-react';
 import { ActivityTimeline } from './ActivityTimeline';
 import { ContactLoadHistory } from './ContactLoadHistory';
-import { ContactRevenueStats } from './ContactRevenueStats';
+import { lazy, Suspense } from 'react';
+const ContactRevenueStats = lazy(() =>
+  import('./ContactRevenueStats').then(m => ({ default: m.ContactRevenueStats })),
+);
+import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
 import { getSubTypeLabel, type UnifiedContact } from '@/hooks/useCRMData';
 
 interface ContactDetailSheetProps {
@@ -146,7 +150,9 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
               <ContactLoadHistory contactId={contact.id} />
             </TabsContent>
             <TabsContent value="revenue" className="mt-3">
-              <ContactRevenueStats contactId={contact.id} />
+              <Suspense fallback={<ChartSkeleton height={260} />}>
+                <ContactRevenueStats contactId={contact.id} />
+              </Suspense>
             </TabsContent>
           </Tabs>
         ) : (

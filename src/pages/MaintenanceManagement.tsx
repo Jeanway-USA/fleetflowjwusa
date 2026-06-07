@@ -149,12 +149,16 @@ export default function MaintenanceManagement() {
         onOpenChange={setNewWorkOrderOpen} 
       />
 
-      {/* Truck History Drawer */}
-      <TruckHistoryDrawer
-        truckId={selectedTruckId}
-        open={truckDrawerOpen}
-        onOpenChange={setTruckDrawerOpen}
-      />
+      {/* Truck History Drawer — only mount (and load chunk) once opened */}
+      {truckDrawerOpen && (
+        <Suspense fallback={null}>
+          <TruckHistoryDrawer
+            truckId={selectedTruckId}
+            open={truckDrawerOpen}
+            onOpenChange={setTruckDrawerOpen}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route, Link2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
-import { LoadRouteMap } from './LoadRouteMap';
+const LoadRouteMap = lazy(() => import('./LoadRouteMap').then(m => ({ default: m.LoadRouteMap })));
+import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -263,7 +264,9 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
           </div>
 
           {/* Route Map Preview */}
-          <LoadRouteMap origin={load.origin} destination={load.destination} notes={load.notes} />
+          <Suspense fallback={<MapSkeleton height={200} />}>
+            <LoadRouteMap origin={load.origin} destination={load.destination} notes={load.notes} />
+          </Suspense>
 
           {/* Miles and Estimated Pay */}
           <div className="flex items-center justify-between pt-2 border-t">

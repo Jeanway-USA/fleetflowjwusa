@@ -7,8 +7,10 @@ import { DollarSign, TrendingUp, ChevronDown, Clock, Package, Receipt } from 'lu
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
-import { useState } from 'react';
-import { MyPaystubsDialog } from './MyPaystubsDialog';
+import { useState, lazy, Suspense } from 'react';
+const MyPaystubsDialog = lazy(() =>
+  import('./MyPaystubsDialog').then(m => ({ default: m.MyPaystubsDialog })),
+);
 
 interface DriverPayWidgetProps {
   driverId: string;
