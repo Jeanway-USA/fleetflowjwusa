@@ -6,8 +6,10 @@ import { Gauge, Truck, Receipt } from 'lucide-react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek } from 'date-fns';
-import { useState } from 'react';
-import { MyPaystubsDialog } from './MyPaystubsDialog';
+import { useState, lazy, Suspense } from 'react';
+const MyPaystubsDialog = lazy(() =>
+  import('./MyPaystubsDialog').then(m => ({ default: m.MyPaystubsDialog })),
+);
 
 interface WeeklyPerformanceWidgetProps {
   driverId: string;
@@ -131,14 +133,18 @@ export function WeeklyPerformanceWidget({ driverId, payRate = null, payType = nu
         </div>
       </CardContent>
 
-      <MyPaystubsDialog
-        open={paystubsOpen}
-        onOpenChange={setPaystubsOpen}
-        driverId={driverId}
-        driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim() || 'Driver'}
-        payType={payType}
-        payRate={payRate}
-      />
+      {paystubsOpen && (
+        <Suspense fallback={null}>
+          <MyPaystubsDialog
+            open={paystubsOpen}
+            onOpenChange={setPaystubsOpen}
+            driverId={driverId}
+            driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim() || 'Driver'}
+            payType={payType}
+            payRate={payRate}
+          />
+        </Suspense>
+      )}
     </Card>
   );
 }

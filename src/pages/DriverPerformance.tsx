@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,10 @@ import { useDriverPerformanceData, PerformancePeriod } from '@/hooks/useDriverPe
 import { ScoringMethodology } from '@/components/performance/ScoringMethodology';
 import { PerformanceLeaderboard } from '@/components/performance/PerformanceLeaderboard';
 import { PerformanceScorecards } from '@/components/performance/PerformanceScorecards';
-import { PerformanceCharts } from '@/components/performance/PerformanceCharts';
+const PerformanceCharts = lazy(() =>
+  import('@/components/performance/PerformanceCharts').then(m => ({ default: m.PerformanceCharts })),
+);
+import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
@@ -127,7 +130,9 @@ export default function DriverPerformance() {
         </TabsContent>
 
         <TabsContent value="charts" className="mt-6">
-          <PerformanceCharts metrics={driverMetrics} />
+          <Suspense fallback={<ChartSkeleton height={400} />}>
+            <PerformanceCharts metrics={driverMetrics} />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </>

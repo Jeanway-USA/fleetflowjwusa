@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationMode } from '@/hooks/useOrganizationMode';
@@ -20,11 +20,16 @@ import { toast } from 'sonner';
 import { DollarSign, TrendingUp, TrendingDown, Percent, Receipt, PiggyBank, Calculator, Route, Pencil, Trash2, Plus, Fuel, Truck as TruckIcon, Users, Briefcase, CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, MapPin, Banknote, MoreHorizontal, Landmark, Upload } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { StatementUpload } from '@/components/finance/StatementUpload';
+const StatementUpload = lazy(() =>
+  import('@/components/finance/StatementUpload').then(m => ({ default: m.StatementUpload })),
+);
+import { ChartSkeleton, DialogSkeleton } from '@/components/shared/LazyFallbacks';
 import { AuditReconciliation } from '@/components/finance/AuditReconciliation';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
-import { RevenueTab } from '@/components/finance/RevenueTab';
+const RevenueTab = lazy(() =>
+  import('@/components/finance/RevenueTab').then(m => ({ default: m.RevenueTab })),
+);
 import { CommissionsTab } from '@/components/finance/CommissionsTab';
 import { DriverSettlementsTab } from '@/components/finance/driver-settlements/DriverSettlementsTab';
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
@@ -34,7 +39,9 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { InvoicingTab } from '@/components/finance/InvoicingTab';
 import { FactoringTab } from '@/components/finance/FactoringTab';
 
-import { LoadProfitabilityTab } from '@/components/finance/LoadProfitabilityTab';
+const LoadProfitabilityTab = lazy(() =>
+  import('@/components/finance/LoadProfitabilityTab').then(m => ({ default: m.LoadProfitabilityTab })),
+);
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
 import { US_STATES } from '@/lib/us-states';
@@ -674,23 +681,27 @@ export default function Finance() {
               totalRevenueWithCommissions={totalRevenueWithCommissions}
               getSetting={getSetting}
             />
-            <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
+            <Suspense fallback={<ChartSkeleton height={320} />}>
+              <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
+            </Suspense>
           </div>
         </TabsContent>
 
         <TabsContent value="profitability">
           <div className="space-y-6 animate-in fade-in-50">
-            <LoadProfitabilityTab
-              deliveredLoads={deliveredLoads}
-              loadExpenses={loadExpenses}
-              drivers={drivers}
-              expenses={filteredExpenses}
-              totalExpenses={totalExpenses}
-              totalPayroll={totalPayroll}
-              revenueTotals={revenueTotals}
-              allLoads={loads}
-              isIndependent={isIndependent}
-            />
+            <Suspense fallback={<ChartSkeleton height={320} />}>
+              <LoadProfitabilityTab
+                deliveredLoads={deliveredLoads}
+                loadExpenses={loadExpenses}
+                drivers={drivers}
+                expenses={filteredExpenses}
+                totalExpenses={totalExpenses}
+                totalPayroll={totalPayroll}
+                revenueTotals={revenueTotals}
+                allLoads={loads}
+                isIndependent={isIndependent}
+              />
+            </Suspense>
           </div>
         </TabsContent>
 
@@ -994,13 +1005,15 @@ export default function Finance() {
           <DialogHeader>
             <DialogTitle>Upload Statement</DialogTitle>
           </DialogHeader>
-          <StatementUpload
-            existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination }))}
-            trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
-            existingExpenses={expenses.map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id }))}
-            onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setUploadDialogOpen(false); }}
-            orgId={orgId}
-          />
+          <Suspense fallback={<DialogSkeleton />}>
+            <StatementUpload
+              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination }))}
+              trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
+              existingExpenses={expenses.map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id }))}
+              onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setUploadDialogOpen(false); }}
+              orgId={orgId}
+            />
+          </Suspense>
         </DialogContent>
       </Dialog>
 

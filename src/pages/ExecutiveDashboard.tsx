@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, subWeeks, subMonths, subQuarters, subYears, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,9 +7,14 @@ import { FileText } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PeriodSelector, TimePeriod } from '@/components/executive/PeriodSelector';
 import { RevenueKPICards } from '@/components/executive/RevenueKPICards';
-import { RevenueTrendsChart } from '@/components/executive/RevenueTrendsChart';
+import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
+const RevenueTrendsChart = lazy(() =>
+  import('@/components/executive/RevenueTrendsChart').then(m => ({ default: m.RevenueTrendsChart })),
+);
 import { OperationalMetrics } from '@/components/executive/OperationalMetrics';
-import { CostBreakdownChart } from '@/components/executive/CostBreakdownChart';
+const CostBreakdownChart = lazy(() =>
+  import('@/components/executive/CostBreakdownChart').then(m => ({ default: m.CostBreakdownChart })),
+);
 import { TopPerformerCards } from '@/components/executive/TopPerformerCards';
 import { QuickInsights, Insight } from '@/components/executive/QuickInsights';
 import { CompanyHealthScore } from '@/components/executive/CompanyHealthScore';
@@ -733,7 +738,9 @@ export default function ExecutiveDashboard() {
 
         {/* Row 4: Revenue Trends Chart */}
         <ErrorBoundary compact>
-          <RevenueTrendsChart data={trendsData} isLoading={trendsLoading} />
+          <Suspense fallback={<ChartSkeleton height={320} />}>
+            <RevenueTrendsChart data={trendsData} isLoading={trendsLoading} />
+          </Suspense>
         </ErrorBoundary>
 
         {/* Row 5: Operations + Costs */}
@@ -742,7 +749,9 @@ export default function ExecutiveDashboard() {
             <OperationalMetrics data={operationalData} isLoading={operationalLoading} />
           </ErrorBoundary>
           <ErrorBoundary compact>
-            <CostBreakdownChart data={costBreakdown} isLoading={costLoading} />
+            <Suspense fallback={<ChartSkeleton height={320} />}>
+              <CostBreakdownChart data={costBreakdown} isLoading={costLoading} />
+            </Suspense>
           </ErrorBoundary>
         </div>
 

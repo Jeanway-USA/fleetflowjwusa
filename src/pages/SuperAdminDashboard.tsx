@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,7 +17,10 @@ import { format } from 'date-fns';
 import { OrgDetailSheet } from '@/components/superadmin/OrgDetailSheet';
 import { AuditLogDetailSheet } from '@/components/superadmin/AuditLogDetailSheet';
 import { OrgActionsDropdown } from '@/components/superadmin/OrgActionsDropdown';
-import { EngagementTab } from '@/components/superadmin/EngagementTab';
+const EngagementTab = lazy(() =>
+  import('@/components/superadmin/EngagementTab').then(m => ({ default: m.EngagementTab })),
+);
+import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
 import { InfrastructureTab } from '@/components/superadmin/InfrastructureTab';
 import { ResetDemoDialog } from '@/components/superadmin/ResetDemoDialog';
 import { BillingPromotionsTab } from '@/components/superadmin/BillingPromotionsTab';
@@ -226,7 +229,9 @@ export default function SuperAdminDashboard() {
 
         {/* Tab 3: Engagement */}
         <TabsContent value="engagement">
-          <EngagementTab />
+          <Suspense fallback={<ChartSkeleton height={320} />}>
+            <EngagementTab />
+          </Suspense>
         </TabsContent>
 
         {/* Tab 4: Infrastructure */}

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, lazy, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -23,7 +23,10 @@ import { extractJurisdictionFromVendor } from '@/lib/us-states';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { STATE_DIESEL_TAX_RATES } from '@/lib/ifta-tax-rates';
-import { JurisdictionMap } from '@/components/ifta/JurisdictionMap';
+const JurisdictionMap = lazy(() =>
+  import('@/components/ifta/JurisdictionMap').then(m => ({ default: m.JurisdictionMap })),
+);
+import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { UnsyncedExpenses } from '@/components/ifta/UnsyncedExpenses';
 import { IFTAWorkflowStepper } from '@/components/ifta/IFTAWorkflowStepper';
 import { IFTATooltip } from '@/components/ifta/IFTATooltip';
@@ -1010,12 +1013,14 @@ export default function IFTA() {
         </TabsContent>
 
         <TabsContent value="summary" className="mt-6">
-          <JurisdictionMap
-            iftaRecords={iftaRecords}
-            fuelPurchases={filteredFuelPurchases}
-            fleetMpg={avgMpg}
-            quarter={selectedQuarter}
-          />
+          <Suspense fallback={<MapSkeleton height={400} />}>
+            <JurisdictionMap
+              iftaRecords={iftaRecords}
+              fuelPurchases={filteredFuelPurchases}
+              fleetMpg={avgMpg}
+              quarter={selectedQuarter}
+            />
+          </Suspense>
         </TabsContent>
 
         <TabsContent value="report" className="mt-6">

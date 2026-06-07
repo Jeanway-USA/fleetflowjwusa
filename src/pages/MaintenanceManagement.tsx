@@ -1,16 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { MaintenanceKPICards } from '@/components/maintenance/MaintenanceKPICards';
+const MaintenanceKPICards = lazy(() =>
+  import('@/components/maintenance/MaintenanceKPICards').then(m => ({ default: m.MaintenanceKPICards })),
+);
+import { ChartSkeleton, PanelSkeleton } from '@/components/shared/LazyFallbacks';
 import { ActiveWorkOrdersTab } from '@/components/maintenance/ActiveWorkOrdersTab';
 import { PreventiveMaintenanceTab } from '@/components/maintenance/PreventiveMaintenanceTab';
 import { ServiceHistoryTab } from '@/components/maintenance/ServiceHistoryTab';
 import { NewWorkOrderSheet } from '@/components/maintenance/NewWorkOrderSheet';
-import { TruckHistoryDrawer } from '@/components/maintenance/TruckHistoryDrawer';
+const TruckHistoryDrawer = lazy(() =>
+  import('@/components/maintenance/TruckHistoryDrawer').then(m => ({ default: m.TruckHistoryDrawer })),
+);
 import { PMNotificationsPanel, PMNotificationsBell } from '@/components/maintenance/PMNotificationsPanel';
 import { PredictiveServiceCalendar } from '@/components/maintenance/PredictiveServiceCalendar';
 import { InventoryManagementTab } from '@/components/maintenance/InventoryManagementTab';
@@ -64,7 +69,9 @@ export default function MaintenanceManagement() {
 
       <div className="space-y-6">
         {/* KPI Dashboard */}
-        <MaintenanceKPICards />
+        <Suspense fallback={<PanelSkeleton height={140} />}>
+          <MaintenanceKPICards />
+        </Suspense>
 
         {/* Main Content Card with Tabs */}
         <Card>
@@ -142,12 +149,16 @@ export default function MaintenanceManagement() {
         onOpenChange={setNewWorkOrderOpen} 
       />
 
-      {/* Truck History Drawer */}
-      <TruckHistoryDrawer
-        truckId={selectedTruckId}
-        open={truckDrawerOpen}
-        onOpenChange={setTruckDrawerOpen}
-      />
+      {/* Truck History Drawer — only mount (and load chunk) once opened */}
+      {truckDrawerOpen && (
+        <Suspense fallback={null}>
+          <TruckHistoryDrawer
+            truckId={selectedTruckId}
+            open={truckDrawerOpen}
+            onOpenChange={setTruckDrawerOpen}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

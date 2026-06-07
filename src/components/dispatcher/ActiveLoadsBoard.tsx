@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,10 @@ import { Package, MapPin, User, Truck, Eye, MoreHorizontal, Calendar, DollarSign
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { format, parseISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { LoadRouteMap } from '@/components/driver/LoadRouteMap';
+const LoadRouteMap = lazy(() =>
+  import('@/components/driver/LoadRouteMap').then(m => ({ default: m.LoadRouteMap })),
+);
+import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { DataTable } from '@/components/shared/DataTable';
 import { toast } from 'sonner';
 import {
@@ -478,7 +481,9 @@ export function ActiveLoadsBoard() {
                 </div>
 
                 {/* Route Map */}
-                <LoadRouteMap origin={selectedLoad.origin} destination={selectedLoad.destination} notes={selectedLoad.notes} />
+                <Suspense fallback={<MapSkeleton height={220} />}>
+                  <LoadRouteMap origin={selectedLoad.origin} destination={selectedLoad.destination} notes={selectedLoad.notes} />
+                </Suspense>
 
                 {/* Miles */}
                 <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">

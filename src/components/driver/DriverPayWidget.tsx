@@ -7,8 +7,10 @@ import { DollarSign, TrendingUp, ChevronDown, Clock, Package, Receipt } from 'lu
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
-import { useState } from 'react';
-import { MyPaystubsDialog } from './MyPaystubsDialog';
+import { useState, lazy, Suspense } from 'react';
+const MyPaystubsDialog = lazy(() =>
+  import('./MyPaystubsDialog').then(m => ({ default: m.MyPaystubsDialog })),
+);
 
 interface DriverPayWidgetProps {
   driverId: string;
@@ -212,14 +214,18 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
         </div>
       </CardContent>
 
-      <MyPaystubsDialog
-        open={paystubsOpen}
-        onOpenChange={setPaystubsOpen}
-        driverId={driverId}
-        driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim() || 'Driver'}
-        payType={payType}
-        payRate={payRate}
-      />
+      {paystubsOpen && (
+        <Suspense fallback={null}>
+          <MyPaystubsDialog
+            open={paystubsOpen}
+            onOpenChange={setPaystubsOpen}
+            driverId={driverId}
+            driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim() || 'Driver'}
+            payType={payType}
+            payRate={payRate}
+          />
+        </Suspense>
+      )}
     </Card>
   );
 }
