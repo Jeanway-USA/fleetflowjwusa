@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,6 +58,7 @@ export function FleetTimelineScheduler() {
   // Active drivers with their truck assignments
   const { data: drivers, isLoading: driversLoading } = useQuery({
     queryKey: ['timeline-drivers'],
+    staleTime: 15 * 60 * 1000,
     queryFn: async () => {
       const { data: driverRows } = await supabase
         .from('drivers_public_view')
@@ -81,6 +82,8 @@ export function FleetTimelineScheduler() {
   // Loads in the 7-day window (assigned)
   const { data: assignedLoads } = useQuery({
     queryKey: ['timeline-assigned-loads', weekStart.toISOString()],
+    staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const windowStart = weekStart.toISOString().split('T')[0];
       const windowEnd = format(addDays(weekEnd, 1), 'yyyy-MM-dd');
@@ -99,6 +102,7 @@ export function FleetTimelineScheduler() {
   // Unassigned loads
   const { data: unassignedLoads } = useQuery({
     queryKey: ['timeline-unassigned-loads'],
+    staleTime: 2 * 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase
         .from('fleet_loads')
@@ -115,6 +119,7 @@ export function FleetTimelineScheduler() {
   // Service schedules for conflict detection
   const { data: serviceSchedules } = useQuery({
     queryKey: ['timeline-service-schedules'],
+    staleTime: 15 * 60 * 1000,
     queryFn: async () => {
       const { data } = await supabase
         .from('service_schedules')

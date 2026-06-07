@@ -98,7 +98,9 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
       return data;
     },
     enabled: !!driver?.id,
-    refetchInterval: 30_000, // re-check every 30s
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30 * 1000,
   });
 
   const isLoading = driverLoading || loadsLoading;

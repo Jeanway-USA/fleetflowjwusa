@@ -133,6 +133,7 @@ export function FleetMapView() {
   // Fetch ALL driver locations (not just recent ones)
   const { data: initialLocations } = useQuery({
     queryKey: ['driver-locations'],
+    staleTime: 30 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('driver_locations')
@@ -224,7 +225,9 @@ export function FleetMapView() {
       if (error) throw error;
       return data;
     },
-    refetchInterval: 30000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    staleTime: 30 * 1000,
   });
 
   // Parse intermediate stops for each load

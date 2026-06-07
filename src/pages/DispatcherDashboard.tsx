@@ -103,6 +103,7 @@ export default function DispatcherDashboard() {
         upcomingPickups: upcomingPickups || 0,
       };
     },
+    staleTime: 2 * 60 * 1000,
   });
 
   // Real-time updates for dispatcher stats when loads change
