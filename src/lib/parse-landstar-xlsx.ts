@@ -1,4 +1,10 @@
-import * as XLSX from 'xlsx';
+// xlsx is large (~140 KB gz). Load it lazily only when parsing.
+type XLSXModule = typeof import('xlsx');
+let xlsxPromise: Promise<XLSXModule> | null = null;
+function loadXLSX(): Promise<XLSXModule> {
+  if (!xlsxPromise) xlsxPromise = import('xlsx');
+  return xlsxPromise;
+}
 
 interface ExtractedExpense {
   date: string;
@@ -73,7 +79,7 @@ function parseAmount(raw: unknown): number {
   return parseFloat(raw.replace(/[^0-9.\-]/g, '')) || 0;
 }
 
-function parseDate(raw: unknown): string | null {
+async function parseDate(raw: unknown): Promise<string | null> {
   if (!raw) return null;
   if (typeof raw === 'number') {
     // Excel serial date
