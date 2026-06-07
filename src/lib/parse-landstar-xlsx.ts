@@ -149,12 +149,12 @@ export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStat
     // Extract date
     let date: string | null = null;
     if (isFreightBill) {
-      date = parseDate(row['Settlement Date']);
+      date = parseDate(row['Settlement Date'], xlsx);
     }
     // Fallback: try any date-looking column
     if (!date) {
       for (const key of ['Settlement Date', 'Pickup Date', 'Delivery Date']) {
-        date = parseDate(row[key]);
+        date = parseDate(row[key], xlsx);
         if (date) break;
       }
     }
