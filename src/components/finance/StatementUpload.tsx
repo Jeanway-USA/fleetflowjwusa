@@ -188,7 +188,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
 
         if (isExcel) {
           const buffer = await sf.file.arrayBuffer();
-          data = parseLandstarXlsx(buffer);
+          data = await parseLandstarXlsx(buffer);
         } else {
           const pdfBase64 = await convertFileToBase64(sf.file);
           if (!pdfBase64 || pdfBase64.length < 100) throw new Error('Could not read PDF file.');
