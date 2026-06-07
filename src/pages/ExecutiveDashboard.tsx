@@ -738,7 +738,9 @@ export default function ExecutiveDashboard() {
 
         {/* Row 4: Revenue Trends Chart */}
         <ErrorBoundary compact>
-          <RevenueTrendsChart data={trendsData} isLoading={trendsLoading} />
+          <Suspense fallback={<ChartSkeleton height={320} />}>
+            <RevenueTrendsChart data={trendsData} isLoading={trendsLoading} />
+          </Suspense>
         </ErrorBoundary>
 
         {/* Row 5: Operations + Costs */}
@@ -747,7 +749,9 @@ export default function ExecutiveDashboard() {
             <OperationalMetrics data={operationalData} isLoading={operationalLoading} />
           </ErrorBoundary>
           <ErrorBoundary compact>
-            <CostBreakdownChart data={costBreakdown} isLoading={costLoading} />
+            <Suspense fallback={<ChartSkeleton height={320} />}>
+              <CostBreakdownChart data={costBreakdown} isLoading={costLoading} />
+            </Suspense>
           </ErrorBoundary>
         </div>
 
