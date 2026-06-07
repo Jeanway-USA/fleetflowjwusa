@@ -69,7 +69,9 @@ export default function MaintenanceManagement() {
 
       <div className="space-y-6">
         {/* KPI Dashboard */}
-        <MaintenanceKPICards />
+        <Suspense fallback={<PanelSkeleton height={140} />}>
+          <MaintenanceKPICards />
+        </Suspense>
 
         {/* Main Content Card with Tabs */}
         <Card>
