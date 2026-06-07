@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,7 +13,10 @@ import { UpcomingPickups } from '@/components/dispatcher/UpcomingPickups';
 import { DriverStatusGrid } from '@/components/dispatcher/DriverStatusGrid';
 import { TruckStatusGrid } from '@/components/dispatcher/TruckStatusGrid';
 import { DispatcherAlerts } from '@/components/dispatcher/DispatcherAlerts';
-import { FleetMapView } from '@/components/dispatcher/FleetMapView';
+const FleetMapView = lazy(() =>
+  import('@/components/dispatcher/FleetMapView').then(m => ({ default: m.FleetMapView })),
+);
+import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { DriverAssignmentPanel } from '@/components/dispatcher/DriverAssignmentPanel';
 import { FleetTimelineScheduler } from '@/components/dispatcher/FleetTimelineScheduler';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
