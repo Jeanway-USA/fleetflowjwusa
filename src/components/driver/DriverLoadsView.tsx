@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { getRelativeTimestamp } from './RelativeTimestamp';
+import { calculateLoadPay } from '@/utils/payCalculations';
+import { usePaySettings } from '@/hooks/usePaySettings';
 
 // Status progression for drivers
 const STATUS_PROGRESSION: Record<string, string> = {
