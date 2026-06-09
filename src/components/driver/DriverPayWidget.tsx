@@ -8,6 +8,8 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
 import { useState, lazy, Suspense } from 'react';
+import { calculateWeeklyPay } from '@/utils/payCalculations';
+import { usePaySettings } from '@/hooks/usePaySettings';
 const MyPaystubsDialog = lazy(() =>
   import('./MyPaystubsDialog').then(m => ({ default: m.MyPaystubsDialog })),
 );
@@ -75,23 +77,22 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
     placeholderData: keepPreviousData,
   });
 
-  // Calculate earnings
-  const totalMiles = weeklyLoads.reduce((sum, load) => sum + (load.booked_miles || 0), 0);
-  const totalRate = weeklyLoads.reduce((sum, load) => sum + (load.rate || 0), 0);
-  const allAccessorials = weeklyLoads.flatMap(load => 
+  // === Unified pay calculation ===
+  const paySettings = usePaySettings();
+  const weekly = calculateWeeklyPay({
+    loads: weeklyLoads as any,
+    driver: { pay_type: payType, pay_rate: payRate },
+    settings: paySettings,
+  });
+  const totalMiles = weekly.totalMiles;
+  const allAccessorials = weeklyLoads.flatMap(load =>
     (load.load_accessorials || []).map((a: any) => ({
       ...a,
       loadId: load.landstar_load_id || load.id.slice(0, 8),
     }))
   );
-  const accessorialsTotal = allAccessorials.reduce((sum, a) => sum + (a.amount || 0), 0);
-
-  let weeklyEarnings = 0;
-  if (payType === 'percentage' && payRate) {
-    weeklyEarnings = (totalRate + accessorialsTotal) * (payRate / 100);
-  } else if (payType === 'per_mile' && payRate) {
-    weeklyEarnings = totalMiles * payRate;
-  }
+  const accessorialsTotal = weekly.accessorialsTotal;
+  const weeklyEarnings = weekly.total;
 
   // Weekly goals from driver settings
   const weeklyMilesGoal = driverSettings?.weekly_miles_goal || 2500;
