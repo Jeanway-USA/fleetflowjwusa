@@ -382,6 +382,7 @@ export function DriverSettlementsTab() {
         periodStart={periodStart}
         periodEnd={periodEnd}
         orgId={orgId}
+        paySettings={paySettings}
         onCreated={() => {
           qc.invalidateQueries({ queryKey: ['driver_settlements'] });
           qc.invalidateQueries({ queryKey: ['settled_load_ids'] });
