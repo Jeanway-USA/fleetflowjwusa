@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { getRelativeTimestamp } from './RelativeTimestamp';
+import { calculateLoadPay } from '@/utils/payCalculations';
+import { usePaySettings } from '@/hooks/usePaySettings';
 
 // Status progression for drivers
 const STATUS_PROGRESSION: Record<string, string> = {
@@ -131,10 +133,13 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
   const canProgress = STATUS_PROGRESSION[load.status] !== undefined;
   const nextStatus = STATUS_PROGRESSION[load.status];
 
-  // Calculate estimated pay
-  const estimatedPay = payType === 'per_mile' 
-    ? (load.booked_miles || 0) * payRate
-    : ((load.rate || 0) + (load.fuel_surcharge || 0)) * (payRate / 100);
+  // Calculate estimated pay via single source of truth
+  const paySettings = usePaySettings();
+  const estimatedPay = calculateLoadPay(
+    load as any,
+    { pay_type: payType, pay_rate: payRate },
+    paySettings,
+  ).total;
 
   const handleProgressStatus = async () => {
     if (!nextStatus) return;

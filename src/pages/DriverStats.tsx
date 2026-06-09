@@ -21,11 +21,14 @@ import {
   Droplets
 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, startOfYear, endOfYear, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { calculateWeeklyPay } from '@/utils/payCalculations';
+import { usePaySettings } from '@/hooks/usePaySettings';
 
 type PeriodType = 'weekly' | 'monthly' | 'annual';
 
 export default function DriverStats() {
   const { user } = useAuth();
+  const paySettings = usePaySettings();
   const [period, setPeriod] = useState<PeriodType>('weekly');
 
   // Fetch driver settings for custom pay-week start day
@@ -154,29 +157,22 @@ export default function DriverStats() {
   const calculateStats = () => {
     let totalLoadedMiles = 0;
     let totalEmptyMiles = 0;
-    let totalEarnings = 0;
 
     periodLoads.forEach((load: any) => {
-      // Loaded miles: prefer actual when available
       const loadedMiles = (load.actual_miles && load.actual_miles > 0)
         ? load.actual_miles
         : (load.booked_miles || 0);
       totalLoadedMiles += loadedMiles;
       totalEmptyMiles += load.empty_miles || 0;
-
-      // Earnings — mirror DriverPayWidget so stats match payroll
-      const accessorialsTotal = load.load_accessorials?.reduce(
-        (sum: number, a: any) => sum + (a.amount || 0), 0
-      ) || 0;
-      const payMiles = load.booked_miles || 0;
-
-      if (driver?.pay_type === 'percentage' && driver?.pay_rate) {
-        totalEarnings += ((load.rate || 0) + accessorialsTotal) * (driver.pay_rate / 100);
-      } else if (driver?.pay_type === 'per_mile' && driver?.pay_rate) {
-        totalEarnings += payMiles * driver.pay_rate;
-      }
-      // 'flat' pay type: earnings not derivable per-load, leave at 0
     });
+
+    // Earnings — single source of truth shared with DriverPayWidget
+    const weekly = calculateWeeklyPay({
+      loads: periodLoads as any,
+      driver: { pay_type: driver?.pay_type, pay_rate: driver?.pay_rate },
+      settings: paySettings,
+    });
+    const totalEarnings = weekly.total;
 
     const totalLoads = periodLoads.length;
     const totalMiles = totalLoadedMiles + totalEmptyMiles;

@@ -18,6 +18,8 @@ import { Users, FileText, ChevronLeft, ChevronRight, MoreHorizontal, CheckCircle
 import { format, addDays, startOfWeek, endOfWeek, parseISO } from 'date-fns';
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
+import { calculateWeeklyPay, type PaySettings } from '@/utils/payCalculations';
+import { usePaySettings } from '@/hooks/usePaySettings';
 
 type DriverSettlement = Database['public']['Tables']['driver_settlements']['Row'];
 
@@ -41,8 +43,10 @@ interface FleetLoad {
   gross_revenue: number | null;
   net_revenue: number | null;
   rate: number | null;
+  fuel_surcharge?: number | null;
   actual_miles: number | null;
   booked_miles: number | null;
+  load_accessorials?: Array<{ amount: number | null }> | null;
 }
 
 const STATUS_OPTIONS = ['all', 'draft', 'approved', 'paid'] as const;
@@ -52,26 +56,18 @@ function driverName(d?: Driver | null) {
   return `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || '—';
 }
 
-function estimatePay(driver: Driver, loads: FleetLoad[]): number {
-  const pt = (driver.pay_type || '').toLowerCase();
-  const rate = Number(driver.pay_rate ?? 0);
-  if (pt === 'percentage') {
-    const gross = loads.reduce((s, l) => s + Number(l.gross_revenue ?? l.rate ?? 0), 0);
-    return gross * (rate / 100);
-  }
-  if (pt === 'per_mile') {
-    const miles = loads.reduce((s, l) => s + Number(l.actual_miles ?? l.booked_miles ?? 0), 0);
-    return miles * rate;
-  }
-  if (pt === 'flat') return rate;
-  // fallback: 25% of gross
-  const gross = loads.reduce((s, l) => s + Number(l.gross_revenue ?? l.rate ?? 0), 0);
-  return gross * 0.25;
+function estimatePay(driver: Driver, loads: FleetLoad[], settings: PaySettings): number {
+  return calculateWeeklyPay({
+    loads: loads as any,
+    driver: { pay_type: driver.pay_type, pay_rate: driver.pay_rate },
+    settings,
+  }).total;
 }
 
 export function DriverSettlementsTab() {
   const qc = useQueryClient();
   const { orgId } = useAuth();
+  const paySettings = usePaySettings();
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
   const periodStart = format(weekStart, 'yyyy-MM-dd');
@@ -95,7 +91,7 @@ export function DriverSettlementsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fleet_loads')
-        .select('id, driver_id, status, delivery_date, pickup_date, gross_revenue, net_revenue, rate, actual_miles, booked_miles')
+        .select('id, driver_id, status, delivery_date, pickup_date, gross_revenue, net_revenue, rate, fuel_surcharge, actual_miles, booked_miles, load_accessorials(amount)')
         .eq('status', 'delivered')
         .gte('delivery_date', periodStart)
         .lte('delivery_date', periodEnd);
@@ -135,7 +131,7 @@ export function DriverSettlementsTab() {
         const loads = weekLoads.filter((l) => l.driver_id === d.id && !settledLoadIds.has(l.id));
         if (loads.length === 0) return null;
         const gross = loads.reduce((s, l) => s + Number(l.gross_revenue ?? l.rate ?? 0), 0);
-        const est = estimatePay(d, loads);
+        const est = estimatePay(d, loads, paySettings);
         return { driver: d, loads, gross, est };
       })
       .filter(Boolean) as Array<{ driver: Driver; loads: FleetLoad[]; gross: number; est: number }>;
@@ -386,6 +382,7 @@ export function DriverSettlementsTab() {
         periodStart={periodStart}
         periodEnd={periodEnd}
         orgId={orgId}
+        paySettings={paySettings}
         onCreated={() => {
           qc.invalidateQueries({ queryKey: ['driver_settlements'] });
           qc.invalidateQueries({ queryKey: ['settled_load_ids'] });
@@ -404,6 +401,7 @@ function GeneratePaystubDialog({
   periodStart,
   periodEnd,
   orgId,
+  paySettings,
   onCreated,
 }: {
   open: boolean;
@@ -413,11 +411,13 @@ function GeneratePaystubDialog({
   periodStart: string;
   periodEnd: string;
   orgId: string | null | undefined;
+  paySettings: PaySettings;
   onCreated: () => void;
 }) {
   const isFlat = (driver?.pay_type || '').toLowerCase() === 'flat';
-  const includedLoads = isFlat ? [] : loads;
-  const estimated = driver ? estimatePay(driver, includedLoads) : 0;
+  // Flat drivers: still pass loads so accessorials are included in the estimate.
+  const includedLoads = loads;
+  const estimated = driver ? estimatePay(driver, includedLoads, paySettings) : 0;
 
   const [basePay, setBasePay] = useState<string>('');
   const [bonusPay, setBonusPay] = useState<string>('0');
