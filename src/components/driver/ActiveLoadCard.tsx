@@ -14,6 +14,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { getRelativeTimestamp } from './RelativeTimestamp';
+import { calculateLoadPay } from '@/utils/payCalculations';
+import { usePaySettings } from '@/hooks/usePaySettings';
 
 // Helper to format and clean special instructions for better readability
 function formatSpecialInstructions(notes: string | null): React.ReactNode {
