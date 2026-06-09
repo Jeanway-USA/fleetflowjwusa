@@ -401,6 +401,7 @@ function GeneratePaystubDialog({
   periodStart,
   periodEnd,
   orgId,
+  paySettings,
   onCreated,
 }: {
   open: boolean;
@@ -410,11 +411,13 @@ function GeneratePaystubDialog({
   periodStart: string;
   periodEnd: string;
   orgId: string | null | undefined;
+  paySettings: PaySettings;
   onCreated: () => void;
 }) {
   const isFlat = (driver?.pay_type || '').toLowerCase() === 'flat';
-  const includedLoads = isFlat ? [] : loads;
-  const estimated = driver ? estimatePay(driver, includedLoads) : 0;
+  // Flat drivers: still pass loads so accessorials are included in the estimate.
+  const includedLoads = loads;
+  const estimated = driver ? estimatePay(driver, includedLoads, paySettings) : 0;
 
   const [basePay, setBasePay] = useState<string>('');
   const [bonusPay, setBonusPay] = useState<string>('0');
