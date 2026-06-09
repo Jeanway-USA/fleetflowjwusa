@@ -67,6 +67,7 @@ function estimatePay(driver: Driver, loads: FleetLoad[], settings: PaySettings):
 export function DriverSettlementsTab() {
   const qc = useQueryClient();
   const { orgId } = useAuth();
+  const paySettings = usePaySettings();
   const [weekStart, setWeekStart] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
   const periodStart = format(weekStart, 'yyyy-MM-dd');
@@ -130,7 +131,7 @@ export function DriverSettlementsTab() {
         const loads = weekLoads.filter((l) => l.driver_id === d.id && !settledLoadIds.has(l.id));
         if (loads.length === 0) return null;
         const gross = loads.reduce((s, l) => s + Number(l.gross_revenue ?? l.rate ?? 0), 0);
-        const est = estimatePay(d, loads);
+        const est = estimatePay(d, loads, paySettings);
         return { driver: d, loads, gross, est };
       })
       .filter(Boolean) as Array<{ driver: Driver; loads: FleetLoad[]; gross: number; est: number }>;
