@@ -7,6 +7,9 @@ import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { TrendingUp, TrendingDown, Target, BarChart3, Calculator } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import { format, parseISO } from 'date-fns';
+import { calculateLoadPay } from '@/utils/payCalculations';
+import { usePaySettings } from '@/hooks/usePaySettings';
+
 
 interface LoadProfitabilityTabProps {
   deliveredLoads: any[];
@@ -37,6 +40,8 @@ export function LoadProfitabilityTab({
   allLoads,
   isIndependent = false,
 }: LoadProfitabilityTabProps) {
+  const paySettings = usePaySettings();
+
 
   // Build load-linked expense lookup from the expenses table (consistent with P&L)
   // Non-P&L expense types to exclude (must match Finance.tsx logic)
@@ -78,16 +83,12 @@ export function LoadProfitabilityTab({
       const miles = load.actual_miles || load.booked_miles || 0;
       const linkedExpenses = loadExpenseMap.get(load.id) || { fuel: 0, tolls: 0, other: 0, total: 0 };
 
-      // Driver pay: skip for independent (owner IS the driver)
+      // Driver pay via single source of truth (skip for independent — owner IS the driver)
       let driverPay = 0;
       if (!isIndependent && load.driver_id) {
         const driver = driverMap.get(load.driver_id);
         if (driver) {
-          if (driver.pay_type === 'percentage') {
-            driverPay = gross * ((driver.pay_rate || 0) / 100);
-          } else {
-            driverPay = (driver.pay_rate || 0) * miles;
-          }
+          driverPay = calculateLoadPay(load, { pay_type: driver.pay_type, pay_rate: driver.pay_rate }, paySettings).total;
         }
       }
 
@@ -113,7 +114,7 @@ export function LoadProfitabilityTab({
         rpm: miles > 0 ? gross / miles : 0,
       };
     }).sort((a, b) => (b.pickupDate || '').localeCompare(a.pickupDate || ''));
-  }, [deliveredLoads, loadExpenseMap, driverMap, isIndependent]);
+  }, [deliveredLoads, loadExpenseMap, driverMap, isIndependent, paySettings]);
 
   // Aggregates
   const totalTrueNet = loadProfitability.reduce((s, l) => s + l.trueNetIncome, 0);
