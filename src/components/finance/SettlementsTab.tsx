@@ -19,6 +19,8 @@ import { format, parseISO, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
+import { calculateWeeklyPay } from '@/utils/payCalculations';
+import { usePaySettings } from '@/hooks/usePaySettings';
 
 interface Settlement {
   id: string;
@@ -110,6 +112,7 @@ export function SettlementsTab() {
   const queryClient = useQueryClient();
   const { orgId } = useAuth();
   const { isLandstar } = useOrganizationMode();
+  const paySettings = usePaySettings();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<Settlement | null>(null);
   const [viewingSettlement, setViewingSettlement] = useState<Settlement | null>(null);
