@@ -90,7 +90,7 @@ export function DriverSettlementsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fleet_loads')
-        .select('id, driver_id, status, delivery_date, pickup_date, gross_revenue, net_revenue, rate, actual_miles, booked_miles')
+        .select('id, driver_id, status, delivery_date, pickup_date, gross_revenue, net_revenue, rate, fuel_surcharge, actual_miles, booked_miles, load_accessorials(amount)')
         .eq('status', 'delivered')
         .gte('delivery_date', periodStart)
         .lte('delivery_date', periodEnd);
