@@ -162,14 +162,10 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   const canProgress = STATUS_PROGRESSION[load.status] !== undefined;
   const nextStatus = STATUS_PROGRESSION[load.status];
 
-  // Calculate estimated pay
-  const accessorialsTotal = load.load_accessorials?.reduce((sum, a) => sum + (a.amount || 0), 0) || 0;
-  let estimatedPay = 0;
-  if (payType === 'percentage' && load.rate && payRate) {
-    estimatedPay = ((load.rate + accessorialsTotal) * (payRate / 100));
-  } else if (payType === 'per_mile' && load.booked_miles && payRate) {
-    estimatedPay = load.booked_miles * payRate;
-  }
+  // Single source of truth for pay math.
+  const paySettings = usePaySettings();
+  const payBreakdown = calculateLoadPay(load, { pay_type: payType, pay_rate: payRate }, paySettings);
+  const estimatedPay = payBreakdown.total;
 
   const handleProgressStatus = async () => {
     if (!nextStatus) return;
