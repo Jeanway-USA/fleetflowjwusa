@@ -18,6 +18,8 @@ import { Users, FileText, ChevronLeft, ChevronRight, MoreHorizontal, CheckCircle
 import { format, addDays, startOfWeek, endOfWeek, parseISO } from 'date-fns';
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
+import { calculateWeeklyPay, type PaySettings } from '@/utils/payCalculations';
+import { usePaySettings } from '@/hooks/usePaySettings';
 
 type DriverSettlement = Database['public']['Tables']['driver_settlements']['Row'];
 
@@ -41,8 +43,10 @@ interface FleetLoad {
   gross_revenue: number | null;
   net_revenue: number | null;
   rate: number | null;
+  fuel_surcharge?: number | null;
   actual_miles: number | null;
   booked_miles: number | null;
+  load_accessorials?: Array<{ amount: number | null }> | null;
 }
 
 const STATUS_OPTIONS = ['all', 'draft', 'approved', 'paid'] as const;
@@ -52,21 +56,12 @@ function driverName(d?: Driver | null) {
   return `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || '—';
 }
 
-function estimatePay(driver: Driver, loads: FleetLoad[]): number {
-  const pt = (driver.pay_type || '').toLowerCase();
-  const rate = Number(driver.pay_rate ?? 0);
-  if (pt === 'percentage') {
-    const gross = loads.reduce((s, l) => s + Number(l.gross_revenue ?? l.rate ?? 0), 0);
-    return gross * (rate / 100);
-  }
-  if (pt === 'per_mile') {
-    const miles = loads.reduce((s, l) => s + Number(l.actual_miles ?? l.booked_miles ?? 0), 0);
-    return miles * rate;
-  }
-  if (pt === 'flat') return rate;
-  // fallback: 25% of gross
-  const gross = loads.reduce((s, l) => s + Number(l.gross_revenue ?? l.rate ?? 0), 0);
-  return gross * 0.25;
+function estimatePay(driver: Driver, loads: FleetLoad[], settings: PaySettings): number {
+  return calculateWeeklyPay({
+    loads: loads as any,
+    driver: { pay_type: driver.pay_type, pay_rate: driver.pay_rate },
+    settings,
+  }).total;
 }
 
 export function DriverSettlementsTab() {
