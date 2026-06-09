@@ -280,13 +280,21 @@ export function SettlementsTab() {
 
       let driverPay = 0;
       if (driver) {
-        if (driver.pay_type === 'percentage') {
-          driverPay = grossRevenue * ((driver.pay_rate || 0) / 100);
-        } else if (driver.pay_type === 'per_mile') {
-          driverPay = grossRevenue * 0.25;
-        } else {
-          driverPay = driver.pay_rate || 0;
-        }
+        // Re-fetch full load rows incl. accessorials so percentage pay is
+        // calculated through the single source of truth.
+        const ids = driverLoads.map((l) => l.id);
+        const { data: fullLoads } = ids.length
+          ? await supabase
+              .from('fleet_loads')
+              .select('rate, fuel_surcharge, booked_miles, load_accessorials(amount)')
+              .in('id', ids)
+          : { data: [] as any[] };
+        const weekly = calculateWeeklyPay({
+          loads: (fullLoads ?? []) as any,
+          driver: { pay_type: driver.pay_type, pay_rate: driver.pay_rate },
+          settings: paySettings,
+        });
+        driverPay = weekly.total;
       }
 
       const loadIds = driverLoads.map(l => l.id);

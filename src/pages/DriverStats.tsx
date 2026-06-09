@@ -21,11 +21,14 @@ import {
   Droplets
 } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, startOfYear, endOfYear, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { calculateWeeklyPay } from '@/utils/payCalculations';
+import { usePaySettings } from '@/hooks/usePaySettings';
 
 type PeriodType = 'weekly' | 'monthly' | 'annual';
 
 export default function DriverStats() {
   const { user } = useAuth();
+  const paySettings = usePaySettings();
   const [period, setPeriod] = useState<PeriodType>('weekly');
 
   // Fetch driver settings for custom pay-week start day
