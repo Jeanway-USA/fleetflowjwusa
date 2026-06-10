@@ -402,23 +402,8 @@ export default function ExecutiveDashboard() {
         });
       }
 
-      // Unresolved inspection defects
-      const { data: defects } = await supabase
-        .from('driver_inspections')
-        .select('id')
-        .eq('defects_found', true)
-        .neq('status', 'resolved');
+      // DVIR/inspection defects removed — feature deprecated.
 
-      if (defects && defects.length > 0) {
-        actions.push({
-          id: 'defects',
-          type: 'defect',
-          title: 'Unresolved Defects',
-          count: defects.length,
-          priority: 'high',
-          link: '/safety',
-        });
-      }
 
       // Expiring credentials (within 30 days)
       const { data: drivers } = await supabase.from('drivers').select('license_expiry, medical_card_expiry');
