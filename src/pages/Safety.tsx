@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -10,8 +10,12 @@ import { DriverComplianceHub } from '@/components/safety/DriverComplianceHub';
 import { NewWorkOrderSheet, WorkOrderInitialData } from '@/components/maintenance/NewWorkOrderSheet';
 import { AlertTriangle, CheckCircle, Clock, Truck, Shield, Flame, CreditCard, User, ClipboardCheck, FileWarning, TrendingUp } from 'lucide-react';
 import { format, addDays, isBefore, parseISO, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
+
+const IncidentTrendsChart = lazy(() =>
+  import('@/components/safety/IncidentTrendsChart').then(m => ({ default: m.IncidentTrendsChart })),
+);
+
 
 interface AlertItem {
   id: string;
@@ -242,19 +246,13 @@ export default function Safety() {
             <CardDescription>Monthly incident count breakdown</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={trendChartConfig} className="h-[200px]">
-              <BarChart data={incidentTrends}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="month" />
-                <YAxis allowDecimals={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="total" fill="var(--color-total)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="critical" fill="var(--color-critical)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
+            <Suspense fallback={<ChartSkeleton height={200} />}>
+              <IncidentTrendsChart data={incidentTrends} config={trendChartConfig} />
+            </Suspense>
           </CardContent>
         </Card>
       )}
+
 
       {/* Driver Compliance Hub */}
       <DriverComplianceHub />
