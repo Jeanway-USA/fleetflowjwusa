@@ -126,25 +126,8 @@ export function DispatcherAlerts() {
         });
       });
 
-      // Fetch unresolved defects from inspections
-      const { data: defects } = await supabase
-        .from('driver_inspections')
-        .select('id, inspection_date, defect_notes, truck:trucks!driver_inspections_truck_id_fkey(unit_number)')
-        .eq('defects_found', true)
-        .eq('status', 'submitted')
-        .order('inspection_date', { ascending: false })
-        .limit(5);
+      // DVIR / inspection alerts removed — feature deprecated.
 
-      defects?.forEach(defect => {
-        alertsList.push({
-          id: `defect-${defect.id}`,
-          type: 'defect',
-          priority: 'high',
-          title: `DVIR Defect - Unit ${(defect.truck as any)?.unit_number || 'Unknown'}`,
-          description: defect.defect_notes?.slice(0, 50) || 'Defect reported',
-          link: '/safety',
-        });
-      });
 
       // Fetch drivers with expiring credentials
       const { data: drivers } = await supabase

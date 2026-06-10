@@ -352,21 +352,8 @@ export default function ExecutiveDashboard() {
         });
       }
 
-      // Check for unresolved defects
-      const { data: defects } = await supabase
-        .from('driver_inspections')
-        .select('id')
-        .eq('defects_found', true)
-        .neq('status', 'resolved');
+      // DVIR/inspection defects removed — feature deprecated.
 
-      if (defects && defects.length > 0) {
-        alerts.push({
-          id: 'unresolved-defects',
-          type: 'maintenance',
-          message: `${defects.length} unresolved defect${defects.length > 1 ? 's' : ''} from inspections`,
-          count: defects.length,
-        });
-      }
 
       return alerts;
     },
