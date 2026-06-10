@@ -20,6 +20,10 @@ import { OrgActionsDropdown } from '@/components/superadmin/OrgActionsDropdown';
 const EngagementTab = lazy(() =>
   import('@/components/superadmin/EngagementTab').then(m => ({ default: m.EngagementTab })),
 );
+const TierDistributionChart = lazy(() =>
+  import('@/components/superadmin/TierDistributionChart').then(m => ({ default: m.TierDistributionChart })),
+);
+
 import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
 import { InfrastructureTab } from '@/components/superadmin/InfrastructureTab';
 import { ResetDemoDialog } from '@/components/superadmin/ResetDemoDialog';
@@ -143,24 +147,19 @@ export default function SuperAdminDashboard() {
               {dashLoading ? (
                 <Skeleton className="h-[300px] w-full" />
               ) : tierDistribution.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={tierDistribution.map((t: any) => ({ name: TIER_LABELS[t.tier] || t.tier, value: t.count }))}
-                      cx="50%" cy="50%" outerRadius={100} dataKey="value"
-                      label={({ name, value }) => `${name}: ${value}`}
-                    >
-                      {tierDistribution.map((t: any, i: number) => (
-                        <Cell key={i} fill={TIER_COLORS[t.tier] || 'hsl(0, 0%, 60%)'} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+                <Suspense fallback={<ChartSkeleton height={300} />}>
+                  <TierDistributionChart
+                    data={tierDistribution.map((t: any) => ({
+                      name: TIER_LABELS[t.tier] || t.tier,
+                      value: t.count,
+                      color: TIER_COLORS[t.tier] || 'hsl(0, 0%, 60%)',
+                    }))}
+                  />
+                </Suspense>
               ) : (
                 <p className="text-muted-foreground text-center py-8">No data available</p>
               )}
+
             </CardContent>
           </Card>
 
