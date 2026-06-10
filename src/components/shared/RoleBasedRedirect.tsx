@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import Landing from '@/pages/Landing';
+import { getRoleHomePath } from '@/lib/role-home';
 
 export function RoleBasedRedirect() {
   const {
@@ -9,6 +10,7 @@ export function RoleBasedRedirect() {
     loading,
     rolesLoading,
     orgLoading,
+    roles,
     hasRole,
     subscriptionTier,
     orgId,
@@ -25,55 +27,14 @@ export function RoleBasedRedirect() {
     );
   }
 
-  if (!user) {
-    return <Landing />;
-  }
+  if (!user) return <Landing />;
 
-  // User signed up but hasn't completed onboarding (no org yet)
-  if (!orgId) {
-    return <Navigate to="/onboarding" replace />;
-  }
+  if (!orgId) return <Navigate to="/onboarding" replace />;
+  if (!orgIsActive) return <Navigate to="/account-deactivated" replace />;
 
-  // Organization deactivated — redirect to deactivation page
-  if (!orgIsActive) {
-    return <Navigate to="/account-deactivated" replace />;
-  }
-
-  // Drivers who still owe onboarding must finish it before anything else
   if (hasRole('driver') && requiresOnboarding && !onboardingCompleted) {
     return <Navigate to="/driver/onboarding" replace />;
   }
 
-  // Owner routing — tier-aware
-  if (hasRole('owner')) {
-    switch (subscriptionTier) {
-      case 'solo_bco':
-      case 'open_beta':
-        return <Navigate to="/fleet-loads" replace />;
-      case 'agency':
-        return <Navigate to="/agency-loads" replace />;
-      case 'fleet_owner':
-      case 'all_in_one':
-      default:
-        return <Navigate to="/executive-dashboard" replace />;
-    }
-  }
-
-  if (hasRole('dispatcher')) {
-    return <Navigate to="/dispatcher-dashboard" replace />;
-  }
-
-  if (hasRole('driver')) {
-    return <Navigate to="/driver-dashboard" replace />;
-  }
-
-  if (hasRole('maintenance')) {
-    return <Navigate to="/maintenance-home" replace />;
-  }
-
-  if (hasRole('safety') || hasRole('payroll_admin')) {
-    return <Navigate to="/executive-dashboard" replace />;
-  }
-
-  return <Navigate to="/pending-access" replace />;
+  return <Navigate to={getRoleHomePath(roles, subscriptionTier)} replace />;
 }

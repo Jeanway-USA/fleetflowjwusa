@@ -19,7 +19,7 @@ const TABLE_CONTEXT: Record<string, string> = {
   maintenance_logs: 'Service history records',
   crm_contacts: 'CRM contact records',
   agency_loads: 'Agency brokered loads',
-  driver_inspections: 'DVIR inspection records',
+  
 };
 
 const SENSITIVE_TABLES = ['driver_payroll', 'settlements', 'drivers', 'incidents', 'organizations'];

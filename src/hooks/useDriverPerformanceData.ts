@@ -95,14 +95,9 @@ export function useDriverPerformanceData(selectedPeriod: PerformancePeriod) {
     },
   });
 
-  const { data: inspections = [] } = useQuery({
-    queryKey: ['driver_inspections'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('driver_inspections').select('*');
-      if (error) throw error;
-      return data as Inspection[];
-    },
-  });
+  // DVIR inspections feature removed; keep stub for downstream metrics
+  const inspections: Inspection[] = [];
+
 
   const { data: incidents = [] } = useQuery({
     queryKey: ['incidents'],

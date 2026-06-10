@@ -1,90 +1,90 @@
-# Unified Driver Pay Calculation
+# Production Readiness Lockdown
 
-## Goal
-One source of truth for driver pay. Every dashboard, dispatcher view, finance tab, and driver card calls the same function, with identical results.
+A four-part sweep to harden access control, verify backend isolation, purge removed-feature code, and finish performance polish.
 
-## Task 1 — Create `src/utils/payCalculations.ts`
+## Task 1 — RBAC Routing Lockdown
 
-A single module exporting:
+**Goal:** strict role segregation; bad URLs bounce to the user's role-home with a toast.
 
-- `PayType = 'percentage' | 'per_mile' | 'cpm' | 'flat' | 'hourly'`
-- `calculateLoadPay({ load, driver, settings })` — pay for ONE load
-- `calculateWeeklyPay({ loads, driver, settings, hoursWorked? })` — pay for a set of loads in a pay period
-- `getPayBreakdown(...)` — returns `{ base, accessorialsTotal, total, formulaLabel }` for UI display
+1. **New helper `src/lib/role-home.ts`** — single source of truth for "where does this role belong?":
+   - owner → tier-aware (current logic from `RoleBasedRedirect`)
+   - dispatcher → `/dispatcher-dashboard`
+   - driver → `/driver-dashboard`
+   - maintenance → `/maintenance-home`
+   - safety / payroll_admin → `/executive-dashboard`
+2. **Refactor `RoleBasedRedirect.tsx`** to use the helper.
+3. **`ProtectedRoute.tsx` upgrade** — when role check fails, instead of `<Navigate to="/" replace />` (which silently re-routes), fire a sonner toast `"You don't have access to that page"` once per redirect, then navigate to the caller's role-home via the helper. Use a `useEffect` guard so the toast fires exactly once.
+4. **Tighten allowed-role lists** on routes:
+   - `/trucks`, `/trailers` → drop `dispatcher`; keep `owner, safety, maintenance` (maintenance needs read for service).
+   - `/drivers` → drop `dispatcher, safety` (leave `owner, payroll_admin`).
+   - `/fleet-loads` → remove `driver` (drivers use `/driver-dashboard` only).
+   - `/crm` → remove `driver, safety`.
+   - `/documents` → remove `driver` (drivers see their own docs via dashboard).
+   - `/load-optimizer`, `/agency-loads` → owner + dispatcher only (already correct).
+   - `/incidents`, `/driver-performance`, `/driver-view/:id` → remove `dispatcher` (safety/owner only).
+   - `/maintenance` → owner + maintenance only (drop `safety`).
+   - Confirm `maintenance` role is **not** in any finance, CRM, loads, dispatch, executive, or driver-mgmt route.
+5. **Maintenance landing** = `/maintenance-home`; sidebar (`AppSidebar.tsx`) — hide every nav item except Maintenance Home, Maintenance, Trucks, Trailers, Safety Bonus settings when role is `maintenance`.
 
-### Inputs
-- `load`: `{ rate, fuel_surcharge, booked_miles, load_accessorials[] }`
-- `driver`: `{ pay_type, pay_rate, weekly_flat_rate?, hourly_rate? }`
-- `settings` (org-level, with sane defaults):
-  - `landstarSplit` — number, default `0.65`. Applied **only when `tmsMode === 'landstar'`**. In Independent mode the split is `1.0`.
-  - Read from `organizations` (existing column or new `landstar_split` numeric; default 0.65 in code if missing — no schema change required for this task).
+## Task 2 — RLS Verification + Migrations
 
-### Formulas (strict)
+**Audit (frontend):** every driver-facing query must filter by the authed user's driver id. Files to verify and patch if missing `.eq('driver_id', myDriverId)` or equivalent:
+- `DriverDashboard.tsx`, `DriverLoadsView.tsx`, `ActiveLoadCard.tsx`, `DriverPayWidget.tsx`, `WeeklyPerformanceWidget.tsx`, `MyPaystubsDialog.tsx`, `DriverNotifications.tsx`, `DriverRequestsCard.tsx`, `LocationSharing.tsx`, `GeofenceArrivalDrawer.tsx`, `ProofOfDeliveryDialog.tsx`, `DriverStats.tsx`, `DriverSettings.tsx`, `DriverOnboarding.tsx`.
+- Spot-check confirms most already scope by `driver_id`; add explicit filters anywhere only `org_id` RLS is relied on.
 
-**Percentage** (per load)
+**Migration — RLS tighten (single migration):** for each table below, drop any policy that lets drivers see siblings' rows and replace with strict `driver_id = get_driver_id_for_user(auth.uid())` policies for the `driver` role. Admin/owner policies preserved.
+- `fleet_loads` — driver SELECT/UPDATE limited to assigned loads (already via trigger; ensure RLS matches).
+- `driver_payroll`, `driver_settlements`, `driver_settlement_items` — driver SELECT only own rows; no INSERT/UPDATE/DELETE for drivers.
+- `driver_signed_documents` (1099 / compliance) — driver SELECT/INSERT own rows only.
+- `driver_notifications`, `driver_requests`, `driver_settings`, `driver_locations`, `detention_requests`, `documents`, `driver_banking_info` — driver scope = own rows.
+
+After migration, run `supabase--linter` and address new findings related to changes.
+
+## Task 3 — Dead-Code & UI Purge (hard delete + fix references)
+
+**Delete files**
+- `src/components/finance/PayrollTab.tsx` (legacy, replaced by DriverSettlementsTab; not imported anywhere live).
+- Any orphan inspection/fuel-stop/profile/duplicate-load components if found during refactor pass (current scan shows none in `src/components` or `src/pages`).
+
+**Drop unused DB tables (migration, second statement set):**
+- `driver_inspections`, `inspection_photos` (pre/post-trip)
+- `fuel_stops_cache` (fuel stop uploads — referenced only in generated types)
+- `hos_logs` (HOS already removed from UI per core memory)
+
+Regenerated `types.ts` will auto-drop the orphan type entries.
+
+**Code cleanup**
+- Remove `driver_inspections`, `inspection_photos`, `fuel_stops_cache`, `hos_logs` references from `useDriverPerformanceData.ts`, `ExecutiveDashboard.tsx`, `DispatcherAlerts.tsx`, `AuditLogDetailSheet.tsx`, `tour-steps.ts`.
+- Note: settlement-style "deductions" in `SettlementsTab.tsx` / `DriverSettlementsTab.tsx` are **kept** — those are settlement reconciliation line items (escrow, advances), not the removed driver-deductions feature. Only the legacy `PayrollTab` deductions UI is removed.
+- Verify no remaining imports of deleted files (`rg` sweep), fix any breakage.
+
+## Task 4 — Lazy-Loading Polish
+
+- Re-scan with `rg` for direct (non-lazy) imports of: `recharts`, `leaflet`/`react-leaflet`, `jspdf`, `html2canvas`, `xlsx`, `qrcode`, `signature_pad`. Anything still eager gets wrapped via `React.lazy` + `<Suspense>` using the existing `LazyFallbacks.tsx` skeletons.
+- Audit list of suspects to confirm/lazy-fix:
+  - `PrintableExecutiveSummary.tsx`, `IFTAPrintSummary.tsx` (jspdf)
+  - `JurisdictionMap.tsx`, `LoadRouteMap.tsx` (leaflet) — confirm lazy
+  - `MorningBriefingWidget`, `CostBreakdownChart`, `RevenueTrendsChart`, `PerformanceCharts` (recharts)
+  - `SignaturePad.tsx` (signature_pad lib)
+- Verify no regression on mobile preview routes (`/driver-dashboard`, `/fleet-loads`).
+
+## Out of Scope
+
+- No new features. No design changes.
+- No edits to onboarding/auth flow.
+- Settlement deductions stay (they're not the "driver deductions" feature).
+- Edge-function code untouched unless an RLS change forces a payload tweak.
+
+## Verification
+
+1. Build passes; `tsc` clean after types regen.
+2. Manual route-spoof check: visit `/finance` as driver → toast + redirect to `/driver-dashboard`; visit `/fleet-loads` as maintenance → toast + redirect to `/maintenance-home`.
+3. `supabase--linter` clean for touched tables.
+4. Bundle: confirm `recharts`/`leaflet`/`jspdf` no longer in main chunk (vite build output).
+
+```text
+RBAC ─────────►  role-home.ts  ──► ProtectedRoute (toast+redirect)
+RLS  ─────────►  migration: driver_id-scoped policies
+PURGE ────────►  drop tables + delete PayrollTab + clean refs
+LAZY ─────────►  recharts / leaflet / jspdf wrapped via LazyFallbacks
 ```
-base       = load.rate * (tmsMode === 'landstar' ? landstarSplit : 1)
-basePay    = base * (driver.pay_rate / 100)
-total      = basePay + accessorialsTotal
-```
-FSC is **excluded** from the percentage base. Accessorials add on top, at 100%.
-
-**Mileage** (`per_mile` / `cpm`, per load)
-```
-total = (load.booked_miles || 0) * driver.pay_rate + accessorialsTotal
-```
-
-**Flat** (per week, not per load)
-```
-weeklyTotal = driver.weekly_flat_rate (or pay_rate as fallback)
-            + sum(accessorials across delivered loads that week)
-```
-Per-load pay for flat drivers returns `{ base: 0, accessorialsTotal, total: accessorialsTotal }` so per-load UIs show accessorials only and the weekly widget shows flat + accessorials.
-
-**Hourly** (preserved as-is)
-```
-weeklyTotal = (hoursWorked ?? 0) * driver.hourly_rate (or pay_rate)
-```
-No per-load calculation; existing hourly configuration UI in CompensationSettingsTab / driver card stays intact.
-
-### Behavior
-- All inputs coerced via `Number(x ?? 0)` to avoid NaN.
-- `cpm` is treated as alias for `per_mile`.
-- Returns zero when required fields are missing rather than throwing.
-- Pure function, no React/Supabase imports — easy to unit test.
-
-## Task 2 — Refactor sites
-
-Replace inline math at every site with `calculateLoadPay` or `calculateWeeklyPay`. The `tmsMode` comes from existing `useOrganizationMode()`; pass it (and org's `landstarSplit`) into the helper.
-
-| File | Current logic | Replace with |
-|---|---|---|
-| `src/components/driver/ActiveLoadCard.tsx` (L166–171) | `(rate + accessorials) * pct` / `miles * rate` | `calculateLoadPay` |
-| `src/components/driver/DriverPayWidget.tsx` (weekly earnings block) | inline % and per-mile sums | `calculateWeeklyPay` |
-| `src/components/driver/WeeklyPerformanceWidget.tsx` | inline math + flat branch | `calculateWeeklyPay` |
-| `src/components/driver/DriverLoadsView.tsx` (L135–137) | `(rate + fsc) * pct` ❌ wrong, uses FSC | `calculateLoadPay` |
-| `src/components/driver/MyPaystubsDialog.tsx` | inline per-period math | `calculateWeeklyPay` |
-| `src/pages/DriverStats.tsx` (L173–176) | inline % and per-mile | `calculateLoadPay` in the reducer |
-| `src/pages/DriverSpectatorView.tsx` | passes pay props only | no math change, ensure children use util |
-| `src/components/finance/SettlementsTab.tsx` (L283–288) | `grossRevenue * pct` ❌ wrong (no 65% split, includes FSC) | `calculateLoadPay` |
-| `src/components/finance/driver-settlements/DriverSettlementsTab.tsx` | inline per-driver totals | `calculateWeeklyPay` |
-| `src/components/finance/LoadProfitabilityTab.tsx` (driver-cost column) | inline pct math | `calculateLoadPay` |
-| `src/components/finance/PLSummaryTab.tsx` (driver pay aggregation) | inline | `calculateWeeklyPay` per driver |
-| `src/components/finance/CompensationSettingsTab.tsx` | settings UI only — confirm hourly inputs still work | unchanged math, keep hourly preserved |
-| `src/components/executive/CompanyHealthScore.tsx`, `FleetStatusCard.tsx`, `DriverAvailabilityCard.tsx` | aggregate-only references | switch any inline pay sums to util |
-| `src/pages/LoadOptimizer.tsx` | profitability margin uses inline driver pay | `calculateLoadPay` |
-| `src/hooks/useOperationalCPM.ts` | inline cost-per-mile that includes driver pay | `calculateLoadPay` for the driver-cost component |
-
-Anything that already calls `formatPayRate` / `payTypeLabel` in `src/lib/pay-format.ts` stays — those are display helpers, not math.
-
-## Task 3 — Verification
-
-- Add `src/utils/payCalculations.test.ts` with cases for each pay type (Landstar + Independent), zero/NaN inputs, FSC exclusion, flat weekly aggregation.
-- Smoke check: Driver Dashboard, Active Load Card, Paystubs dialog, Settlements tab, Driver Settlements tab, Load Profitability all render expected numbers for a sample percentage / mileage / flat / hourly driver.
-- Typecheck runs automatically.
-
-## Out of scope
-- Schema changes (no new columns; `landstarSplit` defaults to 0.65 in code, read from `organizations.landstar_split` if present).
-- Settlement reconciliation / Landstar XLSX parser math.
-- Hourly UI changes (preserved as-is).
-- Org-revenue split logic in `src/lib/revenue-calculator.ts` (that's company revenue, not driver pay).

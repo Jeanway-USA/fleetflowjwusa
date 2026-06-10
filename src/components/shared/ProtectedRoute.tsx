@@ -1,11 +1,12 @@
-import { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { ReactNode, useEffect, useRef } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { TierGate } from '@/components/shared/TierGate';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { getRoleHomePath } from '@/lib/role-home';
 import type { Database } from '@/integrations/supabase/types';
-
 
 type AppRole = Database['public']['Enums']['app_role'];
 
@@ -16,13 +17,36 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles, requiredFeature }: ProtectedRouteProps) {
-  const { user, loading, rolesLoading, orgLoading, hasRole, orgIsActive, orgId, requiresOnboarding, onboardingCompleted } = useAuth();
+  const {
+    user,
+    loading,
+    rolesLoading,
+    orgLoading,
+    roles,
+    hasRole,
+    subscriptionTier,
+    orgIsActive,
+    orgId,
+    requiresOnboarding,
+    onboardingCompleted,
+  } = useAuth();
+  const location = useLocation();
+  const toastedPathRef = useRef<string | null>(null);
 
-  // SIGNED_OUT toast + redirect is handled globally in AuthProvider so it
-  // fires exactly once on session loss (not N times for N mounted routes).
-  // When the provider clears `user`, the `!user` redirect below kicks in.
+  const stillLoading = loading || rolesLoading || orgLoading;
+  const authenticated = !!user;
+  const hasAccess = allowedRoles.some(role => hasRole(role));
+  const showAccessDeniedToast = authenticated && !stillLoading && !hasAccess;
 
-  if (loading || rolesLoading || orgLoading) {
+  // Fire access-denied toast exactly once per pathname.
+  useEffect(() => {
+    if (showAccessDeniedToast && toastedPathRef.current !== location.pathname) {
+      toastedPathRef.current = location.pathname;
+      toast.error("You don't have access to that page");
+    }
+  }, [showAccessDeniedToast, location.pathname]);
+
+  if (stillLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -34,26 +58,21 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
     return <Navigate to="/auth" replace />;
   }
 
-  // Organization deactivated — block access
   if (orgId && !orgIsActive) {
     return <Navigate to="/account-deactivated" replace />;
   }
 
-  // Check if user has at least one of the allowed roles
-  const hasAccess = allowedRoles.some(role => hasRole(role));
   if (!hasAccess) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={getRoleHomePath(roles, subscriptionTier)} replace />;
   }
 
-  // Drivers with outstanding onboarding cannot reach any protected page until they finish.
-  // (The /driver/onboarding route itself bypasses this guard by being the redirect target.)
+  // Drivers with outstanding onboarding must finish first.
   if (hasRole('driver') && requiresOnboarding && !onboardingCompleted) {
     if (typeof window !== 'undefined' && window.location.pathname !== '/driver/onboarding') {
       return <Navigate to="/driver/onboarding" replace />;
     }
   }
 
-  // Wrap in layout, then optionally gate by tier feature
   const content = requiredFeature ? (
     <TierGate requiredFeature={requiredFeature}>{children}</TierGate>
   ) : (

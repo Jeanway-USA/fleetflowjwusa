@@ -130,25 +130,25 @@ const App = () => {
 
                     {/* Fleet management */}
                     <Route path="/trucks" element={
-                      <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety', 'maintenance']} requiredFeature="trucks">
+                      <ProtectedRoute allowedRoles={['owner', 'safety', 'maintenance']} requiredFeature="trucks">
 
                         <Trucks />
                       </ProtectedRoute>
                     } />
                     <Route path="/trailers" element={
-                      <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety', 'maintenance']} requiredFeature="trailers">
+                      <ProtectedRoute allowedRoles={['owner', 'safety', 'maintenance']} requiredFeature="trailers">
                         <Trailers />
                       </ProtectedRoute>
                     } />
                     <Route path="/drivers" element={
-                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety']} requiredFeature="drivers">
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin']} requiredFeature="drivers">
                         <Drivers />
                       </ProtectedRoute>
                     } />
 
                     {/* Loads */}
                     <Route path="/fleet-loads" element={
-                      <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety', 'driver']} requiredFeature="loads">
+                      <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety']} requiredFeature="loads">
                         <FleetLoads />
                       </ProtectedRoute>
                     } />
@@ -182,7 +182,7 @@ const App = () => {
 
                     {/* Operations */}
                     <Route path="/crm" element={
-                      <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'safety', 'driver']} requiredFeature="crm">
+                      <ProtectedRoute allowedRoles={['owner', 'dispatcher']} requiredFeature="crm">
                         <CRM />
                       </ProtectedRoute>
                     } />
@@ -193,7 +193,7 @@ const App = () => {
                       </ProtectedRoute>
                     } />
                     <Route path="/maintenance" element={
-                      <ProtectedRoute allowedRoles={['owner', 'safety', 'maintenance']} requiredFeature="maintenance_full">
+                      <ProtectedRoute allowedRoles={['owner', 'maintenance']} requiredFeature="maintenance_full">
                         <MaintenanceManagement />
                       </ProtectedRoute>
                     } />
@@ -203,7 +203,7 @@ const App = () => {
                       </ProtectedRoute>
                     } />
                     <Route path="/documents" element={
-                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver']} requiredFeature="documents">
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety']} requiredFeature="documents">
                         <Documents />
                       </ProtectedRoute>
                     } />
@@ -215,20 +215,21 @@ const App = () => {
                       </ProtectedRoute>
                     } />
                     <Route path="/incidents" element={
-                      <ProtectedRoute allowedRoles={['owner', 'safety', 'dispatcher']} requiredFeature="incidents">
+                      <ProtectedRoute allowedRoles={['owner', 'safety']} requiredFeature="incidents">
                         <Incidents />
                       </ProtectedRoute>
                     } />
                     <Route path="/driver-performance" element={
-                      <ProtectedRoute allowedRoles={['owner', 'safety', 'dispatcher']} requiredFeature="driver_performance">
+                      <ProtectedRoute allowedRoles={['owner', 'safety']} requiredFeature="driver_performance">
                         <DriverPerformance />
                       </ProtectedRoute>
                     } />
                     <Route path="/driver-view/:driverId" element={
-                      <ProtectedRoute allowedRoles={['owner', 'safety', 'dispatcher']}>
+                      <ProtectedRoute allowedRoles={['owner', 'safety']}>
                         <DriverSpectatorView />
                       </ProtectedRoute>
                     } />
+
 
                     {/* Settings */}
                     <Route path="/settings" element={
