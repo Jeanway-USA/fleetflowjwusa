@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { compressImage } from '@/lib/compress-image';
 import { CheckCircle2, Download } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -295,7 +296,7 @@ export default function DriverOnboarding() {
       const templateHasFileUpload = /\{\{\s*file_upload\s*\}\}/.test(tmpl.content);
       let attachmentPath: string | null = null;
       if (templateHasFileUpload && tState.attachment) {
-        const file = tState.attachment;
+        const file = await compressImage(tState.attachment);
         const rawExt = (file.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const ext = rawExt || (file.type.startsWith('image/') ? 'jpg' : 'bin');
         attachmentPath = `${orgId}/${driverRow.id}/${safeType}_attachment-${timestamp}.${ext}`;

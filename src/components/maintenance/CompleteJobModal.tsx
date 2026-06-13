@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useCompleteWorkOrder, WorkOrder } from '@/hooks/useMaintenanceData';
 import { toast } from 'sonner';
+import { compressImage } from '@/lib/compress-image';
 import { Loader2, Upload, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { differenceInDays } from 'date-fns';
@@ -57,13 +58,14 @@ export function CompleteJobModal({ workOrder, open, onOpenChange }: CompleteJobM
 
         if (profileError || !profile?.org_id) throw new Error('Could not resolve organization');
 
-        const fileExt = invoiceFile.name.split('.').pop();
+        const compressed = await compressImage(invoiceFile);
+        const fileExt = compressed.name.split('.').pop();
         const fileName = `${workOrder.id}-invoice-${Date.now()}.${fileExt}`;
         const filePath = `${profile.org_id}/invoices/${fileName}`;
         
         const { error: uploadError } = await supabase.storage
           .from('documents')
-          .upload(filePath, invoiceFile);
+          .upload(filePath, compressed, { contentType: compressed.type });
 
         if (uploadError) throw uploadError;
 

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileText, Award, ShieldCheck, FileCheck2, Send, Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { compressImage } from '@/lib/compress-image';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -75,13 +76,14 @@ export function CarrierDocumentHub() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const fileExt = file.name.split('.').pop();
+      const compressed = await compressImage(file);
+      const fileExt = compressed.name.split('.').pop();
       const filePath = `${orgId}/carrier-packet/${docType.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.${fileExt}`;
 
       // Upload directly to native storage (bypass Google Drive)
       const { error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(filePath, file);
+        .upload(filePath, compressed, { contentType: compressed.type });
 
       if (uploadError) throw uploadError;
 

@@ -20,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { compressImage } from '@/lib/compress-image';
 import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off, Eye, MoreHorizontal, FileSpreadsheet, FileSignature } from 'lucide-react';
 import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { SignedOnboardingDocuments } from '@/components/drivers/SignedOnboardingDocuments';
@@ -268,12 +269,13 @@ export default function Drivers() {
 
     setUploadingAvatar(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      const compressed = await compressImage(file);
+      const fileExt = compressed.name.split('.').pop();
       const fileName = `avatars/${driverId}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(fileName, file);
+        .upload(fileName, compressed, { contentType: compressed.type });
 
       if (uploadError) throw uploadError;
 
