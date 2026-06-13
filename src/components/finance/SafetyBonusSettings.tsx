@@ -352,36 +352,30 @@ export function SafetyBonusSettings() {
                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
                       <div className="space-y-1">
                         <Label className="text-xs">Min Miles</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
+                        <IntegerInput
                           value={tier.min_miles}
                           disabled={tier._toDelete}
-                          onChange={(e) => updateTier(idx, { min_miles: e.target.value })}
+                          onChange={(v) => updateTier(idx, { min_miles: v })}
+                          placeholder="0"
                         />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Max Miles</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
+                        <IntegerInput
                           placeholder="blank = ∞"
                           value={tier.max_miles}
                           disabled={tier._toDelete}
-                          onChange={(e) => updateTier(idx, { max_miles: e.target.value })}
+                          onChange={(v) => updateTier(idx, { max_miles: v })}
                         />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Rate Per Mile ($)</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.001"
+                        <CurrencyInput
+                          maxDecimals={3}
                           value={tier.rate_per_mile}
                           disabled={tier._toDelete}
-                          onChange={(e) => updateTier(idx, { rate_per_mile: e.target.value })}
+                          onChange={(v) => updateTier(idx, { rate_per_mile: v })}
+                          placeholder="0.000"
                         />
                       </div>
                       <div className="flex items-center gap-2">
