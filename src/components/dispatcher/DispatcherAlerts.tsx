@@ -337,6 +337,7 @@ export function DispatcherAlerts() {
       case 'maintenance': return Wrench;
       case 'credential': return User;
       case 'inspection': return Truck;
+      case 'detention_timer': return Clock;
       default: return AlertTriangle;
     }
   };
