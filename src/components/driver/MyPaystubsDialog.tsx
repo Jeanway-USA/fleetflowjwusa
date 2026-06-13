@@ -257,6 +257,59 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
                   )}
                 </div>
 
+                {/* Accessorials Breakdown — informational transparency */}
+                {(isLoadingAccessorials || accessorialLines.length > 0) && (
+                  <Collapsible open={accessorialsOpen} onOpenChange={setAccessorialsOpen}>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full py-2 px-3 rounded-lg bg-background/60 hover:bg-background border border-border transition-colors">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Accessorials</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isLoadingAccessorials ? (
+                          <Skeleton className="h-5 w-16" />
+                        ) : (
+                          <Badge variant="secondary" className="tabular-nums">
+                            {formatCurrency(accessorialsTotal)}
+                          </Badge>
+                        )}
+                        <ChevronDown className={`h-4 w-4 transition-transform ${accessorialsOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <div className="space-y-2 pl-2 border-l-2 border-muted ml-2">
+                        {isLoadingAccessorials ? (
+                          <Skeleton className="h-8 w-full" />
+                        ) : (
+                          accessorialLines.map((a) => (
+                            <div key={a.key} className="flex items-start justify-between text-sm py-1 gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  {a.loadNumber && (
+                                    <span className="text-muted-foreground font-mono text-xs">
+                                      #{a.loadNumber}
+                                    </span>
+                                  )}
+                                  <span className="capitalize font-medium">
+                                    {(a.accessorial_type || 'Other').replace(/_/g, ' ')}
+                                  </span>
+                                </div>
+                                {a.notes && (
+                                  <p className="text-xs text-muted-foreground">{a.notes}</p>
+                                )}
+                              </div>
+                              <span className="font-medium tabular-nums shrink-0">
+                                {formatCurrency(a.amount)}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+
                 <div className="border-t border-border pt-4 flex items-end justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Net Pay</p>
