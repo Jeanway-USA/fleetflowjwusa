@@ -1,32 +1,73 @@
 ## Goal
-Make the driver-facing UI comfortable for night driving by exposing a quick dark/light toggle in the driver's top bar, while confirming the existing theme system already honors the OS `prefers-color-scheme` setting.
+Make every driver-side load-status mutation feel instant on flaky cell connections by applying React Query optimistic updates with automatic rollback + a friendly retry toast on failure.
 
-## Audit findings
-- `ThemeContext` (`src/contexts/ThemeContext.tsx`) already:
-  - Defaults to `window.matchMedia('(prefers-color-scheme: dark)')` when no stored preference exists.
-  - Persists the user choice to `localStorage` (`jeanway-theme`).
-  - Toggles the `.dark` class on `<html>`, which drives all shadcn semantic tokens in `src/index.css` (background, card, foreground, border, primary, etc.).
-- Dark tokens in `index.css` already provide high-contrast values (`--background 0 0% 7%`, `--foreground 45 10% 95%`, etc.) used by cards, tables, inputs, dialogs.
-- A toggle exists in `DriverSettings`, but there is **no one-tap toggle in the driver dashboard header**. The driver dashboard (`src/pages/DriverDashboard.tsx`) renders its own compact header (greeting + refresh + notifications) and the ActiveLoadCard / ProofOfDeliveryDialog / DocumentScanButton screens inherit from it.
+## Mutations in scope
+All write paths triggered from the Driver Load View:
+1. `ActiveLoadCard.handleProgressStatus` — intermediate transitions: `pending → assigned`, `assigned → loading`.
+2. `StartingOdometerDialog.handleSubmit` — `loading → in_transit` + `start_miles`.
+3. `EndingOdometerDialog.handleSubmit` — `in_transit → delivered` + `end_miles` (+ `actual_miles`).
+4. `ProofOfDeliveryDialog.handleSubmit` — `in_transit → delivered` + `end_miles` (+ `actual_miles`, `pod_signature_path`, `pod_transflo_link`, optional `notes`). The signature upload / document inserts stay sequential since they must complete server-side; only the status flip is treated optimistically (load already moves on the UI; the dialog still shows a spinner only briefly).
 
-No color contrast violations were spotted — driver components already use semantic tokens (`bg-card`, `text-foreground`, `text-muted-foreground`, `border-border`, `bg-warning/10`, etc.), so they invert cleanly.
+The offline path (already handled by `useOfflineQueue`) is preserved unchanged.
 
-## Changes
+## Pattern (shared)
 
-1. **New component** `src/components/shared/ThemeToggle.tsx`
-   - Small icon-only `Button` (ghost, `h-8 w-8`) using `lucide-react` `Sun` / `Moon`.
-   - Reads `theme` + `toggleTheme` from `useTheme()`.
-   - `aria-label` + `title` reflect current state ("Switch to dark mode" / "Switch to light mode").
-   - Smooth icon swap (no extra deps).
+Use the existing `useQueryClient` and operate on cache entries matching the active-load query keys:
+- `['driver-active-loads', driverId]` (driver dashboard)
+- `['driver-loads', ...]` (driver loads list view — apply with `predicate` so we cover both screens)
 
-2. **`src/pages/DriverDashboard.tsx`**
-   - Import and render `<ThemeToggle />` in the header actions row, immediately to the left of the existing refresh button so it sits in the driver's top navigation area on every driver screen that uses this header.
+For each mutation:
 
-3. **No changes** to `ThemeContext`, `index.css`, or token usage — the existing system already:
-   - Listens to `prefers-color-scheme` on first load.
-   - Persists manual overrides.
-   - Drives all driver views (ActiveLoadCard, ProofOfDeliveryDialog, DocumentScanButton, EndingOdometerDialog, StartingOdometerDialog) through semantic tokens.
+```text
+1. snapshot = queryClient.getQueriesData({ predicate: matchesDriverLoads })
+2. queryClient.cancelQueries({ predicate })
+3. queryClient.setQueriesData({ predicate }, (old) => patch load by id with new fields)
+4. close dialog + call onComplete (UI now shows new status immediately)
+5. await supabase update
+   - success → toast.success(...), invalidate queries to reconcile
+   - failure → restore snapshot via setQueriesData, toast.error('Network error. Please try again when you have a better signal.')
+```
+
+Helper extracted to `src/hooks/useOptimisticLoadStatus.ts` exposing `applyOptimistic(loadId, patch)` returning `{ commit, rollback }`. Keeps the four call sites tiny and consistent.
+
+## File changes
+
+1. **New** `src/hooks/useOptimisticLoadStatus.ts`
+   - Wraps `useQueryClient`.
+   - `matchesDriverLoads`: `key[0] === 'driver-active-loads' || key[0] === 'driver-loads'`.
+   - `applyOptimistic(loadId, patch)`:
+     - snapshots matching queries,
+     - cancels in-flight refetches,
+     - mutates each cached array by mapping the matching load id and shallow-merging `patch`,
+     - returns `commit()` (invalidates queries) and `rollback()` (restores snapshot + shows the standard network-error toast).
+   - Standard network-error message constant: `'Network error. Please try again when you have a better signal.'`
+
+2. **`src/components/driver/ActiveLoadCard.tsx`**
+   - Use `useOptimisticLoadStatus`.
+   - In `handleProgressStatus` (non-intercept branch): call `applyOptimistic(load.id, { status: nextStatus })`, close/notify immediately, then `await supabase.update`; on error → `rollback()`; on success → quiet `commit()` and remove the existing redundant success toast (status change is now visible without it) or downgrade to a short confirmation.
+   - Remove `isUpdating` button spinner (the load already advances visually); keep the button disabled only for the brief window between click and optimistic apply. Simplest: drop `isUpdating` entirely for this path.
+
+3. **`src/components/driver/StartingOdometerDialog.tsx`**
+   - Inject optimistic helper. On submit (online path):
+     - Run `applyOptimistic(loadId, { status: nextStatus, start_miles: startMiles })`.
+     - Immediately close dialog + `onComplete()`.
+     - Await Supabase update in background; on error `rollback()` (which fires the friendly toast); on success `commit()` + concise success toast.
+
+4. **`src/components/driver/EndingOdometerDialog.tsx`**
+   - Same pattern with patch `{ status: nextStatus, end_miles, actual_miles? }`.
+
+5. **`src/components/driver/ProofOfDeliveryDialog.tsx`**
+   - Apply optimistic patch `{ status: 'delivered', end_miles, actual_miles? }` right before kicking off the signature upload + document inserts + status update.
+   - On any thrown error in the try block → `rollback()` (friendly network toast) and keep dialog open with the form data preserved so the driver can retry. On success → `commit()`.
+   - The existing toasts stay, but failure toast is replaced with the standardized network-error copy.
+
+## UX details
+- Single source of friendly copy: `'Network error. Please try again when you have a better signal.'` exported from the hook and reused across all four call sites.
+- No new dependencies. Pure React Query cache surgery.
+- Offline branch (`!isOnline`) untouched — it already enqueues and toasts.
+- Optimistic updates only happen online; offline already feels instant via the queue.
 
 ## Out of scope
-- No business logic, no DB, no edits to the global manager layout (it already has theme controls in settings).
-- No restyling of existing components; they already pass contrast in both themes via semantic tokens.
+- No DB schema changes.
+- No global mutation refactor (we're not introducing `useMutation` wrappers — keeping current `async` handlers, just adding cache patching around them).
+- Status change for `delivered` via POD: signature/upload work still awaits the network; only the status badge on the dashboard updates optimistically.

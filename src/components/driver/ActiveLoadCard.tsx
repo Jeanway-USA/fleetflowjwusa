@@ -15,6 +15,7 @@ import { EndingOdometerDialog } from './EndingOdometerDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { useOptimisticLoadStatus, NETWORK_ERROR_TOAST } from '@/hooks/useOptimisticLoadStatus';
 import { getRelativeTimestamp } from './RelativeTimestamp';
 import { calculateLoadPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
@@ -152,6 +153,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   const [startOdometerOpen, setStartOdometerOpen] = useState(false);
   const [endOdometerOpen, setEndOdometerOpen] = useState(false);
   const { isOnline, enqueue } = useOfflineQueue();
+  const { applyOptimistic } = useOptimisticLoadStatus();
 
   if (!load) {
     return (
@@ -201,6 +203,10 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
       return;
     }
 
+    // Optimistic: update cache immediately, then attempt the network write.
+    const { commit, rollback } = applyOptimistic(load.id, { status: nextStatus });
+    onStatusUpdate?.();
+
     setIsUpdating(true);
     try {
       const { error } = await supabase
@@ -211,10 +217,10 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
       if (error) throw error;
 
       toast.success(`Load status updated to ${getStatusLabel(nextStatus)}`);
-      onStatusUpdate?.();
+      commit();
     } catch (error) {
       console.error('Error updating status:', error);
-      toast.error('Failed to update load status');
+      rollback();
     } finally {
       setIsUpdating(false);
     }
