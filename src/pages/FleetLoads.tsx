@@ -1081,12 +1081,11 @@ export default function FleetLoads() {
                 {/* Lumper - shown for both modes */}
                 <div className="space-y-2">
                   <Label htmlFor="lumper">Lumper ($)</Label>
-                  <Input 
-                    id="lumper" 
-                    type="number" 
-                    step="0.01" 
-                    value={formData.lumper || ''} 
-                    onChange={(e) => setFormData({ ...formData, lumper: parseFloat(e.target.value) || 0 })} 
+                  <CurrencyInput
+                    id="lumper"
+                    value={formData.lumper ?? ''}
+                    onChange={(v) => setFormData({ ...formData, lumper: v === '' ? 0 : parseFloat(v) })}
+                    placeholder="0.00"
                   />
                 </div>
 
