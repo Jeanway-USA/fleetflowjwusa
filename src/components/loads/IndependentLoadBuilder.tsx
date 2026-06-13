@@ -125,6 +125,8 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
   const handleSave = () => {
+    const effShipperTz = shipperTz || companyTz;
+    const effConsigneeTz = consigneeTz || companyTz;
     onSave({
       broker_name: brokerName,
       landstar_load_id: brokerPO,
@@ -134,10 +136,16 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
       factoring_approved: factoringApproved,
       origin: shipperAddress,
       destination: consigneeAddress,
+      // Legacy (kept for one release; existing readers still work)
       pickup_date: shipperDate,
       pickup_time: shipperTime,
       delivery_date: consigneeDate,
       delivery_time: consigneeTime,
+      // New UTC + IANA tz columns
+      pickup_at: combineToUtc(shipperDate, shipperTime, effShipperTz),
+      pickup_tz: effShipperTz,
+      delivery_at: combineToUtc(consigneeDate, consigneeTime, effConsigneeTz),
+      delivery_tz: effConsigneeTz,
       intermediate_stops: intermediateStops,
       shipper_facility: shipperFacility,
       consignee_facility: consigneeFacility,
@@ -306,6 +314,10 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
                   <Input id="shipper_time" value={shipperTime} onChange={(e) => setShipperTime(e.target.value)} placeholder="8:00 AM" />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Pickup Timezone</Label>
+                <TimezoneSelect value={shipperTz} onChange={(v) => { setShipperTz(v); setShipperTzTouched(true); }} />
+              </div>
             </div>
 
             <Separator />
@@ -374,6 +386,10 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
                   </Label>
                   <Input id="consignee_time" value={consigneeTime} onChange={(e) => setConsigneeTime(e.target.value)} placeholder="2:00 PM" />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Delivery Timezone</Label>
+                <TimezoneSelect value={consigneeTz} onChange={(v) => { setConsigneeTz(v); setConsigneeTzTouched(true); }} />
               </div>
             </div>
           </TabsContent>
