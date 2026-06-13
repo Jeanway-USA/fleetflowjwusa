@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route, Link2 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route, Link2, ChevronDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 const LoadRouteMap = lazy(() => import('./LoadRouteMap').then(m => ({ default: m.LoadRouteMap })));
@@ -17,8 +18,9 @@ import { toast } from 'sonner';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { useOptimisticLoadStatus } from '@/hooks/useOptimisticLoadStatus';
 import { getRelativeTimestamp } from './RelativeTimestamp';
-import { calculateLoadPay } from '@/utils/payCalculations';
+import { calculateLoadPay, sumAccessorials } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
+
 
 // Helper to format and clean special instructions for better readability
 function formatSpecialInstructions(notes: string | null): React.ReactNode {
@@ -69,7 +71,7 @@ interface Load {
   landstar_load_id: string | null;
   tracking_id?: string | null;
   pod_required?: boolean;
-  load_accessorials?: { amount: number }[];
+  load_accessorials?: Array<{ id?: string; accessorial_type?: string | null; amount?: number | null; notes?: string | null }>;
 }
 
 interface ActiveLoadCardProps {
@@ -152,6 +154,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   const [podDialogOpen, setPodDialogOpen] = useState(false);
   const [startOdometerOpen, setStartOdometerOpen] = useState(false);
   const [endOdometerOpen, setEndOdometerOpen] = useState(false);
+  const [accessorialsOpen, setAccessorialsOpen] = useState(false);
   const { isOnline, enqueue } = useOfflineQueue();
   const { applyOptimistic } = useOptimisticLoadStatus();
 
@@ -460,6 +463,43 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
                 {formatCurrency(estimatedPay)}
               </span>
             </div>
+
+            {/* Accessorials Breakdown */}
+            {(load.load_accessorials?.length ?? 0) > 0 && (
+              <Collapsible open={accessorialsOpen} onOpenChange={setAccessorialsOpen}>
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-2 px-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Accessorials</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">
+                      {formatCurrency(sumAccessorials(load))}
+                    </Badge>
+                    <ChevronDown className={`h-4 w-4 transition-transform ${accessorialsOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2">
+                  <div className="space-y-2 pl-2 border-l-2 border-muted ml-2">
+                    {load.load_accessorials!.map((a, idx) => (
+                      <div key={a.id ?? idx} className="flex items-start justify-between text-sm py-1 gap-3">
+                        <div className="min-w-0">
+                          <p className="capitalize font-medium">
+                            {(a.accessorial_type || 'Other').replace(/_/g, ' ')}
+                          </p>
+                          {a.notes && (
+                            <p className="text-xs text-muted-foreground">{a.notes}</p>
+                          )}
+                        </div>
+                        <span className="font-medium tabular-nums shrink-0">
+                          {formatCurrency(Number(a.amount ?? 0))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
 
             {/* Special Instructions */}
             {load.notes && (

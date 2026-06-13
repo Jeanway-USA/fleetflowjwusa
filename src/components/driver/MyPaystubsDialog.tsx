@@ -4,7 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, Download, Receipt, FileText } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ChevronLeft, ChevronRight, ChevronDown, Download, Receipt, FileText, Package } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { formatCurrency } from '@/lib/formatters';
 import jsPDF from 'jspdf';
@@ -30,6 +32,7 @@ function fmtPeriod(start: string, end: string) {
 
 export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, payType, payRate }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [accessorialsOpen, setAccessorialsOpen] = useState(false);
 
   const { data: paystubs = [], isLoading } = useQuery<DriverSettlement[]>({
     queryKey: ['my-paystubs', driverId],
@@ -49,6 +52,44 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
   const selected = useMemo(
     () => paystubs.find((p) => p.id === selectedId) ?? null,
     [paystubs, selectedId],
+  );
+
+  // Pull accessorials from delivered loads in this paystub's period so the
+  // driver can see exactly what extras rolled into their pay.
+  const { data: accessorialLines = [], isLoading: isLoadingAccessorials } = useQuery({
+    queryKey: ['paystub-accessorials', selected?.id],
+    queryFn: async () => {
+      if (!selected) return [] as Array<{
+        key: string;
+        loadNumber: string | null;
+        accessorial_type: string | null;
+        amount: number;
+        notes: string | null;
+      }>;
+      const { data, error } = await supabase
+        .from('fleet_loads')
+        .select('id, landstar_load_id, load_accessorials(id, accessorial_type, amount, notes)')
+        .eq('driver_id', driverId)
+        .eq('status', 'delivered')
+        .gte('delivery_date', selected.period_start)
+        .lte('delivery_date', selected.period_end);
+      if (error) throw error;
+      return (data ?? []).flatMap((load: any) =>
+        (load.load_accessorials || []).map((a: any) => ({
+          key: a.id ?? `${load.id}-${a.accessorial_type}`,
+          loadNumber: load.landstar_load_id,
+          accessorial_type: a.accessorial_type,
+          amount: Number(a.amount ?? 0),
+          notes: a.notes,
+        })),
+      );
+    },
+    enabled: !!selected && !!driverId,
+  });
+
+  const accessorialsTotal = useMemo(
+    () => accessorialLines.reduce((s, a) => s + (a.amount || 0), 0),
+    [accessorialLines],
   );
 
   const isFlat = (payType || '').toLowerCase() === 'flat';
@@ -215,6 +256,59 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
                     </div>
                   )}
                 </div>
+
+                {/* Accessorials Breakdown — informational transparency */}
+                {(isLoadingAccessorials || accessorialLines.length > 0) && (
+                  <Collapsible open={accessorialsOpen} onOpenChange={setAccessorialsOpen}>
+                    <CollapsibleTrigger className="flex items-center justify-between w-full py-2 px-3 rounded-lg bg-background/60 hover:bg-background border border-border transition-colors">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Accessorials</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isLoadingAccessorials ? (
+                          <Skeleton className="h-5 w-16" />
+                        ) : (
+                          <Badge variant="secondary" className="tabular-nums">
+                            {formatCurrency(accessorialsTotal)}
+                          </Badge>
+                        )}
+                        <ChevronDown className={`h-4 w-4 transition-transform ${accessorialsOpen ? 'rotate-180' : ''}`} />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      <div className="space-y-2 pl-2 border-l-2 border-muted ml-2">
+                        {isLoadingAccessorials ? (
+                          <Skeleton className="h-8 w-full" />
+                        ) : (
+                          accessorialLines.map((a) => (
+                            <div key={a.key} className="flex items-start justify-between text-sm py-1 gap-3">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  {a.loadNumber && (
+                                    <span className="text-muted-foreground font-mono text-xs">
+                                      #{a.loadNumber}
+                                    </span>
+                                  )}
+                                  <span className="capitalize font-medium">
+                                    {(a.accessorial_type || 'Other').replace(/_/g, ' ')}
+                                  </span>
+                                </div>
+                                {a.notes && (
+                                  <p className="text-xs text-muted-foreground">{a.notes}</p>
+                                )}
+                              </div>
+                              <span className="font-medium tabular-nums shrink-0">
+                                {formatCurrency(a.amount)}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
 
                 <div className="border-t border-border pt-4 flex items-end justify-between">
                   <div>
