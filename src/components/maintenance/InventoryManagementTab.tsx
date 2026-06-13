@@ -94,14 +94,16 @@ function statusBadge(p: PartInventoryItem) {
   const min = Number(p.min_threshold);
   if (qty <= 0) {
     return (
-      <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border border-red-500/30 hover:bg-red-500/20">
+      <Badge variant="destructive" className="gap-1">
+        <AlertTriangle className="h-3 w-3" />
         Out of Stock
       </Badge>
     );
   }
   if (qty <= min) {
     return (
-      <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/20">
+      <Badge variant="destructive" className="gap-1">
+        <AlertTriangle className="h-3 w-3" />
         Low Stock
       </Badge>
     );
