@@ -53,12 +53,15 @@ export default function MaintenanceManagement() {
             <SheetTrigger asChild>
               <PMNotificationsBell />
             </SheetTrigger>
-            <SheetContent className="w-[400px] sm:w-[450px] p-0">
+            <SheetContent className="w-[400px] sm:w-[450px] flex flex-col p-0 gap-0 overflow-hidden">
               <SheetHeader className="sr-only">
                 <SheetTitle>PM Notifications</SheetTitle>
               </SheetHeader>
-              <PMNotificationsPanel onViewTruck={handleViewTruck} />
+              <div className="flex-1 overflow-y-auto">
+                <PMNotificationsPanel onViewTruck={handleViewTruck} />
+              </div>
             </SheetContent>
+
           </Sheet>
           <Button onClick={() => setNewWorkOrderOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />

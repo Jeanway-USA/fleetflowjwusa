@@ -47,8 +47,9 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg">
-        <SheetHeader>
+      <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 gap-0 overflow-hidden">
+        <SheetHeader className="shrink-0 mx-0 mt-0 px-6 pt-6 pb-4 pr-12 border-b static">
+
           <SheetTitle className="flex items-center gap-2">
             <Truck className="h-5 w-5" />
             {isLoading ? (
@@ -73,6 +74,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
           </SheetDescription>
         </SheetHeader>
 
+        <div className="flex-1 overflow-y-auto px-6 py-4">
         {isLoading ? (
           <div className="space-y-4 py-6">
             <Skeleton className="h-24 w-full" />
@@ -80,6 +82,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
             <Skeleton className="h-24 w-full" />
           </div>
         ) : data ? (
+
           <Tabs defaultValue="history" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="history">History</TabsTrigger>
@@ -418,7 +421,9 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
             </TabsContent>
           </Tabs>
         ) : null}
+        </div>
       </SheetContent>
+
     </Sheet>
   );
 }

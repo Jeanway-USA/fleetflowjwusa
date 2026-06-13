@@ -36,8 +36,9 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg">
-        <SheetHeader className="pb-4">
+      <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 gap-0 overflow-hidden">
+        <SheetHeader className="shrink-0 mx-0 mt-0 px-6 pt-6 pb-4 pr-12 border-b static">
+
           <div className="flex items-start justify-between gap-2">
             <div>
               <SheetTitle className="text-lg">{contact.company_name}</SheetTitle>
@@ -70,8 +71,10 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
           </div>
         </SheetHeader>
 
+        <div className="flex-1 overflow-y-auto px-6 py-4">
         {/* Contact Info */}
         <div className="space-y-2 pb-4 border-b border-border">
+
           {contact.contact_name && (
             <p className="text-sm font-medium">{contact.contact_name}</p>
           )}
@@ -160,7 +163,9 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
             Activity log & revenue analytics are available for CRM contacts (brokers).
           </div>
         )}
+        </div>
       </SheetContent>
     </Sheet>
+
   );
 }
