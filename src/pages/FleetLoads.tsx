@@ -87,6 +87,22 @@ export default function FleetLoads() {
     },
   });
 
+  // Lookup: accessorial type catalog (per-org)
+  const { data: accessorialTypes = [] } = useQuery({
+    queryKey: ['accessorial_types', orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('accessorial_types')
+        .select('id, name, default_is_driver_pay, sort_order')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!orgId,
+  });
+
   const { data: allAccessorials = [] } = useQuery({
     queryKey: ['load_accessorials'],
     queryFn: async () => {
