@@ -1251,22 +1251,20 @@ export default function FleetLoads() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="start_miles">Starting Odometer</Label>
-                    <Input 
-                      id="start_miles" 
-                      type="number" 
-                      value={formData.start_miles || ''} 
-                      onChange={(e) => setFormData({ ...formData, start_miles: parseInt(e.target.value) || 0 })} 
-                      placeholder="647744"
+                    <IntegerInput
+                      id="start_miles"
+                      value={formData.start_miles ?? ''}
+                      onChange={(v) => setFormData({ ...formData, start_miles: v === '' ? 0 : parseInt(v, 10) })}
+                      placeholder="0"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="end_miles">Ending Odometer</Label>
-                    <Input 
-                      id="end_miles" 
-                      type="number" 
-                      value={formData.end_miles || ''} 
-                      onChange={(e) => setFormData({ ...formData, end_miles: parseInt(e.target.value) || 0 })} 
-                      placeholder="648611"
+                    <IntegerInput
+                      id="end_miles"
+                      value={formData.end_miles ?? ''}
+                      onChange={(v) => setFormData({ ...formData, end_miles: v === '' ? 0 : parseInt(v, 10) })}
+                      placeholder="0"
                     />
                   </div>
                   <div className="space-y-2">
