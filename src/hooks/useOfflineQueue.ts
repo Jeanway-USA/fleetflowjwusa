@@ -64,9 +64,28 @@ async function processAction(action: OfflineAction): Promise<void> {
       if (typeof status !== 'string' || !ALLOWED_LOAD_STATUSES.has(status)) {
         throw new Error('Invalid load status');
       }
+      const update: Record<string, unknown> = { status };
+      // Optional odometer readings captured by the driver during transit/delivery.
+      const startMiles = action.payload.start_miles;
+      const endMiles = action.payload.end_miles;
+      const actualMiles = action.payload.actual_miles;
+      const isValidMileage = (n: unknown): n is number =>
+        typeof n === 'number' && Number.isFinite(n) && Number.isInteger(n) && n >= 0 && n <= 10_000_000;
+      if (startMiles !== undefined && startMiles !== null) {
+        if (!isValidMileage(startMiles)) throw new Error('Invalid start_miles');
+        update.start_miles = startMiles;
+      }
+      if (endMiles !== undefined && endMiles !== null) {
+        if (!isValidMileage(endMiles)) throw new Error('Invalid end_miles');
+        update.end_miles = endMiles;
+      }
+      if (actualMiles !== undefined && actualMiles !== null) {
+        if (!isValidMileage(actualMiles)) throw new Error('Invalid actual_miles');
+        update.actual_miles = actualMiles;
+      }
       const { error } = await supabase
         .from('fleet_loads')
-        .update({ status })
+        .update(update)
         .eq('id', id);
       if (error) throw error;
       break;
