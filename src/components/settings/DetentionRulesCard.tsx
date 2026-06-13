@@ -29,7 +29,7 @@ export function DetentionRulesCard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('detention_rules')
-        .select('id, trailer_type, free_time_minutes, hourly_rate')
+        .select('id, trailer_type, free_time_minutes, hourly_rate, max_charge_per_day')
         .order('trailer_type', { ascending: true });
       if (error) throw error;
       return (data ?? []) as DetentionRule[];
