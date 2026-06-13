@@ -1,24 +1,21 @@
 ## Plan
 
-1. **Stop simulation state from blocking owner navigation**
-   - Update the dashboard switch handler so owners navigate first, then role simulation is applied after the route change starts.
-   - This avoids the current intermediate state where the app is still on the old page but already simulating a role that cannot access that old page.
+1. **Remove the fragile delayed simulation switch**
+   - Stop using the `setTimeout(0)` re-apply pattern in `AppSidebar`.
+   - Dashboard clicks should set the intended simulation state and destination together, without depending on timing between route changes and guard cleanup.
 
-2. **Make owner dashboard buttons deterministic**
-   - Replace the current `flushSync` approach in `AppSidebar` with a safer deferred simulation update.
-   - Keep “Executive View” clearing simulation, and keep Dispatcher/Driver/Maintenance View applying their simulated role.
+2. **Make owner navigation authoritative**
+   - In `ProtectedRoute`, real owners should always be allowed through protected pages based on their real owner role.
+   - Role simulation should continue to affect what navigation items and page UI they see, but it should not block routing for a real owner.
 
-3. **Narrow the auto-exit behavior**
-   - Adjust `ProtectedRoute` so it does not clear simulation during dashboard-switch navigation.
-   - Preserve the useful behavior where an owner is not trapped if they manually land on a page the simulated role cannot access.
+3. **Delete the auto-exit trap logic**
+   - Remove the `ProtectedRoute` effect that clears simulation when the current simulated role cannot access the route.
+   - That effect is now the likely source of the repeated “must click Executive View first” behavior because it keeps clearing the simulation during normal navigation.
 
-4. **Validate the exact workflow**
-   - Fresh owner load on Executive Dashboard.
-   - Click Dispatcher View, Driver View, Maintenance View: each should navigate on the first click.
-   - Click Executive View: simulation clears and returns to owner mode.
-   - Click between simulation pages repeatedly: no extra Executive View reset should be required.
+4. **Keep explicit exit behavior**
+   - “Executive View” and the simulation banner “Exit” will still clear simulation and navigate to `/executive-dashboard`.
+   - Dispatcher/Driver/Maintenance dashboard buttons will set their simulated role and navigate to their dashboard immediately.
 
-## Technical notes
-
-- Primary files: `src/components/layout/AppSidebar.tsx` and `src/components/shared/ProtectedRoute.tsx`.
-- The root issue is ordering between `setSimulatedRole(...)`, React Router navigation, and the access guard. I’ll make route changes win before simulation enforcement runs.
+5. **Validate the workflow**
+   - From a fresh owner load on Executive Dashboard: click Dispatcher View, Driver View, Maintenance View, and normal sidebar pages.
+   - Confirm every click navigates on the first attempt and that Executive View/Exit still returns to owner mode.
