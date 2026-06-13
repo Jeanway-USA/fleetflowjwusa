@@ -264,6 +264,7 @@ const App = () => {
                   </Routes>
                 </Suspense>
               </ErrorBoundary>
+              </TimeDisplayProvider>
             </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>
