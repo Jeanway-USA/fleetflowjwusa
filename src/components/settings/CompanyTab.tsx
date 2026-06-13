@@ -238,41 +238,6 @@ export function CompanyTab() {
         </CardContent>
       </Card>
 
-      <Card className="card-elevated">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-primary" />
-            Driver Incentives
-          </CardTitle>
-          <CardDescription>Configure bonus goals for drivers</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="bonus-goal-miles">Monthly Bonus Goal (Miles)</Label>
-            <Input
-              id="bonus-goal-miles"
-              type="number"
-              min="1000"
-              step="500"
-              value={bonusGoalMiles}
-              onChange={(e) => setBonusGoalMiles(e.target.value)}
-              placeholder="12000"
-              disabled={isDemoMode}
-            />
-            <p className="text-xs text-muted-foreground">
-              Drivers who reach this mileage goal in a month unlock the $0.05/mile bonus
-            </p>
-          </div>
-          <Button
-            onClick={handleSaveBonusGoal}
-            disabled={isSavingBonusGoal || isDemoMode}
-            className="gradient-gold text-primary-foreground"
-          >
-            {isSavingBonusGoal ? 'Saving...' : 'Save Goal'}
-          </Button>
-        </CardContent>
-      </Card>
-
       {/* Factoring Settings - Independent Only */}
       {isIndependent && (
         <Card className="card-elevated">
