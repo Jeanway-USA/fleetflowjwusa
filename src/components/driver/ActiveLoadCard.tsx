@@ -178,15 +178,22 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   const handleProgressStatus = async () => {
     if (!nextStatus) return;
 
-    // If transitioning to delivered, check if POD is required
+    // Intercept: starting a load — capture odometer first.
+    if (nextStatus === 'in_transit') {
+      setStartOdometerOpen(true);
+      return;
+    }
+
+    // Intercept: completing a load — capture ending odometer (with POD if required).
     if (nextStatus === 'delivered') {
       if (load.pod_required !== false) {
         setPodDialogOpen(true);
-        return;
+      } else {
+        setEndOdometerOpen(true);
       }
-      // POD not required — fall through to direct status update
+      return;
     }
-    
+
     if (!isOnline) {
       enqueue('load_status_update', { id: load.id, status: nextStatus });
       toast.success(`Status update saved. Will sync when online.`);
