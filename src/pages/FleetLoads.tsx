@@ -1027,11 +1027,10 @@ export default function FleetLoads() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="empty_miles">Empty / Deadhead Miles</Label>
-                    <Input 
-                      id="empty_miles" 
-                      type="number" 
-                      value={formData.empty_miles || ''} 
-                      onChange={(e) => setFormData({ ...formData, empty_miles: parseInt(e.target.value) || 0 })} 
+                    <IntegerInput
+                      id="empty_miles"
+                      value={formData.empty_miles ?? ''}
+                      onChange={(v) => setFormData({ ...formData, empty_miles: v === '' ? 0 : parseInt(v, 10) })}
                       placeholder="0"
                     />
                   </div>
