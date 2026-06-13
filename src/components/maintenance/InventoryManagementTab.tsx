@@ -72,8 +72,8 @@ const partSchema = z.object({
   vendor_name: optionalText(120),
   category: optionalText(60),
   unit: z.string().trim().min(1).max(20).default('ea'),
-  quantity_on_hand: z.coerce.number().min(0).max(1_000_000),
-  min_threshold: z.coerce.number().min(0).max(1_000_000),
+  quantity_on_hand: z.coerce.number().int('Must be a whole number').min(0).max(1_000_000),
+  min_threshold: z.coerce.number().int('Must be a whole number').min(0).max(1_000_000),
 });
 type PartFormValues = z.infer<typeof partSchema>;
 
