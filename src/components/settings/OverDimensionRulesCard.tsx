@@ -16,6 +16,7 @@ interface Rule {
   min_inches: number;
   max_inches: number | null;
   cents_per_mile: number;
+  min_charge: number;
   sort_order: number;
 }
 
