@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Separator } from '@/components/ui/separator';
 import { Building2, DollarSign, MapPin, Truck, Plus, X, Upload, Package, Clock } from 'lucide-react';
+import { TimezoneSelect } from '@/components/shared/TimezoneSelect';
+import { combineToUtc, guessTimezoneFromLocation } from '@/lib/datetime';
+import { useTimeDisplay } from '@/contexts/TimeDisplayContext';
 
 const BROKER_SUGGESTIONS = [
   'CH Robinson',
@@ -60,11 +63,29 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
   const [shipperAddress, setShipperAddress] = useState(initialData?.origin || '');
   const [shipperDate, setShipperDate] = useState(initialData?.pickup_date || '');
   const [shipperTime, setShipperTime] = useState(initialData?.pickup_time || '');
+  const [shipperTz, setShipperTz] = useState<string>(initialData?.pickup_tz || '');
   const [consigneeFacility, setConsigneeFacility] = useState(initialData?.consignee_facility || '');
   const [consigneeAddress, setConsigneeAddress] = useState(initialData?.destination || '');
   const [consigneeDate, setConsigneeDate] = useState(initialData?.delivery_date || '');
   const [consigneeTime, setConsigneeTime] = useState(initialData?.delivery_time || '');
+  const [consigneeTz, setConsigneeTz] = useState<string>(initialData?.delivery_tz || '');
   const [intermediateStops, setIntermediateStops] = useState<Stop[]>([]);
+
+  // Auto-guess timezone from typed origin/destination state until the user
+  // overrides it. Once they pick a TZ explicitly, we stop touching it.
+  const { companyTz } = useTimeDisplay();
+  const [shipperTzTouched, setShipperTzTouched] = useState<boolean>(!!initialData?.pickup_tz);
+  const [consigneeTzTouched, setConsigneeTzTouched] = useState<boolean>(!!initialData?.delivery_tz);
+  useEffect(() => {
+    if (shipperTzTouched) return;
+    const guess = guessTimezoneFromLocation(shipperAddress) || companyTz;
+    if (guess && guess !== shipperTz) setShipperTz(guess);
+  }, [shipperAddress, shipperTzTouched, companyTz, shipperTz]);
+  useEffect(() => {
+    if (consigneeTzTouched) return;
+    const guess = guessTimezoneFromLocation(consigneeAddress) || companyTz;
+    if (guess && guess !== consigneeTz) setConsigneeTz(guess);
+  }, [consigneeAddress, consigneeTzTouched, companyTz, consigneeTz]);
 
   // Tab 3 state
   const [weight, setWeight] = useState(initialData?.weight?.toString() || '');
@@ -104,6 +125,8 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
   const handleSave = () => {
+    const effShipperTz = shipperTz || companyTz;
+    const effConsigneeTz = consigneeTz || companyTz;
     onSave({
       broker_name: brokerName,
       landstar_load_id: brokerPO,
@@ -113,10 +136,16 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
       factoring_approved: factoringApproved,
       origin: shipperAddress,
       destination: consigneeAddress,
+      // Legacy (kept for one release; existing readers still work)
       pickup_date: shipperDate,
       pickup_time: shipperTime,
       delivery_date: consigneeDate,
       delivery_time: consigneeTime,
+      // New UTC + IANA tz columns
+      pickup_at: combineToUtc(shipperDate, shipperTime, effShipperTz),
+      pickup_tz: effShipperTz,
+      delivery_at: combineToUtc(consigneeDate, consigneeTime, effConsigneeTz),
+      delivery_tz: effConsigneeTz,
       intermediate_stops: intermediateStops,
       shipper_facility: shipperFacility,
       consignee_facility: consigneeFacility,
@@ -285,6 +314,10 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
                   <Input id="shipper_time" value={shipperTime} onChange={(e) => setShipperTime(e.target.value)} placeholder="8:00 AM" />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Pickup Timezone</Label>
+                <TimezoneSelect value={shipperTz} onChange={(v) => { setShipperTz(v); setShipperTzTouched(true); }} />
+              </div>
             </div>
 
             <Separator />
@@ -353,6 +386,10 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
                   </Label>
                   <Input id="consignee_time" value={consigneeTime} onChange={(e) => setConsigneeTime(e.target.value)} placeholder="2:00 PM" />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Delivery Timezone</Label>
+                <TimezoneSelect value={consigneeTz} onChange={(v) => { setConsigneeTz(v); setConsigneeTzTouched(true); }} />
               </div>
             </div>
           </TabsContent>

@@ -34,6 +34,7 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProductTour } from '@/components/shared/ProductTour';
 import { useProductTour } from '@/hooks/useProductTour';
 import { getTourForRoute } from '@/lib/tour-steps';
+import { TimeDisplayToggle } from '@/components/shared/TimeDisplayToggle';
 
 const ROUTE_LABELS: Record<string, string> = {
   '/executive-dashboard': 'Executive Dashboard',
@@ -307,6 +308,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
               </div>
             )}
             <div className="flex-1" />
+            <TimeDisplayToggle />
             <Button
               variant="outline"
               size="sm"

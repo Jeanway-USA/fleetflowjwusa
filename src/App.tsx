@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { TimeDisplayProvider } from "@/contexts/TimeDisplayContext";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { RoleBasedRedirect } from "@/components/shared/RoleBasedRedirect";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
@@ -85,9 +86,10 @@ const App = () => {
           <Sonner />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AuthProvider>
-              <BrandColorInjector />
-              <ErrorBoundary>
-                <Suspense fallback={<LoadingFallback />}>
+              <TimeDisplayProvider>
+                <BrandColorInjector />
+                <ErrorBoundary>
+                  <Suspense fallback={<LoadingFallback />}>
                   <Routes>
                     {/* Public routes */}
                     <Route path="/" element={<RoleBasedRedirect />} />
@@ -262,6 +264,7 @@ const App = () => {
                   </Routes>
                 </Suspense>
               </ErrorBoundary>
+              </TimeDisplayProvider>
             </AuthProvider>
           </BrowserRouter>
         </TooltipProvider>
