@@ -975,6 +975,48 @@ export default function FleetLoads() {
               </TabsList>
 
               <TabsContent value="details" className="space-y-4 mt-4">
+                {/* In-Bond (Rule 480) compliance flag */}
+                <div className="rounded-lg border border-border/60 p-3 bg-muted/20 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      id="is_in_bond"
+                      checked={!!formData.is_in_bond}
+                      onCheckedChange={(checked) =>
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          is_in_bond: !!checked,
+                          cf_7512_number: checked ? prev.cf_7512_number ?? '' : null,
+                        }))
+                      }
+                      className="mt-1"
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="is_in_bond" className="font-medium cursor-pointer">
+                        In-Bond / International Shipment (Rule 480)
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Adds a <strong>Company</strong> accessorial of ${parseFloat(getSetting('in_bond_fee', '100')).toFixed(2)} and warns the driver not to break the customs seal.
+                      </p>
+                    </div>
+                  </div>
+                  {formData.is_in_bond && (
+                    <div className="space-y-1 pl-6">
+                      <Label htmlFor="cf_7512_number" className="text-xs font-semibold">
+                        CF 7512 Number <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="cf_7512_number"
+                        value={formData.cf_7512_number ?? ''}
+                        onChange={(e) => setFormData({ ...formData, cf_7512_number: e.target.value })}
+                        placeholder="e.g. 123-45678901"
+                        maxLength={64}
+                        required
+                        className="pl-4 sm:pl-3 h-10 font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="landstar_load_id">{isLandstar ? 'Landstar Load ID' : 'Load ID'}</Label>
