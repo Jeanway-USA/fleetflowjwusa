@@ -1122,24 +1122,19 @@ export default function FleetLoads() {
                           </div>
                           <div className="col-span-3 space-y-1">
                             <Label className="text-xs">Amount ($)</Label>
-                            <Input 
-                              type="number" 
-                              step="0.01"
+                            <CurrencyInput
                               className="h-9"
-                              value={acc.amount || ''} 
-                              onChange={(e) => updateAccessorial(index, 'amount', parseFloat(e.target.value) || 0)}
+                              value={acc.amount ?? ''}
+                              onChange={(v) => updateAccessorial(index, 'amount', v === '' ? 0 : parseFloat(v))}
                               placeholder="0.00"
                             />
                           </div>
                           <div className="col-span-2 space-y-1">
                             <Label className="text-xs">% Paid</Label>
-                            <Input 
-                              type="number" 
-                              min="0" 
-                              max="100"
+                            <PercentageInput
                               className="h-9"
-                              value={acc.percentage || ''} 
-                              onChange={(e) => updateAccessorial(index, 'percentage', parseFloat(e.target.value) || 100)}
+                              value={acc.percentage ?? ''}
+                              onChange={(v) => updateAccessorial(index, 'percentage', v === '' ? 100 : parseFloat(v))}
                               placeholder="100"
                             />
                           </div>
