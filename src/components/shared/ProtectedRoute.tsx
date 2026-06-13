@@ -49,7 +49,11 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
   // also can't access, leaving them stuck with a recurring access-denied toast.
   useEffect(() => {
     if (!stillLoading && authenticated && actuallyIsOwner && simulatedRole && !hasAccess) {
-      setSimulatedRole(null);
+      // Defer one tick so any in-flight navigation can settle first.
+      // If the route change moves us to a page the simulation CAN access,
+      // hasAccess flips true and the timer is cancelled — simulation preserved.
+      const t = setTimeout(() => setSimulatedRole(null), 0);
+      return () => clearTimeout(t);
     }
   }, [stillLoading, authenticated, actuallyIsOwner, simulatedRole, hasAccess, setSimulatedRole]);
 
