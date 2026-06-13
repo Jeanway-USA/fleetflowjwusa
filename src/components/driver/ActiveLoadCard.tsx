@@ -71,7 +71,7 @@ interface Load {
   landstar_load_id: string | null;
   tracking_id?: string | null;
   pod_required?: boolean;
-  load_accessorials?: { amount: number }[];
+  load_accessorials?: Array<{ id?: string; accessorial_type?: string | null; amount?: number | null; notes?: string | null }>;
 }
 
 interface ActiveLoadCardProps {
