@@ -505,7 +505,9 @@ export function InventoryManagementTab() {
                   <p className="text-sm text-muted-foreground">
                     {parts.length === 0
                       ? 'No inventory yet. Click "Add New Part" to get started.'
-                      : 'No parts match your search.'}
+                      : lowStockOnly
+                        ? 'No low-stock parts. Everything is above its minimum threshold.'
+                        : 'No parts match your search.'}
                   </p>
                 </TableCell>
               </TableRow>
