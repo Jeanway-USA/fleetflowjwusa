@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { Building2, Landmark, Banknote } from 'lucide-react';
+import { DetentionRulesCard } from './DetentionRulesCard';
 
 export function CompanyTab() {
   const { orgId, orgName, refreshOrgData, isDemoMode } = useAuth();
