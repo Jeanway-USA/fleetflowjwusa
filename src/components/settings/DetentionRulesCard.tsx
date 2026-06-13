@@ -56,6 +56,7 @@ export function DetentionRulesCard() {
           .update({
             free_time_minutes: Math.max(0, Math.floor(r.free_time_minutes || 0)),
             hourly_rate: Math.max(0, Number(r.hourly_rate) || 0),
+            max_charge_per_day: Math.max(0, Number(r.max_charge_per_day) || 0),
           })
           .eq('id', r.id)
       );
