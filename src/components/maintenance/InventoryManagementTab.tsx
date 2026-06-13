@@ -441,11 +441,29 @@ export function InventoryManagementTab() {
             className="pl-9"
           />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <Button
+            type="button"
+            variant={lowStockOnly ? 'destructive' : 'outline'}
+            onClick={() => setLowStockOnly(v => !v)}
+            aria-pressed={lowStockOnly}
+            className="gap-2"
+          >
+            <AlertTriangle className="h-4 w-4" />
+            {lowStockOnly ? 'Showing Low Stock' : 'Show Low Stock'}
+            {lowStockCount > 0 && (
+              <Badge
+                variant={lowStockOnly ? 'secondary' : 'destructive'}
+                className="ml-1 h-5 px-1.5 text-[10px]"
+              >
+                {lowStockCount}
+              </Badge>
+            )}
+          </Button>
           <p className="text-xs text-muted-foreground hidden sm:block">
             {isLoading
               ? 'Loading…'
-              : query
+              : query || lowStockOnly
                 ? `${filtered.length} of ${parts.length}`
                 : `${parts.length} part${parts.length === 1 ? '' : 's'}`}
           </p>
