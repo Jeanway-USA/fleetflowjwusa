@@ -31,7 +31,7 @@ import type { SubscriptionTier } from '@/contexts/AuthContext';
 import { useOrganizationMode, type TmsMode } from '@/hooks/useOrganizationMode';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import {
   Sidebar,
@@ -184,6 +184,7 @@ export function AppSidebar() {
   const hasOrgBranding = !!(signedBannerUrl || signedLogoUrl);
   const bannerSrc = signedBannerUrl || signedLogoUrl || null;
   const currentPath = location.pathname;
+  const simulationSwitchTimerRef = useRef<number | null>(null);
 
   const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
 
@@ -295,15 +296,39 @@ export function AppSidebar() {
     await signOut();
   };
 
+  useEffect(() => {
+    return () => {
+      if (simulationSwitchTimerRef.current !== null) {
+        window.clearTimeout(simulationSwitchTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleDashboardSwitch = (path: string, role: 'owner' | 'dispatcher' | 'driver' | 'maintenance') => {
     if (actuallyIsOwner) {
-      // flushSync forces the simulation state update to commit synchronously
-      // before navigate() runs, so we never get an intermediate render with
-      // the new simulation but the old route — which previously triggered the
-      // auto-exit effect in ProtectedRoute and cancelled the navigation.
+      if (simulationSwitchTimerRef.current !== null) {
+        window.clearTimeout(simulationSwitchTimerRef.current);
+        simulationSwitchTimerRef.current = null;
+      }
+
+      const nextSimulatedRole = role === 'owner' ? null : role;
+
+      // Clear simulation first so the old simulated role cannot block the
+      // destination route while React Router commits the navigation.
       flushSync(() => {
-        setSimulatedRole(role === 'owner' ? null : role);
+        setSimulatedRole(null);
       });
+
+      navigate(path, { flushSync: true });
+
+      if (nextSimulatedRole) {
+        simulationSwitchTimerRef.current = window.setTimeout(() => {
+          setSimulatedRole(nextSimulatedRole);
+          simulationSwitchTimerRef.current = null;
+        }, 0);
+      }
+
+      return;
     }
     navigate(path);
   };
