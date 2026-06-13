@@ -8,6 +8,7 @@ import { IntegerInput } from '@/components/ui/numeric-input';
 import { SignaturePad } from './SignaturePad';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useOptimisticLoadStatus, NETWORK_ERROR_TOAST } from '@/hooks/useOptimisticLoadStatus';
 import { CheckCircle, Loader2, ClipboardCheck, AlertTriangle, ExternalLink, Gauge } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -39,6 +40,7 @@ export function ProofOfDeliveryDialog({
   const [hasException, setHasException] = useState(false);
   const [endOdometer, setEndOdometer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { applyOptimistic } = useOptimisticLoadStatus();
 
   const parsedEnd = endOdometer === '' ? NaN : parseInt(endOdometer, 10);
   const hasEnd = Number.isInteger(parsedEnd) && parsedEnd > 0;
