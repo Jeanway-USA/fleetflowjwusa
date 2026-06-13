@@ -55,8 +55,8 @@ export function OrgDetailSheet({ org, open, onOpenChange }: OrgDetailSheetProps)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-md overflow-y-auto">
-        <SheetHeader>
+      <SheetContent className="sm:max-w-md flex flex-col p-0 gap-0 overflow-hidden">
+        <SheetHeader className="shrink-0 mx-0 mt-0 px-6 pt-6 pb-4 pr-12 border-b static">
           <SheetTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
             {org.name}
@@ -64,7 +64,8 @@ export function OrgDetailSheet({ org, open, onOpenChange }: OrgDetailSheetProps)
           <SheetDescription>Organization details & management</SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+
           {/* Status */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Status</span>

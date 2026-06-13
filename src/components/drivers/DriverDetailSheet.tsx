@@ -128,8 +128,9 @@ export function DriverDetailSheet({
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-lg flex flex-col overflow-y-auto">
-        <SheetHeader className="pb-4">
+        <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 gap-0 overflow-hidden">
+        <SheetHeader className="shrink-0 mx-0 mt-0 px-6 pt-6 pb-4 pr-12 border-b static">
+
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3">
               <SheetAvatar avatarPath={driver.avatar_url ?? null} initials={initials} />
@@ -165,8 +166,10 @@ export function DriverDetailSheet({
           </div>
         </SheetHeader>
 
+        <div className="flex-1 overflow-y-auto px-6 py-4">
         {/* Contact strip */}
         <div className="space-y-2 pb-4 border-b border-border">
+
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
             {driver.phone ? (
               <a
@@ -283,8 +286,10 @@ export function DriverDetailSheet({
           </>
         )}
 
+        </div>
         </SheetContent>
       </Sheet>
+
       <DriverChatSheet driver={driver} open={chatOpen} onOpenChange={setChatOpen} />
     </>
   );
