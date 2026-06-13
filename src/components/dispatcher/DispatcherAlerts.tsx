@@ -74,7 +74,8 @@ export function DispatcherAlerts() {
 
   const { data: alerts, isLoading } = useQuery({
     queryKey: ['dispatcher-alerts'],
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
     queryFn: async () => {
       const alertsList: Alert[] = [];
       const now = new Date();
