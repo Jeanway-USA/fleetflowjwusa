@@ -421,7 +421,9 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
             </TabsContent>
           </Tabs>
         ) : null}
+        </div>
       </SheetContent>
+
     </Sheet>
   );
 }
