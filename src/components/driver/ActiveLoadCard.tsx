@@ -149,6 +149,8 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   const [isUpdating, setIsUpdating] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [podDialogOpen, setPodDialogOpen] = useState(false);
+  const [startOdometerOpen, setStartOdometerOpen] = useState(false);
+  const [endOdometerOpen, setEndOdometerOpen] = useState(false);
   const { isOnline, enqueue } = useOfflineQueue();
 
   if (!load) {
