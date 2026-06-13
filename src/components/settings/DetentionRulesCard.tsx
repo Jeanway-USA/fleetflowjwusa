@@ -14,6 +14,7 @@ interface DetentionRule {
   trailer_type: string;
   free_time_minutes: number;
   hourly_rate: number;
+  max_charge_per_day: number;
 }
 
 export function DetentionRulesCard() {
