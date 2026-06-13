@@ -370,6 +370,27 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Starting Odometer Intercept */}
+      <StartingOdometerDialog
+        open={startOdometerOpen}
+        onOpenChange={setStartOdometerOpen}
+        loadId={load.id}
+        loadNumber={load.landstar_load_id}
+        nextStatus="in_transit"
+        onComplete={onStatusUpdate}
+      />
+
+      {/* Ending Odometer Intercept */}
+      <EndingOdometerDialog
+        open={endOdometerOpen}
+        onOpenChange={setEndOdometerOpen}
+        loadId={load.id}
+        loadNumber={load.landstar_load_id}
+        startMiles={load.start_miles ?? null}
+        nextStatus="delivered"
+        onComplete={onStatusUpdate}
+      />
     </>
   );
 }
