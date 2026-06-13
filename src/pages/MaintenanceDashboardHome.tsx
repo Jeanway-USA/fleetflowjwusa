@@ -718,10 +718,10 @@ function InventoryAlertsCard() {
   };
 
   return (
-    <Card className="border-amber-500/40">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-amber-500/20 bg-amber-500/5">
+    <Card className="border-destructive/40">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-destructive/20 bg-destructive/5">
         <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          <Package className="h-4 w-4 text-destructive" />
           <div>
             <CardTitle className="text-base font-semibold">Inventory Alerts</CardTitle>
             <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -730,12 +730,7 @@ function InventoryAlertsCard() {
           </div>
         </div>
         {!isLoading && parts.length > 0 && (
-          <Badge
-            variant="outline"
-            className="border-amber-400 text-amber-700 dark:text-amber-400"
-          >
-            {parts.length}
-          </Badge>
+          <Badge variant="destructive">{parts.length}</Badge>
         )}
       </CardHeader>
       <CardContent className="p-0">
