@@ -211,6 +211,23 @@ export default function FleetLoads() {
     };
   };
 
+  // Compute the auto In-Bond (Rule 480) accessorial when the load is flagged.
+  const buildInBondAccessorial = (data: any): Accessorial | null => {
+    if (!data?.is_in_bond) return null;
+    const cf = (data.cf_7512_number ?? '').toString().trim();
+    if (!cf) return null;
+    const fee = parseFloat(getSetting('in_bond_fee', '100')) || 0;
+    if (fee <= 0) return null;
+    return {
+      accessorial_type: IN_BOND_ACCESSORIAL_TYPE,
+      amount: fee,
+      percentage: 100,
+      notes: `${IN_BOND_AUTO_NOTE_PREFIX} Rule 480 fee · CF 7512 #${cf}`,
+      is_driver_pay: false,
+    };
+  };
+
+
 
   const createMutation = useMutation({
     mutationFn: async ({ load, accessorials: accs }: { load: any; accessorials: Accessorial[] }) => {
