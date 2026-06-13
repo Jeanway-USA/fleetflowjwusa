@@ -764,7 +764,16 @@ export default function FleetLoads() {
           <DataTable
             columns={[
               { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
-              { key: 'landstar_load_id', header: isLandstar ? 'Landstar ID' : 'Load ID', hiddenOnMobile: true, render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
+              { key: 'landstar_load_id', header: isLandstar ? 'Landstar ID' : 'Load ID', hiddenOnMobile: true, render: (load: any) => (
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono">{load.landstar_load_id || '-'}</span>
+                  {load.is_in_bond && (
+                    <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-destructive/15 text-destructive border border-destructive/30" title={load.cf_7512_number ? `CF 7512: ${load.cf_7512_number}` : 'In-Bond shipment'}>
+                      IN-BOND
+                    </span>
+                  )}
+                </div>
+              ) },
               { key: 'tracking_id', header: 'Tracking ID', hiddenOnMobile: true, render: (load: any) => 
                 load.tracking_id ? (
                   <span 
