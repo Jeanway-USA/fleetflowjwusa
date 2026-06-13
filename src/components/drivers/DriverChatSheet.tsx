@@ -153,7 +153,7 @@ export function DriverChatSheet({ driver, open, onOpenChange }: DriverChatSheetP
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md flex flex-col p-0 gap-0 overflow-hidden">
-        <SheetHeader className="px-5 py-4 border-b border-border">
+        <div className="shrink-0 px-5 pt-5 pb-4 pr-12 border-b border-border bg-background">
           <div className="flex items-center gap-3">
             <ChatAvatar avatarPath={driver.avatar_url ?? null} initials={initials} />
             <div className="min-w-0">
@@ -163,7 +163,7 @@ export function DriverChatSheet({ driver, open, onOpenChange }: DriverChatSheetP
               <p className="text-xs text-muted-foreground">Direct message</p>
             </div>
           </div>
-        </SheetHeader>
+        </div>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
           {!canChat ? (
