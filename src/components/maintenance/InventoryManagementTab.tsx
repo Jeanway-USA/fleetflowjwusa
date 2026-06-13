@@ -388,6 +388,7 @@ export function InventoryManagementTab() {
   const del = useDeletePart();
 
   const [query, setQuery] = useState('');
+  const [lowStockOnly, setLowStockOnly] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editPart, setEditPart] = useState<PartInventoryItem | null>(null);
   const [receivePart, setReceivePart] = useState<PartInventoryItem | null>(null);
@@ -395,15 +396,26 @@ export function InventoryManagementTab() {
 
   const parts = data ?? [];
 
+  const lowStockCount = useMemo(
+    () => parts.filter(p => Number(p.quantity_on_hand) <= Number(p.min_threshold)).length,
+    [parts],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return parts;
-    return parts.filter(p =>
-      [p.part_name, p.part_number, p.vendor_name, p.category]
-        .filter(Boolean)
-        .some(v => String(v).toLowerCase().includes(q)),
-    );
-  }, [parts, query]);
+    let result = parts;
+    if (lowStockOnly) {
+      result = result.filter(p => Number(p.quantity_on_hand) <= Number(p.min_threshold));
+    }
+    if (q) {
+      result = result.filter(p =>
+        [p.part_name, p.part_number, p.vendor_name, p.category]
+          .filter(Boolean)
+          .some(v => String(v).toLowerCase().includes(q)),
+      );
+    }
+    return result;
+  }, [parts, query, lowStockOnly]);
 
   const handleDelete = () => {
     if (!deletePart) return;
