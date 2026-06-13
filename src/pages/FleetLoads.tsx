@@ -170,6 +170,44 @@ export default function FleetLoads() {
     return Number(rule?.hourly_rate) || 0;
   };
 
+  // Over-dimension (Rule 670) rules catalog (per-org)
+  const { data: overDimRules = [] } = useQuery({
+    queryKey: ['over_dimension_rules', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('over_dimension_rules')
+        .select('dimension, min_inches, max_inches, cents_per_mile');
+      if (error) throw error;
+      return (data ?? []) as OverDimRule[];
+    },
+  });
+
+  // Compute the auto Over-Dimension accessorial for the current form, if any.
+  const buildOverDimAccessorial = (data: any): Accessorial | null => {
+    const miles = (Number(data?.actual_miles) > 0 ? Number(data?.actual_miles) : Number(data?.booked_miles)) || 0;
+    const result = calcOverDimensionCharge({
+      height_inches: data?.height_inches,
+      width_inches: data?.width_inches,
+      length_inches: data?.length_inches,
+      miles,
+      rules: overDimRules as OverDimRule[],
+    });
+    if (result.charge_amount <= 0) return null;
+    const parts = result.breakdown.map((b) => {
+      const tag = b.dimension === 'height' ? 'H' : b.dimension === 'width' ? 'W' : 'L';
+      return `${tag} ${b.value_in}" → $${b.cpm.toFixed(2)}/mi`;
+    });
+    return {
+      accessorial_type: OVER_DIM_ACCESSORIAL_TYPE,
+      amount: result.charge_amount,
+      percentage: 100,
+      notes: `${OVER_DIM_AUTO_NOTE_PREFIX} ${parts.join(', ')} × ${miles} mi`,
+      is_driver_pay: false,
+    };
+  };
+
+
   const createMutation = useMutation({
     mutationFn: async ({ load, accessorials: accs }: { load: any; accessorials: Accessorial[] }) => {
       const { data, error } = await supabase.from('fleet_loads').insert(load).select().single();
