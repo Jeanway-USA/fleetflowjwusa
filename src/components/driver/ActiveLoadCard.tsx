@@ -357,9 +357,32 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
           loadNumber={load.landstar_load_id}
           destination={load.destination}
           driverId={driverId}
+          startMiles={load.start_miles ?? null}
           onComplete={() => onStatusUpdate?.()}
         />
       )}
+
+      {/* Starting Odometer Intercept */}
+      <StartingOdometerDialog
+        open={startOdometerOpen}
+        onOpenChange={setStartOdometerOpen}
+        loadId={load.id}
+        loadNumber={load.landstar_load_id}
+        nextStatus="in_transit"
+        onComplete={() => onStatusUpdate?.()}
+      />
+
+      {/* Ending Odometer Intercept (no-POD path) */}
+      <EndingOdometerDialog
+        open={endOdometerOpen}
+        onOpenChange={setEndOdometerOpen}
+        loadId={load.id}
+        loadNumber={load.landstar_load_id}
+        startMiles={load.start_miles ?? null}
+        nextStatus="delivered"
+        onComplete={() => onStatusUpdate?.()}
+      />
+
 
       {/* Load Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
