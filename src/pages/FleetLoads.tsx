@@ -152,26 +152,29 @@ export default function FleetLoads() {
     },
   });
 
-  // Detention rules catalog (per-org)
+  // Detention rules catalog (per-org) — Rule 500 with daily cap.
   const { data: detentionRules = [] } = useQuery({
     queryKey: ['detention_rules', orgId],
     enabled: !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('detention_rules')
-        .select('trailer_type, free_time_minutes, hourly_rate');
+        .select('trailer_type, free_time_minutes, hourly_rate, max_charge_per_day');
       if (error) throw error;
       return data ?? [];
     },
   });
 
-  // Helper: derive the detention hourly rate for the selected trailer on this load.
-  const getDetentionRateForLoad = (data: any): number => {
+  // Helper: derive the detention rule {hourly, cap} for the selected trailer on this load.
+  const getDetentionRuleForLoad = (data: any): { rate: number; cap: number } => {
     const trailer = trailers.find((t: any) => t.id === data?.trailer_id);
     const type = trailer?.trailer_type;
-    if (!type) return 0;
+    if (!type) return { rate: 0, cap: 0 };
     const rule = (detentionRules as any[]).find((r) => r.trailer_type === type);
-    return Number(rule?.hourly_rate) || 0;
+    return {
+      rate: Number(rule?.hourly_rate) || 0,
+      cap: Number(rule?.max_charge_per_day) || 0,
+    };
   };
 
   // Over-dimension (Rule 670) rules catalog (per-org)
@@ -181,7 +184,7 @@ export default function FleetLoads() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('over_dimension_rules')
-        .select('dimension, min_inches, max_inches, cents_per_mile');
+        .select('dimension, min_inches, max_inches, cents_per_mile, min_charge');
       if (error) throw error;
       return (data ?? []) as OverDimRule[];
     },
