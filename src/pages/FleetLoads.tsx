@@ -419,10 +419,17 @@ export default function FleetLoads() {
       negotiation_notes: formData.negotiation_notes || null,
     };
 
+    // Strip any prior auto-generated Over-Dimension rows, then re-inject if applicable.
+    const manualAccessorials = accessorials.filter(
+      (a) => !(a.accessorial_type === OVER_DIM_ACCESSORIAL_TYPE && (a.notes ?? '').startsWith(OVER_DIM_AUTO_NOTE_PREFIX))
+    );
+    const autoOverDim = buildOverDimAccessorial(payload);
+    const finalAccessorials = autoOverDim ? [...manualAccessorials, autoOverDim] : manualAccessorials;
+
     if (editingLoad) {
-      updateMutation.mutate({ id: editingLoad.id, updates: payload, accessorialItems: accessorials });
+      updateMutation.mutate({ id: editingLoad.id, updates: payload, accessorialItems: finalAccessorials });
     } else {
-      createMutation.mutate({ load: payload, accessorials });
+      createMutation.mutate({ load: payload, accessorials: finalAccessorials });
     }
   };
 
