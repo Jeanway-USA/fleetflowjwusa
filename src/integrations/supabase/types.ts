@@ -736,6 +736,58 @@ export type Database = {
           },
         ]
       }
+      detention_rules: {
+        Row: {
+          created_at: string
+          free_time_minutes: number
+          hourly_rate: number
+          id: string
+          org_id: string
+          trailer_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          free_time_minutes?: number
+          hourly_rate?: number
+          id?: string
+          org_id: string
+          trailer_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          free_time_minutes?: number
+          hourly_rate?: number
+          id?: string
+          org_id?: string
+          trailer_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "detention_rules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "detention_rules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "detention_rules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_templates: {
         Row: {
           content: string
@@ -1871,6 +1923,7 @@ export type Database = {
           delivery_time_type: string
           delivery_tz: string | null
           destination: string
+          detention_hours: number | null
           detention_pay: number | null
           driver_id: string | null
           empty_miles: number | null
@@ -1928,6 +1981,7 @@ export type Database = {
           delivery_time_type?: string
           delivery_tz?: string | null
           destination: string
+          detention_hours?: number | null
           detention_pay?: number | null
           driver_id?: string | null
           empty_miles?: number | null
@@ -1985,6 +2039,7 @@ export type Database = {
           delivery_time_type?: string
           delivery_tz?: string | null
           destination?: string
+          detention_hours?: number | null
           detention_pay?: number | null
           driver_id?: string | null
           empty_miles?: number | null

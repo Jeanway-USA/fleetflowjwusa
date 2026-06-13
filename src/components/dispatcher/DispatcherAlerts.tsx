@@ -22,7 +22,7 @@ import { useState, useEffect } from 'react';
 
 interface Alert {
   id: string;
-  type: 'defect' | 'maintenance' | 'credential' | 'inspection' | 'driver_request';
+  type: 'defect' | 'maintenance' | 'credential' | 'inspection' | 'driver_request' | 'detention_timer';
   requestType?: 'detention' | 'home_time' | 'pto' | 'maintenance';
   priority: 'high' | 'medium' | 'low';
   title: string;
@@ -36,6 +36,8 @@ interface Alert {
     endDate?: string | null;
   };
 }
+
+const ARRIVAL_STATUSES = ['at_pickup', 'at_delivery', 'loading', 'unloading'] as const;
 
 export function DispatcherAlerts() {
   const navigate = useNavigate();
@@ -72,7 +74,8 @@ export function DispatcherAlerts() {
 
   const { data: alerts, isLoading } = useQuery({
     queryKey: ['dispatcher-alerts'],
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
     queryFn: async () => {
       const alertsList: Alert[] = [];
       const now = new Date();
@@ -182,6 +185,78 @@ export function DispatcherAlerts() {
         }
       });
 
+      // Detention timer: any load currently in an arrival status whose elapsed time
+      // since the most recent arrival-status change exceeds the trailer-type free time.
+      const { data: activeArrivals } = await supabase
+        .from('fleet_loads')
+        .select(`
+          id, status, origin, destination, trailer_id,
+          driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name)
+        `)
+        .in('status', ARRIVAL_STATUSES as unknown as string[]);
+
+      const [{ data: detentionRules }, { data: trailerRows }] = await Promise.all([
+        supabase.from('detention_rules').select('trailer_type, free_time_minutes, hourly_rate'),
+        activeArrivals && activeArrivals.length > 0
+          ? supabase
+              .from('trailers')
+              .select('id, trailer_type, unit_number')
+              .in('id', activeArrivals.map((l: any) => l.trailer_id).filter(Boolean))
+          : Promise.resolve({ data: [] as any[] } as any),
+      ]);
+
+      const ruleByType = new Map<string, { free_time_minutes: number; hourly_rate: number }>(
+        (detentionRules ?? []).map((r: any) => [r.trailer_type, r])
+      );
+      const trailerById = new Map<string, { trailer_type: string; unit_number: string }>(
+        (trailerRows ?? []).map((t: any) => [t.id, t])
+      );
+
+      if (activeArrivals && activeArrivals.length > 0) {
+        const loadIds = activeArrivals.map((l: any) => l.id);
+        const { data: latestLogs } = await supabase
+          .from('load_status_logs')
+          .select('load_id, new_status, created_at')
+          .in('load_id', loadIds)
+          .in('new_status', ARRIVAL_STATUSES as unknown as string[])
+          .order('created_at', { ascending: false });
+
+        const startedAt = new Map<string, Date>();
+        latestLogs?.forEach((log: any) => {
+          if (!startedAt.has(log.load_id)) {
+            startedAt.set(log.load_id, new Date(log.created_at));
+          }
+        });
+
+        activeArrivals.forEach((load: any) => {
+          const start = startedAt.get(load.id);
+          if (!start) return;
+          const trailerType = load.trailer_id ? trailerById.get(load.trailer_id)?.trailer_type : undefined;
+          const rule = trailerType ? ruleByType.get(trailerType) : undefined;
+          if (!rule || rule.free_time_minutes <= 0) return;
+
+          const elapsedMin = (now.getTime() - start.getTime()) / 60000;
+          if (elapsedMin <= rule.free_time_minutes) return;
+
+          const overMin = Math.floor(elapsedMin - rule.free_time_minutes);
+          const overHrs = (overMin / 60).toFixed(1);
+          const driver = load.driver as any;
+          const driverName = `${driver?.first_name || ''} ${driver?.last_name || ''}`.trim() || 'Unassigned';
+          const route = `${(load.origin || '').split(',')[0]} → ${(load.destination || '').split(',')[0]}`;
+          alertsList.push({
+            id: `detention-${load.id}`,
+            type: 'detention_timer',
+            priority: 'high',
+            title: `Detention accruing — ${driverName}`,
+            description: `${route} • ${overHrs}h past ${rule.free_time_minutes}m free time (${trailerType})`,
+            link: `/fleet-loads?loadId=${load.id}`,
+          });
+        });
+      }
+
+
+
+
       // Sort: driver requests first, then by priority
       return alertsList.sort((a, b) => {
         if (a.type === 'driver_request' && b.type !== 'driver_request') return -1;
@@ -271,6 +346,7 @@ export function DispatcherAlerts() {
       case 'maintenance': return Wrench;
       case 'credential': return User;
       case 'inspection': return Truck;
+      case 'detention_timer': return Clock;
       default: return AlertTriangle;
     }
   };

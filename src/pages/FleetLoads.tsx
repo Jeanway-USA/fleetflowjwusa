@@ -139,6 +139,28 @@ export default function FleetLoads() {
     },
   });
 
+  // Detention rules catalog (per-org)
+  const { data: detentionRules = [] } = useQuery({
+    queryKey: ['detention_rules', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('detention_rules')
+        .select('trailer_type, free_time_minutes, hourly_rate');
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  // Helper: derive the detention hourly rate for the selected trailer on this load.
+  const getDetentionRateForLoad = (data: any): number => {
+    const trailer = trailers.find((t: any) => t.id === data?.trailer_id);
+    const type = trailer?.trailer_type;
+    if (!type) return 0;
+    const rule = (detentionRules as any[]).find((r) => r.trailer_type === type);
+    return Number(rule?.hourly_rate) || 0;
+  };
+
   const createMutation = useMutation({
     mutationFn: async ({ load, accessorials: accs }: { load: any; accessorials: Accessorial[] }) => {
       const { data, error } = await supabase.from('fleet_loads').insert(load).select().single();
@@ -1107,7 +1129,53 @@ export default function FleetLoads() {
                   />
                 </div>
 
-                {/* Accessorials Section - shown for both modes */}
+                {/* Detention - hours-based with auto-computed $ from trailer-type rule */}
+                {(() => {
+                  const rate = getDetentionRateForLoad(formData);
+                  const hours = parseFloat(formData.detention_hours ?? '0') || 0;
+                  const computed = +(hours * rate).toFixed(2);
+                  const trailer = trailers.find((t: any) => t.id === formData?.trailer_id);
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                      <div className="space-y-2">
+                        <Label htmlFor="detention_hours">Detention Hours</Label>
+                        <Input
+                          id="detention_hours"
+                          type="number"
+                          min={0}
+                          step="0.25"
+                          value={formData.detention_hours ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const h = v === '' ? 0 : parseFloat(v);
+                            const auto = +(h * rate).toFixed(2);
+                            setFormData({ ...formData, detention_hours: v === '' ? null : h, detention_pay: auto });
+                          }}
+                          placeholder="0"
+                          className="pl-4 sm:pl-3 h-12"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {trailer?.trailer_type
+                            ? `Rate: $${rate.toFixed(2)}/hr (${trailer.trailer_type})`
+                            : 'Select a trailer to auto-fill the rate.'}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="detention_pay">Detention Pay ($)</Label>
+                        <CurrencyInput
+                          id="detention_pay"
+                          value={formData.detention_pay ?? ''}
+                          onChange={(v) => setFormData({ ...formData, detention_pay: v === '' ? 0 : parseFloat(v) })}
+                          placeholder={computed ? computed.toFixed(2) : '0.00'}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Auto-calculated; override if needed.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className="border-t pt-4 mt-4">
                   <div className="flex items-center justify-between mb-3">
                     <Label className="text-base font-medium">Accessorials</Label>
