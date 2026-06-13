@@ -1,73 +1,53 @@
-## Goal
-Make every driver-side load-status mutation feel instant on flaky cell connections by applying React Query optimistic updates with automatic rollback + a friendly retry toast on failure.
+## Audit summary
 
-## Mutations in scope
-All write paths triggered from the Driver Load View:
-1. `ActiveLoadCard.handleProgressStatus` — intermediate transitions: `pending → assigned`, `assigned → loading`.
-2. `StartingOdometerDialog.handleSubmit` — `loading → in_transit` + `start_miles`.
-3. `EndingOdometerDialog.handleSubmit` — `in_transit → delivered` + `end_miles` (+ `actual_miles`).
-4. `ProofOfDeliveryDialog.handleSubmit` — `in_transit → delivered` + `end_miles` (+ `actual_miles`, `pod_signature_path`, `pod_transflo_link`, optional `notes`). The signature upload / document inserts stay sequential since they must complete server-side; only the status flip is treated optimistically (load already moves on the UI; the dialog still shows a spinner only briefly).
+The Safety Bonus system is **already mostly tier-driven** — `safety_bonus_settings` + `safety_bonus_tiers` tables, configurable from `SafetyBonusSettings.tsx`, consumed by `useSafetyBonus.ts`, and rendered by `MonthlyBonusWidget.tsx`. There is **no `10000`/`is_10k_eligible` boolean** anywhere in the codebase. The only literal `10,000-mile` reference is one stale copy line in driver settings:
 
-The offline path (already handled by `useOfflineQueue`) is preserved unchanged.
+- `src/pages/DriverSettings.tsx:253` — "Pace yourself to hit 2,500 safe miles per week to ensure you unlock your 10,000-mile monthly safety bonus."
 
-## Pattern (shared)
+Everywhere else (`MaintenanceDashboardHome`, `DriverDashboard`, `DriverSpectatorView`, `Finance`, `TopPerformerCards`, etc.) the `10000` matches are unrelated (numeric formatters, animation z-index, alternator lifespan miles, etc.).
 
-Use the existing `useQueryClient` and operate on cache entries matching the active-load query keys:
-- `['driver-active-loads', driverId]` (driver dashboard)
-- `['driver-loads', ...]` (driver loads list view — apply with `predicate` so we cover both screens)
+The current widget already renders a tier-aware progress bar, but it only surfaces "X mi to next rate jump" — it doesn't make the **Current Tier → Next Tier** structure visually explicit.
 
-For each mutation:
+## Changes
 
-```text
-1. snapshot = queryClient.getQueriesData({ predicate: matchesDriverLoads })
-2. queryClient.cancelQueries({ predicate })
-3. queryClient.setQueriesData({ predicate }, (old) => patch load by id with new fields)
-4. close dialog + call onComplete (UI now shows new status immediately)
-5. await supabase update
-   - success → toast.success(...), invalidate queries to reconcile
-   - failure → restore snapshot via setQueriesData, toast.error('Network error. Please try again when you have a better signal.')
+### 1. UI text clean-up — `src/pages/DriverSettings.tsx` (line ~253)
+Replace the hardcoded "10,000-mile monthly safety bonus" sentence with a tier-agnostic prompt that reflects the driver's actual configured target (`targetMiles` is already in scope):
+
+```
+Aim for steady weekly progress to hit your {targetMiles.toLocaleString()}-mile target and climb to the next safety-bonus tier.
 ```
 
-Helper extracted to `src/hooks/useOptimisticLoadStatus.ts` exposing `applyOptimistic(loadId, patch)` returning `{ commit, rollback }`. Keeps the four call sites tiny and consistent.
+When `targetMiles` is 0/unset, fall back to: "Aim for steady weekly progress to climb to the next safety-bonus tier."
 
-## File changes
+### 2. Hook surface — `src/hooks/useSafetyBonus.ts`
+Extend `SafetyBonusStatus` and `computeSafetyBonus` to expose tier metadata the UI needs (without altering existing fields, so other consumers keep working):
 
-1. **New** `src/hooks/useOptimisticLoadStatus.ts`
-   - Wraps `useQueryClient`.
-   - `matchesDriverLoads`: `key[0] === 'driver-active-loads' || key[0] === 'driver-loads'`.
-   - `applyOptimistic(loadId, patch)`:
-     - snapshots matching queries,
-     - cancels in-flight refetches,
-     - mutates each cached array by mapping the matching load id and shallow-merging `patch`,
-     - returns `commit()` (invalidates queries) and `rollback()` (restores snapshot + shows the standard network-error toast).
-   - Standard network-error message constant: `'Network error. Please try again when you have a better signal.'`
+- `currentTier: { index: number; minMiles: number; maxMiles: number | null; ratePerMile: number } | null`
+- `nextTier:    { index: number; minMiles: number; maxMiles: number | null; ratePerMile: number } | null`
+- `tierCount: number`
 
-2. **`src/components/driver/ActiveLoadCard.tsx`**
-   - Use `useOptimisticLoadStatus`.
-   - In `handleProgressStatus` (non-intercept branch): call `applyOptimistic(load.id, { status: nextStatus })`, close/notify immediately, then `await supabase.update`; on error → `rollback()`; on success → quiet `commit()` and remove the existing redundant success toast (status change is now visible without it) or downgrade to a short confirmation.
-   - Remove `isUpdating` button spinner (the load already advances visually); keep the button disabled only for the brief window between click and optimistic apply. Simplest: drop `isUpdating` entirely for this path.
+Derived from the same `tiers` array already fetched — pure refactor, no extra queries.
 
-3. **`src/components/driver/StartingOdometerDialog.tsx`**
-   - Inject optimistic helper. On submit (online path):
-     - Run `applyOptimistic(loadId, { status: nextStatus, start_miles: startMiles })`.
-     - Immediately close dialog + `onComplete()`.
-     - Await Supabase update in background; on error `rollback()` (which fires the friendly toast); on success `commit()` + concise success toast.
+### 3. Widget refactor — `src/components/driver/MonthlyBonusWidget.tsx`
+Replace the single anonymous progress bar with a tiered display:
 
-4. **`src/components/driver/EndingOdometerDialog.tsx`**
-   - Same pattern with patch `{ status: nextStatus, end_miles, actual_miles? }`.
+- Header row: two badges side-by-side
+  - **Current Tier**: `Tier {currentTier.index + 1} of {tierCount}` + `$X.XX/mi`
+  - **Next Tier**: `Tier {nextTier.index + 1}` + `$Y.YY/mi` (or "Top tier reached" pill when `nextTier == null`)
+- Progress bar segment now scales between `currentTier.minMiles` and `nextTier.minMiles` (or the cap on the top tier), so it visually represents progress **within the current tier toward the next**, not just toward an arbitrary total.
+- Sub-label under the bar: `{formatMiles(currentSafeMiles - currentTier.minMiles)} / {formatMiles(nextTier.minMiles - currentTier.minMiles)} mi into Tier N` (or "Top tier — max rate active" at the cap).
+- "X days left in period" stays.
 
-5. **`src/components/driver/ProofOfDeliveryDialog.tsx`**
-   - Apply optimistic patch `{ status: 'delivered', end_miles, actual_miles? }` right before kicking off the signature upload + document inserts + status update.
-   - On any thrown error in the try block → `rollback()` (friendly network toast) and keep dialog open with the form data preserved so the driver can retry. On success → `commit()`.
-   - The existing toasts stay, but failure toast is replaced with the standardized network-error copy.
+No layout/size regression — same Card footprint.
 
-## UX details
-- Single source of friendly copy: `'Network error. Please try again when you have a better signal.'` exported from the hook and reused across all four call sites.
-- No new dependencies. Pure React Query cache surgery.
-- Offline branch (`!isOnline`) untouched — it already enqueues and toasts.
-- Optimistic updates only happen online; offline already feels instant via the queue.
+### 4. No DB or settings changes
+The existing schema already supports unbounded tiers (`min_miles` / nullable `max_miles` / `rate_per_mile`). No migration needed. `SafetyBonusSettings.tsx` already lets owners add/edit any number of tiers — leaving it untouched.
+
+## Files touched
+- `src/pages/DriverSettings.tsx` — copy fix
+- `src/hooks/useSafetyBonus.ts` — add `currentTier` / `nextTier` / `tierCount` to returned status
+- `src/components/driver/MonthlyBonusWidget.tsx` — current/next tier badges + tier-relative progress bar
 
 ## Out of scope
-- No DB schema changes.
-- No global mutation refactor (we're not introducing `useMutation` wrappers — keeping current `async` handlers, just adding cache patching around them).
-- Status change for `delivered` via POD: signature/upload work still awaits the network; only the status badge on the dashboard updates optimistically.
+- No changes to `SafetyBonusSettings.tsx`, the `safety_bonus_*` tables, or any other component.
+- No change to disqualifier rules, max bonus cap, or period length logic.

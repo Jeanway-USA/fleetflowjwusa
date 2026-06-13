@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+export type SafetyBonusTierInfo = {
+  index: number;
+  minMiles: number;
+  maxMiles: number | null;
+  ratePerMile: number;
+};
+
 export type SafetyBonusStatus = {
   isEligible: boolean;
   currentSafeMiles: number;
@@ -16,6 +23,9 @@ export type SafetyBonusStatus = {
     serviceFailures: boolean;
   };
   hasSettings: boolean;
+  currentTier: SafetyBonusTierInfo | null;
+  nextTier: SafetyBonusTierInfo | null;
+  tierCount: number;
 };
 
 const EMPTY: SafetyBonusStatus = {
@@ -29,6 +39,9 @@ const EMPTY: SafetyBonusStatus = {
   periodEnd: "",
   disqualifiers: { accidents: false, csaPoints: false, serviceFailures: false },
   hasSettings: false,
+  currentTier: null,
+  nextTier: null,
+  tierCount: 0,
 };
 
 function toDateString(d: Date): string {
@@ -130,17 +143,30 @@ async function computeSafetyBonus(driverId: string): Promise<SafetyBonusStatus> 
   const isEligible = !hasAccidents && !hasCsa && !hasFailures;
 
   // Tier match
-  const currentTier = [...tiers]
-    .reverse()
-    .find(
-      (t) =>
-        currentSafeMiles >= t.min_miles &&
-        (t.max_miles == null || currentSafeMiles < t.max_miles),
-    );
-  const currentRate = currentTier?.rate_per_mile ?? 0;
+  let currentIdx = -1;
+  for (let i = tiers.length - 1; i >= 0; i--) {
+    const t = tiers[i];
+    if (
+      currentSafeMiles >= t.min_miles &&
+      (t.max_miles == null || currentSafeMiles < t.max_miles)
+    ) {
+      currentIdx = i;
+      break;
+    }
+  }
+  const currentTierRaw = currentIdx >= 0 ? tiers[currentIdx] : null;
+  const currentRate = currentTierRaw?.rate_per_mile ?? 0;
 
-  const nextTier = tiers.find((t) => t.min_miles > currentSafeMiles);
-  const nextTierMiles = nextTier ? nextTier.min_miles - currentSafeMiles : null;
+  const nextIdx = tiers.findIndex((t) => t.min_miles > currentSafeMiles);
+  const nextTierRaw = nextIdx >= 0 ? tiers[nextIdx] : null;
+  const nextTierMiles = nextTierRaw ? nextTierRaw.min_miles - currentSafeMiles : null;
+
+  const toTierInfo = (idx: number, t: typeof tiers[number]): SafetyBonusTierInfo => ({
+    index: idx,
+    minMiles: t.min_miles,
+    maxMiles: t.max_miles,
+    ratePerMile: t.rate_per_mile,
+  });
 
   const rawBonus = isEligible ? currentSafeMiles * currentRate : 0;
   const currentEarnedBonus = Math.min(rawBonus, maxBonus);
@@ -160,6 +186,9 @@ async function computeSafetyBonus(driverId: string): Promise<SafetyBonusStatus> 
       serviceFailures: hasFailures,
     },
     hasSettings: true,
+    currentTier: currentTierRaw ? toTierInfo(currentIdx, currentTierRaw) : null,
+    nextTier: nextTierRaw ? toTierInfo(nextIdx, nextTierRaw) : null,
+    tierCount: tiers.length,
   };
 }
 

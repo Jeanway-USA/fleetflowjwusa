@@ -250,7 +250,9 @@ export default function DriverSettings() {
                   <span className="text-sm text-muted-foreground whitespace-nowrap">miles</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Pace yourself to hit 2,500 safe miles per week to ensure you unlock your 10,000-mile monthly safety bonus.
+                  {targetMiles > 0
+                    ? `Aim for steady weekly progress to hit your ${targetMiles.toLocaleString()}-mile target and climb to the next safety-bonus tier.`
+                    : 'Aim for steady weekly progress to climb to the next safety-bonus tier.'}
                 </p>
               </div>
             ) : (

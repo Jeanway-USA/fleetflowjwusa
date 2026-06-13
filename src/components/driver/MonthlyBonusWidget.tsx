@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trophy, Sparkles, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Trophy, Sparkles, ShieldAlert, ShieldCheck, Crown } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useSafetyBonus } from '@/hooks/useSafetyBonus';
 
