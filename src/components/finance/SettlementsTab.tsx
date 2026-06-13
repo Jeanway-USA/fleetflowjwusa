@@ -477,13 +477,12 @@ export function SettlementsTab() {
   const DeductionInput = ({ field, label }: { field: keyof Settlement; label: string }) => (
     <div className="space-y-1">
       <Label htmlFor={field} className="text-xs">{label}</Label>
-      <Input
+      <CurrencyInput
         id={field}
-        type="number"
-        step="0.01"
-        value={(formData[field] as number) || ''}
-        onChange={(e) => setFormData({ ...formData, [field]: parseFloat(e.target.value) || 0 })}
+        value={(formData[field] as number) ?? ''}
+        onChange={(v) => setFormData({ ...formData, [field]: v === '' ? 0 : parseFloat(v) })}
         className="h-8 text-sm"
+        placeholder="0.00"
       />
     </div>
   );
