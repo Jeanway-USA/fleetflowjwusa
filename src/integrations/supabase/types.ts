@@ -742,6 +742,7 @@ export type Database = {
           free_time_minutes: number
           hourly_rate: number
           id: string
+          max_charge_per_day: number
           org_id: string
           trailer_type: string
           updated_at: string
@@ -751,6 +752,7 @@ export type Database = {
           free_time_minutes?: number
           hourly_rate?: number
           id?: string
+          max_charge_per_day?: number
           org_id: string
           trailer_type: string
           updated_at?: string
@@ -760,6 +762,7 @@ export type Database = {
           free_time_minutes?: number
           hourly_rate?: number
           id?: string
+          max_charge_per_day?: number
           org_id?: string
           trailer_type?: string
           updated_at?: string
@@ -1943,6 +1946,7 @@ export type Database = {
           invoiced_at: string | null
           is_in_bond: boolean
           is_power_only: boolean | null
+          is_spotted_trailer: boolean
           landstar_load_id: string | null
           length_inches: number | null
           lumper: number | null
@@ -2006,6 +2010,7 @@ export type Database = {
           invoiced_at?: string | null
           is_in_bond?: boolean
           is_power_only?: boolean | null
+          is_spotted_trailer?: boolean
           landstar_load_id?: string | null
           length_inches?: number | null
           lumper?: number | null
@@ -2069,6 +2074,7 @@ export type Database = {
           invoiced_at?: string | null
           is_in_bond?: boolean
           is_power_only?: boolean | null
+          is_spotted_trailer?: boolean
           landstar_load_id?: string | null
           length_inches?: number | null
           lumper?: number | null
@@ -3431,6 +3437,7 @@ export type Database = {
           dimension: string
           id: string
           max_inches: number | null
+          min_charge: number
           min_inches: number
           org_id: string
           sort_order: number
@@ -3442,6 +3449,7 @@ export type Database = {
           dimension: string
           id?: string
           max_inches?: number | null
+          min_charge?: number
           min_inches: number
           org_id: string
           sort_order?: number
@@ -3453,6 +3461,7 @@ export type Database = {
           dimension?: string
           id?: string
           max_inches?: number | null
+          min_charge?: number
           min_inches?: number
           org_id?: string
           sort_order?: number
