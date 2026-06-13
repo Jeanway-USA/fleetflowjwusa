@@ -1,39 +1,35 @@
-Give drivers a click-to-expand breakdown of the accessorials behind every total they see — on the Load Detail dialog and on the Paystub dialog.
+Add a compact, read-only **My Equipment** card to the Driver Dashboard showing the driver's assigned truck and trailer with an out-of-service warning badge.
 
 ### Scope
-Two driver surfaces, frontend-only. No schema or business-logic changes.
+Frontend-only. Reads existing tables; no schema or RLS changes.
 
-1. `src/components/driver/ActiveLoadCard.tsx` — Load Detail dialog
-2. `src/components/driver/MyPaystubsDialog.tsx` — Paystub detail view
+### New file
+`src/components/driver/MyEquipmentCard.tsx`
 
-`DriverPayWidget` already has the desired collapsible accessorials breakdown for weekly pay — leave it as-is.
+- Props: `{ driverId: string; assignedTruck?: { id, unit_number, make, model, year, status } | null }` — truck is already fetched on `DriverDashboard`, so we reuse it instead of re-querying.
+- Internal `useQuery` keyed `['driver-trailer', driverId]` to find the current trailer via `trailer_assignments` (the active row is `released_at IS NULL`) joined to `trailers(id, unit_number, trailer_type, status)`.
+- Internal `useQuery` keyed `['driver-equipment-work-orders', truckId]` for `work_orders.select('id, status, service_type, description').eq('truck_id', truckId).neq('status', 'completed')` — any open work order is treated as a "Critical Defect" signal.
+- Status interpretation (shared helper):
+  - `out_of_service` or `down` → **red destructive** badge labeled "OUT OF SERVICE — Do Not Dispatch"
+  - `in_shop` or any open work order present → **amber warning** badge labeled "In Shop / Active Work Order"
+  - `active` and no open work orders → muted "Active" badge
+- Layout (compact, mirrors existing dashboard cards):
+  - Card title: "My Equipment" with a `Truck` icon.
+  - Two rows: Truck (unit number + make/model/year + per-equipment badge) and Trailer (unit number + type + badge). Each row collapses gracefully when not assigned ("No truck assigned — contact dispatch" / "No trailer assigned").
+  - A prominent top-banner alert appears when any piece of equipment resolves to the red destructive state, repeating the "Do Not Dispatch" message so it can't be missed.
+- Pure read-only — no edit affordances, no action buttons.
+- Uses semantic tokens (`bg-destructive`, `bg-warning`, `text-destructive-foreground`, etc.) — no hardcoded colors.
 
-### 1. Load Detail dialog (ActiveLoadCard)
-
-Currently the detail dialog shows a single "Estimated Pay" row with no breakdown. Drivers can't see where accessorials come from.
-
-- Widen the local `Load` interface so `load_accessorials` carries `{ id, accessorial_type, amount, notes }` (the parent `DriverDashboard` query already pulls `load_accessorials(*)`, so no fetch change needed).
-- Below the "Estimated Pay" row, render a shadcn `Collapsible` titled "Accessorials" only when `load.load_accessorials?.length > 0`.
-  - Trigger row shows the icon, label "Accessorials", a `Badge` with the summed `$X.XX`, and a chevron that rotates on open (mirror the styling used in `DriverPayWidget`).
-  - Content lists each accessorial: title-cased `accessorial_type` (replace `_` with space), optional `notes` as subtext, and the formatted amount on the right.
-  - Empty/zero case: hide the section entirely.
-- Sum is computed locally from `load.load_accessorials`, matching `sumAccessorials` in `payCalculations.ts` so totals stay consistent with `estimatedPay`.
-
-### 2. Paystub dialog (MyPaystubsDialog)
-
-The selected paystub card currently shows Base Pay, Bonus, and Net Pay — no accessorial visibility. Drivers must call dispatch to verify.
-
-- Add a `useQuery` (enabled only when a paystub is selected) keyed by `['paystub-accessorials', selected.id]` that:
-  - Pulls delivered `fleet_loads` for `driver_id = driverId` with `delivery_date` in `[period_start, period_end]`, selecting `id, landstar_load_id, load_accessorials(id, accessorial_type, amount, notes)`.
-  - Flattens to a list of `{ loadId, loadNumber, accessorial_type, amount, notes }` and computes the total.
-- Inside the selected-paystub layout, between the base/bonus rows and the Net Pay block, insert an `Accessorials` `Collapsible` when items exist:
-  - Trigger shows label + total badge + chevron.
-  - Content lists each accessorial with `#loadNumber`, type, optional notes, and amount right-aligned.
-  - When loading, show a small skeleton row; when empty, omit the section.
-- The Net Pay value is not changed — settlement totals are already authoritative. The breakdown is informational transparency.
+### Wiring in `src/pages/DriverDashboard.tsx`
+- Import the new component.
+- Replace the current standalone "No truck assigned" warning block (lines ~180–185) with `<MyEquipmentCard driverId={driver.id} assignedTruck={assignedTruck} />`. The new card already handles the no-truck case more richly and also adds trailer visibility.
+- Add the same query key (`'driver-trailer'`, `'driver-equipment-work-orders'`) to the `handleRefresh` invalidation list so manual refresh stays in sync.
+- Placement: directly above the `ActiveLoadCard` so equipment status is the first thing a driver sees after the header.
 
 ### Verification
-- Open a driver's Load Details dialog with a load that has 2+ accessorials → section appears, total matches `Estimated Pay - base`, items expand/collapse.
-- Open a driver's paystub from `My Paystubs` for a period with accessorials → new "Accessorials" collapsible lists each line item from delivered loads in the period and sums correctly.
-- Loads/paystubs without accessorials show no new UI (no empty section).
-- Mobile: collapsible rows wrap and respect existing 48px touch target spacing.
+- Driver with `out_of_service` truck → red "Do Not Dispatch" banner + red badge on the truck row.
+- Driver with `in_shop` truck → amber "In Shop" badge, no destructive banner.
+- Truck `active` but has an open work order → amber "Active Work Order" badge.
+- Driver with no trailer assignment → trailer row shows neutral "No trailer assigned".
+- Driver with no truck → truck row shows the existing-style "No truck assigned — contact dispatch" message.
+- Manual refresh on the dashboard updates equipment status without a full reload.

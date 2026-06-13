@@ -18,6 +18,7 @@ import { DriverNotifications } from '@/components/driver/DriverNotifications';
 import { DriverMessages } from '@/components/driver/DriverMessages';
 import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
 import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
+import { MyEquipmentCard } from '@/components/driver/MyEquipmentCard';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { Loader2, Sun, Moon, AlertTriangle, RefreshCw } from 'lucide-react';
@@ -36,6 +37,8 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
     await queryClient.invalidateQueries({ queryKey: ['driver-for-user'] });
     await queryClient.invalidateQueries({ queryKey: ['driver-active-loads'] });
     await queryClient.invalidateQueries({ queryKey: ['driver-truck'] });
+    await queryClient.invalidateQueries({ queryKey: ['driver-trailer'] });
+    await queryClient.invalidateQueries({ queryKey: ['driver-equipment-work-orders'] });
     setTimeout(() => setIsRefreshing(false), 600);
   }, [queryClient]);
 
@@ -176,13 +179,10 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
           </div>
         </div>
 
-        {/* No Truck Warning - Compact */}
-        {!assignedTruck && (
-          <div className="bg-warning/10 border border-warning/30 rounded-md p-3 flex items-center gap-2 text-sm">
-            <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
-            <span className="text-warning font-medium">No truck assigned - contact dispatch</span>
-          </div>
-        )}
+        {/* My Equipment Card */}
+        <ErrorBoundary compact>
+          <MyEquipmentCard driverId={driver.id} assignedTruck={assignedTruck as any} />
+        </ErrorBoundary>
 
         {/* Active Load Card */}
         <div id="tour-active-load">
