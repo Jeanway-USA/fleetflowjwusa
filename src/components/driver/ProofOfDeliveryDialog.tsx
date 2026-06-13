@@ -339,7 +339,7 @@ export function ProofOfDeliveryDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !signatureDataUrl}
+            disabled={isSubmitting || !signatureDataUrl || !isOdometerValid}
             className="w-full sm:w-auto"
           >
             {isSubmitting ? (
