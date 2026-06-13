@@ -176,11 +176,11 @@ function AddPartDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
               <Label htmlFor="quantity_on_hand">Quantity *</Label>
-              <Input id="quantity_on_hand" type="number" min={0} {...form.register('quantity_on_hand')} />
+              <Input id="quantity_on_hand" type="number" min={0} step={1} {...form.register('quantity_on_hand')} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="min_threshold">Min Threshold *</Label>
-              <Input id="min_threshold" type="number" min={0} {...form.register('min_threshold')} />
+              <Input id="min_threshold" type="number" min={0} step={1} {...form.register('min_threshold')} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="unit">Unit</Label>
