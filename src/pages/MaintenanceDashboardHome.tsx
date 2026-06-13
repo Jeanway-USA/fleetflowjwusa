@@ -797,7 +797,7 @@ function InventoryAlertsCard() {
                     <LoadingButton
                       size="sm"
                       variant="ghost"
-                      className="text-amber-700 dark:text-amber-400 hover:text-amber-800"
+                      className="text-destructive hover:text-destructive/80"
                       loading={reorder.isPending && reorder.variables === p.id}
                       onClick={() => handleReorder(p)}
                     >
