@@ -34,6 +34,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 import { PODViewer } from '@/components/loads/PODViewer';
 import { BrokerRateHistoryCard } from '@/components/loads/BrokerRateHistoryCard';
+import { FeetInchesInput } from '@/components/shared/FeetInchesInput';
+import {
+  calcOverDimensionCharge,
+  OVER_DIM_ACCESSORIAL_TYPE,
+  OVER_DIM_AUTO_NOTE_PREFIX,
+  type OverDimRule,
+} from '@/utils/overDimension';
+
+
 
 // Accessorial types are now sourced from public.accessorial_types per-org lookup.
 
