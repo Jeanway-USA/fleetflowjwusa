@@ -1124,16 +1124,35 @@ export default function FleetLoads() {
                         <div key={index} className="grid grid-cols-12 gap-2 items-end p-3 bg-muted/50 rounded-lg">
                           <div className="col-span-3 space-y-1">
                             <Label className="text-xs">Type</Label>
-                            <Select 
-                              value={acc.accessorial_type} 
-                              onValueChange={(v) => updateAccessorial(index, 'accessorial_type', v)}
+                            <Select
+                              value={acc.accessorial_type}
+                              onValueChange={(v) => {
+                                const match = accessorialTypes.find((t: any) => t.name === v);
+                                const updated = [...accessorials];
+                                updated[index] = {
+                                  ...updated[index],
+                                  accessorial_type: v,
+                                  // Auto-apply the catalog default; dispatcher can still override via the Payable To select.
+                                  is_driver_pay: match ? !!match.default_is_driver_pay : updated[index].is_driver_pay,
+                                };
+                                setAccessorials(updated);
+                              }}
                             >
                               <SelectTrigger className="h-9">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {ACCESSORIAL_TYPES.map(type => (
-                                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                                {/* Preserve legacy free-text values not in the catalog */}
+                                {acc.accessorial_type &&
+                                  !accessorialTypes.some((t: any) => t.name === acc.accessorial_type) && (
+                                    <SelectItem value={acc.accessorial_type}>
+                                      {acc.accessorial_type} (legacy)
+                                    </SelectItem>
+                                  )}
+                                {accessorialTypes.map((t: any) => (
+                                  <SelectItem key={t.id} value={t.name}>
+                                    {t.name}
+                                  </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
