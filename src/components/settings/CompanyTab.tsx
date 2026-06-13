@@ -319,6 +319,7 @@ export function CompanyTab() {
 
       <DetentionRulesCard />
       <OverDimensionRulesCard />
+      <InBondFeeCard />
     </div>
   );
 }
