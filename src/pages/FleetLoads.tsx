@@ -35,19 +35,7 @@ import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 import { PODViewer } from '@/components/loads/PODViewer';
 import { BrokerRateHistoryCard } from '@/components/loads/BrokerRateHistoryCard';
 
-// Accessorial types commonly used in trucking
-const ACCESSORIAL_TYPES = [
-  'Detention',
-  'Layover',
-  'Lumper',
-  'TONU',
-  'Deadhead',
-  'Stop-off',
-  'Unloading',
-  'Inside Delivery',
-  'Lift Gate',
-  'Other',
-];
+// Accessorial types are now sourced from public.accessorial_types per-org lookup.
 
 interface Accessorial {
   id?: string;
@@ -97,6 +85,22 @@ export default function FleetLoads() {
       if (error) throw error;
       return data;
     },
+  });
+
+  // Lookup: accessorial type catalog (per-org)
+  const { data: accessorialTypes = [] } = useQuery({
+    queryKey: ['accessorial_types', orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('accessorial_types')
+        .select('id, name, default_is_driver_pay, sort_order')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!orgId,
   });
 
   const { data: allAccessorials = [] } = useQuery({
@@ -272,7 +276,16 @@ export default function FleetLoads() {
 
   // Accessorial management
   const addAccessorial = () => {
-    setAccessorials([...accessorials, { accessorial_type: 'Detention', amount: 0, percentage: 100, is_driver_pay: true }]);
+    const first = accessorialTypes[0];
+    setAccessorials([
+      ...accessorials,
+      {
+        accessorial_type: first?.name ?? 'Detention',
+        amount: 0,
+        percentage: 100,
+        is_driver_pay: first?.default_is_driver_pay ?? true,
+      },
+    ]);
   };
 
   const removeAccessorial = (index: number) => {
@@ -1111,16 +1124,35 @@ export default function FleetLoads() {
                         <div key={index} className="grid grid-cols-12 gap-2 items-end p-3 bg-muted/50 rounded-lg">
                           <div className="col-span-3 space-y-1">
                             <Label className="text-xs">Type</Label>
-                            <Select 
-                              value={acc.accessorial_type} 
-                              onValueChange={(v) => updateAccessorial(index, 'accessorial_type', v)}
+                            <Select
+                              value={acc.accessorial_type}
+                              onValueChange={(v) => {
+                                const match = accessorialTypes.find((t: any) => t.name === v);
+                                const updated = [...accessorials];
+                                updated[index] = {
+                                  ...updated[index],
+                                  accessorial_type: v,
+                                  // Auto-apply the catalog default; dispatcher can still override via the Payable To select.
+                                  is_driver_pay: match ? !!match.default_is_driver_pay : updated[index].is_driver_pay,
+                                };
+                                setAccessorials(updated);
+                              }}
                             >
                               <SelectTrigger className="h-9">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {ACCESSORIAL_TYPES.map(type => (
-                                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                                {/* Preserve legacy free-text values not in the catalog */}
+                                {acc.accessorial_type &&
+                                  !accessorialTypes.some((t: any) => t.name === acc.accessorial_type) && (
+                                    <SelectItem value={acc.accessorial_type}>
+                                      {acc.accessorial_type} (legacy)
+                                    </SelectItem>
+                                  )}
+                                {accessorialTypes.map((t: any) => (
+                                  <SelectItem key={t.id} value={t.name}>
+                                    {t.name}
+                                  </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
