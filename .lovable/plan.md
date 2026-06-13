@@ -1,51 +1,58 @@
-# Global Sheet Layout Audit — Apply Safe Flex Pattern
+# Automatic Client-Side Image Compression for Uploads
 
 ## Goal
-Refactor every Sheet consumer (except the excluded chat components and the core `ui/sheet.tsx`) to follow one consistent layout pattern so the `SheetHeader` and close X can never overlap body content, and long bodies always scroll inside their own region.
+Compress every image file in the browser before it's uploaded to Lovable Cloud storage. Target ≤ ~800 KB per image (configurable up to 1 MB), preserve readability for document scans, and surface a clear loading state so users know the compression + upload is in progress.
 
-## Safe layout pattern (applied to each file)
-Inside `<SheetContent>`:
+## Approach
+1. **One shared utility** that all upload paths call.
+2. **Centralize the call** inside the storage helper that nearly every upload already routes through (`useStorageProvider.uploadFile`), so app-wide coverage is automatic.
+3. **Patch the few direct `supabase.storage.from(...).upload(...)` call sites** that bypass the helper.
+4. **Use existing per-call `uploading` flags / spinners** in the consumer components; verify each spinner stays visible during the (new) compression step.
 
-```text
-<SheetContent className="... flex flex-col p-0 gap-0">
-  <SheetHeader className="shrink-0 px-6 pt-6 pb-4 pr-12 border-b">
-    <SheetTitle/> <SheetDescription/>
-  </SheetHeader>
-  <div className="flex-1 overflow-y-auto px-6 py-4">
-    {body / form / list}
-  </div>
-  {optional} <SheetFooter className="shrink-0 border-t px-6 py-4"/>
-</SheetContent>
-```
+## Files / changes
 
-Key rules:
-- `SheetContent` itself becomes the flex column (`flex flex-col p-0 gap-0`). We override the default `p-6` so the sticky header from `ui/sheet.tsx` no longer needs negative-margin bleed to clear the close button — we instead provide our own padding inside each region.
-- `SheetHeader` keeps the global sticky styles, plus local `shrink-0 pr-12` to reserve room for the absolute X button.
-- All scrollable content lives in a single `flex-1 overflow-y-auto` div so it cannot ride under the header.
-- Existing `overflow-y-auto` on `SheetContent` is removed (would conflict with `flex-1` child).
+### 1. New util — `src/lib/compress-image.ts`
+- `compressImage(file: File, opts?): Promise<File>` (returns the original `File` untouched when not an image, when SVG, or when already under the target).
+- Logic:
+  - Skip if `!file.type.startsWith('image/')` or `file.type === 'image/svg+xml'` or `file.size <= targetBytes` (default 800 KB) AND already JPEG/WebP.
+  - Decode with `createImageBitmap(file)` (fallback to `<img>` + `URL.createObjectURL`).
+  - Compute scaled dimensions so the longest edge ≤ 2400 px (configurable). Documents need readable text, so we cap at 2400 px instead of 1600 px.
+  - Draw to an `OffscreenCanvas` (fallback `HTMLCanvasElement`) with white background fill (preserves white-paper look when source is transparent PNG).
+  - Encode iteratively: start at quality 0.85, try `image/webp` first; if browser doesn't return a blob for webp, fall back to `image/jpeg`. If result > target, lower quality in steps of 0.1 down to 0.5; if still > target, scale dimensions down by 0.85 and retry (max 3 rescale loops).
+  - Re-wrap in `new File([blob], renamedToMatchMime, { type: blob.type, lastModified: file.lastModified })`. Original extension swapped to `.webp` / `.jpg`.
+  - On any failure, log and return the original `File` (never block an upload).
 
-## Files to update
+### 2. `src/hooks/useStorageProvider.ts`
+- Import `compressImage`.
+- At the top of `uploadFile`, replace the incoming `file` with `await compressImage(file)` only when it's a `File` (not a `Blob` without a name/type — those are already programmatic, e.g. signature pads, and must remain unchanged).
+- Covers: `useDocumentUpload`, onboarding paperwork, load/POD photos, smart load creator, rate confirmation, work-order attachments, anything else routed through `useStorageProvider`.
 
-1. `src/components/crm/ContactDetailSheet.tsx` — wrap the tabs/details body in `flex-1 overflow-y-auto`; switch `SheetContent` to flex column with `p-0`.
-2. `src/components/drivers/DriverDetailSheet.tsx` — already has `flex flex-col overflow-y-auto`; move `overflow-y-auto` off `SheetContent` onto a new inner `flex-1` wrapper around the existing body.
-3. `src/components/superadmin/AuditLogDetailSheet.tsx` — move `overflow-y-auto` from `SheetContent` to inner `flex-1` body wrapper.
-4. `src/components/superadmin/OrgDetailSheet.tsx` — same refactor.
-5. `src/components/maintenance/NewWorkOrderSheet.tsx` — large form; wrap form body in `flex-1 overflow-y-auto`, keep `SheetFooter` as static `shrink-0`.
-6. `src/components/maintenance/TruckHistoryDrawer.tsx` — wrap tabs/history body in `flex-1 overflow-y-auto`.
-7. `src/components/finance/SettlementsTab.tsx` — already uses `p-0` with `overflow-y-auto`; restructure into header / `flex-1 overflow-y-auto` body.
-8. `src/components/settings/TeamManagementTab.tsx` — switch to flex column, body scroll, footer pinned via `shrink-0`.
-9. `src/components/driver/DriverRequestsCard.tsx` — bottom sheet: keep `max-h-[90vh]`, switch to `flex flex-col`, body in `flex-1 overflow-y-auto`.
-10. `src/pages/Incidents.tsx` — detail sheet: same refactor (move scroll off `SheetContent`).
-11. `src/pages/MaintenanceManagement.tsx` — sidebar sheet already uses `p-0` + sr-only header; only ensure `flex flex-col h-full` so the embedded `<AppSidebar/>` fills available height.
+### 3. Direct-upload call sites that bypass the helper
+Patch these to call `compressImage` before their direct `supabase.storage.from(...).upload(...)`:
+- `src/components/drivers/DriverBankingDetails.tsx` (voided check images — sensitive, compress at 80% quality only).
+- `src/components/settings/BrandingTab.tsx` (logo upload — already small typically; compression still applied for huge PNG drops).
+- `src/components/shared/BetaFeedbackWidget.tsx` (html2canvas screenshot — already a blob, but wrap in File and compress).
+- `src/pages/DriverOnboarding.tsx` and `src/pages/Onboarding.tsx` (any direct uploads found there during edit).
+- `src/components/driver/ProofOfDeliveryDialog.tsx` and `src/components/driver/PhotoCapture.tsx` (camera photos — biggest win).
+- `src/components/loads/SmartLoadCreator.tsx` and `src/components/loads/RateConfirmationUpload.tsx` (PDF inputs: skipped automatically; image inputs: compressed).
+- `src/components/maintenance/CompleteJobModal.tsx` and `src/components/crm/CarrierDocumentHub.tsx` (attachments).
+- `src/components/drivers/SignedOnboardingDocuments.tsx` (PDFs, will be auto-skipped).
 
-## Explicitly excluded
-- `src/components/ui/sheet.tsx` (per constraint)
-- `src/components/driver/DriverMessages.tsx` and `src/components/drivers/DriverChatSheet.tsx` (custom fix already applied)
-- `src/pages/Landing.tsx` (mobile nav menu — no header/scrollable body issue)
+For each, the diff is one line: `const fileToUpload = await compressImage(file); ... upload(..., fileToUpload)`.
 
-## Validation
-Open each affected sheet in the preview, verify:
-- Title and X button are fully visible and unclipped.
-- Long content scrolls inside the body while header stays pinned.
-- Footers (NewWorkOrder, TeamManagement) stay pinned at the bottom.
-- No layout regressions on `sm:max-w-*` widths or `side="bottom"` variants.
+### 4. Loading state / spinner verification
+- `useDocumentUpload` already exposes `uploading`; consumers (`SignedOnboardingDocuments`, `CarrierDocumentHub`, etc.) already render a spinner from it. Compression runs inside the same `try` block, so the spinner naturally covers both phases.
+- For the inline call sites above, each already has a local `uploading`/`isSubmitting` flag — confirm it's set BEFORE `compressImage` and cleared AFTER the upload resolves. Update where the flag is currently set only around the network call.
+- `ProofOfDeliveryDialog` and `PhotoCapture`: add a small "Compressing image…" / "Uploading…" copy swap if not already present (use existing `<Loader2 className="animate-spin" />` patterns).
+
+### 5. Validation
+- Drop a 6 MB phone photo into the Driver Onboarding paperwork upload → confirm spinner shows, network payload to `/storage/v1/object/documents/...` is ≤ ~1 MB, and the stored file opens with readable text in the viewer.
+- Upload a 200 KB scanned receipt → confirm it is left untouched (no quality loss, no extension change).
+- Upload a 2 MB PDF rate confirmation → confirm the util skips PDFs and uploads the original bytes.
+- Confirm Branding logo SVG upload is untouched (skipped).
+- POD photo from mobile camera → confirm WebP-encoded, < 800 KB, spinner displayed during compression + upload.
+
+## Out of scope
+- No server-side recompression / edge function changes.
+- No changes to view/download paths (existing signed URL logic unchanged).
+- No bucket-level changes (existing private buckets continue to enforce RLS).
