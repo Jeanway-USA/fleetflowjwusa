@@ -55,6 +55,16 @@ export function ProofOfDeliveryDialog({
       return;
     }
 
+    if (!hasEnd) {
+      toast.error('Please enter your ending odometer reading');
+      return;
+    }
+
+    if (endViolatesStart) {
+      toast.error(`Ending odometer must be greater than starting odometer (${(startMiles as number).toLocaleString()} mi)`);
+      return;
+    }
+
     if (transfloLink.trim() && !isValidTransfloLink(transfloLink)) {
       toast.error('Please enter a valid Transflo Express link');
       return;
