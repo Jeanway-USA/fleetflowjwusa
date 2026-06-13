@@ -1208,13 +1208,11 @@ export default function FleetLoads() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="advance_taken">Advance Taken ($)</Label>
-                    <Input 
-                      id="advance_taken" 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.advance_taken || ''} 
-                      onChange={(e) => setFormData({ ...formData, advance_taken: parseFloat(e.target.value) || 0 })} 
-                      placeholder="456.50"
+                    <CurrencyInput
+                      id="advance_taken"
+                      value={formData.advance_taken ?? ''}
+                      onChange={(v) => setFormData({ ...formData, advance_taken: v === '' ? 0 : parseFloat(v) })}
+                      placeholder="0.00"
                     />
                   </div>
                   <div className="space-y-2">
