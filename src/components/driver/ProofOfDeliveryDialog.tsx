@@ -175,6 +175,7 @@ export function ProofOfDeliveryDialog({
       setTransfloLink('');
       setExceptionNotes('');
       setHasException(false);
+      setEndOdometer('');
       onOpenChange(false);
       onComplete();
     } catch (error: any) {
@@ -191,6 +192,7 @@ export function ProofOfDeliveryDialog({
       setTransfloLink('');
       setExceptionNotes('');
       setHasException(false);
+      setEndOdometer('');
       onOpenChange(false);
     }
   };
