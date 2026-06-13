@@ -435,6 +435,7 @@ export default function FleetLoads() {
       amount: acc.amount || 0,
       percentage: 100,
       notes: acc.notes,
+      is_driver_pay: true,
     }));
 
     // Format intermediate stops to append to notes
