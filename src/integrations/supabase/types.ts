@@ -2580,6 +2580,7 @@ export type Database = {
           amount: number
           created_at: string
           id: string
+          is_driver_pay: boolean
           load_id: string
           notes: string | null
           org_id: string | null
@@ -2591,6 +2592,7 @@ export type Database = {
           amount?: number
           created_at?: string
           id?: string
+          is_driver_pay?: boolean
           load_id: string
           notes?: string | null
           org_id?: string | null
@@ -2602,6 +2604,7 @@ export type Database = {
           amount?: number
           created_at?: string
           id?: string
+          is_driver_pay?: boolean
           load_id?: string
           notes?: string | null
           org_id?: string | null

@@ -34,7 +34,7 @@ export interface PayLoad {
   rate?: number | null;
   fuel_surcharge?: number | null;
   booked_miles?: number | null;
-  load_accessorials?: Array<{ amount?: number | null }> | null;
+  load_accessorials?: Array<{ amount?: number | null; is_driver_pay?: boolean | null }> | null;
 }
 
 export interface PaySettings {
@@ -73,7 +73,11 @@ export function normalizePayType(pt: DriverPayType): CanonicalPayType | 'unknown
 
 export function sumAccessorials(load: PayLoad | null | undefined): number {
   if (!load?.load_accessorials) return 0;
-  return load.load_accessorials.reduce((s, a) => s + n(a?.amount), 0);
+  // Only driver-payable accessorials count toward driver pay.
+  // `!== false` keeps legacy/undefined rows (default true) included.
+  return load.load_accessorials
+    .filter((a) => a?.is_driver_pay !== false)
+    .reduce((s, a) => s + n(a?.amount), 0);
 }
 
 function effectiveLandstarSplit(settings?: PaySettings): number {

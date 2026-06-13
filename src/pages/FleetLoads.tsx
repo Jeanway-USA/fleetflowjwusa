@@ -55,6 +55,7 @@ interface Accessorial {
   amount: number;
   percentage: number;
   notes?: string;
+  is_driver_pay: boolean;
 }
 import { format, parseISO } from 'date-fns';
 
@@ -148,6 +149,7 @@ export default function FleetLoads() {
           amount: acc.amount,
           percentage: acc.percentage,
           notes: acc.notes,
+          is_driver_pay: acc.is_driver_pay,
         }));
         const { error: accError } = await supabase.from('load_accessorials').insert(accessorialRecords);
         if (accError) throw accError;
@@ -181,6 +183,7 @@ export default function FleetLoads() {
           amount: acc.amount,
           percentage: acc.percentage,
           notes: acc.notes,
+          is_driver_pay: acc.is_driver_pay,
         }));
         const { error: accError } = await supabase.from('load_accessorials').insert(accessorialRecords);
         if (accError) throw accError;
@@ -228,6 +231,7 @@ export default function FleetLoads() {
           amount: Number(a.amount) || 0,
           percentage: Number(a.percentage) || 100,
           notes: a.notes,
+          is_driver_pay: a.is_driver_pay !== false,
         })));
       } else {
         setAccessorials([]);
@@ -268,7 +272,7 @@ export default function FleetLoads() {
 
   // Accessorial management
   const addAccessorial = () => {
-    setAccessorials([...accessorials, { accessorial_type: 'Detention', amount: 0, percentage: 100 }]);
+    setAccessorials([...accessorials, { accessorial_type: 'Detention', amount: 0, percentage: 100, is_driver_pay: true }]);
   };
 
   const removeAccessorial = (index: number) => {
@@ -431,6 +435,7 @@ export default function FleetLoads() {
       amount: acc.amount || 0,
       percentage: 100,
       notes: acc.notes,
+      is_driver_pay: true,
     }));
 
     // Format intermediate stops to append to notes
@@ -1104,7 +1109,7 @@ export default function FleetLoads() {
                     <div className="space-y-3">
                       {accessorials.map((acc, index) => (
                         <div key={index} className="grid grid-cols-12 gap-2 items-end p-3 bg-muted/50 rounded-lg">
-                          <div className="col-span-4 space-y-1">
+                          <div className="col-span-3 space-y-1">
                             <Label className="text-xs">Type</Label>
                             <Select 
                               value={acc.accessorial_type} 
@@ -1120,7 +1125,22 @@ export default function FleetLoads() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="col-span-3 space-y-1">
+                          <div className="col-span-2 space-y-1">
+                            <Label className="text-xs">Payable To</Label>
+                            <Select
+                              value={acc.is_driver_pay ? 'driver' : 'company'}
+                              onValueChange={(v) => updateAccessorial(index, 'is_driver_pay', v === 'driver')}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="driver">Driver</SelectItem>
+                                <SelectItem value="company">Company</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-2 space-y-1">
                             <Label className="text-xs">Amount ($)</Label>
                             <CurrencyInput
                               className="h-9"
@@ -1140,9 +1160,15 @@ export default function FleetLoads() {
                           </div>
                           <div className="col-span-2 space-y-1">
                             <Label className="text-xs">Net</Label>
-                            <div className="h-9 px-2 py-1.5 rounded-md border bg-muted text-sm font-medium">
-                              {formatCurrency(acc.amount * (acc.percentage / 100))}
-                            </div>
+                            {acc.is_driver_pay ? (
+                              <div className="h-9 px-2 py-1.5 rounded-md border bg-muted text-sm font-medium">
+                                {formatCurrency(acc.amount * (acc.percentage / 100))}
+                              </div>
+                            ) : (
+                              <div className="h-9 px-2 py-1.5 rounded-md border bg-muted text-[11px] font-medium text-muted-foreground flex items-center">
+                                Company expense
+                              </div>
+                            )}
                           </div>
                           <div className="col-span-1">
                             <Button 
@@ -1157,10 +1183,20 @@ export default function FleetLoads() {
                           </div>
                         </div>
                       ))}
-                      <div className="flex justify-end pt-2">
-                        <div className="text-sm">
+                      <div className="flex flex-col items-end gap-0.5 pt-2 text-sm">
+                        <div>
                           <span className="text-muted-foreground">Total Accessorials: </span>
                           <span className="font-bold">{formatCurrency(calculateAccessorialsTotal())}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Driver portion:{' '}
+                          <span className="font-semibold text-foreground">
+                            {formatCurrency(
+                              accessorials
+                                .filter((a) => a.is_driver_pay)
+                                .reduce((s, a) => s + (Number(a.amount) || 0) * ((Number(a.percentage) || 0) / 100), 0),
+                            )}
+                          </span>
                         </div>
                       </div>
                     </div>
