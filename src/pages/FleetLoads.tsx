@@ -411,20 +411,45 @@ export default function FleetLoads() {
       return;
     }
 
+    // In-Bond / Rule 480 client-side validation (server enforces too)
+    const inBondSchema = z.object({
+      is_in_bond: z.boolean().optional(),
+      cf_7512_number: z.string().trim().max(64, 'CF 7512 number must be 64 characters or fewer').optional().nullable(),
+    }).refine(
+      (v) => !v.is_in_bond || (typeof v.cf_7512_number === 'string' && v.cf_7512_number.trim().length > 0),
+      { message: 'CF 7512 number is required for In-Bond shipments', path: ['cf_7512_number'] },
+    );
+    const parsed = inBondSchema.safeParse({
+      is_in_bond: !!formData.is_in_bond,
+      cf_7512_number: formData.cf_7512_number ?? null,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message || 'Invalid In-Bond fields');
+      return;
+    }
+
     const calculated = calculateRevenueLocal(formData);
     const payload = {
       ...formData,
       ...calculated,
       org_id: orgId,
+      cf_7512_number: formData.is_in_bond ? (formData.cf_7512_number ?? '').trim() : null,
       negotiation_notes: formData.negotiation_notes || null,
     };
 
-    // Strip any prior auto-generated Over-Dimension rows, then re-inject if applicable.
+    // Strip any prior auto-generated rows, then re-inject if applicable.
     const manualAccessorials = accessorials.filter(
-      (a) => !(a.accessorial_type === OVER_DIM_ACCESSORIAL_TYPE && (a.notes ?? '').startsWith(OVER_DIM_AUTO_NOTE_PREFIX))
+      (a) =>
+        !(a.accessorial_type === OVER_DIM_ACCESSORIAL_TYPE && (a.notes ?? '').startsWith(OVER_DIM_AUTO_NOTE_PREFIX)) &&
+        !(a.accessorial_type === IN_BOND_ACCESSORIAL_TYPE && (a.notes ?? '').startsWith(IN_BOND_AUTO_NOTE_PREFIX))
     );
     const autoOverDim = buildOverDimAccessorial(payload);
-    const finalAccessorials = autoOverDim ? [...manualAccessorials, autoOverDim] : manualAccessorials;
+    const autoInBond = buildInBondAccessorial(payload);
+    const finalAccessorials = [
+      ...manualAccessorials,
+      ...(autoOverDim ? [autoOverDim] : []),
+      ...(autoInBond ? [autoInBond] : []),
+    ];
 
     if (editingLoad) {
       updateMutation.mutate({ id: editingLoad.id, updates: payload, accessorialItems: finalAccessorials });
