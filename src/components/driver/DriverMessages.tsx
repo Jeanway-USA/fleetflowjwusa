@@ -204,27 +204,53 @@ export function DriverMessages() {
   useEffect(() => {
     if (!me) return;
     return safeChannel(`driver-msgs-${me}`, (ch) =>
-      ch.on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `receiver_id=eq.${me}`,
-        },
-        (payload) => {
-          const m = payload.new as Message;
-          queryClient.invalidateQueries({ queryKey: unreadQueryKey });
-          queryClient.invalidateQueries({ queryKey: threadsKey });
-          if (open && activeCounterpart && m.sender_id === activeCounterpart) {
-            queryClient.setQueryData<Message[]>(threadKey, (prev = []) =>
-              prev.some((x) => x.id === m.id) ? prev : [...prev, m],
-            );
-          }
-        },
-      ),
+      ch
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `receiver_id=eq.${me}`,
+          },
+          (payload) => {
+            const m = payload.new as Message;
+            queryClient.invalidateQueries({ queryKey: unreadQueryKey });
+            queryClient.invalidateQueries({ queryKey: threadsKey });
+            const isOpen = openRef.current;
+            const activeCp = activeCounterpartRef.current;
+            if (isOpen && activeCp && m.sender_id === activeCp) {
+              queryClient.setQueryData<Message[]>(
+                ['driver-msgs-thread', me, activeCp],
+                (prev = []) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]),
+              );
+            } else {
+              // Chat closed (or different thread) — play chime; ignore autoplay errors
+              audioRef.current?.play().catch(() => { /* autoplay blocked */ });
+            }
+          },
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `sender_id=eq.${me}`,
+          },
+          (payload) => {
+            const m = payload.new as Message;
+            const activeCp = activeCounterpartRef.current;
+            if (activeCp && m.receiver_id === activeCp) {
+              queryClient.setQueryData<Message[]>(
+                ['driver-msgs-thread', me, activeCp],
+                (prev = []) => prev.map((x) => (x.id === m.id ? { ...x, is_read: m.is_read } : x)),
+              );
+            }
+          },
+        ),
     );
-  }, [me, open, activeCounterpart, queryClient, unreadQueryKey, threadsKey, threadKey]);
+  }, [me, queryClient, unreadQueryKey, threadsKey]);
 
   // ---------- Send ----------
   const sendMutation = useMutation({
