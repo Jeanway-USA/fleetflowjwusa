@@ -32,6 +32,7 @@ function fmtPeriod(start: string, end: string) {
 
 export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, payType, payRate }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [accessorialsOpen, setAccessorialsOpen] = useState(false);
 
   const { data: paystubs = [], isLoading } = useQuery<DriverSettlement[]>({
     queryKey: ['my-paystubs', driverId],
@@ -51,6 +52,44 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
   const selected = useMemo(
     () => paystubs.find((p) => p.id === selectedId) ?? null,
     [paystubs, selectedId],
+  );
+
+  // Pull accessorials from delivered loads in this paystub's period so the
+  // driver can see exactly what extras rolled into their pay.
+  const { data: accessorialLines = [], isLoading: isLoadingAccessorials } = useQuery({
+    queryKey: ['paystub-accessorials', selected?.id],
+    queryFn: async () => {
+      if (!selected) return [] as Array<{
+        key: string;
+        loadNumber: string | null;
+        accessorial_type: string | null;
+        amount: number;
+        notes: string | null;
+      }>;
+      const { data, error } = await supabase
+        .from('fleet_loads')
+        .select('id, landstar_load_id, load_accessorials(id, accessorial_type, amount, notes)')
+        .eq('driver_id', driverId)
+        .eq('status', 'delivered')
+        .gte('delivery_date', selected.period_start)
+        .lte('delivery_date', selected.period_end);
+      if (error) throw error;
+      return (data ?? []).flatMap((load: any) =>
+        (load.load_accessorials || []).map((a: any) => ({
+          key: a.id ?? `${load.id}-${a.accessorial_type}`,
+          loadNumber: load.landstar_load_id,
+          accessorial_type: a.accessorial_type,
+          amount: Number(a.amount ?? 0),
+          notes: a.notes,
+        })),
+      );
+    },
+    enabled: !!selected && !!driverId,
+  });
+
+  const accessorialsTotal = useMemo(
+    () => accessorialLines.reduce((s, a) => s + (a.amount || 0), 0),
+    [accessorialLines],
   );
 
   const isFlat = (payType || '').toLowerCase() === 'flat';
