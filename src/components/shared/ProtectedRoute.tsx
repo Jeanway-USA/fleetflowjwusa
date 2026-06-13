@@ -38,27 +38,12 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
   const stillLoading = loading || rolesLoading || orgLoading;
   const authenticated = !!user;
   const actuallyIsOwner = roles.includes('owner');
-  // Owners have global access to every protected route (role simulation still
-  // takes precedence — when an owner simulates a non-owner role, hasRole('owner')
-  // returns false and the normal allowedRoles check applies).
-  const hasAccess = hasRole('owner') || allowedRoles.some(role => hasRole(role));
+  // Real owners can always access every protected route, regardless of any
+  // simulated role they may be viewing the UI as. Simulation affects what
+  // they see — it must never block their navigation.
+  const hasAccess = actuallyIsOwner || allowedRoles.some(role => hasRole(role));
 
-  // If a real owner is simulating a lower role and lands on a route that role
-  // can't access, automatically exit simulation so they aren't trapped.
-  // Without this, the fallback redirect sends them to a page their simulation
-  // also can't access, leaving them stuck with a recurring access-denied toast.
-  useEffect(() => {
-    if (!stillLoading && authenticated && actuallyIsOwner && simulatedRole && !hasAccess) {
-      // Defer briefly so any in-flight dashboard-switch navigation can settle first.
-      // If the route change moves us to a page the simulation CAN access,
-      // hasAccess flips true and the timer is cancelled — simulation preserved.
-      const t = setTimeout(() => setSimulatedRole(null), 100);
-      return () => clearTimeout(t);
-    }
-  }, [stillLoading, authenticated, actuallyIsOwner, simulatedRole, hasAccess, setSimulatedRole]);
-
-  const showAccessDeniedToast =
-    authenticated && !stillLoading && !hasAccess && !(actuallyIsOwner && simulatedRole);
+  const showAccessDeniedToast = authenticated && !stillLoading && !hasAccess;
 
   // Fire access-denied toast exactly once per pathname.
   useEffect(() => {
@@ -82,16 +67,6 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
 
   if (orgId && !orgIsActive) {
     return <Navigate to="/account-deactivated" replace />;
-  }
-
-  // While the simulation-exit effect above runs, don't redirect — wait one
-  // render so the cleared simulation grants access on the next pass.
-  if (!hasAccess && actuallyIsOwner && simulatedRole) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
   }
 
   if (!hasAccess) {

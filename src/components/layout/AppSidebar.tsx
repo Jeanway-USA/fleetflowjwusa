@@ -306,28 +306,12 @@ export function AppSidebar() {
 
   const handleDashboardSwitch = (path: string, role: 'owner' | 'dispatcher' | 'driver' | 'maintenance') => {
     if (actuallyIsOwner) {
-      if (simulationSwitchTimerRef.current !== null) {
-        window.clearTimeout(simulationSwitchTimerRef.current);
-        simulationSwitchTimerRef.current = null;
-      }
-
       const nextSimulatedRole = role === 'owner' ? null : role;
-
-      // Clear simulation first so the old simulated role cannot block the
-      // destination route while React Router commits the navigation.
-      flushSync(() => {
-        setSimulatedRole(null);
-      });
-
-      navigate(path, { flushSync: true });
-
-      if (nextSimulatedRole) {
-        simulationSwitchTimerRef.current = window.setTimeout(() => {
-          setSimulatedRole(nextSimulatedRole);
-          simulationSwitchTimerRef.current = null;
-        }, 0);
-      }
-
+      // Real owners can access every route regardless of simulation
+      // (ProtectedRoute trusts the real owner role), so we can update
+      // simulation and navigate together without any timing dance.
+      setSimulatedRole(nextSimulatedRole);
+      navigate(path);
       return;
     }
     navigate(path);
