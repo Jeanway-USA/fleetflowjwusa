@@ -399,7 +399,7 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
                   <Package className="h-3.5 w-3.5 text-muted-foreground" />
                   Total Weight (lbs)
                 </Label>
-                <Input id="weight" type="number" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="42,000" />
+                <IntegerInput id="weight" value={weight} onChange={setWeight} placeholder="42000" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="commodity">Commodity Description</Label>
