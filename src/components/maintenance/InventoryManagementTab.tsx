@@ -275,7 +275,7 @@ function EditPartDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="edit_min">Min Threshold</Label>
-              <Input id="edit_min" type="number" min={0} {...form.register('min_threshold')} />
+              <Input id="edit_min" type="number" min={0} step={1} {...form.register('min_threshold')} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit_unit">Unit</Label>
