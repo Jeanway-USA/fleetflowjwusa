@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { IntegerInput } from '@/components/ui/numeric-input';
 import { SignaturePad } from './SignaturePad';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { CheckCircle, Loader2, ClipboardCheck, AlertTriangle, ExternalLink } from 'lucide-react';
+import { CheckCircle, Loader2, ClipboardCheck, AlertTriangle, ExternalLink, Gauge } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ProofOfDeliveryDialogProps {
@@ -17,6 +18,8 @@ interface ProofOfDeliveryDialogProps {
   loadNumber: string | null;
   destination: string;
   driverId: string;
+  /** Starting odometer recorded when the load began. Used to validate the ending odometer. */
+  startMiles: number | null;
   onComplete: () => void;
 }
 
@@ -27,13 +30,21 @@ export function ProofOfDeliveryDialog({
   loadNumber,
   destination,
   driverId,
+  startMiles,
   onComplete,
 }: ProofOfDeliveryDialogProps) {
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [transfloLink, setTransfloLink] = useState('');
   const [exceptionNotes, setExceptionNotes] = useState('');
   const [hasException, setHasException] = useState(false);
+  const [endOdometer, setEndOdometer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const parsedEnd = endOdometer === '' ? NaN : parseInt(endOdometer, 10);
+  const hasEnd = Number.isInteger(parsedEnd) && parsedEnd > 0;
+  const hasStart = typeof startMiles === 'number' && startMiles >= 0;
+  const endViolatesStart = hasStart && hasEnd && parsedEnd <= (startMiles as number);
+  const isOdometerValid = hasEnd && !endViolatesStart;
 
   const isValidTransfloLink = (url: string) =>
     url.trim() === '' || url.trim().startsWith('https://viewer.transfloexpress.com/');
@@ -41,6 +52,16 @@ export function ProofOfDeliveryDialog({
   const handleSubmit = async () => {
     if (!signatureDataUrl) {
       toast.error('Please provide a signature to confirm delivery');
+      return;
+    }
+
+    if (!hasEnd) {
+      toast.error('Please enter your ending odometer reading');
+      return;
+    }
+
+    if (endViolatesStart) {
+      toast.error(`Ending odometer must be greater than starting odometer (${(startMiles as number).toLocaleString()} mi)`);
       return;
     }
 
@@ -114,7 +135,11 @@ export function ProofOfDeliveryDialog({
         delivery_date: format(new Date(), 'yyyy-MM-dd'),
         pod_signature_path: !sigUploadError ? sigPath : null,
         pod_transflo_link: transfloLink.trim() || null,
+        end_miles: parsedEnd,
       };
+      if (hasStart) {
+        updateData.actual_miles = parsedEnd - (startMiles as number);
+      }
 
       if (deliveryNotes) {
         const { data: currentLoad } = await supabase
@@ -150,6 +175,7 @@ export function ProofOfDeliveryDialog({
       setTransfloLink('');
       setExceptionNotes('');
       setHasException(false);
+      setEndOdometer('');
       onOpenChange(false);
       onComplete();
     } catch (error: any) {
@@ -166,6 +192,7 @@ export function ProofOfDeliveryDialog({
       setTransfloLink('');
       setExceptionNotes('');
       setHasException(false);
+      setEndOdometer('');
       onOpenChange(false);
     }
   };
@@ -191,6 +218,37 @@ export function ProofOfDeliveryDialog({
               {format(new Date(), 'MMM d, yyyy h:mm a')}
             </span>
           </div>
+
+          {/* Ending Odometer (required) */}
+          <div className="space-y-2">
+            <Label htmlFor="pod-end-odometer" className="text-sm font-medium flex items-center gap-2">
+              <Gauge className="h-4 w-4" />
+              Ending Odometer <span className="text-destructive">*</span>
+            </Label>
+            <IntegerInput
+              id="pod-end-odometer"
+              value={endOdometer}
+              onChange={setEndOdometer}
+              placeholder={hasStart ? `Must be > ${(startMiles as number).toLocaleString()}` : 'e.g. 648611'}
+              disabled={isSubmitting}
+              className={`h-12 text-lg ${endViolatesStart ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+            />
+            {hasStart ? (
+              <p className="text-xs text-muted-foreground">
+                Starting odometer: <span className="font-medium text-foreground">{(startMiles as number).toLocaleString()}</span> mi
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">
+                No starting odometer recorded — any positive reading is allowed.
+              </p>
+            )}
+            {endViolatesStart && (
+              <p className="text-xs font-medium text-destructive">
+                Ending odometer must be greater than the starting odometer ({(startMiles as number).toLocaleString()} mi).
+              </p>
+            )}
+          </div>
+
 
           {/* Transflo POD Link */}
           <div className="space-y-2">
@@ -281,7 +339,7 @@ export function ProofOfDeliveryDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !signatureDataUrl}
+            disabled={isSubmitting || !signatureDataUrl || !isOdometerValid}
             className="w-full sm:w-auto"
           >
             {isSubmitting ? (

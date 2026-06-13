@@ -25,6 +25,10 @@ import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { getRelativeTimestamp } from './RelativeTimestamp';
 import { calculateLoadPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
+import { StartingOdometerDialog } from './StartingOdometerDialog';
+import { EndingOdometerDialog } from './EndingOdometerDialog';
+
+
 
 // Status progression for drivers
 const STATUS_PROGRESSION: Record<string, string> = {
@@ -117,6 +121,8 @@ interface Load {
   fuel_surcharge: number | null;
   notes: string | null;
   driver_id: string | null;
+  start_miles?: number | null;
+  end_miles?: number | null;
 }
 
 interface DriverLoadCardProps {
@@ -129,7 +135,9 @@ interface DriverLoadCardProps {
 function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  
+  const [startOdometerOpen, setStartOdometerOpen] = useState(false);
+  const [endOdometerOpen, setEndOdometerOpen] = useState(false);
+
   const canProgress = STATUS_PROGRESSION[load.status] !== undefined;
   const nextStatus = STATUS_PROGRESSION[load.status];
 
@@ -143,7 +151,19 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
 
   const handleProgressStatus = async () => {
     if (!nextStatus) return;
-    
+
+    // Intercept: starting a load — capture odometer first.
+    if (nextStatus === 'in_transit') {
+      setStartOdometerOpen(true);
+      return;
+    }
+
+    // Intercept: completing a load — capture ending odometer.
+    if (nextStatus === 'delivered') {
+      setEndOdometerOpen(true);
+      return;
+    }
+
     setIsUpdating(true);
     try {
       const { error } = await supabase
@@ -152,7 +172,7 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
         .eq('id', load.id);
 
       if (error) throw error;
-      
+
       toast.success(`Load status updated to ${getStatusLabel(nextStatus)}`);
       onStatusUpdate();
     } catch (error: any) {
@@ -350,6 +370,27 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Starting Odometer Intercept */}
+      <StartingOdometerDialog
+        open={startOdometerOpen}
+        onOpenChange={setStartOdometerOpen}
+        loadId={load.id}
+        loadNumber={load.landstar_load_id}
+        nextStatus="in_transit"
+        onComplete={onStatusUpdate}
+      />
+
+      {/* Ending Odometer Intercept */}
+      <EndingOdometerDialog
+        open={endOdometerOpen}
+        onOpenChange={setEndOdometerOpen}
+        loadId={load.id}
+        loadNumber={load.landstar_load_id}
+        startMiles={load.start_miles ?? null}
+        nextStatus="delivered"
+        onComplete={onStatusUpdate}
+      />
     </>
   );
 }

@@ -10,6 +10,8 @@ import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 const LoadRouteMap = lazy(() => import('./LoadRouteMap').then(m => ({ default: m.LoadRouteMap })));
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
+import { StartingOdometerDialog } from './StartingOdometerDialog';
+import { EndingOdometerDialog } from './EndingOdometerDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
@@ -60,6 +62,8 @@ interface Load {
   rate: number | null;
   booked_miles: number | null;
   empty_miles?: number | null;
+  start_miles?: number | null;
+  end_miles?: number | null;
   notes: string | null;
   landstar_load_id: string | null;
   tracking_id?: string | null;
@@ -145,6 +149,8 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   const [isUpdating, setIsUpdating] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [podDialogOpen, setPodDialogOpen] = useState(false);
+  const [startOdometerOpen, setStartOdometerOpen] = useState(false);
+  const [endOdometerOpen, setEndOdometerOpen] = useState(false);
   const { isOnline, enqueue } = useOfflineQueue();
 
   if (!load) {
@@ -172,15 +178,22 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   const handleProgressStatus = async () => {
     if (!nextStatus) return;
 
-    // If transitioning to delivered, check if POD is required
+    // Intercept: starting a load — capture odometer first.
+    if (nextStatus === 'in_transit') {
+      setStartOdometerOpen(true);
+      return;
+    }
+
+    // Intercept: completing a load — capture ending odometer (with POD if required).
     if (nextStatus === 'delivered') {
       if (load.pod_required !== false) {
         setPodDialogOpen(true);
-        return;
+      } else {
+        setEndOdometerOpen(true);
       }
-      // POD not required — fall through to direct status update
+      return;
     }
-    
+
     if (!isOnline) {
       enqueue('load_status_update', { id: load.id, status: nextStatus });
       toast.success(`Status update saved. Will sync when online.`);
@@ -344,9 +357,32 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
           loadNumber={load.landstar_load_id}
           destination={load.destination}
           driverId={driverId}
+          startMiles={load.start_miles ?? null}
           onComplete={() => onStatusUpdate?.()}
         />
       )}
+
+      {/* Starting Odometer Intercept */}
+      <StartingOdometerDialog
+        open={startOdometerOpen}
+        onOpenChange={setStartOdometerOpen}
+        loadId={load.id}
+        loadNumber={load.landstar_load_id}
+        nextStatus="in_transit"
+        onComplete={() => onStatusUpdate?.()}
+      />
+
+      {/* Ending Odometer Intercept (no-POD path) */}
+      <EndingOdometerDialog
+        open={endOdometerOpen}
+        onOpenChange={setEndOdometerOpen}
+        loadId={load.id}
+        loadNumber={load.landstar_load_id}
+        startMiles={load.start_miles ?? null}
+        nextStatus="delivered"
+        onComplete={() => onStatusUpdate?.()}
+      />
+
 
       {/* Load Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
