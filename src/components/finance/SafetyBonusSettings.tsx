@@ -272,28 +272,20 @@ export function SafetyBonusSettings() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="max-bonus">Max Bonus Amount ($)</Label>
-              <Input
+              <CurrencyInput
                 id="max-bonus"
-                type="number"
-                step="0.01"
-                min="0"
                 value={rules.max_bonus_amount}
-                onChange={(e) =>
-                  setRules((r) => ({ ...r, max_bonus_amount: e.target.value }))
-                }
+                onChange={(v) => setRules((r) => ({ ...r, max_bonus_amount: v }))}
+                placeholder="0.00"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="period-days">Period Length (Days)</Label>
-              <Input
+              <IntegerInput
                 id="period-days"
-                type="number"
-                step="1"
-                min="1"
                 value={rules.period_length_days}
-                onChange={(e) =>
-                  setRules((r) => ({ ...r, period_length_days: e.target.value }))
-                }
+                onChange={(v) => setRules((r) => ({ ...r, period_length_days: v }))}
+                placeholder="0"
               />
             </div>
           </div>
