@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -266,7 +266,7 @@ export function DriverMessages() {
         }}
       >
         <SheetContent className="w-full sm:max-w-md flex flex-col p-0 gap-0 overflow-hidden">
-          <SheetHeader className="px-5 py-4 border-b border-border">
+          <div className="shrink-0 px-5 pt-5 pb-4 pr-12 border-b border-border bg-background">
             <div className="flex items-center gap-2">
               {activeCounterpart && (
                 <Button
@@ -288,7 +288,7 @@ export function DriverMessages() {
                 </p>
               </div>
             </div>
-          </SheetHeader>
+          </div>
 
           {/* List vs Thread */}
           {!activeCounterpart ? (
