@@ -12,7 +12,7 @@
  * module's helpers handle it internally.
  */
 
-import { zonedTimeToUtc, formatInTimeZone } from 'date-fns-tz';
+import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 
 /** Best-effort IANA → friendly label (display only; abbreviation comes from Intl). */
 export const COMMON_TIMEZONES: { value: string; label: string }[] = [
@@ -76,7 +76,7 @@ export function combineToUtc(
   if (!dateStr) return null;
   const safeTime = normalizeTimeString(timeStr) || '00:00';
   try {
-    const utc = zonedTimeToUtc(`${dateStr}T${safeTime}:00`, tz);
+    const utc = fromZonedTime(`${dateStr}T${safeTime}:00`, tz);
     return utc.toISOString();
   } catch {
     return null;
