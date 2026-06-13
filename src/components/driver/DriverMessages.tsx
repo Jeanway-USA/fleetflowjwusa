@@ -401,9 +401,24 @@ export function DriverMessages() {
                         >
                           {m.content}
                         </div>
-                        <span className="text-[10px] text-muted-foreground mt-1 px-1">
-                          {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
-                        </span>
+                        <div className="flex items-center gap-1 mt-1 px-1">
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
+                          </span>
+                          {mine && (
+                            m.is_read ? (
+                              <span className="flex items-center gap-0.5 text-[10px] text-primary" title="Read">
+                                <CheckCheck className="h-3 w-3" />
+                                Read
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Delivered">
+                                <Check className="h-3 w-3" />
+                                Delivered
+                              </span>
+                            )
+                          )}
+                        </div>
                       </div>
                     );
                   })
