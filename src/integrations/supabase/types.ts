@@ -21,7 +21,9 @@ export type Database = {
           carrier_name: string | null
           carrier_rate: number | null
           created_at: string
+          delivery_at: string | null
           delivery_date: string | null
+          delivery_tz: string | null
           destination: string
           id: string
           load_reference: string | null
@@ -29,7 +31,9 @@ export type Database = {
           notes: string | null
           org_id: string
           origin: string
+          pickup_at: string | null
           pickup_date: string | null
+          pickup_tz: string | null
           status: string
           updated_at: string
         }
@@ -39,7 +43,9 @@ export type Database = {
           carrier_name?: string | null
           carrier_rate?: number | null
           created_at?: string
+          delivery_at?: string | null
           delivery_date?: string | null
+          delivery_tz?: string | null
           destination: string
           id?: string
           load_reference?: string | null
@@ -47,7 +53,9 @@ export type Database = {
           notes?: string | null
           org_id: string
           origin: string
+          pickup_at?: string | null
           pickup_date?: string | null
+          pickup_tz?: string | null
           status?: string
           updated_at?: string
         }
@@ -57,7 +65,9 @@ export type Database = {
           carrier_name?: string | null
           carrier_rate?: number | null
           created_at?: string
+          delivery_at?: string | null
           delivery_date?: string | null
+          delivery_tz?: string | null
           destination?: string
           id?: string
           load_reference?: string | null
@@ -65,7 +75,9 @@ export type Database = {
           notes?: string | null
           org_id?: string
           origin?: string
+          pickup_at?: string | null
           pickup_date?: string | null
+          pickup_tz?: string | null
           status?: string
           updated_at?: string
         }
@@ -1798,9 +1810,11 @@ export type Database = {
           auto_email_updates: boolean
           booked_miles: number | null
           created_at: string
+          delivery_at: string | null
           delivery_date: string | null
           delivery_time: string | null
           delivery_time_type: string
+          delivery_tz: string | null
           destination: string
           detention_pay: number | null
           driver_id: string | null
@@ -1825,9 +1839,11 @@ export type Database = {
           notes: string | null
           org_id: string
           origin: string
+          pickup_at: string | null
           pickup_date: string | null
           pickup_time: string | null
           pickup_time_type: string
+          pickup_tz: string | null
           pod_required: boolean
           pod_signature_path: string | null
           pod_transflo_link: string | null
@@ -1851,9 +1867,11 @@ export type Database = {
           auto_email_updates?: boolean
           booked_miles?: number | null
           created_at?: string
+          delivery_at?: string | null
           delivery_date?: string | null
           delivery_time?: string | null
           delivery_time_type?: string
+          delivery_tz?: string | null
           destination: string
           detention_pay?: number | null
           driver_id?: string | null
@@ -1878,9 +1896,11 @@ export type Database = {
           notes?: string | null
           org_id: string
           origin: string
+          pickup_at?: string | null
           pickup_date?: string | null
           pickup_time?: string | null
           pickup_time_type?: string
+          pickup_tz?: string | null
           pod_required?: boolean
           pod_signature_path?: string | null
           pod_transflo_link?: string | null
@@ -1904,9 +1924,11 @@ export type Database = {
           auto_email_updates?: boolean
           booked_miles?: number | null
           created_at?: string
+          delivery_at?: string | null
           delivery_date?: string | null
           delivery_time?: string | null
           delivery_time_type?: string
+          delivery_tz?: string | null
           destination?: string
           detention_pay?: number | null
           driver_id?: string | null
@@ -1931,9 +1953,11 @@ export type Database = {
           notes?: string | null
           org_id?: string
           origin?: string
+          pickup_at?: string | null
           pickup_date?: string | null
           pickup_time?: string | null
           pickup_time_type?: string
+          pickup_tz?: string | null
           pod_required?: boolean
           pod_signature_path?: string | null
           pod_transflo_link?: string | null
@@ -3181,6 +3205,7 @@ export type Database = {
         Row: {
           applied_promo_code_id: string | null
           banner_url: string | null
+          company_timezone: string
           complimentary_ends_at: string | null
           created_at: string
           dot_number: string | null
@@ -3208,6 +3233,7 @@ export type Database = {
         Insert: {
           applied_promo_code_id?: string | null
           banner_url?: string | null
+          company_timezone?: string
           complimentary_ends_at?: string | null
           created_at?: string
           dot_number?: string | null
@@ -3235,6 +3261,7 @@ export type Database = {
         Update: {
           applied_promo_code_id?: string | null
           banner_url?: string | null
+          company_timezone?: string
           complimentary_ends_at?: string | null
           created_at?: string
           dot_number?: string | null
@@ -3410,6 +3437,7 @@ export type Database = {
           org_id: string | null
           phone: string | null
           requires_onboarding: boolean
+          time_display_pref: string
           updated_at: string
           user_id: string
         }
@@ -3425,6 +3453,7 @@ export type Database = {
           org_id?: string | null
           phone?: string | null
           requires_onboarding?: boolean
+          time_display_pref?: string
           updated_at?: string
           user_id: string
         }
@@ -3440,6 +3469,7 @@ export type Database = {
           org_id?: string | null
           phone?: string | null
           requires_onboarding?: boolean
+          time_display_pref?: string
           updated_at?: string
           user_id?: string
         }
@@ -4747,6 +4777,8 @@ export type Database = {
       has_safety_access: { Args: { _user_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      parse_legacy_time: { Args: { _t: string }; Returns: string }
+      state_to_iana: { Args: { _location: string }; Returns: string }
       storage_user_same_org: {
         Args: { folder_owner_id: string }
         Returns: boolean
