@@ -52,7 +52,7 @@ describe('calcOverDimensionCharge (Rule 670)', () => {
 
   it('still applies min_charge when miles are zero (per-load floor)', () => {
     const r = calcOverDimensionCharge({
-      height_inches: 200, miles: 0, rules: RULES,
+      height_inches: 220, miles: 0, rules: RULES,
     });
     expect(r.charge_amount).toBe(3500);
   });
