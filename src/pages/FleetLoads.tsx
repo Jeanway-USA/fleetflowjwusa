@@ -1118,6 +1118,68 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
+                {/* Freight dimensions — drives Rule 670 Over-Dimension auto-billing */}
+                {(() => {
+                  const milesForPreview = (Number(formData.actual_miles) > 0 ? Number(formData.actual_miles) : Number(formData.booked_miles)) || 0;
+                  const preview = calcOverDimensionCharge({
+                    height_inches: formData.height_inches,
+                    width_inches: formData.width_inches,
+                    length_inches: formData.length_inches,
+                    miles: milesForPreview,
+                    rules: overDimRules as OverDimRule[],
+                  });
+                  const anyDim = !!(formData.height_inches || formData.width_inches || formData.length_inches);
+                  return (
+                    <div className="space-y-3 rounded-lg border border-border/60 p-3 bg-muted/20">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <Label className="text-sm font-semibold">Freight Dimensions <span className="text-xs font-normal text-muted-foreground">(Legal: 13'6" H × 8'6" W × 70' L)</span></Label>
+                        {anyDim && (
+                          preview.charge_amount > 0 ? (
+                            <span className="text-xs font-medium px-2 py-1 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300" title={preview.breakdown.map(b => `${b.dimension}: $${b.cpm.toFixed(2)}/mi`).join(' · ')}>
+                              Over-Dimension · +${preview.total_cpm.toFixed(2)}/mi · ${preview.charge_amount.toFixed(2)} on {milesForPreview} mi
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">Legal</span>
+                          )
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="height_inches" className="text-xs">Height</Label>
+                          <FeetInchesInput
+                            id="height_inches"
+                            valueInches={formData.height_inches}
+                            onChange={(v) => setFormData({ ...formData, height_inches: v })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="width_inches" className="text-xs">Width</Label>
+                          <FeetInchesInput
+                            id="width_inches"
+                            valueInches={formData.width_inches}
+                            onChange={(v) => setFormData({ ...formData, width_inches: v })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="length_inches" className="text-xs">Length</Label>
+                          <FeetInchesInput
+                            id="length_inches"
+                            valueInches={formData.length_inches}
+                            onChange={(v) => setFormData({ ...formData, length_inches: v })}
+                          />
+                        </div>
+                      </div>
+                      {preview.charge_amount > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          A <strong>Company</strong> accessorial of <strong>${preview.charge_amount.toFixed(2)}</strong> (Rule 670) will be added on save. Not paid to the driver.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="empty_miles">Empty / Deadhead Miles</Label>
