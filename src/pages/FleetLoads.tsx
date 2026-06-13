@@ -1051,34 +1051,29 @@ export default function FleetLoads() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="rate">Booked Linehaul ($)</Label>
-                    <Input 
-                      id="rate" 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.rate || ''} 
-                      onChange={(e) => setFormData({ ...formData, rate: parseFloat(e.target.value) || 0 })} 
-                      placeholder="2430.00"
+                    <CurrencyInput
+                      id="rate"
+                      value={formData.rate ?? ''}
+                      onChange={(v) => setFormData({ ...formData, rate: v === '' ? 0 : parseFloat(v) })}
+                      placeholder="0.00"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="booked_miles">Booked Miles</Label>
-                    <Input 
-                      id="booked_miles" 
-                      type="number" 
-                      value={formData.booked_miles || ''} 
-                      onChange={(e) => setFormData({ ...formData, booked_miles: parseInt(e.target.value) || 0 })} 
-                      placeholder="810"
+                    <IntegerInput
+                      id="booked_miles"
+                      value={formData.booked_miles ?? ''}
+                      onChange={(v) => setFormData({ ...formData, booked_miles: v === '' ? 0 : parseInt(v, 10) })}
+                      placeholder="0"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="fuel_surcharge">Fuel Surcharge ($)</Label>
-                    <Input 
-                      id="fuel_surcharge" 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.fuel_surcharge || ''} 
-                      onChange={(e) => setFormData({ ...formData, fuel_surcharge: parseFloat(e.target.value) || 0 })} 
-                      placeholder="315.90"
+                    <CurrencyInput
+                      id="fuel_surcharge"
+                      value={formData.fuel_surcharge ?? ''}
+                      onChange={(v) => setFormData({ ...formData, fuel_surcharge: v === '' ? 0 : parseFloat(v) })}
+                      placeholder="0.00"
                     />
                   </div>
                 </div>
