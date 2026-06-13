@@ -1,21 +1,27 @@
 ## Plan
 
-1. **Remove the fragile delayed simulation switch**
-   - Stop using the `setTimeout(0)` re-apply pattern in `AppSidebar`.
-   - Dashboard clicks should set the intended simulation state and destination together, without depending on timing between route changes and guard cleanup.
+1. **Fix the leftover dashboard self-redirect**
+   - Update `src/pages/DispatcherDashboard.tsx` so it no longer redirects to `/` when the owner switches simulation from Dispatcher View to Driver View.
+   - Best fix: remove the redundant page-level `<Navigate to="/" />` guard and rely on `ProtectedRoute`, which already handles route access correctly for real owners.
 
-2. **Make owner navigation authoritative**
-   - In `ProtectedRoute`, real owners should always be allowed through protected pages based on their real owner role.
-   - Role simulation should continue to affect what navigation items and page UI they see, but it should not block routing for a real owner.
+2. **Clean up unused imports**
+   - Remove `Navigate` from `DispatcherDashboard.tsx` if the guard is removed.
 
-3. **Delete the auto-exit trap logic**
-   - Remove the `ProtectedRoute` effect that clears simulation when the current simulated role cannot access the route.
-   - That effect is now the likely source of the repeated “must click Executive View first” behavior because it keeps clearing the simulation during normal navigation.
+3. **Validate the exact workflow**
+   - From Executive Dashboard as an owner:
+     - Click Dispatcher View.
+     - Click Driver View directly.
+     - Click Dispatcher View directly again.
+   - Confirm each click changes pages on the first attempt and never bounces through Executive View.
 
-4. **Keep explicit exit behavior**
-   - “Executive View” and the simulation banner “Exit” will still clear simulation and navigate to `/executive-dashboard`.
-   - Dispatcher/Driver/Maintenance dashboard buttons will set their simulated role and navigate to their dashboard immediately.
+## Technical details
 
-5. **Validate the workflow**
-   - From a fresh owner load on Executive Dashboard: click Dispatcher View, Driver View, Maintenance View, and normal sidebar pages.
-   - Confirm every click navigates on the first attempt and that Executive View/Exit still returns to owner mode.
+The remaining issue is likely caused by `DispatcherDashboard.tsx` doing its own role redirect:
+
+```ts
+if (!hasRole('dispatcher') && !hasRole('owner') && roles.length > 0) {
+  return <Navigate to="/" replace />;
+}
+```
+
+Because `hasRole()` respects simulated roles, clicking Driver View while currently on Dispatcher View temporarily re-renders the dispatcher page as `driver` before navigation finishes. That guard sends the app to `/`, and `/` redirects real owners back to Executive Dashboard. Removing this redundant guard lets `ProtectedRoute` be the single source of routing truth.
