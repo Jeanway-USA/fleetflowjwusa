@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route, Link2 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route, Link2, ChevronDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 const LoadRouteMap = lazy(() => import('./LoadRouteMap').then(m => ({ default: m.LoadRouteMap })));
@@ -17,8 +18,9 @@ import { toast } from 'sonner';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
 import { useOptimisticLoadStatus } from '@/hooks/useOptimisticLoadStatus';
 import { getRelativeTimestamp } from './RelativeTimestamp';
-import { calculateLoadPay } from '@/utils/payCalculations';
+import { calculateLoadPay, sumAccessorials } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
+import { formatCurrency } from '@/lib/formatters';
 
 // Helper to format and clean special instructions for better readability
 function formatSpecialInstructions(notes: string | null): React.ReactNode {
