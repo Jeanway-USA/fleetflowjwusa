@@ -219,6 +219,37 @@ export function ProofOfDeliveryDialog({
             </span>
           </div>
 
+          {/* Ending Odometer (required) */}
+          <div className="space-y-2">
+            <Label htmlFor="pod-end-odometer" className="text-sm font-medium flex items-center gap-2">
+              <Gauge className="h-4 w-4" />
+              Ending Odometer <span className="text-destructive">*</span>
+            </Label>
+            <IntegerInput
+              id="pod-end-odometer"
+              value={endOdometer}
+              onChange={setEndOdometer}
+              placeholder={hasStart ? `Must be > ${(startMiles as number).toLocaleString()}` : 'e.g. 648611'}
+              disabled={isSubmitting}
+              className={`h-12 text-lg ${endViolatesStart ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+            />
+            {hasStart ? (
+              <p className="text-xs text-muted-foreground">
+                Starting odometer: <span className="font-medium text-foreground">{(startMiles as number).toLocaleString()}</span> mi
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">
+                No starting odometer recorded — any positive reading is allowed.
+              </p>
+            )}
+            {endViolatesStart && (
+              <p className="text-xs font-medium text-destructive">
+                Ending odometer must be greater than the starting odometer ({(startMiles as number).toLocaleString()} mi).
+              </p>
+            )}
+          </div>
+
+
           {/* Transflo POD Link */}
           <div className="space-y-2">
             <Label htmlFor="transflo-link" className="text-sm font-medium flex items-center gap-2">
