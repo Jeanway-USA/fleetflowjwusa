@@ -20,7 +20,7 @@ import { useOptimisticLoadStatus } from '@/hooks/useOptimisticLoadStatus';
 import { getRelativeTimestamp } from './RelativeTimestamp';
 import { calculateLoadPay, sumAccessorials } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
-import { formatCurrency } from '@/lib/formatters';
+
 
 // Helper to format and clean special instructions for better readability
 function formatSpecialInstructions(notes: string | null): React.ReactNode {
