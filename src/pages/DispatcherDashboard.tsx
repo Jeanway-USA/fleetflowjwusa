@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Package, Users, Truck, Calendar, Plus, ArrowRight } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { addHours } from 'date-fns';
 import { ActiveLoadsBoard } from '@/components/dispatcher/ActiveLoadsBoard';
 import { UpcomingPickups } from '@/components/dispatcher/UpcomingPickups';
@@ -24,7 +24,7 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 
 export default function DispatcherDashboard() {
-  const { user, roles, hasRole } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -136,10 +136,6 @@ export default function DispatcherDashboard() {
     };
   }, [queryClient]);
 
-  // Redirect if user doesn't have dispatcher or owner role (after all hooks)
-  if (!hasRole('dispatcher') && !hasRole('owner') && roles.length > 0) {
-    return <Navigate to="/" replace />;
-  }
 
   const getGreeting = () => {
     const hour = new Date().getHours();
