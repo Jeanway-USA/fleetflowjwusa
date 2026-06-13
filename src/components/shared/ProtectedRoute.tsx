@@ -35,7 +35,10 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
 
   const stillLoading = loading || rolesLoading || orgLoading;
   const authenticated = !!user;
-  const hasAccess = allowedRoles.some(role => hasRole(role));
+  // Owners have global access to every protected route (role simulation still
+  // takes precedence — when an owner simulates a non-owner role, hasRole('owner')
+  // returns false and the normal allowedRoles check applies).
+  const hasAccess = hasRole('owner') || allowedRoles.some(role => hasRole(role));
   const showAccessDeniedToast = authenticated && !stillLoading && !hasAccess;
 
   // Fire access-denied toast exactly once per pathname.
