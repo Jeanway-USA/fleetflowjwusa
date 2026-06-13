@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { IntegerInput } from '@/components/ui/numeric-input';
 import { SignaturePad } from './SignaturePad';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { CheckCircle, Loader2, ClipboardCheck, AlertTriangle, ExternalLink } from 'lucide-react';
+import { CheckCircle, Loader2, ClipboardCheck, AlertTriangle, ExternalLink, Gauge } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ProofOfDeliveryDialogProps {
@@ -17,6 +18,8 @@ interface ProofOfDeliveryDialogProps {
   loadNumber: string | null;
   destination: string;
   driverId: string;
+  /** Starting odometer recorded when the load began. Used to validate the ending odometer. */
+  startMiles: number | null;
   onComplete: () => void;
 }
 
@@ -27,13 +30,21 @@ export function ProofOfDeliveryDialog({
   loadNumber,
   destination,
   driverId,
+  startMiles,
   onComplete,
 }: ProofOfDeliveryDialogProps) {
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [transfloLink, setTransfloLink] = useState('');
   const [exceptionNotes, setExceptionNotes] = useState('');
   const [hasException, setHasException] = useState(false);
+  const [endOdometer, setEndOdometer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const parsedEnd = endOdometer === '' ? NaN : parseInt(endOdometer, 10);
+  const hasEnd = Number.isInteger(parsedEnd) && parsedEnd > 0;
+  const hasStart = typeof startMiles === 'number' && startMiles >= 0;
+  const endViolatesStart = hasStart && hasEnd && parsedEnd <= (startMiles as number);
+  const isOdometerValid = hasEnd && !endViolatesStart;
 
   const isValidTransfloLink = (url: string) =>
     url.trim() === '' || url.trim().startsWith('https://viewer.transfloexpress.com/');
