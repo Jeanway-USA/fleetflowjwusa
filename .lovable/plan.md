@@ -1,31 +1,44 @@
-### Task 1 — Database read receipts
-`public.messages` already has a `NOT NULL is_read boolean`, and both `DriverMessages.tsx` and `DriverChatSheet.tsx` already run an `UPDATE messages SET is_read=true` when the active thread is opened. **No schema migration or new mark-as-read logic is needed.** I'll keep the existing behavior and only invalidate the dispatcher's thread cache via realtime (see Task 2).
+### Task 1 — Schema migration (`load_accessorials`)
+Add a single column with a safe default so historical payroll math is unchanged:
 
-### Task 2 — Dispatcher "Delivered / Read" indicator
-Edit `src/components/drivers/DriverChatSheet.tsx`:
-- Under every outgoing bubble (`mine === true`), render a small status line:
-  - `✓ Delivered` (single check, muted) when `is_read === false`
-  - `✓✓ Read` (double check, primary color) when `is_read === true`
-  - Use `Check` / `CheckCheck` icons from `lucide-react` plus the existing timestamp.
-- Extend the existing realtime channel to also listen for `UPDATE` events on `messages` filtered by `sender_id=eq.${me}` (the dispatcher's own outbound messages). On each update, patch the cached `Message[]` so `is_read` flips live the instant the driver opens the chat — no refetch needed.
-- Same treatment applied to outgoing bubbles in `src/components/driver/DriverMessages.tsx` (Tier 1 symmetry — drivers also see ✓✓ once dispatch reads their replies).
+```sql
+ALTER TABLE public.load_accessorials
+  ADD COLUMN is_driver_pay boolean NOT NULL DEFAULT true;
+```
 
-### Task 3 — Persistent driver unread badge
-Today `<DriverMessages />` lives inside the dashboard header only, so it disappears on `/driver-settings`. Move it so it's persistent for every driver-facing page:
-- In `src/components/layout/DashboardLayout.tsx`, render `<DriverMessages />` in the top-bar action area when the active user has the `driver` role (use existing role context). On the dashboard, remove the duplicated mount so it appears only once.
-- The button itself already shows a red destructive `Badge` driven by a `useQuery` against `messages` where `receiver_id = me AND is_read = false` with a 60s refetch + realtime invalidation. No badge logic changes needed — just relocation guarantees it's visible across all driver routes.
+- `DEFAULT true` ensures every existing row is treated as driver-payable (current behavior).
+- No RLS or grant changes — the column inherits the table's existing policies.
+- After approval, regenerate types so `load_accessorials.is_driver_pay` is typed throughout the client.
 
-### Task 4 — Audio chime on incoming message
-- Add a small royalty-free chime to `public/sounds/message-chime.mp3` (downloaded via curl from a CC0 source during build).
-- In `src/components/driver/DriverMessages.tsx`, create a lazy `audioRef` (`new Audio('/sounds/message-chime.mp3')` initialized inside a `useEffect` so SSR safety is preserved). Set `audio.preload = 'auto'` and `audio.volume = 0.6`.
-- Inside the existing realtime `INSERT` handler, when the new message's `receiver_id === me` **and** the sheet is closed (`!open`), call:
+### Task 2 — UI input segregation (`src/pages/FleetLoads.tsx`)
+This is the single dispatcher-facing accessorial editor used for both load creation and edit.
+
+- Extend the local `Accessorial` interface (line 52) with `is_driver_pay: boolean`.
+- `addAccessorial` (line 270) seeds new rows with `is_driver_pay: true`.
+- `openDialog`'s fetch mapping (line 225) reads `is_driver_pay` from the DB row, falling back to `true` if null.
+- Both insert mappings — create flow (line 144) and update flow (line 177) — include `is_driver_pay: acc.is_driver_pay` in the payload sent to `load_accessorials`.
+- Editor row (line 1106 grid): retighten the column layout to `grid-cols-12` and add a new "Payable To" `Select` with options **Driver** (`is_driver_pay = true`) and **Company** (`is_driver_pay = false`). Layout:
+  - Type 3 cols → Payable To 2 cols → Amount 2 cols → % Paid 2 cols → Net 2 cols → Delete 1 col.
+  - When **Company** is selected, the Net cell shows a small muted "Company expense" tag so dispatchers can see at a glance it won't reach the driver.
+- Net total footer (line 1163) keeps showing the total $ for the load; an additional small line below it shows "Driver portion: $X" computed from rows where `is_driver_pay === true` so the dispatcher has immediate visual confirmation.
+
+### Task 3 — Payroll guardrail (`src/utils/payCalculations.ts`)
+- Widen the line-37 type: `load_accessorials?: Array<{ amount?: number | null; is_driver_pay?: boolean | null }> | null;`
+- Update `sumAccessorials` (line 74) so it filters before summing:
   ```ts
-  audioRef.current?.play().catch(() => { /* autoplay blocked — ignore */ });
+  return load.load_accessorials
+    .filter((a) => a?.is_driver_pay !== false) // default true preserves legacy rows
+    .reduce((s, a) => s + n(a?.amount), 0);
   ```
-- The `.catch()` block silently swallows the `NotAllowedError` browsers throw before any user gesture, so the app never crashes.
+  Using `!== false` keeps historical/undefined values flowing into driver pay, which matches the migration default.
+- `calculateLoadPay` and `calculateWeeklyPay` already route every accessorial figure through `sumAccessorials`, so this single change automatically excludes Company accessorials from per-load pay, weekly pay, settlements, paystubs, and the driver dashboard widgets.
+- Update `src/utils/payCalculations.test.ts` with one new case: a load with two accessorials — one `is_driver_pay: true` ($100) and one `is_driver_pay: false` ($75) — asserting `sumAccessorials` returns `100` and `calculateLoadPay(...).accessorialsTotal === 100`. Add a second case confirming legacy rows (no flag) still sum.
 
-### Verification checklist
-- Dispatcher sends a message → bubble shows `✓ Delivered`. Driver opens chat → dispatcher bubble updates live to `✓✓ Read` via the new UPDATE subscription.
-- Driver navigates to `/driver-settings` → the messages button + unread badge stays visible in the top bar; opening it loads the same threads and clears the badge.
-- Driver receives a new message with the chat sheet closed → the chime plays once; receiving with the sheet open does not play (avoids noise during active chatting).
-- Browsers that block autoplay log nothing user-visible; the message still arrives and the badge still increments.
+### Out of scope (intentionally untouched)
+- Company P&L / revenue analytics: the company accessorials remain on the load row as before, so `gross_revenue` and revenue dashboards keep counting them. Only the driver-pay reducer changes.
+- Settlement display components (`SettlementsTab`, `DriverSettlementsTab`, `MyPaystubsDialog`, etc.) all already call `sumAccessorials`, so they pick up the new filter for free — no per-screen edits needed.
+
+### Verification
+- Existing load with no flag → driver still gets accessorial in pay (default `true`).
+- New load with one Driver and one Company accessorial → driver sees only the Driver amount in `Estimated Pay`, the paystub breakdown, and the weekly settlement; the load's `accessorialsTotal` in the editor still shows the combined total for company revenue tracking.
+- Toggle a row from Driver → Company and save → next refresh excludes that row from driver pay everywhere without losing the record.
