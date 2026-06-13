@@ -1,120 +1,64 @@
-# Standardize Appointment Times: True UTC + Per-Stop Timezone + Display Toggle
+# Odometer Capture on Driver Status Transitions
 
-## Decisions (locked in)
-- **Storage**: true `timestamptz` for each appointment + an IANA timezone column per stop (`America/Chicago` etc.).
-- **Display**: always render the abbreviation next to the time (`08:00 CST`) **and** add a header toggle for `Company Time` ↔ `Local Time` that flips every screen.
-- **Backfill**: geocode existing rows' origin/destination → IANA zone.
+## Mapping to existing schema
+The `fleet_loads` table already has the integer columns `start_miles` and `end_miles` (used by the dispatcher form). The driver UI just never wrote to them. We will reuse those columns rather than creating new `starting_odometer` / `ending_odometer` fields. **No database migration is required.**
 
-## Current state (from audit)
-- `fleet_loads` and `agency_loads` store `pickup_date date`, `delivery_date date`, plus `pickup_time text`, `delivery_time text`. No timezone anywhere.
-- ~49 historical `fleet_loads` rows + agency rows to backfill.
-- No org-level or user-level timezone preference exists yet.
-- Affected UI: `IndependentLoadBuilder`, `SmartLoadCreator`, `RateConfirmationUpload`, `FleetLoads` page, `ActiveLoadsBoard`, `UpcomingPickups`, `FleetTimelineScheduler`, `RapidCallModal`, `DriverLoadsView`, `ActiveLoadCard`, `NextLoadPreview`, `DriverDashboard`, `DriverSpectatorView`, `PublicLoadTracker`, `AgencyLoads`, `DispatcherDashboard`.
+## Where the intercept happens
+Two driver components currently call `supabase.from('fleet_loads').update({ status })` directly when the driver advances a load:
 
-## Schema migration (single migration call)
+- `src/components/driver/ActiveLoadCard.tsx` — the "active load" card on the Driver Dashboard.
+- `src/components/driver/DriverLoadsView.tsx` — the full load list / detail screen.
 
-```text
-fleet_loads / agency_loads
-  + pickup_at         timestamptz
-  + pickup_tz         text          -- IANA, e.g. 'America/Chicago'
-  + delivery_at       timestamptz
-  + delivery_tz       text
-  ( pickup_date / pickup_time / delivery_date / delivery_time kept for now —
-    dropped in a follow-up after one stable release )
+Both share the same status progression: `pending → assigned → loading → in_transit → delivered`. The relevant transitions to intercept are:
 
-organizations
-  + company_timezone  text          NOT NULL DEFAULT 'America/Chicago'
+- `loading → in_transit` (driver taps **Loaded & Departing**) → **Starting Odometer** dialog.
+- `in_transit → delivered` (driver taps **Mark Delivered**) → **Ending Odometer** capture.
 
-profiles
-  + time_display_pref text          NOT NULL DEFAULT 'company'
-                                    CHECK in ('company','local')
-```
+## New components
 
-No new tables, so no GRANT block needed; existing privileges carry over for ALTER TABLE.
+### 1. `src/components/driver/StartingOdometerDialog.tsx`
+A shadcn `Dialog` with a single required field.
 
-## Backfill strategy (data migration)
+- Title: "Starting Odometer".
+- Description: "Please enter your starting odometer reading to begin this load."
+- One input — `inputMode="numeric"`, `pattern="[0-9]*"`, masked to digits only on change (consistent with the new `IntegerInput` primitive shipped earlier this session).
+- Submit is disabled until the value is a positive integer.
+- On submit: a single Supabase update — `{ status: 'in_transit', start_miles: <int>, in_transit_at: now() }` (we already set `in_transit_at` on this transition elsewhere — keep that behavior). Toast on success, error toast on failure, dialog stays open on failure.
+- Offline path: enqueue the same payload via the existing `useOfflineQueue` so we don't lose the reading.
 
-Pragmatic, no external API: map US `state` (parsed from `origin` / `destination` text, e.g. `"Dallas, TX"` → `TX`) to its dominant IANA zone via a static lookup table embedded in the migration's PL/pgSQL function. The Tier-2 dual-zone states (TX, FL, ID, IN, KY, TN, ND, SD, NE, KS, OR, MI) default to their majority zone with a code-side note. Then:
+### 2. `src/components/driver/EndingOdometerDialog.tsx`
+Same shape as the starting dialog, plus validation.
 
-```text
-UPDATE fleet_loads
-  SET pickup_tz   = state_to_iana(origin),
-      delivery_tz = state_to_iana(destination),
-      pickup_at   = (pickup_date::text   || ' ' || COALESCE(pickup_time,'00:00'))::timestamp
-                      AT TIME ZONE state_to_iana(origin),
-      delivery_at = (delivery_date::text || ' ' || COALESCE(delivery_time,'00:00'))::timestamp
-                      AT TIME ZONE state_to_iana(destination)
-  WHERE pickup_date IS NOT NULL;
-```
+- Title: "Ending Odometer".
+- Receives `startMiles: number | null` as a prop.
+- Inline red error text under the field when the entered value is ≤ `startMiles` ("Ending odometer must be greater than starting odometer (XX,XXX mi).").
+- If `startMiles` is null (legacy load without a starting reading), allow any positive integer and show a subtle muted note explaining no starting value was recorded.
+- On submit: update `{ status: 'delivered', end_miles: <int>, actual_miles: end_miles - start_miles }` (only set `actual_miles` when `start_miles` is present). Same offline-queue fallback.
 
-Same pattern for `agency_loads`. Rows whose origin/destination can't be parsed fall back to the org's `company_timezone`.
+## Wiring into the two driver views
 
-## Shared client utility — `src/lib/datetime.ts`
+For both `ActiveLoadCard.tsx` and `DriverLoadsView.tsx`, modify `handleProgressStatus` so that:
 
-```text
-combineToUtc(dateStr, timeStr, ianaTz): string   // 'YYYY-MM-DD','HH:mm','America/Chicago' -> ISO UTC
-splitFromUtc(utcIso, ianaTz): { date, time }     // for editing
-formatStopTime(utcIso, stopTz, opts): {
-  primary: '08:00 CST',
-  secondary?: '06:00 PST'   // present when viewer's effective zone differs
-}
-useTimeDisplay(): {
-  mode: 'company' | 'local',
-  effectiveTz: string,        // companyTz when mode==='company', else browser zone
-  setMode: (m) => void
-}
-```
+1. If `nextStatus === 'in_transit'`, open `StartingOdometerDialog` instead of running the direct update. The dialog owns the write and then calls `onStatusUpdate()`.
+2. If `nextStatus === 'delivered'`:
+   - **POD required** (`load.pod_required !== false`): open the existing `ProofOfDeliveryDialog`, and add an "Ending Odometer" required field at the top of that dialog so the driver isn't hit with two modals in a row. The POD submit handler already issues one `update({ status: 'delivered', ... })` — we'll add `end_miles` and `actual_miles` to that same payload and refuse submit if the value isn't > `start_miles`.
+   - **POD not required**: open the new `EndingOdometerDialog`, which owns the status write.
+3. All other transitions (`pending → assigned`, `assigned → loading`) stay as-is — no odometer prompt.
 
-Implemented with `Intl.DateTimeFormat` (`timeZoneName: 'short'`) — no new dependency. State/IANA map shared with the backfill.
+## Validation rules (enforced client-side)
 
-## UI changes
+| Field            | Rule                                                                 |
+| ---------------- | -------------------------------------------------------------------- |
+| Starting Odometer | Integer ≥ 1. Non-digits stripped on input. Submit disabled if blank. |
+| Ending Odometer   | Integer ≥ 1, AND `> load.start_miles` (when present). Red error text on violation. |
 
-### Header toggle
-Add a small pill toggle in `src/components/layouts/DashboardLayout.tsx` header (next to user menu): `Company Time | Local Time`. Persists to `profiles.time_display_pref` via a new context `TimeDisplayProvider` mounted inside `ProtectedRoute`.
+We rely on `IntegerInput` for masking (already exists in `src/components/ui/numeric-input.tsx`); both dialogs render it with `inputMode="numeric"` so iOS / Android show the numeric keypad in-cab.
 
-### Load creation forms
-`IndependentLoadBuilder`, `SmartLoadCreator` (manual edit step), `RateConfirmationUpload` (confirm step), and the FleetLoads inline form:
-- Add a `Timezone` dropdown next to each date/time field, auto-defaulted from the parsed state of the origin/destination (or org's `company_timezone` if unknown). Common US zones listed first, then full IANA list.
-- On save, send `pickup_at`/`delivery_at` (UTC ISO) and `pickup_tz`/`delivery_tz` instead of the legacy split fields. Legacy fields are also written (for the deprecation window) by deriving them back from the UTC + tz so any code still reading them works.
+## Loading types
 
-### Display components
-Every place that currently renders `pickup_date` / `pickup_time` (and delivery) is replaced with `formatStopTime(load.pickup_at, load.pickup_tz)`. Output renders as:
-
-```text
-Mon, Jun 15 · 08:00 CST       (when mode === 'local' and viewer is in CST,
-                               OR mode === 'company' and company is CST)
-
-Mon, Jun 15 · 08:00 CST       (when mode === 'company', differing stop zone)
-              (06:00 your time)
-
-Mon, Jun 15 · 08:00 CST       (when mode === 'local', viewer in PST)
-              (10:00 PST)
-```
-
-Files updated: `ActiveLoadsBoard`, `ActiveLoadCard`, `UpcomingPickups`, `FleetTimelineScheduler`, `NextLoadPreview`, `DriverLoadsView`, `RapidCallModal`, `PublicLoadTracker`, `AgencyLoads`, `FleetLoads`, `DispatcherDashboard`, `DriverDashboard`, `DriverSpectatorView`.
-
-### Settings
-Add `Company Timezone` selector to the existing org settings → Company tab. Defaults to `America/Chicago`. Owners only.
-
-## Detail-level technical notes
-
-- All `combineToUtc` calls use `date-fns-tz`'s `zonedTimeToUtc` (already common in the React ecosystem; add the single dep `date-fns-tz`).
-- `formatStopTime` calls `Intl.DateTimeFormat(undefined, { timeZone: stopTz, hour:'2-digit', minute:'2-digit', timeZoneName:'short' })` — abbreviations come from the runtime so they're always correct for the date (handles DST transitions automatically).
-- The header toggle's selected mode is also persisted in `localStorage` (`time-display-mode`) so the first paint after reload is correct before the profile fetch resolves.
-- The Core memory rule `Append 'T00:00:00' to 'YYYY-MM-DD' before parsing to prevent timezone shifting` still applies for pure date fields (delivery date with no time); the new util respects it.
-- Edge functions that send broker status emails (`email-load-status`) currently include `pickup_date`/`pickup_time` strings — switched to formatted `pickup_at + pickup_tz` so brokers see `"08:00 CST"` consistently.
-
-## Validation
-
-- Create a new load in IndependentLoadBuilder with pickup `Dallas, TX 08:00` and delivery `Los Angeles, CA 14:00`. Confirm DB row stores `pickup_at = 2026-06-15T13:00:00Z` and `pickup_tz = 'America/Chicago'`; delivery `21:00Z` / `America/Los_Angeles`.
-- View it as a Central-time dispatcher with toggle = Company: `08:00 CST` / `14:00 PDT (16:00 your time)`.
-- Switch toggle → Local: `08:00 CST (06:00 your time)` / `14:00 PDT`.
-- Open as a PST driver: pickup shows `08:00 CST (06:00 PDT)`.
-- Refresh the page during a DST transition window (March test): confirm abbreviation flips `CST` ↔ `CDT` automatically.
-- Backfilled historical loads display with their original wall-clock unchanged and a TZ label.
+`Load` interfaces in both `ActiveLoadCard.tsx` and `DriverLoadsView.tsx` need `start_miles: number | null` and `end_miles: number | null` added. The list query on the Driver Dashboard / Loads view selects `*` from `fleet_loads`, so no SQL change is needed — just the TypeScript surface.
 
 ## Out of scope
-
-- Mid-stop timezone changes (a load that crosses an additional waypoint with a different zone is still represented by just pickup_tz + delivery_tz).
-- Per-driver default timezone (drivers inherit the viewer rule above).
-- Dropping the legacy `pickup_date`/`pickup_time` columns — left for a follow-up cleanup migration after one release of dual-writing.
+- Editing odometer values after the fact from the driver UI (dispatcher edit screen already handles that in `FleetLoads.tsx`).
+- Backfilling missing odometers on historical loads.
+- Showing the captured odometer on the driver's delivered-load card (can be a follow-up).
