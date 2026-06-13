@@ -135,7 +135,9 @@ interface DriverLoadCardProps {
 function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  
+  const [startOdometerOpen, setStartOdometerOpen] = useState(false);
+  const [endOdometerOpen, setEndOdometerOpen] = useState(false);
+
   const canProgress = STATUS_PROGRESSION[load.status] !== undefined;
   const nextStatus = STATUS_PROGRESSION[load.status];
 
@@ -149,7 +151,19 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
 
   const handleProgressStatus = async () => {
     if (!nextStatus) return;
-    
+
+    // Intercept: starting a load — capture odometer first.
+    if (nextStatus === 'in_transit') {
+      setStartOdometerOpen(true);
+      return;
+    }
+
+    // Intercept: completing a load — capture ending odometer.
+    if (nextStatus === 'delivered') {
+      setEndOdometerOpen(true);
+      return;
+    }
+
     setIsUpdating(true);
     try {
       const { error } = await supabase
@@ -158,7 +172,7 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
         .eq('id', load.id);
 
       if (error) throw error;
-      
+
       toast.success(`Load status updated to ${getStatusLabel(nextStatus)}`);
       onStatusUpdate();
     } catch (error: any) {
