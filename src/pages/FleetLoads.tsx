@@ -35,19 +35,7 @@ import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 import { PODViewer } from '@/components/loads/PODViewer';
 import { BrokerRateHistoryCard } from '@/components/loads/BrokerRateHistoryCard';
 
-// Accessorial types commonly used in trucking
-const ACCESSORIAL_TYPES = [
-  'Detention',
-  'Layover',
-  'Lumper',
-  'TONU',
-  'Deadhead',
-  'Stop-off',
-  'Unloading',
-  'Inside Delivery',
-  'Lift Gate',
-  'Other',
-];
+// Accessorial types are now sourced from public.accessorial_types per-org lookup.
 
 interface Accessorial {
   id?: string;
