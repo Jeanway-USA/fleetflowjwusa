@@ -773,8 +773,8 @@ function InventoryAlertsCard() {
                         className={cn(
                           'font-medium',
                           out
-                            ? 'text-red-600 dark:text-red-400'
-                            : 'text-amber-600 dark:text-amber-400',
+                            ? 'text-red-700 dark:text-red-400'
+                            : 'text-red-600 dark:text-red-400',
                         )}
                       >
                         {qty} / {threshold} {p.unit}
