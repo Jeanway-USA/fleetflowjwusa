@@ -31,6 +31,40 @@ describe('sumAccessorials', () => {
     expect(sumAccessorials({ load_accessorials: null })).toBe(0);
     expect(sumAccessorials({ load_accessorials: [{ amount: 10 }, { amount: null }] })).toBe(10);
   });
+
+  it('excludes accessorials flagged as company-pay', () => {
+    const result = sumAccessorials({
+      load_accessorials: [
+        { amount: 100, is_driver_pay: true },
+        { amount: 75, is_driver_pay: false },
+      ],
+    });
+    expect(result).toBe(100);
+  });
+
+  it('includes legacy rows without the flag (defaults to driver pay)', () => {
+    expect(
+      sumAccessorials({
+        load_accessorials: [{ amount: 40 }, { amount: 60, is_driver_pay: null }],
+      }),
+    ).toBe(100);
+  });
+
+  it('feeds calculateLoadPay so company accessorials are excluded from driver pay', () => {
+    const r = calculateLoadPay(
+      {
+        rate: 0,
+        booked_miles: 100,
+        load_accessorials: [
+          { amount: 100, is_driver_pay: true },
+          { amount: 75, is_driver_pay: false },
+        ],
+      },
+      { pay_type: 'per_mile', pay_rate: 0.5 },
+    );
+    expect(r.accessorialsTotal).toBe(100);
+    expect(r.total).toBeCloseTo(50 + 100);
+  });
 });
 
 describe('percentage pay', () => {
