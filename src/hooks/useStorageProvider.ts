@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { extractStoragePath, getSignedUrl } from './useSignedUrl';
+import { compressImage } from '@/lib/compress-image';
 
 interface StorageStatus {
   provider: 'built_in' | 'google_drive';
@@ -50,6 +51,11 @@ export async function uploadFile(
   file: File | Blob,
   useProxy: boolean = false
 ): Promise<{ path: string; error: Error | null }> {
+  // Auto-compress real image File inputs (skips PDFs, raw Blobs, signatures, etc.)
+  if (file instanceof File) {
+    file = await compressImage(file);
+  }
+
   // If not using proxy, use direct built-in storage
   if (!useProxy) {
     const { error } = await supabase.storage
