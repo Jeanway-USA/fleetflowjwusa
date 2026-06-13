@@ -383,12 +383,14 @@ export function TeamManagementTab() {
 
       {/* ── Invite Sheet ── */}
       <Sheet open={inviteOpen} onOpenChange={setInviteOpen}>
-        <SheetContent>
-          <SheetHeader>
+        <SheetContent className="flex flex-col p-0 gap-0 overflow-hidden">
+          <SheetHeader className="shrink-0 mx-0 mt-0 px-6 pt-6 pb-4 pr-12 border-b static">
             <SheetTitle>Invite Team Member</SheetTitle>
             <SheetDescription>Send an email invitation to add a new member. They'll receive a link to create their account.</SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleInviteUser} className="space-y-6 mt-6">
+          <form onSubmit={handleInviteUser} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="invite-first-name">First Name</Label>
@@ -437,7 +439,8 @@ export function TeamManagementTab() {
                 </p>
               </div>
             </div>
-            <SheetFooter>
+            </div>
+            <SheetFooter className="shrink-0 mx-0 mb-0 px-6 pt-4 pb-6 border-t static">
               <Button type="submit" className="w-full gradient-gold text-primary-foreground" disabled={isInviting}>
                 {isInviting ? 'Sending...' : 'Send Invitation'}
               </Button>
@@ -445,6 +448,7 @@ export function TeamManagementTab() {
           </form>
         </SheetContent>
       </Sheet>
+
 
       {/* ── Assign Role Dialog ── */}
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>

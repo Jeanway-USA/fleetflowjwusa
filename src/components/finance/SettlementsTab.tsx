@@ -765,14 +765,13 @@ export function SettlementsTab() {
 
       {/* View Settlement — Professional Ledger Sheet */}
       <Sheet open={!!viewingSettlement} onOpenChange={(open) => !open && setViewingSettlement(null)}>
-        <SheetContent className="sm:max-w-xl overflow-y-auto p-0">
-          <div className="p-6">
-            <SheetHeader>
-              <SheetTitle className="text-base">Settlement Statement</SheetTitle>
-            </SheetHeader>
-          </div>
+        <SheetContent className="sm:max-w-xl flex flex-col p-0 gap-0 overflow-hidden">
+          <SheetHeader className="shrink-0 mx-0 mt-0 px-6 pt-6 pb-4 pr-12 border-b static">
+            <SheetTitle className="text-base">Settlement Statement</SheetTitle>
+          </SheetHeader>
           {viewingSettlement && (
-            <div className="px-6 pb-6">
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+
               {/* Header */}
               <div className="flex items-center justify-between mb-1">
                 <h3 className="text-lg font-bold">{getDriverName(viewingSettlement.driver_id)}</h3>

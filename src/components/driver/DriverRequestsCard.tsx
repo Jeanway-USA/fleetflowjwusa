@@ -171,11 +171,11 @@ export function DriverRequestsCard({ driverId, truckId, activeLoadId, activeLoad
 
       {/* Request Form Sheet */}
       <Sheet open={formOpen} onOpenChange={setFormOpen}>
-        <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto">
-          <SheetHeader>
+        <SheetContent side="bottom" className="max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+          <SheetHeader className="shrink-0 mx-0 mt-0 px-6 pt-6 pb-4 pr-12 border-b static">
             <SheetTitle>New Request</SheetTitle>
           </SheetHeader>
-          <div className="mt-4">
+          <div className="flex-1 overflow-y-auto px-6 py-4">
             <DriverRequestForm
               driverId={driverId}
               truckId={truckId}
@@ -188,6 +188,7 @@ export function DriverRequestsCard({ driverId, truckId, activeLoadId, activeLoad
           </div>
         </SheetContent>
       </Sheet>
+
     </>
   );
 }
