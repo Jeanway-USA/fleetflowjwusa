@@ -16,6 +16,7 @@ import { IndependentLoadBuilder } from '@/components/loads/IndependentLoadBuilde
 import DriverLoadsView from '@/components/driver/DriverLoadsView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput, IntegerInput, PercentageInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -1026,11 +1027,10 @@ export default function FleetLoads() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="empty_miles">Empty / Deadhead Miles</Label>
-                    <Input 
-                      id="empty_miles" 
-                      type="number" 
-                      value={formData.empty_miles || ''} 
-                      onChange={(e) => setFormData({ ...formData, empty_miles: parseInt(e.target.value) || 0 })} 
+                    <IntegerInput
+                      id="empty_miles"
+                      value={formData.empty_miles ?? ''}
+                      onChange={(v) => setFormData({ ...formData, empty_miles: v === '' ? 0 : parseInt(v, 10) })}
                       placeholder="0"
                     />
                   </div>
@@ -1051,34 +1051,29 @@ export default function FleetLoads() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="rate">Booked Linehaul ($)</Label>
-                    <Input 
-                      id="rate" 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.rate || ''} 
-                      onChange={(e) => setFormData({ ...formData, rate: parseFloat(e.target.value) || 0 })} 
-                      placeholder="2430.00"
+                    <CurrencyInput
+                      id="rate"
+                      value={formData.rate ?? ''}
+                      onChange={(v) => setFormData({ ...formData, rate: v === '' ? 0 : parseFloat(v) })}
+                      placeholder="0.00"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="booked_miles">Booked Miles</Label>
-                    <Input 
-                      id="booked_miles" 
-                      type="number" 
-                      value={formData.booked_miles || ''} 
-                      onChange={(e) => setFormData({ ...formData, booked_miles: parseInt(e.target.value) || 0 })} 
-                      placeholder="810"
+                    <IntegerInput
+                      id="booked_miles"
+                      value={formData.booked_miles ?? ''}
+                      onChange={(v) => setFormData({ ...formData, booked_miles: v === '' ? 0 : parseInt(v, 10) })}
+                      placeholder="0"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="fuel_surcharge">Fuel Surcharge ($)</Label>
-                    <Input 
-                      id="fuel_surcharge" 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.fuel_surcharge || ''} 
-                      onChange={(e) => setFormData({ ...formData, fuel_surcharge: parseFloat(e.target.value) || 0 })} 
-                      placeholder="315.90"
+                    <CurrencyInput
+                      id="fuel_surcharge"
+                      value={formData.fuel_surcharge ?? ''}
+                      onChange={(v) => setFormData({ ...formData, fuel_surcharge: v === '' ? 0 : parseFloat(v) })}
+                      placeholder="0.00"
                     />
                   </div>
                 </div>
@@ -1086,12 +1081,11 @@ export default function FleetLoads() {
                 {/* Lumper - shown for both modes */}
                 <div className="space-y-2">
                   <Label htmlFor="lumper">Lumper ($)</Label>
-                  <Input 
-                    id="lumper" 
-                    type="number" 
-                    step="0.01" 
-                    value={formData.lumper || ''} 
-                    onChange={(e) => setFormData({ ...formData, lumper: parseFloat(e.target.value) || 0 })} 
+                  <CurrencyInput
+                    id="lumper"
+                    value={formData.lumper ?? ''}
+                    onChange={(v) => setFormData({ ...formData, lumper: v === '' ? 0 : parseFloat(v) })}
+                    placeholder="0.00"
                   />
                 </div>
 
@@ -1128,24 +1122,19 @@ export default function FleetLoads() {
                           </div>
                           <div className="col-span-3 space-y-1">
                             <Label className="text-xs">Amount ($)</Label>
-                            <Input 
-                              type="number" 
-                              step="0.01"
+                            <CurrencyInput
                               className="h-9"
-                              value={acc.amount || ''} 
-                              onChange={(e) => updateAccessorial(index, 'amount', parseFloat(e.target.value) || 0)}
+                              value={acc.amount ?? ''}
+                              onChange={(v) => updateAccessorial(index, 'amount', v === '' ? 0 : parseFloat(v))}
                               placeholder="0.00"
                             />
                           </div>
                           <div className="col-span-2 space-y-1">
                             <Label className="text-xs">% Paid</Label>
-                            <Input 
-                              type="number" 
-                              min="0" 
-                              max="100"
+                            <PercentageInput
                               className="h-9"
-                              value={acc.percentage || ''} 
-                              onChange={(e) => updateAccessorial(index, 'percentage', parseFloat(e.target.value) || 100)}
+                              value={acc.percentage ?? ''}
+                              onChange={(v) => updateAccessorial(index, 'percentage', v === '' ? 100 : parseFloat(v))}
                               placeholder="100"
                             />
                           </div>
@@ -1219,13 +1208,11 @@ export default function FleetLoads() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="advance_taken">Advance Taken ($)</Label>
-                    <Input 
-                      id="advance_taken" 
-                      type="number" 
-                      step="0.01" 
-                      value={formData.advance_taken || ''} 
-                      onChange={(e) => setFormData({ ...formData, advance_taken: parseFloat(e.target.value) || 0 })} 
-                      placeholder="456.50"
+                    <CurrencyInput
+                      id="advance_taken"
+                      value={formData.advance_taken ?? ''}
+                      onChange={(v) => setFormData({ ...formData, advance_taken: v === '' ? 0 : parseFloat(v) })}
+                      placeholder="0.00"
                     />
                   </div>
                   <div className="space-y-2">
@@ -1264,22 +1251,20 @@ export default function FleetLoads() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="start_miles">Starting Odometer</Label>
-                    <Input 
-                      id="start_miles" 
-                      type="number" 
-                      value={formData.start_miles || ''} 
-                      onChange={(e) => setFormData({ ...formData, start_miles: parseInt(e.target.value) || 0 })} 
-                      placeholder="647744"
+                    <IntegerInput
+                      id="start_miles"
+                      value={formData.start_miles ?? ''}
+                      onChange={(v) => setFormData({ ...formData, start_miles: v === '' ? 0 : parseInt(v, 10) })}
+                      placeholder="0"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="end_miles">Ending Odometer</Label>
-                    <Input 
-                      id="end_miles" 
-                      type="number" 
-                      value={formData.end_miles || ''} 
-                      onChange={(e) => setFormData({ ...formData, end_miles: parseInt(e.target.value) || 0 })} 
-                      placeholder="648611"
+                    <IntegerInput
+                      id="end_miles"
+                      value={formData.end_miles ?? ''}
+                      onChange={(v) => setFormData({ ...formData, end_miles: v === '' ? 0 : parseInt(v, 10) })}
+                      placeholder="0"
                     />
                   </div>
                   <div className="space-y-2">

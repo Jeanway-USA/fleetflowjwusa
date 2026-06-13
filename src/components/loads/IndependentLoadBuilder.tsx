@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput, IntegerInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -243,13 +244,11 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
                   <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
                   Linehaul Rate ($)
                 </Label>
-                <Input
+                <CurrencyInput
                   id="linehaul"
-                  type="number"
-                  step="0.01"
                   value={linehaul}
-                  onChange={(e) => setLinehaul(e.target.value)}
-                  placeholder="2,450.00"
+                  onChange={setLinehaul}
+                  placeholder="0.00"
                 />
               </div>
               <div className="space-y-2">
@@ -257,12 +256,10 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
                   <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
                   Accessorial Pay ($)
                 </Label>
-                <Input
+                <CurrencyInput
                   id="accessorial_pay"
-                  type="number"
-                  step="0.01"
                   value={accessorialPay}
-                  onChange={(e) => setAccessorialPay(e.target.value)}
+                  onChange={setAccessorialPay}
                   placeholder="0.00"
                 />
               </div>
@@ -402,7 +399,7 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
                   <Package className="h-3.5 w-3.5 text-muted-foreground" />
                   Total Weight (lbs)
                 </Label>
-                <Input id="weight" type="number" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="42,000" />
+                <IntegerInput id="weight" value={weight} onChange={setWeight} placeholder="42000" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="commodity">Commodity Description</Label>

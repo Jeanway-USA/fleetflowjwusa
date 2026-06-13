@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PercentageInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
@@ -146,23 +147,23 @@ export function CompensationSettingsTab({ getSetting }: CompensationSettingsTabP
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Gross Percentage (%)</Label>
-                  <Input type="number" value={form.gross_percentage || ''} onChange={(e) => setForm({ ...form, gross_percentage: e.target.value })} />
+                  <PercentageInput value={form.gross_percentage ?? ''} onChange={(v) => setForm({ ...form, gross_percentage: v })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Truck Percentage</Label>
-                  <Input type="number" value={form.truck_percentage || ''} onChange={(e) => setForm({ ...form, truck_percentage: e.target.value })} />
+                  <PercentageInput value={form.truck_percentage ?? ''} onChange={(v) => setForm({ ...form, truck_percentage: v })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Trailer Percentage</Label>
-                  <Input type="number" value={form.trailer_percentage || ''} onChange={(e) => setForm({ ...form, trailer_percentage: e.target.value })} />
+                  <PercentageInput value={form.trailer_percentage ?? ''} onChange={(v) => setForm({ ...form, trailer_percentage: v })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Power Only Percentage</Label>
-                  <Input type="number" value={form.power_only_percentage || ''} onChange={(e) => setForm({ ...form, power_only_percentage: e.target.value })} />
+                  <PercentageInput value={form.power_only_percentage ?? ''} onChange={(v) => setForm({ ...form, power_only_percentage: v })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Advance Percentage</Label>
-                  <Input type="number" value={form.advance_percentage || ''} onChange={(e) => setForm({ ...form, advance_percentage: e.target.value })} />
+                  <PercentageInput value={form.advance_percentage ?? ''} onChange={(v) => setForm({ ...form, advance_percentage: v })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Owns Trailer</Label>

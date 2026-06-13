@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -522,11 +523,10 @@ function GeneratePaystubDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Base Pay ($)</Label>
-              <Input
-                type="number"
-                step="0.01"
+              <CurrencyInput
                 value={basePay}
-                onChange={(e) => setBasePay(e.target.value)}
+                onChange={setBasePay}
+                placeholder="0.00"
               />
               {isFlat && (
                 <p className="text-xs text-muted-foreground">Flat rate — loads ignored.</p>
@@ -534,11 +534,9 @@ function GeneratePaystubDialog({
             </div>
             <div className="space-y-2">
               <Label>Bonus Pay ($)</Label>
-              <Input
-                type="number"
-                step="0.01"
+              <CurrencyInput
                 value={bonusPay}
-                onChange={(e) => setBonusPay(e.target.value)}
+                onChange={setBonusPay}
                 placeholder="0.00"
               />
               <p className="text-xs text-muted-foreground">Safety bonus, referral, etc.</p>

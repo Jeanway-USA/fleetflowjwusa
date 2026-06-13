@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput, IntegerInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -271,28 +272,20 @@ export function SafetyBonusSettings() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="max-bonus">Max Bonus Amount ($)</Label>
-              <Input
+              <CurrencyInput
                 id="max-bonus"
-                type="number"
-                step="0.01"
-                min="0"
                 value={rules.max_bonus_amount}
-                onChange={(e) =>
-                  setRules((r) => ({ ...r, max_bonus_amount: e.target.value }))
-                }
+                onChange={(v) => setRules((r) => ({ ...r, max_bonus_amount: v }))}
+                placeholder="0.00"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="period-days">Period Length (Days)</Label>
-              <Input
+              <IntegerInput
                 id="period-days"
-                type="number"
-                step="1"
-                min="1"
                 value={rules.period_length_days}
-                onChange={(e) =>
-                  setRules((r) => ({ ...r, period_length_days: e.target.value }))
-                }
+                onChange={(v) => setRules((r) => ({ ...r, period_length_days: v }))}
+                placeholder="0"
               />
             </div>
           </div>
@@ -359,36 +352,30 @@ export function SafetyBonusSettings() {
                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
                       <div className="space-y-1">
                         <Label className="text-xs">Min Miles</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
+                        <IntegerInput
                           value={tier.min_miles}
                           disabled={tier._toDelete}
-                          onChange={(e) => updateTier(idx, { min_miles: e.target.value })}
+                          onChange={(v) => updateTier(idx, { min_miles: v })}
+                          placeholder="0"
                         />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Max Miles</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="1"
+                        <IntegerInput
                           placeholder="blank = ∞"
                           value={tier.max_miles}
                           disabled={tier._toDelete}
-                          onChange={(e) => updateTier(idx, { max_miles: e.target.value })}
+                          onChange={(v) => updateTier(idx, { max_miles: v })}
                         />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Rate Per Mile ($)</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.001"
+                        <CurrencyInput
+                          maxDecimals={3}
                           value={tier.rate_per_mile}
                           disabled={tier._toDelete}
-                          onChange={(e) => updateTier(idx, { rate_per_mile: e.target.value })}
+                          onChange={(v) => updateTier(idx, { rate_per_mile: v })}
+                          placeholder="0.000"
                         />
                       </div>
                       <div className="flex items-center gap-2">

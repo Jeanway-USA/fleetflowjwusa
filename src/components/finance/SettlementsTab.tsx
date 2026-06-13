@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -476,13 +477,12 @@ export function SettlementsTab() {
   const DeductionInput = ({ field, label }: { field: keyof Settlement; label: string }) => (
     <div className="space-y-1">
       <Label htmlFor={field} className="text-xs">{label}</Label>
-      <Input
+      <CurrencyInput
         id={field}
-        type="number"
-        step="0.01"
-        value={(formData[field] as number) || ''}
-        onChange={(e) => setFormData({ ...formData, [field]: parseFloat(e.target.value) || 0 })}
+        value={(formData[field] as number) ?? ''}
+        onChange={(v) => setFormData({ ...formData, [field]: v === '' ? 0 : parseFloat(v) })}
         className="h-8 text-sm"
+        placeholder="0.00"
       />
     </div>
   );
@@ -674,22 +674,20 @@ export function SettlementsTab() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="gross_revenue">Gross Revenue</Label>
-                  <Input
+                  <CurrencyInput
                     id="gross_revenue"
-                    type="number"
-                    step="0.01"
-                    value={formData.gross_revenue || ''}
-                    onChange={(e) => setFormData({ ...formData, gross_revenue: parseFloat(e.target.value) || 0 })}
+                    value={formData.gross_revenue ?? ''}
+                    onChange={(v) => setFormData({ ...formData, gross_revenue: v === '' ? 0 : parseFloat(v) })}
+                    placeholder="0.00"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="driver_pay">Driver Pay</Label>
-                  <Input
+                  <CurrencyInput
                     id="driver_pay"
-                    type="number"
-                    step="0.01"
-                    value={formData.driver_pay || ''}
-                    onChange={(e) => setFormData({ ...formData, driver_pay: parseFloat(e.target.value) || 0 })}
+                    value={formData.driver_pay ?? ''}
+                    onChange={(v) => setFormData({ ...formData, driver_pay: v === '' ? 0 : parseFloat(v) })}
+                    placeholder="0.00"
                   />
                 </div>
               </div>
