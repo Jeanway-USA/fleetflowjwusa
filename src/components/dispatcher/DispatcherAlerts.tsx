@@ -22,7 +22,7 @@ import { useState, useEffect } from 'react';
 
 interface Alert {
   id: string;
-  type: 'defect' | 'maintenance' | 'credential' | 'inspection' | 'driver_request';
+  type: 'defect' | 'maintenance' | 'credential' | 'inspection' | 'driver_request' | 'detention_timer';
   requestType?: 'detention' | 'home_time' | 'pto' | 'maintenance';
   priority: 'high' | 'medium' | 'low';
   title: string;
@@ -36,6 +36,8 @@ interface Alert {
     endDate?: string | null;
   };
 }
+
+const ARRIVAL_STATUSES = ['at_pickup', 'at_delivery', 'loading', 'unloading'] as const;
 
 export function DispatcherAlerts() {
   const navigate = useNavigate();
