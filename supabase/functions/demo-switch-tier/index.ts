@@ -126,7 +126,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("demo-switch-tier error:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to switch tier" }),
+      JSON.stringify({ error: "Failed to switch tier. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
