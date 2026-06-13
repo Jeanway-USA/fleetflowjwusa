@@ -1916,6 +1916,7 @@ export type Database = {
           agency_code: string | null
           auto_email_updates: boolean
           booked_miles: number | null
+          cf_7512_number: string | null
           created_at: string
           delivery_at: string | null
           delivery_date: string | null
@@ -1940,6 +1941,7 @@ export type Database = {
           invoice_status: string | null
           invoice_url: string | null
           invoiced_at: string | null
+          is_in_bond: boolean
           is_power_only: boolean | null
           landstar_load_id: string | null
           length_inches: number | null
@@ -1977,6 +1979,7 @@ export type Database = {
           agency_code?: string | null
           auto_email_updates?: boolean
           booked_miles?: number | null
+          cf_7512_number?: string | null
           created_at?: string
           delivery_at?: string | null
           delivery_date?: string | null
@@ -2001,6 +2004,7 @@ export type Database = {
           invoice_status?: string | null
           invoice_url?: string | null
           invoiced_at?: string | null
+          is_in_bond?: boolean
           is_power_only?: boolean | null
           landstar_load_id?: string | null
           length_inches?: number | null
@@ -2038,6 +2042,7 @@ export type Database = {
           agency_code?: string | null
           auto_email_updates?: boolean
           booked_miles?: number | null
+          cf_7512_number?: string | null
           created_at?: string
           delivery_at?: string | null
           delivery_date?: string | null
@@ -2062,6 +2067,7 @@ export type Database = {
           invoice_status?: string | null
           invoice_url?: string | null
           invoiced_at?: string | null
+          is_in_bond?: boolean
           is_power_only?: boolean | null
           landstar_load_id?: string | null
           length_inches?: number | null

@@ -41,6 +41,10 @@ import {
   OVER_DIM_AUTO_NOTE_PREFIX,
   type OverDimRule,
 } from '@/utils/overDimension';
+import { z } from 'zod';
+
+export const IN_BOND_ACCESSORIAL_TYPE = 'In-Bond Fee (Rule 480)';
+export const IN_BOND_AUTO_NOTE_PREFIX = 'Auto:';
 
 
 
@@ -206,6 +210,23 @@ export default function FleetLoads() {
       is_driver_pay: false,
     };
   };
+
+  // Compute the auto In-Bond (Rule 480) accessorial when the load is flagged.
+  const buildInBondAccessorial = (data: any): Accessorial | null => {
+    if (!data?.is_in_bond) return null;
+    const cf = (data.cf_7512_number ?? '').toString().trim();
+    if (!cf) return null;
+    const fee = parseFloat(getSetting('in_bond_fee', '100')) || 0;
+    if (fee <= 0) return null;
+    return {
+      accessorial_type: IN_BOND_ACCESSORIAL_TYPE,
+      amount: fee,
+      percentage: 100,
+      notes: `${IN_BOND_AUTO_NOTE_PREFIX} Rule 480 fee · CF 7512 #${cf}`,
+      is_driver_pay: false,
+    };
+  };
+
 
 
   const createMutation = useMutation({
@@ -411,20 +432,45 @@ export default function FleetLoads() {
       return;
     }
 
+    // In-Bond / Rule 480 client-side validation (server enforces too)
+    const inBondSchema = z.object({
+      is_in_bond: z.boolean().optional(),
+      cf_7512_number: z.string().trim().max(64, 'CF 7512 number must be 64 characters or fewer').optional().nullable(),
+    }).refine(
+      (v) => !v.is_in_bond || (typeof v.cf_7512_number === 'string' && v.cf_7512_number.trim().length > 0),
+      { message: 'CF 7512 number is required for In-Bond shipments', path: ['cf_7512_number'] },
+    );
+    const parsed = inBondSchema.safeParse({
+      is_in_bond: !!formData.is_in_bond,
+      cf_7512_number: formData.cf_7512_number ?? null,
+    });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0]?.message || 'Invalid In-Bond fields');
+      return;
+    }
+
     const calculated = calculateRevenueLocal(formData);
     const payload = {
       ...formData,
       ...calculated,
       org_id: orgId,
+      cf_7512_number: formData.is_in_bond ? (formData.cf_7512_number ?? '').trim() : null,
       negotiation_notes: formData.negotiation_notes || null,
     };
 
-    // Strip any prior auto-generated Over-Dimension rows, then re-inject if applicable.
+    // Strip any prior auto-generated rows, then re-inject if applicable.
     const manualAccessorials = accessorials.filter(
-      (a) => !(a.accessorial_type === OVER_DIM_ACCESSORIAL_TYPE && (a.notes ?? '').startsWith(OVER_DIM_AUTO_NOTE_PREFIX))
+      (a) =>
+        !(a.accessorial_type === OVER_DIM_ACCESSORIAL_TYPE && (a.notes ?? '').startsWith(OVER_DIM_AUTO_NOTE_PREFIX)) &&
+        !(a.accessorial_type === IN_BOND_ACCESSORIAL_TYPE && (a.notes ?? '').startsWith(IN_BOND_AUTO_NOTE_PREFIX))
     );
     const autoOverDim = buildOverDimAccessorial(payload);
-    const finalAccessorials = autoOverDim ? [...manualAccessorials, autoOverDim] : manualAccessorials;
+    const autoInBond = buildInBondAccessorial(payload);
+    const finalAccessorials = [
+      ...manualAccessorials,
+      ...(autoOverDim ? [autoOverDim] : []),
+      ...(autoInBond ? [autoInBond] : []),
+    ];
 
     if (editingLoad) {
       updateMutation.mutate({ id: editingLoad.id, updates: payload, accessorialItems: finalAccessorials });
@@ -718,7 +764,16 @@ export default function FleetLoads() {
           <DataTable
             columns={[
               { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
-              { key: 'landstar_load_id', header: isLandstar ? 'Landstar ID' : 'Load ID', hiddenOnMobile: true, render: (load: any) => <span className="font-mono">{load.landstar_load_id || '-'}</span> },
+              { key: 'landstar_load_id', header: isLandstar ? 'Landstar ID' : 'Load ID', hiddenOnMobile: true, render: (load: any) => (
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono">{load.landstar_load_id || '-'}</span>
+                  {load.is_in_bond && (
+                    <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-destructive/15 text-destructive border border-destructive/30" title={load.cf_7512_number ? `CF 7512: ${load.cf_7512_number}` : 'In-Bond shipment'}>
+                      IN-BOND
+                    </span>
+                  )}
+                </div>
+              ) },
               { key: 'tracking_id', header: 'Tracking ID', hiddenOnMobile: true, render: (load: any) => 
                 load.tracking_id ? (
                   <span 
@@ -929,6 +984,48 @@ export default function FleetLoads() {
               </TabsList>
 
               <TabsContent value="details" className="space-y-4 mt-4">
+                {/* In-Bond (Rule 480) compliance flag */}
+                <div className="rounded-lg border border-border/60 p-3 bg-muted/20 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      id="is_in_bond"
+                      checked={!!formData.is_in_bond}
+                      onCheckedChange={(checked) =>
+                        setFormData((prev: any) => ({
+                          ...prev,
+                          is_in_bond: !!checked,
+                          cf_7512_number: checked ? prev.cf_7512_number ?? '' : null,
+                        }))
+                      }
+                      className="mt-1"
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="is_in_bond" className="font-medium cursor-pointer">
+                        In-Bond / International Shipment (Rule 480)
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Adds a <strong>Company</strong> accessorial of ${parseFloat(getSetting('in_bond_fee', '100')).toFixed(2)} and warns the driver not to break the customs seal.
+                      </p>
+                    </div>
+                  </div>
+                  {formData.is_in_bond && (
+                    <div className="space-y-1 pl-6">
+                      <Label htmlFor="cf_7512_number" className="text-xs font-semibold">
+                        CF 7512 Number <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="cf_7512_number"
+                        value={formData.cf_7512_number ?? ''}
+                        onChange={(e) => setFormData({ ...formData, cf_7512_number: e.target.value })}
+                        placeholder="e.g. 123-45678901"
+                        maxLength={64}
+                        required
+                        className="pl-4 sm:pl-3 h-10 font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="landstar_load_id">{isLandstar ? 'Landstar Load ID' : 'Load ID'}</Label>
