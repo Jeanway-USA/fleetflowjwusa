@@ -71,6 +71,8 @@ interface Load {
   landstar_load_id: string | null;
   tracking_id?: string | null;
   pod_required?: boolean;
+  is_in_bond?: boolean | null;
+  cf_7512_number?: string | null;
   load_accessorials?: Array<{ id?: string; accessorial_type?: string | null; amount?: number | null; notes?: string | null }>;
 }
 
@@ -232,6 +234,18 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   return (
     <>
       <Card className="overflow-hidden border-2 border-primary/50 shadow-lg">
+        {/* In-Bond / Rule 480 compliance banner */}
+        {load.is_in_bond && (
+          <div className="bg-destructive text-destructive-foreground px-4 py-3 border-b border-destructive/40 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" aria-hidden="true" />
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-sm tracking-wide uppercase">In-Bond Shipment — Do Not Break Seal</div>
+              {load.cf_7512_number && (
+                <div className="text-xs opacity-90 font-mono mt-0.5 truncate">CF 7512: {load.cf_7512_number}</div>
+              )}
+            </div>
+          </div>
+        )}
         {/* Status bar */}
         <div className={`h-2 ${getStatusColor(load.status)}`} />
         
