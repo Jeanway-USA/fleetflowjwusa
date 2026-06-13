@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { compressImage } from '@/lib/compress-image';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Palette, ImageIcon, Upload, X } from 'lucide-react';
@@ -110,13 +111,14 @@ export function BrandingTab() {
     setLoading(true);
 
     try {
-      const ext = file.name.split('.').pop() || 'png';
+      const compressed = await compressImage(file);
+      const ext = compressed.name.split('.').pop() || 'png';
       const filePath = `${orgId}/${type}.${ext}`;
 
       // Upload directly to built-in storage (not through provider)
       const { error: uploadError } = await supabase.storage
         .from('branding-assets')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, compressed, { upsert: true, contentType: compressed.type });
       if (uploadError) throw uploadError;
       const path = filePath;
 

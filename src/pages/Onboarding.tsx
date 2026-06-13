@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { compressImage } from '@/lib/compress-image';
 import {
   Loader2, ArrowLeft, ArrowRight, CheckCircle2, Building2, Truck, Container,
   Users, Plus, X, SkipForward, Upload, ImageIcon, LogOut,
@@ -114,11 +115,12 @@ export default function Onboarding() {
 
       // Upload logo if provided
       if (logoFile) {
-        const ext = logoFile.name.split('.').pop();
+        const compressedLogo = await compressImage(logoFile);
+        const ext = compressedLogo.name.split('.').pop();
         const path = `${newOrgId}/logo.${ext}`;
         const { error: uploadError } = await supabase.storage
           .from('branding-assets')
-          .upload(path, logoFile, { upsert: true });
+          .upload(path, compressedLogo, { upsert: true, contentType: compressedLogo.type });
         if (!uploadError) {
           updates.logo_url = path;
         }
