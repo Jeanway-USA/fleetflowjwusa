@@ -34,6 +34,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 import { PODViewer } from '@/components/loads/PODViewer';
 import { BrokerRateHistoryCard } from '@/components/loads/BrokerRateHistoryCard';
+import { FeetInchesInput } from '@/components/shared/FeetInchesInput';
+import {
+  calcOverDimensionCharge,
+  OVER_DIM_ACCESSORIAL_TYPE,
+  OVER_DIM_AUTO_NOTE_PREFIX,
+  type OverDimRule,
+} from '@/utils/overDimension';
+
+
 
 // Accessorial types are now sourced from public.accessorial_types per-org lookup.
 
@@ -160,6 +169,44 @@ export default function FleetLoads() {
     const rule = (detentionRules as any[]).find((r) => r.trailer_type === type);
     return Number(rule?.hourly_rate) || 0;
   };
+
+  // Over-dimension (Rule 670) rules catalog (per-org)
+  const { data: overDimRules = [] } = useQuery({
+    queryKey: ['over_dimension_rules', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('over_dimension_rules')
+        .select('dimension, min_inches, max_inches, cents_per_mile');
+      if (error) throw error;
+      return (data ?? []) as OverDimRule[];
+    },
+  });
+
+  // Compute the auto Over-Dimension accessorial for the current form, if any.
+  const buildOverDimAccessorial = (data: any): Accessorial | null => {
+    const miles = (Number(data?.actual_miles) > 0 ? Number(data?.actual_miles) : Number(data?.booked_miles)) || 0;
+    const result = calcOverDimensionCharge({
+      height_inches: data?.height_inches,
+      width_inches: data?.width_inches,
+      length_inches: data?.length_inches,
+      miles,
+      rules: overDimRules as OverDimRule[],
+    });
+    if (result.charge_amount <= 0) return null;
+    const parts = result.breakdown.map((b) => {
+      const tag = b.dimension === 'height' ? 'H' : b.dimension === 'width' ? 'W' : 'L';
+      return `${tag} ${b.value_in}" → $${b.cpm.toFixed(2)}/mi`;
+    });
+    return {
+      accessorial_type: OVER_DIM_ACCESSORIAL_TYPE,
+      amount: result.charge_amount,
+      percentage: 100,
+      notes: `${OVER_DIM_AUTO_NOTE_PREFIX} ${parts.join(', ')} × ${miles} mi`,
+      is_driver_pay: false,
+    };
+  };
+
 
   const createMutation = useMutation({
     mutationFn: async ({ load, accessorials: accs }: { load: any; accessorials: Accessorial[] }) => {
@@ -372,10 +419,17 @@ export default function FleetLoads() {
       negotiation_notes: formData.negotiation_notes || null,
     };
 
+    // Strip any prior auto-generated Over-Dimension rows, then re-inject if applicable.
+    const manualAccessorials = accessorials.filter(
+      (a) => !(a.accessorial_type === OVER_DIM_ACCESSORIAL_TYPE && (a.notes ?? '').startsWith(OVER_DIM_AUTO_NOTE_PREFIX))
+    );
+    const autoOverDim = buildOverDimAccessorial(payload);
+    const finalAccessorials = autoOverDim ? [...manualAccessorials, autoOverDim] : manualAccessorials;
+
     if (editingLoad) {
-      updateMutation.mutate({ id: editingLoad.id, updates: payload, accessorialItems: accessorials });
+      updateMutation.mutate({ id: editingLoad.id, updates: payload, accessorialItems: finalAccessorials });
     } else {
-      createMutation.mutate({ load: payload, accessorials });
+      createMutation.mutate({ load: payload, accessorials: finalAccessorials });
     }
   };
 
@@ -1063,6 +1117,68 @@ export default function FleetLoads() {
                     </Select>
                   </div>
                 </div>
+
+                {/* Freight dimensions — drives Rule 670 Over-Dimension auto-billing */}
+                {(() => {
+                  const milesForPreview = (Number(formData.actual_miles) > 0 ? Number(formData.actual_miles) : Number(formData.booked_miles)) || 0;
+                  const preview = calcOverDimensionCharge({
+                    height_inches: formData.height_inches,
+                    width_inches: formData.width_inches,
+                    length_inches: formData.length_inches,
+                    miles: milesForPreview,
+                    rules: overDimRules as OverDimRule[],
+                  });
+                  const anyDim = !!(formData.height_inches || formData.width_inches || formData.length_inches);
+                  return (
+                    <div className="space-y-3 rounded-lg border border-border/60 p-3 bg-muted/20">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <Label className="text-sm font-semibold">Freight Dimensions <span className="text-xs font-normal text-muted-foreground">(Legal: 13'6" H × 8'6" W × 70' L)</span></Label>
+                        {anyDim && (
+                          preview.charge_amount > 0 ? (
+                            <span className="text-xs font-medium px-2 py-1 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300" title={preview.breakdown.map(b => `${b.dimension}: $${b.cpm.toFixed(2)}/mi`).join(' · ')}>
+                              Over-Dimension · +${preview.total_cpm.toFixed(2)}/mi · ${preview.charge_amount.toFixed(2)} on {milesForPreview} mi
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">Legal</span>
+                          )
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="height_inches" className="text-xs">Height</Label>
+                          <FeetInchesInput
+                            id="height_inches"
+                            valueInches={formData.height_inches}
+                            onChange={(v) => setFormData({ ...formData, height_inches: v })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="width_inches" className="text-xs">Width</Label>
+                          <FeetInchesInput
+                            id="width_inches"
+                            valueInches={formData.width_inches}
+                            onChange={(v) => setFormData({ ...formData, width_inches: v })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="length_inches" className="text-xs">Length</Label>
+                          <FeetInchesInput
+                            id="length_inches"
+                            valueInches={formData.length_inches}
+                            onChange={(v) => setFormData({ ...formData, length_inches: v })}
+                          />
+                        </div>
+                      </div>
+                      {preview.charge_amount > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          A <strong>Company</strong> accessorial of <strong>${preview.charge_amount.toFixed(2)}</strong> (Rule 670) will be added on save. Not paid to the driver.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

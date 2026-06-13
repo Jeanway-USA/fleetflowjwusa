@@ -1933,6 +1933,7 @@ export type Database = {
           fuel_advance: number | null
           fuel_surcharge: number | null
           gross_revenue: number | null
+          height_inches: number | null
           id: string
           invoice_email: string | null
           invoice_number: string | null
@@ -1941,6 +1942,7 @@ export type Database = {
           invoiced_at: string | null
           is_power_only: boolean | null
           landstar_load_id: string | null
+          length_inches: number | null
           lumper: number | null
           negotiation_notes: string | null
           net_revenue: number | null
@@ -1965,6 +1967,7 @@ export type Database = {
           truck_id: string | null
           truck_revenue: number | null
           updated_at: string
+          width_inches: number | null
         }
         Insert: {
           accessorials?: number | null
@@ -1991,6 +1994,7 @@ export type Database = {
           fuel_advance?: number | null
           fuel_surcharge?: number | null
           gross_revenue?: number | null
+          height_inches?: number | null
           id?: string
           invoice_email?: string | null
           invoice_number?: string | null
@@ -1999,6 +2003,7 @@ export type Database = {
           invoiced_at?: string | null
           is_power_only?: boolean | null
           landstar_load_id?: string | null
+          length_inches?: number | null
           lumper?: number | null
           negotiation_notes?: string | null
           net_revenue?: number | null
@@ -2023,6 +2028,7 @@ export type Database = {
           truck_id?: string | null
           truck_revenue?: number | null
           updated_at?: string
+          width_inches?: number | null
         }
         Update: {
           accessorials?: number | null
@@ -2049,6 +2055,7 @@ export type Database = {
           fuel_advance?: number | null
           fuel_surcharge?: number | null
           gross_revenue?: number | null
+          height_inches?: number | null
           id?: string
           invoice_email?: string | null
           invoice_number?: string | null
@@ -2057,6 +2064,7 @@ export type Database = {
           invoiced_at?: string | null
           is_power_only?: boolean | null
           landstar_load_id?: string | null
+          length_inches?: number | null
           lumper?: number | null
           negotiation_notes?: string | null
           net_revenue?: number | null
@@ -2081,6 +2089,7 @@ export type Database = {
           truck_id?: string | null
           truck_revenue?: number | null
           updated_at?: string
+          width_inches?: number | null
         }
         Relationships: [
           {
@@ -3405,6 +3414,64 @@ export type Database = {
             columns: ["applied_promo_code_id"]
             isOneToOne: false
             referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      over_dimension_rules: {
+        Row: {
+          cents_per_mile: number
+          created_at: string
+          dimension: string
+          id: string
+          max_inches: number | null
+          min_inches: number
+          org_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          cents_per_mile?: number
+          created_at?: string
+          dimension: string
+          id?: string
+          max_inches?: number | null
+          min_inches: number
+          org_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          cents_per_mile?: number
+          created_at?: string
+          dimension?: string
+          id?: string
+          max_inches?: number | null
+          min_inches?: number
+          org_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "over_dimension_rules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "over_dimension_rules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "over_dimension_rules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
         ]
