@@ -32,6 +32,7 @@ import { useOrganizationMode, type TmsMode } from '@/hooks/useOrganizationMode';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -296,11 +297,13 @@ export function AppSidebar() {
 
   const handleDashboardSwitch = (path: string, role: 'owner' | 'dispatcher' | 'driver' | 'maintenance') => {
     if (actuallyIsOwner) {
-      if (role === 'owner') {
-        setSimulatedRole(null);
-      } else {
-        setSimulatedRole(role);
-      }
+      // flushSync forces the simulation state update to commit synchronously
+      // before navigate() runs, so we never get an intermediate render with
+      // the new simulation but the old route — which previously triggered the
+      // auto-exit effect in ProtectedRoute and cancelled the navigation.
+      flushSync(() => {
+        setSimulatedRole(role === 'owner' ? null : role);
+      });
     }
     navigate(path);
   };
