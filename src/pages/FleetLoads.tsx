@@ -41,6 +41,10 @@ import {
   OVER_DIM_AUTO_NOTE_PREFIX,
   type OverDimRule,
 } from '@/utils/overDimension';
+import { z } from 'zod';
+
+export const IN_BOND_ACCESSORIAL_TYPE = 'In-Bond Fee (Rule 480)';
+export const IN_BOND_AUTO_NOTE_PREFIX = 'Auto:';
 
 
 
