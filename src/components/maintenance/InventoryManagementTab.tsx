@@ -348,7 +348,7 @@ function ReceiveShipmentDialog({
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="receive_qty">Quantity to add *</Label>
-            <Input id="receive_qty" type="number" min={1} {...form.register('quantity')} />
+            <Input id="receive_qty" type="number" min={1} step={1} {...form.register('quantity')} />
             {form.formState.errors.quantity && (
               <p className="text-xs text-destructive">{form.formState.errors.quantity.message}</p>
             )}
