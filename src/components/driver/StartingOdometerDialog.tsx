@@ -14,6 +14,7 @@ import { CheckCircle, Gauge, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { useOptimisticLoadStatus } from '@/hooks/useOptimisticLoadStatus';
 
 interface StartingOdometerDialogProps {
   open: boolean;
@@ -36,6 +37,7 @@ export function StartingOdometerDialog({
   const [value, setValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { isOnline, enqueue } = useOfflineQueue();
+  const { applyOptimistic } = useOptimisticLoadStatus();
 
   const parsed = value === '' ? NaN : parseInt(value, 10);
   const isValid = Number.isInteger(parsed) && parsed > 0;
@@ -65,7 +67,15 @@ export function StartingOdometerDialog({
       return;
     }
 
-    setIsSubmitting(true);
+    // Optimistic update — UI flips immediately, dialog closes.
+    const { commit, rollback } = applyOptimistic(loadId, {
+      status: nextStatus,
+      start_miles: startMiles,
+    });
+    onComplete();
+    reset();
+    onOpenChange(false);
+
     try {
       const { error } = await supabase
         .from('fleet_loads')
@@ -74,14 +84,10 @@ export function StartingOdometerDialog({
       if (error) throw error;
 
       toast.success('Load started — odometer recorded.');
-      onComplete();
-      reset();
-      onOpenChange(false);
+      commit();
     } catch (err: any) {
       console.error('Starting odometer save failed:', err);
-      toast.error('Could not start load: ' + (err?.message ?? 'Unknown error'));
-    } finally {
-      setIsSubmitting(false);
+      rollback();
     }
   };
 

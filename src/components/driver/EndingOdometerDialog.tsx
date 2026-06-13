@@ -14,6 +14,7 @@ import { CheckCircle, Gauge, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { useOptimisticLoadStatus } from '@/hooks/useOptimisticLoadStatus';
 
 interface EndingOdometerDialogProps {
   open: boolean;
@@ -39,6 +40,7 @@ export function EndingOdometerDialog({
   const [value, setValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { isOnline, enqueue } = useOfflineQueue();
+  const { applyOptimistic } = useOptimisticLoadStatus();
 
   const parsed = value === '' ? NaN : parseInt(value, 10);
   const isPositiveInt = Number.isInteger(parsed) && parsed > 0;
@@ -76,14 +78,19 @@ export function EndingOdometerDialog({
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const update: Record<string, unknown> = {
-        status: nextStatus,
-        end_miles: endMiles,
-      };
-      if (actualMiles !== null) update.actual_miles = actualMiles;
+    const update: Record<string, unknown> = {
+      status: nextStatus,
+      end_miles: endMiles,
+    };
+    if (actualMiles !== null) update.actual_miles = actualMiles;
 
+    // Optimistic patch + close dialog so the UI feels instant.
+    const { commit, rollback } = applyOptimistic(loadId, update);
+    onComplete();
+    reset();
+    onOpenChange(false);
+
+    try {
       const { error } = await supabase
         .from('fleet_loads')
         .update(update)
@@ -91,14 +98,10 @@ export function EndingOdometerDialog({
       if (error) throw error;
 
       toast.success('Load delivered — odometer recorded.');
-      onComplete();
-      reset();
-      onOpenChange(false);
+      commit();
     } catch (err: any) {
       console.error('Ending odometer save failed:', err);
-      toast.error('Could not complete load: ' + (err?.message ?? 'Unknown error'));
-    } finally {
-      setIsSubmitting(false);
+      rollback();
     }
   };
 
