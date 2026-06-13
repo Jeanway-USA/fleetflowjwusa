@@ -276,7 +276,16 @@ export default function FleetLoads() {
 
   // Accessorial management
   const addAccessorial = () => {
-    setAccessorials([...accessorials, { accessorial_type: 'Detention', amount: 0, percentage: 100, is_driver_pay: true }]);
+    const first = accessorialTypes[0];
+    setAccessorials([
+      ...accessorials,
+      {
+        accessorial_type: first?.name ?? 'Detention',
+        amount: 0,
+        percentage: 100,
+        is_driver_pay: first?.default_is_driver_pay ?? true,
+      },
+    ]);
   };
 
   const removeAccessorial = (index: number) => {
