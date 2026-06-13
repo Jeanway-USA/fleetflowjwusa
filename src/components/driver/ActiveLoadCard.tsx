@@ -62,6 +62,8 @@ interface Load {
   rate: number | null;
   booked_miles: number | null;
   empty_miles?: number | null;
+  start_miles?: number | null;
+  end_miles?: number | null;
   notes: string | null;
   landstar_load_id: string | null;
   tracking_id?: string | null;
