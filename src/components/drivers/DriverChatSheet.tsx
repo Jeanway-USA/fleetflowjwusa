@@ -152,7 +152,7 @@ export function DriverChatSheet({ driver, open, onOpenChange }: DriverChatSheetP
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-md flex flex-col p-0 gap-0">
+      <SheetContent className="w-full sm:max-w-md flex flex-col p-0 gap-0 overflow-hidden">
         <SheetHeader className="px-5 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <ChatAvatar avatarPath={driver.avatar_url ?? null} initials={initials} />
