@@ -1345,11 +1345,14 @@ export default function FleetLoads() {
                   />
                 </div>
 
-                {/* Detention - hours-based with auto-computed $ from trailer-type rule */}
+                {/* Detention - hours-based with auto-computed $ from trailer-type rule (Rule 500) */}
                 {(() => {
-                  const rate = getDetentionRateForLoad(formData);
+                  const { rate, cap } = getDetentionRuleForLoad(formData);
                   const hours = parseFloat(formData.detention_hours ?? '0') || 0;
-                  const computed = +(hours * rate).toFixed(2);
+                  const uncapped = hours * rate;
+                  const days = hours > 0 ? Math.ceil(hours / 24) : 0;
+                  const capped = cap > 0 ? Math.min(uncapped, cap * days) : uncapped;
+                  const computed = +capped.toFixed(2);
                   const trailer = trailers.find((t: any) => t.id === formData?.trailer_id);
                   return (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
@@ -1364,15 +1367,17 @@ export default function FleetLoads() {
                           onChange={(e) => {
                             const v = e.target.value;
                             const h = v === '' ? 0 : parseFloat(v);
-                            const auto = +(h * rate).toFixed(2);
-                            setFormData({ ...formData, detention_hours: v === '' ? null : h, detention_pay: auto });
+                            const u = h * rate;
+                            const d = h > 0 ? Math.ceil(h / 24) : 0;
+                            const c = cap > 0 ? Math.min(u, cap * d) : u;
+                            setFormData({ ...formData, detention_hours: v === '' ? null : h, detention_pay: +c.toFixed(2) });
                           }}
                           placeholder="0"
                           className="pl-4 sm:pl-3 h-12"
                         />
                         <p className="text-xs text-muted-foreground">
                           {trailer?.trailer_type
-                            ? `Rate: $${rate.toFixed(2)}/hr (${trailer.trailer_type})`
+                            ? `Rate: $${rate.toFixed(2)}/hr · Cap $${cap.toFixed(2)}/day (${trailer.trailer_type})`
                             : 'Select a trailer to auto-fill the rate.'}
                         </p>
                       </div>
@@ -1385,7 +1390,7 @@ export default function FleetLoads() {
                           placeholder={computed ? computed.toFixed(2) : '0.00'}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Auto-calculated; override if needed.
+                          Auto-calculated (Rule 500); override if needed.
                         </p>
                       </div>
                     </div>
