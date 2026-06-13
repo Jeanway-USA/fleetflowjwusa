@@ -31,6 +31,9 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
     maxBonus,
     periodEnd,
     disqualifiers,
+    currentTier,
+    nextTier,
+    tierCount,
   } = useSafetyBonus(driverId);
 
   const capHit = isEligible && maxBonus > 0 && currentEarnedBonus >= maxBonus;
@@ -136,9 +139,14 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
   }
 
   // ---------- Eligible ----------
-  const atTopTier = nextTierMiles == null;
-  const denom = atTopTier ? currentSafeMiles || 1 : currentSafeMiles + (nextTierMiles ?? 0);
-  const progressPct = atTopTier ? 100 : Math.min((currentSafeMiles / denom) * 100, 100);
+  const atTopTier = nextTier == null;
+  const tierFloor = currentTier?.minMiles ?? 0;
+  const tierCeiling = nextTier?.minMiles ?? currentTier?.maxMiles ?? null;
+  const milesIntoTier = Math.max(0, currentSafeMiles - tierFloor);
+  const tierSpan = tierCeiling != null ? Math.max(1, tierCeiling - tierFloor) : 0;
+  const progressPct = atTopTier ? 100 : Math.min((milesIntoTier / tierSpan) * 100, 100);
+
+  const currentTierLabel = currentTier ? `Tier ${currentTier.index + 1}` : 'Starter';
 
   return (
     <Card className="border-primary/20">
@@ -162,17 +170,36 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
           </p>
         </div>
 
+        {/* Tier badges */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="default" className="gap-1.5">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            {currentTierLabel}
+            {tierCount > 0 && currentTier ? ` of ${tierCount}` : ''} · {rate(currentRate)}
+          </Badge>
+          {atTopTier ? (
+            <Badge variant="secondary" className="gap-1.5">
+              <Crown className="h-3.5 w-3.5" />
+              Top tier reached
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="gap-1.5">
+              Next: Tier {(nextTier?.index ?? 0) + 1} · {rate(nextTier?.ratePerMile ?? 0)}
+            </Badge>
+          )}
+        </div>
+
         <div className="space-y-1.5">
           <Progress value={progressPct} className="h-3" />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
               {atTopTier
-                ? 'Top tier reached'
-                : `${formatMiles(nextTierMiles ?? 0)} mi to next rate jump`}
+                ? 'Max rate active'
+                : `${formatMiles(milesIntoTier)} / ${formatMiles(tierSpan)} mi into ${currentTierLabel} · ${formatMiles(nextTierMiles ?? 0)} mi to next rate jump`}
             </span>
             {daysToReset != null && (
-              <span>
-                {daysToReset === 0 ? 'Resets tomorrow' : `${daysToReset}d left in period`}
+              <span className="whitespace-nowrap pl-2">
+                {daysToReset === 0 ? 'Resets tomorrow' : `${daysToReset}d left`}
               </span>
             )}
           </div>
