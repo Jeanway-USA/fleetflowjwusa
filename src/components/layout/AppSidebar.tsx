@@ -187,7 +187,9 @@ export function AppSidebar() {
   const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
 
   const filterByRoleAndTier = useCallback((items: NavItem[]) => items.filter(item => {
-    const roleMatch = item.roles.some(role => hasRole(role));
+    // Owners see every nav item (unless they're simulating a lower role,
+    // in which case hasRole('owner') is false and normal filtering applies).
+    const roleMatch = hasRole('owner') || item.roles.some(role => hasRole(role));
     const tierMatch = !item.feature || tierFeatures.has(item.feature);
     const modeMatch = !item.tmsMode || item.tmsMode === currentTmsMode;
     return roleMatch && tierMatch && modeMatch;
