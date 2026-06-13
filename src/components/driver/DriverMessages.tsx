@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, Send, Loader2, ArrowLeft } from 'lucide-react';
+import { MessageSquare, Send, Loader2, ArrowLeft, Check, CheckCheck } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,9 +47,27 @@ export function DriverMessages() {
   const me = user?.id ?? null;
 
   const [open, setOpen] = useState(false);
+  const openRef = useRef(open);
+  useEffect(() => { openRef.current = open; }, [open]);
   const [activeCounterpart, setActiveCounterpart] = useState<string | null>(null);
+  const activeCounterpartRef = useRef(activeCounterpart);
+  useEffect(() => { activeCounterpartRef.current = activeCounterpart; }, [activeCounterpart]);
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Lazy-init notification chime (client only)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const a = new Audio('/sounds/message-chime.mp3');
+      a.preload = 'auto';
+      a.volume = 0.6;
+      audioRef.current = a;
+    } catch {
+      audioRef.current = null;
+    }
+  }, []);
 
   // ---------- Unread badge count ----------
   const unreadQueryKey = useMemo(() => ['driver-msgs-unread', me], [me]);
