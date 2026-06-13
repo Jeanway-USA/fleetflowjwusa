@@ -1,44 +1,58 @@
-### Task 1 — Schema migration (`load_accessorials`)
-Add a single column with a safe default so historical payroll math is unchanged:
+## Task 1 — Lookup table for accessorial categories
+
+New table `public.accessorial_types`, scoped per org so each company can grow their own list later, but seeded globally for every existing org so the dropdown works on day one.
 
 ```sql
-ALTER TABLE public.load_accessorials
-  ADD COLUMN is_driver_pay boolean NOT NULL DEFAULT true;
+CREATE TABLE public.accessorial_types (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  default_is_driver_pay boolean NOT NULL DEFAULT true,
+  is_active boolean NOT NULL DEFAULT true,
+  sort_order int NOT NULL DEFAULT 100,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (org_id, name)
+);
 ```
 
-- `DEFAULT true` ensures every existing row is treated as driver-payable (current behavior).
-- No RLS or grant changes — the column inherits the table's existing policies.
-- After approval, regenerate types so `load_accessorials.is_driver_pay` is typed throughout the client.
+- GRANT SELECT/INSERT/UPDATE/DELETE to `authenticated`; GRANT ALL to `service_role`.
+- RLS: SELECT for same-org users (`org_id = get_user_org_id(auth.uid())`); INSERT/UPDATE/DELETE restricted to `has_admin_access(auth.uid())` and same org. `updated_at` trigger via existing `update_updated_at_column()`.
+- Trigger `set_accessorial_types_org_id` (mirrors existing `set_trucks_org_id` pattern) fills `org_id` from `get_user_org_id(auth.uid())` on insert.
+- Seed: one INSERT per org × default type so every existing org receives the standard list:
+  - Driver pay (default true): Detention, Layover, Tarping, Expedited Service
+  - Company (default false): Tolls, Permits, Lumper Fees, Trailer Wash Out, Route Surveys, Transfer of Lading
+- New-org bootstrap: append the same seed inside `public.create_onboarding_org` so brand-new tenants get the list automatically.
 
-### Task 2 — UI input segregation (`src/pages/FleetLoads.tsx`)
-This is the single dispatcher-facing accessorial editor used for both load creation and edit.
+## Task 2 — Dropdown in load create/edit (`src/pages/FleetLoads.tsx`)
 
-- Extend the local `Accessorial` interface (line 52) with `is_driver_pay: boolean`.
-- `addAccessorial` (line 270) seeds new rows with `is_driver_pay: true`.
-- `openDialog`'s fetch mapping (line 225) reads `is_driver_pay` from the DB row, falling back to `true` if null.
-- Both insert mappings — create flow (line 144) and update flow (line 177) — include `is_driver_pay: acc.is_driver_pay` in the payload sent to `load_accessorials`.
-- Editor row (line 1106 grid): retighten the column layout to `grid-cols-12` and add a new "Payable To" `Select` with options **Driver** (`is_driver_pay = true`) and **Company** (`is_driver_pay = false`). Layout:
-  - Type 3 cols → Payable To 2 cols → Amount 2 cols → % Paid 2 cols → Net 2 cols → Delete 1 col.
-  - When **Company** is selected, the Net cell shows a small muted "Company expense" tag so dispatchers can see at a glance it won't reach the driver.
-- Net total footer (line 1163) keeps showing the total $ for the load; an additional small line below it shows "Driver portion: $X" computed from rows where `is_driver_pay === true` so the dispatcher has immediate visual confirmation.
+Single dispatcher-facing editor handles both create and edit.
 
-### Task 3 — Payroll guardrail (`src/utils/payCalculations.ts`)
-- Widen the line-37 type: `load_accessorials?: Array<{ amount?: number | null; is_driver_pay?: boolean | null }> | null;`
-- Update `sumAccessorials` (line 74) so it filters before summing:
-  ```ts
-  return load.load_accessorials
-    .filter((a) => a?.is_driver_pay !== false) // default true preserves legacy rows
-    .reduce((s, a) => s + n(a?.amount), 0);
-  ```
-  Using `!== false` keeps historical/undefined values flowing into driver pay, which matches the migration default.
-- `calculateLoadPay` and `calculateWeeklyPay` already route every accessorial figure through `sumAccessorials`, so this single change automatically excludes Company accessorials from per-load pay, weekly pay, settlements, paystubs, and the driver dashboard widgets.
-- Update `src/utils/payCalculations.test.ts` with one new case: a load with two accessorials — one `is_driver_pay: true` ($100) and one `is_driver_pay: false` ($75) — asserting `sumAccessorials` returns `100` and `calculateLoadPay(...).accessorialsTotal === 100`. Add a second case confirming legacy rows (no flag) still sum.
+- Add a TanStack query for `accessorial_types` (active rows, sorted by `sort_order, name`) keyed by org.
+- Replace the free-text "Type" input in the accessorial grid row (~line 1106) with a `Select`:
+  - Options come from the query.
+  - On change, set `accessorial_type` AND auto-set `is_driver_pay = type.default_is_driver_pay`. The existing "Payable To" Driver/Company select stays so dispatchers can still override per row.
+  - Legacy free-text values on existing rows are preserved by injecting them as a disabled item at the top of the list if not found (prevents "value missing" warnings on old loads).
+- `addAccessorial` seeds new rows with the first list entry's name and its `default_is_driver_pay`, falling back to `Detention`/`true` if the list is empty.
+- Remove the `ACCESSORIAL_TYPES` constant (lines 39-50) — no longer needed.
+- No other field touched; existing insert/update payloads already write `is_driver_pay`.
 
-### Out of scope (intentionally untouched)
-- Company P&L / revenue analytics: the company accessorials remain on the load row as before, so `gross_revenue` and revenue dashboards keep counting them. Only the driver-pay reducer changes.
-- Settlement display components (`SettlementsTab`, `DriverSettlementsTab`, `MyPaystubsDialog`, etc.) all already call `sumAccessorials`, so they pick up the new filter for free — no per-screen edits needed.
+Out of scope (not requested):
+- No admin UI to manage the lookup table this turn — defaults cover the spec; a settings screen can be added later.
 
-### Verification
-- Existing load with no flag → driver still gets accessorial in pay (default `true`).
-- New load with one Driver and one Company accessorial → driver sees only the Driver amount in `Estimated Pay`, the paystub breakdown, and the weekly settlement; the load's `accessorialsTotal` in the editor still shows the combined total for company revenue tracking.
-- Toggle a row from Driver → Company and save → next refresh excludes that row from driver pay everywhere without losing the record.
+## Task 3 — Payroll util (`src/utils/payCalculations.ts`)
+
+Already correct from the prior turn: `sumAccessorials` filters `a?.is_driver_pay !== false` before summing, and both `calculateLoadPay` and `calculateWeeklyPay` route through it. Verification only:
+
+- Re-read the file and confirm the filter is intact.
+- Re-run `payCalculations.test.ts` (it already covers driver-only sums, mixed rows, and legacy rows).
+- No code changes expected. If the filter has regressed, restore it.
+
+Company-side accounting is unchanged: the load row still carries the full accessorial total, so `gross_revenue` and revenue dashboards continue to capture company-pay accessorials as revenue/expenses while driver settlements exclude them.
+
+## Files touched
+
+- New migration: `accessorial_types` table + RLS + GRANTs + org-id trigger + seed for existing orgs + edit `create_onboarding_org` to seed new orgs.
+- `src/pages/FleetLoads.tsx` — dropdown wiring, query, auto-fill of `is_driver_pay`, removal of free-text constant.
+- `src/integrations/supabase/types.ts` regenerates after migration.
+- No changes expected to `payCalculations.ts` beyond verification.
