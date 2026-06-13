@@ -15,6 +15,7 @@ import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { Building2, Landmark, Banknote } from 'lucide-react';
 import { DetentionRulesCard } from './DetentionRulesCard';
 import { OverDimensionRulesCard } from './OverDimensionRulesCard';
+import { InBondFeeCard } from './InBondFeeCard';
 
 export function CompanyTab() {
   const { orgId, orgName, refreshOrgData, isDemoMode } = useAuth();
