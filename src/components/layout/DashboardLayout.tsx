@@ -307,6 +307,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
               </div>
             )}
             <div className="flex-1" />
+            <TimeDisplayToggle />
             <Button
               variant="outline"
               size="sm"
