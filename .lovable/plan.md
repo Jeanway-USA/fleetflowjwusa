@@ -1,58 +1,120 @@
-# Automatic Client-Side Image Compression for Uploads
+# Standardize Appointment Times: True UTC + Per-Stop Timezone + Display Toggle
 
-## Goal
-Compress every image file in the browser before it's uploaded to Lovable Cloud storage. Target ≤ ~800 KB per image (configurable up to 1 MB), preserve readability for document scans, and surface a clear loading state so users know the compression + upload is in progress.
+## Decisions (locked in)
+- **Storage**: true `timestamptz` for each appointment + an IANA timezone column per stop (`America/Chicago` etc.).
+- **Display**: always render the abbreviation next to the time (`08:00 CST`) **and** add a header toggle for `Company Time` ↔ `Local Time` that flips every screen.
+- **Backfill**: geocode existing rows' origin/destination → IANA zone.
 
-## Approach
-1. **One shared utility** that all upload paths call.
-2. **Centralize the call** inside the storage helper that nearly every upload already routes through (`useStorageProvider.uploadFile`), so app-wide coverage is automatic.
-3. **Patch the few direct `supabase.storage.from(...).upload(...)` call sites** that bypass the helper.
-4. **Use existing per-call `uploading` flags / spinners** in the consumer components; verify each spinner stays visible during the (new) compression step.
+## Current state (from audit)
+- `fleet_loads` and `agency_loads` store `pickup_date date`, `delivery_date date`, plus `pickup_time text`, `delivery_time text`. No timezone anywhere.
+- ~49 historical `fleet_loads` rows + agency rows to backfill.
+- No org-level or user-level timezone preference exists yet.
+- Affected UI: `IndependentLoadBuilder`, `SmartLoadCreator`, `RateConfirmationUpload`, `FleetLoads` page, `ActiveLoadsBoard`, `UpcomingPickups`, `FleetTimelineScheduler`, `RapidCallModal`, `DriverLoadsView`, `ActiveLoadCard`, `NextLoadPreview`, `DriverDashboard`, `DriverSpectatorView`, `PublicLoadTracker`, `AgencyLoads`, `DispatcherDashboard`.
 
-## Files / changes
+## Schema migration (single migration call)
 
-### 1. New util — `src/lib/compress-image.ts`
-- `compressImage(file: File, opts?): Promise<File>` (returns the original `File` untouched when not an image, when SVG, or when already under the target).
-- Logic:
-  - Skip if `!file.type.startsWith('image/')` or `file.type === 'image/svg+xml'` or `file.size <= targetBytes` (default 800 KB) AND already JPEG/WebP.
-  - Decode with `createImageBitmap(file)` (fallback to `<img>` + `URL.createObjectURL`).
-  - Compute scaled dimensions so the longest edge ≤ 2400 px (configurable). Documents need readable text, so we cap at 2400 px instead of 1600 px.
-  - Draw to an `OffscreenCanvas` (fallback `HTMLCanvasElement`) with white background fill (preserves white-paper look when source is transparent PNG).
-  - Encode iteratively: start at quality 0.85, try `image/webp` first; if browser doesn't return a blob for webp, fall back to `image/jpeg`. If result > target, lower quality in steps of 0.1 down to 0.5; if still > target, scale dimensions down by 0.85 and retry (max 3 rescale loops).
-  - Re-wrap in `new File([blob], renamedToMatchMime, { type: blob.type, lastModified: file.lastModified })`. Original extension swapped to `.webp` / `.jpg`.
-  - On any failure, log and return the original `File` (never block an upload).
+```text
+fleet_loads / agency_loads
+  + pickup_at         timestamptz
+  + pickup_tz         text          -- IANA, e.g. 'America/Chicago'
+  + delivery_at       timestamptz
+  + delivery_tz       text
+  ( pickup_date / pickup_time / delivery_date / delivery_time kept for now —
+    dropped in a follow-up after one stable release )
 
-### 2. `src/hooks/useStorageProvider.ts`
-- Import `compressImage`.
-- At the top of `uploadFile`, replace the incoming `file` with `await compressImage(file)` only when it's a `File` (not a `Blob` without a name/type — those are already programmatic, e.g. signature pads, and must remain unchanged).
-- Covers: `useDocumentUpload`, onboarding paperwork, load/POD photos, smart load creator, rate confirmation, work-order attachments, anything else routed through `useStorageProvider`.
+organizations
+  + company_timezone  text          NOT NULL DEFAULT 'America/Chicago'
 
-### 3. Direct-upload call sites that bypass the helper
-Patch these to call `compressImage` before their direct `supabase.storage.from(...).upload(...)`:
-- `src/components/drivers/DriverBankingDetails.tsx` (voided check images — sensitive, compress at 80% quality only).
-- `src/components/settings/BrandingTab.tsx` (logo upload — already small typically; compression still applied for huge PNG drops).
-- `src/components/shared/BetaFeedbackWidget.tsx` (html2canvas screenshot — already a blob, but wrap in File and compress).
-- `src/pages/DriverOnboarding.tsx` and `src/pages/Onboarding.tsx` (any direct uploads found there during edit).
-- `src/components/driver/ProofOfDeliveryDialog.tsx` and `src/components/driver/PhotoCapture.tsx` (camera photos — biggest win).
-- `src/components/loads/SmartLoadCreator.tsx` and `src/components/loads/RateConfirmationUpload.tsx` (PDF inputs: skipped automatically; image inputs: compressed).
-- `src/components/maintenance/CompleteJobModal.tsx` and `src/components/crm/CarrierDocumentHub.tsx` (attachments).
-- `src/components/drivers/SignedOnboardingDocuments.tsx` (PDFs, will be auto-skipped).
+profiles
+  + time_display_pref text          NOT NULL DEFAULT 'company'
+                                    CHECK in ('company','local')
+```
 
-For each, the diff is one line: `const fileToUpload = await compressImage(file); ... upload(..., fileToUpload)`.
+No new tables, so no GRANT block needed; existing privileges carry over for ALTER TABLE.
 
-### 4. Loading state / spinner verification
-- `useDocumentUpload` already exposes `uploading`; consumers (`SignedOnboardingDocuments`, `CarrierDocumentHub`, etc.) already render a spinner from it. Compression runs inside the same `try` block, so the spinner naturally covers both phases.
-- For the inline call sites above, each already has a local `uploading`/`isSubmitting` flag — confirm it's set BEFORE `compressImage` and cleared AFTER the upload resolves. Update where the flag is currently set only around the network call.
-- `ProofOfDeliveryDialog` and `PhotoCapture`: add a small "Compressing image…" / "Uploading…" copy swap if not already present (use existing `<Loader2 className="animate-spin" />` patterns).
+## Backfill strategy (data migration)
 
-### 5. Validation
-- Drop a 6 MB phone photo into the Driver Onboarding paperwork upload → confirm spinner shows, network payload to `/storage/v1/object/documents/...` is ≤ ~1 MB, and the stored file opens with readable text in the viewer.
-- Upload a 200 KB scanned receipt → confirm it is left untouched (no quality loss, no extension change).
-- Upload a 2 MB PDF rate confirmation → confirm the util skips PDFs and uploads the original bytes.
-- Confirm Branding logo SVG upload is untouched (skipped).
-- POD photo from mobile camera → confirm WebP-encoded, < 800 KB, spinner displayed during compression + upload.
+Pragmatic, no external API: map US `state` (parsed from `origin` / `destination` text, e.g. `"Dallas, TX"` → `TX`) to its dominant IANA zone via a static lookup table embedded in the migration's PL/pgSQL function. The Tier-2 dual-zone states (TX, FL, ID, IN, KY, TN, ND, SD, NE, KS, OR, MI) default to their majority zone with a code-side note. Then:
+
+```text
+UPDATE fleet_loads
+  SET pickup_tz   = state_to_iana(origin),
+      delivery_tz = state_to_iana(destination),
+      pickup_at   = (pickup_date::text   || ' ' || COALESCE(pickup_time,'00:00'))::timestamp
+                      AT TIME ZONE state_to_iana(origin),
+      delivery_at = (delivery_date::text || ' ' || COALESCE(delivery_time,'00:00'))::timestamp
+                      AT TIME ZONE state_to_iana(destination)
+  WHERE pickup_date IS NOT NULL;
+```
+
+Same pattern for `agency_loads`. Rows whose origin/destination can't be parsed fall back to the org's `company_timezone`.
+
+## Shared client utility — `src/lib/datetime.ts`
+
+```text
+combineToUtc(dateStr, timeStr, ianaTz): string   // 'YYYY-MM-DD','HH:mm','America/Chicago' -> ISO UTC
+splitFromUtc(utcIso, ianaTz): { date, time }     // for editing
+formatStopTime(utcIso, stopTz, opts): {
+  primary: '08:00 CST',
+  secondary?: '06:00 PST'   // present when viewer's effective zone differs
+}
+useTimeDisplay(): {
+  mode: 'company' | 'local',
+  effectiveTz: string,        // companyTz when mode==='company', else browser zone
+  setMode: (m) => void
+}
+```
+
+Implemented with `Intl.DateTimeFormat` (`timeZoneName: 'short'`) — no new dependency. State/IANA map shared with the backfill.
+
+## UI changes
+
+### Header toggle
+Add a small pill toggle in `src/components/layouts/DashboardLayout.tsx` header (next to user menu): `Company Time | Local Time`. Persists to `profiles.time_display_pref` via a new context `TimeDisplayProvider` mounted inside `ProtectedRoute`.
+
+### Load creation forms
+`IndependentLoadBuilder`, `SmartLoadCreator` (manual edit step), `RateConfirmationUpload` (confirm step), and the FleetLoads inline form:
+- Add a `Timezone` dropdown next to each date/time field, auto-defaulted from the parsed state of the origin/destination (or org's `company_timezone` if unknown). Common US zones listed first, then full IANA list.
+- On save, send `pickup_at`/`delivery_at` (UTC ISO) and `pickup_tz`/`delivery_tz` instead of the legacy split fields. Legacy fields are also written (for the deprecation window) by deriving them back from the UTC + tz so any code still reading them works.
+
+### Display components
+Every place that currently renders `pickup_date` / `pickup_time` (and delivery) is replaced with `formatStopTime(load.pickup_at, load.pickup_tz)`. Output renders as:
+
+```text
+Mon, Jun 15 · 08:00 CST       (when mode === 'local' and viewer is in CST,
+                               OR mode === 'company' and company is CST)
+
+Mon, Jun 15 · 08:00 CST       (when mode === 'company', differing stop zone)
+              (06:00 your time)
+
+Mon, Jun 15 · 08:00 CST       (when mode === 'local', viewer in PST)
+              (10:00 PST)
+```
+
+Files updated: `ActiveLoadsBoard`, `ActiveLoadCard`, `UpcomingPickups`, `FleetTimelineScheduler`, `NextLoadPreview`, `DriverLoadsView`, `RapidCallModal`, `PublicLoadTracker`, `AgencyLoads`, `FleetLoads`, `DispatcherDashboard`, `DriverDashboard`, `DriverSpectatorView`.
+
+### Settings
+Add `Company Timezone` selector to the existing org settings → Company tab. Defaults to `America/Chicago`. Owners only.
+
+## Detail-level technical notes
+
+- All `combineToUtc` calls use `date-fns-tz`'s `zonedTimeToUtc` (already common in the React ecosystem; add the single dep `date-fns-tz`).
+- `formatStopTime` calls `Intl.DateTimeFormat(undefined, { timeZone: stopTz, hour:'2-digit', minute:'2-digit', timeZoneName:'short' })` — abbreviations come from the runtime so they're always correct for the date (handles DST transitions automatically).
+- The header toggle's selected mode is also persisted in `localStorage` (`time-display-mode`) so the first paint after reload is correct before the profile fetch resolves.
+- The Core memory rule `Append 'T00:00:00' to 'YYYY-MM-DD' before parsing to prevent timezone shifting` still applies for pure date fields (delivery date with no time); the new util respects it.
+- Edge functions that send broker status emails (`email-load-status`) currently include `pickup_date`/`pickup_time` strings — switched to formatted `pickup_at + pickup_tz` so brokers see `"08:00 CST"` consistently.
+
+## Validation
+
+- Create a new load in IndependentLoadBuilder with pickup `Dallas, TX 08:00` and delivery `Los Angeles, CA 14:00`. Confirm DB row stores `pickup_at = 2026-06-15T13:00:00Z` and `pickup_tz = 'America/Chicago'`; delivery `21:00Z` / `America/Los_Angeles`.
+- View it as a Central-time dispatcher with toggle = Company: `08:00 CST` / `14:00 PDT (16:00 your time)`.
+- Switch toggle → Local: `08:00 CST (06:00 your time)` / `14:00 PDT`.
+- Open as a PST driver: pickup shows `08:00 CST (06:00 PDT)`.
+- Refresh the page during a DST transition window (March test): confirm abbreviation flips `CST` ↔ `CDT` automatically.
+- Backfilled historical loads display with their original wall-clock unchanged and a TZ label.
 
 ## Out of scope
-- No server-side recompression / edge function changes.
-- No changes to view/download paths (existing signed URL logic unchanged).
-- No bucket-level changes (existing private buckets continue to enforce RLS).
+
+- Mid-stop timezone changes (a load that crosses an additional waypoint with a different zone is still represented by just pickup_tz + delivery_tz).
+- Per-driver default timezone (drivers inherit the viewer rule above).
+- Dropping the legacy `pickup_date`/`pickup_time` columns — left for a follow-up cleanup migration after one release of dual-writing.
