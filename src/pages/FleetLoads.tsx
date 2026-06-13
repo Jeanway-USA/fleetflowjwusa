@@ -55,6 +55,7 @@ interface Accessorial {
   amount: number;
   percentage: number;
   notes?: string;
+  is_driver_pay: boolean;
 }
 import { format, parseISO } from 'date-fns';
 
@@ -148,6 +149,7 @@ export default function FleetLoads() {
           amount: acc.amount,
           percentage: acc.percentage,
           notes: acc.notes,
+          is_driver_pay: acc.is_driver_pay,
         }));
         const { error: accError } = await supabase.from('load_accessorials').insert(accessorialRecords);
         if (accError) throw accError;
@@ -181,6 +183,7 @@ export default function FleetLoads() {
           amount: acc.amount,
           percentage: acc.percentage,
           notes: acc.notes,
+          is_driver_pay: acc.is_driver_pay,
         }));
         const { error: accError } = await supabase.from('load_accessorials').insert(accessorialRecords);
         if (accError) throw accError;
@@ -228,6 +231,7 @@ export default function FleetLoads() {
           amount: Number(a.amount) || 0,
           percentage: Number(a.percentage) || 100,
           notes: a.notes,
+          is_driver_pay: a.is_driver_pay !== false,
         })));
       } else {
         setAccessorials([]);
@@ -268,7 +272,7 @@ export default function FleetLoads() {
 
   // Accessorial management
   const addAccessorial = () => {
-    setAccessorials([...accessorials, { accessorial_type: 'Detention', amount: 0, percentage: 100 }]);
+    setAccessorials([...accessorials, { accessorial_type: 'Detention', amount: 0, percentage: 100, is_driver_pay: true }]);
   };
 
   const removeAccessorial = (index: number) => {
