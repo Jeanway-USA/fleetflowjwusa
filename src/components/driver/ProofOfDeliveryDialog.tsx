@@ -135,7 +135,11 @@ export function ProofOfDeliveryDialog({
         delivery_date: format(new Date(), 'yyyy-MM-dd'),
         pod_signature_path: !sigUploadError ? sigPath : null,
         pod_transflo_link: transfloLink.trim() || null,
+        end_miles: parsedEnd,
       };
+      if (hasStart) {
+        updateData.actual_miles = parsedEnd - (startMiles as number);
+      }
 
       if (deliveryNotes) {
         const { data: currentLoad } = await supabase
