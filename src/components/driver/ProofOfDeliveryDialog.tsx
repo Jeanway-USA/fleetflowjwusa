@@ -180,6 +180,7 @@ export function ProofOfDeliveryDialog({
       });
 
       toast.success('Delivery confirmed! POD captured successfully.');
+      commit();
 
       // Cleanup
       setSignatureDataUrl(null);
@@ -191,7 +192,9 @@ export function ProofOfDeliveryDialog({
       onComplete();
     } catch (error: any) {
       console.error('POD submission error:', error);
-      toast.error('Failed to submit proof of delivery: ' + error.message);
+      // Revert the optimistic status flip and show the friendly retry toast.
+      rollback({ silent: true });
+      toast.error(NETWORK_ERROR_TOAST);
     } finally {
       setIsSubmitting(false);
     }
