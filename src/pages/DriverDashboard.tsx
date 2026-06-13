@@ -22,6 +22,7 @@ import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { Loader2, Sun, Moon, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/shared/ThemeToggle';
 
 const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboard(_, _ref) {
   const { user } = useAuth();
@@ -159,6 +160,7 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
             {greeting}, {driver.first_name}
           </h1>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleRefresh} disabled={isRefreshing}>
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </Button>
