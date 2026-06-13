@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizationMode } from '@/hooks/useOrganizationMode';
 import { Building2, Landmark, Banknote } from 'lucide-react';
 import { DetentionRulesCard } from './DetentionRulesCard';
+import { OverDimensionRulesCard } from './OverDimensionRulesCard';
 
 export function CompanyTab() {
   const { orgId, orgName, refreshOrgData, isDemoMode } = useAuth();
@@ -316,6 +317,7 @@ export function CompanyTab() {
       )}
 
       <DetentionRulesCard />
+      <OverDimensionRulesCard />
     </div>
   );
 }
