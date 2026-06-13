@@ -191,17 +191,25 @@ export function DispatcherAlerts() {
         .from('fleet_loads')
         .select(`
           id, status, origin, destination, trailer_id,
-          driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
-          trailer:trailers!fleet_loads_trailer_id_fkey(trailer_type, unit_number)
+          driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name)
         `)
         .in('status', ARRIVAL_STATUSES as unknown as string[]);
 
-      const { data: detentionRules } = await supabase
-        .from('detention_rules')
-        .select('trailer_type, free_time_minutes, hourly_rate');
+      const [{ data: detentionRules }, { data: trailerRows }] = await Promise.all([
+        supabase.from('detention_rules').select('trailer_type, free_time_minutes, hourly_rate'),
+        activeArrivals && activeArrivals.length > 0
+          ? supabase
+              .from('trailers')
+              .select('id, trailer_type, unit_number')
+              .in('id', activeArrivals.map((l: any) => l.trailer_id).filter(Boolean))
+          : Promise.resolve({ data: [] as any[] } as any),
+      ]);
 
       const ruleByType = new Map<string, { free_time_minutes: number; hourly_rate: number }>(
         (detentionRules ?? []).map((r: any) => [r.trailer_type, r])
+      );
+      const trailerById = new Map<string, { trailer_type: string; unit_number: string }>(
+        (trailerRows ?? []).map((t: any) => [t.id, t])
       );
 
       if (activeArrivals && activeArrivals.length > 0) {
@@ -223,7 +231,7 @@ export function DispatcherAlerts() {
         activeArrivals.forEach((load: any) => {
           const start = startedAt.get(load.id);
           if (!start) return;
-          const trailerType = (load.trailer as any)?.trailer_type as string | undefined;
+          const trailerType = load.trailer_id ? trailerById.get(load.trailer_id)?.trailer_type : undefined;
           const rule = trailerType ? ruleByType.get(trailerType) : undefined;
           if (!rule || rule.free_time_minutes <= 0) return;
 
@@ -245,6 +253,7 @@ export function DispatcherAlerts() {
           });
         });
       }
+
 
 
 
