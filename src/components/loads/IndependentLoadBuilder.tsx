@@ -243,13 +243,11 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
                   <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
                   Linehaul Rate ($)
                 </Label>
-                <Input
+                <CurrencyInput
                   id="linehaul"
-                  type="number"
-                  step="0.01"
                   value={linehaul}
-                  onChange={(e) => setLinehaul(e.target.value)}
-                  placeholder="2,450.00"
+                  onChange={setLinehaul}
+                  placeholder="0.00"
                 />
               </div>
               <div className="space-y-2">
@@ -257,12 +255,10 @@ export function IndependentLoadBuilder({ onSave, onCancel, initialData }: Indepe
                   <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
                   Accessorial Pay ($)
                 </Label>
-                <Input
+                <CurrencyInput
                   id="accessorial_pay"
-                  type="number"
-                  step="0.01"
                   value={accessorialPay}
-                  onChange={(e) => setAccessorialPay(e.target.value)}
+                  onChange={setAccessorialPay}
                   placeholder="0.00"
                 />
               </div>
