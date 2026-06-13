@@ -25,6 +25,10 @@ import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { getRelativeTimestamp } from './RelativeTimestamp';
 import { calculateLoadPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
+import { StartingOdometerDialog } from './StartingOdometerDialog';
+import { EndingOdometerDialog } from './EndingOdometerDialog';
+import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
+import { useAuth as useAuthForDriverId } from '@/contexts/AuthContext';
 
 // Status progression for drivers
 const STATUS_PROGRESSION: Record<string, string> = {
