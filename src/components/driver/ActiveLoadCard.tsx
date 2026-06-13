@@ -15,7 +15,7 @@ import { EndingOdometerDialog } from './EndingOdometerDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOfflineQueue } from '@/hooks/useOfflineQueue';
-import { useOptimisticLoadStatus, NETWORK_ERROR_TOAST } from '@/hooks/useOptimisticLoadStatus';
+import { useOptimisticLoadStatus } from '@/hooks/useOptimisticLoadStatus';
 import { getRelativeTimestamp } from './RelativeTimestamp';
 import { calculateLoadPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
