@@ -94,8 +94,9 @@ export function DetentionRulesCard() {
           <div className="space-y-3">
             <div className="hidden sm:grid grid-cols-12 gap-3 text-xs font-medium text-muted-foreground px-1">
               <div className="col-span-4">Trailer Type</div>
-              <div className="col-span-4">Free Time (minutes)</div>
-              <div className="col-span-4">Hourly Rate ($)</div>
+              <div className="col-span-3">Free Time (min)</div>
+              <div className="col-span-2">$/Hr</div>
+              <div className="col-span-3">Max $/24h (cap)</div>
             </div>
             {rows.map((r, idx) => (
               <div key={r.id} className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-3 rounded-lg bg-muted/40">
@@ -103,7 +104,7 @@ export function DetentionRulesCard() {
                   <Label className="sm:hidden text-xs">Trailer Type</Label>
                   <div className="font-medium pt-1">{r.trailer_type}</div>
                 </div>
-                <div className="sm:col-span-4 space-y-1">
+                <div className="sm:col-span-3 space-y-1">
                   <Label className="sm:hidden text-xs">Free Time (min)</Label>
                   <Input
                     type="number"
@@ -113,14 +114,25 @@ export function DetentionRulesCard() {
                     className="pl-4 sm:pl-3 h-12"
                   />
                 </div>
-                <div className="sm:col-span-4 space-y-1">
-                  <Label className="sm:hidden text-xs">Hourly Rate ($)</Label>
+                <div className="sm:col-span-2 space-y-1">
+                  <Label className="sm:hidden text-xs">$/Hr</Label>
                   <Input
                     type="number"
                     min={0}
                     step="0.01"
                     value={r.hourly_rate}
                     onChange={(e) => update(idx, 'hourly_rate', parseFloat(e.target.value || '0'))}
+                    className="pl-4 sm:pl-3 h-12"
+                  />
+                </div>
+                <div className="sm:col-span-3 space-y-1">
+                  <Label className="sm:hidden text-xs">Max $/24h (0 = no cap)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={r.max_charge_per_day}
+                    onChange={(e) => update(idx, 'max_charge_per_day', parseFloat(e.target.value || '0'))}
                     className="pl-4 sm:pl-3 h-12"
                   />
                 </div>
