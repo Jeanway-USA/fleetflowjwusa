@@ -74,6 +74,15 @@ export function ProofOfDeliveryDialog({
 
     setIsSubmitting(true);
 
+    // Optimistically flip the load to delivered on the driver dashboard
+    // so the UI feels instant even on flaky cell. We commit/rollback below.
+    const optimisticPatch: Record<string, unknown> = {
+      status: 'delivered',
+      end_miles: parsedEnd,
+    };
+    if (hasStart) optimisticPatch.actual_miles = parsedEnd - (startMiles as number);
+    const { commit, rollback } = applyOptimistic(loadId, optimisticPatch);
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
