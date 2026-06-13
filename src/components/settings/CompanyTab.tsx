@@ -45,58 +45,6 @@ export function CompanyTab() {
     }
   };
 
-  // Monthly bonus goal
-  const [bonusGoalMiles, setBonusGoalMiles] = useState('12000');
-  const [isSavingBonusGoal, setIsSavingBonusGoal] = useState(false);
-
-  const { data: bonusGoalSetting } = useQuery({
-    queryKey: ['company-setting', 'monthly_bonus_miles'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('company_settings')
-        .select('*')
-        .eq('setting_key', 'monthly_bonus_miles')
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  useEffect(() => {
-    if (bonusGoalSetting?.setting_value) {
-      setBonusGoalMiles(bonusGoalSetting.setting_value);
-    }
-  }, [bonusGoalSetting]);
-
-  const handleSaveBonusGoal = async () => {
-    const miles = Number(bonusGoalMiles);
-    if (!miles || miles <= 0) {
-      toast.error('Please enter a valid number of miles');
-      return;
-    }
-    setIsSavingBonusGoal(true);
-    try {
-      const { error } = await supabase
-        .from('company_settings')
-        .upsert(
-          {
-            setting_key: 'monthly_bonus_miles',
-            setting_value: String(miles),
-            description: 'Monthly miles goal for driver bonus',
-            org_id: orgId,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'setting_key,org_id' }
-        );
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['company-setting', 'monthly_bonus_miles'] });
-      toast.success('Bonus goal updated');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to save bonus goal');
-    } finally {
-      setIsSavingBonusGoal(false);
-    }
-  };
 
   // DOT/MC state for independent mode
   const [dotNumber, setDotNumber] = useState('');
