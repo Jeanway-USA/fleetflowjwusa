@@ -314,6 +314,8 @@ export function CompanyTab() {
           </CardContent>
         </Card>
       )}
+
+      <DetentionRulesCard />
     </div>
   );
 }
