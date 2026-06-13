@@ -138,7 +138,8 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
   const [showWelcome, setShowWelcome] = useState(false);
   const [tourFlagLoaded, setTourFlagLoaded] = useState(false);
   const [hasSeenTour, setHasSeenTour] = useState<boolean | null>(null);
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+  const isDriverRole = hasRole('driver');
   const autoStartedRef = useRef(false);
 
   // Persist tour completion server-side so it doesn't re-trigger on other devices.
@@ -310,6 +311,11 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
             )}
             <div className="flex-1" />
             <TimeDisplayToggle />
+            {isDriverRole && (
+              <ErrorBoundary compact>
+                <DriverMessages />
+              </ErrorBoundary>
+            )}
             <Button
               variant="outline"
               size="sm"
