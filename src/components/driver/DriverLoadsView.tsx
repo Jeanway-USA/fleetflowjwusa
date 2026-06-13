@@ -121,6 +121,8 @@ interface Load {
   fuel_surcharge: number | null;
   notes: string | null;
   driver_id: string | null;
+  start_miles?: number | null;
+  end_miles?: number | null;
 }
 
 interface DriverLoadCardProps {
