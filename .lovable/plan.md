@@ -1,28 +1,51 @@
-# Fix Messages Drawer Header Clipping (Local-Only)
+# Global Sheet Layout Audit — Apply Safe Flex Pattern
 
-## Root cause
-The global `SheetHeader` in `src/components/ui/sheet.tsx` bakes in negative offsets and a sticky overlay (`-mx-6 -mt-6 px-6 pt-6 pr-12 sticky top-0 z-10 bg-background`) intended to work with the default `p-6` `SheetContent` padding. The Messages drawers (`DriverChatSheet` and `DriverMessages`) intentionally override `SheetContent` with `p-0 flex flex-col overflow-hidden` to build a header / scroll-body / composer layout. The header's `-mt-6` then pulls it up over the first row of the conversation list, and `-mx-6` makes it bleed beyond the panel — producing the visible overlap with the X close button and first item.
+## Goal
+Refactor every Sheet consumer (except the excluded chat components and the core `ui/sheet.tsx`) to follow one consistent layout pattern so the `SheetHeader` and close X can never overlap body content, and long bodies always scroll inside their own region.
 
-Per the constraint, `src/components/ui/sheet.tsx` will NOT be touched. The fix lives entirely inside the driver messaging components.
+## Safe layout pattern (applied to each file)
+Inside `<SheetContent>`:
 
-## Files to edit (local only)
+```text
+<SheetContent className="... flex flex-col p-0 gap-0">
+  <SheetHeader className="shrink-0 px-6 pt-6 pb-4 pr-12 border-b">
+    <SheetTitle/> <SheetDescription/>
+  </SheetHeader>
+  <div className="flex-1 overflow-y-auto px-6 py-4">
+    {body / form / list}
+  </div>
+  {optional} <SheetFooter className="shrink-0 border-t px-6 py-4"/>
+</SheetContent>
+```
 
-### 1. `src/components/driver/DriverMessages.tsx`
-- Replace the `<SheetHeader>` wrapper with a plain `<div>` acting as a static, in-flow header:
-  - Classes: `shrink-0 px-5 pt-5 pb-4 pr-12 border-b border-border bg-background` (the `pr-12` reserves space for the absolute X close button rendered by `SheetContent`; `shrink-0` keeps it out of the flex shrink calculation so the conversation list cannot ride up under it).
-- Keep `<SheetTitle>` inside that div for accessibility (Radix requires it inside `SheetContent`).
-- Remove the `SheetHeader` import (leave `SheetTitle`).
-- Leave the conversation `<ul>` / thread body untouched — its parent already has `flex-1 overflow-y-auto`, which now correctly starts below the static header.
+Key rules:
+- `SheetContent` itself becomes the flex column (`flex flex-col p-0 gap-0`). We override the default `p-6` so the sticky header from `ui/sheet.tsx` no longer needs negative-margin bleed to clear the close button — we instead provide our own padding inside each region.
+- `SheetHeader` keeps the global sticky styles, plus local `shrink-0 pr-12` to reserve room for the absolute X button.
+- All scrollable content lives in a single `flex-1 overflow-y-auto` div so it cannot ride under the header.
+- Existing `overflow-y-auto` on `SheetContent` is removed (would conflict with `flex-1` child).
 
-### 2. `src/components/drivers/DriverChatSheet.tsx`
-Same change: swap `<SheetHeader>` for a `<div className="shrink-0 px-5 pt-5 pb-4 pr-12 border-b border-border bg-background">` containing the existing avatar + `SheetTitle` markup. Drop the `SheetHeader` import.
+## Files to update
 
-## What stays the same
-- `src/components/ui/sheet.tsx` and every other consumer of `SheetHeader` are untouched.
-- `SheetContent` still owns the absolute X close button and the outer flex column.
-- The message list still scrolls independently; the composer stays pinned at the bottom.
+1. `src/components/crm/ContactDetailSheet.tsx` — wrap the tabs/details body in `flex-1 overflow-y-auto`; switch `SheetContent` to flex column with `p-0`.
+2. `src/components/drivers/DriverDetailSheet.tsx` — already has `flex flex-col overflow-y-auto`; move `overflow-y-auto` off `SheetContent` onto a new inner `flex-1` wrapper around the existing body.
+3. `src/components/superadmin/AuditLogDetailSheet.tsx` — move `overflow-y-auto` from `SheetContent` to inner `flex-1` body wrapper.
+4. `src/components/superadmin/OrgDetailSheet.tsx` — same refactor.
+5. `src/components/maintenance/NewWorkOrderSheet.tsx` — large form; wrap form body in `flex-1 overflow-y-auto`, keep `SheetFooter` as static `shrink-0`.
+6. `src/components/maintenance/TruckHistoryDrawer.tsx` — wrap tabs/history body in `flex-1 overflow-y-auto`.
+7. `src/components/finance/SettlementsTab.tsx` — already uses `p-0` with `overflow-y-auto`; restructure into header / `flex-1 overflow-y-auto` body.
+8. `src/components/settings/TeamManagementTab.tsx` — switch to flex column, body scroll, footer pinned via `shrink-0`.
+9. `src/components/driver/DriverRequestsCard.tsx` — bottom sheet: keep `max-h-[90vh]`, switch to `flex flex-col`, body in `flex-1 overflow-y-auto`.
+10. `src/pages/Incidents.tsx` — detail sheet: same refactor (move scroll off `SheetContent`).
+11. `src/pages/MaintenanceManagement.tsx` — sidebar sheet already uses `p-0` + sr-only header; only ensure `flex flex-col h-full` so the embedded `<AppSidebar/>` fills available height.
+
+## Explicitly excluded
+- `src/components/ui/sheet.tsx` (per constraint)
+- `src/components/driver/DriverMessages.tsx` and `src/components/drivers/DriverChatSheet.tsx` (custom fix already applied)
+- `src/pages/Landing.tsx` (mobile nav menu — no header/scrollable body issue)
 
 ## Validation
-1. Open the Drivers page → click message on a driver row → `DriverChatSheet` opens. Header sits flush at the top, X button is fully clickable, first message and avatar are 100% visible, conversation scrolls under a static header, composer pinned at bottom.
-2. From the Driver Dashboard top bar → open Messages icon → `DriverMessages` opens. The first conversation row in the list is fully visible (not clipped by the header), list scrolls cleanly, opening a thread keeps the same correct layout.
-3. Spot-check one unrelated sheet (e.g. `NewWorkOrderSheet`, `AuditLogDetailSheet`) to confirm nothing regressed — they still use the global `SheetHeader` with default `SheetContent` padding.
+Open each affected sheet in the preview, verify:
+- Title and X button are fully visible and unclipped.
+- Long content scrolls inside the body while header stays pinned.
+- Footers (NewWorkOrder, TeamManagement) stay pinned at the bottom.
+- No layout regressions on `sm:max-w-*` widths or `side="bottom"` variants.
