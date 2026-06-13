@@ -1,96 +1,70 @@
 ## Goal
 
-Capture freight dimensions (Height, Width, Length) on each load. Compare against legal limits (13'6" H, 8'6" W, 70' L). Apply the corresponding Landstar Rule 670 Table A cents-per-mile surcharge to the load's mileage and auto-post the result as a **Company** accessorial (not driver pay).
+Add a compliance-tracked In-Bond / international shipment workflow (Landstar Rule 480): flag the load, capture the CF 7512 number, warn the driver, and auto-bill the Rule 480 fee as a Company accessorial.
 
 ## What gets built
 
 ### 1. Database migration
 
-**`fleet_loads` — add dimension columns**
-- `height_inches integer` — load height in inches
-- `width_inches integer` — load width in inches
-- `length_inches integer` — load length in inches
-- `is_over_dimension boolean` (generated/derived in code, not stored — computed from the three above)
+**`fleet_loads` — new columns**
+- `is_in_bond boolean NOT NULL DEFAULT false`
+- `cf_7512_number text` — Customs Form 7512 number; only required when `is_in_bond = true`
 
-**Driver column guardrail (`enforce_driver_fleet_loads_column_restrictions`)** — block drivers from changing dimension fields.
+**Validation trigger `enforce_in_bond_requires_cf7512`** (BEFORE INSERT/UPDATE on `fleet_loads`): raises a `42501` error if `is_in_bond = true` and `cf_7512_number` is null/blank. Server-side guard so the CF number is genuinely mandatory.
 
-**New table `over_dimension_rules` (per-org, editable Rule 670 Table A)**
-- `id`, `org_id`, `dimension` (`'height' | 'width' | 'length'`), `min_inches int`, `max_inches int NULL` (NULL = unlimited), `cents_per_mile numeric`, `sort_order int`, `created_at`, `updated_at`
-- UNIQUE(`org_id`, `dimension`, `min_inches`)
-- Standard RLS: same-org SELECT, admin-only write. GRANT to authenticated + service_role. `set_over_dimension_rules_org_id` BEFORE INSERT trigger. `update_updated_at_column` trigger.
-- Seed defaults for every existing org and inside `create_onboarding_org`:
+**Driver guardrail update** (`enforce_driver_fleet_loads_column_restrictions`): block drivers from flipping `is_in_bond` or editing `cf_7512_number`.
 
-  | Dimension | Range (over legal limit)         | CPM   |
-  |-----------|----------------------------------|-------|
-  | Height    | 13'7"–14'0" (163–168 in)         | $0.10 |
-  | Height    | 14'1"–14'6" (169–174 in)         | $0.20 |
-  | Height    | 14'7"–15'0" (175–180 in)         | $0.40 |
-  | Height    | > 15'0" (181+ in)                | $0.75 |
-  | Width     | 8'7"–10'0" (103–120 in)          | $0.10 |
-  | Width     | 10'1"–12'0" (121–144 in)         | $0.20 |
-  | Width     | 12'1"–14'0" (145–168 in)         | $0.40 |
-  | Width     | > 14'0" (169+ in)                | $0.75 |
-  | Length    | 70'1"–85'0" (841–1020 in)        | $0.10 |
-  | Length    | 85'1"–95'0" (1021–1140 in)       | $0.20 |
-  | Length    | 95'1"–105'0" (1141–1260 in)      | $0.40 |
-  | Length    | > 105'0" (1261+ in)              | $0.75 |
+**Accessorial catalog seed**: add `'In-Bond Fee (Rule 480)'` with `default_is_driver_pay = false, sort_order = 170` for every existing org and inside `create_onboarding_org`.
 
-  *(Defaults are seeded so the user can edit them later in Settings; the legal limits 13'6"/8'6"/70' are hard-coded constants — anything below the first band's `min_inches` is "legal" and produces zero surcharge.)*
+**Org-level fee setting**: add a single `company_settings` row per existing org with `setting_key = 'in_bond_fee'`, `setting_value = '100'` (default $100, editable in Settings).
 
-### 2. Calculation utility — `src/utils/overDimension.ts`
+### 2. Settings UI
 
-```text
-calcOverDimensionCharge({ height_in, width_in, length_in, miles, rules }) → {
-  height_cpm, width_cpm, length_cpm,        // matched CPMs
-  total_cpm,                                 // sum
-  charge_amount,                             // total_cpm * miles
-  breakdown: [{ dimension, value_in, cpm, miles, subtotal }]
-}
+In **Settings → Company → Detention/Over-Dim section**, append a small "In-Bond (Rule 480)" card with one editable currency input — the default fee that gets auto-added when a load is flagged In-Bond. Saves via `company_settings` upsert.
+
+### 3. Load edit dialog (`src/pages/FleetLoads.tsx`)
+
+In the existing "Revenue" tab next to the Power Only checkbox (or grouped above the Dimensions section on Details — placed on Details for visibility):
+
+- **Checkbox** "In-Bond / International Shipment (Rule 480)" → toggles `formData.is_in_bond`.
+- When checked, an inline required text input appears for **CF 7512 Number** with `maxLength=64` and zod-validated on submit (`z.string().trim().min(1).max(64)`).
+- Submit blocks with a toast if In-Bond is checked but CF 7512 is empty.
+- On save flow (same pattern as the existing Over-Dimension auto-accessorial):
+  - Strip any prior auto In-Bond rows (matched by `accessorial_type = 'In-Bond Fee (Rule 480)'` AND `notes` starts with `Auto:`).
+  - If `is_in_bond = true`, append one new auto row:
+    - `accessorial_type = 'In-Bond Fee (Rule 480)'`
+    - `amount = <in_bond_fee from company_settings>` (default 100)
+    - `percentage = 100`, `is_driver_pay = false`
+    - `notes = "Auto: Rule 480 fee · CF 7512 #{number}"`
+
+### 4. Driver dashboard warning
+
+**`src/components/driver/ActiveLoadCard.tsx`** — extend `Load` interface with `is_in_bond` and `cf_7512_number`. When `load.is_in_bond` is true, render a prominent destructive-styled banner at the top of the card (above the colored status bar):
+
 ```
-- Resolves miles from `actual_miles ?? booked_miles ?? 0`.
-- Returns `charge_amount = 0` and an empty breakdown when no dimension exceeds its legal limit.
-- Unit-tested in `src/utils/overDimension.test.ts` (legal load → $0, 14' tall × 500 mi → $50, multi-dimension oversize, missing miles → $0).
+🚨 IN-BOND SHIPMENT — DO NOT BREAK SEAL
+CF 7512: <number>
+```
 
-### 3. FleetLoads UI
+Use existing destructive design tokens (`bg-destructive/15 text-destructive border-destructive/40`) for the banner; keep it semantic, not hardcoded colors.
 
-**Load edit dialog — new "Dimensions" section on the Details tab** (above Empty Miles):
-- Three inputs accepting feet + inches (e.g. `13 ft`, `6 in`) that store as total inches. Component: `<FeetInchesInput />` (new, `src/components/shared/FeetInchesInput.tsx`).
-- Inline badge: **"Legal"** (green) or **"Over-Dimension — +$X.XX/mi"** (warning) with a tooltip listing matched bands per dimension.
+Also surface a small "IN-BOND" badge on the FleetLoads list row for dispatchers, next to the status pill.
 
-**Load save flow (`createMutation` and `updateMutation`)**:
-- After the load is saved, run `calcOverDimensionCharge`. If `charge_amount > 0`:
-  - Remove any existing auto-generated Rule 670 accessorial rows for this load (matched by `accessorial_type = 'Over-Dimension (Rule 670)'` and `notes LIKE 'Auto-generated …'`).
-  - Insert one new `load_accessorials` row:
-    - `accessorial_type = 'Over-Dimension (Rule 670)'`
-    - `amount = charge_amount`, `percentage = 100`
-    - `is_driver_pay = false` (Company)
-    - `notes = "Auto: H {h}\" → $X/mi, W {w}\" → $X/mi, L {l}\" → $X/mi × {miles} mi"`
-- If `charge_amount === 0`, remove any prior auto rows for this load (dimensions were brought back into spec).
-- Manually edited Over-Dimension rows are preserved by matching the `notes LIKE 'Auto:%'` filter.
+### 5. Load list query
 
-### 4. Accessorial catalog
-
-In the same migration, seed `'Over-Dimension (Rule 670)'` with `default_is_driver_pay = false, sort_order = 160` for every existing org and inside `create_onboarding_org` so the type also shows up in the manual accessorial dropdown.
-
-### 5. Settings UI
-
-New `OverDimensionRulesCard` mounted in **Settings → Company** (under DetentionRulesCard).
-- Table of all `over_dimension_rules` for the org, grouped by dimension.
-- Edit CPM and inch ranges inline; Save persists.
-- Read-only legal-limit note: "Legal: 13'6" H × 8'6" W × 70' L".
+Extend the `select(...)` calls (FleetLoads, Driver Dashboard active-load fetch) so the new columns flow through.
 
 ## Files
 
-- `supabase/migrations/<ts>_over_dimension_rule_670.sql` — columns, table, RLS, GRANTs, triggers, seed, `create_onboarding_org` update, guardrail update, accessorial-type seed
-- `src/utils/overDimension.ts` (new) + `src/utils/overDimension.test.ts` (new)
-- `src/components/shared/FeetInchesInput.tsx` (new)
-- `src/components/settings/OverDimensionRulesCard.tsx` (new)
+- `supabase/migrations/<ts>_in_bond_rule_480.sql` — columns, validation trigger, driver guardrail update, accessorial seed, `create_onboarding_org` update, `in_bond_fee` settings seed
+- `src/pages/FleetLoads.tsx` — checkbox + CF 7512 input, zod validation, auto-accessorial sync, list badge
+- `src/components/driver/ActiveLoadCard.tsx` — In-Bond banner + interface fields
+- `src/components/settings/InBondFeeCard.tsx` (new) — fee config card
 - `src/components/settings/CompanyTab.tsx` — mount the new card
-- `src/pages/FleetLoads.tsx` — dimensions section, save-time auto-accessorial sync
 - `src/integrations/supabase/types.ts` — regenerates after migration
 
 ## Out of scope (flag for follow-up)
 
-- Per-mile billing for **deadhead/empty** miles (Rule 670 sometimes excludes empties; current pass uses loaded miles only via `actual_miles ?? booked_miles`).
-- Permits/escort fees — those are separate Landstar tariffs and remain a manual accessorial.
-- Tier-gating the Settings card behind subscription tier — left open as-is.
+- Customs broker contact storage / document upload (PARS/PAPS labels, manifest PDF).
+- Border-crossing GPS milestones / customs clearance status tracking.
+- Variable In-Bond fees per lane or per customer — single org-wide flat fee for v1.
