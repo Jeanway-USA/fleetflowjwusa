@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, Send, Loader2, ArrowLeft } from 'lucide-react';
+import { MessageSquare, Send, Loader2, ArrowLeft, Check, CheckCheck } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,9 +47,27 @@ export function DriverMessages() {
   const me = user?.id ?? null;
 
   const [open, setOpen] = useState(false);
+  const openRef = useRef(open);
+  useEffect(() => { openRef.current = open; }, [open]);
   const [activeCounterpart, setActiveCounterpart] = useState<string | null>(null);
+  const activeCounterpartRef = useRef(activeCounterpart);
+  useEffect(() => { activeCounterpartRef.current = activeCounterpart; }, [activeCounterpart]);
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Lazy-init notification chime (client only)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const a = new Audio('/sounds/message-chime.mp3');
+      a.preload = 'auto';
+      a.volume = 0.6;
+      audioRef.current = a;
+    } catch {
+      audioRef.current = null;
+    }
+  }, []);
 
   // ---------- Unread badge count ----------
   const unreadQueryKey = useMemo(() => ['driver-msgs-unread', me], [me]);
@@ -186,27 +204,53 @@ export function DriverMessages() {
   useEffect(() => {
     if (!me) return;
     return safeChannel(`driver-msgs-${me}`, (ch) =>
-      ch.on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `receiver_id=eq.${me}`,
-        },
-        (payload) => {
-          const m = payload.new as Message;
-          queryClient.invalidateQueries({ queryKey: unreadQueryKey });
-          queryClient.invalidateQueries({ queryKey: threadsKey });
-          if (open && activeCounterpart && m.sender_id === activeCounterpart) {
-            queryClient.setQueryData<Message[]>(threadKey, (prev = []) =>
-              prev.some((x) => x.id === m.id) ? prev : [...prev, m],
-            );
-          }
-        },
-      ),
+      ch
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `receiver_id=eq.${me}`,
+          },
+          (payload) => {
+            const m = payload.new as Message;
+            queryClient.invalidateQueries({ queryKey: unreadQueryKey });
+            queryClient.invalidateQueries({ queryKey: threadsKey });
+            const isOpen = openRef.current;
+            const activeCp = activeCounterpartRef.current;
+            if (isOpen && activeCp && m.sender_id === activeCp) {
+              queryClient.setQueryData<Message[]>(
+                ['driver-msgs-thread', me, activeCp],
+                (prev = []) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]),
+              );
+            } else {
+              // Chat closed (or different thread) — play chime; ignore autoplay errors
+              audioRef.current?.play().catch(() => { /* autoplay blocked */ });
+            }
+          },
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `sender_id=eq.${me}`,
+          },
+          (payload) => {
+            const m = payload.new as Message;
+            const activeCp = activeCounterpartRef.current;
+            if (activeCp && m.receiver_id === activeCp) {
+              queryClient.setQueryData<Message[]>(
+                ['driver-msgs-thread', me, activeCp],
+                (prev = []) => prev.map((x) => (x.id === m.id ? { ...x, is_read: m.is_read } : x)),
+              );
+            }
+          },
+        ),
     );
-  }, [me, open, activeCounterpart, queryClient, unreadQueryKey, threadsKey, threadKey]);
+  }, [me, queryClient, unreadQueryKey, threadsKey]);
 
   // ---------- Send ----------
   const sendMutation = useMutation({
@@ -357,9 +401,24 @@ export function DriverMessages() {
                         >
                           {m.content}
                         </div>
-                        <span className="text-[10px] text-muted-foreground mt-1 px-1">
-                          {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
-                        </span>
+                        <div className="flex items-center gap-1 mt-1 px-1">
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
+                          </span>
+                          {mine && (
+                            m.is_read ? (
+                              <span className="flex items-center gap-0.5 text-[10px] text-primary" title="Read">
+                                <CheckCheck className="h-3 w-3" />
+                                Read
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Delivered">
+                                <Check className="h-3 w-3" />
+                                Delivered
+                              </span>
+                            )
+                          )}
+                        </div>
                       </div>
                     );
                   })

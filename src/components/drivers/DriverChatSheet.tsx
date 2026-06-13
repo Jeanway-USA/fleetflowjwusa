@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, Check, CheckCheck } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -94,26 +94,43 @@ export function DriverChatSheet({ driver, open, onOpenChange }: DriverChatSheetP
       });
   }, [messages, open, canChat, me, driverUserId]);
 
-  // Realtime subscription
+  // Realtime subscription: incoming INSERTs + read-receipt UPDATEs on my outbound messages
   useEffect(() => {
     if (!open || !canChat) return;
     return safeChannel(`direct-msgs-${me}-${driverUserId}`, (ch) =>
-      ch.on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `receiver_id=eq.${me}`,
-        },
-        (payload) => {
-          const m = payload.new as Message;
-          if (m.sender_id !== driverUserId) return;
-          queryClient.setQueryData<Message[]>(queryKey, (prev = []) =>
-            prev.some((x) => x.id === m.id) ? prev : [...prev, m],
-          );
-        },
-      ),
+      ch
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `receiver_id=eq.${me}`,
+          },
+          (payload) => {
+            const m = payload.new as Message;
+            if (m.sender_id !== driverUserId) return;
+            queryClient.setQueryData<Message[]>(queryKey, (prev = []) =>
+              prev.some((x) => x.id === m.id) ? prev : [...prev, m],
+            );
+          },
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `sender_id=eq.${me}`,
+          },
+          (payload) => {
+            const m = payload.new as Message;
+            if (m.receiver_id !== driverUserId) return;
+            queryClient.setQueryData<Message[]>(queryKey, (prev = []) =>
+              prev.map((x) => (x.id === m.id ? { ...x, is_read: m.is_read } : x)),
+            );
+          },
+        ),
     );
   }, [open, canChat, me, driverUserId, queryClient, queryKey]);
 
@@ -189,9 +206,24 @@ export function DriverChatSheet({ driver, open, onOpenChange }: DriverChatSheetP
                   >
                     {m.content}
                   </div>
-                  <span className="text-[10px] text-muted-foreground mt-1 px-1">
-                    {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
-                  </span>
+                  <div className="flex items-center gap-1 mt-1 px-1">
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatDistanceToNow(new Date(m.created_at), { addSuffix: true })}
+                    </span>
+                    {mine && (
+                      m.is_read ? (
+                        <span className="flex items-center gap-0.5 text-[10px] text-primary" title="Read">
+                          <CheckCheck className="h-3 w-3" />
+                          Read
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Delivered">
+                          <Check className="h-3 w-3" />
+                          Delivered
+                        </span>
+                      )
+                    )}
+                  </div>
                 </div>
               );
             })

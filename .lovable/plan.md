@@ -1,35 +1,31 @@
-Add a compact, read-only **My Equipment** card to the Driver Dashboard showing the driver's assigned truck and trailer with an out-of-service warning badge.
+### Task 1 — Database read receipts
+`public.messages` already has a `NOT NULL is_read boolean`, and both `DriverMessages.tsx` and `DriverChatSheet.tsx` already run an `UPDATE messages SET is_read=true` when the active thread is opened. **No schema migration or new mark-as-read logic is needed.** I'll keep the existing behavior and only invalidate the dispatcher's thread cache via realtime (see Task 2).
 
-### Scope
-Frontend-only. Reads existing tables; no schema or RLS changes.
+### Task 2 — Dispatcher "Delivered / Read" indicator
+Edit `src/components/drivers/DriverChatSheet.tsx`:
+- Under every outgoing bubble (`mine === true`), render a small status line:
+  - `✓ Delivered` (single check, muted) when `is_read === false`
+  - `✓✓ Read` (double check, primary color) when `is_read === true`
+  - Use `Check` / `CheckCheck` icons from `lucide-react` plus the existing timestamp.
+- Extend the existing realtime channel to also listen for `UPDATE` events on `messages` filtered by `sender_id=eq.${me}` (the dispatcher's own outbound messages). On each update, patch the cached `Message[]` so `is_read` flips live the instant the driver opens the chat — no refetch needed.
+- Same treatment applied to outgoing bubbles in `src/components/driver/DriverMessages.tsx` (Tier 1 symmetry — drivers also see ✓✓ once dispatch reads their replies).
 
-### New file
-`src/components/driver/MyEquipmentCard.tsx`
+### Task 3 — Persistent driver unread badge
+Today `<DriverMessages />` lives inside the dashboard header only, so it disappears on `/driver-settings`. Move it so it's persistent for every driver-facing page:
+- In `src/components/layout/DashboardLayout.tsx`, render `<DriverMessages />` in the top-bar action area when the active user has the `driver` role (use existing role context). On the dashboard, remove the duplicated mount so it appears only once.
+- The button itself already shows a red destructive `Badge` driven by a `useQuery` against `messages` where `receiver_id = me AND is_read = false` with a 60s refetch + realtime invalidation. No badge logic changes needed — just relocation guarantees it's visible across all driver routes.
 
-- Props: `{ driverId: string; assignedTruck?: { id, unit_number, make, model, year, status } | null }` — truck is already fetched on `DriverDashboard`, so we reuse it instead of re-querying.
-- Internal `useQuery` keyed `['driver-trailer', driverId]` to find the current trailer via `trailer_assignments` (the active row is `released_at IS NULL`) joined to `trailers(id, unit_number, trailer_type, status)`.
-- Internal `useQuery` keyed `['driver-equipment-work-orders', truckId]` for `work_orders.select('id, status, service_type, description').eq('truck_id', truckId).neq('status', 'completed')` — any open work order is treated as a "Critical Defect" signal.
-- Status interpretation (shared helper):
-  - `out_of_service` or `down` → **red destructive** badge labeled "OUT OF SERVICE — Do Not Dispatch"
-  - `in_shop` or any open work order present → **amber warning** badge labeled "In Shop / Active Work Order"
-  - `active` and no open work orders → muted "Active" badge
-- Layout (compact, mirrors existing dashboard cards):
-  - Card title: "My Equipment" with a `Truck` icon.
-  - Two rows: Truck (unit number + make/model/year + per-equipment badge) and Trailer (unit number + type + badge). Each row collapses gracefully when not assigned ("No truck assigned — contact dispatch" / "No trailer assigned").
-  - A prominent top-banner alert appears when any piece of equipment resolves to the red destructive state, repeating the "Do Not Dispatch" message so it can't be missed.
-- Pure read-only — no edit affordances, no action buttons.
-- Uses semantic tokens (`bg-destructive`, `bg-warning`, `text-destructive-foreground`, etc.) — no hardcoded colors.
+### Task 4 — Audio chime on incoming message
+- Add a small royalty-free chime to `public/sounds/message-chime.mp3` (downloaded via curl from a CC0 source during build).
+- In `src/components/driver/DriverMessages.tsx`, create a lazy `audioRef` (`new Audio('/sounds/message-chime.mp3')` initialized inside a `useEffect` so SSR safety is preserved). Set `audio.preload = 'auto'` and `audio.volume = 0.6`.
+- Inside the existing realtime `INSERT` handler, when the new message's `receiver_id === me` **and** the sheet is closed (`!open`), call:
+  ```ts
+  audioRef.current?.play().catch(() => { /* autoplay blocked — ignore */ });
+  ```
+- The `.catch()` block silently swallows the `NotAllowedError` browsers throw before any user gesture, so the app never crashes.
 
-### Wiring in `src/pages/DriverDashboard.tsx`
-- Import the new component.
-- Replace the current standalone "No truck assigned" warning block (lines ~180–185) with `<MyEquipmentCard driverId={driver.id} assignedTruck={assignedTruck} />`. The new card already handles the no-truck case more richly and also adds trailer visibility.
-- Add the same query key (`'driver-trailer'`, `'driver-equipment-work-orders'`) to the `handleRefresh` invalidation list so manual refresh stays in sync.
-- Placement: directly above the `ActiveLoadCard` so equipment status is the first thing a driver sees after the header.
-
-### Verification
-- Driver with `out_of_service` truck → red "Do Not Dispatch" banner + red badge on the truck row.
-- Driver with `in_shop` truck → amber "In Shop" badge, no destructive banner.
-- Truck `active` but has an open work order → amber "Active Work Order" badge.
-- Driver with no trailer assignment → trailer row shows neutral "No trailer assigned".
-- Driver with no truck → truck row shows the existing-style "No truck assigned — contact dispatch" message.
-- Manual refresh on the dashboard updates equipment status without a full reload.
+### Verification checklist
+- Dispatcher sends a message → bubble shows `✓ Delivered`. Driver opens chat → dispatcher bubble updates live to `✓✓ Read` via the new UPDATE subscription.
+- Driver navigates to `/driver-settings` → the messages button + unread badge stays visible in the top bar; opening it loads the same threads and clears the badge.
+- Driver receives a new message with the chat sheet closed → the chime plays once; receiving with the sheet open does not play (avoids noise during active chatting).
+- Browsers that block autoplay log nothing user-visible; the message still arrives and the badge still increments.
