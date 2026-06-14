@@ -112,6 +112,14 @@ Deno.serve(async (req) => {
       });
     }
 
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (recipientEmail.length > 254 || !EMAIL_RE.test(recipientEmail)) {
+      return new Response(JSON.stringify({ error: 'Invalid recipientEmail format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
       return new Response(JSON.stringify({ error: 'At least one document must be selected' }), {
         status: 400,
