@@ -434,7 +434,46 @@ export function FleetMapView() {
       let truckCoords = null;
       let isLiveLocation = false;
       
-      if (locationRecord) {
+  // Dispatcher-side live route recalc: redraw polyline from driver's current GPS
+  // fix to the destination whenever a live driver_location update comes in.
+  // Self-throttled per load (≥0.5 mi moved AND ≥60 s elapsed) to stay well
+  // under OSRM rate limits.
+  const liveRecalcLastOrigin = useRef<Map<string, { lat: number; lng: number }>>(new Map());
+  const liveRecalcLastAt = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (!rawLoads) return;
+    rawLoads.forEach((load: any) => {
+      if (!load.driver_id) return;
+      const loc = driverLocations.get(load.driver_id);
+      if (!loc || !isLocationLive(loc)) return;
+      const destCoords = geocodedCoords.get(load.destination);
+      if (!destCoords) return;
+      const origin = { lat: Number(loc.latitude), lng: Number(loc.longitude) };
+      if (!Number.isFinite(origin.lat) || !Number.isFinite(origin.lng)) return;
+
+      const lastOrigin = liveRecalcLastOrigin.current.get(load.id);
+      const lastAt = liveRecalcLastAt.current.get(load.id) ?? 0;
+      const now = Date.now();
+      if (lastOrigin && haversineMiles(lastOrigin, origin) < LIVE_RECALC_MIN_DISTANCE_MI) return;
+      if (lastOrigin && now - lastAt < LIVE_RECALC_MIN_INTERVAL_MS) return;
+
+      liveRecalcLastOrigin.current.set(load.id, origin);
+      liveRecalcLastAt.current.set(load.id, now);
+
+      fetchRoute(origin, destCoords)
+        .then((path) => {
+          if (!path || path.length < 2) return;
+          setLiveRouteGeometries((prev) => {
+            const next = new Map(prev);
+            next.set(load.id, path as [number, number][]);
+            return next;
+          });
+        })
+        .catch((err) => console.warn('[FleetMapView] live recalc failed:', err));
+    });
+  }, [rawLoads, driverLocations, geocodedCoords]);
+
+  if (locationRecord) {
         truckCoords = { lat: Number(locationRecord.latitude), lng: Number(locationRecord.longitude) };
         isLiveLocation = isLocationLive(locationRecord);
       } else if (originCoords && destCoords) {
