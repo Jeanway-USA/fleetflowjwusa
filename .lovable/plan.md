@@ -1,35 +1,22 @@
-## Audit result: persistence already works
+## Plan: make saved live routes persist and render everywhere
 
-The live route is already persisted to Supabase and consumed by all three views. The column is named **`current_route_geometry`** (semantically equivalent to your requested `active_route_geometry`).
+### 1. Persist the live route from the same update that saves GPS
+- Change the driver location update flow so the active route recalculation runs after an accepted GPS save, not only from the browser watcher callback.
+- Make the route updater return a success/failure result and log useful failure details so blocked writes are visible.
+- Lower the route update gates enough for testing/live tracking responsiveness while keeping debounce protection.
 
-### Task 1 — DB column ✅
-`supabase/migrations/20260614003343_…sql` already added to `public.fleet_loads`:
-- `current_route_geometry jsonb` — array of `[lat, lng]` tuples
-- `current_route_origin jsonb` — GPS point that produced the geometry
-- `current_route_updated_at timestamptz` — last recalc time
-- `REPLICA IDENTITY FULL` + added to `supabase_realtime` publication
-- The driver column-restriction trigger explicitly whitelists these three columns so the assigned driver can write them.
+### 2. Ensure drivers are allowed to write only route persistence fields
+- Add a database migration to explicitly keep `current_route_geometry`, `current_route_origin`, and `current_route_updated_at` writable by the assigned driver while preserving restrictions on financial, assignment, and customer-sensitive fields.
+- Verify existing `fleet_loads` RLS still only lets assigned drivers update their own load rows.
 
-### Task 2 — Save on GPS update ✅
-`src/components/driver/LocationSharing.tsx` (line 124) calls `maybeRecalcRoute(loadId, {lat, lng})` on every accepted GPS fix.
+### 3. Remove dispatcher-only in-memory route overrides
+- Update `FleetMapView` so dispatcher live routes come from saved `fleet_loads.current_route_geometry` first.
+- Remove/disable the dispatcher-side temporary route recalculation that currently draws a new route in memory without saving it, because that can make the UI look live until refresh and then revert.
 
-`src/lib/recalcActiveRoute.ts`:
-- Throttles: ≥0.5 mi moved, ≥60 s elapsed, 4 s debounce.
-- Geocodes the destination (cached per load).
-- Calls OSRM via `fetchRoute(origin, dest)`.
-- `supabase.from('fleet_loads').update({ current_route_geometry, current_route_origin, current_route_updated_at }).eq('id', loadId)`.
+### 4. Make the driver/public map truly live-route-first
+- Update `LoadRouteMap` so when saved live geometry exists, it does not wait for or visually compete with the static origin-to-destination route.
+- For public tracking, keep polling the public tracking function and pass saved geometry into the map as the source of truth.
 
-### Task 3 — Universal read ✅
-- **Driver page** — `src/components/driver/LoadRouteMap.tsx` uses `useActiveLoadRoute(loadId)` which (a) does an initial `SELECT current_route_geometry,…` and (b) subscribes via realtime `postgres_changes` on `fleet_loads`. Falls back to the static origin→destination route only when `geometry` is null.
-- **Dispatcher page** — `src/components/dispatcher/FleetMapView.tsx` selects `current_route_geometry` in its loads query, seeds `liveRouteGeometries` from the DB on initial load, and subscribes to `fleet_loads` UPDATEs to refresh that map. The route layer prefers `liveRouteGeometry` over the static OSRM polyline.
-- **Public tracker** — `supabase/functions/public-load-tracker/index.ts` selects and returns `current_route_geometry`/`current_route_updated_at`; `src/pages/PublicLoadTracker.tsx` passes it down as `liveGeometry`, so the public link draws the persisted live route on refresh too.
-
-### What this means for your bug report
-If a refresh is still showing the static route, the geometry simply was not saved yet for that load (e.g. driver had not started sharing GPS, or the throttle gates had not yet fired). Once `maybeRecalcRoute` posts a successful update, all three surfaces will draw the saved geometry on refresh and update live via realtime.
-
-### Optional follow-ups (only if you want them — say the word)
-1. **Rename** `current_route_geometry` → `active_route_geometry` across DB column, migration, edge function, types, and 4 client files. Cosmetic only; no behavior change.
-2. **Telemetry** — add a `console.info` / toast on successful save + a `last_updated` badge on the dispatcher map so you can visibly confirm persistence is firing.
-3. **Tighten throttle** — drop `MIN_DISTANCE_MILES` from 0.5 → 0.1 and `MIN_INTERVAL_MS` from 60 s → 20 s so a stationary refresh test shows updates faster (uses more OSRM quota).
-
-Tell me which (if any) of 1–3 you want and I'll switch to build mode.
+### 5. Verify the fix
+- Use read-only database checks to confirm the column and policy/trigger state.
+- After implementation, verify the changed code paths and run the relevant targeted checks available in the project.

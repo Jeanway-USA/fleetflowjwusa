@@ -21,9 +21,9 @@ const lastRecalcAtByLoad = new Map<string, number>();
 const pendingTimerByLoad = new Map<string, ReturnType<typeof setTimeout>>();
 const destCacheByLoad = new Map<string, LatLng | null>();
 
-const MIN_DISTANCE_MILES = 0.5;
-const MIN_INTERVAL_MS = 60 * 1000; // never more than 1 recalc / minute / load
-const DEBOUNCE_MS = 4_000; // coalesce bursts of GPS pings
+const MIN_DISTANCE_MILES = 0.1;
+const MIN_INTERVAL_MS = 20 * 1000; // at most 1 recalc / 20s / load
+const DEBOUNCE_MS = 2_500; // coalesce bursts of GPS pings
 
 function haversineMiles(a: LatLng, b: LatLng): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -54,14 +54,20 @@ async function getDestinationCoords(loadId: string): Promise<LatLng | null> {
   return coords;
 }
 
-async function runRecalc(loadId: string, origin: LatLng): Promise<void> {
+async function runRecalc(loadId: string, origin: LatLng): Promise<boolean> {
   const destination = await getDestinationCoords(loadId);
-  if (!destination) return;
+  if (!destination) {
+    console.warn('[recalcActiveRoute] no destination coords for load', loadId);
+    return false;
+  }
 
   const path = await fetchRoute(origin, destination);
-  if (!path || path.length < 2) return;
+  if (!path || path.length < 2) {
+    console.warn('[recalcActiveRoute] OSRM returned empty path');
+    return false;
+  }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('fleet_loads')
     // Columns exist in the migration; types may regenerate on next build.
     .update({
@@ -69,15 +75,23 @@ async function runRecalc(loadId: string, origin: LatLng): Promise<void> {
       current_route_origin: { lat: origin.lat, lng: origin.lng } as unknown as never,
       current_route_updated_at: new Date().toISOString() as unknown as never,
     } as never)
-    .eq('id', loadId);
+    .eq('id', loadId)
+    .select('id')
+    .maybeSingle();
 
   if (error) {
-    console.warn('[recalcActiveRoute] update failed:', error.message);
-    return;
+    console.warn('[recalcActiveRoute] update failed:', error.message, error);
+    return false;
+  }
+  if (!data) {
+    console.warn('[recalcActiveRoute] update returned no row — RLS blocked or wrong load id?', loadId);
+    return false;
   }
 
+  console.info('[recalcActiveRoute] saved live route', { loadId, points: path.length });
   lastRecalcOriginByLoad.set(loadId, origin);
   lastRecalcAtByLoad.set(loadId, Date.now());
+  return true;
 }
 
 /**
