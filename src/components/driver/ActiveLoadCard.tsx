@@ -299,7 +299,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
 
           {/* Route Map Preview */}
           <Suspense fallback={<MapSkeleton height={200} />}>
-            <LoadRouteMap origin={load.origin} destination={load.destination} notes={load.notes} />
+            <LoadRouteMap origin={load.origin} destination={load.destination} notes={load.notes} loadId={load.id} />
           </Suspense>
 
           {/* Miles and Estimated Pay */}
