@@ -118,15 +118,23 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
   const handlePositionUpdate = useCallback((position: GeolocationPosition) => {
     setCurrentPosition(position);
     setError(null);
-    
+
+    // Fire live route recalculation (independent throttling: 0.5mi / 60s / debounced)
+    if (loadId) {
+      maybeRecalcRoute(loadId, {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      });
+    }
+
     const now = Date.now();
     const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
-    
+
     // Send update if it's the first update or 10 minutes have passed
     if (lastUpdateTimeRef.current === 0 || timeSinceLastUpdate >= UPDATE_INTERVAL_MS) {
       updateLocation.mutate(position);
     }
-  }, [updateLocation]);
+  }, [updateLocation, loadId]);
 
   // Handle position errors
   const handlePositionError = useCallback((error: GeolocationPositionError) => {
