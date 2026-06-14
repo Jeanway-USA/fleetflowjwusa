@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,9 +9,27 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { geocodeLocationAsync, interpolatePosition, getProgressFromStatus } from '@/lib/geocoding';
-import { fetchRoutesBatch } from '@/lib/routing';
+import { fetchRoute, fetchRoutesBatch } from '@/lib/routing';
 import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
+
+// Live-recalc throttle constants (mirror src/lib/recalcActiveRoute.ts)
+const LIVE_RECALC_MIN_DISTANCE_MI = 0.5;
+const LIVE_RECALC_MIN_INTERVAL_MS = 60 * 1000;
+
+function haversineMiles(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 3958.8;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLng / 2) ** 2 * Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat));
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
 
 // Fix Leaflet default icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
