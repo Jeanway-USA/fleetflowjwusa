@@ -107,6 +107,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        load_id: load.id,
         origin: condense(load.origin),
         origin_full: load.origin,
         destination: condense(load.destination),
@@ -116,6 +117,8 @@ Deno.serve(async (req) => {
         delivery_date: load.delivery_date,
         booked_miles: load.booked_miles,
         load_number: load.landstar_load_id,
+        current_route_geometry: load.current_route_geometry ?? null,
+        current_route_updated_at: load.current_route_updated_at ?? null,
         org: org
           ? {
               name: org.name,
