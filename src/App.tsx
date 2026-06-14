@@ -40,7 +40,7 @@ const DriverPerformance = lazy(() => import("./pages/DriverPerformance"));
 const DriverSpectatorView = lazy(() => import("./pages/DriverSpectatorView"));
 const IFTA = lazy(() => import("./pages/IFTA"));
 const CRM = lazy(() => import("./pages/CRM"));
-const LoadOptimizer = lazy(() => import("./pages/LoadOptimizer"));
+
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PendingAccess = lazy(() => import("./pages/PendingAccess"));
 const Landing = lazy(() => import("./pages/Landing"));
@@ -189,11 +189,6 @@ const App = () => {
                       </ProtectedRoute>
                     } />
                     <Route path="/resources" element={<Navigate to="/crm" replace />} />
-                    <Route path="/load-optimizer" element={
-                      <ProtectedRoute allowedRoles={['owner', 'dispatcher']} requiredFeature="loads">
-                        <LoadOptimizer />
-                      </ProtectedRoute>
-                    } />
                     <Route path="/maintenance" element={
                       <ProtectedRoute allowedRoles={['owner', 'maintenance']} requiredFeature="maintenance_full">
                         <MaintenanceManagement />
