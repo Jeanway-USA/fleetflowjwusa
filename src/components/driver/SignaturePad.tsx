@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
+import SignatureCanvas from 'react-signature-canvas';
 import { Button } from '@/components/ui/button';
 import { Eraser, Check } from 'lucide-react';
 
@@ -8,147 +9,89 @@ interface SignaturePadProps {
 }
 
 export function SignaturePad({ onSignatureCapture, disabled }: SignaturePadProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const padRef = useRef<SignatureCanvas>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [hasSignature, setHasSignature] = useState(false);
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
+  // Responsive sizing — react-signature-canvas needs fixed pixel dims for its canvas.
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const container = canvas.parentElement;
-    if (!container) return;
-
-    const initCanvas = (width: number) => {
-      const dpr = window.devicePixelRatio || 1;
-      const height = width * 3 / 8;
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.scale(dpr, dpr);
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, width, height);
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      if (w > 0) {
+        const h = Math.max(180, Math.round((w * 3) / 8));
+        setSize({ width: w, height: h });
       }
     };
-
-    const observer = new ResizeObserver((entries) => {
-      const { width } = entries[0].contentRect;
-      if (width > 0) initCanvas(width);
-    });
-    observer.observe(container);
-    return () => observer.disconnect();
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
-  const getCoordinates = (e: React.MouseEvent | React.TouchEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-
-    if ('touches' in e) {
-      const touch = e.touches[0];
-      return {
-        x: (touch.clientX - rect.left) * scaleX / (window.devicePixelRatio || 1),
-        y: (touch.clientY - rect.top) * scaleY / (window.devicePixelRatio || 1),
-      };
-    } else {
-      return {
-        x: (e.clientX - rect.left) * scaleX / (window.devicePixelRatio || 1),
-        y: (e.clientY - rect.top) * scaleY / (window.devicePixelRatio || 1),
-      };
-    }
-  };
-
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    if (disabled) return;
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!ctx) return;
-
-    const { x, y } = getCoordinates(e);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    setIsDrawing(true);
-    setHasSignature(true);
-  };
-
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || disabled) return;
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!ctx) return;
-
-    const { x, y } = getCoordinates(e);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
-
-  const stopDrawing = () => {
-    if (!isDrawing) return;
-    setIsDrawing(false);
-  };
-
-  const clearSignature = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!ctx || !canvas) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+  const handleClear = () => {
+    padRef.current?.clear();
     setHasSignature(false);
   };
 
-  const confirmSignature = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !hasSignature) return;
-
-    const dataUrl = canvas.toDataURL('image/png');
+  const handleConfirm = () => {
+    const pad = padRef.current;
+    if (!pad || pad.isEmpty()) return;
+    // Trim whitespace so the embedded PNG sits cleanly on the signature line.
+    let dataUrl: string;
+    try {
+      dataUrl = pad.getTrimmedCanvas().toDataURL('image/png');
+    } catch {
+      dataUrl = pad.getCanvas().toDataURL('image/png');
+    }
     onSignatureCapture(dataUrl);
   };
 
   return (
     <div className="space-y-2">
       <div className="text-sm font-medium">Sign Below</div>
-      <div className="border rounded-lg overflow-hidden bg-white">
-        <canvas
-          ref={canvasRef}
-          className="w-full touch-none cursor-crosshair aspect-[8/3]"
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onTouchStart={startDrawing}
-          onTouchMove={draw}
-          onTouchEnd={stopDrawing}
-        />
+      <div
+        ref={containerRef}
+        className="border rounded-lg overflow-hidden bg-white touch-none overscroll-contain"
+        style={{ height: size.height || 180 }}
+      >
+        {size.width > 0 && (
+          <SignatureCanvas
+            ref={padRef}
+            penColor="#000"
+            minWidth={1.2}
+            maxWidth={2.6}
+            velocityFilterWeight={0.7}
+            throttle={8}
+            clearOnResize={false}
+            onBegin={() => setHasSignature(true)}
+            onEnd={() => setHasSignature(!padRef.current?.isEmpty())}
+            canvasProps={{
+              width: size.width,
+              height: size.height,
+              className: 'w-full h-full cursor-crosshair touch-none',
+            }}
+          />
+        )}
       </div>
       <div className="flex flex-col sm:flex-row gap-2">
         <Button
           type="button"
           variant="outline"
-          onClick={clearSignature}
+          onClick={handleClear}
           disabled={disabled || !hasSignature}
-          className="w-full sm:w-auto bg-white text-slate-900 border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+          className="w-full sm:w-auto h-12 sm:h-10 bg-white text-slate-900 border-slate-300 hover:bg-slate-100 hover:text-slate-900"
         >
           <Eraser className="h-4 w-4 mr-1" />
           Clear
         </Button>
         <Button
           type="button"
-          onClick={confirmSignature}
+          onClick={handleConfirm}
           disabled={disabled || !hasSignature}
-          className="gradient-gold text-primary-foreground w-full sm:w-auto"
+          className="gradient-gold text-primary-foreground w-full sm:w-auto h-12 sm:h-10"
         >
           <Check className="h-4 w-4 mr-1" />
           Confirm Signature

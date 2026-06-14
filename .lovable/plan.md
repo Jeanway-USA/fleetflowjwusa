@@ -1,22 +1,36 @@
-## Plan: make saved live routes persist and render everywhere
+## Goal
 
-### 1. Persist the live route from the same update that saves GPS
-- Change the driver location update flow so the active route recalculation runs after an accepted GPS save, not only from the browser watcher callback.
-- Make the route updater return a success/failure result and log useful failure details so blocked writes are visible.
-- Lower the route update gates enough for testing/live tracking responsiveness while keeping debounce protection.
+Replace the hand-rolled signature canvas with `react-signature-canvas` for smoother, more reliable finger-drawn signatures on mobile. Keep the existing one-step PDF embed + inline flow you already have working.
 
-### 2. Ensure drivers are allowed to write only route persistence fields
-- Add a database migration to explicitly keep `current_route_geometry`, `current_route_origin`, and `current_route_updated_at` writable by the assigned driver while preserving restrictions on financial, assignment, and customer-sensitive fields.
-- Verify existing `fleet_loads` RLS still only lets assigned drivers update their own load rows.
+## Scope
 
-### 3. Remove dispatcher-only in-memory route overrides
-- Update `FleetMapView` so dispatcher live routes come from saved `fleet_loads.current_route_geometry` first.
-- Remove/disable the dispatcher-side temporary route recalculation that currently draws a new route in memory without saving it, because that can make the UI look live until refresh and then revert.
+Only the signature capture layer changes. PDF generation, upload to `signed-documents`, and onboarding step advancement stay exactly as they are.
 
-### 4. Make the driver/public map truly live-route-first
-- Update `LoadRouteMap` so when saved live geometry exists, it does not wait for or visually compete with the static origin-to-destination route.
-- For public tracking, keep polling the public tracking function and pass saved geometry into the map as the source of truth.
+## Changes
 
-### 5. Verify the fix
-- Use read-only database checks to confirm the column and policy/trigger state.
-- After implementation, verify the changed code paths and run the relevant targeted checks available in the project.
+1. **Add dependency**: `react-signature-canvas` (+ `@types/react-signature-canvas`).
+
+2. **Rewrite `src/components/driver/SignaturePad.tsx`**:
+   - Use `SignatureCanvas` from `react-signature-canvas`.
+   - Transparent background (no white fill) so the PNG can be stamped cleanly onto any PDF backdrop. Export with `getCanvas().toDataURL('image/png')` after trimming via `getTrimmedCanvas()` so empty whitespace is cropped.
+   - Mobile-friendly: `touch-none` wrapper, `ResizeObserver` for responsive width, `aspect-[8/3]`, DPR-aware via `canvasProps`.
+   - Buttons: **Clear** (calls `.clear()`), **Confirm Signature** (emits trimmed transparent PNG to `onSignatureCapture`). Disabled state while empty (`.isEmpty()`).
+   - Keep the exact same props contract (`onSignatureCapture(dataUrl)`, `disabled`) so `DocumentTemplateRenderer` needs no changes.
+   - Landscape-friendly: min-height 180px, full width, prevents page scroll while drawing (`onBegin` adds `overscroll-contain`).
+
+3. **No changes** to:
+   - `DocumentTemplateRenderer.tsx` (already renders `<SignaturePad onSignatureCapture={...} />` inline at `{{driver_signature}}`).
+   - `generateSignedPdf.ts` (already `addImage(signature, 'PNG', ...)` — transparent PNGs render fine in jsPDF).
+   - `DriverOnboarding.tsx` upload + step advancement logic.
+   - Storage bucket / RLS (already in place).
+
+## Verification
+
+- Test on mobile viewport: signature draws smoothly, Clear works, Confirm advances the step.
+- Generated PDF still shows the signature on the signature line.
+- File appears in `signed-documents/{org_id}/{driver_id}/...` and onboarding marks complete.
+
+## Out of scope (per your answers)
+
+- No two-step "preview then stamp" with `pdf-lib`.
+- No separate PDF preview screen / "Tap to Sign" modal — the inline pad stays.
