@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,9 +9,27 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { geocodeLocationAsync, interpolatePosition, getProgressFromStatus } from '@/lib/geocoding';
-import { fetchRoutesBatch } from '@/lib/routing';
+import { fetchRoute, fetchRoutesBatch } from '@/lib/routing';
 import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
+
+// Live-recalc throttle constants (mirror src/lib/recalcActiveRoute.ts)
+const LIVE_RECALC_MIN_DISTANCE_MI = 0.5;
+const LIVE_RECALC_MIN_INTERVAL_MS = 60 * 1000;
+
+function haversineMiles(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 3958.8;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLng / 2) ** 2 * Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat));
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
 
 // Fix Leaflet default icon issue
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -404,18 +422,58 @@ export function FleetMapView() {
   }, [rawLoads, geocodedCoords, loadStops, routeKeys]);
 
   // Process loads with geocoded coordinates and GPS data
+  // Dispatcher-side live route recalc: redraw polyline from driver's current GPS
+  // fix to the destination whenever a live driver_location update comes in.
+  // Self-throttled per load (≥0.5 mi moved AND ≥60 s elapsed) to stay well
+  // under OSRM rate limits.
+  const liveRecalcLastOrigin = useRef<Map<string, { lat: number; lng: number }>>(new Map());
+  const liveRecalcLastAt = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (!rawLoads) return;
+    rawLoads.forEach((load: any) => {
+      if (!load.driver_id) return;
+      const loc = driverLocations.get(load.driver_id);
+      if (!loc || !isLocationLive(loc)) return;
+      const destCoords = geocodedCoords.get(load.destination);
+      if (!destCoords) return;
+      const origin = { lat: Number(loc.latitude), lng: Number(loc.longitude) };
+      if (!Number.isFinite(origin.lat) || !Number.isFinite(origin.lng)) return;
+
+      const lastOrigin = liveRecalcLastOrigin.current.get(load.id);
+      const lastAt = liveRecalcLastAt.current.get(load.id) ?? 0;
+      const now = Date.now();
+      if (lastOrigin && haversineMiles(lastOrigin, origin) < LIVE_RECALC_MIN_DISTANCE_MI) return;
+      if (lastOrigin && now - lastAt < LIVE_RECALC_MIN_INTERVAL_MS) return;
+
+      liveRecalcLastOrigin.current.set(load.id, origin);
+      liveRecalcLastAt.current.set(load.id, now);
+
+      fetchRoute(origin, destCoords)
+        .then((path) => {
+          if (!path || path.length < 2) return;
+          setLiveRouteGeometries((prev) => {
+            const next = new Map(prev);
+            next.set(load.id, path as [number, number][]);
+            return next;
+          });
+        })
+        .catch((err) => console.warn('[FleetMapView] live recalc failed:', err));
+    });
+  }, [rawLoads, driverLocations, geocodedCoords]);
+
+  // Process loads with geocoded coordinates and GPS data
   const loads = useMemo(() => {
     if (!rawLoads) return [];
 
     return rawLoads.map(load => {
       const originCoords = geocodedCoords.get(load.origin) || null;
       const destCoords = geocodedCoords.get(load.destination) || null;
-      
+
       const locationRecord = load.driver_id ? driverLocations.get(load.driver_id) : null;
-      
+
       let truckCoords = null;
       let isLiveLocation = false;
-      
+
       if (locationRecord) {
         truckCoords = { lat: Number(locationRecord.latitude), lng: Number(locationRecord.longitude) };
         isLiveLocation = isLocationLive(locationRecord);
