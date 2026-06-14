@@ -478,7 +478,7 @@ function GeneratePaystubDialog({
         const items = includedLoads.map((l) => ({
           org_id: orgId,
           settlement_id: row.id,
-          item_type: 'load',
+          item_type: 'load_pay',
           load_id: l.id,
           description: 'Load delivery',
           amount: Number(l.gross_revenue ?? l.rate ?? 0),
