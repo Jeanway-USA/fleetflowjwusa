@@ -483,20 +483,22 @@ export function FleetMapView() {
 
         {loads.map(load => (
           <div key={load.id}>
-            {/* Route line — real road or straight-line fallback */}
+            {/* Route line — live recalculated > static OSRM > straight-line fallback */}
             {load.originCoords && load.destCoords && (
               <Polyline
                 positions={
+                  load.liveRouteGeometry ||
                   routeGeometries.get(load.id) || [
                     [load.originCoords.lat, load.originCoords.lng],
                     [load.destCoords.lat, load.destCoords.lng],
                   ]
                 }
                 pathOptions={{
-                  color: '#22c55e',
-                  weight: 3,
-                  opacity: 0.6,
-                  dashArray: routeGeometries.has(load.id) ? undefined : '10, 10',
+                  color: load.liveRouteGeometry ? '#16a34a' : '#22c55e',
+                  weight: load.liveRouteGeometry ? 4 : 3,
+                  opacity: load.liveRouteGeometry ? 0.85 : 0.6,
+                  dashArray:
+                    load.liveRouteGeometry || routeGeometries.has(load.id) ? undefined : '10, 10',
                 }}
               />
             )}
