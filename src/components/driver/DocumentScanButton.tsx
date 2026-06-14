@@ -1,15 +1,16 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Camera, Loader2, CheckCircle, Upload } from 'lucide-react';
+import { Camera, Loader2, CheckCircle, Upload, CloudOff, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStorageProvider } from '@/hooks/useStorageProvider';
 import { compressImage } from '@/lib/compress-image';
+import { useOfflineDocumentQueue } from '@/hooks/useOfflineDocumentQueue';
 import { PhotoQualityGate } from './PhotoQualityGate';
 
 interface DocumentScanButtonProps {
