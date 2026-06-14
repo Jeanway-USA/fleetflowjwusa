@@ -422,18 +422,6 @@ export function FleetMapView() {
   }, [rawLoads, geocodedCoords, loadStops, routeKeys]);
 
   // Process loads with geocoded coordinates and GPS data
-  const loads = useMemo(() => {
-    if (!rawLoads) return [];
-
-    return rawLoads.map(load => {
-      const originCoords = geocodedCoords.get(load.origin) || null;
-      const destCoords = geocodedCoords.get(load.destination) || null;
-      
-      const locationRecord = load.driver_id ? driverLocations.get(load.driver_id) : null;
-      
-      let truckCoords = null;
-      let isLiveLocation = false;
-      
   // Dispatcher-side live route recalc: redraw polyline from driver's current GPS
   // fix to the destination whenever a live driver_location update comes in.
   // Self-throttled per load (≥0.5 mi moved AND ≥60 s elapsed) to stay well
@@ -473,7 +461,20 @@ export function FleetMapView() {
     });
   }, [rawLoads, driverLocations, geocodedCoords]);
 
-  if (locationRecord) {
+  // Process loads with geocoded coordinates and GPS data
+  const loads = useMemo(() => {
+    if (!rawLoads) return [];
+
+    return rawLoads.map(load => {
+      const originCoords = geocodedCoords.get(load.origin) || null;
+      const destCoords = geocodedCoords.get(load.destination) || null;
+
+      const locationRecord = load.driver_id ? driverLocations.get(load.driver_id) : null;
+
+      let truckCoords = null;
+      let isLiveLocation = false;
+
+      if (locationRecord) {
         truckCoords = { lat: Number(locationRecord.latitude), lng: Number(locationRecord.longitude) };
         isLiveLocation = isLocationLive(locationRecord);
       } else if (originCoords && destCoords) {
