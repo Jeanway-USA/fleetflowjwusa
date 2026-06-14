@@ -86,27 +86,57 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
         : selectedFile;
 
       const fileExt = (fileToUpload.name.split('.').pop() || 'bin').toLowerCase();
+
+      // OFFLINE PATH — persist to IndexedDB; sync hook drains on reconnect.
+      if (!navigator.onLine) {
+        await queueCurrentForOffline(
+          fileToUpload,
+          fileToUpload.name,
+          fileToUpload.type,
+          fileToUpload.size
+        );
+        return { queued: true as const };
+      }
+
+      // ONLINE PATH — direct upload; fall back to the queue on transient failure.
       const filePath = `${driverId}/${Date.now()}.${fileExt}`;
+      try {
+        const { path, error: uploadError } = await upload('documents', filePath, fileToUpload);
+        if (uploadError || !path) throw uploadError || new Error('Upload failed');
 
-      // Upload through storage provider
-      const { path, error: uploadError } = await upload('documents', filePath, fileToUpload);
-      if (uploadError || !path) throw uploadError || new Error('Upload failed');
-
-      const { error: dbError } = await supabase.from('documents').insert({
-        file_name: fileToUpload.name,
-        file_path: path,
-        file_size: fileToUpload.size,
-        document_type: docType,
-        uploaded_by: user?.id,
-        related_type: 'driver',
-        related_id: driverId,
-      });
-
-      if (dbError) throw dbError;
+        const { error: dbError } = await supabase.from('documents').insert({
+          file_name: fileToUpload.name,
+          file_path: path,
+          file_size: fileToUpload.size,
+          document_type: docType,
+          uploaded_by: user?.id,
+          related_type: 'driver',
+          related_id: driverId,
+        });
+        if (dbError) throw dbError;
+        return { queued: false as const };
+      } catch (err: any) {
+        const looksTransient =
+          !navigator.onLine ||
+          err?.name === 'TypeError' ||
+          /network|failed to fetch|load failed/i.test(err?.message ?? '');
+        if (looksTransient) {
+          await queueCurrentForOffline(
+            fileToUpload,
+            fileToUpload.name,
+            fileToUpload.type,
+            fileToUpload.size
+          );
+          return { queued: true as const };
+        }
+        throw err;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
-      toast.success('Document uploaded successfully');
+      if (!result?.queued) {
+        toast.success('Document uploaded successfully');
+      }
       handleReset();
       setDialogOpen(false);
     },
