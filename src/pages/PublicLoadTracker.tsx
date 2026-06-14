@@ -234,7 +234,13 @@ export default function PublicLoadTracker() {
         <Card>
           <CardContent className="p-0 overflow-hidden rounded-lg">
             <Suspense fallback={<MapSkeleton height={320} />}>
-              <LoadRouteMap origin={data.origin_full} destination={data.destination_full} />
+              <LoadRouteMap
+                origin={data.origin_full}
+                destination={data.destination_full}
+                loadId={data.load_id ?? null}
+                liveGeometry={data.current_route_geometry}
+              />
+
             </Suspense>
           </CardContent>
         </Card>
