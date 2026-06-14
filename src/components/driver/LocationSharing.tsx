@@ -88,9 +88,16 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, position) => {
       lastUpdateTimeRef.current = Date.now();
       queryClient.invalidateQueries({ queryKey: ['driver-location', driverId] });
+      // Belt-and-suspenders: also kick a route save right after a confirmed GPS upsert.
+      if (loadId && position?.coords) {
+        maybeRecalcRoute(loadId, {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      }
     },
     onError: (error) => {
       console.error('Failed to update location:', error);
