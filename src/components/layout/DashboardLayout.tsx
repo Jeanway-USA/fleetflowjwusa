@@ -57,6 +57,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/driver-performance': 'Driver Performance',
   '/settings': 'Settings',
   '/driver-stats': 'My Stats',
+  '/driver/loads': 'My Loads',
   '/driver-settings': 'My Settings',
   '/super-admin': 'Super Admin',
 };
