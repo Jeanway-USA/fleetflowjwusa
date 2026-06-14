@@ -7,6 +7,9 @@ import { fetchRouteWithWaypoints } from '@/lib/routing';
 import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
+import { useActiveLoadRoute } from '@/hooks/useActiveLoadRoute';
+import { Badge } from '@/components/ui/badge';
+import { Radio } from 'lucide-react';
 
 interface Coordinates {
   lat: number;
@@ -17,6 +20,10 @@ interface LoadRouteMapProps {
   origin: string;
   destination: string;
   notes?: string | null;
+  /** When provided, subscribes to live recalculated route geometry for this load. */
+  loadId?: string | null;
+  /** Optional fallback geometry (e.g. fetched server-side for public viewers without realtime). */
+  liveGeometry?: [number, number][] | null;
 }
 
 interface GeocodedStop {
