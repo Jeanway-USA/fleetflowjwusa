@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Sparkles, ShieldAlert, ShieldCheck, Crown } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { differenceInCalendarDays, endOfMonth } from 'date-fns';
 import { useSafetyBonus } from '@/hooks/useSafetyBonus';
 
 interface MonthlyBonusWidgetProps {
@@ -29,7 +30,7 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
     currentRate,
     nextTierMiles,
     maxBonus,
-    periodEnd,
+    periodEnd: _periodEnd,
     disqualifiers,
     currentTier,
     nextTier,
@@ -50,14 +51,13 @@ export function MonthlyBonusWidget({ driverId }: MonthlyBonusWidgetProps) {
     }
   }, [capHit, isLoading]);
 
-  // Days until period reset (periodEnd is YYYY-MM-DD)
+  // Days remaining in the current calendar month (inclusive of today).
+  // June 1 -> 30d, June 30 -> 1d, last day -> 1d, never negative.
   const daysToReset = (() => {
-    if (!periodEnd) return null;
-    const end = new Date(`${periodEnd}T00:00:00`);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const diff = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    return Math.max(diff, 0);
+    const monthEnd = endOfMonth(today);
+    return Math.max(differenceInCalendarDays(monthEnd, today) + 1, 0);
   })();
 
   // ---------- Loading ----------
