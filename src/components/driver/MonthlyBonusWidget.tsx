@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Sparkles, ShieldAlert, ShieldCheck, Crown } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { differenceInCalendarDays, endOfMonth } from 'date-fns';
 import { useSafetyBonus } from '@/hooks/useSafetyBonus';
 
 interface MonthlyBonusWidgetProps {
