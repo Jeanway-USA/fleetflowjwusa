@@ -172,6 +172,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Validate override_email format if provided (RFC 5321 max 254 chars)
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (override_email !== undefined && override_email !== null && override_email !== '') {
+      if (typeof override_email !== 'string' || override_email.length > 254 || !EMAIL_RE.test(override_email)) {
+        return new Response(JSON.stringify({ error: 'Invalid override_email format' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // Get user's org_id
     const { data: profile } = await supabaseAdmin
       .from('profiles')
