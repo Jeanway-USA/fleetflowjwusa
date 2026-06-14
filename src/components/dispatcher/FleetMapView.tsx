@@ -84,6 +84,7 @@ interface LoadWithLocation {
   truckCoords: { lat: number; lng: number } | null;
   isLiveLocation: boolean;
   stopCoords: { lat: number; lng: number; stop: IntermediateStop }[];
+  liveRouteGeometry: [number, number][] | null;
 }
 
 // Determine if a location record represents a live GPS signal
