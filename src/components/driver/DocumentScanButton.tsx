@@ -9,6 +9,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStorageProvider } from '@/hooks/useStorageProvider';
+import { compressImage } from '@/lib/compress-image';
+import { PhotoQualityGate } from './PhotoQualityGate';
 
 interface DocumentScanButtonProps {
   driverId: string;
@@ -32,22 +34,29 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
   const [docType, setDocType] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [qualityGateOpen, setQualityGateOpen] = useState(false);
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
       if (!selectedFile || !docType) throw new Error('Missing file or document type');
 
-      const fileExt = selectedFile.name.split('.').pop();
+      // Quality-gate already passed. Compress images now (PDFs untouched).
+      const fileToUpload = selectedFile.type.startsWith('image/')
+        ? await compressImage(selectedFile)
+        : selectedFile;
+
+      const fileExt = (fileToUpload.name.split('.').pop() || 'bin').toLowerCase();
       const filePath = `${driverId}/${Date.now()}.${fileExt}`;
 
       // Upload through storage provider
-      const { path, error: uploadError } = await upload('documents', filePath, selectedFile);
+      const { path, error: uploadError } = await upload('documents', filePath, fileToUpload);
       if (uploadError || !path) throw uploadError || new Error('Upload failed');
 
       const { error: dbError } = await supabase.from('documents').insert({
-        file_name: selectedFile.name,
+        file_name: fileToUpload.name,
         file_path: path,
-        file_size: selectedFile.size,
+        file_size: fileToUpload.size,
         document_type: docType,
         uploaded_by: user?.id,
         related_type: 'driver',
@@ -69,24 +78,48 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    if (file.type.startsWith('image/')) {
+      // Force the quality gate. Don't mark the file as ready to upload yet.
+      setPendingFile(file);
+      setQualityGateOpen(true);
+    } else {
+      // PDFs (and similar) skip the visual gate — quality isn't verifiable as an image.
       setSelectedFile(file);
-      // Create preview for images
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          setPreview(event.target?.result as string);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        setPreview(null);
-      }
+      setPreview(null);
     }
+
+    // Allow re-selecting the same file later.
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleRetake = () => {
+    setQualityGateOpen(false);
+    setPendingFile(null);
+    // Reopen the camera/file picker so the driver can immediately retake.
+    setTimeout(() => fileInputRef.current?.click(), 50);
+  };
+
+  const handleConfirmQuality = () => {
+    if (!pendingFile) {
+      setQualityGateOpen(false);
+      return;
+    }
+    setSelectedFile(pendingFile);
+    // Build an inline thumbnail for the upload dialog.
+    const reader = new FileReader();
+    reader.onload = (event) => setPreview(event.target?.result as string);
+    reader.readAsDataURL(pendingFile);
+    setPendingFile(null);
+    setQualityGateOpen(false);
   };
 
   const handleReset = () => {
     setSelectedFile(null);
     setPreview(null);
+    setPendingFile(null);
+    setQualityGateOpen(false);
     setDocType('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -197,6 +230,13 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
           </Button>
         </div>
       </DialogContent>
+
+      <PhotoQualityGate
+        open={qualityGateOpen}
+        file={pendingFile}
+        onRetake={handleRetake}
+        onConfirm={handleConfirmQuality}
+      />
     </Dialog>
   );
 }
