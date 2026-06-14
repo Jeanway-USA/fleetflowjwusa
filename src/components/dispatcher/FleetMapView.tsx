@@ -84,6 +84,7 @@ interface LoadWithLocation {
   truckCoords: { lat: number; lng: number } | null;
   isLiveLocation: boolean;
   stopCoords: { lat: number; lng: number; stop: IntermediateStop }[];
+  liveRouteGeometry: [number, number][] | null;
 }
 
 // Determine if a location record represents a live GPS signal
@@ -129,6 +130,8 @@ export function FleetMapView() {
   const [geocodedCoords, setGeocodedCoords] = useState<Map<string, { lat: number; lng: number } | null>>(new Map());
   const [routeGeometries, setRouteGeometries] = useState<Map<string, [number, number][]>>(new Map());
   const [routeKeys, setRouteKeys] = useState<Map<string, string>>(new Map());
+  // Live, driver-GPS-derived route geometry per load (overrides static OSRM result when present)
+  const [liveRouteGeometries, setLiveRouteGeometries] = useState<Map<string, [number, number][]>>(new Map());
 
   // Fetch ALL driver locations (not just recent ones)
   const { data: initialLocations } = useQuery({
@@ -217,11 +220,13 @@ export function FleetMapView() {
           status,
           driver_id,
           notes,
+          current_route_geometry,
+          current_route_updated_at,
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
           truck:trucks!fleet_loads_truck_id_fkey(unit_number)
         `)
         .eq('status', 'in_transit');
-      
+
       if (error) throw error;
       return data;
     },
@@ -229,6 +234,58 @@ export function FleetMapView() {
     refetchIntervalInBackground: false,
     staleTime: 30 * 1000,
   });
+
+  // Seed live route geometries from initial fetch, then subscribe to fleet_loads UPDATEs
+  useEffect(() => {
+    if (!rawLoads) return;
+    setLiveRouteGeometries(prev => {
+      const next = new Map(prev);
+      rawLoads.forEach((load: any) => {
+        const raw = load.current_route_geometry;
+        if (Array.isArray(raw) && raw.length >= 2) {
+          const coerced: [number, number][] = raw
+            .filter((p: any) => Array.isArray(p) && p.length >= 2)
+            .map((p: any) => [Number(p[0]), Number(p[1])] as [number, number])
+            .filter(([la, ln]) => Number.isFinite(la) && Number.isFinite(ln));
+          if (coerced.length >= 2) next.set(load.id, coerced);
+        }
+      });
+      return next;
+    });
+  }, [rawLoads]);
+
+  useEffect(() => {
+    const ids = (rawLoads ?? []).map((l: any) => l.id).filter(Boolean);
+    if (ids.length === 0) return;
+
+    const channel = supabase
+      .channel('fleet-loads-route-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'fleet_loads' },
+        (payload) => {
+          const row: any = payload.new;
+          if (!row?.id || !ids.includes(row.id)) return;
+          const raw = row.current_route_geometry;
+          if (!Array.isArray(raw) || raw.length < 2) return;
+          const coerced: [number, number][] = raw
+            .filter((p: any) => Array.isArray(p) && p.length >= 2)
+            .map((p: any) => [Number(p[0]), Number(p[1])] as [number, number])
+            .filter(([la, ln]) => Number.isFinite(la) && Number.isFinite(ln));
+          if (coerced.length < 2) return;
+          setLiveRouteGeometries(prev => {
+            const next = new Map(prev);
+            next.set(row.id, coerced);
+            return next;
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [rawLoads]);
 
   // Parse intermediate stops for each load
   const loadStops = useMemo(() => {
@@ -383,9 +440,10 @@ export function FleetMapView() {
         truckCoords,
         isLiveLocation,
         stopCoords,
+        liveRouteGeometry: liveRouteGeometries.get(load.id) ?? null,
       } as LoadWithLocation;
     });
-  }, [rawLoads, driverLocations, geocodedCoords, loadStops]);
+  }, [rawLoads, driverLocations, geocodedCoords, loadStops, liveRouteGeometries]);
 
   if (isLoading) {
     return (
@@ -425,20 +483,22 @@ export function FleetMapView() {
 
         {loads.map(load => (
           <div key={load.id}>
-            {/* Route line — real road or straight-line fallback */}
+            {/* Route line — live recalculated > static OSRM > straight-line fallback */}
             {load.originCoords && load.destCoords && (
               <Polyline
                 positions={
+                  load.liveRouteGeometry ||
                   routeGeometries.get(load.id) || [
                     [load.originCoords.lat, load.originCoords.lng],
                     [load.destCoords.lat, load.destCoords.lng],
                   ]
                 }
                 pathOptions={{
-                  color: '#22c55e',
-                  weight: 3,
-                  opacity: 0.6,
-                  dashArray: routeGeometries.has(load.id) ? undefined : '10, 10',
+                  color: load.liveRouteGeometry ? '#16a34a' : '#22c55e',
+                  weight: load.liveRouteGeometry ? 4 : 3,
+                  opacity: load.liveRouteGeometry ? 0.85 : 0.6,
+                  dashArray:
+                    load.liveRouteGeometry || routeGeometries.has(load.id) ? undefined : '10, 10',
                 }}
               />
             )}

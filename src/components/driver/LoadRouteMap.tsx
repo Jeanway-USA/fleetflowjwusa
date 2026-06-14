@@ -7,6 +7,9 @@ import { fetchRouteWithWaypoints } from '@/lib/routing';
 import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
+import { useActiveLoadRoute } from '@/hooks/useActiveLoadRoute';
+import { Badge } from '@/components/ui/badge';
+import { Radio } from 'lucide-react';
 
 interface Coordinates {
   lat: number;
@@ -17,6 +20,10 @@ interface LoadRouteMapProps {
   origin: string;
   destination: string;
   notes?: string | null;
+  /** When provided, subscribes to live recalculated route geometry for this load. */
+  loadId?: string | null;
+  /** Optional fallback geometry (e.g. fetched server-side for public viewers without realtime). */
+  liveGeometry?: [number, number][] | null;
 }
 
 interface GeocodedStop {
@@ -73,13 +80,18 @@ function FitBounds({ points }: { points: [number, number][] }) {
   return null;
 }
 
-export function LoadRouteMap({ origin, destination, notes }: LoadRouteMapProps) {
+export function LoadRouteMap({ origin, destination, notes, loadId, liveGeometry }: LoadRouteMapProps) {
   const [originCoords, setOriginCoords] = useState<Coordinates | null>(null);
   const [destCoords, setDestCoords] = useState<Coordinates | null>(null);
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [geocodedStops, setGeocodedStops] = useState<GeocodedStop[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+
+  // Realtime live route (driver/dispatcher authenticated views); fallback to prop for public tracker
+  const { geometry: liveFromHook, isLive: isLiveFromHook } = useActiveLoadRoute(loadId);
+  const effectiveLive = liveFromHook ?? liveGeometry ?? null;
+  const isLive = isLiveFromHook || !!liveGeometry;
 
   const intermediateStops = useMemo(() => parseIntermediateStops(notes || null), [notes]);
 
@@ -147,9 +159,12 @@ export function LoadRouteMap({ origin, destination, notes }: LoadRouteMapProps) 
     return null;
   }
 
+  // Prefer the live recalculated geometry when available; otherwise use the static OSRM route.
+  const displayedRoute: [number, number][] | null = effectiveLive ?? routeCoords;
+
   // Compute bounds from route, stop markers, or origin/dest
-  const boundsPoints: [number, number][] = routeCoords && routeCoords.length > 1
-    ? routeCoords
+  const boundsPoints: [number, number][] = displayedRoute && displayedRoute.length > 1
+    ? displayedRoute
     : [
         ...(originCoords ? [[originCoords.lat, originCoords.lng] as [number, number]] : []),
         ...(destCoords ? [[destCoords.lat, destCoords.lng] as [number, number]] : []),
@@ -161,7 +176,16 @@ export function LoadRouteMap({ origin, destination, notes }: LoadRouteMapProps) 
     : [destCoords!.lat, destCoords!.lng];
 
   const renderMap = ({ isExpanded }: { isExpanded: boolean }) => (
-    <div className={isExpanded ? 'w-full h-full' : 'h-40 w-full rounded-lg overflow-hidden border border-border'}>
+    <div className={isExpanded ? 'w-full h-full' : 'h-40 w-full rounded-lg overflow-hidden border border-border relative'}>
+      {isLive && (
+        <Badge
+          variant="outline"
+          className="absolute top-2 right-2 z-[400] bg-background/90 text-green-600 border-green-500/30 gap-1"
+        >
+          <Radio className="h-3 w-3 animate-pulse" />
+          Live route
+        </Badge>
+      )}
       <MapContainer
         center={center}
         zoom={5}
@@ -175,17 +199,17 @@ export function LoadRouteMap({ origin, destination, notes }: LoadRouteMapProps) 
         className="z-0"
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        
+
         {boundsPoints.length >= 2 && <FitBounds points={boundsPoints} />}
 
-        {/* Route polyline — real road with waypoints */}
-        {routeCoords && routeCoords.length > 0 && (
+        {/* Route polyline — live recalc if present, otherwise static OSRM result */}
+        {displayedRoute && displayedRoute.length > 0 && (
           <Polyline
-            positions={routeCoords}
+            positions={displayedRoute}
             pathOptions={{
-              color: 'hsl(var(--primary))',
+              color: isLive ? '#22c55e' : 'hsl(var(--primary))',
               weight: 3,
-              opacity: 0.8,
+              opacity: 0.85,
             }}
           />
         )}

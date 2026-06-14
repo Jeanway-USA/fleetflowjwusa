@@ -10,6 +10,7 @@ import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { format, parseISO } from 'date-fns';
 
 interface TrackingData {
+  load_id?: string;
   origin: string;
   origin_full: string;
   destination: string;
@@ -19,6 +20,8 @@ interface TrackingData {
   delivery_date: string | null;
   booked_miles: number | null;
   load_number: string | null;
+  current_route_geometry: [number, number][] | null;
+  current_route_updated_at: string | null;
   org: {
     name: string;
     logo_url: string | null;
@@ -61,16 +64,30 @@ export default function PublicLoadTracker() {
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
     const url = `https://${projectId}.supabase.co/functions/v1/public-load-tracker?tracking_id=${trackingId}`;
 
-    fetch(url, {
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then(async (res) => {
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Failed to load');
-        setData(json);
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    const fetchOnce = (isInitial: boolean) =>
+      fetch(url, { headers: { 'Content-Type': 'application/json' } })
+        .then(async (res) => {
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error || 'Failed to load');
+          if (!cancelled) setData(json);
+        })
+        .catch((err) => {
+          if (isInitial && !cancelled) setError(err.message);
+        })
+        .finally(() => {
+          if (isInitial && !cancelled) setLoading(false);
+        });
+
+    fetchOnce(true);
+    // Realtime is not available to anonymous viewers — poll for route/location updates.
+    const poll = setInterval(() => fetchOnce(false), 30_000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(poll);
+    };
   }, [trackingId]);
 
   // Apply brand color via inline style
@@ -217,7 +234,13 @@ export default function PublicLoadTracker() {
         <Card>
           <CardContent className="p-0 overflow-hidden rounded-lg">
             <Suspense fallback={<MapSkeleton height={320} />}>
-              <LoadRouteMap origin={data.origin_full} destination={data.destination_full} />
+              <LoadRouteMap
+                origin={data.origin_full}
+                destination={data.destination_full}
+                loadId={data.load_id ?? null}
+                liveGeometry={data.current_route_geometry}
+              />
+
             </Suspense>
           </CardContent>
         </Card>

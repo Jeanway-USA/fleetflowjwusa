@@ -1921,6 +1921,9 @@ export type Database = {
           booked_miles: number | null
           cf_7512_number: string | null
           created_at: string
+          current_route_geometry: Json | null
+          current_route_origin: Json | null
+          current_route_updated_at: string | null
           delivery_at: string | null
           delivery_date: string | null
           delivery_time: string | null
@@ -1985,6 +1988,9 @@ export type Database = {
           booked_miles?: number | null
           cf_7512_number?: string | null
           created_at?: string
+          current_route_geometry?: Json | null
+          current_route_origin?: Json | null
+          current_route_updated_at?: string | null
           delivery_at?: string | null
           delivery_date?: string | null
           delivery_time?: string | null
@@ -2049,6 +2055,9 @@ export type Database = {
           booked_miles?: number | null
           cf_7512_number?: string | null
           created_at?: string
+          current_route_geometry?: Json | null
+          current_route_origin?: Json | null
+          current_route_updated_at?: string | null
           delivery_at?: string | null
           delivery_date?: string | null
           delivery_time?: string | null

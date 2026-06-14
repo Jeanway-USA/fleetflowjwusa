@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { MapPin, Navigation, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { maybeRecalcRoute } from '@/lib/recalcActiveRoute';
 
 // Update interval in milliseconds (10 minutes)
 const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
@@ -117,15 +118,23 @@ export function LocationSharing({ driverId, truckId, loadId }: LocationSharingPr
   const handlePositionUpdate = useCallback((position: GeolocationPosition) => {
     setCurrentPosition(position);
     setError(null);
-    
+
+    // Fire live route recalculation (independent throttling: 0.5mi / 60s / debounced)
+    if (loadId) {
+      maybeRecalcRoute(loadId, {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      });
+    }
+
     const now = Date.now();
     const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
-    
+
     // Send update if it's the first update or 10 minutes have passed
     if (lastUpdateTimeRef.current === 0 || timeSinceLastUpdate >= UPDATE_INTERVAL_MS) {
       updateLocation.mutate(position);
     }
-  }, [updateLocation]);
+  }, [updateLocation, loadId]);
 
   // Handle position errors
   const handlePositionError = useCallback((error: GeolocationPositionError) => {
