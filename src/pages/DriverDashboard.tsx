@@ -109,7 +109,14 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
 
   const isLoading = driverLoading || loadsLoading;
   const activeLoad = activeLoads.find(l => l.status === 'in_transit' || l.status === 'loading') || activeLoads[0];
-  const nextLoad = activeLoads.find(l => l.id !== activeLoad?.id);
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const nextLoad = activeLoads
+    .filter(l =>
+      l.id !== activeLoad?.id &&
+      (l.status === 'assigned' || l.status === 'pending') &&
+      l.pickup_date &&
+      l.pickup_date >= todayStr,
+    )[0];
 
   const driverCoords = driverLocation
     ? { lat: driverLocation.latitude, lng: driverLocation.longitude }
@@ -197,8 +204,10 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
         </div>
 
 
-        {/* Next Load Preview */}
-        {nextLoad && <NextLoadPreview load={nextLoad} />}
+        {/* Up Next (Pre-Plan) */}
+        {nextLoad && (
+          <NextLoadPreview load={nextLoad} payRate={driver.pay_rate} payType={driver.pay_type} />
+        )}
 
         {/* Scan Doc Button */}
         <div id="tour-document-scan">
