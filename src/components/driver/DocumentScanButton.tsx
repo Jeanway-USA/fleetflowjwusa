@@ -230,6 +230,13 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
           </Button>
         </div>
       </DialogContent>
+
+      <PhotoQualityGate
+        open={qualityGateOpen}
+        file={pendingFile}
+        onRetake={handleRetake}
+        onConfirm={handleConfirmQuality}
+      />
     </Dialog>
   );
 }
