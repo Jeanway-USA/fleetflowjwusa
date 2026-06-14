@@ -10,6 +10,7 @@ import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { format, parseISO } from 'date-fns';
 
 interface TrackingData {
+  load_id?: string;
   origin: string;
   origin_full: string;
   destination: string;
@@ -19,6 +20,8 @@ interface TrackingData {
   delivery_date: string | null;
   booked_miles: number | null;
   load_number: string | null;
+  current_route_geometry: [number, number][] | null;
+  current_route_updated_at: string | null;
   org: {
     name: string;
     logo_url: string | null;
