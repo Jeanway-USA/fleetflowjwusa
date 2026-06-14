@@ -130,6 +130,8 @@ export function FleetMapView() {
   const [geocodedCoords, setGeocodedCoords] = useState<Map<string, { lat: number; lng: number } | null>>(new Map());
   const [routeGeometries, setRouteGeometries] = useState<Map<string, [number, number][]>>(new Map());
   const [routeKeys, setRouteKeys] = useState<Map<string, string>>(new Map());
+  // Live, driver-GPS-derived route geometry per load (overrides static OSRM result when present)
+  const [liveRouteGeometries, setLiveRouteGeometries] = useState<Map<string, [number, number][]>>(new Map());
 
   // Fetch ALL driver locations (not just recent ones)
   const { data: initialLocations } = useQuery({
