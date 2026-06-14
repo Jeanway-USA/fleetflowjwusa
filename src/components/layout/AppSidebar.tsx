@@ -426,6 +426,14 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={currentPath === '/driver/loads'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
+                    <Link to="/driver/loads">
+                      <Package className="h-4 w-4" />
+                      <span>My Loads</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
                   <SidebarMenuButton asChild isActive={currentPath === '/driver-stats'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
                     <Link to="/driver-stats">
                       <BarChart className="h-4 w-4" />
