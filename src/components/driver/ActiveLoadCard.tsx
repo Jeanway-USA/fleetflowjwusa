@@ -159,6 +159,8 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   const [accessorialsOpen, setAccessorialsOpen] = useState(false);
   const { isOnline, enqueue } = useOfflineQueue();
   const { applyOptimistic } = useOptimisticLoadStatus();
+  // Single source of truth for pay math. Must be called before any early return.
+  const paySettings = usePaySettings();
 
   if (!load) {
     return (
@@ -177,8 +179,6 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
   const canProgress = STATUS_PROGRESSION[load.status] !== undefined;
   const nextStatus = STATUS_PROGRESSION[load.status];
 
-  // Single source of truth for pay math.
-  const paySettings = usePaySettings();
   const payBreakdown = calculateLoadPay(load, { pay_type: payType, pay_rate: payRate }, paySettings);
   const estimatedPay = payBreakdown.total;
 
