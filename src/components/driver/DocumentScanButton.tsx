@@ -1,15 +1,16 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Camera, Loader2, CheckCircle, Upload } from 'lucide-react';
+import { Camera, Loader2, CheckCircle, Upload, CloudOff, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStorageProvider } from '@/hooks/useStorageProvider';
 import { compressImage } from '@/lib/compress-image';
+import { useOfflineDocumentQueue } from '@/hooks/useOfflineDocumentQueue';
 import { PhotoQualityGate } from './PhotoQualityGate';
 
 interface DocumentScanButtonProps {
@@ -36,6 +37,44 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [qualityGateOpen, setQualityGateOpen] = useState(false);
+  const [showJustSynced, setShowJustSynced] = useState(false);
+
+  const {
+    isOnline,
+    queuedCount,
+    isSyncing,
+    lastSyncedAt,
+    enqueue: enqueueOfflineDoc,
+  } = useOfflineDocumentQueue();
+
+  // Flash a green "All documents uploaded" confirmation after a drain completes.
+  useEffect(() => {
+    if (lastSyncedAt && queuedCount === 0 && !isSyncing) {
+      setShowJustSynced(true);
+      const t = setTimeout(() => setShowJustSynced(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [lastSyncedAt, queuedCount, isSyncing]);
+
+  const queueCurrentForOffline = async (
+    fileToUpload: File | Blob,
+    fileName: string,
+    mimeType: string,
+    fileSize: number
+  ) => {
+    if (!user?.id) throw new Error('Not signed in');
+    await enqueueOfflineDoc({
+      blob: fileToUpload,
+      fileName,
+      mimeType,
+      fileSize,
+      documentType: docType,
+      driverId,
+      uploadedBy: user.id,
+      relatedType: 'driver',
+      relatedId: driverId,
+    });
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
@@ -47,27 +86,57 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
         : selectedFile;
 
       const fileExt = (fileToUpload.name.split('.').pop() || 'bin').toLowerCase();
+
+      // OFFLINE PATH — persist to IndexedDB; sync hook drains on reconnect.
+      if (!navigator.onLine) {
+        await queueCurrentForOffline(
+          fileToUpload,
+          fileToUpload.name,
+          fileToUpload.type,
+          fileToUpload.size
+        );
+        return { queued: true as const };
+      }
+
+      // ONLINE PATH — direct upload; fall back to the queue on transient failure.
       const filePath = `${driverId}/${Date.now()}.${fileExt}`;
+      try {
+        const { path, error: uploadError } = await upload('documents', filePath, fileToUpload);
+        if (uploadError || !path) throw uploadError || new Error('Upload failed');
 
-      // Upload through storage provider
-      const { path, error: uploadError } = await upload('documents', filePath, fileToUpload);
-      if (uploadError || !path) throw uploadError || new Error('Upload failed');
-
-      const { error: dbError } = await supabase.from('documents').insert({
-        file_name: fileToUpload.name,
-        file_path: path,
-        file_size: fileToUpload.size,
-        document_type: docType,
-        uploaded_by: user?.id,
-        related_type: 'driver',
-        related_id: driverId,
-      });
-
-      if (dbError) throw dbError;
+        const { error: dbError } = await supabase.from('documents').insert({
+          file_name: fileToUpload.name,
+          file_path: path,
+          file_size: fileToUpload.size,
+          document_type: docType,
+          uploaded_by: user?.id,
+          related_type: 'driver',
+          related_id: driverId,
+        });
+        if (dbError) throw dbError;
+        return { queued: false as const };
+      } catch (err: any) {
+        const looksTransient =
+          !navigator.onLine ||
+          err?.name === 'TypeError' ||
+          /network|failed to fetch|load failed/i.test(err?.message ?? '');
+        if (looksTransient) {
+          await queueCurrentForOffline(
+            fileToUpload,
+            fileToUpload.name,
+            fileToUpload.type,
+            fileToUpload.size
+          );
+          return { queued: true as const };
+        }
+        throw err;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
-      toast.success('Document uploaded successfully');
+      if (!result?.queued) {
+        toast.success('Document uploaded successfully');
+      }
       handleReset();
       setDialogOpen(false);
     },
@@ -150,6 +219,38 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
         </DialogHeader>
+
+        {/* Offline queue status — yellow while pending/syncing, green when freshly drained */}
+        {(queuedCount > 0 || isSyncing || showJustSynced) && (
+          <div
+            className={
+              isSyncing || queuedCount > 0
+                ? 'flex items-center gap-2 px-3 py-2 rounded-md bg-amber-500/15 border border-amber-500/30'
+                : 'flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-500/15 border border-emerald-500/30'
+            }
+          >
+            {isSyncing ? (
+              <RefreshCw className="h-4 w-4 text-amber-600 dark:text-amber-400 animate-spin" />
+            ) : queuedCount > 0 ? (
+              <CloudOff className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            )}
+            <span
+              className={
+                isSyncing || queuedCount > 0
+                  ? 'text-xs font-semibold text-amber-700 dark:text-amber-300'
+                  : 'text-xs font-semibold text-emerald-700 dark:text-emerald-300'
+              }
+            >
+              {isSyncing
+                ? 'Uploading queued documents…'
+                : queuedCount > 0
+                  ? `${queuedCount} queued for upload${isOnline ? '' : ' — offline'}`
+                  : 'All documents uploaded'}
+            </span>
+          </div>
+        )}
 
         <div className="space-y-4">
           {/* File Input */}
