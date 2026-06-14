@@ -207,7 +207,6 @@ export function AppSidebar() {
     { title: 'My Dashboard', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['dispatcher'] },
     { title: 'My Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['driver'] },
     { title: 'My Dashboard', icon: Wrench, path: '/maintenance-home', roles: ['maintenance'], feature: 'maintenance_full' },
-    { title: 'My Dashboard', icon: Wrench, path: '/maintenance-home', roles: ['maintenance'], feature: 'maintenance_full' },
   ];
 
   const pathToRole: Record<string, 'owner' | 'dispatcher' | 'driver' | 'maintenance'> = {
