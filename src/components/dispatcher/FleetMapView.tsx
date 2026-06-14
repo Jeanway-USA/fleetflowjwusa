@@ -440,9 +440,10 @@ export function FleetMapView() {
         truckCoords,
         isLiveLocation,
         stopCoords,
+        liveRouteGeometry: liveRouteGeometries.get(load.id) ?? null,
       } as LoadWithLocation;
     });
-  }, [rawLoads, driverLocations, geocodedCoords, loadStops]);
+  }, [rawLoads, driverLocations, geocodedCoords, loadStops, liveRouteGeometries]);
 
   if (isLoading) {
     return (
