@@ -220,11 +220,13 @@ export function FleetMapView() {
           status,
           driver_id,
           notes,
+          current_route_geometry,
+          current_route_updated_at,
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
           truck:trucks!fleet_loads_truck_id_fkey(unit_number)
         `)
         .eq('status', 'in_transit');
-      
+
       if (error) throw error;
       return data;
     },
@@ -232,6 +234,58 @@ export function FleetMapView() {
     refetchIntervalInBackground: false,
     staleTime: 30 * 1000,
   });
+
+  // Seed live route geometries from initial fetch, then subscribe to fleet_loads UPDATEs
+  useEffect(() => {
+    if (!rawLoads) return;
+    setLiveRouteGeometries(prev => {
+      const next = new Map(prev);
+      rawLoads.forEach((load: any) => {
+        const raw = load.current_route_geometry;
+        if (Array.isArray(raw) && raw.length >= 2) {
+          const coerced: [number, number][] = raw
+            .filter((p: any) => Array.isArray(p) && p.length >= 2)
+            .map((p: any) => [Number(p[0]), Number(p[1])] as [number, number])
+            .filter(([la, ln]) => Number.isFinite(la) && Number.isFinite(ln));
+          if (coerced.length >= 2) next.set(load.id, coerced);
+        }
+      });
+      return next;
+    });
+  }, [rawLoads]);
+
+  useEffect(() => {
+    const ids = (rawLoads ?? []).map((l: any) => l.id).filter(Boolean);
+    if (ids.length === 0) return;
+
+    const channel = supabase
+      .channel('fleet-loads-route-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'fleet_loads' },
+        (payload) => {
+          const row: any = payload.new;
+          if (!row?.id || !ids.includes(row.id)) return;
+          const raw = row.current_route_geometry;
+          if (!Array.isArray(raw) || raw.length < 2) return;
+          const coerced: [number, number][] = raw
+            .filter((p: any) => Array.isArray(p) && p.length >= 2)
+            .map((p: any) => [Number(p[0]), Number(p[1])] as [number, number])
+            .filter(([la, ln]) => Number.isFinite(la) && Number.isFinite(ln));
+          if (coerced.length < 2) return;
+          setLiveRouteGeometries(prev => {
+            const next = new Map(prev);
+            next.set(row.id, coerced);
+            return next;
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [rawLoads]);
 
   // Parse intermediate stops for each load
   const loadStops = useMemo(() => {
