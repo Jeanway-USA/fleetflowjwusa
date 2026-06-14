@@ -1,38 +1,35 @@
-# Public tracking link — already unauthenticated end-to-end
+## Audit result: persistence already works
 
-## What I found in the codebase
+The live route is already persisted to Supabase and consumed by all three views. The column is named **`current_route_geometry`** (semantically equivalent to your requested `active_route_geometry`).
 
-I traced the full tracking-link path (route → component → data fetch → database) and every layer is already public. There is nothing to change to make `/track` reachable without a login.
+### Task 1 — DB column ✅
+`supabase/migrations/20260614003343_…sql` already added to `public.fleet_loads`:
+- `current_route_geometry jsonb` — array of `[lat, lng]` tuples
+- `current_route_origin jsonb` — GPS point that produced the geometry
+- `current_route_updated_at timestamptz` — last recalc time
+- `REPLICA IDENTITY FULL` + added to `supabase_realtime` publication
+- The driver column-restriction trigger explicitly whitelists these three columns so the assigned driver can write them.
 
-### 1. Route is already outside `ProtectedRoute`
-`src/App.tsx` line 103, in the "Public routes" block (above the protected dashboards):
+### Task 2 — Save on GPS update ✅
+`src/components/driver/LocationSharing.tsx` (line 124) calls `maybeRecalcRoute(loadId, {lat, lng})` on every accepted GPS fix.
 
-```tsx
-<Route path="/track" element={<PublicLoadTracker />} />
-```
+`src/lib/recalcActiveRoute.ts`:
+- Throttles: ≥0.5 mi moved, ≥60 s elapsed, 4 s debounce.
+- Geocodes the destination (cached per load).
+- Calls OSRM via `fetchRoute(origin, dest)`.
+- `supabase.from('fleet_loads').update({ current_route_geometry, current_route_origin, current_route_updated_at }).eq('id', loadId)`.
 
-`ProtectedRoute` only wraps the dashboards below it; `/track` is rendered straight from `AuthProvider` with no role/auth gate.
+### Task 3 — Universal read ✅
+- **Driver page** — `src/components/driver/LoadRouteMap.tsx` uses `useActiveLoadRoute(loadId)` which (a) does an initial `SELECT current_route_geometry,…` and (b) subscribes via realtime `postgres_changes` on `fleet_loads`. Falls back to the static origin→destination route only when `geometry` is null.
+- **Dispatcher page** — `src/components/dispatcher/FleetMapView.tsx` selects `current_route_geometry` in its loads query, seeds `liveRouteGeometries` from the DB on initial load, and subscribes to `fleet_loads` UPDATEs to refresh that map. The route layer prefers `liveRouteGeometry` over the static OSRM polyline.
+- **Public tracker** — `supabase/functions/public-load-tracker/index.ts` selects and returns `current_route_geometry`/`current_route_updated_at`; `src/pages/PublicLoadTracker.tsx` passes it down as `liveGeometry`, so the public link draws the persisted live route on refresh too.
 
-### 2. `PublicLoadTracker` does not use `useAuth` or redirect to `/auth`
-`src/pages/PublicLoadTracker.tsx` reads `tracking_id` from the URL query and `fetch`es the public edge function with no Authorization header and no session check. There is no `useAuth`, no `navigate('/auth')`, no `<ProtectedRoute>` in this file. It renders cleanly for anonymous visitors.
+### What this means for your bug report
+If a refresh is still showing the static route, the geometry simply was not saved yet for that load (e.g. driver had not started sharing GPS, or the throttle gates had not yet fired). Once `maybeRecalcRoute` posts a successful update, all three surfaces will draw the saved geometry on refresh and update live via realtime.
 
-### 3. Database is fetched server-side, not from the browser
-Anonymous visitors never hit the `fleet_loads` table directly with the anon key. The component calls the `public-load-tracker` edge function:
+### Optional follow-ups (only if you want them — say the word)
+1. **Rename** `current_route_geometry` → `active_route_geometry` across DB column, migration, edge function, types, and 4 client files. Cosmetic only; no behavior change.
+2. **Telemetry** — add a `console.info` / toast on successful save + a `last_updated` badge on the dispatcher map so you can visibly confirm persistence is firing.
+3. **Tighten throttle** — drop `MIN_DISTANCE_MILES` from 0.5 → 0.1 and `MIN_INTERVAL_MS` from 60 s → 20 s so a stationary refresh test shows updates faster (uses more OSRM quota).
 
-- `supabase/config.toml` sets `verify_jwt = false` for the function, so it accepts unauthenticated requests.
-- `supabase/functions/public-load-tracker/index.ts` uses the **service role** key, looks up the row by `tracking_id` only, and returns a narrowed JSON shape (origin/destination condensed to city+state, status, dates, miles, org branding, current GPS location). Other columns on `fleet_loads` are never exposed.
-- RLS on `fleet_loads` is bypassed by service role — this is the intentional pattern and is safer than opening a public anon SELECT policy, because the edge function controls exactly which columns leave the database and only ever returns one row keyed by the random `tracking_id` token.
-
-The tracking URL generators in `src/pages/FleetLoads.tsx` and `src/components/driver/ActiveLoadCard.tsx` produce links in the form `${origin}/track?tracking_id=<uuid>`, which match the route above.
-
-### 4. No RLS policy change is needed (and adding one would be a regression)
-Granting `SELECT` on `fleet_loads` to the `anon` role — even scoped to `tracking_id` — would widen Data-API surface area: any column on the row becomes reachable from the browser with the anon key, including financial fields (`rate`, `gross_revenue`, `net_revenue`, `settlement`, broker info, etc.) and PII like driver assignments. The current edge-function-with-service-role pattern intentionally hides those columns. Task 3 as written would be a downgrade, not an improvement.
-
-## Recommended action
-
-No code or migration changes. To verify, open an incognito window and visit any link printed by the "Copy tracking link" button — the tracker should render with map, status stepper, and ETA without ever prompting for login. If you are still being bounced to `/auth`, it is almost certainly one of:
-
-- The link was opened on a path other than `/track?tracking_id=...` (e.g. someone pasted just the UUID into `/track/:id`). I can add a `/track/:trackingId` alias if your customers share links that way.
-- A stale service worker cached an old build that didn't have the public route. A hard refresh (or bumping the SW version) clears that.
-
-If you'd like, tell me which URL the broker tried and I'll add the matching public alias or SW bust in the next pass.
+Tell me which (if any) of 1–3 you want and I'll switch to build mode.
