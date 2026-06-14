@@ -1,53 +1,24 @@
 ## Cause
-The `documents` INSERT policy `Users can upload their own documents` has WITH CHECK:
+`src/components/driver/ActiveLoadCard.tsx` violates the Rules of Hooks:
 
-```
-uploaded_by = auth.uid()
-AND org_id = get_user_org_id(auth.uid())
-AND (…related_type checks…)
-```
+- Lines 154–161 call 8 hooks (6× `useState`, `useOfflineQueue`, `useOptimisticLoadStatus`).
+- Line 163: `if (!load) return <No Active Load card />;` — early return.
+- Line 181: `usePaySettings()` is called **after** the early return.
 
-`DocumentScanButton` (and the offline-queue drain in `useOfflineDocumentQueue`) inserts without `org_id`, so it's NULL and the check fails → "new row violates row-level security policy for table 'documents'".
+While the driver had an active load, React saw 9 hooks. The moment they tap "Mark Delivered" and the query refetches, `activeLoad` becomes undefined → only 8 hooks run → React throws "Rendered fewer hooks than expected", which the surrounding `ErrorBoundary` displays as "Something went wrong loading this section".
 
-This matches the project's standard multi-tenant rule (`org_id` on every public table) but the documents table never got a default-org trigger like `trucks`, `driver_notifications`, etc.
+## Fix
+Single-file change in `src/components/driver/ActiveLoadCard.tsx`:
 
-## Fix — single DB migration
+1. Move `const paySettings = usePaySettings();` up to sit alongside the other hooks at the top of the component (right after `useOptimisticLoadStatus`).
+2. Keep the `payBreakdown` / `estimatedPay` derivation where it is — those aren't hooks and depend on `load`, so they stay after the `if (!load)` guard.
 
-Add a `BEFORE INSERT` trigger on `public.documents` that defaults `org_id` from `get_user_org_id(auth.uid())` when the client omits it. Mirrors `set_trucks_org_id`, `set_driver_notification_org_id`, etc.
-
-```sql
-CREATE OR REPLACE FUNCTION public.set_documents_org_id()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  IF NEW.org_id IS NULL THEN
-    NEW.org_id := public.get_user_org_id(auth.uid());
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS set_documents_org_id_trg ON public.documents;
-CREATE TRIGGER set_documents_org_id_trg
-BEFORE INSERT ON public.documents
-FOR EACH ROW EXECUTE FUNCTION public.set_documents_org_id();
-```
-
-## Why this is the right shape
-- **No client code change** → fixes both the live `DocumentScanButton` upload and any document already sitting in the IndexedDB offline queue when the user reconnects.
-- **Trigger-based default**, not a column DEFAULT, so `auth.uid()` is evaluated per insert (column defaults can't reference auth).
-- **Doesn't widen security**: the trigger only fills NULL; the RLS check still validates `org_id = get_user_org_id(auth.uid())` and `uploaded_by = auth.uid()`.
-- **Backwards compatible**: existing inserts that already supply `org_id` (admin/Operations paths) are untouched.
+Result: hook order is identical on every render whether or not `load` is defined.
 
 ## Out of scope
-- No change to `documents` policies — they're correct, the inserts just lacked org context.
-- No change to `DocumentScanButton.tsx`, `useOfflineDocumentQueue.ts`, or the storage bucket.
-- Not retro-filling org on any historical rows (none have been created in this broken state).
+- No other components touched. No query, RLS, or layout changes.
+- No new error boundaries — the existing one is correct; we're removing the cause.
 
 ## Verification
-After the migration runs, in the driver dashboard:
-1. Scan Doc → Take Photo → Quality Gate → Upload → expect "Document uploaded successfully" and a new row in `documents` with `org_id` populated.
-2. With the network throttled to offline → queue + reconnect → expect the green "All documents uploaded" chip and the same row.
+1. Driver dashboard with an active load → "Mark Delivered" → card transitions to "No Active Load" with no error banner.
+2. Refresh the dashboard while no load is active → still renders cleanly.
