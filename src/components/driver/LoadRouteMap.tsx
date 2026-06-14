@@ -80,13 +80,18 @@ function FitBounds({ points }: { points: [number, number][] }) {
   return null;
 }
 
-export function LoadRouteMap({ origin, destination, notes }: LoadRouteMapProps) {
+export function LoadRouteMap({ origin, destination, notes, loadId, liveGeometry }: LoadRouteMapProps) {
   const [originCoords, setOriginCoords] = useState<Coordinates | null>(null);
   const [destCoords, setDestCoords] = useState<Coordinates | null>(null);
   const [routeCoords, setRouteCoords] = useState<[number, number][] | null>(null);
   const [geocodedStops, setGeocodedStops] = useState<GeocodedStop[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+
+  // Realtime live route (driver/dispatcher authenticated views); fallback to prop for public tracker
+  const { geometry: liveFromHook, isLive: isLiveFromHook } = useActiveLoadRoute(loadId);
+  const effectiveLive = liveFromHook ?? liveGeometry ?? null;
+  const isLive = isLiveFromHook || !!liveGeometry;
 
   const intermediateStops = useMemo(() => parseIntermediateStops(notes || null), [notes]);
 
