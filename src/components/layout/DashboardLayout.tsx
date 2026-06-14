@@ -30,6 +30,7 @@ import { CommandPalette } from '@/components/shared/CommandPalette';
 import { BetaFeedbackWidget } from '@/components/shared/BetaFeedbackWidget';
 import { DiscordBanner } from '@/components/shared/DiscordBanner';
 import { OfflineIndicator } from '@/components/shared/OfflineIndicator';
+import { DocumentSyncBootstrap } from '@/components/shared/DocumentSyncBootstrap';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProductTour } from '@/components/shared/ProductTour';
 import { useProductTour } from '@/hooks/useProductTour';
@@ -304,6 +305,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
               </Breadcrumb>
             )}
             <OfflineIndicator />
+            <DocumentSyncBootstrap />
             {tier === 'open_beta' && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/15 to-yellow-500/15 border border-amber-500/30">
                 <Sparkles className="h-3.5 w-3.5 text-amber-500" />
