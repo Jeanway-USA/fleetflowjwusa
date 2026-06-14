@@ -37,6 +37,44 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [qualityGateOpen, setQualityGateOpen] = useState(false);
+  const [showJustSynced, setShowJustSynced] = useState(false);
+
+  const {
+    isOnline,
+    queuedCount,
+    isSyncing,
+    lastSyncedAt,
+    enqueue: enqueueOfflineDoc,
+  } = useOfflineDocumentQueue();
+
+  // Flash a green "All documents uploaded" confirmation after a drain completes.
+  useEffect(() => {
+    if (lastSyncedAt && queuedCount === 0 && !isSyncing) {
+      setShowJustSynced(true);
+      const t = setTimeout(() => setShowJustSynced(false), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [lastSyncedAt, queuedCount, isSyncing]);
+
+  const queueCurrentForOffline = async (
+    fileToUpload: File | Blob,
+    fileName: string,
+    mimeType: string,
+    fileSize: number
+  ) => {
+    if (!user?.id) throw new Error('Not signed in');
+    await enqueueOfflineDoc({
+      blob: fileToUpload,
+      fileName,
+      mimeType,
+      fileSize,
+      documentType: docType,
+      driverId,
+      uploadedBy: user.id,
+      relatedType: 'driver',
+      relatedId: driverId,
+    });
+  };
 
   const uploadMutation = useMutation({
     mutationFn: async () => {
