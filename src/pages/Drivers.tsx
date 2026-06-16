@@ -257,10 +257,14 @@ export default function Drivers() {
       toast.error('First and last name are required');
       return;
     }
+    const payload = {
+      ...formData,
+      landstar_operator_id: formData.landstar_operator_id?.trim() ? formData.landstar_operator_id.trim() : null,
+    };
     if (editingDriver) {
-      updateMutation.mutate({ id: editingDriver.id, ...formData });
+      updateMutation.mutate({ id: editingDriver.id, ...payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
 
