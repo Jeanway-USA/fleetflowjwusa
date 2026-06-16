@@ -74,6 +74,14 @@ export function NextLoadPreview({ load, payRate, payType }: NextLoadPreviewProps
           <span className="truncate" title={load.destination}>{getCondensedAddress(load.destination)}</span>
         </div>
 
+        {load.pickup_number && (
+          <div className="mt-2 inline-flex items-center gap-2 rounded-md border-2 border-warning bg-warning/15 px-2.5 py-1 text-warning font-bold tracking-wide shadow-sm">
+            <FileText className="h-3.5 w-3.5" />
+            <span className="text-[11px] uppercase">Pickup #:</span>
+            <span className="font-mono text-sm">{load.pickup_number}</span>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground gap-2 flex-wrap">
           <div className="flex items-center gap-1">
             <Calendar className="h-3 w-3" />
