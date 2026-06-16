@@ -459,6 +459,7 @@ export default function FleetLoads() {
       org_id: orgId,
       cf_7512_number: formData.is_in_bond ? (formData.cf_7512_number ?? '').trim() : null,
       negotiation_notes: formData.negotiation_notes || null,
+      pickup_number: formData.pickup_number?.trim() ? formData.pickup_number.trim() : null,
     };
 
     // Strip any prior auto-generated rows, then re-inject if applicable.
@@ -1118,6 +1119,18 @@ export default function FleetLoads() {
                       onChange={(e) => setFormData({ ...formData, destination: e.target.value })} 
                       placeholder="5678 Commerce Dr, Evans, CO 80620" 
                       required 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="pickup_number">Pickup Number (PU#)</Label>
+                    <Input
+                      id="pickup_number"
+                      value={formData.pickup_number || ''}
+                      onChange={(e) => setFormData({ ...formData, pickup_number: e.target.value })}
+                      placeholder="e.g. PU-48291 (shown to driver at guard shack)"
                     />
                   </div>
                 </div>
