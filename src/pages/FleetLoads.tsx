@@ -459,6 +459,7 @@ export default function FleetLoads() {
       org_id: orgId,
       cf_7512_number: formData.is_in_bond ? (formData.cf_7512_number ?? '').trim() : null,
       negotiation_notes: formData.negotiation_notes || null,
+      pickup_number: formData.pickup_number?.trim() ? formData.pickup_number.trim() : null,
     };
 
     // Strip any prior auto-generated rows, then re-inject if applicable.
