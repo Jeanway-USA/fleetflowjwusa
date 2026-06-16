@@ -443,6 +443,15 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
                 Origin
               </div>
               <p className="font-medium pl-6">{load.origin}</p>
+              {load.pickup_number && (
+                <div className="pl-6 mt-2">
+                  <div className="inline-flex items-center gap-2 rounded-md border-2 border-warning bg-warning/15 px-3 py-1.5 text-warning font-bold tracking-wide shadow-sm">
+                    <FileText className="h-4 w-4" />
+                    <span className="text-sm uppercase">Pickup #:</span>
+                    <span className="font-mono text-base">{load.pickup_number}</span>
+                  </div>
+                </div>
+              )}
               {load.pickup_date && (
                 <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
