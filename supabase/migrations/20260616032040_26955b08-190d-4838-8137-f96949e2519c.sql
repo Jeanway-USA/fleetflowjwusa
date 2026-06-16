@@ -1,0 +1,1 @@
+ALTER TABLE public.fleet_loads ADD COLUMN IF NOT EXISTS pickup_number text;

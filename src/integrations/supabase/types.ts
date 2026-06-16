@@ -1963,6 +1963,7 @@ export type Database = {
           origin: string
           pickup_at: string | null
           pickup_date: string | null
+          pickup_number: string | null
           pickup_time: string | null
           pickup_time_type: string
           pickup_tz: string | null
@@ -2030,6 +2031,7 @@ export type Database = {
           origin: string
           pickup_at?: string | null
           pickup_date?: string | null
+          pickup_number?: string | null
           pickup_time?: string | null
           pickup_time_type?: string
           pickup_tz?: string | null
@@ -2097,6 +2099,7 @@ export type Database = {
           origin?: string
           pickup_at?: string | null
           pickup_date?: string | null
+          pickup_number?: string | null
           pickup_time?: string | null
           pickup_time_type?: string
           pickup_tz?: string | null
