@@ -269,6 +269,15 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
             <span className="font-medium">{getCondensedAddress(load.destination)}</span>
           </div>
 
+          {/* Pickup Number - prominent guard-shack badge */}
+          {load.pickup_number && (
+            <div className="inline-flex items-center gap-2 rounded-md border-2 border-warning bg-warning/15 px-3 py-1.5 text-warning font-bold tracking-wide shadow-sm">
+              <FileText className="h-4 w-4" />
+              <span className="text-sm uppercase">Pickup #:</span>
+              <span className="font-mono text-base">{load.pickup_number}</span>
+            </div>
+          )}
+
           {/* Date & Time */}
           <div className="flex flex-col gap-1 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
