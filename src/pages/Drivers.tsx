@@ -90,6 +90,7 @@ export default function Drivers() {
     { key: 'email', label: 'Email' },
     { key: 'phone', label: 'Phone' },
     { key: 'license_number', label: 'CDL / License Number' },
+    { key: 'landstar_operator_id', label: 'Landstar Operator ID' },
     { key: 'license_expiry', label: 'License Expiry' },
     { key: 'medical_card_expiry', label: 'Medical Card Expiry' },
     { key: 'hire_date', label: 'Hire Date' },
@@ -256,10 +257,14 @@ export default function Drivers() {
       toast.error('First and last name are required');
       return;
     }
+    const payload = {
+      ...formData,
+      landstar_operator_id: formData.landstar_operator_id?.trim() ? formData.landstar_operator_id.trim() : null,
+    };
     if (editingDriver) {
-      updateMutation.mutate({ id: editingDriver.id, ...formData });
+      updateMutation.mutate({ id: editingDriver.id, ...payload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(payload);
     }
   };
 
@@ -382,6 +387,11 @@ export default function Drivers() {
                           return <Badge variant={variant as any} className="text-xs">{s.label}</Badge>;
                         })()}
                       </div>
+                      {driver.landstar_operator_id && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Landstar ID: <span className="font-mono">{driver.landstar_operator_id}</span>
+                        </p>
+                      )}
                     </div>
 
                   </div>
@@ -588,6 +598,17 @@ export default function Drivers() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="landstar_operator_id">Landstar Operator ID</Label>
+                  <Input
+                    id="landstar_operator_id"
+                    value={formData.landstar_operator_id || ''}
+                    onChange={(e) => setFormData({ ...formData, landstar_operator_id: e.target.value })}
+                    placeholder="e.g. 123456"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="license_expiry">License Expiry</Label>

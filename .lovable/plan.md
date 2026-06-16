@@ -1,24 +1,22 @@
-## Cause
-`src/components/driver/ActiveLoadCard.tsx` violates the Rules of Hooks:
+## Goal
+Capture and surface each driver's unique Landstar Operator ID.
 
-- Lines 154–161 call 8 hooks (6× `useState`, `useOfflineQueue`, `useOptimisticLoadStatus`).
-- Line 163: `if (!load) return <No Active Load card />;` — early return.
-- Line 181: `usePaySettings()` is called **after** the early return.
+## 1. Database (migration)
+Add `landstar_operator_id text` column to `public.drivers` (nullable). No constraints — IDs can vary in format and may be added later. Existing RLS policies already cover the column.
 
-While the driver had an active load, React saw 9 hooks. The moment they tap "Mark Delivered" and the query refetches, `activeLoad` becomes undefined → only 8 hooks run → React throws "Rendered fewer hooks than expected", which the surrounding `ErrorBoundary` displays as "Something went wrong loading this section".
+Note: the `drivers` table is the canonical record for fleet drivers in this app (`profiles` is the auth/account record). Storing it on `drivers` matches every other CDL/credential field and keeps it scoped per-org via existing RLS.
 
-## Fix
-Single-file change in `src/components/driver/ActiveLoadCard.tsx`:
+## 2. Drivers page UI (`src/pages/Drivers.tsx`)
+The page renders drivers as cards (not a table). Make the Operator ID visible at a glance on each card:
+- Under the driver's name/status badges, add a small muted line: `Landstar ID: <value>` (only when present).
+- Add `landstar_operator_id` to the `driverFields` list so it shows up in any field-driven views/exports.
 
-1. Move `const paySettings = usePaySettings();` up to sit alongside the other hooks at the top of the component (right after `useOptimisticLoadStatus`).
-2. Keep the `payBreakdown` / `estimatedPay` derivation where it is — those aren't hooks and depend on `load`, so they stay after the `if (!load)` guard.
-
-Result: hook order is identical on every render whether or not `load` is defined.
+## 3. Add/Edit Driver dialog (same file)
+In the existing form, add a new input inside the "License & Credentials" section (alongside License Number / State):
+- Label: "Landstar Operator ID"
+- Bound to `formData.landstar_operator_id`, trimmed on submit, saved as `null` when blank.
+The existing insert/update mutation already spreads `formData` into the `drivers` row, so once the column exists and the field is in `formData`, saves will persist automatically.
 
 ## Out of scope
-- No other components touched. No query, RLS, or layout changes.
-- No new error boundaries — the existing one is correct; we're removing the cause.
-
-## Verification
-1. Driver dashboard with an active load → "Mark Delivered" → card transitions to "No Active Load" with no error banner.
-2. Refresh the dashboard while no load is active → still renders cleanly.
+- No changes to `profiles`, onboarding flow, signed documents, or driver self-serve screens.
+- No uniqueness constraint (can be added later if required).
