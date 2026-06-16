@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Calendar, MapPin, Lock, DollarSign } from 'lucide-react';
+import { ArrowRight, Calendar, MapPin, Lock, DollarSign, FileText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 
@@ -15,6 +15,7 @@ interface Load {
   booked_miles: number | null;
   landstar_load_id: string | null;
   rate?: number | null;
+  pickup_number?: string | null;
 }
 
 interface NextLoadPreviewProps {
