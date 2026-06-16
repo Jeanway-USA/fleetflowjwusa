@@ -1641,6 +1641,7 @@ export type Database = {
           hazmat_expiry: string | null
           hire_date: string | null
           id: string
+          landstar_operator_id: string | null
           last_name: string
           license_expiry: string | null
           license_number: string | null
@@ -1667,6 +1668,7 @@ export type Database = {
           hazmat_expiry?: string | null
           hire_date?: string | null
           id?: string
+          landstar_operator_id?: string | null
           last_name: string
           license_expiry?: string | null
           license_number?: string | null
@@ -1693,6 +1695,7 @@ export type Database = {
           hazmat_expiry?: string | null
           hire_date?: string | null
           id?: string
+          landstar_operator_id?: string | null
           last_name?: string
           license_expiry?: string | null
           license_number?: string | null
