@@ -598,6 +598,16 @@ export default function Drivers() {
                       ))}
                     </SelectContent>
                   </Select>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="landstar_operator_id">Landstar Operator ID</Label>
+                  <Input
+                    id="landstar_operator_id"
+                    value={formData.landstar_operator_id || ''}
+                    onChange={(e) => setFormData({ ...formData, landstar_operator_id: e.target.value })}
+                    placeholder="e.g. 123456"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="license_expiry">License Expiry</Label>
