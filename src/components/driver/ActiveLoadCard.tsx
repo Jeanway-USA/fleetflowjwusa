@@ -73,6 +73,7 @@ interface Load {
   pod_required?: boolean;
   is_in_bond?: boolean | null;
   cf_7512_number?: string | null;
+  pickup_number?: string | null;
   load_accessorials?: Array<{ id?: string; accessorial_type?: string | null; amount?: number | null; notes?: string | null }>;
 }
 
