@@ -1122,6 +1122,18 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="pickup_number">Pickup Number (PU#)</Label>
+                    <Input
+                      id="pickup_number"
+                      value={formData.pickup_number || ''}
+                      onChange={(e) => setFormData({ ...formData, pickup_number: e.target.value })}
+                      placeholder="e.g. PU-48291 (shown to driver at guard shack)"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="pickup_date">Pickup Date</Label>
