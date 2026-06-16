@@ -387,6 +387,11 @@ export default function Drivers() {
                           return <Badge variant={variant as any} className="text-xs">{s.label}</Badge>;
                         })()}
                       </div>
+                      {driver.landstar_operator_id && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Landstar ID: <span className="font-mono">{driver.landstar_operator_id}</span>
+                        </p>
+                      )}
                     </div>
 
                   </div>
