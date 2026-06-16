@@ -90,6 +90,7 @@ export default function Drivers() {
     { key: 'email', label: 'Email' },
     { key: 'phone', label: 'Phone' },
     { key: 'license_number', label: 'CDL / License Number' },
+    { key: 'landstar_operator_id', label: 'Landstar Operator ID' },
     { key: 'license_expiry', label: 'License Expiry' },
     { key: 'medical_card_expiry', label: 'Medical Card Expiry' },
     { key: 'hire_date', label: 'Hire Date' },
