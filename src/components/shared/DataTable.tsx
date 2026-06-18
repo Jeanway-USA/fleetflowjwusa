@@ -183,13 +183,44 @@ export function DataTable<T extends { id: string }>({
     });
   }, [data, columns, filterValues, activeFilterCount]);
 
+  // Sort state
+  const [sortState, setSortState] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
+  const sortedData = useMemo(() => {
+    if (!sortState) return filteredData;
+    const col = columns.find(c => String(c.key) === sortState.key);
+    if (!col) return filteredData;
+    const accessor = col.sortAccessor ?? ((item: T) => item[col.key as keyof T] as unknown as string | number | null | undefined);
+    const dir = sortState.dir === 'asc' ? 1 : -1;
+    const arr = [...filteredData];
+    arr.sort((a, b) => {
+      const av = accessor(a);
+      const bv = accessor(b);
+      const aNil = av === null || av === undefined || av === '';
+      const bNil = bv === null || bv === undefined || bv === '';
+      if (aNil && bNil) return 0;
+      if (aNil) return 1; // nulls last regardless of dir
+      if (bNil) return -1;
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+    });
+    return arr;
+  }, [filteredData, sortState, columns]);
+
+  const cycleSort = useCallback((key: string) => {
+    setSortState(prev => {
+      if (!prev || prev.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return null;
+    });
+  }, []);
+
   const computedWidths = useMemo(() => {
     const defaultWidth = `${100 / visibleColumns.length}%`;
     return visibleColumns.map(col => col.width || defaultWidth);
   }, [visibleColumns]);
 
   const rowVirtualizer = useVirtualizer({
-    count: filteredData.length,
+    count: sortedData.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
     overscan: 15,
