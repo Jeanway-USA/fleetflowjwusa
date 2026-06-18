@@ -831,6 +831,28 @@ export default function FleetLoads() {
                   : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : '-')
               },
               { key: 'status', header: 'Status', render: (load: any) => <StatusBadge status={load.status} /> },
+              {
+                key: 'driver_name',
+                header: 'Driver',
+                sortable: true,
+                filter: { type: 'text', accessor: (l: any) => l.driver_name },
+                render: (load: any) => (
+                  load.driver_id
+                    ? <span>{load.driver_name}</span>
+                    : <span className="text-muted-foreground italic">Unassigned</span>
+                ),
+              },
+              {
+                key: 'truck_unit',
+                header: 'Truck #',
+                sortable: true,
+                filter: { type: 'text', accessor: (l: any) => l.truck_unit },
+                render: (load: any) => (
+                  load.truck_id
+                    ? <span className="font-mono">{load.truck_unit}</span>
+                    : <span className="text-muted-foreground italic">Unassigned</span>
+                ),
+              },
               { key: 'actions', header: '', render: (load: any) => (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -850,7 +872,7 @@ export default function FleetLoads() {
                 </DropdownMenu>
               )},
             ]}
-            data={filteredLoads}
+            data={enrichedLoads}
             loading={isLoading}
             emptyMessage="No loads yet"
             emptyDescription="Create your first load to start tracking revenue and miles."
