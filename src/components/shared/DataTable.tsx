@@ -40,6 +40,8 @@ interface Column<T> {
   width?: string;
   hiddenOnMobile?: boolean;
   filter?: ColumnFilter<T>;
+  sortable?: boolean;
+  sortAccessor?: (item: T) => string | number | null | undefined;
 }
 
 interface DataTableProps<T> {
