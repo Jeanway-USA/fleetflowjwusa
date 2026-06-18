@@ -425,19 +425,22 @@ export default function DriverOnboarding() {
 
     setSignedResults(results);
 
-    // Mark onboarding complete on the user's profile so guards unlock the dashboard.
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({ onboarding_completed: true })
-      .eq('user_id', user.id);
-    if (profileError) {
-      console.error('Failed to mark onboarding complete:', profileError);
-    } else {
-      await refreshOrgData();
+    if (!revisionMode) {
+      // Mark onboarding complete on the user's profile so guards unlock the dashboard.
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ onboarding_completed: true })
+        .eq('user_id', user.id);
+      if (profileError) {
+        console.error('Failed to mark onboarding complete:', profileError);
+      } else {
+        await refreshOrgData();
+      }
     }
 
-    toast.success('Documents submitted successfully');
+    toast.success(revisionMode ? 'Revisions resubmitted. Admin will be notified.' : 'Documents submitted successfully');
   };
+
 
   const handleContinue = async () => {
     // Step 0: validate + save driver credentials, then advance
