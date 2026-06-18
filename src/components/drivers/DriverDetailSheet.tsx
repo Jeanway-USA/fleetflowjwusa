@@ -213,13 +213,19 @@ export function DriverDetailSheet({
             <div className="pt-4 pb-2 space-y-3">
               <div className="flex items-center gap-2">
                 <FileSignature className="h-4 w-4 text-primary" />
-                <h4 className="font-medium text-sm">Signed Documents</h4>
+                <h4 className="font-medium text-sm">Onboarding Review</h4>
               </div>
+              <CredentialsReviewCard
+                driverId={driver.id}
+                status={(driver.credentials_review_status ?? 'pending') as 'pending' | 'approved' | 'revision_requested'}
+                notes={driver.credentials_revision_notes ?? null}
+              />
               <SignedOnboardingDocuments driverId={driver.id} />
               {(isOwner || hasRole('payroll_admin')) && (
                 <DriverBankingDetails driverId={driver.id} />
               )}
             </div>
+
 
             {canForceReonboard && !readOnly && (
               <>
