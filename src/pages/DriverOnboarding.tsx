@@ -124,6 +124,49 @@ export default function DriverOnboarding() {
     },
   });
 
+  // Latest review status per document_type for this driver
+  const { data: docRevisions = {} } = useQuery({
+    queryKey: ['onboarding-revisions-detail', driverRow?.id],
+    enabled: !!driverRow?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_signed_documents')
+        .select('id, document_type, review_status, revision_notes, signed_at')
+        .eq('driver_id', driverRow!.id)
+        .order('signed_at', { ascending: false });
+      if (error) throw error;
+      const map: Record<string, { id: string; status: string; notes: string | null }> = {};
+      for (const row of (data ?? []) as Array<{ id: string; document_type: string; review_status: string; revision_notes: string | null }>) {
+        if (!map[row.document_type]) {
+          map[row.document_type] = { id: row.id, status: row.review_status, notes: row.revision_notes };
+        }
+      }
+      return map;
+    },
+  });
+
+  const credentialsRevisionNotes = driverRow?.credentials_review_status === 'revision_requested'
+    ? (driverRow?.credentials_revision_notes ?? null)
+    : null;
+
+  // Deep-link: when ?revision=1, jump to first step that needs revision.
+  useEffect(() => {
+    if (deepLinked || !revisionMode || !driverRow || templates.length === 0) return;
+    if (driverRow.credentials_review_status === 'revision_requested') {
+      setStepIndex(0);
+      setDeepLinked(true);
+      return;
+    }
+    const idx = templates.findIndex((t) => docRevisions[t.document_type]?.status === 'revision_requested');
+    if (idx >= 0) {
+      setStepIndex(idx + 1);
+      setDeepLinked(true);
+    } else {
+      setDeepLinked(true);
+    }
+  }, [revisionMode, driverRow, templates, docRevisions, deepLinked]);
+
+
   // Step 0 = credentials, Steps 1..N = templates
   const CREDENTIALS_STEP = 0;
   const isCredentialsStep = stepIndex === CREDENTIALS_STEP;
