@@ -486,7 +486,7 @@ export function DataTable<T extends { id: string }>({
                 display: 'block',
               }}
             >
-              {filteredData.length === 0 && (
+              {sortedData.length === 0 && (
                 <tr style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
                   <td colSpan={visibleColumns.length + (showSelection ? 1 : 0)} className={cn(tdClass, "text-center text-muted-foreground py-8")}>
                     No rows match the current filters.
@@ -494,7 +494,7 @@ export function DataTable<T extends { id: string }>({
                 </tr>
               )}
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const item = filteredData[virtualRow.index];
+                const item = sortedData[virtualRow.index];
                 const isSelected = showSelection && safeSelectedIds.has(item.id);
                 return (
                   <tr
