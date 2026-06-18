@@ -299,8 +299,13 @@ export default function DriverOnboarding() {
     const results: SignedResult[] = [];
 
     for (const tmpl of templates) {
+      // In revision mode, skip templates already approved by the admin.
+      if (revisionMode && docRevisions[tmpl.document_type]?.status === 'approved') {
+        continue;
+      }
       const tState: TemplateState =
         state[tmpl.id] ?? EMPTY_TEMPLATE_STATE;
+
 
       const title =
         tmpl.name ??
