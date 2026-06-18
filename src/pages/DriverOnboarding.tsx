@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/compress-image';
