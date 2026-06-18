@@ -1597,6 +1597,10 @@ export type Database = {
           file_path: string
           id: string
           org_id: string
+          review_status: Database["public"]["Enums"]["onboarding_review_status"]
+          reviewed_at: string | null
+          reviewed_by: string | null
+          revision_notes: string | null
           signature_data_url: string | null
           signed_at: string
           template_id: string | null
@@ -1610,6 +1614,10 @@ export type Database = {
           file_path: string
           id?: string
           org_id: string
+          review_status?: Database["public"]["Enums"]["onboarding_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          revision_notes?: string | null
           signature_data_url?: string | null
           signed_at?: string
           template_id?: string | null
@@ -1623,6 +1631,10 @@ export type Database = {
           file_path?: string
           id?: string
           org_id?: string
+          review_status?: Database["public"]["Enums"]["onboarding_review_status"]
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          revision_notes?: string | null
           signature_data_url?: string | null
           signed_at?: string
           template_id?: string | null
@@ -1633,6 +1645,10 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          credentials_review_status: Database["public"]["Enums"]["onboarding_review_status"]
+          credentials_reviewed_at: string | null
+          credentials_reviewed_by: string | null
+          credentials_revision_notes: string | null
           direct_deposit_attachment_url: string | null
           email: string | null
           endorsements: string[] | null
@@ -1660,6 +1676,10 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          credentials_review_status?: Database["public"]["Enums"]["onboarding_review_status"]
+          credentials_reviewed_at?: string | null
+          credentials_reviewed_by?: string | null
+          credentials_revision_notes?: string | null
           direct_deposit_attachment_url?: string | null
           email?: string | null
           endorsements?: string[] | null
@@ -1687,6 +1707,10 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          credentials_review_status?: Database["public"]["Enums"]["onboarding_review_status"]
+          credentials_reviewed_at?: string | null
+          credentials_reviewed_by?: string | null
+          credentials_revision_notes?: string | null
           direct_deposit_attachment_url?: string | null
           email?: string | null
           endorsements?: string[] | null
@@ -5035,6 +5059,7 @@ export type Database = {
         | "safety"
         | "driver"
         | "maintenance"
+      onboarding_review_status: "pending" | "approved" | "revision_requested"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -5170,6 +5195,7 @@ export const Constants = {
         "driver",
         "maintenance",
       ],
+      onboarding_review_status: ["pending", "approved", "revision_requested"],
     },
   },
 } as const
