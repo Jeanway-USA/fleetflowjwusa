@@ -20,6 +20,8 @@ import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
 import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
 import { MyEquipmentCard } from '@/components/driver/MyEquipmentCard';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
+import { OnboardingRevisionBanner } from '@/components/driver/OnboardingRevisionBanner';
+
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { Loader2, Sun, Moon, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
