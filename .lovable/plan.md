@@ -1,64 +1,37 @@
 ## Goal
-Let admins reject specific onboarding artifacts (credentials, driver agreement, direct deposit, future templates) with a written reason, alert the driver, and deep‑link them back to fix only that step — no full restart.
+Make the Fleet Loads board organizable by assigned Driver and Truck Number — visible columns, sortable headers, and dedicated filters.
 
-## Step model
-Onboarding currently has two kinds of steps:
-- **Credentials step** — saved on the `drivers` row (license, medical card, banking screen, etc.).
-- **Document steps** — one row per signed template in `driver_signed_documents` (`document_type` = `driver_agreement`, `direct_deposit`, plus any future templates).
+## Current state (already in code)
+- `FleetLoads.tsx` fetches `fleet_loads.*` (which already includes `driver_id` and `truck_id`) and separately loads `drivers` (`drivers_public_view`) and `trucks`. Helpers `getDriverName(load.driver_id)` and `getTruckUnit(load.truck_id)` already exist.
+- Table is rendered via the shared `DataTable` component (`src/components/shared/DataTable.tsx`), which supports per-column text/date filters but currently has **no sortable headers**.
 
-To stay generic (Task 1 asks for per-step statuses, not hard-coded columns), we'll track review status on each artifact, not as a fixed list of columns.
+So the join work for Task 1 is effectively done — driver/truck data is already on the client. We just need to wire it into the visible row data so columns, sorting, and filtering all work off the same field.
 
-## Task 1 — Database
+## Changes
 
-Migration adds review tracking in two places:
+### 1. `src/pages/FleetLoads.tsx`
+- Compute a memoized `enrichedLoads` from the filtered-by-month list that adds two derived strings per row:
+  - `driver_name` = `getDriverName(load.driver_id)` or `'Unassigned'`
+  - `truck_unit` = `getTruckUnit(load.truck_id)` or `'Unassigned'`
+- Feed `enrichedLoads` into `DataTable` (replacing `filteredLoads` there; totals stay on the existing array).
+- Add two new columns right after `status` (Status is the most visible anchor and keeps the actions column at the end):
+  - `{ key: 'driver_name', header: 'Driver', sortable: true, filter: { type: 'text', accessor: (l) => l.driver_name } }`
+  - `{ key: 'truck_unit', header: 'Truck #', sortable: true, filter: { type: 'text', accessor: (l) => l.truck_unit } }`
+- Render cells with muted styling for `Unassigned`.
 
-1. New enum `onboarding_review_status` with values `pending`, `approved`, `revision_requested`.
-2. On `public.driver_signed_documents`:
-   - `review_status onboarding_review_status NOT NULL DEFAULT 'pending'`
-   - `revision_notes text`
-   - `reviewed_by uuid` (auth user), `reviewed_at timestamptz`
-3. On `public.drivers` (for the credentials step, which isn't a signed doc):
-   - `credentials_review_status onboarding_review_status NOT NULL DEFAULT 'pending'`
-   - `credentials_revision_notes text`
-   - `credentials_reviewed_by uuid`, `credentials_reviewed_at timestamptz`
-4. RLS update on `driver_signed_documents`: drivers may read `review_status` / `revision_notes` for their own rows (already covered by existing per-driver SELECT policy — verify and extend if needed). Admin update policy (owner / safety / payroll_admin) for the new review columns.
-5. Trigger on `driver_signed_documents`: when the row's `file_path` changes (driver re-uploads/re-signs) and `review_status = 'revision_requested'`, flip it back to `pending` and clear `revision_notes`. Same on `drivers` for the credentials columns when license/medical/banking fields change.
+### 2. `src/components/shared/DataTable.tsx`
+Add lightweight client-side sorting (the table is already client-paginated/virtualized):
+- Extend `Column<T>` with `sortable?: boolean` and optional `sortAccessor?: (item: T) => string | number | null | undefined` (defaults to `item[key]`).
+- Add `sortState: { key: string; dir: 'asc' | 'desc' } | null` state.
+- Wrap the `<th>` label in a button for sortable columns; clicking cycles `asc → desc → none`. Show an up/down chevron from `lucide-react` (`ArrowUp`, `ArrowDown`, `ChevronsUpDown`).
+- Apply sort in a `useMemo` **after** the existing column-filter step and **before** virtualization, using locale-aware string compare and numeric compare for numbers; nulls/`Unassigned` always sort last.
+- No prop signature changes for existing callers — `sortable` is opt-in.
 
-No data loss: `profiles.onboarding_completed` stays as-is so existing gating keeps working.
-
-## Task 2 — Admin "Request Revision" UI
-
-Edit `src/components/drivers/SignedOnboardingDocuments.tsx`:
-- Show a status pill per document (`Pending review`, `Approved`, `Revision requested`).
-- Add **Approve** and **Request Revision** buttons (admin only — same `canView` gate).
-- New component `RequestRevisionDialog` — textarea for the reason (required, ≤500 chars), Confirm/Cancel. On submit: `UPDATE driver_signed_documents SET review_status='revision_requested', revision_notes=…, reviewed_by=auth.uid(), reviewed_at=now()`.
-- Approve action sets `review_status='approved'`, clears notes.
-- In `DriverDetailSheet.tsx`, add a parallel "Credentials" review card (above signed documents) using the same dialog, writing to `drivers.credentials_*`.
-- Invalidate `['driver_signed_documents', driverId]` and `['drivers']` queries after each action.
-
-## Task 3 — Driver dashboard alert banner
-
-In `src/pages/DriverDashboard.tsx`, add a query `['onboarding-revisions', driver.id]` that returns:
-- `drivers.credentials_review_status = 'revision_requested'` (already in `driver`), and
-- any `driver_signed_documents` rows for this driver with `review_status='revision_requested'`.
-
-If `count > 0`, render a non-dismissible red banner at the very top (above the greeting): destructive bg, white text, `AlertTriangle` icon, copy "Action Required: Your onboarding requires a revision." with a **View Details** button that routes to `/driver-onboarding?revision=1`.
-
-## Task 4 — Deep‑link the onboarding flow
-
-Edit `src/pages/DriverOnboarding.tsx`:
-- On mount, when `?revision=1` (or always, as a safer default), fetch the driver's `credentials_review_status` + revision rows from `driver_signed_documents`.
-- Pick the first step that needs revision in flow order (credentials first, then templates in current order) and `setStepIndex` to it, skipping the normal "start at 0" behavior. Steps already `approved` are skipped via Next button advancing to the next non-approved step.
-- At the top of that step, render a prominent destructive alert with the admin's `revision_notes` ("Revisions requested by your administrator: …").
-- On resubmit:
-  - Credentials step: after the existing `drivers` upsert, also set `credentials_review_status='pending'`, clear `credentials_revision_notes`. (The trigger from Task 1 also enforces this if any tracked field changed.)
-  - Document step: after inserting the new `driver_signed_documents` row (or updating file_path), set `review_status='pending'` and clear `revision_notes` for that `document_type`. Trigger from Task 1 covers the file_path change path; we still update explicitly so notes always clear on resubmit.
-- Notify admins: insert a `driver_notifications` row (or org-scoped notification — confirm preferred channel below) addressed to the org's owner/payroll_admin role with message "Driver {name} resubmitted {step}".
+### 3. Filtering UX
+- The existing "Filters" panel already renders text inputs for any column with `filter: { type: 'text' }`. Adding the filter spec on the new columns gives dispatchers a **Filter by Driver** and **Filter by Truck** input out of the box, matching the look of the other filters on this page.
 
 ## Out of scope
-- No change to `profiles.onboarding_completed` semantics or to existing `Force Re-Onboarding` Danger Zone (still nukes everything).
-- No new template types; works with whatever templates the org has today.
-- No email notifications (in-app notification only) unless you say otherwise.
-
-## Open question
-Admin notification on resubmit — write to `driver_notifications` (in-app, what the rest of the app uses), or no notification at all and admins just see the pending review pill next time they open the driver sheet? Default in this plan: in-app `driver_notifications` row to the org owner.
+- No DB migration or query changes (driver_id/truck_id already exist on `fleet_loads`; drivers/trucks are already fetched).
+- No changes to server-side pagination — table is client-side today, so sort/filter stay client-side per the task's "client-side pagination" branch.
+- No changes to the mobile `DriverLoadsView` (driver-only view).
+- Other tables that use `DataTable` are unaffected because `sortable` is opt-in.
