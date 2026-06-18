@@ -532,6 +532,17 @@ export default function FleetLoads() {
     ? loads 
     : loads.filter((l: any) => l.pickup_date && l.pickup_date.startsWith(selectedMonth));
 
+  // Enrich with driver_name + truck_unit so columns, sort, and filter all use the same field
+  const enrichedLoads = filteredLoads.map((l: any) => {
+    const driver = l.driver_id ? drivers.find((d: any) => d.id === l.driver_id) : null;
+    const truck = l.truck_id ? trucks.find((t: any) => t.id === l.truck_id) : null;
+    return {
+      ...l,
+      driver_name: driver ? `${driver.first_name} ${driver.last_name}` : 'Unassigned',
+      truck_unit: truck?.unit_number || 'Unassigned',
+    };
+  });
+
   // Helper to get display miles (actual if valid, otherwise booked)
   const getDisplayMiles = (load: any) => {
     return (load.actual_miles && load.actual_miles > 0) ? load.actual_miles : (load.booked_miles || 0);
@@ -820,6 +831,28 @@ export default function FleetLoads() {
                   : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : '-')
               },
               { key: 'status', header: 'Status', render: (load: any) => <StatusBadge status={load.status} /> },
+              {
+                key: 'driver_name',
+                header: 'Driver',
+                sortable: true,
+                filter: { type: 'text', accessor: (l: any) => l.driver_name },
+                render: (load: any) => (
+                  load.driver_id
+                    ? <span>{load.driver_name}</span>
+                    : <span className="text-muted-foreground italic">Unassigned</span>
+                ),
+              },
+              {
+                key: 'truck_unit',
+                header: 'Truck #',
+                sortable: true,
+                filter: { type: 'text', accessor: (l: any) => l.truck_unit },
+                render: (load: any) => (
+                  load.truck_id
+                    ? <span className="font-mono">{load.truck_unit}</span>
+                    : <span className="text-muted-foreground italic">Unassigned</span>
+                ),
+              },
               { key: 'actions', header: '', render: (load: any) => (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -839,7 +872,7 @@ export default function FleetLoads() {
                 </DropdownMenu>
               )},
             ]}
-            data={filteredLoads}
+            data={enrichedLoads}
             loading={isLoading}
             emptyMessage="No loads yet"
             emptyDescription="Create your first load to start tracking revenue and miles."

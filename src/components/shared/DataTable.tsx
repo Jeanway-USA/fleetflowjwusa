@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Download, SlidersHorizontal, RotateCcw, Rows3, AlignJustify, X, Filter } from 'lucide-react';
+import { Download, SlidersHorizontal, RotateCcw, Rows3, AlignJustify, X, Filter, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -40,6 +40,8 @@ interface Column<T> {
   width?: string;
   hiddenOnMobile?: boolean;
   filter?: ColumnFilter<T>;
+  sortable?: boolean;
+  sortAccessor?: (item: T) => string | number | null | undefined;
 }
 
 interface DataTableProps<T> {
@@ -181,13 +183,44 @@ export function DataTable<T extends { id: string }>({
     });
   }, [data, columns, filterValues, activeFilterCount]);
 
+  // Sort state
+  const [sortState, setSortState] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
+  const sortedData = useMemo(() => {
+    if (!sortState) return filteredData;
+    const col = columns.find(c => String(c.key) === sortState.key);
+    if (!col) return filteredData;
+    const accessor = col.sortAccessor ?? ((item: T) => item[col.key as keyof T] as unknown as string | number | null | undefined);
+    const dir = sortState.dir === 'asc' ? 1 : -1;
+    const arr = [...filteredData];
+    arr.sort((a, b) => {
+      const av = accessor(a);
+      const bv = accessor(b);
+      const aNil = av === null || av === undefined || av === '';
+      const bNil = bv === null || bv === undefined || bv === '';
+      if (aNil && bNil) return 0;
+      if (aNil) return 1; // nulls last regardless of dir
+      if (bNil) return -1;
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' }) * dir;
+    });
+    return arr;
+  }, [filteredData, sortState, columns]);
+
+  const cycleSort = useCallback((key: string) => {
+    setSortState(prev => {
+      if (!prev || prev.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return null;
+    });
+  }, []);
+
   const computedWidths = useMemo(() => {
     const defaultWidth = `${100 / visibleColumns.length}%`;
     return visibleColumns.map(col => col.width || defaultWidth);
   }, [visibleColumns]);
 
   const rowVirtualizer = useVirtualizer({
-    count: filteredData.length,
+    count: sortedData.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
     overscan: 15,
@@ -439,11 +472,28 @@ export function DataTable<T extends { id: string }>({
                     </div>
                   </th>
                 )}
-                {visibleColumns.map((col, i) => (
-                  <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground", col.hiddenOnMobile && "hidden md:table-cell")} style={{ height: `${rowHeight}px`, width: computedWidths[i] }}>
-                    <div className="flex items-center h-full">{col.header}</div>
-                  </th>
-                ))}
+                {visibleColumns.map((col, i) => {
+                  const key = String(col.key);
+                  const isSorted = sortState?.key === key;
+                  const SortIcon = !col.sortable ? null : (isSorted ? (sortState!.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown);
+                  return (
+                    <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground", col.hiddenOnMobile && "hidden md:table-cell")} style={{ height: `${rowHeight}px`, width: computedWidths[i] }}>
+                      {col.sortable ? (
+                        <button
+                          type="button"
+                          onClick={() => cycleSort(key)}
+                          className={cn("flex items-center gap-1 h-full w-full text-left hover:text-foreground transition-colors", isSorted && "text-foreground")}
+                          aria-label={`Sort by ${col.header}`}
+                        >
+                          <span>{col.header}</span>
+                          {SortIcon && <SortIcon className="h-3.5 w-3.5 opacity-70" />}
+                        </button>
+                      ) : (
+                        <div className="flex items-center h-full">{col.header}</div>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody
@@ -453,7 +503,7 @@ export function DataTable<T extends { id: string }>({
                 display: 'block',
               }}
             >
-              {filteredData.length === 0 && (
+              {sortedData.length === 0 && (
                 <tr style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
                   <td colSpan={visibleColumns.length + (showSelection ? 1 : 0)} className={cn(tdClass, "text-center text-muted-foreground py-8")}>
                     No rows match the current filters.
@@ -461,7 +511,7 @@ export function DataTable<T extends { id: string }>({
                 </tr>
               )}
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const item = filteredData[virtualRow.index];
+                const item = sortedData[virtualRow.index];
                 const isSelected = showSelection && safeSelectedIds.has(item.id);
                 return (
                   <tr
