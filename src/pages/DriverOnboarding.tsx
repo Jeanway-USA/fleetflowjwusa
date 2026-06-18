@@ -69,9 +69,12 @@ interface SignedResult {
 
 export default function DriverOnboarding() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const revisionMode = searchParams.get('revision') === '1';
   const { user, orgId, refreshOrgData } = useAuth();
 
   const [stepIndex, setStepIndex] = useState(0);
+  const [deepLinked, setDeepLinked] = useState(false);
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
@@ -82,6 +85,7 @@ export default function DriverOnboarding() {
   useEffect(() => {
     setCurrentSubPageIndex(0);
   }, [stepIndex]);
+
 
   const { data: driverRow, isLoading: driverLoading, refetch: refetchDriver } = useQuery({
     queryKey: ['driver-self', user?.id, orgId],
