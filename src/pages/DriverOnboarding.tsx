@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/compress-image';
-import { CheckCircle2, Download } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+
 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -66,9 +69,12 @@ interface SignedResult {
 
 export default function DriverOnboarding() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const revisionMode = searchParams.get('revision') === '1';
   const { user, orgId, refreshOrgData } = useAuth();
 
   const [stepIndex, setStepIndex] = useState(0);
+  const [deepLinked, setDeepLinked] = useState(false);
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
@@ -80,6 +86,7 @@ export default function DriverOnboarding() {
     setCurrentSubPageIndex(0);
   }, [stepIndex]);
 
+
   const { data: driverRow, isLoading: driverLoading, refetch: refetchDriver } = useQuery({
     queryKey: ['driver-self', user?.id, orgId],
     enabled: !!user && !!orgId,
@@ -87,8 +94,9 @@ export default function DriverOnboarding() {
       const { data, error } = await supabase
         .from('drivers')
         .select(
-          'id, first_name, last_name, phone, license_number, license_expiry, medical_card_expiry, endorsements, hazmat_expiry, has_twic, twic_expiry, pay_type, pay_rate'
+          'id, first_name, last_name, phone, license_number, license_expiry, medical_card_expiry, endorsements, hazmat_expiry, has_twic, twic_expiry, pay_type, pay_rate, credentials_review_status, credentials_revision_notes'
         )
+
         .eq('user_id', user!.id)
         .eq('org_id', orgId!)
         .maybeSingle();
@@ -115,6 +123,49 @@ export default function DriverOnboarding() {
       );
     },
   });
+
+  // Latest review status per document_type for this driver
+  const { data: docRevisions = {} } = useQuery({
+    queryKey: ['onboarding-revisions-detail', driverRow?.id],
+    enabled: !!driverRow?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_signed_documents')
+        .select('id, document_type, review_status, revision_notes, signed_at')
+        .eq('driver_id', driverRow!.id)
+        .order('signed_at', { ascending: false });
+      if (error) throw error;
+      const map: Record<string, { id: string; status: string; notes: string | null }> = {};
+      for (const row of (data ?? []) as Array<{ id: string; document_type: string; review_status: string; revision_notes: string | null }>) {
+        if (!map[row.document_type]) {
+          map[row.document_type] = { id: row.id, status: row.review_status, notes: row.revision_notes };
+        }
+      }
+      return map;
+    },
+  });
+
+  const credentialsRevisionNotes = driverRow?.credentials_review_status === 'revision_requested'
+    ? (driverRow?.credentials_revision_notes ?? null)
+    : null;
+
+  // Deep-link: when ?revision=1, jump to first step that needs revision.
+  useEffect(() => {
+    if (deepLinked || !revisionMode || !driverRow || templates.length === 0) return;
+    if (driverRow.credentials_review_status === 'revision_requested') {
+      setStepIndex(0);
+      setDeepLinked(true);
+      return;
+    }
+    const idx = templates.findIndex((t) => docRevisions[t.document_type]?.status === 'revision_requested');
+    if (idx >= 0) {
+      setStepIndex(idx + 1);
+      setDeepLinked(true);
+    } else {
+      setDeepLinked(true);
+    }
+  }, [revisionMode, driverRow, templates, docRevisions, deepLinked]);
+
 
   // Step 0 = credentials, Steps 1..N = templates
   const CREDENTIALS_STEP = 0;
@@ -248,8 +299,13 @@ export default function DriverOnboarding() {
     const results: SignedResult[] = [];
 
     for (const tmpl of templates) {
+      // In revision mode, skip templates already approved by the admin.
+      if (revisionMode && docRevisions[tmpl.document_type]?.status === 'approved') {
+        continue;
+      }
       const tState: TemplateState =
         state[tmpl.id] ?? EMPTY_TEMPLATE_STATE;
+
 
       const title =
         tmpl.name ??
@@ -369,19 +425,22 @@ export default function DriverOnboarding() {
 
     setSignedResults(results);
 
-    // Mark onboarding complete on the user's profile so guards unlock the dashboard.
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({ onboarding_completed: true })
-      .eq('user_id', user.id);
-    if (profileError) {
-      console.error('Failed to mark onboarding complete:', profileError);
-    } else {
-      await refreshOrgData();
+    if (!revisionMode) {
+      // Mark onboarding complete on the user's profile so guards unlock the dashboard.
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ onboarding_completed: true })
+        .eq('user_id', user.id);
+      if (profileError) {
+        console.error('Failed to mark onboarding complete:', profileError);
+      } else {
+        await refreshOrgData();
+      }
     }
 
-    toast.success('Documents submitted successfully');
+    toast.success(revisionMode ? 'Revisions resubmitted. Admin will be notified.' : 'Documents submitted successfully');
   };
+
 
   const handleContinue = async () => {
     // Step 0: validate + save driver credentials, then advance
@@ -406,7 +465,37 @@ export default function DriverOnboarding() {
             'Could not save your credentials. Please contact your administrator.',
           );
         }
+        // Explicitly clear any pending revision request for credentials.
+        if (driverRow.credentials_review_status === 'revision_requested') {
+          await supabase
+            .from('drivers')
+            .update({
+              credentials_review_status: 'pending',
+              credentials_revision_notes: null,
+            } as never)
+            .eq('id', driverRow.id);
+        }
         await refetchDriver();
+
+        // In revision mode: if no further doc revisions, we're done.
+        if (revisionMode) {
+          const hasMoreDocRevisions = Object.values(docRevisions).some(
+            (r) => r.status === 'revision_requested',
+          );
+          if (!hasMoreDocRevisions) {
+            toast.success('Revisions resubmitted. Admin will be notified.');
+            navigate('/driver-dashboard', { replace: true });
+            return;
+          }
+          // Jump to the first template needing revision
+          const idx = templates.findIndex(
+            (t) => docRevisions[t.document_type]?.status === 'revision_requested',
+          );
+          setStepIndex(idx >= 0 ? idx + 1 : 1);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
         if (totalSteps > 1) {
           setStepIndex(1);
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -426,6 +515,7 @@ export default function DriverOnboarding() {
       } finally {
         setSubmitting(false);
       }
+
       return;
     }
 
@@ -535,6 +625,15 @@ export default function DriverOnboarding() {
       currentTemplate?.document_type ??
       '';
 
+  const currentDocRevision = currentTemplate
+    ? docRevisions[currentTemplate.document_type]
+    : undefined;
+  const stepRevisionNotes = isCredentialsStep
+    ? credentialsRevisionNotes
+    : currentDocRevision?.status === 'revision_requested'
+      ? currentDocRevision.notes
+      : null;
+
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-background">
     <div className="container max-w-4xl py-10 pb-32">
@@ -546,6 +645,15 @@ export default function DriverOnboarding() {
         </p>
         <Progress value={progress} />
       </div>
+
+      {stepRevisionNotes && (
+        <Alert variant="destructive" className="mb-4 border-2">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Revisions requested by your administrator</AlertTitle>
+          <AlertDescription className="mt-1 whitespace-pre-wrap">{stepRevisionNotes}</AlertDescription>
+        </Alert>
+      )}
+
 
       {driverRow?.pay_type && (
         <div className="mb-4 rounded-md border bg-muted/30 p-3 flex items-center justify-between text-sm">

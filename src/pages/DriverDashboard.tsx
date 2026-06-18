@@ -20,6 +20,8 @@ import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
 import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
 import { MyEquipmentCard } from '@/components/driver/MyEquipmentCard';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
+import { OnboardingRevisionBanner } from '@/components/driver/OnboardingRevisionBanner';
+
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { Loader2, Sun, Moon, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -159,7 +161,12 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
   return (
     <>
       <div className="space-y-3 pb-6 max-w-4xl mx-auto">
+        <OnboardingRevisionBanner
+          driverId={driver.id}
+          credentialsStatus={(driver as any).credentials_review_status ?? null}
+        />
         {/* Compact Header */}
+
         <div className="flex items-center justify-between py-1">
           <h1 className="text-lg font-semibold flex items-center gap-2">
             {currentHour >= 6 && currentHour < 18 ? (
