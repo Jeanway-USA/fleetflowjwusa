@@ -161,7 +161,12 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
   return (
     <>
       <div className="space-y-3 pb-6 max-w-4xl mx-auto">
+        <OnboardingRevisionBanner
+          driverId={driver.id}
+          credentialsStatus={(driver as any).credentials_review_status ?? null}
+        />
         {/* Compact Header */}
+
         <div className="flex items-center justify-between py-1">
           <h1 className="text-lg font-semibold flex items-center gap-2">
             {currentHour >= 6 && currentHour < 18 ? (
