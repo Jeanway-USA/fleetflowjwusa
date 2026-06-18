@@ -37,6 +37,8 @@ import { CredentialsCompliance } from './CredentialsCompliance';
 import { SignedOnboardingDocuments } from './SignedOnboardingDocuments';
 import { DriverBankingDetails } from './DriverBankingDetails';
 import { DriverChatSheet } from './DriverChatSheet';
+import { CredentialsReviewCard } from './CredentialsReviewCard';
+
 
 
 interface DriverDetailSheetProps {
