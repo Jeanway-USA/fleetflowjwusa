@@ -320,14 +320,15 @@ export default function Auth() {
                   <form onSubmit={handleSignIn} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="signin-email">Email</Label>
-                      <Input id="signin-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
+                      <Input id="signin-email" name="signin-email" type="email" autoComplete="username" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label htmlFor="signin-password">Password</Label>
                         <button type="button" onClick={() => setShowForgotPassword(true)} className="text-sm text-primary hover:underline">Forgot password?</button>
                       </div>
-                      <Input id="signin-password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="bg-background" />
+                      <Input id="signin-password" name="signin-password" type="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="bg-background" />
+
                     </div>
                     <Button type="submit" className="w-full gradient-gold text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-transform" disabled={formLoading}>
                       {formLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</> : 'Sign In'}
