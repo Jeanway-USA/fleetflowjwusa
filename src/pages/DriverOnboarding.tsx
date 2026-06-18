@@ -625,6 +625,15 @@ export default function DriverOnboarding() {
       currentTemplate?.document_type ??
       '';
 
+  const currentDocRevision = currentTemplate
+    ? docRevisions[currentTemplate.document_type]
+    : undefined;
+  const stepRevisionNotes = isCredentialsStep
+    ? credentialsRevisionNotes
+    : currentDocRevision?.status === 'revision_requested'
+      ? currentDocRevision.notes
+      : null;
+
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-background">
     <div className="container max-w-4xl py-10 pb-32">
@@ -636,6 +645,15 @@ export default function DriverOnboarding() {
         </p>
         <Progress value={progress} />
       </div>
+
+      {stepRevisionNotes && (
+        <Alert variant="destructive" className="mb-4 border-2">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Revisions requested by your administrator</AlertTitle>
+          <AlertDescription className="mt-1 whitespace-pre-wrap">{stepRevisionNotes}</AlertDescription>
+        </Alert>
+      )}
+
 
       {driverRow?.pay_type && (
         <div className="mb-4 rounded-md border bg-muted/30 p-3 flex items-center justify-between text-sm">
