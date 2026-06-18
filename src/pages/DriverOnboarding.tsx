@@ -465,7 +465,37 @@ export default function DriverOnboarding() {
             'Could not save your credentials. Please contact your administrator.',
           );
         }
+        // Explicitly clear any pending revision request for credentials.
+        if (driverRow.credentials_review_status === 'revision_requested') {
+          await supabase
+            .from('drivers')
+            .update({
+              credentials_review_status: 'pending',
+              credentials_revision_notes: null,
+            } as never)
+            .eq('id', driverRow.id);
+        }
         await refetchDriver();
+
+        // In revision mode: if no further doc revisions, we're done.
+        if (revisionMode) {
+          const hasMoreDocRevisions = Object.values(docRevisions).some(
+            (r) => r.status === 'revision_requested',
+          );
+          if (!hasMoreDocRevisions) {
+            toast.success('Revisions resubmitted. Admin will be notified.');
+            navigate('/driver-dashboard', { replace: true });
+            return;
+          }
+          // Jump to the first template needing revision
+          const idx = templates.findIndex(
+            (t) => docRevisions[t.document_type]?.status === 'revision_requested',
+          );
+          setStepIndex(idx >= 0 ? idx + 1 : 1);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+
         if (totalSteps > 1) {
           setStepIndex(1);
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -485,6 +515,7 @@ export default function DriverOnboarding() {
       } finally {
         setSubmitting(false);
       }
+
       return;
     }
 
