@@ -76,45 +76,100 @@ export default function Auth() {
     catch (error) { if (error instanceof z.ZodError) toast.error(error.errors[0].message); return false; }
   };
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    setFormLoading(true);
-    const { error } = await signIn(email, password);
-    setFormLoading(false);
-    if (error) {
-      toast.error(error.message.includes('Invalid login') ? 'Invalid email or password' : error.message);
-    } else {
-      toast.success('Welcome back!');
-      navigate(safeRedirect, { replace: true });
-    }
+  // Read the *actual* DOM value at submit time. Mobile autofill writes to
+  // the input AFTER React state hydrates, so the first submit with React
+  // state alone often posts stale/empty values. Pulling from the form
+  // element guarantees we send what the user (or autofill) actually typed.
+  const readField = (form: HTMLFormElement, name: string): string => {
+    const el = form.elements.namedItem(name) as HTMLInputElement | null;
+    return (el?.value ?? '').trim();
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!validateForm()) return;
-    if (!firstName.trim() || !lastName.trim()) { toast.error('Please enter your first and last name'); return; }
-    setFormLoading(true);
-    const { error } = await signUp(email, password, firstName, lastName);
-    if (error) {
-      toast.error(error.message.includes('already registered') ? 'This email is already registered. Please sign in.' : error.message);
-      setFormLoading(false);
+    const form = e.currentTarget;
+    const submittedEmail = readField(form, 'signin-email') || email;
+    const submittedPassword = (form.elements.namedItem('signin-password') as HTMLInputElement | null)?.value ?? password;
+    // Re-sync React state so subsequent renders reflect what was submitted.
+    if (submittedEmail !== email) setEmail(submittedEmail);
+    try {
+      emailSchema.parse(submittedEmail);
+      passwordSchema.parse(submittedPassword);
+    } catch (err) {
+      if (err instanceof z.ZodError) toast.error(err.errors[0].message);
       return;
     }
-    setFormLoading(false);
-    toast.success('Account created! Welcome aboard.');
-    navigate(safeRedirect, { replace: true });
+    setFormLoading(true);
+    try {
+      const { error } = await signIn(submittedEmail, submittedPassword);
+      if (error) {
+        toast.error(error.message.includes('Invalid login') ? 'Invalid email or password' : error.message);
+      } else {
+        toast.success('Welcome back!');
+        navigate(safeRedirect, { replace: true });
+      }
+    } catch (err) {
+      console.error('[Auth] signIn threw:', err);
+      toast.error("Couldn't reach the server. Please check your connection and try again.");
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!validateEmail()) return;
+    const form = e.currentTarget;
+    const submittedEmail = readField(form, 'signup-email') || email;
+    const submittedPassword = (form.elements.namedItem('signup-password') as HTMLInputElement | null)?.value ?? password;
+    const submittedFirst = readField(form, 'first-name') || firstName;
+    const submittedLast = readField(form, 'last-name') || lastName;
+    if (submittedEmail !== email) setEmail(submittedEmail);
+    if (submittedFirst !== firstName) setFirstName(submittedFirst);
+    if (submittedLast !== lastName) setLastName(submittedLast);
+    try {
+      emailSchema.parse(submittedEmail);
+      passwordSchema.parse(submittedPassword);
+    } catch (err) {
+      if (err instanceof z.ZodError) toast.error(err.errors[0].message);
+      return;
+    }
+    if (!submittedFirst || !submittedLast) { toast.error('Please enter your first and last name'); return; }
     setFormLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setFormLoading(false);
-    if (error) { toast.error(error.message); } else { setResetEmailSent(true); toast.success('Password reset email sent!'); }
+    try {
+      const { error } = await signUp(submittedEmail, submittedPassword, submittedFirst, submittedLast);
+      if (error) {
+        toast.error(error.message.includes('already registered') ? 'This email is already registered. Please sign in.' : error.message);
+        return;
+      }
+      toast.success('Account created! Welcome aboard.');
+      navigate(safeRedirect, { replace: true });
+    } catch (err) {
+      console.error('[Auth] signUp threw:', err);
+      toast.error("Couldn't reach the server. Please check your connection and try again.");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const submittedEmail = readField(form, 'reset-email') || email;
+    if (submittedEmail !== email) setEmail(submittedEmail);
+    try { emailSchema.parse(submittedEmail); }
+    catch (err) { if (err instanceof z.ZodError) toast.error(err.errors[0].message); return; }
+    setFormLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(submittedEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) { toast.error(error.message); } else { setResetEmailSent(true); toast.success('Password reset email sent!'); }
+    } catch (err) {
+      console.error('[Auth] resetPasswordForEmail threw:', err);
+      toast.error("Couldn't reach the server. Please check your connection and try again.");
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   // Forgot Password — centered card, no split layout
