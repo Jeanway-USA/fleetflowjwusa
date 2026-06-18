@@ -16,16 +16,24 @@ export function OnboardingRevisionBanner({ driverId, credentialsStatus }: Props)
     queryKey: ['onboarding-revisions', driverId],
     enabled: !!driverId,
     queryFn: async () => {
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from('driver_signed_documents')
-        .select('id', { count: 'exact', head: true })
+        .select('document_type, review_status, signed_at')
         .eq('driver_id', driverId)
-        .eq('review_status', 'revision_requested');
+        .order('signed_at', { ascending: false });
       if (error) throw error;
-      return count ?? 0;
+      const seen = new Set<string>();
+      let count = 0;
+      for (const row of (data ?? []) as Array<{ document_type: string; review_status: string }>) {
+        if (seen.has(row.document_type)) continue;
+        seen.add(row.document_type);
+        if (row.review_status === 'revision_requested') count += 1;
+      }
+      return count;
     },
     refetchInterval: 60_000,
   });
+
 
   const hasCredentialsRevision = credentialsStatus === 'revision_requested';
   const totalRevisions = (hasCredentialsRevision ? 1 : 0) + docRevisionCount;
