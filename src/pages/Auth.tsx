@@ -76,45 +76,100 @@ export default function Auth() {
     catch (error) { if (error instanceof z.ZodError) toast.error(error.errors[0].message); return false; }
   };
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    setFormLoading(true);
-    const { error } = await signIn(email, password);
-    setFormLoading(false);
-    if (error) {
-      toast.error(error.message.includes('Invalid login') ? 'Invalid email or password' : error.message);
-    } else {
-      toast.success('Welcome back!');
-      navigate(safeRedirect, { replace: true });
-    }
+  // Read the *actual* DOM value at submit time. Mobile autofill writes to
+  // the input AFTER React state hydrates, so the first submit with React
+  // state alone often posts stale/empty values. Pulling from the form
+  // element guarantees we send what the user (or autofill) actually typed.
+  const readField = (form: HTMLFormElement, name: string): string => {
+    const el = form.elements.namedItem(name) as HTMLInputElement | null;
+    return (el?.value ?? '').trim();
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!validateForm()) return;
-    if (!firstName.trim() || !lastName.trim()) { toast.error('Please enter your first and last name'); return; }
-    setFormLoading(true);
-    const { error } = await signUp(email, password, firstName, lastName);
-    if (error) {
-      toast.error(error.message.includes('already registered') ? 'This email is already registered. Please sign in.' : error.message);
-      setFormLoading(false);
+    const form = e.currentTarget;
+    const submittedEmail = readField(form, 'signin-email') || email;
+    const submittedPassword = (form.elements.namedItem('signin-password') as HTMLInputElement | null)?.value ?? password;
+    // Re-sync React state so subsequent renders reflect what was submitted.
+    if (submittedEmail !== email) setEmail(submittedEmail);
+    try {
+      emailSchema.parse(submittedEmail);
+      passwordSchema.parse(submittedPassword);
+    } catch (err) {
+      if (err instanceof z.ZodError) toast.error(err.errors[0].message);
       return;
     }
-    setFormLoading(false);
-    toast.success('Account created! Welcome aboard.');
-    navigate(safeRedirect, { replace: true });
+    setFormLoading(true);
+    try {
+      const { error } = await signIn(submittedEmail, submittedPassword);
+      if (error) {
+        toast.error(error.message.includes('Invalid login') ? 'Invalid email or password' : error.message);
+      } else {
+        toast.success('Welcome back!');
+        navigate(safeRedirect, { replace: true });
+      }
+    } catch (err) {
+      console.error('[Auth] signIn threw:', err);
+      toast.error("Couldn't reach the server. Please check your connection and try again.");
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!validateEmail()) return;
+    const form = e.currentTarget;
+    const submittedEmail = readField(form, 'signup-email') || email;
+    const submittedPassword = (form.elements.namedItem('signup-password') as HTMLInputElement | null)?.value ?? password;
+    const submittedFirst = readField(form, 'first-name') || firstName;
+    const submittedLast = readField(form, 'last-name') || lastName;
+    if (submittedEmail !== email) setEmail(submittedEmail);
+    if (submittedFirst !== firstName) setFirstName(submittedFirst);
+    if (submittedLast !== lastName) setLastName(submittedLast);
+    try {
+      emailSchema.parse(submittedEmail);
+      passwordSchema.parse(submittedPassword);
+    } catch (err) {
+      if (err instanceof z.ZodError) toast.error(err.errors[0].message);
+      return;
+    }
+    if (!submittedFirst || !submittedLast) { toast.error('Please enter your first and last name'); return; }
     setFormLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setFormLoading(false);
-    if (error) { toast.error(error.message); } else { setResetEmailSent(true); toast.success('Password reset email sent!'); }
+    try {
+      const { error } = await signUp(submittedEmail, submittedPassword, submittedFirst, submittedLast);
+      if (error) {
+        toast.error(error.message.includes('already registered') ? 'This email is already registered. Please sign in.' : error.message);
+        return;
+      }
+      toast.success('Account created! Welcome aboard.');
+      navigate(safeRedirect, { replace: true });
+    } catch (err) {
+      console.error('[Auth] signUp threw:', err);
+      toast.error("Couldn't reach the server. Please check your connection and try again.");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const submittedEmail = readField(form, 'reset-email') || email;
+    if (submittedEmail !== email) setEmail(submittedEmail);
+    try { emailSchema.parse(submittedEmail); }
+    catch (err) { if (err instanceof z.ZodError) toast.error(err.errors[0].message); return; }
+    setFormLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(submittedEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) { toast.error(error.message); } else { setResetEmailSent(true); toast.success('Password reset email sent!'); }
+    } catch (err) {
+      console.error('[Auth] resetPasswordForEmail threw:', err);
+      toast.error("Couldn't reach the server. Please check your connection and try again.");
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   // Forgot Password — centered card, no split layout
@@ -147,7 +202,7 @@ export default function Auth() {
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="reset-email">Email</Label>
-                    <Input id="reset-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
+                    <Input id="reset-email" name="reset-email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
                   </div>
                   <Button type="submit" className="w-full gradient-gold text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-transform" disabled={formLoading}>
                     {formLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : 'Send Reset Link'}
@@ -237,21 +292,22 @@ export default function Auth() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="first-name">First Name</Label>
-                        <Input id="first-name" type="text" placeholder="John" value={firstName} onChange={(e) => setFirstName(e.target.value)} required className="bg-background" />
+                        <Input id="first-name" name="first-name" type="text" autoComplete="given-name" placeholder="John" value={firstName} onChange={(e) => setFirstName(e.target.value)} required className="bg-background" />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="last-name">Last Name</Label>
-                        <Input id="last-name" type="text" placeholder="Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} required className="bg-background" />
+                        <Input id="last-name" name="last-name" type="text" autoComplete="family-name" placeholder="Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} required className="bg-background" />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="signup-email">Email</Label>
-                      <Input id="signup-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
+                      <Input id="signup-email" name="signup-email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="signup-password">Password</Label>
-                      <Input id="signup-password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="bg-background" />
+                      <Input id="signup-password" name="signup-password" type="password" autoComplete="new-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="bg-background" />
                       <p className="text-xs text-muted-foreground">Min 8 chars, 1 uppercase, 1 number</p>
+
                     </div>
                     <Button type="submit" className="w-full gradient-gold text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-transform" disabled={formLoading}>
                       {formLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</> : 'Create Free Beta Account'}
@@ -264,14 +320,15 @@ export default function Auth() {
                   <form onSubmit={handleSignIn} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="signin-email">Email</Label>
-                      <Input id="signin-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
+                      <Input id="signin-email" name="signin-email" type="email" autoComplete="username" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label htmlFor="signin-password">Password</Label>
                         <button type="button" onClick={() => setShowForgotPassword(true)} className="text-sm text-primary hover:underline">Forgot password?</button>
                       </div>
-                      <Input id="signin-password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="bg-background" />
+                      <Input id="signin-password" name="signin-password" type="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="bg-background" />
+
                     </div>
                     <Button type="submit" className="w-full gradient-gold text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-transform" disabled={formLoading}>
                       {formLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</> : 'Sign In'}
