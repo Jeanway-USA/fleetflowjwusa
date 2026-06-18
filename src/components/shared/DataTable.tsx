@@ -472,11 +472,28 @@ export function DataTable<T extends { id: string }>({
                     </div>
                   </th>
                 )}
-                {visibleColumns.map((col, i) => (
-                  <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground", col.hiddenOnMobile && "hidden md:table-cell")} style={{ height: `${rowHeight}px`, width: computedWidths[i] }}>
-                    <div className="flex items-center h-full">{col.header}</div>
-                  </th>
-                ))}
+                {visibleColumns.map((col, i) => {
+                  const key = String(col.key);
+                  const isSorted = sortState?.key === key;
+                  const SortIcon = !col.sortable ? null : (isSorted ? (sortState!.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown);
+                  return (
+                    <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground", col.hiddenOnMobile && "hidden md:table-cell")} style={{ height: `${rowHeight}px`, width: computedWidths[i] }}>
+                      {col.sortable ? (
+                        <button
+                          type="button"
+                          onClick={() => cycleSort(key)}
+                          className={cn("flex items-center gap-1 h-full w-full text-left hover:text-foreground transition-colors", isSorted && "text-foreground")}
+                          aria-label={`Sort by ${col.header}`}
+                        >
+                          <span>{col.header}</span>
+                          {SortIcon && <SortIcon className="h-3.5 w-3.5 opacity-70" />}
+                        </button>
+                      ) : (
+                        <div className="flex items-center h-full">{col.header}</div>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody
