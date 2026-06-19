@@ -330,6 +330,63 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
               )}
             />
 
+            <div className="rounded-md border border-border bg-muted/30 p-4 space-y-4">
+              <h4 className="font-medium text-sm">Emergency Contact</h4>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="emergencyContactName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name *</FormLabel>
+                      <FormControl>
+                        <Input className="pl-4 sm:pl-3" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="emergencyContactRelationship"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Relationship *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. Spouse"
+                          className="pl-4 sm:pl-3"
+                          {...field}
+                          value={field.value ?? ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="emergencyContactPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="tel"
+                          inputMode="tel"
+                          placeholder="(555) 123-4567"
+                          className="pl-4 sm:pl-3"
+                          {...field}
+                          value={field.value ?? ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <FormField
