@@ -79,7 +79,7 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, NumericInputProp
             if (v.endsWith(".")) onChange(v.slice(0, -1));
             rest.onBlur?.(e);
           }}
-          className={cn("pl-8", className)}
+          className={cn("pl-9 sm:pl-9", className)}
         />
       </div>
     );
@@ -118,7 +118,7 @@ export const PercentageInput = React.forwardRef<HTMLInputElement, PercentageInpu
             if (v.endsWith(".")) onChange(v.slice(0, -1));
             rest.onBlur?.(e);
           }}
-          className={cn("pr-8", className)}
+          className={cn("pr-9 sm:pr-9", className)}
         />
         <Percent className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
       </div>
