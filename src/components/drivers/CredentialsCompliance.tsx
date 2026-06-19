@@ -12,6 +12,8 @@ interface CredentialsComplianceProps {
     endorsements?: string[] | null;
     has_twic?: boolean | null;
     twic_expiry?: string | null;
+    fast_card_passport_expiry?: string | null;
+    dod_clearance_level?: string | null;
   };
   variant?: 'card' | 'section';
 }
@@ -98,6 +100,12 @@ export function CredentialsCompliance({ driver, variant = 'card' }: CredentialsC
           expiry={driver.twic_expiry}
         />
       )}
+      <Row
+        label="FAST Card / Passport Expiry"
+        value={formatDate(driver.fast_card_passport_expiry)}
+        expiry={driver.fast_card_passport_expiry}
+      />
+      <Row label="DoD Clearance" value={driver.dod_clearance_level || 'None'} />
     </div>
   );
 

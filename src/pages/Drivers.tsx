@@ -241,7 +241,7 @@ export default function Drivers() {
 
   const openDialog = (driver?: any) => {
     setEditingDriver(driver || null);
-    setFormData(driver || { status: 'active', pay_type: 'percentage', pay_rate: 0, has_twic: false, endorsements: [] });
+    setFormData(driver || { status: 'active', pay_type: 'percentage', pay_rate: 0, has_twic: false, endorsements: [], dod_clearance_level: 'None' });
     setDialogOpen(true);
   };
 
@@ -552,6 +552,38 @@ export default function Drivers() {
             </div>
 
             <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">Emergency Contact</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="emergency_contact_name">Name</Label>
+                  <Input
+                    id="emergency_contact_name"
+                    value={(formData as any).emergency_contact_name || ''}
+                    onChange={(e) => setFormData({ ...formData, emergency_contact_name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="emergency_contact_relationship">Relationship</Label>
+                  <Input
+                    id="emergency_contact_relationship"
+                    placeholder="e.g. Spouse"
+                    value={(formData as any).emergency_contact_relationship || ''}
+                    onChange={(e) => setFormData({ ...formData, emergency_contact_relationship: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="emergency_contact_phone">Phone</Label>
+                  <Input
+                    id="emergency_contact_phone"
+                    value={(formData as any).emergency_contact_phone || ''}
+                    onChange={(e) => setFormData({ ...formData, emergency_contact_phone: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
+
+            <div className="border-t pt-4">
               <h4 className="font-medium mb-3">Link to User Account</h4>
               <div className="space-y-2">
                 <Label htmlFor="user_id">User Account</Label>
@@ -672,6 +704,36 @@ export default function Drivers() {
                 </div>
               )}
             </div>
+
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">Advanced Security & Border</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fast_card_passport_expiry">FAST Card / Passport Expiry</Label>
+                  <Input
+                    id="fast_card_passport_expiry"
+                    type="date"
+                    value={(formData as any).fast_card_passport_expiry || ''}
+                    onChange={(e) => setFormData({ ...formData, fast_card_passport_expiry: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dod_clearance_level">DoD Security Clearance</Label>
+                  <Select
+                    value={(formData as any).dod_clearance_level || 'None'}
+                    onValueChange={(v) => setFormData({ ...formData, dod_clearance_level: v })}
+                  >
+                    <SelectTrigger id="dod_clearance_level"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="None">None</SelectItem>
+                      <SelectItem value="Interim Secret">Interim Secret</SelectItem>
+                      <SelectItem value="Secret">Secret</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
 
             <div className="border-t pt-4">
               <h4 className="font-medium mb-3">Pay Information</h4>

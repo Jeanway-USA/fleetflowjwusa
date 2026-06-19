@@ -1650,8 +1650,13 @@ export type Database = {
           credentials_reviewed_by: string | null
           credentials_revision_notes: string | null
           direct_deposit_attachment_url: string | null
+          dod_clearance_level: string
           email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relationship: string | null
           endorsements: string[] | null
+          fast_card_passport_expiry: string | null
           first_name: string
           has_twic: boolean | null
           hazmat_expiry: string | null
@@ -1681,8 +1686,13 @@ export type Database = {
           credentials_reviewed_by?: string | null
           credentials_revision_notes?: string | null
           direct_deposit_attachment_url?: string | null
+          dod_clearance_level?: string
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           endorsements?: string[] | null
+          fast_card_passport_expiry?: string | null
           first_name: string
           has_twic?: boolean | null
           hazmat_expiry?: string | null
@@ -1712,8 +1722,13 @@ export type Database = {
           credentials_reviewed_by?: string | null
           credentials_revision_notes?: string | null
           direct_deposit_attachment_url?: string | null
+          dod_clearance_level?: string
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relationship?: string | null
           endorsements?: string[] | null
+          fast_card_passport_expiry?: string | null
           first_name?: string
           has_twic?: boolean | null
           hazmat_expiry?: string | null
