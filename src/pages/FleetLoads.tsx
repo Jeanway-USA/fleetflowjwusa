@@ -948,6 +948,7 @@ export default function FleetLoads() {
               </>
             )}
           />
+          )}
           <ConfirmDeleteDialog
             open={massDeleteOpen}
             onOpenChange={setMassDeleteOpen}
