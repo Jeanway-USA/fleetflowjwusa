@@ -13,6 +13,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Form,
   FormControl,
   FormDescription,
@@ -46,6 +53,21 @@ const schema = z
       .max(20, 'Phone number must be under 20 characters')
       .optional()
       .or(z.literal('')),
+    emergencyContactName: z
+      .string()
+      .trim()
+      .min(1, 'Emergency contact name is required')
+      .max(100, 'Must be under 100 characters'),
+    emergencyContactRelationship: z
+      .string()
+      .trim()
+      .min(1, 'Relationship is required')
+      .max(60, 'Must be under 60 characters'),
+    emergencyContactPhone: z
+      .string()
+      .trim()
+      .min(1, 'Emergency contact phone is required')
+      .max(20, 'Phone number must be under 20 characters'),
     licenseExpiry: z
       .date({ required_error: 'License expiry date is required' })
       .refine((d) => d >= today(), 'License must not be expired'),
@@ -56,12 +78,29 @@ const schema = z
     hazmatExpiry: z.date().optional(),
     hasTwic: z.enum(['yes', 'no'], { required_error: 'Please select an option' }),
     twicExpiry: z.date().optional(),
+    fastCardPassportExpiry: z.date().optional(),
+    dodClearanceLevel: z
+      .enum(['None', 'Interim Secret', 'Secret'])
+      .default('None'),
+    landstarOperatorId: z
+      .string()
+      .trim()
+      .max(30, 'Must be under 30 characters')
+      .optional()
+      .or(z.literal('')),
   })
   .superRefine((val, ctx) => {
     if (val.phoneNumber && val.phoneNumber.replace(/\D/g, '').length < 10) {
       ctx.addIssue({
         code: 'custom',
         path: ['phoneNumber'],
+        message: 'Enter a valid phone number (at least 10 digits)',
+      });
+    }
+    if (val.emergencyContactPhone.replace(/\D/g, '').length < 10) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['emergencyContactPhone'],
         message: 'Enter a valid phone number (at least 10 digits)',
       });
     }
@@ -109,6 +148,12 @@ export interface DriverCredentialsPayload {
   hazmat_expiry: string | null;
   has_twic: boolean;
   twic_expiry: string | null;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relationship: string;
+  fast_card_passport_expiry: string | null;
+  dod_clearance_level: 'None' | 'Interim Secret' | 'Secret';
+  landstar_operator_id: string | null;
 }
 
 export interface DriverCredentialsStepHandle {
@@ -138,6 +183,12 @@ export const buildDefaultValues = (
     hazmat_expiry?: string | null;
     has_twic?: boolean | null;
     twic_expiry?: string | null;
+    emergency_contact_name?: string | null;
+    emergency_contact_phone?: string | null;
+    emergency_contact_relationship?: string | null;
+    fast_card_passport_expiry?: string | null;
+    dod_clearance_level?: string | null;
+    landstar_operator_id?: string | null;
   } | null,
 ): Partial<DriverCredentialsValues> => ({
   licenseNumber: row?.license_number ?? '',
@@ -151,6 +202,16 @@ export const buildDefaultValues = (
   hazmatExpiry: parseDate(row?.hazmat_expiry),
   hasTwic: row?.has_twic === true ? 'yes' : row?.has_twic === false ? 'no' : undefined,
   twicExpiry: parseDate(row?.twic_expiry),
+  emergencyContactName: row?.emergency_contact_name ?? '',
+  emergencyContactPhone: row?.emergency_contact_phone ?? '',
+  emergencyContactRelationship: row?.emergency_contact_relationship ?? '',
+  fastCardPassportExpiry: parseDate(row?.fast_card_passport_expiry),
+  dodClearanceLevel:
+    row?.dod_clearance_level === 'Interim Secret' ||
+    row?.dod_clearance_level === 'Secret'
+      ? row.dod_clearance_level
+      : 'None',
+  landstarOperatorId: row?.landstar_operator_id ?? '',
 });
 
 export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Props>(
@@ -162,6 +223,11 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
         licenseNumber: '',
         phoneNumber: '',
         endorsements: [],
+        emergencyContactName: '',
+        emergencyContactPhone: '',
+        emergencyContactRelationship: '',
+        dodClearanceLevel: 'None',
+        landstarOperatorId: '',
         ...defaultValues,
       },
     });
@@ -195,6 +261,14 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
           has_twic: v.hasTwic === 'yes',
           twic_expiry:
             v.hasTwic === 'yes' && v.twicExpiry ? format(v.twicExpiry, 'yyyy-MM-dd') : null,
+          emergency_contact_name: v.emergencyContactName.trim(),
+          emergency_contact_phone: v.emergencyContactPhone.trim(),
+          emergency_contact_relationship: v.emergencyContactRelationship.trim(),
+          fast_card_passport_expiry: v.fastCardPassportExpiry
+            ? format(v.fastCardPassportExpiry, 'yyyy-MM-dd')
+            : null,
+          dod_clearance_level: v.dodClearanceLevel ?? 'None',
+          landstar_operator_id: v.landstarOperatorId?.trim() ? v.landstarOperatorId.trim() : null,
         };
       },
     }));
@@ -255,6 +329,63 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
                 </FormItem>
               )}
             />
+
+            <div className="rounded-md border border-border bg-muted/30 p-4 space-y-4">
+              <h4 className="font-medium text-sm">Emergency Contact</h4>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="emergencyContactName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name *</FormLabel>
+                      <FormControl>
+                        <Input className="pl-4 sm:pl-3" {...field} value={field.value ?? ''} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="emergencyContactRelationship"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Relationship *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. Spouse"
+                          className="pl-4 sm:pl-3"
+                          {...field}
+                          value={field.value ?? ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="emergencyContactPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="tel"
+                          inputMode="tel"
+                          placeholder="(555) 123-4567"
+                          className="pl-4 sm:pl-3"
+                          {...field}
+                          value={field.value ?? ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
 
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -488,6 +619,94 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
                 )}
               />
             )}
+
+            <div className="rounded-md border border-border bg-muted/30 p-4 space-y-4">
+              <h4 className="font-medium text-sm">Border & Security Credentials</h4>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="fastCardPassportExpiry"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>FAST Card / Passport Expiry</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                'h-12 w-full justify-start pl-3 text-left font-normal',
+                                !field.value && 'text-muted-foreground',
+                              )}
+                            >
+                              {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                            className={cn('p-3 pointer-events-auto')}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormDescription>Optional</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="dodClearanceLevel"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>DoD Security Clearance</FormLabel>
+                      <Select
+                        value={field.value ?? 'None'}
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-12">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="None">None</SelectItem>
+                          <SelectItem value="Interim Secret">Interim Secret</SelectItem>
+                          <SelectItem value="Secret">Secret</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <FormField
+              control={form.control}
+              name="landstarOperatorId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Landstar Operator ID</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g. 123456"
+                      className="pl-4 sm:pl-3"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <FormDescription>Optional — leave blank if not yet assigned.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </form>
         </Form>
       </div>
