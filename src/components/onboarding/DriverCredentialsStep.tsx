@@ -619,6 +619,94 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
                 )}
               />
             )}
+
+            <div className="rounded-md border border-border bg-muted/30 p-4 space-y-4">
+              <h4 className="font-medium text-sm">Border & Security Credentials</h4>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="fastCardPassportExpiry"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>FAST Card / Passport Expiry</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                'h-12 w-full justify-start pl-3 text-left font-normal',
+                                !field.value && 'text-muted-foreground',
+                              )}
+                            >
+                              {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                            className={cn('p-3 pointer-events-auto')}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormDescription>Optional</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="dodClearanceLevel"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>DoD Security Clearance</FormLabel>
+                      <Select
+                        value={field.value ?? 'None'}
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-12">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="None">None</SelectItem>
+                          <SelectItem value="Interim Secret">Interim Secret</SelectItem>
+                          <SelectItem value="Secret">Secret</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            <FormField
+              control={form.control}
+              name="landstarOperatorId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Landstar Operator ID</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g. 123456"
+                      className="pl-4 sm:pl-3"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <FormDescription>Optional — leave blank if not yet assigned.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </form>
         </Form>
       </div>
