@@ -1,37 +1,32 @@
-## Goal
-Make the Fleet Loads board organizable by assigned Driver and Truck Number — visible columns, sortable headers, and dedicated filters.
+## Root cause
 
-## Current state (already in code)
-- `FleetLoads.tsx` fetches `fleet_loads.*` (which already includes `driver_id` and `truck_id`) and separately loads `drivers` (`drivers_public_view`) and `trucks`. Helpers `getDriverName(load.driver_id)` and `getTruckUnit(load.truck_id)` already exist.
-- Table is rendered via the shared `DataTable` component (`src/components/shared/DataTable.tsx`), which supports per-column text/date filters but currently has **no sortable headers**.
+In `StartingOdometerDialog` and `EndingOdometerDialog`, the submit flow does:
 
-So the join work for Task 1 is effectively done — driver/truck data is already on the client. We just need to wire it into the visible row data so columns, sorting, and filtering all work off the same field.
+1. `applyOptimistic(...)` — patches the cache to `in_transit`/`delivered` and `cancelQueries`.
+2. `onComplete()` — which on the Driver Dashboard is `refetchLoads()`.
+3. Closes the dialog.
+4. Fires the `supabase.update(...)` in the background.
 
-## Changes
+Step 2 calls `useQuery`'s `refetch()`, which **bypasses** the just-issued `cancelQueries` and kicks off a fresh server read **before** step 4's DB write has landed. That read returns the row with its old `pending`/`assigned` status, which then clobbers the optimistic patch in cache.
 
-### 1. `src/pages/FleetLoads.tsx`
-- Compute a memoized `enrichedLoads` from the filtered-by-month list that adds two derived strings per row:
-  - `driver_name` = `getDriverName(load.driver_id)` or `'Unassigned'`
-  - `truck_unit` = `getTruckUnit(load.truck_id)` or `'Unassigned'`
-- Feed `enrichedLoads` into `DataTable` (replacing `filteredLoads` there; totals stay on the existing array).
-- Add two new columns right after `status` (Status is the most visible anchor and keeps the actions column at the end):
-  - `{ key: 'driver_name', header: 'Driver', sortable: true, filter: { type: 'text', accessor: (l) => l.driver_name } }`
-  - `{ key: 'truck_unit', header: 'Truck #', sortable: true, filter: { type: 'text', accessor: (l) => l.truck_unit } }`
-- Render cells with muted styling for `Unassigned`.
+User-visible effect: dialog closes, the load briefly shows the new status, then snaps back to the old status. Driver taps "Start Load" / "Complete Load" again, the (now empty) dialog reopens, and they have to retype the odometer. On the second attempt the background write from the first submit has usually finished, so it sticks — hence "have to enter twice."
 
-### 2. `src/components/shared/DataTable.tsx`
-Add lightweight client-side sorting (the table is already client-paginated/virtualized):
-- Extend `Column<T>` with `sortable?: boolean` and optional `sortAccessor?: (item: T) => string | number | null | undefined` (defaults to `item[key]`).
-- Add `sortState: { key: string; dir: 'asc' | 'desc' } | null` state.
-- Wrap the `<th>` label in a button for sortable columns; clicking cycles `asc → desc → none`. Show an up/down chevron from `lucide-react` (`ArrowUp`, `ArrowDown`, `ChevronsUpDown`).
-- Apply sort in a `useMemo` **after** the existing column-filter step and **before** virtualization, using locale-aware string compare and numeric compare for numbers; nulls/`Unassigned` always sort last.
-- No prop signature changes for existing callers — `sortable` is opt-in.
+## Fix
 
-### 3. Filtering UX
-- The existing "Filters" panel already renders text inputs for any column with `filter: { type: 'text' }`. Adding the filter spec on the new columns gives dispatchers a **Filter by Driver** and **Filter by Truck** input out of the box, matching the look of the other filters on this page.
+Stop calling the parent's refetch in the middle of the optimistic flow. The optimistic patch already updates the UI instantly, and `commit()` invalidates the relevant queries after the DB write succeeds, which triggers the correct refetch.
+
+### `src/components/driver/StartingOdometerDialog.tsx`
+- Remove the early `onComplete()` call that sits between `applyOptimistic(...)` and the `supabase.update(...)`.
+- Keep `onComplete()` in the offline branch (no optimistic patch there; the parent needs the nudge).
+- Add a single `onComplete()` call after `commit()` so any non–driver-loads consumers still re-sync (cheap; `commit()` already invalidates the driver-loads caches, so this just covers other listeners).
+- Also flip `setIsSubmitting(true)` at the start of `handleSubmit` and clear it in a `finally` — currently it is never set, so the "Saving…" state never shows and double-taps on the submit button can fire twice.
+
+### `src/components/driver/EndingOdometerDialog.tsx`
+- Same three changes (remove early `onComplete()` in the optimistic path, keep it in the offline path, add post-commit `onComplete()`, wire `setIsSubmitting` for real).
+
+### No changes needed
+- `ActiveLoadCard.tsx` / `DriverLoadsView.tsx` callers stay the same — `onComplete` keeps the same signature, just gets called later.
+- `useOptimisticLoadStatus.ts` is correct; it already cancels queries and invalidates on commit.
 
 ## Out of scope
-- No DB migration or query changes (driver_id/truck_id already exist on `fleet_loads`; drivers/trucks are already fetched).
-- No changes to server-side pagination — table is client-side today, so sort/filter stay client-side per the task's "client-side pagination" branch.
-- No changes to the mobile `DriverLoadsView` (driver-only view).
-- Other tables that use `DataTable` are unaffected because `sortable` is opt-in.
+- POD dialog, status progression for non-odometer transitions, and the offline-queue path itself.

@@ -60,7 +60,7 @@ export function EndingOdometerDialog({
   };
 
   const handleSubmit = async () => {
-    if (!isValid) return;
+    if (!isValid || isSubmitting) return;
     const endMiles = parsed;
     const actualMiles = hasStart ? endMiles - (startMiles as number) : null;
 
@@ -85,8 +85,11 @@ export function EndingOdometerDialog({
     if (actualMiles !== null) update.actual_miles = actualMiles;
 
     // Optimistic patch + close dialog so the UI feels instant.
+    // NOTE: do NOT call onComplete() here. The parent's refetch would bypass
+    // the cache cancel inside applyOptimistic and clobber the optimistic patch
+    // with stale data, forcing the driver to re-enter the odometer.
+    setIsSubmitting(true);
     const { commit, rollback } = applyOptimistic(loadId, update);
-    onComplete();
     reset();
     onOpenChange(false);
 
@@ -99,9 +102,12 @@ export function EndingOdometerDialog({
 
       toast.success('Load delivered — odometer recorded.');
       commit();
+      onComplete();
     } catch (err: any) {
       console.error('Ending odometer save failed:', err);
       rollback();
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
