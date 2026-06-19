@@ -26,7 +26,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search } from 'lucide-react';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
@@ -70,6 +72,9 @@ export default function FleetLoads() {
   const [editingLoad, setEditingLoad] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSetSearch = useDebouncedCallback((v: string) => setSearchTerm(v.trim().toLowerCase()), 300);
   const [accessorials, setAccessorials] = useState<Accessorial[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
@@ -536,12 +541,12 @@ export default function FleetLoads() {
   };
 
   // Filter loads by month
-  const filteredLoads = selectedMonth === 'all' 
-    ? loads 
+  const monthFilteredLoads = selectedMonth === 'all'
+    ? loads
     : loads.filter((l: any) => l.pickup_date && l.pickup_date.startsWith(selectedMonth));
 
   // Enrich with driver_name + truck_unit so columns, sort, and filter all use the same field
-  const enrichedLoads = filteredLoads.map((l: any) => {
+  const enrichedAll = monthFilteredLoads.map((l: any) => {
     const driver = l.driver_id ? drivers.find((d: any) => d.id === l.driver_id) : null;
     const truck = l.truck_id ? trucks.find((t: any) => t.id === l.truck_id) : null;
     return {
@@ -550,6 +555,18 @@ export default function FleetLoads() {
       truck_unit: truck?.unit_number || 'Unassigned',
     };
   });
+
+  // Omni-search: case-insensitive contains across multiple fields
+  const SEARCH_FIELDS = ['landstar_load_id', 'origin', 'destination', 'status', 'notes', 'pickup_number', 'driver_name', 'truck_unit'];
+  const enrichedLoads = searchTerm
+    ? enrichedAll.filter((l: any) =>
+        SEARCH_FIELDS.some((f) => {
+          const v = l[f];
+          return v != null && String(v).toLowerCase().includes(searchTerm);
+        })
+      )
+    : enrichedAll;
+  const filteredLoads = enrichedLoads;
 
   // Helper to get display miles (actual if valid, otherwise booked)
   const getDisplayMiles = (load: any) => {
@@ -766,10 +783,30 @@ export default function FleetLoads() {
         </Card>
       </div>
 
-      {/* Month Filter */}
-      <div className="flex gap-4 mb-4">
+      {/* Search + Month Filter */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex-1">
+          <Input
+            leftIcon={<Search className="h-4 w-4" />}
+            rightIcon={
+              searchInput ? (
+                <button
+                  type="button"
+                  onClick={() => { setSearchInput(''); setSearchTerm(''); }}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              ) : undefined
+            }
+            placeholder="Search loads by ID, origin, destination, status, driver, truck…"
+            value={searchInput}
+            onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
+          />
+        </div>
         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Filter by month" />
           </SelectTrigger>
           <SelectContent>
@@ -784,6 +821,14 @@ export default function FleetLoads() {
       {/* Loads Table */}
       <Card className="card-elevated">
         <CardContent className="pt-6">
+          {searchTerm && filteredLoads.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title={`No loads found matching "${searchInput}"`}
+              description="Try a different search term, or clear the search to see all loads."
+              action={{ label: 'Clear Search', onClick: () => { setSearchInput(''); setSearchTerm(''); } }}
+            />
+          ) : (
           <DataTable
             columns={[
               { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
@@ -903,6 +948,7 @@ export default function FleetLoads() {
               </>
             )}
           />
+          )}
           <ConfirmDeleteDialog
             open={massDeleteOpen}
             onOpenChange={setMassDeleteOpen}

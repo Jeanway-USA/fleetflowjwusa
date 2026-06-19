@@ -1,45 +1,46 @@
-## Root cause
+# Fleet Loads Omni-Search
 
-The base `Input` component (`src/components/ui/input.tsx`) ships with a **responsive** padding class: `pl-4 pr-4 ... sm:pl-3 sm:pr-3`. When callers wrap it with an absolutely-positioned icon and pass `className="pl-8"` (as `CurrencyInput` does) or `className="pr-8"` (as `PercentageInput` does), `twMerge` correctly replaces the base `pl-4` — **but it does NOT replace `sm:pl-3`** because `pl-8` is a different responsive scope. At the `sm:` breakpoint (≥640px, i.e. the desktop Edit Load dialog) the input falls back to `pl-3`, and the dollar/percent glyph overlaps the typed value. This is the clipping the user sees in the Revenue tab.
+## Schema reality check
 
-## Changes
+The spec references columns that don't exist on `fleet_loads`. Actual relevant fields:
 
-### 1. `src/components/ui/input.tsx` — add first-class icon support
+- `landstar_load_id` (not `load_number`)
+- `origin`, `destination` — single strings like `"Dallas, TX"` (no separate city/state)
+- `status`, `notes`, `pickup_number`
+- No `shipper_name` / `receiver_name` columns
+- Driver and truck are loaded via **separate queries** (`drivers`, `trucks`) and joined client-side into `driver_name` / `truck_unit` on `enrichedLoads` — there is no PostgREST FK embed in this page
 
-Extend the Input component (keep it a drop-in replacement; existing `<Input>` usages keep working unchanged):
+Because of this, a server-side `.or()` with foreign-table `ilike` on driver name **would require restructuring the data layer** (switching to an embedded select like `fleet_loads.select('*, drivers(first_name,last_name), trucks(unit_number)')`). The loads list is already fully in memory and enriched, so a client-side filter is faster, simpler, and covers every requested field including driver name.
 
-- Add optional props `leftIcon?: React.ReactNode` and `rightIcon?: React.ReactNode`.
-- When either is passed, render the input inside a `relative` wrapper, place the icon absolutely (`left-3` / `right-3`, vertically centered, `pointer-events-none`, `text-muted-foreground`), and apply the correct padding class to the `<input>`:
-  - `leftIcon` → `pl-9 sm:pl-9` (overrides both base `pl-4` and `sm:pl-3`)
-  - `rightIcon` → `pr-9 sm:pr-9`
-- Forwarded `className` still merges last so callers can override.
+## Plan — client-side debounced omni-search
 
-This is the canonical fix Tasks 1 and 2 ask for.
+### 1. `src/pages/FleetLoads.tsx` — search state + UI
+- Add `const [searchInput, setSearchInput] = useState('')` and `const [searchTerm, setSearchTerm] = useState('')`.
+- Debounce input → searchTerm with `useDebouncedCallback` (300 ms) from existing `src/hooks/useDebouncedCallback.ts`.
+- Render a full-width `Input` above the DataTable with `leftIcon={<Search />}` (uses the new icon-aware Input from the previous patch — no padding fight). Include a small `X` clear button (right side) when `searchInput` is non-empty.
+- Place the search bar in the same toolbar row as the existing month `Select`, stacking on mobile.
 
-### 2. `src/components/ui/numeric-input.tsx` — use the new pattern (and fix the bug today)
+### 2. Filter logic — extend existing `filteredLoads`
+Apply the search filter **after** month filtering, **against `enrichedLoads`** so `driver_name` and `truck_unit` are already populated:
 
-- `CurrencyInput`: replace `className={cn("pl-8", className)}` with `className={cn("pl-9 sm:pl-9", className)}` so the sm-breakpoint override stops winning. (Could be migrated to `<Input leftIcon={<DollarSign…/>} />` for consistency — will do that as part of the same edit.)
-- `PercentageInput`: replace `className={cn("pr-8", className)}` with `className={cn("pr-9 sm:pr-9", className)}` (or migrate to `rightIcon`).
+```text
+matches(load, q) =
+  any field in [
+    landstar_load_id, origin, destination, status, notes,
+    pickup_number, driver_name, truck_unit
+  ] contains q (case-insensitive)
+```
 
-This alone fixes the Edit Load → Revenue tab clipping (Booked Linehaul, Fuel Surcharge, Lumper, Detention Pay, Advance Taken, custom-accessorial Amount, etc.), because every `$` field in `FleetLoads.tsx` is already routed through `CurrencyInput`.
+Implementation: reorder so enrichment happens before the search filter, then filter once on the lower-cased term. Keep `totals` and downstream `enrichedLoads` consumers pointing at the final filtered array so KPI totals reflect the visible rows.
 
-### 3. Audit pass — raw inputs with absolute icons
+### 3. Zero-state
+- When `searchTerm` is non-empty AND `filteredLoads.length === 0`, render an `EmptyState` inside the table card area: `"No loads found matching \"<term>\""` with a `Clear Search` button that resets both `searchInput` and `searchTerm`.
+- Existing DataTable empty-state stays for the "no loads at all" case (no search term).
 
-Grep result already shows the search/date pickers using the `absolute left-…` / `absolute right-…` icon pattern with raw `<Input>`. For each, confirm the input has `pl-9`/`pr-9` (not just `pl-8` or `pl-10` paired with a different left offset), and bump to `pl-9 sm:pl-9` / `pr-9 sm:pr-9` where the icon is `left-3`/`right-3`. Files to spot-check:
+### Out of scope
+- No schema changes, no new columns (`shipper_name`/`receiver_name`/`origin_city` etc. don't exist).
+- No switch to server-side `.or()` filtering or PostgREST FK embeds — would require refactoring the drivers/trucks fetch pattern and offers no UX gain at current data volumes. Happy to do it as a follow-up if you want server-side filtering for very large fleets.
+- No changes to mutation/edit logic.
 
-- Global search bars: `src/pages/FleetLoads.tsx`, `src/pages/Trucks.tsx`, `src/pages/Drivers.tsx` (search filter row), `src/pages/CRM.tsx`, `src/pages/Finance.tsx`, `src/pages/IFTA.tsx`, `src/components/crm/BrokerDatabase.tsx`, `src/components/finance/driver-settlements/DriverSettlementsTab.tsx`, `src/components/dispatcher/ActiveLoadsBoard.tsx`, `src/components/maintenance/InventoryManagementTab.tsx`, `src/components/maintenance/ActiveWorkOrdersTab.tsx`, `src/components/superadmin/BillingPromotionsTab.tsx`.
-- Date-picker-style inputs and any `$` inputs not using `CurrencyInput` (e.g. raw `<Input type="number">` with a `$` label) in `IndependentLoadBuilder.tsx`, `SmartLoadCreator.tsx`, `FactoringTab.tsx`.
-
-Only edit files where the audit shows the current padding is insufficient or fights the `sm:` override.
-
-## Out of scope
-
-- No backend/schema/RLS changes.
-- No visual redesign of the icons or input sizing — only padding tokens.
-- No changes to layouts using icons that are decorative siblings (e.g. inside `CardHeader`, not overlapping any input), like the `DollarSign` at `FleetLoads.tsx:738`.
-
-## Verification
-
-- Open Fleet Loads → Edit a load → Revenue tab at desktop width; the `$` glyph no longer overlaps the numeric value in Booked Linehaul / Fuel Surcharge / Lumper / Detention / Advance / Accessorial Amount.
-- Resize to mobile; same fields render with comfortable left padding.
-- Spot-check one search bar and one date input from the audit list at both breakpoints.
+## Files touched
+- `src/pages/FleetLoads.tsx` (only)
