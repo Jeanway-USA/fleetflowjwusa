@@ -310,10 +310,16 @@ export default function FleetLoads() {
 
   const openDialog = async (load?: any) => {
     setEditingLoad(load || null);
-    setFormData(load || { 
-      status: 'pending',
-      is_power_only: false,
-    });
+    if (load) {
+      // Strip enrichment-only fields that are not columns on fleet_loads
+      const { driver_name, truck_unit, ...cleanLoad } = load;
+      setFormData(cleanLoad);
+    } else {
+      setFormData({
+        status: 'pending',
+        is_power_only: false,
+      });
+    }
     // Load existing accessorials for this load - fetch fresh from database
     if (load?.id) {
       const { data: loadAccs } = await supabase
@@ -453,8 +459,10 @@ export default function FleetLoads() {
     }
 
     const calculated = calculateRevenueLocal(formData);
+    // Strip non-column enrichment fields before sending to Supabase
+    const { driver_name: _dn, truck_unit: _tu, ...cleanFormData } = formData;
     const payload = {
-      ...formData,
+      ...cleanFormData,
       ...calculated,
       org_id: orgId,
       cf_7512_number: formData.is_in_bond ? (formData.cf_7512_number ?? '').trim() : null,
