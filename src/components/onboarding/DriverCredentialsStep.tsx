@@ -13,6 +13,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Form,
   FormControl,
   FormDescription,
@@ -46,6 +53,21 @@ const schema = z
       .max(20, 'Phone number must be under 20 characters')
       .optional()
       .or(z.literal('')),
+    emergencyContactName: z
+      .string()
+      .trim()
+      .min(1, 'Emergency contact name is required')
+      .max(100, 'Must be under 100 characters'),
+    emergencyContactRelationship: z
+      .string()
+      .trim()
+      .min(1, 'Relationship is required')
+      .max(60, 'Must be under 60 characters'),
+    emergencyContactPhone: z
+      .string()
+      .trim()
+      .min(1, 'Emergency contact phone is required')
+      .max(20, 'Phone number must be under 20 characters'),
     licenseExpiry: z
       .date({ required_error: 'License expiry date is required' })
       .refine((d) => d >= today(), 'License must not be expired'),
@@ -56,12 +78,29 @@ const schema = z
     hazmatExpiry: z.date().optional(),
     hasTwic: z.enum(['yes', 'no'], { required_error: 'Please select an option' }),
     twicExpiry: z.date().optional(),
+    fastCardPassportExpiry: z.date().optional(),
+    dodClearanceLevel: z
+      .enum(['None', 'Interim Secret', 'Secret'])
+      .default('None'),
+    landstarOperatorId: z
+      .string()
+      .trim()
+      .max(30, 'Must be under 30 characters')
+      .optional()
+      .or(z.literal('')),
   })
   .superRefine((val, ctx) => {
     if (val.phoneNumber && val.phoneNumber.replace(/\D/g, '').length < 10) {
       ctx.addIssue({
         code: 'custom',
         path: ['phoneNumber'],
+        message: 'Enter a valid phone number (at least 10 digits)',
+      });
+    }
+    if (val.emergencyContactPhone.replace(/\D/g, '').length < 10) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['emergencyContactPhone'],
         message: 'Enter a valid phone number (at least 10 digits)',
       });
     }
