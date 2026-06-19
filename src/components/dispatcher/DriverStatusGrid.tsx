@@ -191,7 +191,23 @@ export function DriverStatusGrid() {
                       )}
                     </Badge>
                   </div>
-                  
+
+                  <div className="flex items-center gap-2 mt-2">
+                    {hos.isStale ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>{hosBadge}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>Pending Reset — Verify with Driver</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      hosBadge
+                    )}
+                    {hos.relative && (
+                      <span className="text-[11px] text-muted-foreground truncate">{hos.relative}</span>
+                    )}
+                  </div>
+
                   {expiringCreds.length > 0 && (
                     <div className="flex items-center gap-1 mt-2 text-xs text-warning">
                       <AlertTriangle className="h-3 w-3" />
@@ -202,6 +218,7 @@ export function DriverStatusGrid() {
               );
             })}
           </div>
+          </TooltipProvider>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
