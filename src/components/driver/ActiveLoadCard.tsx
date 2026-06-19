@@ -412,6 +412,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
         loadId={load.id}
         loadNumber={load.landstar_load_id}
         startMiles={load.start_miles ?? null}
+        driverId={driverId ?? (load as any).driver_id ?? null}
         nextStatus="delivered"
         onComplete={() => onStatusUpdate?.()}
       />

@@ -388,6 +388,7 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
         loadId={load.id}
         loadNumber={load.landstar_load_id}
         startMiles={load.start_miles ?? null}
+        driverId={load.driver_id ?? null}
         nextStatus="delivered"
         onComplete={onStatusUpdate}
       />

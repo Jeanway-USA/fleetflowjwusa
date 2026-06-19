@@ -1,47 +1,38 @@
 ## Goal
-Capture the newly-added driver fields (emergency contact, FAST/passport, DoD clearance, Landstar Operator ID) in the first onboarding step so they're saved to the `drivers` row when the driver clicks "Save & Continue". TWIC conditional already exists.
+Capture a lightweight HOS snapshot when a driver completes a load by extending the existing ending odometer modal. No full ELD — just two number inputs saved to the driver's record.
 
-## Note on the target table
-The task description says "profiles table", but the new columns from the previous migration live on `public.drivers` (where every other onboarding field — license, medical, TWIC, endorsements — already lives, and where the step's submit handler writes). The plan follows the existing pattern and writes to `drivers`. Flag this in chat if "profiles" was intended.
+## Note on target table
+The task says "profiles", but driver-domain fields (license, medical, TWIC, emergency contact, etc.) live on `public.drivers` in this project; `profiles` is auth/account-level. Following the established pattern, the new columns will be added to `public.drivers`. Flag if `profiles` was intended.
 
 ## Changes
 
-### 1. `src/components/onboarding/DriverCredentialsStep.tsx`
-Extend the Zod schema, payload, defaults, and form UI in one file.
+### 1. Migration — `public.drivers`
+Add three columns:
+- `remaining_drive_hours numeric(4,2)` (nullable; 0–11 typical)
+- `remaining_cycle_hours numeric(4,2)` (nullable; 0–70 typical)
+- `hos_last_updated timestamptz` (nullable)
 
-**Schema additions**
-- `emergencyContactName: z.string().trim().min(1, 'Required').max(100)` — required
-- `emergencyContactRelationship: z.string().trim().min(1, 'Required').max(60)` — required
-- `emergencyContactPhone: z.string().trim().min(1, 'Required').max(20)` — required, with the same `>= 10 digits` superRefine check used for `phoneNumber`
-- `fastCardPassportExpiry: z.date().optional()` — optional, no past-date guard (expired FAST cards are still data worth recording)
-- `dodClearanceLevel: z.enum(['None', 'Interim Secret', 'Secret']).default('None')`
-- `landstarOperatorId: z.string().trim().max(30).optional().or(z.literal(''))` — optional
-- TWIC conditional: already in place (lines 84-98), no change
+Update `prevent_driver_self_sensitive_update` trigger so these three columns are **not** in the blocklist — drivers must be able to write them from the completion modal (similar to `phone` and emergency contact fields, which are already driver-editable).
 
-**Payload (`DriverCredentialsPayload`) additions**, mapped in `submit()`:
-- `emergency_contact_name`, `emergency_contact_phone`, `emergency_contact_relationship: string`
-- `fast_card_passport_expiry: string | null` (formatted `yyyy-MM-dd` or null)
-- `dod_clearance_level: 'None' | 'Interim Secret' | 'Secret'`
-- `landstar_operator_id: string | null` (trim → null when empty)
+No RLS change needed (existing `drivers` self-update policy already covers it).
 
-**`buildDefaultValues`** — accept the new snake_case fields from the driver row and seed them (dropdown defaults to `'None'` when row value is null).
+### 2. `src/components/driver/EndingOdometerDialog.tsx`
+- Accept new prop: `driverId: string`.
+- Add local state `driveHours` and `cycleHours` (strings, parsed via the existing numeric input pattern; allow one decimal).
+- Validation: both required, must be numbers `>= 0`. Drive hours capped at `11`, cycle hours capped at `70` (soft cap — show inline helper, block submit if exceeded). `isValid` gates on odometer **and** both HOS fields.
+- New section below the odometer block, visually distinct (bordered card, `bg-muted/40`, header "Current HOS Snapshot (For Dispatch)" with a small `Clock` icon and one-line helper "Rough hours only — used for dispatch planning."). Two `DecimalInput`s side-by-side on `sm:` and stacked on mobile.
+- Submission:
+  - Build the existing `fleet_loads` update exactly as today.
+  - In **online** path: after the successful `fleet_loads.update`, run `supabase.from('drivers').update({ remaining_drive_hours, remaining_cycle_hours, hos_last_updated: new Date().toISOString() }).eq('id', driverId)`. If this errors, log + `toast.error('HOS snapshot failed to save')` but do **not** roll back the load (load is already delivered). Invalidate `['driver-for-user']` so any HOS UI refreshes.
+  - In **offline** path: enqueue a second offline action `driver_hos_update` with `{ id: driverId, remaining_drive_hours, remaining_cycle_hours, hos_last_updated: <ISO now> }` alongside the existing `load_status_update` enqueue.
 
-**UI layout (in order, top to bottom)**
-- Existing license-number / phone fields stay.
-- **New "Emergency Contact" section** placed immediately after the header block (top of form, per Task 1). Heading `<h4>` + three inputs in a 1/3-column grid: Name, Relationship, Phone. All marked with `*`.
-- License Expiry / Medical / Endorsements / HAZMAT — unchanged.
-- TWIC radio + conditional `twicExpiry` — unchanged.
-- **New "Border & Security Credentials" section**:
-  - `fastCardPassportExpiry` — shadcn Popover + Calendar with `pointer-events-auto` (matches existing date pickers; no `disabled` past-date rule).
-  - `dodClearanceLevel` — shadcn `<Select>` with the three options.
-- **New "Landstar Operator ID" field** at the bottom (or grouped under credentials): single `<Input>` labeled optional, placeholder `e.g. 123456`.
+### 3. `src/hooks/useOfflineQueue.ts`
+- Add a handler branch for the new `driver_hos_update` action type that performs the `drivers` update when the queue flushes. (Read the file first to match the existing handler shape — same pattern as `load_status_update`.)
 
-### 2. `src/pages/DriverOnboarding.tsx`
-- Update both `supabase.from('drivers').select(...)` strings (lines 97 and 289) to include the seven new columns: `emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, fast_card_passport_expiry, dod_clearance_level, landstar_operator_id`. (`twic_expiry` is already selected.)
-- Pass these fields into `buildDefaultValues(driverRow)` (already called wherever the step is mounted — no signature change needed since `buildDefaultValues` now reads more keys off the same row).
-- The existing submit handler at lines 452-461 already does `supabase.from('drivers').update(payload).eq('id', driverRow.id)` — the enlarged payload from the step flows through automatically. No handler edits required beyond keeping the column list in `.select(...)` aligned for the post-update refetch.
+### 4. `src/components/driver/ActiveLoadCard.tsx` (caller)
+- Pass `driverId` prop through to `EndingOdometerDialog` (it already has the driver context from `DriverDashboard` → `ActiveLoadCard` props).
 
 ## Out of scope
-- No DB migration — columns already exist on `drivers` from the previous task.
-- No change to the prevent-self-edit trigger; it already permits emergency contact (driver-editable) and the existing onboarding flow already writes other blocklisted credential fields the same way for the same logged-in driver, so the new ones behave identically.
-- Admin-side Driver edit dialog already covers these fields and isn't touched here.
+- No dispatcher-side UI to display the HOS snapshot in this task — purely capture. (Easy follow-up: surface `remaining_drive_hours` + `hos_last_updated` on the dispatcher Driver Status grid.)
+- No changes to the starting odometer dialog.
+- No HOS history table — only the latest snapshot on `drivers` per the spec.
