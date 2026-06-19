@@ -261,6 +261,14 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
           has_twic: v.hasTwic === 'yes',
           twic_expiry:
             v.hasTwic === 'yes' && v.twicExpiry ? format(v.twicExpiry, 'yyyy-MM-dd') : null,
+          emergency_contact_name: v.emergencyContactName.trim(),
+          emergency_contact_phone: v.emergencyContactPhone.trim(),
+          emergency_contact_relationship: v.emergencyContactRelationship.trim(),
+          fast_card_passport_expiry: v.fastCardPassportExpiry
+            ? format(v.fastCardPassportExpiry, 'yyyy-MM-dd')
+            : null,
+          dod_clearance_level: v.dodClearanceLevel ?? 'None',
+          landstar_operator_id: v.landstarOperatorId?.trim() ? v.landstarOperatorId.trim() : null,
         };
       },
     }));
