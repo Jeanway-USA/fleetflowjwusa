@@ -1661,6 +1661,7 @@ export type Database = {
           has_twic: boolean | null
           hazmat_expiry: string | null
           hire_date: string | null
+          hos_last_updated: string | null
           id: string
           landstar_operator_id: string | null
           last_name: string
@@ -1673,6 +1674,8 @@ export type Database = {
           pay_rate: number | null
           pay_type: string | null
           phone: string | null
+          remaining_cycle_hours: number | null
+          remaining_drive_hours: number | null
           status: string
           twic_expiry: string | null
           updated_at: string
@@ -1697,6 +1700,7 @@ export type Database = {
           has_twic?: boolean | null
           hazmat_expiry?: string | null
           hire_date?: string | null
+          hos_last_updated?: string | null
           id?: string
           landstar_operator_id?: string | null
           last_name: string
@@ -1709,6 +1713,8 @@ export type Database = {
           pay_rate?: number | null
           pay_type?: string | null
           phone?: string | null
+          remaining_cycle_hours?: number | null
+          remaining_drive_hours?: number | null
           status?: string
           twic_expiry?: string | null
           updated_at?: string
@@ -1733,6 +1739,7 @@ export type Database = {
           has_twic?: boolean | null
           hazmat_expiry?: string | null
           hire_date?: string | null
+          hos_last_updated?: string | null
           id?: string
           landstar_operator_id?: string | null
           last_name?: string
@@ -1745,6 +1752,8 @@ export type Database = {
           pay_rate?: number | null
           pay_type?: string | null
           phone?: string | null
+          remaining_cycle_hours?: number | null
+          remaining_drive_hours?: number | null
           status?: string
           twic_expiry?: string | null
           updated_at?: string
