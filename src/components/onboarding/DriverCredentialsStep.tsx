@@ -148,6 +148,12 @@ export interface DriverCredentialsPayload {
   hazmat_expiry: string | null;
   has_twic: boolean;
   twic_expiry: string | null;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relationship: string;
+  fast_card_passport_expiry: string | null;
+  dod_clearance_level: 'None' | 'Interim Secret' | 'Secret';
+  landstar_operator_id: string | null;
 }
 
 export interface DriverCredentialsStepHandle {
@@ -177,6 +183,12 @@ export const buildDefaultValues = (
     hazmat_expiry?: string | null;
     has_twic?: boolean | null;
     twic_expiry?: string | null;
+    emergency_contact_name?: string | null;
+    emergency_contact_phone?: string | null;
+    emergency_contact_relationship?: string | null;
+    fast_card_passport_expiry?: string | null;
+    dod_clearance_level?: string | null;
+    landstar_operator_id?: string | null;
   } | null,
 ): Partial<DriverCredentialsValues> => ({
   licenseNumber: row?.license_number ?? '',
@@ -190,6 +202,16 @@ export const buildDefaultValues = (
   hazmatExpiry: parseDate(row?.hazmat_expiry),
   hasTwic: row?.has_twic === true ? 'yes' : row?.has_twic === false ? 'no' : undefined,
   twicExpiry: parseDate(row?.twic_expiry),
+  emergencyContactName: row?.emergency_contact_name ?? '',
+  emergencyContactPhone: row?.emergency_contact_phone ?? '',
+  emergencyContactRelationship: row?.emergency_contact_relationship ?? '',
+  fastCardPassportExpiry: parseDate(row?.fast_card_passport_expiry),
+  dodClearanceLevel:
+    row?.dod_clearance_level === 'Interim Secret' ||
+    row?.dod_clearance_level === 'Secret'
+      ? row.dod_clearance_level
+      : 'None',
+  landstarOperatorId: row?.landstar_operator_id ?? '',
 });
 
 export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Props>(
@@ -201,6 +223,11 @@ export const DriverCredentialsStep = forwardRef<DriverCredentialsStepHandle, Pro
         licenseNumber: '',
         phoneNumber: '',
         endorsements: [],
+        emergencyContactName: '',
+        emergencyContactPhone: '',
+        emergencyContactRelationship: '',
+        dodClearanceLevel: 'None',
+        landstarOperatorId: '',
         ...defaultValues,
       },
     });
