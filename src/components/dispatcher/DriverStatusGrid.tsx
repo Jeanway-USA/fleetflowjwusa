@@ -4,9 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, Phone, AlertTriangle, Package, CheckCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Users, Phone, AlertTriangle, Package, CheckCircle, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { addDays, isBefore } from 'date-fns';
+import { addDays, isBefore, formatDistanceToNow } from 'date-fns';
 
 interface Driver {
   id: string;
@@ -17,10 +18,41 @@ interface Driver {
   license_expiry: string | null;
   medical_card_expiry: string | null;
   hazmat_expiry: string | null;
+  remaining_drive_hours: number | null;
+  hos_last_updated: string | null;
 }
 
 interface DriverWithLoad extends Driver {
   activeLoad: boolean;
+}
+
+type HosTone = 'red' | 'yellow' | 'green' | 'muted';
+
+const HOS_TONE_CLASSES: Record<HosTone, string> = {
+  red: 'bg-destructive/10 text-destructive border-destructive/20',
+  yellow: 'bg-warning/10 text-warning border-warning/20',
+  green: 'bg-success/10 text-success border-success/20',
+  muted: 'bg-muted text-muted-foreground border-border',
+};
+
+function getHosState(hours: number | null, updatedAt: string | null) {
+  if (updatedAt == null) {
+    return { tone: 'muted' as HosTone, label: 'No HOS', isStale: false, relative: null as string | null };
+  }
+  const ageMs = Date.now() - new Date(updatedAt).getTime();
+  const isStale = ageMs > 14 * 3600 * 1000;
+  const relative = `Updated ${formatDistanceToNow(new Date(updatedAt), { addSuffix: true }).replace('about ', '')}`;
+
+  if (isStale) {
+    return { tone: 'muted' as HosTone, label: 'Pending Reset', isStale: true, relative };
+  }
+  if (hours == null) {
+    return { tone: 'muted' as HosTone, label: 'No HOS', isStale: false, relative };
+  }
+  let tone: HosTone = 'green';
+  if (hours <= 2) tone = 'red';
+  else if (hours <= 6) tone = 'yellow';
+  return { tone, label: `${hours}h drive`, isStale: false, relative };
 }
 
 export function DriverStatusGrid() {
