@@ -622,7 +622,7 @@ export function ServiceHistoryTab({ onViewTruck }: ServiceHistoryTabProps) {
                   type="number"
                   min="0"
                   step="0.01"
-                  className="pl-8 sm:pl-8"
+                  className="pl-9 sm:pl-9"
                   value={editForm.final_cost}
                   onChange={(e) => setEditForm({ ...editForm, final_cost: e.target.value })}
                   placeholder="0.00"

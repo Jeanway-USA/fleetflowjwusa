@@ -568,7 +568,7 @@ export function NewWorkOrderSheet({ open, onOpenChange, initialData }: NewWorkOr
                     type="number"
                     min="0"
                     step="0.01"
-                    className="pl-8 sm:pl-8"
+                    className="pl-9 sm:pl-9"
                     placeholder="0.00"
                     value={formData.cost_estimate}
                     onChange={(e) => handleChange('cost_estimate', e.target.value)}

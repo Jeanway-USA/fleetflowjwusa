@@ -438,7 +438,7 @@ export function InventoryManagementTab() {
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search by part name, number, or vendor…"
-            className="pl-9"
+            className="pl-9 sm:pl-9"
           />
         </div>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
