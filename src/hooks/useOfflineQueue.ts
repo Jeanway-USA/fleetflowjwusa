@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export type OfflineActionType = 'load_status_update' | 'fuel_receipt';
+export type OfflineActionType = 'load_status_update' | 'fuel_receipt' | 'driver_hos_update';
 
 export interface OfflineAction {
   id: string;
@@ -116,6 +116,29 @@ async function processAction(action: OfflineAction): Promise<void> {
       const { error } = await supabase
         .from('expenses')
         .insert(p as any);
+      if (error) throw error;
+      break;
+    }
+    case 'driver_hos_update': {
+      if (!isPlainObject(action.payload)) throw new Error('Invalid payload');
+      const id = action.payload.id;
+      const drive = action.payload.remaining_drive_hours;
+      const cycle = action.payload.remaining_cycle_hours;
+      const ts = action.payload.hos_last_updated;
+      if (typeof id !== 'string' || !UUID_RE.test(id)) throw new Error('Invalid driver id');
+      const isValidHours = (n: unknown, max: number): n is number =>
+        typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= max;
+      if (!isValidHours(drive, 11)) throw new Error('Invalid drive hours');
+      if (!isValidHours(cycle, 70)) throw new Error('Invalid cycle hours');
+      if (typeof ts !== 'string') throw new Error('Invalid timestamp');
+      const { error } = await supabase
+        .from('drivers')
+        .update({
+          remaining_drive_hours: drive,
+          remaining_cycle_hours: cycle,
+          hos_last_updated: ts,
+        })
+        .eq('id', id);
       if (error) throw error;
       break;
     }
