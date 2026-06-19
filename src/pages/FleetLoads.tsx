@@ -459,8 +459,10 @@ export default function FleetLoads() {
     }
 
     const calculated = calculateRevenueLocal(formData);
+    // Strip non-column enrichment fields before sending to Supabase
+    const { driver_name: _dn, truck_unit: _tu, ...cleanFormData } = formData;
     const payload = {
-      ...formData,
+      ...cleanFormData,
       ...calculated,
       org_id: orgId,
       cf_7512_number: formData.is_in_bond ? (formData.cf_7512_number ?? '').trim() : null,
