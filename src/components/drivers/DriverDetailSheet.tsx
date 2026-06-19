@@ -201,7 +201,41 @@ export function DriverDetailSheet({
           )}
         </div>
 
+        {/* Emergency Contact */}
+        <Separator />
+        <div className="py-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Phone className="h-4 w-4 text-primary" />
+            <h4 className="font-medium text-sm">Emergency Contact</h4>
+          </div>
+          {(driver as any).emergency_contact_name || (driver as any).emergency_contact_phone || (driver as any).emergency_contact_relationship ? (
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Name</span>
+                <span className="font-medium">{(driver as any).emergency_contact_name || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Relationship</span>
+                <span className="font-medium">{(driver as any).emergency_contact_relationship || '—'}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Phone</span>
+                {(driver as any).emergency_contact_phone ? (
+                  <a href={`tel:${(driver as any).emergency_contact_phone}`} className="font-medium hover:underline">
+                    {(driver as any).emergency_contact_phone}
+                  </a>
+                ) : (
+                  <span className="font-medium">—</span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">No emergency contact on file</p>
+          )}
+        </div>
+
         {/* Credentials & Compliance */}
+        <Separator />
         <div className="py-4">
           <CredentialsCompliance driver={driver} variant="section" />
         </div>
