@@ -147,9 +147,17 @@ export function DriverStatusGrid() {
       </CardHeader>
       <CardContent>
         {drivers && drivers.length > 0 ? (
+          <TooltipProvider delayDuration={150}>
           <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 max-h-[300px] overflow-y-auto pr-1">
             {drivers.map((driver) => {
               const expiringCreds = getExpiringCredentials(driver);
+              const hos = getHosState(driver.remaining_drive_hours, driver.hos_last_updated);
+              const hosBadge = (
+                <Badge variant="outline" className={`${HOS_TONE_CLASSES[hos.tone]} shrink-0 gap-1`}>
+                  <Clock className="h-3 w-3" />
+                  {hos.label}
+                </Badge>
+              );
               
               return (
                 <div
