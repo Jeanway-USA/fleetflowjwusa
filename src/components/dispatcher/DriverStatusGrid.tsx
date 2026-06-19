@@ -64,7 +64,7 @@ export function DriverStatusGrid() {
     queryFn: async () => {
       const { data: driversData, error: driversError } = await supabase
         .from('drivers')
-        .select('id, first_name, last_name, phone, status, license_expiry, medical_card_expiry, hazmat_expiry')
+        .select('id, first_name, last_name, phone, status, license_expiry, medical_card_expiry, hazmat_expiry, remaining_drive_hours, hos_last_updated')
         .eq('status', 'active')
         .order('first_name');
       
