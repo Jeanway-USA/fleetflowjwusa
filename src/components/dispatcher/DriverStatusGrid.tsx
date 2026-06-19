@@ -4,9 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, Phone, AlertTriangle, Package, CheckCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Users, Phone, AlertTriangle, Package, CheckCircle, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { addDays, isBefore } from 'date-fns';
+import { addDays, isBefore, formatDistanceToNow } from 'date-fns';
 
 interface Driver {
   id: string;
@@ -17,10 +18,41 @@ interface Driver {
   license_expiry: string | null;
   medical_card_expiry: string | null;
   hazmat_expiry: string | null;
+  remaining_drive_hours: number | null;
+  hos_last_updated: string | null;
 }
 
 interface DriverWithLoad extends Driver {
   activeLoad: boolean;
+}
+
+type HosTone = 'red' | 'yellow' | 'green' | 'muted';
+
+const HOS_TONE_CLASSES: Record<HosTone, string> = {
+  red: 'bg-destructive/10 text-destructive border-destructive/20',
+  yellow: 'bg-warning/10 text-warning border-warning/20',
+  green: 'bg-success/10 text-success border-success/20',
+  muted: 'bg-muted text-muted-foreground border-border',
+};
+
+function getHosState(hours: number | null, updatedAt: string | null) {
+  if (updatedAt == null) {
+    return { tone: 'muted' as HosTone, label: 'No HOS', isStale: false, relative: null as string | null };
+  }
+  const ageMs = Date.now() - new Date(updatedAt).getTime();
+  const isStale = ageMs > 14 * 3600 * 1000;
+  const relative = `Updated ${formatDistanceToNow(new Date(updatedAt), { addSuffix: true }).replace('about ', '')}`;
+
+  if (isStale) {
+    return { tone: 'muted' as HosTone, label: 'Pending Reset', isStale: true, relative };
+  }
+  if (hours == null) {
+    return { tone: 'muted' as HosTone, label: 'No HOS', isStale: false, relative };
+  }
+  let tone: HosTone = 'green';
+  if (hours <= 2) tone = 'red';
+  else if (hours <= 6) tone = 'yellow';
+  return { tone, label: `${hours}h drive`, isStale: false, relative };
 }
 
 export function DriverStatusGrid() {
@@ -32,7 +64,7 @@ export function DriverStatusGrid() {
     queryFn: async () => {
       const { data: driversData, error: driversError } = await supabase
         .from('drivers')
-        .select('id, first_name, last_name, phone, status, license_expiry, medical_card_expiry, hazmat_expiry')
+        .select('id, first_name, last_name, phone, status, license_expiry, medical_card_expiry, hazmat_expiry, remaining_drive_hours, hos_last_updated')
         .eq('status', 'active')
         .order('first_name');
       
@@ -115,9 +147,17 @@ export function DriverStatusGrid() {
       </CardHeader>
       <CardContent>
         {drivers && drivers.length > 0 ? (
+          <TooltipProvider delayDuration={150}>
           <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 max-h-[300px] overflow-y-auto pr-1">
             {drivers.map((driver) => {
               const expiringCreds = getExpiringCredentials(driver);
+              const hos = getHosState(driver.remaining_drive_hours, driver.hos_last_updated);
+              const hosBadge = (
+                <Badge variant="outline" className={`${HOS_TONE_CLASSES[hos.tone]} shrink-0 gap-1`}>
+                  <Clock className="h-3 w-3" />
+                  {hos.label}
+                </Badge>
+              );
               
               return (
                 <div
@@ -151,7 +191,23 @@ export function DriverStatusGrid() {
                       )}
                     </Badge>
                   </div>
-                  
+
+                  <div className="flex items-center gap-2 mt-2">
+                    {hos.isStale ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>{hosBadge}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>Pending Reset — Verify with Driver</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      hosBadge
+                    )}
+                    {hos.relative && (
+                      <span className="text-[11px] text-muted-foreground truncate">{hos.relative}</span>
+                    )}
+                  </div>
+
                   {expiringCreds.length > 0 && (
                     <div className="flex items-center gap-1 mt-2 text-xs text-warning">
                       <AlertTriangle className="h-3 w-3" />
@@ -162,6 +218,7 @@ export function DriverStatusGrid() {
               );
             })}
           </div>
+          </TooltipProvider>
         ) : (
           <div className="text-center py-8 text-muted-foreground">
             <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
