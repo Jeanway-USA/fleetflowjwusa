@@ -821,6 +821,14 @@ export default function FleetLoads() {
       {/* Loads Table */}
       <Card className="card-elevated">
         <CardContent className="pt-6">
+          {searchTerm && filteredLoads.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title={`No loads found matching "${searchInput}"`}
+              description="Try a different search term, or clear the search to see all loads."
+              action={{ label: 'Clear Search', onClick: () => { setSearchInput(''); setSearchTerm(''); } }}
+            />
+          ) : (
           <DataTable
             columns={[
               { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
