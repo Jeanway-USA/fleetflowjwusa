@@ -207,7 +207,7 @@ export default function Landing() {
       <RevealOnScroll>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
         <div className="text-center mb-12">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-3">Simple, Transparent Pricing</h2>
+          <h2 className="font-heading text-2xl sm:text-3xl font-bold mb-3 tracking-tight">Simple, Transparent Pricing</h2>
           <p className="text-muted-foreground text-base sm:text-lg">Start free during our Open Beta. Premium tiers coming soon.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-6 items-center max-w-5xl mx-auto">
@@ -375,7 +375,7 @@ export default function Landing() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.08),transparent_70%)]" />
           <div className="relative z-10">
             <span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary mb-4 border border-primary/30 rounded-full px-4 py-1 bg-primary/10">Open Beta</span>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3">Join the Open Beta</h2>
+            <h2 className="font-heading text-2xl sm:text-3xl font-bold mb-3 tracking-tight">Join the Open Beta</h2>
             <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto">
               Be among the first owner-operators to experience Fleet Flow TMS. Full platform access, zero cost during the beta period.
             </p>
