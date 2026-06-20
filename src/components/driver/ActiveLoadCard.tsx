@@ -497,16 +497,31 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
               <span className="font-semibold">{load.booked_miles?.toLocaleString() || 'TBD'}</span>
             </div>
 
-            {/* Estimated Pay */}
-            <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-primary" />
-                <span className="text-sm text-muted-foreground">Estimated Pay</span>
+            {/* Estimated Pay / Accessorials (flat-rate) */}
+            {payBreakdown.payType === 'flat' ? (
+              payBreakdown.accessorialsTotal > 0 && (
+                <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-primary" />
+                    <span className="text-sm text-muted-foreground">Accessorials</span>
+                  </div>
+                  <span className="font-bold text-primary text-lg">
+                    {formatCurrency(payBreakdown.accessorialsTotal)}
+                  </span>
+                </div>
+              )
+            ) : (
+              <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-primary" />
+                  <span className="text-sm text-muted-foreground">Estimated Pay</span>
+                </div>
+                <span className="font-bold text-primary text-lg">
+                  {formatCurrency(estimatedPay)}
+                </span>
               </div>
-              <span className="font-bold text-primary text-lg">
-                {formatCurrency(estimatedPay)}
-              </span>
-            </div>
+            )}
+
 
             {/* Accessorials Breakdown */}
             {(load.load_accessorials?.length ?? 0) > 0 && (
