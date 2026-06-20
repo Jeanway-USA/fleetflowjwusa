@@ -7,9 +7,10 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { 
-  Truck, DollarSign, Shield, BarChart3, Users, Package, 
-  ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone, Menu, Sparkles, Clock
+import {
+  Truck, DollarSign, Shield, BarChart3, Users, Package,
+  ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone, Menu, Sparkles, Clock,
+  Search, Route, ReceiptText, WifiOff, MapPinned, CloudLightning, ShieldCheck, BellRing,
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import RevealOnScroll from '@/components/shared/RevealOnScroll';
@@ -23,12 +24,35 @@ const STATS = [
   { label: 'Setup Time', value: '< 5 min' },
 ];
 
+const DISPATCHER_FEATURES = [
+  { icon: Search, title: 'Global Omni-Search', desc: 'Instantly filter loads by driver, city, truck, or shipper with our lightning-fast debounced search engine.' },
+  { icon: Route, title: 'Dynamic Live Tracking', desc: 'Real-time GPS routing that automatically recalculates and persists active routes on the map.' },
+  { icon: ReceiptText, title: 'Automated Billing', desc: 'Built-in Landstar tariff logic for automatic detention, over-dimension freight, and accessorial calculation.' },
+];
+
+const DRIVER_FEATURES = [
+  { icon: WifiOff, title: 'Offline-First Documents', desc: 'Never lose a BOL again. Scan and queue documents offline; they auto-upload when you regain cell service.' },
+  { icon: DollarSign, title: 'Transparent Settlements', desc: 'Live, pre-split financial previews on every load so you know exactly what you take home.' },
+  { icon: MapPinned, title: 'Facility Intelligence', desc: 'Crowdsourced driver notes, gate codes, and instructions for seamless last-mile navigation.' },
+];
+
+const SAFETY_FEATURES = [
+  { icon: CloudLightning, title: 'Route Hazard Overlays', desc: 'Live severe weather alerts directly overlaid on active driver routes.' },
+  { icon: ShieldCheck, title: 'Advanced Credentialing', desc: 'Track TWIC, FAST cards, DOD Clearances, and Landstar Operator IDs in one secure hub.' },
+  { icon: BellRing, title: 'Predictive PM Alerts', desc: 'Automated 2,000-mile / 14-day preventive-maintenance alerts keep trucks legal and on the road.' },
+];
+
 export default function Landing() {
   const navigate = useNavigate();
   const [demoLoading, setDemoLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isAuthed, setIsAuthed] = useState(false);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [pricesLoading, setPricesLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setIsAuthed(!!data.session));
+  }, []);
 
   useEffect(() => {
     supabase
@@ -44,6 +68,9 @@ export default function Landing() {
         setPricesLoading(false);
       });
   }, []);
+
+  const primaryCtaLabel = isAuthed ? 'Go to Dashboard' : 'Login';
+  const handlePrimaryCta = () => navigate(isAuthed ? '/' : '/auth');
 
   const handleDemoLogin = async () => {
     setDemoLoading(true);
