@@ -140,130 +140,54 @@ export default function Landing() {
 
       <main>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-[hsl(240_20%_4%)]">
+      <section className="relative overflow-hidden">
         {/* Dot pattern overlay */}
-        <div className="absolute inset-0" style={{
-          backgroundImage: 'radial-gradient(circle, hsl(45 80% 50% / 0.07) 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
+        <div className="absolute inset-0 pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle, hsl(var(--primary) / 0.08) 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
         }} />
-        {/* Radial glow */}
-        <div className="absolute inset-0" style={{
-          background: 'radial-gradient(ellipse 80% 60% at 70% 50%, hsl(45 80% 50% / 0.08) 0%, transparent 70%)',
-        }} />
+        {/* Gold radial glow */}
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.18),transparent_60%)]" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 lg:py-28 relative">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Left column */}
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(45_80%_50%/0.12)] text-[hsl(45_80%_60%)] text-sm font-medium mb-6 border border-[hsl(45_80%_50%/0.2)]">
-                <Truck className="h-4 w-4" />
-                Built for Owner-Operators
-              </div>
-              <h1 className="text-3xl sm:text-5xl lg:text-[3.5rem] font-extrabold tracking-tight mb-6 leading-[1.1] text-white">
-                Master Your Fleet's{' '}
-                <span className="text-gradient-gold">Finances & Dispatch.</span>
-              </h1>
-              <p className="text-base sm:text-lg text-[hsl(0_0%_65%)] mb-8 max-w-xl leading-relaxed">
-                The all-in-one platform built specifically for owner-operators to track expenses, manage finances, and streamline dispatching.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  size="lg" 
-                  className="gradient-gold text-primary-foreground text-lg px-8 pulse-glow-gold hover:scale-105 active:scale-[0.97] transition-transform"
-                  onClick={() => navigate('/auth')}
-                >
-                  Join Free Beta
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                <Button 
-                  size="lg" 
-                  variant="outline"
-                  className="text-lg px-8 border-[hsl(0_0%_25%)] text-white hover:bg-[hsl(0_0%_15%)] active:scale-[0.97] transition-transform"
-                  onClick={handleDemoLogin}
-                  disabled={demoLoading}
-                >
-                  {demoLoading ? (
-                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading Demo...</>
-                  ) : (
-                    <><Play className="mr-2 h-5 w-5" /> Try Demo</>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Right column — Floating dashboard mockup */}
-            <div className="hidden lg:block">
-              <div className="animate-float" style={{ perspective: '1000px' }}>
-                <div className="rounded-xl border border-[hsl(45_80%_50%/0.15)] bg-[hsl(240_10%_10%)] shadow-2xl shadow-[hsl(45_80%_50%/0.08)] overflow-hidden"
-                  style={{ transform: 'perspective(1000px) rotateY(-8deg) rotateX(4deg)' }}>
-                  {/* Top bar */}
-                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[hsl(0_0%_18%)]">
-                    <div className="flex gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-[hsl(0_70%_50%)]" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-[hsl(45_80%_50%)]" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-[hsl(142_70%_45%)]" />
-                    </div>
-                    <div className="flex-1 mx-4 h-5 rounded bg-[hsl(0_0%_15%)]" />
-                  </div>
-                  <div className="flex">
-                    {/* Mini sidebar */}
-                    <div className="w-10 border-r border-[hsl(0_0%_18%)] py-3 flex flex-col items-center gap-3">
-                      {[BarChart3, Package, MapPin, Wrench, DollarSign].map((Icon, i) => (
-                        <Icon key={i} className={`h-4 w-4 ${i === 0 ? 'text-[hsl(45_80%_55%)]' : 'text-[hsl(0_0%_35%)]'}`} />
-                      ))}
-                    </div>
-                    {/* Content */}
-                    <div className="flex-1 p-4 space-y-3">
-                      {/* KPI row */}
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { label: 'Revenue', value: '$24,850', color: 'hsl(45 80% 50%)' },
-                          { label: 'Loads', value: '18', color: 'hsl(142 70% 50%)' },
-                          { label: 'Avg CPM', value: '$2.41', color: 'hsl(200 80% 55%)' },
-                        ].map((kpi) => (
-                          <div key={kpi.label} className="rounded-lg bg-[hsl(0_0%_13%)] p-2.5 border border-[hsl(0_0%_18%)]">
-                            <p className="text-[10px] text-[hsl(0_0%_50%)] mb-0.5">{kpi.label}</p>
-                            <p className="text-sm font-bold" style={{ color: kpi.color }}>{kpi.value}</p>
-                          </div>
-                        ))}
-                      </div>
-                      {/* Chart area */}
-                      <div className="rounded-lg bg-[hsl(0_0%_13%)] border border-[hsl(0_0%_18%)] p-3 h-28">
-                        <p className="text-[10px] text-[hsl(0_0%_45%)] mb-2">Weekly Revenue</p>
-                        <svg viewBox="0 0 200 60" className="w-full h-16">
-                          <defs>
-                            <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="hsl(45 80% 50%)" stopOpacity="0.3" />
-                              <stop offset="100%" stopColor="hsl(45 80% 50%)" stopOpacity="0" />
-                            </linearGradient>
-                          </defs>
-                          <path d="M0,50 Q25,45 50,35 T100,25 T150,15 T200,10" fill="none" stroke="hsl(45 80% 50%)" strokeWidth="2" />
-                          <path d="M0,50 Q25,45 50,35 T100,25 T150,15 T200,10 L200,60 L0,60 Z" fill="url(#chartGrad)" />
-                        </svg>
-                      </div>
-                      {/* Table rows */}
-                      <div className="space-y-1">
-                        {['ATL → MIA', 'DAL → HOU', 'CHI → DET'].map((route, i) => (
-                          <div key={route} className="flex items-center justify-between text-[10px] px-2 py-1.5 rounded bg-[hsl(0_0%_13%)] border border-[hsl(0_0%_18%)]">
-                            <span className="text-[hsl(0_0%_60%)]">{route}</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-medium ${
-                              i === 0 ? 'bg-[hsl(142_70%_45%/0.15)] text-[hsl(142_70%_55%)]' :
-                              i === 1 ? 'bg-[hsl(45_80%_50%/0.15)] text-[hsl(45_80%_60%)]' :
-                              'bg-[hsl(200_80%_55%/0.15)] text-[hsl(200_80%_60%)]'
-                            }`}>
-                              {i === 0 ? 'Delivered' : i === 1 ? 'In Transit' : 'Booked'}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36 relative text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs sm:text-sm font-medium mb-6 border border-primary/20">
+            <Sparkles className="h-3.5 w-3.5" />
+            v2026 · Next-Gen TMS Platform
+          </div>
+          <h1 className="font-heading text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-[1.05]">
+            Next-Generation Fleet Management
+            <br className="hidden sm:block" />
+            <span className="text-gradient-gold"> & Driver Intelligence.</span>
+          </h1>
+          <p className="text-base sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
+            Bridging the gap between dispatchers, owner-operators, and compliance with real-time tracking, transparent settlements, and automated logistics.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button
+              size="lg"
+              className="gradient-gold text-primary-foreground text-base px-8 pulse-glow-gold hover:scale-105 active:scale-[0.97] transition-transform"
+              onClick={handlePrimaryCta}
+            >
+              {primaryCtaLabel}
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="text-base px-8 active:scale-[0.97] transition-transform"
+              onClick={handleDemoLogin}
+              disabled={demoLoading}
+            >
+              {demoLoading ? (
+                <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading Demo...</>
+              ) : (
+                <><Play className="mr-2 h-5 w-5" /> Try Live Demo</>
+              )}
+            </Button>
           </div>
         </div>
       </section>
+
 
       <RevealOnScroll>
       <section className="border-y border-border bg-card/50">
