@@ -1,46 +1,20 @@
-# Fleet Loads Omni-Search
+# Fix Estimated Pay Display on Active Load Card
 
-## Schema reality check
+## Problem
+For flat-rate drivers, `calculateLoadPay` returns `base = 0` (flat is paid weekly, not per load), so the per-load "Est." amount reduces to whatever driver-payable accessorials are attached. The card currently shows that as `Est. $50.00`, which misrepresents it as load pay.
 
-The spec references columns that don't exist on `fleet_loads`. Actual relevant fields:
+## Change (frontend only — `src/components/driver/ActiveLoadCard.tsx`)
 
-- `landstar_load_id` (not `load_number`)
-- `origin`, `destination` — single strings like `"Dallas, TX"` (no separate city/state)
-- `status`, `notes`, `pickup_number`
-- No `shipper_name` / `receiver_name` columns
-- Driver and truck are loaded via **separate queries** (`drivers`, `trucks`) and joined client-side into `driver_name` / `truck_unit` on `enrichedLoads` — there is no PostgREST FK embed in this page
+Use the already-computed `payBreakdown` to decide what to render:
 
-Because of this, a server-side `.or()` with foreign-table `ilike` on driver name **would require restructuring the data layer** (switching to an embedded select like `fleet_loads.select('*, drivers(first_name,last_name), trucks(unit_number)')`). The loads list is already fully in memory and enriched, so a client-side filter is faster, simpler, and covers every requested field including driver name.
+- **Flat-rate drivers (`payType === 'flat'`)**
+  - Compact row (line 321-324): if `payBreakdown.accessorialsTotal > 0`, render `Accessorial: $X.XX` (success color, dollar icon). If zero, hide the right-hand pay chip entirely so we don't show a misleading `$0.00`.
+  - Expanded details row (line 490-499): replace the "Estimated Pay" tile with an "Accessorials" tile using the same value, or hide it when there are no driver-pay accessorials (the existing "Accessorials Breakdown" collapsible at 502 already covers detail).
 
-## Plan — client-side debounced omni-search
+- **All other pay types (`percentage`, `per_mile`/`cpm`, `hourly`, unknown)**
+  - Keep current behavior: show `Est. {estimatedPay}` and the "Estimated Pay" tile unchanged.
 
-### 1. `src/pages/FleetLoads.tsx` — search state + UI
-- Add `const [searchInput, setSearchInput] = useState('')` and `const [searchTerm, setSearchTerm] = useState('')`.
-- Debounce input → searchTerm with `useDebouncedCallback` (300 ms) from existing `src/hooks/useDebouncedCallback.ts`.
-- Render a full-width `Input` above the DataTable with `leftIcon={<Search />}` (uses the new icon-aware Input from the previous patch — no padding fight). Include a small `X` clear button (right side) when `searchInput` is non-empty.
-- Place the search bar in the same toolbar row as the existing month `Select`, stacking on mobile.
+No changes to `payCalculations.ts`, no schema changes, no other components. `sumAccessorials` already filters by `is_driver_pay !== false`, so the accessorial value shown is correctly driver-only.
 
-### 2. Filter logic — extend existing `filteredLoads`
-Apply the search filter **after** month filtering, **against `enrichedLoads`** so `driver_name` and `truck_unit` are already populated:
-
-```text
-matches(load, q) =
-  any field in [
-    landstar_load_id, origin, destination, status, notes,
-    pickup_number, driver_name, truck_unit
-  ] contains q (case-insensitive)
-```
-
-Implementation: reorder so enrichment happens before the search filter, then filter once on the lower-cased term. Keep `totals` and downstream `enrichedLoads` consumers pointing at the final filtered array so KPI totals reflect the visible rows.
-
-### 3. Zero-state
-- When `searchTerm` is non-empty AND `filteredLoads.length === 0`, render an `EmptyState` inside the table card area: `"No loads found matching \"<term>\""` with a `Clear Search` button that resets both `searchInput` and `searchTerm`.
-- Existing DataTable empty-state stays for the "no loads at all" case (no search term).
-
-### Out of scope
-- No schema changes, no new columns (`shipper_name`/`receiver_name`/`origin_city` etc. don't exist).
-- No switch to server-side `.or()` filtering or PostgREST FK embeds — would require refactoring the drivers/trucks fetch pattern and offers no UX gain at current data volumes. Happy to do it as a follow-up if you want server-side filtering for very large fleets.
-- No changes to mutation/edit logic.
-
-## Files touched
-- `src/pages/FleetLoads.tsx` (only)
+## Files
+- `src/components/driver/ActiveLoadCard.tsx` — two small conditional render swaps around lines 321-324 and 490-499.

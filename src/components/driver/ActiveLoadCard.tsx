@@ -318,11 +318,21 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
               <Route className="h-4 w-4 text-muted-foreground" />
               <span>{load.booked_miles?.toLocaleString() || 0} mi</span>
             </div>
-            <div className="flex items-center gap-2 text-sm font-medium text-success">
-              <DollarSign className="h-4 w-4" />
-              <span>Est. {formatCurrency(estimatedPay)}</span>
-            </div>
+            {payBreakdown.payType === 'flat' ? (
+              payBreakdown.accessorialsTotal > 0 ? (
+                <div className="flex items-center gap-2 text-sm font-medium text-success">
+                  <DollarSign className="h-4 w-4" />
+                  <span>Accessorial: {formatCurrency(payBreakdown.accessorialsTotal)}</span>
+                </div>
+              ) : null
+            ) : (
+              <div className="flex items-center gap-2 text-sm font-medium text-success">
+                <DollarSign className="h-4 w-4" />
+                <span>Est. {formatCurrency(estimatedPay)}</span>
+              </div>
+            )}
           </div>
+
 
           {/* Action Buttons */}
           <div className="flex gap-2 pt-2">
@@ -487,16 +497,31 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
               <span className="font-semibold">{load.booked_miles?.toLocaleString() || 'TBD'}</span>
             </div>
 
-            {/* Estimated Pay */}
-            <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-primary" />
-                <span className="text-sm text-muted-foreground">Estimated Pay</span>
+            {/* Estimated Pay / Accessorials (flat-rate) */}
+            {payBreakdown.payType === 'flat' ? (
+              payBreakdown.accessorialsTotal > 0 && (
+                <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-primary" />
+                    <span className="text-sm text-muted-foreground">Accessorials</span>
+                  </div>
+                  <span className="font-bold text-primary text-lg">
+                    {formatCurrency(payBreakdown.accessorialsTotal)}
+                  </span>
+                </div>
+              )
+            ) : (
+              <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-primary" />
+                  <span className="text-sm text-muted-foreground">Estimated Pay</span>
+                </div>
+                <span className="font-bold text-primary text-lg">
+                  {formatCurrency(estimatedPay)}
+                </span>
               </div>
-              <span className="font-bold text-primary text-lg">
-                {formatCurrency(estimatedPay)}
-              </span>
-            </div>
+            )}
+
 
             {/* Accessorials Breakdown */}
             {(load.load_accessorials?.length ?? 0) > 0 && (
