@@ -98,11 +98,11 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background pb-20 sm:pb-0">
       <Helmet>
-        <title>FleetFlow TMS — Fleet Finance & Dispatch for Owner-Operators</title>
-        <meta name="description" content="All-in-one TMS for owner-operators and small fleets. Track loads, IFTA, maintenance, settlements, and driver pay in one place." />
+        <title>FleetFlow TMS — Next-Gen Fleet Management & Driver Intelligence</title>
+        <meta name="description" content="Bridging dispatchers, owner-operators, and compliance with real-time tracking, transparent settlements, and automated logistics." />
         <link rel="canonical" href="https://tms.jeanwayusa.com/" />
-        <meta property="og:title" content="FleetFlow TMS — Fleet Finance & Dispatch for Owner-Operators" />
-        <meta property="og:description" content="All-in-one TMS for owner-operators and small fleets. Loads, IFTA, maintenance, settlements, and driver pay." />
+        <meta property="og:title" content="FleetFlow TMS — Next-Gen Fleet Management & Driver Intelligence" />
+        <meta property="og:description" content="Real-time tracking, transparent settlements, and automated logistics for modern fleets and owner-operators." />
         <meta property="og:url" content="https://tms.jeanwayusa.com/" />
       </Helmet>
       {/* Nav */}
