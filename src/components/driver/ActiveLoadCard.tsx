@@ -318,11 +318,21 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
               <Route className="h-4 w-4 text-muted-foreground" />
               <span>{load.booked_miles?.toLocaleString() || 0} mi</span>
             </div>
-            <div className="flex items-center gap-2 text-sm font-medium text-success">
-              <DollarSign className="h-4 w-4" />
-              <span>Est. {formatCurrency(estimatedPay)}</span>
-            </div>
+            {payBreakdown.payType === 'flat' ? (
+              payBreakdown.accessorialsTotal > 0 ? (
+                <div className="flex items-center gap-2 text-sm font-medium text-success">
+                  <DollarSign className="h-4 w-4" />
+                  <span>Accessorial: {formatCurrency(payBreakdown.accessorialsTotal)}</span>
+                </div>
+              ) : null
+            ) : (
+              <div className="flex items-center gap-2 text-sm font-medium text-success">
+                <DollarSign className="h-4 w-4" />
+                <span>Est. {formatCurrency(estimatedPay)}</span>
+              </div>
+            )}
           </div>
+
 
           {/* Action Buttons */}
           <div className="flex gap-2 pt-2">
