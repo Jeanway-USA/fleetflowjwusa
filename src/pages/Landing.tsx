@@ -331,32 +331,43 @@ export default function Landing() {
       </section>
       </RevealOnScroll>
 
-      <RevealOnScroll>
-      <section className="bg-card/50 border-y border-border py-12 sm:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3">Built for the Way You Work</h2>
-            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">Four core capabilities designed around how owner-operators actually run their business.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {[
-              { icon: FileText, title: 'Automated Statement Parsing', desc: 'Upload your settlement PDF and watch it auto-map every line item — revenue, deductions, and advances — in seconds.', accent: 'bg-primary/10 text-primary' },
-              { icon: Fuel, title: 'Fuel & Card Advance Tracking', desc: 'Track fuel purchases, Comdata advances, and per-load expenses so you always know your true cost-per-mile.', accent: 'bg-emerald-500/10 text-emerald-500' },
-              { icon: Package, title: 'Active Load Dispatching', desc: 'Assign drivers, update statuses, and monitor pickups & deliveries from a single real-time board.', accent: 'bg-blue-500/10 text-blue-500' },
-              { icon: Smartphone, title: 'Driver Mobile Access', desc: 'Drivers get their own dashboard for BOL uploads, DVIR forms, and live trip updates — right from their phone.', accent: 'bg-purple-500/10 text-purple-500' },
-            ].map((f) => (
-              <div key={f.title} className="p-5 sm:p-8 rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 active:scale-[0.98]">
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-6 ${f.accent}`}>
-                  <f.icon className="w-6 h-6" />
-                </div>
-                <h4 className="text-lg font-semibold mb-2">{f.title}</h4>
-                <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+      {[
+        { id: 'dispatch', eyebrow: 'For Dispatchers', title: 'Dispatcher Superpowers', desc: 'Run the board faster with tools built for high-volume operations.', items: DISPATCHER_FEATURES, tone: 'default' as const },
+        { id: 'driver', eyebrow: 'For Drivers', title: 'The Driver Experience', desc: 'A mobile-first workspace designed for the cab, not the cubicle.', items: DRIVER_FEATURES, tone: 'muted' as const },
+        { id: 'safety', eyebrow: 'For Safety & Ops', title: 'Safety & Compliance Guardrails', desc: 'Stay ahead of weather, credentials, and maintenance windows.', items: SAFETY_FEATURES, tone: 'default' as const },
+      ].map((section) => (
+        <RevealOnScroll key={section.id}>
+          <section
+            aria-labelledby={`section-${section.id}`}
+            className={section.tone === 'muted'
+              ? 'bg-card/50 border-y border-border py-16 sm:py-24'
+              : 'py-16 sm:py-24'}
+          >
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center mb-12 max-w-2xl mx-auto">
+                <span className="inline-block text-xs font-semibold uppercase tracking-[0.18em] text-primary mb-3">{section.eyebrow}</span>
+                <h2 id={`section-${section.id}`} className="font-heading text-3xl sm:text-4xl font-bold mb-3 tracking-tight">{section.title}</h2>
+                <p className="text-muted-foreground text-base sm:text-lg">{section.desc}</p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      </RevealOnScroll>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {section.items.map((f) => (
+                  <div
+                    key={f.title}
+                    className="group relative p-6 sm:p-8 rounded-2xl border border-border/60 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_8px_30px_-12px_hsl(var(--primary)/0.35)]"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-5 ring-1 ring-primary/20 transition-colors group-hover:bg-primary/15">
+                      <f.icon className="w-6 h-6" />
+                    </div>
+                    <h3 className="font-heading text-lg font-semibold mb-2 tracking-tight">{f.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </RevealOnScroll>
+      ))}
+
 
       <RevealOnScroll>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
