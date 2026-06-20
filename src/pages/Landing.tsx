@@ -7,9 +7,10 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { 
-  Truck, DollarSign, Shield, BarChart3, Users, Package, 
-  ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone, Menu, Sparkles, Clock
+import {
+  Truck, DollarSign, Shield, BarChart3, Users, Package,
+  ArrowRight, CheckCircle2, Fuel, FileText, Wrench, MapPin, Loader2, Play, Smartphone, Menu, Sparkles, Clock,
+  Search, Route, ReceiptText, WifiOff, MapPinned, CloudLightning, ShieldCheck, BellRing,
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import RevealOnScroll from '@/components/shared/RevealOnScroll';
@@ -23,12 +24,35 @@ const STATS = [
   { label: 'Setup Time', value: '< 5 min' },
 ];
 
+const DISPATCHER_FEATURES = [
+  { icon: Search, title: 'Global Omni-Search', desc: 'Instantly filter loads by driver, city, truck, or shipper with our lightning-fast debounced search engine.' },
+  { icon: Route, title: 'Dynamic Live Tracking', desc: 'Real-time GPS routing that automatically recalculates and persists active routes on the map.' },
+  { icon: ReceiptText, title: 'Automated Billing', desc: 'Built-in Landstar tariff logic for automatic detention, over-dimension freight, and accessorial calculation.' },
+];
+
+const DRIVER_FEATURES = [
+  { icon: WifiOff, title: 'Offline-First Documents', desc: 'Never lose a BOL again. Scan and queue documents offline; they auto-upload when you regain cell service.' },
+  { icon: DollarSign, title: 'Transparent Settlements', desc: 'Live, pre-split financial previews on every load so you know exactly what you take home.' },
+  { icon: MapPinned, title: 'Facility Intelligence', desc: 'Crowdsourced driver notes, gate codes, and instructions for seamless last-mile navigation.' },
+];
+
+const SAFETY_FEATURES = [
+  { icon: CloudLightning, title: 'Route Hazard Overlays', desc: 'Live severe weather alerts directly overlaid on active driver routes.' },
+  { icon: ShieldCheck, title: 'Advanced Credentialing', desc: 'Track TWIC, FAST cards, DOD Clearances, and Landstar Operator IDs in one secure hub.' },
+  { icon: BellRing, title: 'Predictive PM Alerts', desc: 'Automated 2,000-mile / 14-day preventive-maintenance alerts keep trucks legal and on the road.' },
+];
+
 export default function Landing() {
   const navigate = useNavigate();
   const [demoLoading, setDemoLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isAuthed, setIsAuthed] = useState(false);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [pricesLoading, setPricesLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setIsAuthed(!!data.session));
+  }, []);
 
   useEffect(() => {
     supabase
@@ -44,6 +68,9 @@ export default function Landing() {
         setPricesLoading(false);
       });
   }, []);
+
+  const primaryCtaLabel = isAuthed ? 'Go to Dashboard' : 'Login';
+  const handlePrimaryCta = () => navigate(isAuthed ? '/' : '/auth');
 
   const handleDemoLogin = async () => {
     setDemoLoading(true);
@@ -71,11 +98,11 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background pb-20 sm:pb-0">
       <Helmet>
-        <title>FleetFlow TMS — Fleet Finance & Dispatch for Owner-Operators</title>
-        <meta name="description" content="All-in-one TMS for owner-operators and small fleets. Track loads, IFTA, maintenance, settlements, and driver pay in one place." />
+        <title>FleetFlow TMS — Next-Gen Fleet Management & Driver Intelligence</title>
+        <meta name="description" content="Bridging dispatchers, owner-operators, and compliance with real-time tracking, transparent settlements, and automated logistics." />
         <link rel="canonical" href="https://tms.jeanwayusa.com/" />
-        <meta property="og:title" content="FleetFlow TMS — Fleet Finance & Dispatch for Owner-Operators" />
-        <meta property="og:description" content="All-in-one TMS for owner-operators and small fleets. Loads, IFTA, maintenance, settlements, and driver pay." />
+        <meta property="og:title" content="FleetFlow TMS — Next-Gen Fleet Management & Driver Intelligence" />
+        <meta property="og:description" content="Real-time tracking, transparent settlements, and automated logistics for modern fleets and owner-operators." />
         <meta property="og:url" content="https://tms.jeanwayusa.com/" />
       </Helmet>
       {/* Nav */}
@@ -113,130 +140,54 @@ export default function Landing() {
 
       <main>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-[hsl(240_20%_4%)]">
+      <section className="relative overflow-hidden">
         {/* Dot pattern overlay */}
-        <div className="absolute inset-0" style={{
-          backgroundImage: 'radial-gradient(circle, hsl(45 80% 50% / 0.07) 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
+        <div className="absolute inset-0 pointer-events-none" style={{
+          backgroundImage: 'radial-gradient(circle, hsl(var(--primary) / 0.08) 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
         }} />
-        {/* Radial glow */}
-        <div className="absolute inset-0" style={{
-          background: 'radial-gradient(ellipse 80% 60% at 70% 50%, hsl(45 80% 50% / 0.08) 0%, transparent 70%)',
-        }} />
+        {/* Gold radial glow */}
+        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.18),transparent_60%)]" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 lg:py-28 relative">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Left column */}
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[hsl(45_80%_50%/0.12)] text-[hsl(45_80%_60%)] text-sm font-medium mb-6 border border-[hsl(45_80%_50%/0.2)]">
-                <Truck className="h-4 w-4" />
-                Built for Owner-Operators
-              </div>
-              <h1 className="text-3xl sm:text-5xl lg:text-[3.5rem] font-extrabold tracking-tight mb-6 leading-[1.1] text-white">
-                Master Your Fleet's{' '}
-                <span className="text-gradient-gold">Finances & Dispatch.</span>
-              </h1>
-              <p className="text-base sm:text-lg text-[hsl(0_0%_65%)] mb-8 max-w-xl leading-relaxed">
-                The all-in-one platform built specifically for owner-operators to track expenses, manage finances, and streamline dispatching.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
-                  size="lg" 
-                  className="gradient-gold text-primary-foreground text-lg px-8 pulse-glow-gold hover:scale-105 active:scale-[0.97] transition-transform"
-                  onClick={() => navigate('/auth')}
-                >
-                  Join Free Beta
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                <Button 
-                  size="lg" 
-                  variant="outline"
-                  className="text-lg px-8 border-[hsl(0_0%_25%)] text-white hover:bg-[hsl(0_0%_15%)] active:scale-[0.97] transition-transform"
-                  onClick={handleDemoLogin}
-                  disabled={demoLoading}
-                >
-                  {demoLoading ? (
-                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading Demo...</>
-                  ) : (
-                    <><Play className="mr-2 h-5 w-5" /> Try Demo</>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Right column — Floating dashboard mockup */}
-            <div className="hidden lg:block">
-              <div className="animate-float" style={{ perspective: '1000px' }}>
-                <div className="rounded-xl border border-[hsl(45_80%_50%/0.15)] bg-[hsl(240_10%_10%)] shadow-2xl shadow-[hsl(45_80%_50%/0.08)] overflow-hidden"
-                  style={{ transform: 'perspective(1000px) rotateY(-8deg) rotateX(4deg)' }}>
-                  {/* Top bar */}
-                  <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[hsl(0_0%_18%)]">
-                    <div className="flex gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-[hsl(0_70%_50%)]" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-[hsl(45_80%_50%)]" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-[hsl(142_70%_45%)]" />
-                    </div>
-                    <div className="flex-1 mx-4 h-5 rounded bg-[hsl(0_0%_15%)]" />
-                  </div>
-                  <div className="flex">
-                    {/* Mini sidebar */}
-                    <div className="w-10 border-r border-[hsl(0_0%_18%)] py-3 flex flex-col items-center gap-3">
-                      {[BarChart3, Package, MapPin, Wrench, DollarSign].map((Icon, i) => (
-                        <Icon key={i} className={`h-4 w-4 ${i === 0 ? 'text-[hsl(45_80%_55%)]' : 'text-[hsl(0_0%_35%)]'}`} />
-                      ))}
-                    </div>
-                    {/* Content */}
-                    <div className="flex-1 p-4 space-y-3">
-                      {/* KPI row */}
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { label: 'Revenue', value: '$24,850', color: 'hsl(45 80% 50%)' },
-                          { label: 'Loads', value: '18', color: 'hsl(142 70% 50%)' },
-                          { label: 'Avg CPM', value: '$2.41', color: 'hsl(200 80% 55%)' },
-                        ].map((kpi) => (
-                          <div key={kpi.label} className="rounded-lg bg-[hsl(0_0%_13%)] p-2.5 border border-[hsl(0_0%_18%)]">
-                            <p className="text-[10px] text-[hsl(0_0%_50%)] mb-0.5">{kpi.label}</p>
-                            <p className="text-sm font-bold" style={{ color: kpi.color }}>{kpi.value}</p>
-                          </div>
-                        ))}
-                      </div>
-                      {/* Chart area */}
-                      <div className="rounded-lg bg-[hsl(0_0%_13%)] border border-[hsl(0_0%_18%)] p-3 h-28">
-                        <p className="text-[10px] text-[hsl(0_0%_45%)] mb-2">Weekly Revenue</p>
-                        <svg viewBox="0 0 200 60" className="w-full h-16">
-                          <defs>
-                            <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="hsl(45 80% 50%)" stopOpacity="0.3" />
-                              <stop offset="100%" stopColor="hsl(45 80% 50%)" stopOpacity="0" />
-                            </linearGradient>
-                          </defs>
-                          <path d="M0,50 Q25,45 50,35 T100,25 T150,15 T200,10" fill="none" stroke="hsl(45 80% 50%)" strokeWidth="2" />
-                          <path d="M0,50 Q25,45 50,35 T100,25 T150,15 T200,10 L200,60 L0,60 Z" fill="url(#chartGrad)" />
-                        </svg>
-                      </div>
-                      {/* Table rows */}
-                      <div className="space-y-1">
-                        {['ATL → MIA', 'DAL → HOU', 'CHI → DET'].map((route, i) => (
-                          <div key={route} className="flex items-center justify-between text-[10px] px-2 py-1.5 rounded bg-[hsl(0_0%_13%)] border border-[hsl(0_0%_18%)]">
-                            <span className="text-[hsl(0_0%_60%)]">{route}</span>
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-medium ${
-                              i === 0 ? 'bg-[hsl(142_70%_45%/0.15)] text-[hsl(142_70%_55%)]' :
-                              i === 1 ? 'bg-[hsl(45_80%_50%/0.15)] text-[hsl(45_80%_60%)]' :
-                              'bg-[hsl(200_80%_55%/0.15)] text-[hsl(200_80%_60%)]'
-                            }`}>
-                              {i === 0 ? 'Delivered' : i === 1 ? 'In Transit' : 'Booked'}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36 relative text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs sm:text-sm font-medium mb-6 border border-primary/20">
+            <Sparkles className="h-3.5 w-3.5" />
+            v2026 · Next-Gen TMS Platform
+          </div>
+          <h1 className="font-heading text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-[1.05]">
+            Next-Generation Fleet Management
+            <br className="hidden sm:block" />
+            <span className="text-gradient-gold"> & Driver Intelligence.</span>
+          </h1>
+          <p className="text-base sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
+            Bridging the gap between dispatchers, owner-operators, and compliance with real-time tracking, transparent settlements, and automated logistics.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button
+              size="lg"
+              className="gradient-gold text-primary-foreground text-base px-8 pulse-glow-gold hover:scale-105 active:scale-[0.97] transition-transform"
+              onClick={handlePrimaryCta}
+            >
+              {primaryCtaLabel}
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="text-base px-8 active:scale-[0.97] transition-transform"
+              onClick={handleDemoLogin}
+              disabled={demoLoading}
+            >
+              {demoLoading ? (
+                <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading Demo...</>
+              ) : (
+                <><Play className="mr-2 h-5 w-5" /> Try Live Demo</>
+              )}
+            </Button>
           </div>
         </div>
       </section>
+
 
       <RevealOnScroll>
       <section className="border-y border-border bg-card/50">
@@ -256,7 +207,7 @@ export default function Landing() {
       <RevealOnScroll>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
         <div className="text-center mb-12">
-          <h2 className="text-2xl sm:text-3xl font-bold mb-3">Simple, Transparent Pricing</h2>
+          <h2 className="font-heading text-2xl sm:text-3xl font-bold mb-3 tracking-tight">Simple, Transparent Pricing</h2>
           <p className="text-muted-foreground text-base sm:text-lg">Start free during our Open Beta. Premium tiers coming soon.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-6 items-center max-w-5xl mx-auto">
@@ -380,32 +331,43 @@ export default function Landing() {
       </section>
       </RevealOnScroll>
 
-      <RevealOnScroll>
-      <section className="bg-card/50 border-y border-border py-12 sm:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3">Built for the Way You Work</h2>
-            <p className="text-muted-foreground text-base sm:text-lg max-w-2xl mx-auto">Four core capabilities designed around how owner-operators actually run their business.</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {[
-              { icon: FileText, title: 'Automated Statement Parsing', desc: 'Upload your settlement PDF and watch it auto-map every line item — revenue, deductions, and advances — in seconds.', accent: 'bg-primary/10 text-primary' },
-              { icon: Fuel, title: 'Fuel & Card Advance Tracking', desc: 'Track fuel purchases, Comdata advances, and per-load expenses so you always know your true cost-per-mile.', accent: 'bg-emerald-500/10 text-emerald-500' },
-              { icon: Package, title: 'Active Load Dispatching', desc: 'Assign drivers, update statuses, and monitor pickups & deliveries from a single real-time board.', accent: 'bg-blue-500/10 text-blue-500' },
-              { icon: Smartphone, title: 'Driver Mobile Access', desc: 'Drivers get their own dashboard for BOL uploads, DVIR forms, and live trip updates — right from their phone.', accent: 'bg-purple-500/10 text-purple-500' },
-            ].map((f) => (
-              <div key={f.title} className="p-5 sm:p-8 rounded-2xl border border-border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 active:scale-[0.98]">
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-6 ${f.accent}`}>
-                  <f.icon className="w-6 h-6" />
-                </div>
-                <h4 className="text-lg font-semibold mb-2">{f.title}</h4>
-                <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+      {[
+        { id: 'dispatch', eyebrow: 'For Dispatchers', title: 'Dispatcher Superpowers', desc: 'Run the board faster with tools built for high-volume operations.', items: DISPATCHER_FEATURES, tone: 'default' as const },
+        { id: 'driver', eyebrow: 'For Drivers', title: 'The Driver Experience', desc: 'A mobile-first workspace designed for the cab, not the cubicle.', items: DRIVER_FEATURES, tone: 'muted' as const },
+        { id: 'safety', eyebrow: 'For Safety & Ops', title: 'Safety & Compliance Guardrails', desc: 'Stay ahead of weather, credentials, and maintenance windows.', items: SAFETY_FEATURES, tone: 'default' as const },
+      ].map((section) => (
+        <RevealOnScroll key={section.id}>
+          <section
+            aria-labelledby={`section-${section.id}`}
+            className={section.tone === 'muted'
+              ? 'bg-card/50 border-y border-border py-16 sm:py-24'
+              : 'py-16 sm:py-24'}
+          >
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center mb-12 max-w-2xl mx-auto">
+                <span className="inline-block text-xs font-semibold uppercase tracking-[0.18em] text-primary mb-3">{section.eyebrow}</span>
+                <h2 id={`section-${section.id}`} className="font-heading text-3xl sm:text-4xl font-bold mb-3 tracking-tight">{section.title}</h2>
+                <p className="text-muted-foreground text-base sm:text-lg">{section.desc}</p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      </RevealOnScroll>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {section.items.map((f) => (
+                  <div
+                    key={f.title}
+                    className="group relative p-6 sm:p-8 rounded-2xl border border-border/60 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_8px_30px_-12px_hsl(var(--primary)/0.35)]"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-5 ring-1 ring-primary/20 transition-colors group-hover:bg-primary/15">
+                      <f.icon className="w-6 h-6" />
+                    </div>
+                    <h3 className="font-heading text-lg font-semibold mb-2 tracking-tight">{f.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        </RevealOnScroll>
+      ))}
+
 
       <RevealOnScroll>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
@@ -413,7 +375,7 @@ export default function Landing() {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.08),transparent_70%)]" />
           <div className="relative z-10">
             <span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary mb-4 border border-primary/30 rounded-full px-4 py-1 bg-primary/10">Open Beta</span>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3">Join the Open Beta</h2>
+            <h2 className="font-heading text-2xl sm:text-3xl font-bold mb-3 tracking-tight">Join the Open Beta</h2>
             <p className="text-muted-foreground text-base sm:text-lg mb-8 max-w-xl mx-auto">
               Be among the first owner-operators to experience Fleet Flow TMS. Full platform access, zero cost during the beta period.
             </p>

@@ -3,6 +3,11 @@ import { createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
 import App from "./App.tsx";
 import "./index.css";
+import "@fontsource/space-grotesk/400.css";
+import "@fontsource/space-grotesk/600.css";
+import "@fontsource/space-grotesk/700.css";
+import "@fontsource/dm-sans/400.css";
+import "@fontsource/dm-sans/500.css";
 
 // --- Pre-init: purge obviously-dead Supabase auth storage ---------------
 // Supabase JS auto-calls _recoverAndRefresh() on init. If a stale/expired
