@@ -48,7 +48,7 @@ interface AuthContextType {
   refreshRoles: () => Promise<void>;
   simulatedOrgId: string | null;
   simulatedOrgName: string | null;
-  clearOrgSimulation: () => void;
+  clearOrgSimulation: () => Promise<void>;
   isSuperAdmin: boolean;
 }
 
