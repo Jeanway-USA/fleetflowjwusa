@@ -96,13 +96,23 @@ export function OrgActionsDropdown({ org }: OrgActionsDropdownProps) {
     },
   });
 
-  const handleSimulate = (e: React.MouseEvent) => {
+  const handleSimulate = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    localStorage.setItem('simulatedOrgId', org.id);
-    localStorage.setItem('simulatedOrgName', org.name);
-    localStorage.setItem('simulatedOrgTier', org.subscription_tier);
-    window.dispatchEvent(new Event('simulatedOrgChanged'));
-    navigate('/executive-dashboard');
+    try {
+      const { error } = await supabase.rpc('super_admin_start_impersonation' as any, {
+        target_org_id: org.id,
+      });
+      if (error) throw error;
+      localStorage.setItem('simulatedOrgId', org.id);
+      localStorage.setItem('simulatedOrgName', org.name);
+      localStorage.setItem('simulatedOrgTier', org.subscription_tier);
+      window.dispatchEvent(new Event('simulatedOrgChanged'));
+      await queryClient.invalidateQueries();
+      toast.success(`Now viewing as ${org.name}`);
+      navigate('/executive-dashboard');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to start impersonation');
+    }
   };
 
   const handlePasswordReset = () => {
