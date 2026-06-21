@@ -15,6 +15,8 @@ export default function PrivacyPolicy() {
         <meta name="description" content="How FleetFlow TMS collects, uses, and protects your information." />
         <link rel="canonical" href="https://tms.jeanwayusa.com/privacy" />
         <meta property="og:url" content="https://tms.jeanwayusa.com/privacy" />
+        <meta property="og:title" content="Privacy Policy — FleetFlow TMS" />
+        <meta property="og:description" content="How FleetFlow TMS collects, uses, and protects your information." />
       </Helmet>
       <header className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-4">
