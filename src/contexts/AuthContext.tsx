@@ -230,7 +230,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       superAdminCheckedRef.current = user.id;
       const { data, error } = await supabase.rpc('is_super_admin');
       if (!isMountedRef.current) return;
-      setIsSuperAdmin(!error && data === true);
+      const isSA = !error && data === true;
+      setIsSuperAdmin(isSA);
+
+      // Hydrate active impersonation state from server so a refresh
+      // doesn't desync the banner from the actually-impersonated org.
+      if (isSA) {
+        const { data: stateRows } = await supabase.rpc('super_admin_impersonation_state' as any);
+        const row = Array.isArray(stateRows) ? stateRows[0] : null;
+        if (row?.impersonating_org_id) {
+          localStorage.setItem('simulatedOrgId', row.impersonating_org_id);
+          localStorage.setItem('simulatedOrgName', row.impersonating_org_name ?? '');
+          if (isMountedRef.current) {
+            setSimulatedOrgId(row.impersonating_org_id);
+            setSimulatedOrgName(row.impersonating_org_name ?? '');
+          }
+        } else {
+          localStorage.removeItem('simulatedOrgId');
+          localStorage.removeItem('simulatedOrgName');
+          localStorage.removeItem('simulatedOrgTier');
+          if (isMountedRef.current) {
+            setSimulatedOrgId(null);
+            setSimulatedOrgName(null);
+            setSimulatedOrgTier(null);
+          }
+        }
+      }
     };
     checkSuperAdmin();
   }, [user]);
