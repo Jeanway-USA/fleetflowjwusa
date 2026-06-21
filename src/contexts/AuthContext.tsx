@@ -201,13 +201,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const clearOrgSimulation = useCallback(() => {
+  const clearOrgSimulation = useCallback(async () => {
+    try {
+      await supabase.rpc('super_admin_stop_impersonation' as any);
+    } catch (err) {
+      console.warn('[Auth] stop impersonation failed:', err);
+    }
     localStorage.removeItem('simulatedOrgId');
     localStorage.removeItem('simulatedOrgName');
     localStorage.removeItem('simulatedOrgTier');
     setSimulatedOrgId(null);
     setSimulatedOrgName(null);
     setSimulatedOrgTier(null);
+    if (currentUserIdRef.current) {
+      await fetchOrgData(currentUserIdRef.current);
+    }
   }, []);
 
   // Super admin check via server-side RPC (no hardcoded emails)
