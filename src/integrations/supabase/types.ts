@@ -4153,14 +4153,17 @@ export type Database = {
       super_admins: {
         Row: {
           created_at: string
+          original_org_id: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
+          original_org_id?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
+          original_org_id?: string | null
           user_id?: string
         }
         Relationships: []
@@ -5050,8 +5053,21 @@ export type Database = {
         Args: { target_org_id: string }
         Returns: string
       }
+      super_admin_impersonation_state: {
+        Args: never
+        Returns: {
+          impersonating_org_id: string
+          impersonating_org_name: string
+          original_org_id: string
+        }[]
+      }
       super_admin_reset_demo: { Args: never; Returns: undefined }
       super_admin_resume_beta: { Args: never; Returns: number }
+      super_admin_start_impersonation: {
+        Args: { target_org_id: string }
+        Returns: undefined
+      }
+      super_admin_stop_impersonation: { Args: never; Returns: undefined }
       super_admin_update_org: {
         Args: {
           new_complimentary_ends_at?: string
