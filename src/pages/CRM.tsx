@@ -63,6 +63,7 @@ function AgentCRM() {
   const { hasRole, isOwner } = useAuth();
   const canEdit = isOwner || hasRole('dispatcher');
 
+  const [scope, setScope] = useState<'agencies' | 'shops'>('agencies');
   const [typeFilter, setTypeFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -73,7 +74,7 @@ function AgentCRM() {
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
-  const { data: contacts, isLoading } = useUnifiedContacts(typeFilter);
+  const { data: contacts, isLoading } = useUnifiedContacts(typeFilter, scope);
   const { deleteContact: deleteCRMMutation } = useContactMutations();
   const { deleteResource: deleteResourceMutation } = useResourceMutations();
   const { deleteFacility: deleteFacilityMutation } = useFacilityMutations();
