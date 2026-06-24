@@ -1,12 +1,14 @@
-Migration is live. Now wire the client to use it:
+## Move Agent Commissions to its own Finance tab
 
-### `src/components/superadmin/OrgActionsDropdown.tsx`
-Replace `handleSimulate` to call `super_admin_start_impersonation(target_org_id)` first, then set the localStorage label, invalidate React Query, and navigate to `/executive-dashboard`. Toast on error.
+The `CommissionsTab` is currently nested inside the **Driver Settlements** tab on `src/pages/Finance.tsx`, which mixes agent-commission tracking with driver payroll — two unrelated concepts.
 
-### `src/contexts/AuthContext.tsx`
-- `clearOrgSimulation`: call `super_admin_stop_impersonation()`, then clear localStorage, refresh org data + roles, and emit the `simulatedOrgChanged` event. Make it async.
-- On boot (after super-admin check), call `super_admin_impersonation_state()` and, if a row is returned, populate `simulatedOrgId`/`simulatedOrgName` from it so the banner survives refresh.
-- Remove the client-only override on `orgId`/`subscriptionTier` in the provider value — `profiles.org_id` is now the impersonated org, so `orgId` and `subscriptionTier` come from `fetchOrgData` naturally. Keep `simulatedOrgId`/`simulatedOrgName` only to drive the banner + exit button.
+### Changes (single file: `src/pages/Finance.tsx`)
 
-### `src/components/layout/DashboardLayout.tsx`
-No structural change — banner already reads `simulatedOrgId`/`simulatedOrgName` and the exit click already calls `clearOrgSimulation` (which is now async + RPC-backed).
+1. Add a new tab trigger in the `TabsList` (around line 663), placed after "Driver Settlements":
+   ```
+   <TabsTrigger value="commissions">Agent Commissions</TabsTrigger>
+   ```
+2. Remove the `<CommissionsTab .../>` render from inside the `driver-settlements` TabsContent (lines 972–976), leaving only `<DriverSettlementsTab />` there.
+3. Add a new `<TabsContent value="commissions">` block that renders `<CommissionsTab />` with the existing props (`filteredCommissions`, `commissionTotals`, `commissionsLoading`), wrapped in the same `space-y-6 animate-in fade-in-50` container used by the other tabs.
+
+No changes to `CommissionsTab.tsx`, data fetching, or totals — the existing state and queries already feed it.
