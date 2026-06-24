@@ -13,6 +13,7 @@ import { ExpensesList } from '@/components/shared/ExpensesList';
 import { RateConfirmationUpload } from '@/components/loads/RateConfirmationUpload';
 import { SmartLoadCreator } from '@/components/loads/SmartLoadCreator';
 import { IndependentLoadBuilder } from '@/components/loads/IndependentLoadBuilder';
+import { IntermediateStopsView } from '@/components/loads/IntermediateStopsView';
 import DriverLoadsView from '@/components/driver/DriverLoadsView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
