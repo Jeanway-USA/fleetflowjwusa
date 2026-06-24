@@ -2985,6 +2985,62 @@ export type Database = {
           },
         ]
       }
+      load_intermediate_stops: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          facility_name: string | null
+          id: string
+          load_id: string
+          location: string
+          org_id: string
+          remaining_hos: number | null
+          scheduled_date: string | null
+          status: string
+          stop_number: number
+          stop_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          facility_name?: string | null
+          id?: string
+          load_id: string
+          location: string
+          org_id: string
+          remaining_hos?: number | null
+          scheduled_date?: string | null
+          status?: string
+          stop_number: number
+          stop_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          facility_name?: string | null
+          id?: string
+          load_id?: string
+          location?: string
+          org_id?: string
+          remaining_hos?: number | null
+          scheduled_date?: string | null
+          status?: string
+          stop_number?: number
+          stop_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_intermediate_stops_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_loads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       load_status_logs: {
         Row: {
           changed_at: string
