@@ -1836,13 +1836,16 @@ export default function FleetLoads() {
 
               <TabsContent value="history" className="mt-4">
                 {editingLoad?.id ? (
-                  <StatusHistoryLog
-                    loadId={editingLoad.id}
-                    pickupDate={editingLoad.pickup_date}
-                    pickupTime={editingLoad.pickup_time}
-                    deliveryDate={editingLoad.delivery_date}
-                    deliveryTime={editingLoad.delivery_time}
-                  />
+                  <div className="space-y-4">
+                    <IntermediateStopsView loadId={editingLoad.id} />
+                    <StatusHistoryLog
+                      loadId={editingLoad.id}
+                      pickupDate={editingLoad.pickup_date}
+                      pickupTime={editingLoad.pickup_time}
+                      deliveryDate={editingLoad.delivery_date}
+                      deliveryTime={editingLoad.delivery_time}
+                    />
+                  </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <p>Save the load first to view status history.</p>
