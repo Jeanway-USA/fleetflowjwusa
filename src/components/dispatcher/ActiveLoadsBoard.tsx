@@ -15,6 +15,7 @@ const LoadRouteMap = lazy(() =>
 );
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { DataTable } from '@/components/shared/DataTable';
+import { IntermediateStopsView } from '@/components/loads/IntermediateStopsView';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
