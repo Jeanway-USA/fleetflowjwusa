@@ -27,14 +27,18 @@ import { ContactFormDialog } from '@/components/crm/ContactFormDialog';
 import { ContactDetailSheet } from '@/components/crm/ContactDetailSheet';
 import { BrokerDatabase } from '@/components/crm/BrokerDatabase';
 
-const TYPE_TABS = [
+const AGENCY_TYPE_TABS = [
   { value: 'all', label: 'All' },
   { value: 'broker', label: 'Brokers' },
   { value: 'agent', label: 'Agents' },
   { value: 'shipper', label: 'Shippers' },
   { value: 'receiver', label: 'Receivers' },
-  { value: 'vendor', label: 'Vendors' },
 ];
+
+const SCOPE_TABS = [
+  { value: 'agencies', label: 'Freight Agencies' },
+  { value: 'shops', label: 'Maintenance Shops' },
+] as const;
 
 const TYPE_COLORS: Record<string, string> = {
   broker: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
@@ -42,6 +46,7 @@ const TYPE_COLORS: Record<string, string> = {
   shipper: 'bg-green-500/10 text-green-600 border-green-500/30',
   receiver: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
   vendor: 'bg-red-500/10 text-red-600 border-red-500/30',
+  shop: 'bg-orange-500/10 text-orange-600 border-orange-500/30',
 };
 
 export default function CRM() {
