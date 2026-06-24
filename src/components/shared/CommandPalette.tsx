@@ -3,294 +3,320 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   CommandDialog,
-  CommandInput,
-  CommandList,
   CommandEmpty,
   CommandGroup,
+  CommandInput,
   CommandItem,
+  CommandList,
   CommandSeparator,
-  CommandShortcut,
 } from '@/components/ui/command';
 import {
-  LayoutDashboard, Truck, Package, Users, TrendingUp, FileText,
-  Wrench, Settings, Shield, Building2, BarChart3, Crown, Container,
-  Contact, AlertTriangle, Award, Fuel, Plus, Upload, UserCheck,
-  RefreshCw, Search, MapPin, Loader2,
+  Truck,
+  User,
+  Package,
+  Wrench,
+  Building2,
+  PlusCircle,
+  LayoutDashboard,
+  Banknote,
+  Map,
+  Shield,
+  FileText,
+  Settings as SettingsIcon,
+  History,
+  Users,
+  CircleGauge,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import type { SubscriptionTier } from '@/contexts/AuthContext';
-import type { Database } from '@/integrations/supabase/types';
-import type { LucideIcon } from 'lucide-react';
+import { useRecents } from '@/hooks/useRecents';
+import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 
-type AppRole = Database['public']['Enums']['app_role'];
+type AppRole = string;
 
-interface PaletteItem {
+interface RouteEntry {
+  path: string;
   label: string;
-  icon: LucideIcon;
-  path?: string;
-  action?: () => void;
-  roles: AppRole[];
-  feature?: string;
-  shortcut?: string;
+  icon: typeof Truck;
+  roles?: AppRole[];
 }
 
-const TIER_FEATURES: Record<SubscriptionTier, Set<string>> = {
-  open_beta: new Set(['loads','ifta','maintenance_basic','documents','profit_loss','crm_basic','drivers','dispatch','settlements','fleet_analytics','gps_tracking','payroll','driver_performance','maintenance_full','trucks','trailers','incidents','safety','executive_dashboard','agency_loads','commissions','crm','insights']),
-  solo_bco: new Set(['loads','ifta','maintenance_basic','documents','profit_loss','crm_basic']),
-  fleet_owner: new Set(['loads','ifta','maintenance_basic','documents','profit_loss','crm_basic','drivers','dispatch','settlements','fleet_analytics','gps_tracking','payroll','driver_performance','maintenance_full','trucks','trailers','incidents','safety','executive_dashboard','insights']),
-  agency: new Set(['agency_loads','commissions','crm','documents','insights']),
-  all_in_one: new Set(['loads','ifta','maintenance_basic','documents','profit_loss','crm_basic','drivers','dispatch','settlements','fleet_analytics','gps_tracking','payroll','driver_performance','maintenance_full','trucks','trailers','incidents','safety','executive_dashboard','agency_loads','commissions','crm','insights']),
-};
-
-const NAV_ITEMS: PaletteItem[] = [
-  { label: 'Executive Dashboard', icon: Crown, path: '/executive-dashboard', roles: ['owner'], feature: 'executive_dashboard' },
-  { label: 'Dispatcher Dashboard', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['owner', 'dispatcher'] },
-  { label: 'Driver Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['owner', 'driver'] },
-  { label: 'Trucks', icon: Truck, path: '/trucks', roles: ['owner', 'dispatcher', 'safety'], feature: 'trucks' },
-  { label: 'Trailers', icon: Container, path: '/trailers', roles: ['owner', 'dispatcher', 'safety'], feature: 'trailers' },
-  { label: 'Drivers', icon: Users, path: '/drivers', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety'], feature: 'drivers' },
-  { label: 'Fleet Loads', icon: Package, path: '/fleet-loads', roles: ['owner', 'dispatcher', 'safety', 'driver'], feature: 'loads' },
-  { label: 'Agency Loads', icon: Building2, path: '/agency-loads', roles: ['owner', 'dispatcher'], feature: 'agency_loads' },
-  { label: 'Finance & P/L', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
-  { label: 'Company Insights', icon: BarChart3, path: '/insights', roles: ['owner', 'payroll_admin'], feature: 'insights' },
-  { label: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta' },
-  { label: 'CRM', icon: Contact, path: '/crm', roles: ['owner', 'dispatcher', 'safety', 'driver'], feature: 'crm' },
-  { label: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'safety'], feature: 'maintenance_full' },
-  { label: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver'], feature: 'documents' },
-  { label: 'Safety', icon: Shield, path: '/safety', roles: ['owner', 'safety'], feature: 'safety' },
-  { label: 'Incidents', icon: AlertTriangle, path: '/incidents', roles: ['owner', 'safety', 'dispatcher'], feature: 'incidents' },
-  { label: 'Driver Performance', icon: Award, path: '/driver-performance', roles: ['owner', 'safety', 'dispatcher'], feature: 'driver_performance' },
-  { label: 'Settings', icon: Settings, path: '/settings', roles: ['owner'] },
+const ROUTES: RouteEntry[] = [
+  { path: '/executive-dashboard', label: 'Executive Dashboard', icon: LayoutDashboard, roles: ['owner'] },
+  { path: '/dispatcher-dashboard', label: 'Dispatcher Dashboard', icon: CircleGauge, roles: ['owner', 'dispatcher'] },
+  { path: '/driver-dashboard', label: 'Driver Dashboard', icon: User, roles: ['owner', 'driver'] },
+  { path: '/fleet-loads', label: 'Fleet Loads', icon: Package, roles: ['owner', 'dispatcher', 'safety'] },
+  { path: '/agency-loads', label: 'Agency Loads', icon: Package, roles: ['owner', 'dispatcher'] },
+  { path: '/trucks', label: 'Trucks', icon: Truck, roles: ['owner', 'safety', 'maintenance'] },
+  { path: '/trailers', label: 'Trailers', icon: Truck, roles: ['owner', 'safety', 'maintenance'] },
+  { path: '/drivers', label: 'Drivers', icon: Users, roles: ['owner', 'payroll_admin'] },
+  { path: '/crm', label: 'CRM', icon: Building2, roles: ['owner', 'dispatcher'] },
+  { path: '/finance', label: 'Finance', icon: Banknote, roles: ['owner', 'payroll_admin'] },
+  { path: '/insights', label: 'Company Insights', icon: CircleGauge, roles: ['owner', 'payroll_admin'] },
+  { path: '/ifta', label: 'IFTA', icon: Map, roles: ['owner', 'payroll_admin'] },
+  { path: '/maintenance-home', label: 'Maintenance', icon: Wrench, roles: ['owner', 'maintenance'] },
+  { path: '/documents', label: 'Documents', icon: FileText },
+  { path: '/safety', label: 'Safety', icon: Shield, roles: ['owner', 'safety'] },
+  { path: '/incidents', label: 'Incidents', icon: Shield, roles: ['owner', 'safety'] },
+  { path: '/performance', label: 'Driver Performance', icon: CircleGauge, roles: ['owner'] },
+  { path: '/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
-const TYPE_ICON: Record<string, LucideIcon> = {
-  broker: Building2,
-  agent: UserCheck,
-  shipper: Package,
-  receiver: MapPin,
-  vendor: Wrench,
-};
+const QUICK_ACTIONS = [
+  { id: 'new-load', label: 'New Load', icon: PlusCircle, route: '/fleet-loads' },
+  { id: 'new-work-order', label: 'New Work Order', icon: PlusCircle, route: '/maintenance-home' },
+  { id: 'new-contact', label: 'New CRM Contact', icon: PlusCircle, route: '/crm' },
+  { id: 'new-driver', label: 'Invite Driver', icon: PlusCircle, route: '/drivers' },
+];
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-muted text-muted-foreground',
-  assigned: 'bg-blue-500/10 text-blue-600',
-  in_transit: 'bg-amber-500/10 text-amber-600',
-  delivered: 'bg-green-500/10 text-green-600',
-  cancelled: 'bg-destructive/10 text-destructive',
-};
+function iconForRecent(type: string) {
+  switch (type) {
+    case 'load': return Package;
+    case 'driver': return User;
+    case 'truck': return Truck;
+    case 'trailer': return Truck;
+    case 'contact': return Building2;
+    default: return History;
+  }
+}
 
 export function CommandPalette() {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
   const navigate = useNavigate();
-  const { hasRole, subscriptionTier } = useAuth();
+  const { user, orgId, roles } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const recents = useRecents(8);
 
-  const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
+  const setDebouncedFn = useDebouncedCallback((v: string) => setDebounced(v), 200);
+  useEffect(() => { setDebouncedFn(search); }, [search, setDebouncedFn]);
 
-  // Cmd/Ctrl+K and external open events
+  // Global hotkey
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setOpen(prev => !prev);
+        setOpen((o) => !o);
+        return;
+      }
+      if (e.key === '/' && !open) {
+        const t = e.target as HTMLElement | null;
+        const tag = t?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
+        e.preventDefault();
+        setOpen(true);
       }
     };
-    const externalOpen = () => setOpen(true);
-    window.addEventListener('keydown', handler);
-    window.addEventListener('open-command-palette', externalOpen);
-    return () => {
-      window.removeEventListener('keydown', handler);
-      window.removeEventListener('open-command-palette', externalOpen);
-    };
-  }, []);
-
-  // Reset query when closed
-  useEffect(() => {
-    if (!open) {
-      setQuery('');
-      setDebouncedQuery('');
-    }
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
   }, [open]);
 
-  // Debounce
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(query.trim()), 200);
-    return () => clearTimeout(t);
-  }, [query]);
+  // Reset search when closed
+  useEffect(() => { if (!open) { setSearch(''); setDebounced(''); } }, [open]);
 
-  // Parse broker: prefix
-  const brokerOnly = debouncedQuery.toLowerCase().startsWith('broker:');
-  const searchTerm = brokerOnly ? debouncedQuery.slice(7).trim() : debouncedQuery;
-  const isSearching = searchTerm.length >= 2;
+  const roleSet = useMemo(() => new Set((roles ?? []).map(String)), [roles]);
+  const visibleRoutes = useMemo(
+    () => ROUTES.filter((r) => !r.roles || r.roles.some((role) => roleSet.has(role))),
+    [roleSet],
+  );
 
-  // Combined search: CRM contacts + active fleet loads
-  const { data: results, isFetching } = useQuery({
-    queryKey: ['palette-search', searchTerm, brokerOnly],
-    enabled: isSearching,
+  // Search across loads/drivers/trucks/contacts
+  const { data: searchResults } = useQuery({
+    queryKey: ['cmdk-search', orgId, debounced],
+    enabled: !!orgId && debounced.length >= 2 && open,
     staleTime: 30_000,
     queryFn: async () => {
-      const like = `%${searchTerm}%`;
-
-      let contactsQuery = supabase
-        .from('crm_contacts')
-        .select('id, company_name, contact_name, contact_type, city, state')
-        .eq('is_active', true)
-        .or(`company_name.ilike.${like},contact_name.ilike.${like},email.ilike.${like}`)
-        .limit(8);
-      if (brokerOnly) contactsQuery = contactsQuery.eq('contact_type', 'broker');
-
-      const loadsPromise = brokerOnly
-        ? Promise.resolve({ data: [], error: null })
-        : supabase
-            .from('fleet_loads')
-            .select('id, landstar_load_id, origin, destination, status')
-            .not('status', 'in', '(delivered,cancelled)')
-            .or(`origin.ilike.${like},destination.ilike.${like},landstar_load_id.ilike.${like}`)
-            .limit(8);
-
-      const [contactsRes, loadsRes] = await Promise.all([contactsQuery, loadsPromise]);
+      const term = debounced.trim();
+      const like = `%${term}%`;
+      const [loads, drivers, trucks, contacts] = await Promise.all([
+        supabase.from('fleet_loads')
+          .select('id, landstar_load_id, agency_code, origin, destination, status')
+          .eq('org_id', orgId!)
+          .or(`landstar_load_id.ilike.${like},agency_code.ilike.${like},origin.ilike.${like},destination.ilike.${like}`)
+          .limit(6),
+        supabase.from('drivers')
+          .select('id, first_name, last_name')
+          .eq('org_id', orgId!)
+          .or(`first_name.ilike.${like},last_name.ilike.${like}`)
+          .limit(6),
+        supabase.from('trucks')
+          .select('id, unit_number, make, model')
+          .eq('org_id', orgId!)
+          .ilike('unit_number', like)
+          .limit(6),
+        supabase.from('crm_contacts')
+          .select('id, company_name, agent_code, contact_type')
+          .eq('org_id', orgId!)
+          .or(`company_name.ilike.${like},agent_code.ilike.${like}`)
+          .limit(6),
+      ]);
       return {
-        contacts: (contactsRes.data ?? []) as Array<{ id: string; company_name: string; contact_name: string | null; contact_type: string; city: string | null; state: string | null }>,
-        loads: (loadsRes.data ?? []) as Array<{ id: string; landstar_load_id: string | null; origin: string; destination: string; status: string }>,
+        loads: loads.data ?? [],
+        drivers: drivers.data ?? [],
+        trucks: trucks.data ?? [],
+        contacts: contacts.data ?? [],
       };
     },
   });
 
-  // Quick actions (dispatcher-focused)
-  const QUICK_ACTIONS: PaletteItem[] = useMemo(() => [
-    { label: 'New Load', icon: Plus, path: '/fleet-loads?action=new-load', roles: ['owner', 'dispatcher'], feature: 'loads', shortcut: 'N' },
-    { label: 'Assign Driver', icon: UserCheck, path: '/dispatcher-dashboard#assign-driver', roles: ['owner', 'dispatcher'] },
-    { label: 'Change Load Status', icon: RefreshCw, path: '/fleet-loads?action=bulk-status', roles: ['owner', 'dispatcher'], feature: 'loads' },
-    { label: 'Search Broker', icon: Search, action: () => setQuery('broker:'), roles: ['owner', 'dispatcher', 'safety'], feature: 'crm' },
-    { label: 'Upload Expense Report', icon: Upload, path: '/finance?action=new-expense', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
-    { label: 'New Maintenance Request', icon: Wrench, path: '/maintenance?action=new-work-order', roles: ['owner', 'safety'], feature: 'maintenance_full' },
-  ], []);
+  const run = (fn: () => void) => { setOpen(false); fn(); };
 
-  const filter = (items: PaletteItem[]) =>
-    items.filter(item => {
-      const roleMatch = item.roles.some(r => hasRole(r));
-      const tierMatch = !item.feature || tierFeatures.has(item.feature);
-      return roleMatch && tierMatch;
-    });
-
-  const navItems = filter(NAV_ITEMS);
-  const quickActions = filter(QUICK_ACTIONS);
-
-  const close = () => setOpen(false);
-  const handleNavigate = (path: string) => { close(); navigate(path); };
-  const runAction = (item: PaletteItem) => {
-    if (item.action) item.action();
-    else if (item.path) handleNavigate(item.path);
+  const fireQuickAction = (id: string, route: string) => {
+    navigate(route);
+    // Defer so the destination page can mount and register its listener.
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('jw:quick-action', { detail: id }));
+    }, 100);
   };
 
+  if (!user || !orgId) return null;
+
   return (
-    <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={!isSearching}>
+    <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput
-        placeholder="Search loads, contacts, pages…  (Try 'broker:acme')"
-        value={query}
-        onValueChange={setQuery}
+        placeholder="Search loads, drivers, trucks, contacts… or type a command"
+        value={search}
+        onValueChange={setSearch}
       />
       <CommandList>
-        {isSearching && isFetching && (
-          <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Searching…
-          </div>
-        )}
+        <CommandEmpty>No results found.</CommandEmpty>
 
-        {!isFetching && <CommandEmpty>No results found.</CommandEmpty>}
-
-        {isSearching && results && results.contacts.length > 0 && (
-          <CommandGroup heading={brokerOnly ? 'Brokers' : 'Contacts'}>
-            {results.contacts.map(c => {
-              const Icon = TYPE_ICON[c.contact_type] || Contact;
-              const sub = [c.contact_name, [c.city, c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+        {recents.length > 0 && !debounced && (
+          <CommandGroup heading="Recent">
+            {recents.map((r) => {
+              const Icon = iconForRecent(r.type);
               return (
                 <CommandItem
-                  key={`contact-${c.id}`}
-                  value={`contact-${c.id}-${c.company_name}`}
-                  onSelect={() => handleNavigate(`/crm?contactId=${c.id}`)}
+                  key={`${r.type}:${r.id}`}
+                  value={`recent ${r.label}`}
+                  onSelect={() => run(() => navigate(r.href))}
                 >
-                  <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <div className="flex flex-col min-w-0">
-                    <span className="truncate">{c.company_name}</span>
-                    {sub && <span className="text-xs text-muted-foreground truncate">{sub}</span>}
-                  </div>
-                  <CommandShortcut className="capitalize">{c.contact_type}</CommandShortcut>
+                  <Icon className="mr-2 h-4 w-4" />
+                  <span className="truncate">{r.label}</span>
+                  <span className="ml-auto text-xs text-muted-foreground capitalize">{r.type}</span>
                 </CommandItem>
               );
             })}
           </CommandGroup>
         )}
 
-        {isSearching && results && results.loads.length > 0 && (
-          <>
-            {results.contacts.length > 0 && <CommandSeparator />}
-            <CommandGroup heading="Active Loads">
-              {results.loads.map(l => {
-                const ref = l.landstar_load_id || `#${l.id.slice(0, 8)}`;
-                return (
-                  <CommandItem
-                    key={`load-${l.id}`}
-                    value={`load-${l.id}-${ref}-${l.origin}-${l.destination}`}
-                    onSelect={() => handleNavigate(`/fleet-loads?loadId=${l.id}`)}
-                  >
-                    <Package className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <div className="flex flex-col min-w-0">
-                      <span className="truncate">
-                        <span className="font-medium">{ref}</span>
-                        <span className="text-muted-foreground"> · {l.origin} → {l.destination}</span>
-                      </span>
-                    </div>
-                    <CommandShortcut className={`px-2 py-0.5 rounded text-[10px] uppercase ${STATUS_COLORS[l.status] || 'bg-muted'}`}>
-                      {l.status.replace('_', ' ')}
-                    </CommandShortcut>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </>
-        )}
-
-        {quickActions.length > 0 && (
-          <>
-            {isSearching && results && (results.contacts.length > 0 || results.loads.length > 0) && <CommandSeparator />}
-            <CommandGroup heading="Quick Actions">
-              {quickActions.map(item => (
-                <CommandItem
-                  key={`action-${item.label}`}
-                  value={`action-${item.label}`}
-                  onSelect={() => runAction(item)}
-                >
-                  <item.icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                  {item.label}
-                  {item.shortcut && <CommandShortcut>{item.shortcut}</CommandShortcut>}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </>
-        )}
-
-        {!isSearching && (
+        {!debounced && (
           <>
             <CommandSeparator />
-            <CommandGroup heading="Navigation">
-              {navItems.map(item => (
+            <CommandGroup heading="Quick actions">
+              {QUICK_ACTIONS.map((a) => (
                 <CommandItem
-                  key={item.path}
-                  value={`nav-${item.label}`}
-                  onSelect={() => item.path && handleNavigate(item.path)}
+                  key={a.id}
+                  value={`action ${a.label}`}
+                  onSelect={() => run(() => fireQuickAction(a.id, a.route))}
                 >
-                  <item.icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                  {item.label}
+                  <a.icon className="mr-2 h-4 w-4" />
+                  {a.label}
                 </CommandItem>
               ))}
             </CommandGroup>
+          </>
+        )}
+
+        <CommandSeparator />
+        <CommandGroup heading="Pages">
+          {visibleRoutes.map((r) => (
+            <CommandItem
+              key={r.path}
+              value={`page ${r.label} ${r.path}`}
+              onSelect={() => run(() => navigate(r.path))}
+            >
+              <r.icon className="mr-2 h-4 w-4" />
+              {r.label}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+
+        {searchResults && (
+          <>
+            {searchResults.loads.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Loads">
+                  {searchResults.loads.map((l: any) => (
+                    <CommandItem
+                      key={l.id}
+                      value={`load ${l.landstar_load_id ?? ''} ${l.origin ?? ''} ${l.destination ?? ''}`}
+                      onSelect={() => run(() => navigate(`/fleet-loads?load=${l.id}`))}
+                    >
+                      <Package className="mr-2 h-4 w-4" />
+                      <span className="truncate">
+                        {l.landstar_load_id || l.agency_code || 'Load'}
+                        <span className="text-muted-foreground"> — {l.origin} → {l.destination}</span>
+                      </span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+            {searchResults.drivers.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Drivers">
+                  {searchResults.drivers.map((d: any) => (
+                    <CommandItem
+                      key={d.id}
+                      value={`driver ${d.first_name ?? ''} ${d.last_name ?? ''}`}
+                      onSelect={() => run(() => navigate(`/drivers?id=${d.id}`))}
+                    >
+                      <User className="mr-2 h-4 w-4" />
+                      {(d.first_name || '') + ' ' + (d.last_name || '')}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+            {searchResults.trucks.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Trucks">
+                  {searchResults.trucks.map((t: any) => (
+                    <CommandItem
+                      key={t.id}
+                      value={`truck ${t.unit_number}`}
+                      onSelect={() => run(() => navigate(`/trucks?id=${t.id}`))}
+                    >
+                      <Truck className="mr-2 h-4 w-4" />
+                      Unit {t.unit_number}
+                      {t.make && <span className="ml-2 text-muted-foreground">{t.make} {t.model}</span>}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+            {searchResults.contacts.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Contacts">
+                  {searchResults.contacts.map((c: any) => (
+                    <CommandItem
+                      key={c.id}
+                      value={`contact ${c.company_name} ${c.agent_code ?? ''}`}
+                      onSelect={() => run(() => navigate(`/crm?id=${c.id}`))}
+                    >
+                      <Building2 className="mr-2 h-4 w-4" />
+                      <span className="truncate">
+                        {c.company_name}
+                        {c.agent_code && <span className="text-muted-foreground"> · {c.agent_code}</span>}
+                      </span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )}
           </>
         )}
       </CommandList>
+      <div className="border-t border-border px-3 py-2 text-[10px] text-muted-foreground flex items-center justify-between">
+        <span>Tip: press <kbd className="rounded bg-muted px-1">⌘K</kbd> from anywhere</span>
+        <span>↵ to select · esc to close</span>
+      </div>
     </CommandDialog>
   );
 }
