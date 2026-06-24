@@ -422,6 +422,7 @@ export default function FleetLoads() {
     setEditingLoad(null);
     setFormData({});
     setAccessorials([]);
+    setPendingIntermediateStops([]);
   };
 
   // Accessorial management
