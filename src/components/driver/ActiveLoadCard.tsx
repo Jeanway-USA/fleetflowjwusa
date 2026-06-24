@@ -11,6 +11,7 @@ import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 const LoadRouteMap = lazy(() => import('./LoadRouteMap').then(m => ({ default: m.LoadRouteMap })));
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
+import { IntermediateStopsTimeline } from './IntermediateStopsTimeline';
 import { StartingOdometerDialog } from './StartingOdometerDialog';
 import { EndingOdometerDialog } from './EndingOdometerDialog';
 import { supabase } from '@/integrations/supabase/client';
