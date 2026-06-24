@@ -36,6 +36,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { StatusHistoryLog } from '@/components/loads/StatusHistoryLog';
 import { PODViewer } from '@/components/loads/PODViewer';
 import { BrokerRateHistoryCard } from '@/components/loads/BrokerRateHistoryCard';
+import { AgencyCRMStatusBadge } from '@/components/loads/AgencyCRMStatusBadge';
 import { FeetInchesInput } from '@/components/shared/FeetInchesInput';
 import {
   calcOverDimensionCharge,
@@ -80,6 +81,8 @@ export default function FleetLoads() {
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
   const [massEditOpen, setMassEditOpen] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [agencyBlocked, setAgencyBlocked] = useState(false);
+
 
   // Fetch settings for calculations
   const { data: settings = [] } = useQuery({
@@ -1137,7 +1140,9 @@ export default function FleetLoads() {
                       maxLength={3}
                       className="font-mono uppercase"
                     />
+                    <AgencyCRMStatusBadge agencyCode={formData.agency_code} onBlockedChange={setAgencyBlocked} />
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="status">Status</Label>
                     <Select value={formData.status || 'pending'} onValueChange={(v) => setFormData({ ...formData, status: v })}>
