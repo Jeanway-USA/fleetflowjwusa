@@ -11,6 +11,7 @@ import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 const LoadRouteMap = lazy(() => import('./LoadRouteMap').then(m => ({ default: m.LoadRouteMap })));
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
+import { IntermediateStopsTimeline } from './IntermediateStopsTimeline';
 import { StartingOdometerDialog } from './StartingOdometerDialog';
 import { EndingOdometerDialog } from './EndingOdometerDialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -334,8 +335,12 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
           </div>
 
 
+          {/* Intermediate stops timeline (structured) */}
+          <IntermediateStopsTimeline loadId={load.id} />
+
           {/* Action Buttons */}
           <div className="flex gap-2 pt-2">
+
             {load.tracking_id && (
               <Button
                 variant="outline"
