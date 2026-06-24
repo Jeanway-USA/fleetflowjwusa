@@ -201,6 +201,9 @@ function AgentCRM() {
             },
             { key: 'details', header: 'Details', hiddenOnMobile: true, render: (contact: UnifiedContact) => (
               <div className="flex flex-wrap gap-1">
+                {contact.source === 'crm' && contact.agent_status === 'safe' && (contact.notes || '').startsWith('Auto-added from') && (
+                  <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30">Auto-added</Badge>
+                )}
                 {contact.source === 'facility' && contact.appointment_required && (
                   <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Appt Req</Badge>
                 )}
