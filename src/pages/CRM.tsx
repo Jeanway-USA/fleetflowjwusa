@@ -136,6 +136,17 @@ function AgentCRM() {
       <CRMSummaryCards contacts={contacts} />
 
       <div className="mt-6 space-y-4">
+        {/* Top-level scope toggle: Freight Agencies vs Maintenance Shops */}
+        <Tabs value={scope} onValueChange={(v) => { setScope(v as 'agencies' | 'shops'); setTypeFilter('all'); }}>
+          <TabsList className="h-11">
+            {SCOPE_TABS.map((s) => (
+              <TabsTrigger key={s.value} value={s.value} className="text-sm px-4">
+                {s.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 max-w-sm">
@@ -147,16 +158,19 @@ function AgentCRM() {
               className="pl-10 sm:pl-10"
             />
           </div>
-          <Tabs value={typeFilter} onValueChange={setTypeFilter}>
-            <TabsList>
-              {TYPE_TABS.map((t) => (
-                <TabsTrigger key={t.value} value={t.value} className="text-xs">
-                  {t.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          {scope === 'agencies' && (
+            <Tabs value={typeFilter} onValueChange={setTypeFilter}>
+              <TabsList>
+                {AGENCY_TYPE_TABS.map((t) => (
+                  <TabsTrigger key={t.value} value={t.value} className="text-xs">
+                    {t.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          )}
         </div>
+
 
         {/* Contacts Table */}
         <DataTable
