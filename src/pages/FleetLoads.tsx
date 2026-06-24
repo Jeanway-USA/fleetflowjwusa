@@ -707,6 +707,7 @@ export default function FleetLoads() {
         
         setEditingLoad(existingLoad);
         setAccessorials(extractedAccessorials);
+        setPendingIntermediateStops(data.intermediate_stops || []);
         setDialogOpen(true);
         toast.info('Updating existing load. Review changes and save when ready.');
         return;
