@@ -77,6 +77,7 @@ export default function FleetLoads() {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSetSearch = useDebouncedCallback((v: string) => setSearchTerm(v.trim().toLowerCase()), 300);
   const [accessorials, setAccessorials] = useState<Accessorial[]>([]);
+  const [pendingIntermediateStops, setPendingIntermediateStops] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
   const [massEditOpen, setMassEditOpen] = useState(false);
@@ -240,8 +241,36 @@ export default function FleetLoads() {
 
 
 
+  // Replace intermediate stop rows for a load. Maps the flat extraction shape
+  // ({stop_number, stop_type, facility_name, address, date}) into the structured
+  // load_intermediate_stops schema.
+  const replaceIntermediateStops = async (loadId: string, orgIdForLoad: string, stops: any[]) => {
+    const client = supabase as any;
+    const { error: delErr } = await client
+      .from('load_intermediate_stops')
+      .delete()
+      .eq('load_id', loadId);
+    if (delErr) throw delErr;
+    if (!stops || stops.length === 0) return;
+    const rows = stops.map((s: any, idx: number) => ({
+      load_id: loadId,
+      org_id: orgIdForLoad,
+      stop_number: s.stop_number ?? idx + 1,
+      stop_type: s.stop_type ?? null,
+      facility_name: s.facility_name ?? null,
+      location: s.address ?? s.location ?? '',
+      scheduled_date: s.date ?? s.scheduled_date ?? null,
+      status: s.status ?? 'pending',
+      remaining_hos: s.remaining_hos ?? null,
+      completed_at: s.completed_at ?? null,
+    })).filter((r: any) => r.location);
+    if (rows.length === 0) return;
+    const { error: insErr } = await client.from('load_intermediate_stops').insert(rows);
+    if (insErr) throw insErr;
+  };
+
   const createMutation = useMutation({
-    mutationFn: async ({ load, accessorials: accs }: { load: any; accessorials: Accessorial[] }) => {
+    mutationFn: async ({ load, accessorials: accs, intermediateStops }: { load: any; accessorials: Accessorial[]; intermediateStops?: any[] }) => {
       const { data, error } = await supabase.from('fleet_loads').insert(load).select().single();
       if (error) throw error;
       
@@ -259,10 +288,16 @@ export default function FleetLoads() {
         const { error: accError } = await supabase.from('load_accessorials').insert(accessorialRecords);
         if (accError) throw accError;
       }
+
+      // Persist structured intermediate stops
+      if (intermediateStops && intermediateStops.length > 0) {
+        await replaceIntermediateStops(data.id, data.org_id, intermediateStops);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
       queryClient.invalidateQueries({ queryKey: ['load_accessorials'] });
+      queryClient.invalidateQueries({ queryKey: ['load_intermediate_stops'] });
       toast.success('Load created successfully');
       closeDialog();
     },
@@ -270,7 +305,7 @@ export default function FleetLoads() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, updates, accessorialItems }: { id: string; updates: any; accessorialItems: Accessorial[] }) => {
+    mutationFn: async ({ id, updates, accessorialItems, intermediateStops }: { id: string; updates: any; accessorialItems: Accessorial[]; intermediateStops?: any[] }) => {
       const { error } = await supabase.from('fleet_loads').update(updates).eq('id', id);
       if (error) throw error;
 
@@ -278,9 +313,10 @@ export default function FleetLoads() {
       const { error: deleteError } = await supabase.from('load_accessorials').delete().eq('load_id', id);
       if (deleteError) throw deleteError;
 
+      // Fetch the load's org_id for RLS compliance (used for both accessorials + stops)
+      const { data: loadData } = await supabase.from('fleet_loads').select('org_id').eq('id', id).single();
+
       if (accessorialItems.length > 0) {
-        // Fetch the load's org_id for RLS compliance
-        const { data: loadData } = await supabase.from('fleet_loads').select('org_id').eq('id', id).single();
         const accessorialRecords = accessorialItems.map((acc: Accessorial) => ({
           load_id: id,
           org_id: loadData?.org_id,
@@ -293,10 +329,17 @@ export default function FleetLoads() {
         const { error: accError } = await supabase.from('load_accessorials').insert(accessorialRecords);
         if (accError) throw accError;
       }
+
+      // Only replace intermediate stops when caller explicitly provided a set
+      // (undefined = leave existing stops untouched; [] = clear)
+      if (intermediateStops !== undefined && loadData?.org_id) {
+        await replaceIntermediateStops(id, loadData.org_id, intermediateStops);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
       queryClient.invalidateQueries({ queryKey: ['load_accessorials'] });
+      queryClient.invalidateQueries({ queryKey: ['load_intermediate_stops'] });
       toast.success('Load updated successfully');
       closeDialog();
     },
@@ -379,6 +422,7 @@ export default function FleetLoads() {
     setEditingLoad(null);
     setFormData({});
     setAccessorials([]);
+    setPendingIntermediateStops([]);
   };
 
   // Accessorial management
@@ -497,10 +541,15 @@ export default function FleetLoads() {
       ...(autoInBond ? [autoInBond] : []),
     ];
 
+    // Only pass intermediateStops when the user actually provided a fresh set
+    // (from rate-conf extraction or independent builder). Otherwise leave them
+    // untouched on edit.
+    const stopsArg = pendingIntermediateStops.length > 0 ? pendingIntermediateStops : undefined;
+
     if (editingLoad) {
-      updateMutation.mutate({ id: editingLoad.id, updates: payload, accessorialItems: finalAccessorials });
+      updateMutation.mutate({ id: editingLoad.id, updates: payload, accessorialItems: finalAccessorials, intermediateStops: stopsArg });
     } else {
-      createMutation.mutate({ load: payload, accessorials: finalAccessorials });
+      createMutation.mutate({ load: payload, accessorials: finalAccessorials, intermediateStops: stopsArg });
     }
   };
 
@@ -658,6 +707,7 @@ export default function FleetLoads() {
         
         setEditingLoad(existingLoad);
         setAccessorials(extractedAccessorials);
+        setPendingIntermediateStops(data.intermediate_stops || []);
         setDialogOpen(true);
         toast.info('Updating existing load. Review changes and save when ready.');
         return;
@@ -685,6 +735,7 @@ export default function FleetLoads() {
     });
 
     setAccessorials(extractedAccessorials);
+    setPendingIntermediateStops(data.intermediate_stops || []);
     setEditingLoad(null);
     setDialogOpen(true);
     
@@ -1060,7 +1111,14 @@ export default function FleetLoads() {
                   org_id: orgId,
                 };
                 const calculated = calculateRevenueLocal(payload);
-                createMutation.mutate({ load: { ...payload, ...calculated }, accessorials: [] });
+                const structuredStops = (data.intermediate_stops || []).map((s: any, i: number) => ({
+                  stop_number: i + 1,
+                  stop_type: 'intermediate',
+                  facility_name: s.facility_name,
+                  address: s.address,
+                  date: s.date,
+                }));
+                createMutation.mutate({ load: { ...payload, ...calculated }, accessorials: [], intermediateStops: structuredStops });
               }}
               onCancel={closeDialog}
             />
