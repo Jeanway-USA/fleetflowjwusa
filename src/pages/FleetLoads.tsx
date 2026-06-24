@@ -541,10 +541,15 @@ export default function FleetLoads() {
       ...(autoInBond ? [autoInBond] : []),
     ];
 
+    // Only pass intermediateStops when the user actually provided a fresh set
+    // (from rate-conf extraction or independent builder). Otherwise leave them
+    // untouched on edit.
+    const stopsArg = pendingIntermediateStops.length > 0 ? pendingIntermediateStops : undefined;
+
     if (editingLoad) {
-      updateMutation.mutate({ id: editingLoad.id, updates: payload, accessorialItems: finalAccessorials });
+      updateMutation.mutate({ id: editingLoad.id, updates: payload, accessorialItems: finalAccessorials, intermediateStops: stopsArg });
     } else {
-      createMutation.mutate({ load: payload, accessorials: finalAccessorials });
+      createMutation.mutate({ load: payload, accessorials: finalAccessorials, intermediateStops: stopsArg });
     }
   };
 
