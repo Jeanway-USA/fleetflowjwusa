@@ -448,6 +448,11 @@ export default function FleetLoads() {
       toast.error('Origin and destination are required');
       return;
     }
+    if (agencyBlocked) {
+      toast.error('This agency is marked DO NOT USE in the CRM. Change the agency code to continue.');
+      return;
+    }
+
 
     // In-Bond / Rule 480 client-side validation (server enforces too)
     const inBondSchema = z.object({
@@ -1789,9 +1794,10 @@ export default function FleetLoads() {
 
             <DialogFooter className="mt-6">
               <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground">
+              <Button type="submit" className="gradient-gold text-primary-foreground" disabled={agencyBlocked}>
                 {editingLoad ? 'Save Changes' : 'Add Load'}
               </Button>
+
             </DialogFooter>
           </form>
           )}
