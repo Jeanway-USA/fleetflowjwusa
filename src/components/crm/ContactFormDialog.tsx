@@ -182,22 +182,27 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
           await createResource.mutateAsync(resourcePayload);
         }
       } else {
+        const crmContactType = isBroker ? 'broker' : isAgent ? 'agent' : 'vendor';
+        const trimmedAgentCode = form.agent_code.trim().toUpperCase();
         const crmPayload = {
-          contact_type: isBroker ? 'broker' : 'vendor',
-          company_name: form.company_name,
+          contact_type: crmContactType,
+          company_name: isAgent ? (trimmedAgentCode || form.company_name || trimmedAgentCode) : form.company_name,
           contact_name: form.contact_name || null,
           phone: form.phone || null,
           email: form.email || null,
-          address: form.address || null,
-          city: form.city || null,
-          state: form.state || null,
+          address: isAgent ? null : (form.address || null),
+          city: isAgent ? null : (form.city || null),
+          state: isAgent ? null : (form.state || null),
           website: form.website || null,
-          agent_code: null,
-          agent_status: null,
+          agent_code: isAgent ? (trimmedAgentCode || null) : null,
+          agent_status: isAgent ? form.agent_status : null,
           notes: form.notes || null,
-          tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+          tags: (isBroker || formType === 'vendor-other')
+            ? (form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [])
+            : [],
           org_id: orgId,
         };
+
         if (isEditing && editContact) {
           await updateContact.mutateAsync({ id: editContact.id, ...crmPayload });
         } else {

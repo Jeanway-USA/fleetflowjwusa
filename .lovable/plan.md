@@ -1,18 +1,31 @@
-## Backfill CRM from existing loads and work orders
+## Fix the "edited agent disappears" bug and restore the LTL agent
 
-Run a one-time data backfill mirroring the auto-harvest triggers, so every historical load/work order contributes a CRM contact (idempotent — skips any agency or shop already in the CRM for that org).
+### Why it happened
 
-### Steps
+`src/components/crm/ContactFormDialog.tsx` assumes every agent contact lives in `company_resources`. When you edited the auto-added LTL agent (which lives in `crm_contacts`), the save path took the `crm` branch but hard-coded `contact_type` to `'broker'` or `'vendor'` and dropped `agent_code` / `agent_status`. The row was rewritten as a vendor, so the Freight Agencies tab (which filters to `agent`/`broker`) stopped showing it.
 
-1. **Agencies from `fleet_loads`** — for each row with a non-empty `landstar_load_id` or `broker_name`, insert one `crm_contacts` row with `contact_type='agent'`, `agent_status='safe'`, `is_active=true`, `agent_code = landstar_load_id`, `company_name = broker_name` (or the code), `notes = 'Auto-added from load <load_id>'`. Skip when the org already has a contact with the same `agent_code` or `company_name` (case-insensitive). Group by `(org_id, lower(agent_code), lower(company_name))` so duplicates inside the load history collapse to one insert.
+### Fix (single file: `src/components/crm/ContactFormDialog.tsx`)
 
-2. **Agencies from `agency_loads`** — same shape, using `broker_name` only (this table has no agency code). Insert `contact_type='agent'`, dedup by `(org_id, lower(broker_name))`, skip if already in CRM.
+In the `target === 'crm'` save branch, write the actual form type and preserve agent fields when applicable:
 
-3. **Shops from `work_orders`** — for each row with a non-empty `vendor`, insert `contact_type='shop'`, `agent_status='safe'`, `company_name = vendor`, `notes = 'Auto-added from work order <wo_id>'`. Dedup by `(org_id, lower(vendor))`, skip if an existing CRM row with `contact_type IN ('shop','vendor')` already matches.
+- `contact_type`: derive from `formType` — `'broker'` when broker, `'agent'` when agent, otherwise `'vendor'`.
+- When `isAgent`, persist `agent_code` (uppercased, trimmed) and `agent_status` instead of nulling them, and use the agent code (or company name) as `company_name` so the row stays identifiable.
+- Tags continue to apply only to broker / vendor-other.
 
-All three inserts use `ON CONFLICT DO NOTHING` against the partial unique indexes created in the previous migration, and an explicit `NOT EXISTS` filter against `crm_contacts` so previously-curated entries are left untouched.
+This keeps existing broker/vendor saves identical and only changes the agent-in-crm path that caused the bug. No schema or trigger changes needed.
+
+### Restore the LTL agent
+
+One data update on `crm_contacts` for id `79bb3ba1-78e7-4920-9a63-389118802d6d`:
+
+- `contact_type` → `'agent'`
+- `agent_code` → `'LTL'`
+- `agent_status` → `'safe'`
+- Leave the edited `notes` ("Amazing Agency! Lots of good loads originating in the Dallas, TX area.") and `company_name='LTL'` as-is — these are the user's edits and should survive.
+
+After this, the row reappears under **Freight Agencies** with the LTL agent code and the user's note intact.
 
 ### Out of scope
 
-- No schema changes (the columns and indexes are already in place).
-- No UI changes — the existing CRM page already shows the new entries under **Freight Agencies** and **Maintenance Shops** with the "Auto-added" badge.
+- No changes to other branches (resource / facility) of the dialog.
+- No changes to the auto-harvest triggers or backfill.
