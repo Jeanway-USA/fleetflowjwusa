@@ -13,6 +13,7 @@ import { ExpensesList } from '@/components/shared/ExpensesList';
 import { RateConfirmationUpload } from '@/components/loads/RateConfirmationUpload';
 import { SmartLoadCreator } from '@/components/loads/SmartLoadCreator';
 import { IndependentLoadBuilder } from '@/components/loads/IndependentLoadBuilder';
+import { IntermediateStopsView } from '@/components/loads/IntermediateStopsView';
 import DriverLoadsView from '@/components/driver/DriverLoadsView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1835,13 +1836,16 @@ export default function FleetLoads() {
 
               <TabsContent value="history" className="mt-4">
                 {editingLoad?.id ? (
-                  <StatusHistoryLog
-                    loadId={editingLoad.id}
-                    pickupDate={editingLoad.pickup_date}
-                    pickupTime={editingLoad.pickup_time}
-                    deliveryDate={editingLoad.delivery_date}
-                    deliveryTime={editingLoad.delivery_time}
-                  />
+                  <div className="space-y-4">
+                    <IntermediateStopsView loadId={editingLoad.id} />
+                    <StatusHistoryLog
+                      loadId={editingLoad.id}
+                      pickupDate={editingLoad.pickup_date}
+                      pickupTime={editingLoad.pickup_time}
+                      deliveryDate={editingLoad.delivery_date}
+                      deliveryTime={editingLoad.delivery_time}
+                    />
+                  </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <p>Save the load first to view status history.</p>

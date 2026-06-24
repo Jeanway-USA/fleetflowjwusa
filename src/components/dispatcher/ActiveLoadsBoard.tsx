@@ -15,6 +15,7 @@ const LoadRouteMap = lazy(() =>
 );
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { DataTable } from '@/components/shared/DataTable';
+import { IntermediateStopsView } from '@/components/loads/IntermediateStopsView';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -515,6 +516,9 @@ export function ActiveLoadsBoard() {
                     <p className="text-[10px] text-warning/60 mt-1 italic">Scroll for more ↓</p>
                   </div>
                 )}
+
+                {/* Structured intermediate stops with HOS tracking */}
+                <IntermediateStopsView loadId={selectedLoad.id} />
               </div>
             </>
           )}
