@@ -516,6 +516,9 @@ export function ActiveLoadsBoard() {
                     <p className="text-[10px] text-warning/60 mt-1 italic">Scroll for more ↓</p>
                   </div>
                 )}
+
+                {/* Structured intermediate stops with HOS tracking */}
+                <IntermediateStopsView loadId={selectedLoad.id} />
               </div>
             </>
           )}
