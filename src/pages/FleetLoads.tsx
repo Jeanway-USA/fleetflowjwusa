@@ -735,6 +735,7 @@ export default function FleetLoads() {
     });
 
     setAccessorials(extractedAccessorials);
+    setPendingIntermediateStops(data.intermediate_stops || []);
     setEditingLoad(null);
     setDialogOpen(true);
     
