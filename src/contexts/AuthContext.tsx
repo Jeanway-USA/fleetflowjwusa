@@ -490,6 +490,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     currentUserIdRef.current = null;
     resetTenantState();
 
+    // Clear per-user QoL state (recents + form drafts) so the next account
+    // doesn't see prior tenant data leaking through localStorage.
+    try {
+      localStorage.removeItem('jw-recents:v1');
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('jw-draft:')) localStorage.removeItem(k);
+      }
+    } catch { /* ignore */ }
+
     try {
       await supabase.auth.signOut();
     } finally {
