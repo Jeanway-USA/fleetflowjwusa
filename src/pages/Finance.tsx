@@ -657,6 +657,7 @@ export default function Finance() {
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="overview">Overview & P&L</TabsTrigger>
           <TabsTrigger value="driver-settlements">Driver Settlements</TabsTrigger>
+          <TabsTrigger value="commissions">Agent Commissions</TabsTrigger>
           <TabsTrigger value="invoicing">Invoicing & Factoring</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="profitability">Profitability</TabsTrigger>
@@ -969,6 +970,11 @@ export default function Finance() {
         <TabsContent value="driver-settlements">
           <div className="space-y-6 animate-in fade-in-50">
             <DriverSettlementsTab />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="commissions">
+          <div className="space-y-6 animate-in fade-in-50">
             <CommissionsTab
               filteredCommissions={filteredCommissions}
               commissionTotals={commissionTotals}
