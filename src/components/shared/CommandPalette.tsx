@@ -91,7 +91,7 @@ export function CommandPalette() {
   const setDebouncedFn = useDebouncedCallback((v: string) => setDebounced(v), 200);
   useEffect(() => { setDebouncedFn(search); }, [search, setDebouncedFn]);
 
-  // Global hotkey
+  // Global hotkey + legacy event from header search button
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
@@ -108,8 +108,13 @@ export function CommandPalette() {
         setOpen(true);
       }
     };
+    const openHandler = () => setOpen(true);
     document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    window.addEventListener('open-command-palette', openHandler);
+    return () => {
+      document.removeEventListener('keydown', handler);
+      window.removeEventListener('open-command-palette', openHandler);
+    };
   }, [open]);
 
   // Reset search when closed

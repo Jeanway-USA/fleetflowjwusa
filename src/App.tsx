@@ -12,7 +12,6 @@ import { RoleBasedRedirect } from "@/components/shared/RoleBasedRedirect";
 import { ProtectedRoute } from "@/components/shared/ProtectedRoute";
 import { SuperAdminGuard } from "@/components/shared/SuperAdminGuard";
 import { BrandColorInjector } from "@/components/shared/BrandColorInjector";
-import { CommandPalette } from "@/components/shared/CommandPalette";
 import { Loader2 } from "lucide-react";
 
 // Lazy-loaded pages
@@ -90,7 +89,6 @@ const App = () => {
             <AuthProvider>
               <TimeDisplayProvider>
                 <BrandColorInjector />
-                <CommandPalette />
                 <ErrorBoundary>
                   <Suspense fallback={<LoadingFallback />}>
                   <Routes>
