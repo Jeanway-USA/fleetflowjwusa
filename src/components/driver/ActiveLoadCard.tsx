@@ -335,8 +335,12 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
           </div>
 
 
+          {/* Intermediate stops timeline (structured) */}
+          <IntermediateStopsTimeline loadId={load.id} />
+
           {/* Action Buttons */}
           <div className="flex gap-2 pt-2">
+
             {load.tracking_id && (
               <Button
                 variant="outline"
