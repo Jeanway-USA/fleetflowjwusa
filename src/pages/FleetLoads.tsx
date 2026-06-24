@@ -1111,7 +1111,14 @@ export default function FleetLoads() {
                   org_id: orgId,
                 };
                 const calculated = calculateRevenueLocal(payload);
-                createMutation.mutate({ load: { ...payload, ...calculated }, accessorials: [] });
+                const structuredStops = (data.intermediate_stops || []).map((s: any, i: number) => ({
+                  stop_number: i + 1,
+                  stop_type: 'intermediate',
+                  facility_name: s.facility_name,
+                  address: s.address,
+                  date: s.date,
+                }));
+                createMutation.mutate({ load: { ...payload, ...calculated }, accessorials: [], intermediateStops: structuredStops });
               }}
               onCancel={closeDialog}
             />
