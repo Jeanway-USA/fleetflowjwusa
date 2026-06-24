@@ -1,96 +1,52 @@
+## Driver Dashboard — Intermediate Stops Timeline + Confirm Flow
 
-# Site-Wide Quality-of-Life Pass
+### 1. Read structured stops on the driver's active load
+- In `src/components/driver/ActiveLoadCard.tsx`, fetch `load_intermediate_stops` for the current `load_id` (ordered by `stop_number`) via TanStack Query. Drop the legacy `=== INTERMEDIATE STOPS ===` notes parser only as the source of truth for stops; keep the notes text rendering unchanged for backwards compatibility on loads that don't have structured rows yet.
+- Cache key: `['load-intermediate-stops', loadId]`. Refetch on confirm-success.
 
-A heavy, opinionated polish sweep touching forms, tables, navigation, and mobile across the whole app. Built around a handful of new shared primitives so every page benefits without rewriting page-level code.
+### 2. New component: `IntermediateStopsTimeline.tsx`
+Location: `src/components/driver/IntermediateStopsTimeline.tsx`.
 
----
+Renders a vertical timeline:
+```text
+●──  Stop 1 · Pickup · ACME Warehouse — Dallas, TX
+│    Completed 06/24 14:02 · HOS left: 6.5 hr
+●──  Stop 2 · Drop · Cooler #4 — Houston, TX        [Confirm Stop Delivery]
+○    Stop 3 · Pickup · ...                          (disabled — complete prior stop first)
+```
+- Status dot colors via design tokens (`bg-primary` completed, `bg-muted` pending).
+- Shows `facility_name`, `location`, `scheduled_date`, plus `completed_at` + `remaining_hos` once completed.
+- **Strict sequence**: only the first `status='pending'` row shows an enabled `Confirm Stop Delivery` button (`h-12`, full width on mobile). Later pending rows render a disabled button with tooltip "Complete previous stops first".
+- Empty state: nothing rendered if there are no structured stops (notes block still shows).
 
-## 1. Global Command Palette (⌘K / Ctrl+K)
+### 3. New component: `ConfirmStopDialog.tsx`
+Location: `src/components/driver/ConfirmStopDialog.tsx`. Modeled after `EndingOdometerDialog.tsx` for visual/UX consistency.
 
-A single keyboard-driven launcher that works from any page.
+- Props: `stop`, `open`, `onOpenChange`, `onConfirmed`.
+- Single required input: **Remaining Hours of Service (HOS)** — numeric, `0–11` valid range, `inputMode="decimal"`, same sanitizer as the end-of-load dialog.
+- Confirm button disabled until valid; shows inline validation message.
+- On submit:
+  1. `UPDATE load_intermediate_stops SET status='completed', remaining_hos=<value>, completed_at=now() WHERE id=<stop.id>` via Supabase client (RLS already org-scoped).
+  2. Optimistic UI: mark row completed in cache, then `queryClient.invalidateQueries(['load-intermediate-stops', loadId])`.
+  3. Toast: `sonner` success "Stop confirmed". On error, rollback + error toast.
+  4. Close dialog; focus returns to next pending stop's button.
 
-- **New:** `src/components/shared/CommandPalette.tsx` using shadcn `cmdk` (`Command`, `CommandDialog`).
-- Mounted once in `App.tsx` inside `ProtectedRoute` so it follows the authed shell.
-- Global hotkey listener (`⌘K` / `Ctrl+K`, `/` when not in an input) toggles it.
-- Sections:
-  - **Jump to page** — every route the user has access to (role-gated via existing `useAuth` role).
-  - **Recents** — last 8 visited loads, drivers, trucks, contacts (stored in `localStorage` key `jw-recents`).
-  - **Quick actions** — "New Load", "New Work Order", "New Contact", "New Expense" — calls page-level openers via a tiny event bus (`window.dispatchEvent(new CustomEvent('jw:quick-action', { detail: 'new-load' }))`).
-  - **Search** — fuzzy across loads (load #), drivers (name), trucks (unit #), contacts (company/agent code). Debounced 200ms, queries existing tables filtered by `org_id`, `limit 8` per type.
-- Result selection navigates or fires the action, then closes.
+### 4. Integration in `ActiveLoadCard.tsx`
+- Mount `<IntermediateStopsTimeline loadId={load.id} driverId={driverId} />` directly above (or replacing, when structured data exists) the existing free-text intermediate stops block.
+- No changes to the End-of-Load / odometer flow.
 
-## 2. Recents + Breadcrumbs
+### 5. Out of scope
+- No schema changes — `load_intermediate_stops` already has `status`, `remaining_hos`, `completed_at`.
+- No edits to FleetLoads (dispatcher) side, rate-conf parser, or notes generation.
+- No changes to existing HOS snapshot at end of load.
 
-- **New:** `src/hooks/useRecents.ts` — `pushRecent({ type, id, label, href })`, capped at 20, deduped.
-- Wire into the detail openers we already have: Load detail dialog, Driver detail sheet, Truck history drawer, CRM contact sheet. One-line `useEffect` per opener.
-- **New:** `src/components/shared/Breadcrumbs.tsx` — derives crumbs from `useLocation()` + a small route→label map; renders under page header on detail-style pages (Loads, Maintenance, CRM, Drivers, Trucks, Trailers, Finance, IFTA, Safety, Settings).
+### Technical notes
+- Cache invalidation only — no realtime subscription needed; the driver is the only actor on their own stops.
+- All buttons `h-12` for touch (per mobile-ux memory).
+- Date formatting uses `'YYYY-MM-DDT00:00:00'` parse pattern for `scheduled_date` (per date-handling memory).
+- New files only under `src/components/driver/`. No DB migration, no edge function.
 
-## 3. Form UX Primitives
-
-Roll these into the highest-traffic forms first: FleetLoads create/edit, IndependentLoadBuilder, NewWorkOrderSheet, ContactFormDialog, Driver onboarding wizard, Settings tabs.
-
-- **New:** `src/hooks/useFormShortcuts.ts` — binds `Enter` to submit (skipped in `<textarea>` unless `⌘/Ctrl+Enter`), `Esc` to close, `⌘/Ctrl+S` to save without closing. Accepts `{ onSubmit, onCancel, onSaveDraft, disabled }`.
-- **New:** `src/hooks/useDraftAutosave.ts` — debounced (1s) write of form state to `localStorage` keyed by `jw-draft:<formId>:<orgId>:<userId>`. Restores on mount with a dismissible "Restore draft from 3m ago?" banner. Clears on successful submit. Opt-in per form via `formId`.
-- **New:** `src/components/shared/StickySaveBar.tsx` — appears at the bottom of long forms when dirty, on mobile becomes a fixed bottom bar above safe-area. Shows "Unsaved changes • Save / Discard". Used by Settings tabs, NewWorkOrderSheet, IndependentLoadBuilder.
-- **New:** `src/components/shared/FormField.tsx` thin wrapper standardizing label / required marker / inline error / helper text spacing. Optional — used in new code; existing fields untouched.
-- Focus management: every dialog/sheet opens with focus on its first input (already partial — make consistent), returns focus to the trigger on close.
-
-## 4. Table Primitives
-
-- **New:** `src/components/shared/DataTable/` — `DataTable.tsx`, `TableSkeleton.tsx`, `TableEmptyState.tsx`, `TableToolbar.tsx`, `useTablePrefs.ts`.
-  - Sticky header (`position: sticky; top: 0` inside a scroll container).
-  - Column resize via mouse drag on header divider; widths persisted per table id in `localStorage`.
-  - Sort + page-size persisted per table id.
-  - Bulk-select column with checkbox + sticky bulk-action bar (count + actions slot).
-  - Standard empty state (icon + headline + CTA slot) and consistent skeleton row count.
-- Refactor (in this order — stop when scope feels right): FleetLoads table, DriverLoads table, Trucks, Trailers, CRM Brokers/Agents, Maintenance ServiceHistoryTab, Finance SettlementsTab.
-
-## 5. Undoable Deletes Everywhere
-
-We already have `useUndoableDelete`. Make it the default.
-
-- Sweep all delete buttons in: Loads, Drivers, Trucks, Trailers, CRM contacts, Maintenance work orders / service history, Expenses, Documents, Templates.
-- Pattern: optimistic remove → sonner toast with "Undo" action for 6s → on undo, restore; otherwise commit hard delete.
-- Remove redundant confirm dialogs where undo replaces them. Keep confirm only for cascading/irreversible ops (delete org, delete user account).
-
-## 6. Mobile Polish Sweep
-
-- Audit every `Sheet`, `Dialog`, and primary form on `<sm` breakpoint.
-- Ensure all primary action buttons are `h-12` and reachable above safe-area.
-- Add `pb-[env(safe-area-inset-bottom)]` to sticky bottom bars.
-- Sheets: ensure `flex flex-col` with scrollable middle so footer stays pinned (matches existing sheet memory).
-- Hit-target sweep for table row actions (use a kebab menu instead of cramped inline icons on mobile).
-- Convert long horizontal table scroll to a card-stack on `<md` for Loads and Maintenance lists.
-
-## 7. Cross-cutting niceties
-
-- Toast consistency: every mutation uses sonner with one of `loading → success/error` (promise form). Remove ad-hoc `toast.success` without error pairs.
-- Disabled-state clarity: buttons show a tooltip explaining why they're disabled (blocked agency, demo mode, missing fields).
-- Loading bars: standardize on a top-of-page progress hint via existing `LoadingBar` (no full-screen blockers on background refetches).
-- Empty states: every list page gets an illustration-less but headline + helper + CTA empty state via `TableEmptyState`.
-
----
-
-## Technical notes
-
-- No DB / RLS / edge function changes.
-- New shared code lives under `src/components/shared/` and `src/hooks/`.
-- Recents + drafts + table prefs are all `localStorage` (per-user, per-org keyed). Cleared on logout via `AuthContext` sign-out (one-line addition).
-- Quick-action event bus: pages that own a "+ New X" dialog add a single `useEffect` listener; no prop drilling.
-- Command palette search uses existing tables/columns; no new indexes needed at this scale.
-- Respect existing rules: no hardcoded colors, semantic tokens only, no DashboardLayout wrapping in pages, demo-mode guard on mutating quick actions.
-
-## Out of scope
-
-- Visual redesign / theming changes.
-- New backend tables, migrations, or edge functions.
-- Reworking the AgencyCRMStatusBadge flow shipped earlier.
-- i18n.
-
-## Rough sequencing
-
-1. CommandPalette + recents + breadcrumbs (highest user-visible win).
-2. Form primitives + autosave + shortcuts, applied to top 5 forms.
-3. DataTable primitive + refactor FleetLoads first, then roll outward.
-4. Undoable-delete sweep.
-5. Mobile sweep + toast/disabled-state polish.
+### Files
+- **Create** `src/components/driver/IntermediateStopsTimeline.tsx`
+- **Create** `src/components/driver/ConfirmStopDialog.tsx`
+- **Edit** `src/components/driver/ActiveLoadCard.tsx` (mount timeline; leave notes parser intact)
