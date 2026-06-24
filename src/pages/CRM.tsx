@@ -27,14 +27,18 @@ import { ContactFormDialog } from '@/components/crm/ContactFormDialog';
 import { ContactDetailSheet } from '@/components/crm/ContactDetailSheet';
 import { BrokerDatabase } from '@/components/crm/BrokerDatabase';
 
-const TYPE_TABS = [
+const AGENCY_TYPE_TABS = [
   { value: 'all', label: 'All' },
   { value: 'broker', label: 'Brokers' },
   { value: 'agent', label: 'Agents' },
   { value: 'shipper', label: 'Shippers' },
   { value: 'receiver', label: 'Receivers' },
-  { value: 'vendor', label: 'Vendors' },
 ];
+
+const SCOPE_TABS = [
+  { value: 'agencies', label: 'Freight Agencies' },
+  { value: 'shops', label: 'Maintenance Shops' },
+] as const;
 
 const TYPE_COLORS: Record<string, string> = {
   broker: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
@@ -42,6 +46,7 @@ const TYPE_COLORS: Record<string, string> = {
   shipper: 'bg-green-500/10 text-green-600 border-green-500/30',
   receiver: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
   vendor: 'bg-red-500/10 text-red-600 border-red-500/30',
+  shop: 'bg-orange-500/10 text-orange-600 border-orange-500/30',
 };
 
 export default function CRM() {
@@ -58,6 +63,7 @@ function AgentCRM() {
   const { hasRole, isOwner } = useAuth();
   const canEdit = isOwner || hasRole('dispatcher');
 
+  const [scope, setScope] = useState<'agencies' | 'shops'>('agencies');
   const [typeFilter, setTypeFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
@@ -68,7 +74,7 @@ function AgentCRM() {
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
-  const { data: contacts, isLoading } = useUnifiedContacts(typeFilter);
+  const { data: contacts, isLoading } = useUnifiedContacts(typeFilter, scope);
   const { deleteContact: deleteCRMMutation } = useContactMutations();
   const { deleteResource: deleteResourceMutation } = useResourceMutations();
   const { deleteFacility: deleteFacilityMutation } = useFacilityMutations();
@@ -130,6 +136,17 @@ function AgentCRM() {
       <CRMSummaryCards contacts={contacts} />
 
       <div className="mt-6 space-y-4">
+        {/* Top-level scope toggle: Freight Agencies vs Maintenance Shops */}
+        <Tabs value={scope} onValueChange={(v) => { setScope(v as 'agencies' | 'shops'); setTypeFilter('all'); }}>
+          <TabsList className="h-11">
+            {SCOPE_TABS.map((s) => (
+              <TabsTrigger key={s.value} value={s.value} className="text-sm px-4">
+                {s.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 max-w-sm">
@@ -141,16 +158,19 @@ function AgentCRM() {
               className="pl-10 sm:pl-10"
             />
           </div>
-          <Tabs value={typeFilter} onValueChange={setTypeFilter}>
-            <TabsList>
-              {TYPE_TABS.map((t) => (
-                <TabsTrigger key={t.value} value={t.value} className="text-xs">
-                  {t.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          {scope === 'agencies' && (
+            <Tabs value={typeFilter} onValueChange={setTypeFilter}>
+              <TabsList>
+                {AGENCY_TYPE_TABS.map((t) => (
+                  <TabsTrigger key={t.value} value={t.value} className="text-xs">
+                    {t.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          )}
         </div>
+
 
         {/* Contacts Table */}
         <DataTable
@@ -181,6 +201,9 @@ function AgentCRM() {
             },
             { key: 'details', header: 'Details', hiddenOnMobile: true, render: (contact: UnifiedContact) => (
               <div className="flex flex-wrap gap-1">
+                {contact.source === 'crm' && contact.agent_status === 'safe' && (contact.notes || '').startsWith('Auto-added from') && (
+                  <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30">Auto-added</Badge>
+                )}
                 {contact.source === 'facility' && contact.appointment_required && (
                   <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Appt Req</Badge>
                 )}

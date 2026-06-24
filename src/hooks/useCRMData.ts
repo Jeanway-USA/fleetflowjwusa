@@ -8,7 +8,11 @@ export type CRMActivity = Tables<'crm_activities'>;
 export type CRMContactLoad = Tables<'crm_contact_loads'>;
 export type CompanyResource = Tables<'company_resources'>;
 export type Facility = Tables<'facilities'>;
-export type ContactType = 'broker' | 'agent' | 'shipper' | 'receiver' | 'vendor';
+export type ContactType = 'broker' | 'agent' | 'shipper' | 'receiver' | 'vendor' | 'shop';
+export type CRMScope = 'agencies' | 'shops';
+
+const AGENCY_TYPES: ContactType[] = ['agent', 'broker'];
+const SHOP_TYPES: ContactType[] = ['shop', 'vendor'];
 
 // Unified shape for display across all data sources
 export interface UnifiedContact {
@@ -388,18 +392,33 @@ export function useFacilityMutations() {
 
 // --- Unified contacts hook ---
 
-export function useUnifiedContacts(typeFilter?: string) {
+export function useUnifiedContacts(typeFilter?: string, scope?: CRMScope) {
   const { data: crmContacts = [], isLoading: crmLoading } = useContacts();
   const { data: resources = [], isLoading: resLoading } = useCompanyResources();
   const { data: facilities = [], isLoading: facLoading } = useFacilities();
 
   const isLoading = crmLoading || resLoading || facLoading;
 
-  const unified: UnifiedContact[] = [
+  let unified: UnifiedContact[] = [
     ...crmContacts.map(normalizeCRMContact),
     ...resources.map(normalizeResource),
     ...facilities.map(normalizeFacility),
   ];
+
+  // Apply scope (top-level toggle: agencies vs shops)
+  if (scope === 'agencies') {
+    unified = unified.filter(
+      (c) =>
+        AGENCY_TYPES.includes(c.contact_type) ||
+        (c.source === 'resource' && c.resource_type === 'load_agent'),
+    );
+  } else if (scope === 'shops') {
+    unified = unified.filter(
+      (c) =>
+        SHOP_TYPES.includes(c.contact_type) ||
+        (c.source === 'resource' && (c.resource_type === 'mechanic' || c.resource_type === 'roadside' || c.resource_type === 'truck_wash')),
+    );
+  }
 
   // Apply type filter
   const filtered = typeFilter && typeFilter !== 'all'
