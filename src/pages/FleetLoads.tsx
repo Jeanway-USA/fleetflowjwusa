@@ -77,6 +77,7 @@ export default function FleetLoads() {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSetSearch = useDebouncedCallback((v: string) => setSearchTerm(v.trim().toLowerCase()), 300);
   const [accessorials, setAccessorials] = useState<Accessorial[]>([]);
+  const [pendingIntermediateStops, setPendingIntermediateStops] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
   const [massEditOpen, setMassEditOpen] = useState(false);
