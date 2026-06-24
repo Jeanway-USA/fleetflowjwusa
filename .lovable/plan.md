@@ -1,31 +1,38 @@
-## Fix the "edited agent disappears" bug and restore the LTL agent
+## Live Agency CRM validation in the Load form
 
-### Why it happened
+Add an instant CRM safety lookup to the Agency Code field in the Fleet Load create/edit dialog (`src/pages/FleetLoads.tsx`), the only form that captures agency codes.
 
-`src/components/crm/ContactFormDialog.tsx` assumes every agent contact lives in `company_resources`. When you edited the auto-added LTL agent (which lives in `crm_contacts`), the save path took the `crm` branch but hard-coded `contact_type` to `'broker'` or `'vendor'` and dropped `agent_code` / `agent_status`. The row was rewritten as a vendor, so the Freight Agencies tab (which filters to `agent`/`broker`) stopped showing it.
+### 1. New hook: `src/hooks/useAgencyCRMStatus.ts`
 
-### Fix (single file: `src/components/crm/ContactFormDialog.tsx`)
+- Accepts an `agencyCode` string.
+- Trims + uppercases the input and **only queries when length ≥ 2** (avoids noisy lookups while typing a single character or an empty box).
+- Debounces input by ~250 ms via local `setTimeout` state.
+- Runs a TanStack `useQuery` against `crm_contacts` filtered by `org_id`, `contact_type in ('agent','broker')`, and `agent_code ilike <code>` (case-insensitive exact match), `limit 1`.
+- Returns one of four states: `idle` (empty/too short), `loading`, `found` (with `{ company_name, agent_status, notes }`), or `not_found`.
+- Gracefully returns `idle` for empty / whitespace input so no errors surface mid-typing.
 
-In the `target === 'crm'` save branch, write the actual form type and preserve agent fields when applicable:
+### 2. New component: `src/components/loads/AgencyCRMStatusBadge.tsx`
 
-- `contact_type`: derive from `formType` — `'broker'` when broker, `'agent'` when agent, otherwise `'vendor'`.
-- When `isAgent`, persist `agent_code` (uppercased, trimmed) and `agent_status` instead of nulling them, and use the agent code (or company name) as `company_name` so the row stays identifiable.
-- Tags continue to apply only to broker / vendor-other.
+Renders below the Agency Code input based on hook state:
 
-This keeps existing broker/vendor saves identical and only changes the agent-in-crm path that caused the bug. No schema or trigger changes needed.
+- `idle` → nothing.
+- `loading` → muted "Checking CRM…" badge with spinner.
+- `found` + `agent_status === 'safe'` → green badge: **✓ CRM Approved: Safe** (shows company name).
+- `found` + `agent_status` in `'unsafe' | 'not_safe' | 'blocked'` → red destructive alert: **⚠ WARNING: DO NOT USE — Agency Blocked**, displays company name + `notes` as the reason. Also exposes an `onBlockedChange` callback so the parent form can disable submit.
+- `found` with any other status → neutral info badge showing the status verbatim.
+- `not_found` → blue info badge: **✦ New Agency: Will Auto-Harvest as Safe** (explains the trigger will register it on save).
 
-### Restore the LTL agent
+### 3. Wire into `FleetLoads.tsx`
 
-One data update on `crm_contacts` for id `79bb3ba1-78e7-4920-9a63-389118802d6d`:
+- Import the hook and badge.
+- Track `const [agencyBlocked, setAgencyBlocked] = useState(false)`.
+- Below the existing Agency Code input (line ~1139), render `<AgencyCRMStatusBadge agencyCode={formData.agency_code} onBlockedChange={setAgencyBlocked} />`.
+- Reset `agencyBlocked` to false whenever the dialog opens/closes or the code is cleared (handled inside the badge's effect).
+- Disable the submit Button (line 1787) when `agencyBlocked` is true, and short-circuit `handleSubmit` (line 442) with a toast if somehow invoked while blocked.
 
-- `contact_type` → `'agent'`
-- `agent_code` → `'LTL'`
-- `agent_status` → `'safe'`
-- Leave the edited `notes` ("Amazing Agency! Lots of good loads originating in the Dallas, TX area.") and `company_name='LTL'` as-is — these are the user's edits and should survive.
+### Notes / out of scope
 
-After this, the row reappears under **Freight Agencies** with the LTL agent code and the user's note intact.
-
-### Out of scope
-
-- No changes to other branches (resource / facility) of the dialog.
-- No changes to the auto-harvest triggers or backfill.
+- Auto-harvest already happens via the existing `AFTER INSERT` trigger on `fleet_loads` — no DB changes needed; the "New Agency" badge is purely informational.
+- `SmartLoadCreator` only displays extracted PDF data and has no editable agency-code input, so no changes there.
+- Independent / agency load forms don't use `agency_code`, so they're untouched.
+- No schema or RLS changes; `crm_contacts` is already readable to org members.
