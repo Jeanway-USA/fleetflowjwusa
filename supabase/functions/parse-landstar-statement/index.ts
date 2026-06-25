@@ -36,12 +36,21 @@ interface ExtractedExpense {
   is_advance: boolean;
 }
 
+interface ExtractedRevenue {
+  date: string | null;
+  trip_number: string | null;
+  flat_rate: number;
+  reimbursement_total: number;
+  description: string;
+}
+
 interface ParsedStatement {
   statement_type: 'card_activity' | 'contractor';
   period_start: string | null;
   period_end: string | null;
   unit_number: string | null;
   expenses: ExtractedExpense[];
+  revenue?: ExtractedRevenue[];
 }
 
 serve(async (req) => {
