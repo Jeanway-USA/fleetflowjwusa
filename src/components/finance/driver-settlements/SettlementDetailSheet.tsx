@@ -24,7 +24,7 @@ import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { formatCurrency } from '@/lib/formatters';
 import { format, parseISO } from 'date-fns';
-import { Download, Plus, Trash2 } from 'lucide-react';
+import { Download, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
 import { fetchPayBreakdown, type PayBreakdown } from '@/lib/settlement-pay-breakdown';
@@ -139,16 +139,29 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                   </>
                 )}
               </span>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleDownload}
-                disabled={downloading}
-                className="w-full sm:w-auto"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {downloading ? 'Generating…' : 'Download PDF'}
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    window.open(`/settlements/${settlement.id}/print`, '_blank', 'noopener')
+                  }
+                  className="w-full sm:w-auto"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Preview Statement
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  className="w-full sm:w-auto"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {downloading ? 'Generating…' : 'Download PDF'}
+                </Button>
+              </div>
             </SheetDescription>
           )}
         </SheetHeader>

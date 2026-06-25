@@ -57,6 +57,7 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const DocumentTemplates = lazy(() => import("./pages/admin/DocumentTemplates"));
 const DriverOnboarding = lazy(() => import("./pages/DriverOnboarding"));
+const SettlementPrint = lazy(() => import("./pages/SettlementPrint"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -253,6 +254,12 @@ const App = () => {
                     <Route path="/driver-stats" element={
                       <ProtectedRoute allowedRoles={['driver']}>
                         <DriverStats />
+                      </ProtectedRoute>
+                    } />
+
+                    <Route path="/settlements/:id/print" element={
+                      <ProtectedRoute allowedRoles={['owner', 'dispatcher', 'payroll_admin', 'driver']}>
+                        <SettlementPrint />
                       </ProtectedRoute>
                     } />
 

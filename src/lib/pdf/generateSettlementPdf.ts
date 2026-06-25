@@ -1,35 +1,39 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, parseISO } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/formatters';
-import { fetchPayBreakdown } from '@/lib/settlement-pay-breakdown';
+import {
+  buildSettlementDocumentData,
+  CORPORATE_HEADER,
+  LEGAL_DISCLOSURE,
+  statusLabel,
+  type SettlementStatusLabel,
+} from '@/lib/settlement-document-data';
 
 const fmtDate = (d?: string | null) =>
   d ? format(parseISO(`${d}T00:00:00`), 'MMM d, yyyy') : '—';
-
 const fmtDateShort = (d?: string | null) =>
   d ? format(parseISO(`${d}T00:00:00`), 'MM/dd/yyyy') : '—';
-
 const fmtMiles = (n: number) =>
   n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
-/**
- * jsPDF's default helvetica uses WinAnsi encoding, which does not include
- * many common typographic glyphs (→ × – — • etc.). Passing them through
- * produces garbage like `!'`. This swaps them for safe ASCII equivalents
- * before any text reaches the PDF.
- */
 const safe = (s: unknown): string =>
   String(s ?? '')
-    .replace(/\u2192/g, '->') // →
-    .replace(/\u2190/g, '<-') // ←
-    .replace(/\u00d7/g, 'x') // ×
-    .replace(/[\u2013\u2014]/g, '-') // – —
-    .replace(/[\u2018\u2019]/g, "'") // ‘ ’
-    .replace(/[\u201c\u201d]/g, '"') // “ ”
-    .replace(/\u2022/g, '*') // •
-    .replace(/\u00a0/g, ' '); // nbsp
+    .replace(/\u2192/g, '->')
+    .replace(/\u2190/g, '<-')
+    .replace(/\u00d7/g, 'x')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/\u2022/g, '*')
+    .replace(/\u00a0/g, ' ');
+
+const STATUS_COLOR: Record<SettlementStatusLabel, [number, number, number]> = {
+  DRAFT: [113, 113, 122],
+  PENDING: [217, 119, 6],
+  APPROVED: [71, 85, 105],
+  PAID: [5, 150, 105],
+};
 
 async function loadLogo(url: string | null | undefined): Promise<string | null> {
   if (!url) return null;
@@ -54,61 +58,24 @@ function detectLogoFormat(dataUrl: string): 'PNG' | 'JPEG' {
 }
 
 export async function generateSettlementPdf(settlementId: string): Promise<void> {
-  const { data: settlement, error: sErr } = await supabase
-    .from('driver_settlements')
-    .select('*')
-    .eq('id', settlementId)
-    .maybeSingle();
-  if (sErr) throw sErr;
-  if (!settlement) throw new Error('Settlement not found');
-
-  const s: any = settlement;
-
-  const [{ data: driver }, { data: org }, { data: items }, { data: settings }] =
-    await Promise.all([
-      supabase
-        .from('drivers')
-        .select(
-          'first_name, last_name, email, phone, landstar_operator_id, hire_date, pay_type, pay_rate',
-        )
-        .eq('id', s.driver_id)
-        .maybeSingle(),
-      supabase
-        .from('organizations')
-        .select('name, logo_url, dot_number, mc_number, tms_mode')
-        .eq('id', s.org_id)
-        .maybeSingle(),
-      supabase
-        .from('driver_settlement_items')
-        .select('id, item_type, amount, description, load_id, expense_id')
-        .eq('settlement_id', settlementId),
-      supabase
-        .from('company_settings')
-        .select('setting_key, setting_value')
-        .eq('org_id', s.org_id)
-        .in('setting_key', ['company_address', 'payroll_contact']),
-    ]);
-
-  const settingMap = new Map<string, string>(
-    (settings ?? []).map((r: any) => [r.setting_key, r.setting_value]),
-  );
-  const companyAddress = settingMap.get('company_address') ?? '';
-  const payrollContact = settingMap.get('payroll_contact') ?? '';
-
-  const reimbItems = (items ?? []).filter((i: any) => i.item_type === 'reimbursement');
-
-  const breakdown = await fetchPayBreakdown(s, driver as any);
-
-  const logoData = await loadLogo(org?.logo_url);
-  const logoFmt = logoData ? detectLogoFormat(logoData) : 'PNG';
+  const data = await buildSettlementDocumentData(settlementId);
+  const { settlement: s, driver, org, reimbursementItems, breakdown, ytd } = data;
 
   const driverName =
     `${driver?.first_name ?? ''} ${driver?.last_name ?? ''}`.trim() || 'Driver';
-  const orgName = org?.name ?? 'Company';
   const driverIdLabel =
     driver?.landstar_operator_id ||
-    (s.driver_id ? `ID ${String(s.driver_id).slice(0, 8).toUpperCase()}` : '');
-  const isContractor = (driver?.pay_type ?? '') !== 'employee';
+    (s.driver_id ? `ID ${String(s.driver_id).slice(0, 8).toUpperCase()}` : '—');
+  const statementNo = String(s.id).slice(0, 8).toUpperCase();
+  const status = statusLabel(s.status);
+
+  const currentGross = Number(s.gross_pay ?? 0);
+  const currentReimb = Number(s.reimbursements ?? 0);
+  const currentNet = currentGross + currentReimb;
+  const ytdNet = ytd.gross + ytd.reimbursements;
+
+  const logoData = await loadLogo(org?.logo_url);
+  const logoFmt = logoData ? detectLogoFormat(logoData) : 'PNG';
 
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const W = doc.internal.pageSize.getWidth();
@@ -116,7 +83,20 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   const margin = 40;
   const contentW = W - margin * 2;
 
-  // ---------- Header band ----------
+  // Footer reserve calc — disclosure + meta line
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8);
+  const disclosureLines = doc.splitTextToSize(safe(LEGAL_DISCLOSURE), contentW);
+  const FOOTER_RESERVE = 20 + disclosureLines.length * 10 + 18;
+
+  const ensureSpace = (needed: number) => {
+    if (y + needed > H - FOOTER_RESERVE) {
+      doc.addPage();
+      y = margin;
+    }
+  };
+
+  // ---------- Corporate header banner ----------
   const HEADER_H = 110;
   doc.setFillColor(15, 23, 42);
   doc.rect(0, 0, W, HEADER_H, 'F');
@@ -124,144 +104,126 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   let leftX = margin;
   if (logoData) {
     try {
-      doc.addImage(logoData, logoFmt, margin, 20, 60, 60);
-      leftX = margin + 72;
+      doc.addImage(logoData, logoFmt, margin, 22, 56, 56);
+      leftX = margin + 68;
     } catch {
       /* ignore */
     }
   }
-  const leftMaxW = W / 2 - leftX - 10;
+
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text(
-    doc.splitTextToSize(safe(orgName), leftMaxW)[0] ?? safe(orgName),
-    leftX,
-    38,
-  );
+  doc.setFontSize(20);
+  doc.text(safe(CORPORATE_HEADER.name), leftX, 44);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  let leftY = 54;
-  if (companyAddress) {
-    safe(companyAddress)
-      .split(/\r?\n/)
-      .forEach((line) => {
-        const wrapped = doc.splitTextToSize(line, leftMaxW);
-        wrapped.forEach((ln: string) => {
-          doc.text(ln, leftX, leftY);
-          leftY += 11;
-        });
-      });
-  }
-  const ids: string[] = [];
-  if (org?.dot_number) ids.push(`USDOT ${org.dot_number}`);
-  if (org?.mc_number) ids.push(`MC ${org.mc_number}`);
-  if (ids.length) doc.text(safe(ids.join('  ·  ')), leftX, leftY);
+  doc.setFontSize(10);
+  doc.setTextColor(203, 213, 225);
+  doc.text(safe(CORPORATE_HEADER.subtitle), leftX, 62);
 
+  doc.setFontSize(9);
+  doc.setTextColor(148, 163, 184);
+  doc.text(safe(CORPORATE_HEADER.address), leftX, 78);
+
+  // Right side: title, statement #, status pill
   const rx = W - margin;
-  const rightMaxW = 240;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text(
-    doc.splitTextToSize(safe(driverName), rightMaxW)[0] ?? safe(driverName),
-    rx,
-    32,
-    { align: 'right' },
-  );
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  let rightY = 46;
-  const rightLine = (val?: string | null) => {
-    if (!val) return;
-    const wrapped = doc.splitTextToSize(safe(val), rightMaxW);
-    wrapped.forEach((ln: string) => {
-      doc.text(ln, rx, rightY, { align: 'right' });
-      rightY += 11;
-    });
-  };
-  if (driverIdLabel) rightLine(driverIdLabel);
-  if (driver?.email) rightLine(driver.email);
-  if (driver?.phone) rightLine(driver.phone);
-
-  // ---------- Title + period strip ----------
-  let y = HEADER_H + 22;
-  doc.setTextColor(15, 23, 42);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.text('Settlement Statement', margin, y);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(100, 116, 139);
-  doc.text(
-    `Statement #${String(s.id).slice(0, 8).toUpperCase()}`,
-    rx,
-    y,
-    { align: 'right' },
-  );
-
-  y += 14;
-  doc.setDrawColor(226, 232, 240);
-  doc.line(margin, y, W - margin, y);
-  y += 16;
-
-  // Period info grid (4 columns)
-  doc.setTextColor(100, 116, 139);
   doc.setFontSize(8);
-  const col1 = margin;
-  const col2 = margin + 170;
-  const col3 = margin + 320;
-  doc.text('PAY PERIOD', col1, y);
-  doc.text('PAYMENT DATE', col2, y);
-  doc.text('EARNINGS METHOD', col3, y);
-  doc.text('STATUS', rx, y, { align: 'right' });
+  doc.setTextColor(203, 213, 225);
+  doc.text('SETTLEMENT & EARNINGS STATEMENT', rx, 40, { align: 'right' });
 
-  doc.setTextColor(15, 23, 42);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text(
-    safe(`${fmtDate(s.period_start)} - ${fmtDate(s.period_end)}`),
-    col1,
-    y + 14,
-  );
-  doc.text(fmtDate(s.payment_date), col2, y + 14);
   doc.setFontSize(9);
-  doc.text(
-    doc.splitTextToSize(safe(breakdown.methodLabel), rx - col3 - 60)[0] ??
-      safe(breakdown.methodLabel),
-    col3,
-    y + 14,
-  );
+  doc.setTextColor(226, 232, 240);
+  doc.text(`Statement #${statementNo}`, rx, 56, { align: 'right' });
+
+  // Status pill
+  const pillText = status;
+  const [pr, pg, pb] = STATUS_COLOR[status];
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  const pillW = doc.getTextWidth(pillText) + 16;
+  const pillH = 16;
+  const pillX = rx - pillW;
+  const pillY = 66;
+  doc.setFillColor(pr, pg, pb);
+  doc.roundedRect(pillX, pillY, pillW, pillH, 3, 3, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.text(pillText, pillX + pillW / 2, pillY + 11, { align: 'center' });
+
+  // ---------- Statement Details + Contractor Information ----------
+  let y = HEADER_H + 22;
+  doc.setDrawColor(228, 228, 231);
+  doc.setLineWidth(0.5);
+
+  const colMidGap = 18;
+  const colW = (contentW - colMidGap) / 2;
+
+  // Section labels
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(113, 113, 122);
+  doc.text('STATEMENT DETAILS', margin, y);
+  doc.text('CONTRACTOR INFORMATION', margin + colW + colMidGap, y);
+  y += 6;
+  doc.line(margin, y, margin + colW, y);
+  doc.line(margin + colW + colMidGap, y, margin + contentW, y);
+  y += 14;
+
+  const leftDetails: [string, string][] = [
+    ['Statement #', statementNo],
+    ['Pay Period', `${fmtDate(s.period_start)} - ${fmtDate(s.period_end)}`],
+    ['Payment Date', fmtDate(s.payment_date)],
+    ['Status', status],
+    ['Earnings Method', breakdown.methodLabel],
+  ];
+  const rightDetails: [string, string][] = [
+    ['Driver Name', driverName],
+    ['Driver ID', driverIdLabel],
+    ['Email', driver?.email || '—'],
+    ['Phone', driver?.phone || '—'],
+  ];
+
+  const drawDetails = (
+    rows: [string, string][],
+    x: number,
+    boxed: boolean,
+  ) => {
+    const rowH = 16;
+    const padTop = boxed ? 10 : 0;
+    const padBottom = boxed ? 10 : 0;
+    const h = padTop + rows.length * rowH + padBottom;
+    if (boxed) {
+      doc.setDrawColor(228, 228, 231);
+      doc.roundedRect(x, y - 4, colW, h, 4, 4, 'S');
+    }
+    let ry = y + padTop + 4;
+    rows.forEach(([label, value]) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(113, 113, 122);
+      doc.text(safe(label.toUpperCase()), x + (boxed ? 10 : 0), ry);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(24, 24, 27);
+      const valX = x + (boxed ? 10 : 0) + 96;
+      const valMaxW = colW - (boxed ? 20 : 0) - 96;
+      const wrapped = doc.splitTextToSize(safe(value), valMaxW);
+      doc.text(wrapped[0] ?? safe(value), valX, ry);
+      ry += rowH;
+    });
+    return h;
+  };
+
+  const lh = drawDetails(leftDetails, margin, false);
+  const rh = drawDetails(rightDetails, margin + colW + colMidGap, true);
+  y += Math.max(lh, rh) + 10;
+
+  // ---------- Load Earnings & Routes table ----------
+  ensureSpace(60);
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
-  doc.text(safe(String(s.status || 'draft').toUpperCase()), rx, y + 14, {
-    align: 'right',
-  });
-
-  y += 34;
-
-  // ---------- Pay Calculation band ----------
-  doc.setDrawColor(226, 232, 240);
-  doc.setFillColor(241, 245, 249);
-  doc.rect(margin, y, contentW, 28, 'FD');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(71, 85, 105);
-  doc.text('PAY CALCULATION', margin + 10, y + 11);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(15, 23, 42);
-  const formulaMaxW = contentW - 140;
-  const formulaSafe = safe(breakdown.formulaLabel);
-  const formulaLines = doc.splitTextToSize(formulaSafe, formulaMaxW);
-  doc.text(formulaLines[0], W - margin - 10, y + 19, { align: 'right' });
-  y += 40;
-
-  // ---------- Earnings table (per pay type) ----------
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(15, 23, 42);
-  doc.text('Load Earnings', margin, y);
+  doc.setTextColor(24, 24, 27);
+  doc.text('Load Earnings & Routes', margin, y);
   y += 6;
 
   const headStyles = {
@@ -272,10 +234,11 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   };
   const baseStyles = {
     fontSize: 9,
-    cellPadding: 5,
+    cellPadding: 6,
     textColor: [30, 41, 59] as [number, number, number],
     overflow: 'linebreak' as const,
     valign: 'top' as const,
+    minCellHeight: 22,
   };
   const alt = { fillColor: [248, 250, 252] as [number, number, number] };
   const footStyles = {
@@ -283,310 +246,217 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
     textColor: [15, 23, 42] as [number, number, number],
   };
 
-  if (breakdown.payType === 'flat') {
-    // total contentW ≈ 532. widths sum to 532.
-    const widths = { date: 62, load: 64, origin: 156, dest: 156, miles: 44, status: 50 };
-    autoTable(doc, {
-      startY: y,
-      head: [['Date', 'Load #', 'Origin', 'Destination', 'Miles', 'Status']],
-      body:
-        breakdown.loads.length === 0
-          ? [['—', '—', 'No loads recorded in this period', '', '—', '—']]
-          : breakdown.loads.map((l) => [
-              fmtDateShort(l.delivery_date ?? l.pickup_date),
-              safe(l.landstar_load_id || String(l.id).slice(0, 8)),
-              safe(l.origin ?? ''),
-              safe(l.destination ?? ''),
-              fmtMiles(Number(l.booked_miles ?? l.actual_miles ?? 0)),
-              safe(String(l.status ?? '—').replace(/_/g, ' ')),
-            ]),
-      headStyles,
-      styles: baseStyles,
-      alternateRowStyles: alt,
-      columnStyles: {
-        0: { cellWidth: widths.date },
-        1: { cellWidth: widths.load },
-        2: { cellWidth: widths.origin },
-        3: { cellWidth: widths.dest },
-        4: { cellWidth: widths.miles, halign: 'right' },
-        5: { cellWidth: widths.status },
-      },
-      margin: { left: margin, right: margin },
-      tableWidth: contentW,
-      foot: [
-        [
-          { content: 'Flat Rate Base Pay', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
-          { content: formatCurrency(breakdown.basePay), styles: { halign: 'right', fontStyle: 'bold' } },
-        ],
-      ],
-      footStyles,
-    });
-  } else if (breakdown.payType === 'per_mile') {
-    const widths = { date: 58, load: 60, origin: 130, dest: 130, miles: 50, rate: 50, amt: 54 };
-    autoTable(doc, {
-      startY: y,
-      head: [['Date', 'Load #', 'Origin', 'Destination', 'Miles', 'Rate', 'Amount']],
-      body:
-        breakdown.loads.length === 0
-          ? [['—', '—', 'No completed loads in this period', '', '—', '—', formatCurrency(0)]]
-          : breakdown.loads.map((l) => {
-              const mi = Number(l.booked_miles ?? l.actual_miles ?? 0);
-              return [
-                fmtDateShort(l.delivery_date),
-                safe(l.landstar_load_id || String(l.id).slice(0, 8)),
-                safe(l.origin ?? ''),
-                safe(l.destination ?? ''),
-                fmtMiles(mi),
-                `$${breakdown.payRate.toFixed(2)}/mi`,
-                formatCurrency(mi * breakdown.payRate),
-              ];
-            }),
-      headStyles,
-      styles: baseStyles,
-      alternateRowStyles: alt,
-      columnStyles: {
-        0: { cellWidth: widths.date },
-        1: { cellWidth: widths.load },
-        2: { cellWidth: widths.origin },
-        3: { cellWidth: widths.dest },
-        4: { cellWidth: widths.miles, halign: 'right' },
-        5: { cellWidth: widths.rate, halign: 'right' },
-        6: { cellWidth: widths.amt, halign: 'right', fontStyle: 'bold' },
-      },
-      margin: { left: margin, right: margin },
-      tableWidth: contentW,
-      foot: [
-        [
-          { content: 'Totals', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
-          { content: `${fmtMiles(breakdown.totalLoadedMiles)} mi`, styles: { halign: 'right', fontStyle: 'bold' } },
-          { content: '', styles: {} },
-          { content: formatCurrency(breakdown.basePay), styles: { halign: 'right', fontStyle: 'bold' } },
-        ],
-      ],
-      footStyles,
-    });
-  } else if (breakdown.payType === 'percentage') {
-    const pct = breakdown.payRate;
-    const split = breakdown.truckSplit;
-    const widths = { date: 56, load: 56, origin: 116, dest: 116, lh: 60, split: 64, drv: 64 };
-    autoTable(doc, {
-      startY: y,
-      head: [
-        [
-          'Date',
-          'Load #',
-          'Origin',
-          'Destination',
-          'Linehaul',
-          `After ${(split * 100).toFixed(0)}% Split`,
-          `Driver ${pct}%`,
-        ],
-      ],
-      body:
-        breakdown.loads.length === 0
-          ? [['—', '—', 'No completed loads in this period', '', '—', '—', formatCurrency(0)]]
-          : breakdown.loads.map((l) => {
-              const linehaul = Number(l.rate ?? 0);
-              const afterSplit = linehaul * split;
-              const driverShare = afterSplit * (pct / 100);
-              return [
-                fmtDateShort(l.delivery_date),
-                safe(l.landstar_load_id || String(l.id).slice(0, 8)),
-                safe(l.origin ?? ''),
-                safe(l.destination ?? ''),
-                formatCurrency(linehaul),
-                formatCurrency(afterSplit),
-                formatCurrency(driverShare),
-              ];
-            }),
-      headStyles,
-      styles: baseStyles,
-      alternateRowStyles: alt,
-      columnStyles: {
-        0: { cellWidth: widths.date },
-        1: { cellWidth: widths.load },
-        2: { cellWidth: widths.origin },
-        3: { cellWidth: widths.dest },
-        4: { cellWidth: widths.lh, halign: 'right' },
-        5: { cellWidth: widths.split, halign: 'right' },
-        6: { cellWidth: widths.drv, halign: 'right', fontStyle: 'bold' },
-      },
-      margin: { left: margin, right: margin },
-      tableWidth: contentW,
-      foot: [
-        [
-          { content: 'Totals', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
-          { content: formatCurrency(breakdown.totalLinehaul), styles: { halign: 'right', fontStyle: 'bold' } },
-          { content: formatCurrency(breakdown.totalAfterSplit), styles: { halign: 'right', fontStyle: 'bold' } },
-          { content: formatCurrency(breakdown.basePay), styles: { halign: 'right', fontStyle: 'bold' } },
-        ],
-      ],
-      footStyles,
-    });
-  } else {
-    autoTable(doc, {
-      startY: y,
-      head: [['Description', 'Amount']],
-      body: [['Base Pay', formatCurrency(breakdown.basePay)]],
-      headStyles,
-      styles: baseStyles,
-      alternateRowStyles: alt,
-      columnStyles: {
-        0: { cellWidth: contentW - 120 },
-        1: { cellWidth: 120, halign: 'right', fontStyle: 'bold' },
-      },
-      margin: { left: margin, right: margin },
-      tableWidth: contentW,
-    });
-  }
-
-  y = (doc as any).lastAutoTable.finalY + 18;
-
-  // ---------- Reimbursements table ----------
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('Reimbursements', margin, y);
-  y += 6;
-
+  const loadWidths = { date: 56, load: 60, miles: 44, status: 56, origin: 158, dest: 158 };
   autoTable(doc, {
     startY: y,
-    head: [['Description', 'Amount']],
+    head: [['Date', 'Load #', 'Miles', 'Status', 'Origin', 'Destination']],
     body:
-      reimbItems.length === 0
-        ? [['No reimbursements in this period', formatCurrency(0)]]
-        : reimbItems.map((i: any) => [
-            safe(i.description || '—'),
-            formatCurrency(Number(i.amount ?? 0)),
+      breakdown.loads.length === 0
+        ? [['—', '—', '—', '—', 'No loads recorded in this period', '']]
+        : breakdown.loads.map((l) => [
+            fmtDateShort(l.delivery_date ?? l.pickup_date),
+            safe(l.landstar_load_id || String(l.id).slice(0, 8)),
+            fmtMiles(Number(l.booked_miles ?? l.actual_miles ?? 0)),
+            safe(String(l.status ?? '—').replace(/_/g, ' ')),
+            safe(l.origin ?? ''),
+            safe(l.destination ?? ''),
           ]),
     headStyles,
     styles: baseStyles,
     alternateRowStyles: alt,
     columnStyles: {
-      0: { cellWidth: contentW - 120 },
-      1: { cellWidth: 120, halign: 'right', fontStyle: 'bold' },
+      0: { cellWidth: loadWidths.date },
+      1: { cellWidth: loadWidths.load },
+      2: { cellWidth: loadWidths.miles, halign: 'right' },
+      3: { cellWidth: loadWidths.status },
+      4: { cellWidth: loadWidths.origin },
+      5: { cellWidth: loadWidths.dest },
     },
-    margin: { left: margin, right: margin },
+    margin: { left: margin, right: margin, bottom: FOOTER_RESERVE },
     tableWidth: contentW,
-    foot: [
-      [
-        { content: 'Total Reimbursements', styles: { halign: 'right', fontStyle: 'bold' } },
-        {
-          content: formatCurrency(Number(s.reimbursements ?? 0)),
-          styles: { halign: 'right', fontStyle: 'bold' },
-        },
-      ],
-    ],
+    foot:
+      breakdown.payType === 'flat'
+        ? [
+            [
+              {
+                content: 'Flat Rate Base Pay',
+                colSpan: 5,
+                styles: { halign: 'right', fontStyle: 'bold' },
+              },
+              {
+                content: formatCurrency(breakdown.basePay),
+                styles: { halign: 'right', fontStyle: 'bold' },
+              },
+            ],
+          ]
+        : breakdown.payType === 'per_mile'
+          ? [
+              [
+                {
+                  content: `Total ${fmtMiles(breakdown.totalLoadedMiles)} mi × $${breakdown.payRate.toFixed(2)}/mi`,
+                  colSpan: 5,
+                  styles: { halign: 'right', fontStyle: 'bold' },
+                },
+                {
+                  content: formatCurrency(breakdown.basePay),
+                  styles: { halign: 'right', fontStyle: 'bold' },
+                },
+              ],
+            ]
+          : breakdown.payType === 'percentage'
+            ? [
+                [
+                  {
+                    content: `Linehaul ${formatCurrency(breakdown.totalLinehaul)} · After ${(breakdown.truckSplit * 100).toFixed(0)}% split ${formatCurrency(breakdown.totalAfterSplit)} · Driver ${breakdown.payRate}%`,
+                    colSpan: 5,
+                    styles: { halign: 'right', fontStyle: 'bold', fontSize: 8 },
+                  },
+                  {
+                    content: formatCurrency(breakdown.basePay),
+                    styles: { halign: 'right', fontStyle: 'bold' },
+                  },
+                ],
+              ]
+            : [
+                [
+                  {
+                    content: 'Base Pay',
+                    colSpan: 5,
+                    styles: { halign: 'right', fontStyle: 'bold' },
+                  },
+                  {
+                    content: formatCurrency(breakdown.basePay),
+                    styles: { halign: 'right', fontStyle: 'bold' },
+                  },
+                ],
+              ],
     footStyles,
   });
 
-  y = (doc as any).lastAutoTable.finalY + 22;
+  y = (doc as any).lastAutoTable.finalY + 18;
 
-  // ---------- Summary + YTD side-by-side ----------
-  const blockHeight = 30 + 3 * 22 + 24;
-  if (y + blockHeight > H - 90) {
-    doc.addPage();
-    y = margin;
+  // ---------- Earnings & Reimbursements itemized list ----------
+  const lineRows: [string, number][] = [['Flat Rate Base Pay', breakdown.basePay]];
+  if (reimbursementItems.length === 0) {
+    lineRows.push(['No reimbursements in this period', 0]);
+  } else {
+    reimbursementItems.forEach((r) => {
+      lineRows.push([`Reimbursement — ${r.description ?? 'Other'}`, Number(r.amount ?? 0)]);
+    });
   }
 
-  const colW = (contentW - 16) / 2;
+  ensureSpace(28 + lineRows.length * 16);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(24, 24, 27);
+  doc.text('Earnings & Reimbursements', margin, y);
+  y += 12;
 
-  const drawBlock = (
+  lineRows.forEach(([label, val]) => {
+    doc.setDrawColor(244, 244, 245);
+    doc.line(margin, y + 12, W - margin, y + 12);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(63, 63, 70);
+    doc.text(safe(label), margin, y + 8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(24, 24, 27);
+    doc.text(formatCurrency(val), W - margin, y + 8, { align: 'right' });
+    y += 16;
+  });
+  y += 8;
+
+  // ---------- Dual summary cards ----------
+  const summaryBlockH = 22 + 3 * 22 + 6;
+  ensureSpace(summaryBlockH + 28);
+
+  const sColW = (contentW - 16) / 2;
+
+  const drawSummary = (
     x: number,
     title: string,
-    rows: [string, string][],
-    highlightLast = false,
+    gross: number,
+    reimb: number,
+    net: number,
   ) => {
-    const h = 30 + rows.length * 22;
-    doc.setDrawColor(226, 232, 240);
-    doc.setFillColor(248, 250, 252);
-    doc.rect(x, y, colW, h, 'FD');
+    const rows: [string, number][] = [
+      ['Gross Pay', gross],
+      ['Reimbursements', reimb],
+    ];
+    const cardH = 22 + rows.length * 22 + 26;
 
+    doc.setDrawColor(228, 228, 231);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(x, y, sColW, cardH, 4, 4, 'S');
+
+    // Header bar
     doc.setFillColor(15, 23, 42);
-    doc.rect(x, y, colW, 22, 'F');
+    doc.rect(x, y, sColW, 22, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setTextColor(255, 255, 255);
-    doc.text(safe(title), x + 10, y + 15);
+    doc.text(safe(title.toUpperCase()), x + 10, y + 14);
 
-    doc.setTextColor(15, 23, 42);
-    let ry = y + 38;
-    rows.forEach(([label, val], idx) => {
-      const isLast = highlightLast && idx === rows.length - 1;
-      if (isLast) {
-        doc.setDrawColor(226, 232, 240);
-        doc.line(x + 10, ry - 12, x + colW - 10, ry - 12);
-      }
-      doc.setFont('helvetica', isLast ? 'bold' : 'normal');
-      doc.setFontSize(isLast ? 11 : 10);
-      doc.setTextColor(isLast ? 15 : 71, isLast ? 23 : 85, isLast ? 42 : 105);
+    // Rows
+    let ry = y + 22 + 16;
+    doc.setTextColor(24, 24, 27);
+    rows.forEach(([label, val]) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(82, 82, 91);
       doc.text(safe(label), x + 10, ry);
-      doc.setTextColor(15, 23, 42);
-      doc.text(safe(val), x + colW - 10, ry, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(24, 24, 27);
+      doc.text(formatCurrency(val), x + sColW - 10, ry, { align: 'right' });
       ry += 22;
     });
-    return h;
+
+    // Net Pay highlighted band
+    const bandY = ry - 14;
+    doc.setFillColor(241, 245, 249);
+    doc.rect(x + 1, bandY, sColW - 2, 26, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Net Pay', x + 10, bandY + 17);
+    doc.text(formatCurrency(net), x + sColW - 10, bandY + 17, { align: 'right' });
+
+    return cardH;
   };
 
-  drawBlock(
-    margin,
-    'CURRENT PERIOD',
-    [
-      ['Gross Pay', formatCurrency(Number(s.gross_pay ?? 0))],
-      ['Reimbursements', formatCurrency(Number(s.reimbursements ?? 0))],
-      ['Net Pay', formatCurrency(Number(s.net_pay ?? 0))],
-    ],
-    true,
+  const h1 = drawSummary(margin, 'Current Period', currentGross, currentReimb, currentNet);
+  const h2 = drawSummary(
+    margin + sColW + 16,
+    'Year-to-Date',
+    ytd.gross,
+    ytd.reimbursements,
+    ytdNet,
   );
-  drawBlock(
-    margin + colW + 16,
-    'YEAR-TO-DATE',
-    [
-      ['YTD Gross', formatCurrency(Number(s.ytd_gross ?? 0))],
-      ['YTD Reimbursements', formatCurrency(Number(s.ytd_reimbursements ?? 0))],
-      ['YTD Net Pay', formatCurrency(Number(s.ytd_net ?? 0))],
-    ],
-    true,
-  );
+  y += Math.max(h1, h2) + 8;
 
-  const blocksH = 30 + 3 * 22;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8);
-  doc.setTextColor(100, 116, 139);
-  doc.text(
-    'Net Pay = Gross Pay + Reimbursements',
-    margin,
-    y + blocksH + 14,
-  );
+  doc.setTextColor(113, 113, 122);
+  doc.text('Net Pay = Gross Pay + Reimbursements', W / 2, y, { align: 'center' });
 
-  // ---------- Footer (every page) ----------
-  const taxNote = isContractor
-    ? 'This settlement reflects payment for independent contractor services. No federal, state, or local taxes have been withheld. The recipient is responsible for all applicable self-employment and income tax obligations.'
-    : 'This settlement reflects gross wages. Tax withholdings, deductions, and benefits are reported separately on the employee pay statement and annual W-2.';
-
+  // ---------- Footer on every page ----------
   const pageCount = (doc as any).internal.getNumberOfPages();
   for (let p = 1; p <= pageCount; p++) {
     doc.setPage(p);
-    const footerY = H - 72;
+    const footerTop = H - FOOTER_RESERVE + 4;
+    doc.setDrawColor(228, 228, 231);
+    doc.line(margin, footerTop, W - margin, footerTop);
 
-    doc.setDrawColor(226, 232, 240);
-    doc.line(margin, footerY, W - margin, footerY);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(82, 82, 91);
+    doc.text(disclosureLines, margin, footerTop + 12);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
-    doc.setTextColor(100, 116, 139);
-    const wrapped = doc.splitTextToSize(safe(taxNote), contentW);
-    doc.text(wrapped, margin, footerY + 12);
-
-    const contactLine = payrollContact
-      ? `For payroll inquiries or disputes, contact: ${payrollContact}`
-      : 'For payroll inquiries or disputes, please contact your dispatcher or payroll administrator.';
-    const contactWrapped = doc.splitTextToSize(safe(contactLine), contentW);
-    doc.text(contactWrapped, margin, footerY + 12 + wrapped.length * 10);
-
-    doc.setFontSize(7);
     doc.setTextColor(140, 148, 165);
-    doc.text(`Generated ${format(new Date(), 'PPpp')}`, margin, H - 16);
-    doc.text(`Page ${p} of ${pageCount}`, W - margin, H - 16, { align: 'right' });
+    doc.text(`Generated ${format(new Date(), 'PPpp')}`, margin, H - 14);
+    doc.text(`Page ${p} of ${pageCount}`, W - margin, H - 14, { align: 'right' });
   }
 
   const lastName = (driver?.last_name || 'Driver').replace(/\s+/g, '_');
