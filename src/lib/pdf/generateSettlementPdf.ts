@@ -230,7 +230,7 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   y += 6;
 
   const headStyles = {
-    fillColor: [15, 23, 42] as [number, number, number],
+    fillColor: [24, 24, 27] as [number, number, number],
     textColor: 255,
     fontSize: 9,
     halign: 'left' as const,
@@ -246,8 +246,9 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   const alt = { fillColor: [248, 250, 252] as [number, number, number] };
   const footStyles = {
     fillColor: [241, 245, 249] as [number, number, number],
-    textColor: [15, 23, 42] as [number, number, number],
+    textColor: [24, 24, 27] as [number, number, number],
   };
+
 
   const loadWidths = { date: 56, load: 60, miles: 44, status: 56, origin: 158, dest: 158 };
   autoTable(doc, {
