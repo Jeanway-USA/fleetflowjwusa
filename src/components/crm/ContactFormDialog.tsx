@@ -278,7 +278,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
           )}
 
           {/* Facility sub-type */}
-          {isFacility && !isEditing && (
+          {isFacility && (
             <div className="space-y-2">
               <Label>Facility Type</Label>
               <Select value={form.facility_type} onValueChange={(v) => setForm({ ...form, facility_type: v })}>
@@ -294,7 +294,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
 
           {/* Company / Name */}
           <div className="space-y-2">
-            <Label>{isFacility ? 'Facility Name *' : isAgent ? 'Notes / Name' : 'Company Name *'}</Label>
+            <Label>{isFacility ? 'Facility Name *' : isAgent ? 'Agency Name' : 'Company Name *'}</Label>
             <Input
               value={form.company_name}
               onChange={(e) => setForm({ ...form, company_name: e.target.value })}
