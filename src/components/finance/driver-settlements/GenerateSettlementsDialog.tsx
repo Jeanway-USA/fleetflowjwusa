@@ -103,12 +103,16 @@ export function GenerateSettlementsDialog({
       if (selected.size === 0) {
         throw new Error('Select at least one driver.');
       }
-      if (!periodEnd || !paymentDate) {
-        throw new Error('Pay period end and payment date are required.');
+      if (!periodEnd || !paymentDate || !periodStart) {
+        throw new Error('Pay period start, end, and payment date are required.');
+      }
+      if (periodStart > periodEnd) {
+        throw new Error('Pay period start must be on or before the end date.');
       }
       const targetIds = allSelected ? null : Array.from(selected);
       const { data, error } = await supabase.rpc('generate_driver_settlements', {
         _driver_ids: targetIds,
+        _period_start: format(periodStart, 'yyyy-MM-dd'),
         _period_end: format(periodEnd, 'yyyy-MM-dd'),
         _payment_date: format(paymentDate, 'yyyy-MM-dd'),
       });
