@@ -52,6 +52,212 @@ const TYPE_COLORS: Record<string, string> = {
   both: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
 };
 
+// --- Render helpers ---
+function formatLocation(c: UnifiedContact): string {
+  const cityState = [c.city, c.state].filter(Boolean).join(', ');
+  if (cityState) return cityState;
+  if (c.service_area) return c.service_area;
+  return '—';
+}
+
+function formatAddress(c: UnifiedContact): string {
+  const parts: string[] = [];
+  if (c.address) parts.push(c.address);
+  const cityStateZip = [c.city, c.state].filter(Boolean).join(', ');
+  const tail = [cityStateZip, c.zip].filter(Boolean).join(' ');
+  if (tail) parts.push(tail);
+  return parts.length ? parts.join(' • ') : '—';
+}
+
+function renderAgentStatus(status: string | null) {
+  if (status === 'safe') return <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/20">Safe</Badge>;
+  if (status === 'unsafe') return <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/20">Unsafe</Badge>;
+  return <span className="text-xs text-muted-foreground">Unrated</span>;
+}
+
+function renderCode(code: string | null) {
+  if (!code) return <span className="text-muted-foreground">—</span>;
+  return <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{code}</code>;
+}
+
+function renderTags(tags: string[] | null) {
+  if (!tags || tags.length === 0) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {tags.slice(0, 3).map((t) => (
+        <Badge key={t} variant="secondary" className="text-[10px]">{t}</Badge>
+      ))}
+      {tags.length > 3 && <Badge variant="secondary" className="text-[10px]">+{tags.length - 3}</Badge>}
+    </div>
+  );
+}
+
+type ColumnCtx = {
+  canEdit: boolean;
+  setDetailContact: (c: UnifiedContact) => void;
+  handleEdit: (c: UnifiedContact) => void;
+  setDeleteTarget: (c: UnifiedContact) => void;
+};
+
+function actionsColumn(ctx: ColumnCtx) {
+  return {
+    key: 'actions',
+    header: '',
+    render: (contact: UnifiedContact) => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => ctx.setDetailContact(contact)}>
+            <Eye className="mr-2 h-4 w-4" /> View Details
+          </DropdownMenuItem>
+          {ctx.canEdit && (
+            <DropdownMenuItem onClick={() => ctx.handleEdit(contact)}>
+              <Edit2 className="mr-2 h-4 w-4" /> Edit
+            </DropdownMenuItem>
+          )}
+          {ctx.canEdit && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-destructive" onClick={() => ctx.setDeleteTarget(contact)}>
+                <Trash2 className="mr-2 h-4 w-4" /> Delete
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    ),
+  };
+}
+
+function getColumnsFor(typeFilter: string, scope: 'agencies' | 'shops', ctx: ColumnCtx) {
+  // Maintenance shops scope
+  if (scope === 'shops') {
+    return [
+      { key: 'company_name', header: 'Shop Name', render: (c: UnifiedContact) => (
+        <div className="font-medium">{c.company_name}</div>
+      )},
+      { key: 'sub_type', header: 'Sub-Type', render: (c: UnifiedContact) => {
+        const label = getSubTypeLabel(c);
+        return label ? <Badge variant="outline" className="text-xs">{label}</Badge> : <span className="text-muted-foreground">—</span>;
+      }},
+      { key: 'phone', header: 'Phone', hiddenOnMobile: true, render: (c: UnifiedContact) => c.phone || '—' },
+      { key: 'email', header: 'Email', hiddenOnMobile: true, render: (c: UnifiedContact) => c.email || '—' },
+      { key: 'service_area', header: 'Service Area', hiddenOnMobile: true, render: (c: UnifiedContact) => c.service_area || '—' },
+      { key: 'address', header: 'Address', hiddenOnMobile: true, render: (c: UnifiedContact) => c.address || '—' },
+      actionsColumn(ctx),
+    ];
+  }
+
+  if (typeFilter === 'broker') {
+    return [
+      { key: 'company_name', header: 'Broker', render: (c: UnifiedContact) => (
+        <div className="font-medium">{c.company_name}</div>
+      )},
+      { key: 'contact_name', header: 'Contact', hiddenOnMobile: true, render: (c: UnifiedContact) => c.contact_name || '—' },
+      { key: 'mc', header: 'MC#', hiddenOnMobile: true, render: (c: UnifiedContact) => renderCode(c.agent_code) },
+      { key: 'phone', header: 'Phone', hiddenOnMobile: true, render: (c: UnifiedContact) => c.phone || '—' },
+      { key: 'email', header: 'Email', hiddenOnMobile: true, render: (c: UnifiedContact) => c.email || '—' },
+      { key: 'location', header: 'Location', hiddenOnMobile: true, render: (c: UnifiedContact) => formatLocation(c) },
+      { key: 'tags', header: 'Tags', hiddenOnMobile: true, render: (c: UnifiedContact) => renderTags(c.tags) },
+      actionsColumn(ctx),
+    ];
+  }
+
+  if (typeFilter === 'agent') {
+    return [
+      { key: 'company_name', header: 'Agent', render: (c: UnifiedContact) => (
+        <div className="font-medium">{c.company_name}</div>
+      )},
+      { key: 'agent_code', header: 'Agent Code', render: (c: UnifiedContact) => renderCode(c.agent_code) },
+      { key: 'agency', header: 'Agency', hiddenOnMobile: true, render: (c: UnifiedContact) => c.contact_name || '—' },
+      { key: 'status', header: 'Status', hiddenOnMobile: true, render: (c: UnifiedContact) => renderAgentStatus(c.agent_status) },
+      { key: 'phone', header: 'Phone', hiddenOnMobile: true, render: (c: UnifiedContact) => c.phone || '—' },
+      { key: 'email', header: 'Email', hiddenOnMobile: true, render: (c: UnifiedContact) => c.email || '—' },
+      { key: 'service_area', header: 'Service Area', hiddenOnMobile: true, render: (c: UnifiedContact) => c.service_area || '—' },
+      actionsColumn(ctx),
+    ];
+  }
+
+  if (typeFilter === 'shipper' || typeFilter === 'receiver') {
+    return [
+      { key: 'company_name', header: 'Facility', render: (c: UnifiedContact) => (
+        <div className="font-medium">{c.company_name}</div>
+      )},
+      { key: 'sub_type', header: 'Sub-Type', render: (c: UnifiedContact) => {
+        const label = getSubTypeLabel(c);
+        return label ? (
+          <Badge variant="outline" className={`text-xs ${TYPE_COLORS[c.contact_type] || ''}`}>{label}</Badge>
+        ) : <span className="text-muted-foreground">—</span>;
+      }},
+      { key: 'address', header: 'Address', hiddenOnMobile: true, render: (c: UnifiedContact) => formatAddress(c) },
+      { key: 'contact', header: 'Contact', hiddenOnMobile: true, render: (c: UnifiedContact) => c.contact_name || '—' },
+      { key: 'phone', header: 'Phone', hiddenOnMobile: true, render: (c: UnifiedContact) => c.phone || '—' },
+      { key: 'hours', header: 'Hours', hiddenOnMobile: true, render: (c: UnifiedContact) => c.operating_hours || '—' },
+      { key: 'appt', header: 'Appt', hiddenOnMobile: true, render: (c: UnifiedContact) =>
+        c.appointment_required
+          ? <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Required</Badge>
+          : <span className="text-xs text-muted-foreground">No</span>
+      },
+      actionsColumn(ctx),
+    ];
+  }
+
+  // typeFilter === 'all'
+  return [
+    { key: 'company_name', header: 'Company', render: (c: UnifiedContact) => (
+      <div className="font-medium">{c.company_name}</div>
+    )},
+    { key: 'contact_type', header: 'Type', render: (c: UnifiedContact) => {
+      const subType = getSubTypeLabel(c);
+      return (
+        <div className="flex flex-col gap-1">
+          <Badge variant="outline" className={`text-xs capitalize w-fit ${TYPE_COLORS[c.contact_type] || ''}`}>
+            {c.contact_type}
+          </Badge>
+          {subType && <span className="text-[10px] text-muted-foreground">{subType}</span>}
+        </div>
+      );
+    }},
+    { key: 'identifier', header: 'Identifier', hiddenOnMobile: true, render: (c: UnifiedContact) => {
+      if (c.agent_code) return renderCode(c.agent_code);
+      if (c.source === 'facility') {
+        const label = getSubTypeLabel(c);
+        return label ? <span className="text-xs">{label}</span> : <span className="text-muted-foreground">—</span>;
+      }
+      return <span className="text-muted-foreground">—</span>;
+    }},
+    { key: 'phone', header: 'Phone', hiddenOnMobile: true, render: (c: UnifiedContact) => c.phone || '—' },
+    { key: 'location', header: 'Location', hiddenOnMobile: true, render: (c: UnifiedContact) => formatLocation(c) },
+    { key: 'flags', header: 'Flags', hiddenOnMobile: true, render: (c: UnifiedContact) => (
+      <div className="flex flex-wrap gap-1">
+        {c.source === 'crm' && c.agent_status === 'safe' && (c.notes || '').startsWith('Auto-added from') && (
+          <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30">Auto-added</Badge>
+        )}
+        {c.source === 'facility' && c.appointment_required && (
+          <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Appt Req</Badge>
+        )}
+        {c.agent_status === 'unsafe' && (
+          <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/20">Unsafe</Badge>
+        )}
+        {c.agent_status === 'safe' && c.source === 'resource' && (
+          <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/20">Safe</Badge>
+        )}
+        {(c.tags || []).slice(0, 2).map((tag) => (
+          <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
+        ))}
+        {(c.tags || []).length > 2 && (
+          <Badge variant="secondary" className="text-[10px]">+{c.tags!.length - 2}</Badge>
+        )}
+      </div>
+    )},
+    actionsColumn(ctx),
+  ];
+}
+
 export default function CRM() {
   const { isIndependent } = useOrganizationMode();
 
@@ -181,87 +387,13 @@ function AgentCRM() {
 
         {/* Contacts Table */}
         <DataTable
-          columns={[
-            { key: 'company_name', header: 'Company', render: (contact: UnifiedContact) => (
-              <div>
-                <div className="font-medium">{contact.company_name}</div>
-                {contact.agent_code && (
-                  <span className="text-xs text-muted-foreground">Code: {contact.agent_code}</span>
-                )}
-              </div>
-            )},
-            { key: 'contact_name', header: 'Contact', hiddenOnMobile: true, render: (contact: UnifiedContact) => contact.contact_name || '—' },
-            { key: 'contact_type', header: 'Type', render: (contact: UnifiedContact) => {
-              const subType = getSubTypeLabel(contact);
-              return (
-                <div className="flex flex-col gap-1">
-                  <Badge variant="outline" className={`text-xs capitalize w-fit ${TYPE_COLORS[contact.contact_type] || ''}`}>
-                    {contact.contact_type}
-                  </Badge>
-                  {subType && <span className="text-[10px] text-muted-foreground">{subType}</span>}
-                </div>
-              );
-            }},
-            { key: 'phone', header: 'Phone', hiddenOnMobile: true, render: (contact: UnifiedContact) => contact.phone || '—' },
-            { key: 'location', header: 'Location', hiddenOnMobile: true, render: (contact: UnifiedContact) => 
-              [contact.city, contact.state].filter(Boolean).join(', ') || contact.service_area || '—'
-            },
-            { key: 'details', header: 'Details', hiddenOnMobile: true, render: (contact: UnifiedContact) => (
-              <div className="flex flex-wrap gap-1">
-                {contact.source === 'crm' && contact.agent_status === 'safe' && (contact.notes || '').startsWith('Auto-added from') && (
-                  <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30">Auto-added</Badge>
-                )}
-                {contact.source === 'facility' && contact.appointment_required && (
-                  <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Appt Req</Badge>
-                )}
-                {contact.agent_status === 'unsafe' && (
-                  <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/20">Unsafe</Badge>
-                )}
-                {contact.agent_status === 'safe' && contact.source === 'resource' && (
-                  <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/20">Safe</Badge>
-                )}
-                {(contact.tags || []).slice(0, 2).map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
-                ))}
-                {(contact.tags || []).length > 2 && (
-                  <Badge variant="secondary" className="text-[10px]">+{contact.tags!.length - 2}</Badge>
-                )}
-              </div>
-            )},
-            { key: 'actions', header: '', render: (contact: UnifiedContact) => (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setDetailContact(contact)}>
-                    <Eye className="mr-2 h-4 w-4" /> View Details
-                  </DropdownMenuItem>
-                  {canEdit && (
-                    <DropdownMenuItem onClick={() => handleEdit(contact)}>
-                      <Edit2 className="mr-2 h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                  )}
-                  {canEdit && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(contact)}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )},
-          ]}
+          columns={getColumnsFor(typeFilter, scope, { canEdit, setDetailContact, handleEdit, setDeleteTarget })}
           data={filtered}
           loading={isLoading}
           emptyMessage={search ? 'No contacts match your search.' : 'No contacts yet. Add your first contact to get started.'}
           onRowClick={(contact) => setDetailContact(contact)}
           onRowDoubleClick={(contact) => setDetailContact(contact)}
-          tableId="crm-contacts"
+          tableId={`crm-contacts-${scope}-${typeFilter}`}
           exportFilename="crm-contacts"
           selectable={canEdit}
           selectedIds={selectedIds}
