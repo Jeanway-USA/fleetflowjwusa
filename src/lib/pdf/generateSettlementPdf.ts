@@ -59,7 +59,7 @@ function detectLogoFormat(dataUrl: string): 'PNG' | 'JPEG' {
 
 export async function generateSettlementPdf(settlementId: string): Promise<void> {
   const data = await buildSettlementDocumentData(settlementId);
-  const { settlement: s, driver, org, reimbursementItems, breakdown, ytd } = data;
+  const { settlement: s, driver, org, reimbursementItems, deductionItems, breakdown, ytd } = data;
 
   const driverName =
     `${driver?.first_name ?? ''} ${driver?.last_name ?? ''}`.trim() || 'Driver';
@@ -71,8 +71,10 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
 
   const currentGross = Number(s.gross_pay ?? 0);
   const currentReimb = Number(s.reimbursements ?? 0);
-  const currentNet = currentGross + currentReimb;
-  const ytdNet = ytd.gross + ytd.reimbursements;
+  const currentDed = Number(s.deductions ?? 0);
+  const currentNet = currentGross + currentReimb - currentDed;
+  const ytdNet = ytd.gross + ytd.reimbursements - ytd.deductions;
+
 
   const logoData = await loadLogo(org?.logo_url);
   const logoFmt = logoData ? detectLogoFormat(logoData) : 'PNG';
@@ -98,8 +100,9 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
 
   // ---------- Corporate header banner ----------
   const HEADER_H = 110;
-  doc.setFillColor(15, 23, 42);
+  doc.setFillColor(24, 24, 27); // zinc-900
   doc.rect(0, 0, W, HEADER_H, 'F');
+
 
   let leftX = margin;
   if (logoData) {
@@ -227,7 +230,7 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   y += 6;
 
   const headStyles = {
-    fillColor: [15, 23, 42] as [number, number, number],
+    fillColor: [24, 24, 27] as [number, number, number],
     textColor: 255,
     fontSize: 9,
     halign: 'left' as const,
@@ -243,8 +246,9 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   const alt = { fillColor: [248, 250, 252] as [number, number, number] };
   const footStyles = {
     fillColor: [241, 245, 249] as [number, number, number],
-    textColor: [15, 23, 42] as [number, number, number],
+    textColor: [24, 24, 27] as [number, number, number],
   };
+
 
   const loadWidths = { date: 56, load: 60, miles: 44, status: 56, origin: 158, dest: 158 };
   autoTable(doc, {
@@ -335,39 +339,73 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
 
   y = (doc as any).lastAutoTable.finalY + 18;
 
-  // ---------- Earnings & Reimbursements itemized list ----------
-  const lineRows: [string, number][] = [['Flat Rate Base Pay', breakdown.basePay]];
+  // ---------- Dual-column itemization: Earnings & Additions / Deductions & Escrows ----------
+  const itemColGap = 16;
+  const itemColW = (contentW - itemColGap) / 2;
+
+  const earningsBody: Array<[string, string]> = [
+    [breakdown.methodLabel, formatCurrency(breakdown.basePay)],
+  ];
   if (reimbursementItems.length === 0) {
-    lineRows.push(['No reimbursements in this period', 0]);
+    earningsBody.push(['No reimbursements in this period', formatCurrency(0)]);
   } else {
     reimbursementItems.forEach((r) => {
-      lineRows.push([`Reimbursement — ${r.description ?? 'Other'}`, Number(r.amount ?? 0)]);
+      earningsBody.push([
+        `Reimbursement — ${r.description ?? 'Other'}`,
+        formatCurrency(Number(r.amount ?? 0)),
+      ]);
     });
   }
 
-  ensureSpace(28 + lineRows.length * 16);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(24, 24, 27);
-  doc.text('Earnings & Reimbursements', margin, y);
-  y += 12;
+  const deductionsBody: Array<[string, string]> =
+    deductionItems.length === 0
+      ? [['No deductions in this period', formatCurrency(0)]]
+      : deductionItems.map((d) => [
+          d.description ?? 'Deduction',
+          formatCurrency(-Math.abs(Number(d.amount ?? 0))),
+        ]);
 
-  lineRows.forEach(([label, val]) => {
-    doc.setDrawColor(244, 244, 245);
-    doc.line(margin, y + 12, W - margin, y + 12);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(63, 63, 70);
-    doc.text(safe(label), margin, y + 8);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(24, 24, 27);
-    doc.text(formatCurrency(val), W - margin, y + 8, { align: 'right' });
-    y += 16;
+  ensureSpace(80);
+  const itemsStartY = y;
+
+  autoTable(doc, {
+    startY: itemsStartY,
+    head: [[{ content: 'EARNINGS & ADDITIONS', colSpan: 2 }]],
+    body: earningsBody,
+    headStyles: { ...headStyles, halign: 'left' as const, fontStyle: 'bold' as const },
+    styles: { ...baseStyles, fontSize: 9, cellPadding: 5, minCellHeight: 18 },
+    columnStyles: {
+      0: { cellWidth: itemColW - 70 },
+      1: { cellWidth: 70, halign: 'right' as const, fontStyle: 'bold' as const },
+    },
+    margin: { left: margin, right: margin + itemColW + itemColGap, bottom: FOOTER_RESERVE },
+    tableWidth: itemColW,
   });
-  y += 8;
+  const earningsEndY = (doc as any).lastAutoTable.finalY;
 
-  // ---------- Dual summary cards ----------
-  const summaryBlockH = 22 + 3 * 22 + 6;
+  autoTable(doc, {
+    startY: itemsStartY,
+    head: [[{ content: 'DEDUCTIONS & ESCROWS', colSpan: 2 }]],
+    body: deductionsBody,
+    headStyles: { ...headStyles, halign: 'left' as const, fontStyle: 'bold' as const },
+    styles: { ...baseStyles, fontSize: 9, cellPadding: 5, minCellHeight: 18 },
+    columnStyles: {
+      0: { cellWidth: itemColW - 70 },
+      1: {
+        cellWidth: 70,
+        halign: 'right' as const,
+        fontStyle: 'bold' as const,
+        textColor: [220, 38, 38] as [number, number, number],
+      },
+    },
+    margin: { left: margin + itemColW + itemColGap, right: margin, bottom: FOOTER_RESERVE },
+    tableWidth: itemColW,
+  });
+  const deductionsEndY = (doc as any).lastAutoTable.finalY;
+  y = Math.max(earningsEndY, deductionsEndY) + 18;
+
+  // ---------- Dual summary cards (4 rows: Gross / Reimb / Deductions / Net) ----------
+  const summaryBlockH = 22 + 3 * 18 + 28 + 6;
   ensureSpace(summaryBlockH + 28);
 
   const sColW = (contentW - 16) / 2;
@@ -377,20 +415,22 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
     title: string,
     gross: number,
     reimb: number,
+    ded: number,
     net: number,
   ) => {
-    const rows: [string, number][] = [
-      ['Gross Pay', gross],
-      ['Reimbursements', reimb],
+    const rows: Array<[string, number, boolean]> = [
+      ['Gross Pay', gross, false],
+      ['Total Reimbursements', reimb, false],
+      ['Total Deductions', -Math.abs(ded), true],
     ];
-    const cardH = 22 + rows.length * 22 + 26;
+    const cardH = 22 + rows.length * 18 + 28;
 
     doc.setDrawColor(228, 228, 231);
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(x, y, sColW, cardH, 4, 4, 'S');
 
     // Header bar
-    doc.setFillColor(15, 23, 42);
+    doc.setFillColor(24, 24, 27);
     doc.rect(x, y, sColW, 22, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
@@ -398,46 +438,55 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
     doc.text(safe(title.toUpperCase()), x + 10, y + 14);
 
     // Rows
-    let ry = y + 22 + 16;
-    doc.setTextColor(24, 24, 27);
-    rows.forEach(([label, val]) => {
+    let ry = y + 22 + 14;
+    rows.forEach(([label, val, isRed]) => {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
+      doc.setFontSize(9.5);
       doc.setTextColor(82, 82, 91);
       doc.text(safe(label), x + 10, ry);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(24, 24, 27);
+      if (isRed) {
+        doc.setTextColor(220, 38, 38);
+      } else {
+        doc.setTextColor(24, 24, 27);
+      }
       doc.text(formatCurrency(val), x + sColW - 10, ry, { align: 'right' });
-      ry += 22;
+      ry += 18;
     });
 
     // Net Pay highlighted band
-    const bandY = ry - 14;
+    const bandY = ry - 12;
     doc.setFillColor(241, 245, 249);
     doc.rect(x + 1, bandY, sColW - 2, 26, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(24, 24, 27);
     doc.text('Net Pay', x + 10, bandY + 17);
     doc.text(formatCurrency(net), x + sColW - 10, bandY + 17, { align: 'right' });
 
     return cardH;
   };
 
-  const h1 = drawSummary(margin, 'Current Period', currentGross, currentReimb, currentNet);
+  const h1 = drawSummary(margin, 'Current Period', currentGross, currentReimb, currentDed, currentNet);
   const h2 = drawSummary(
     margin + sColW + 16,
     'Year-to-Date',
     ytd.gross,
     ytd.reimbursements,
+    ytd.deductions,
     ytdNet,
   );
-  y += Math.max(h1, h2) + 8;
+  y += Math.max(h1, h2) + 10;
 
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8);
   doc.setTextColor(113, 113, 122);
-  doc.text('Net Pay = Gross Pay + Reimbursements', W / 2, y, { align: 'center' });
+  doc.text(
+    'Calculation Note: Net Pay = Gross Pay + Reimbursements - Deductions',
+    W / 2,
+    y,
+    { align: 'center' },
+  );
+
 
   // ---------- Footer on every page ----------
   const pageCount = (doc as any).internal.getNumberOfPages();

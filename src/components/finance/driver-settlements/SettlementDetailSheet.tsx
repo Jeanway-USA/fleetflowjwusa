@@ -100,6 +100,16 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
     : 'Driver';
 
   const reimbursements = (items as any[]).filter((i) => i.item_type === 'reimbursement');
+  const deductions = (items as any[]).filter((i) => i.item_type === 'deduction');
+  const currentGross = Number(settlement?.gross_pay ?? 0);
+  const currentReimb = Number(settlement?.reimbursements ?? 0);
+  const currentDed = Number(settlement?.deductions ?? 0);
+  const currentNet = currentGross + currentReimb - currentDed;
+  const ytdGross = Number(settlement?.ytd_gross ?? 0);
+  const ytdReimb = Number(settlement?.ytd_reimbursements ?? 0);
+  const ytdDed = Number(settlement?.ytd_deductions ?? 0);
+  const ytdNet = ytdGross + ytdReimb - ytdDed;
+
 
 
   const handleDownload = async () => {
@@ -168,17 +178,11 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
 
         {settlement && (
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <SummaryStat label="Gross Pay" value={Number(settlement.gross_pay ?? 0)} />
-              <SummaryStat
-                label="Reimbursements"
-                value={Number(settlement.reimbursements ?? 0)}
-              />
-              <SummaryStat
-                label="Net Pay"
-                value={Number(settlement.net_pay ?? 0)}
-                primary
-              />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <SummaryStat label="Gross Pay" value={currentGross} />
+              <SummaryStat label="Reimbursements" value={currentReimb} />
+              <SummaryStat label="Deductions" value={-Math.abs(currentDed)} negative />
+              <SummaryStat label="Net Pay" value={currentNet} primary />
             </div>
 
             <Card>
@@ -186,38 +190,51 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                 <CardTitle className="text-sm">Year-to-Date (Proof of Income)</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground">YTD Gross</p>
-                    <p className="font-semibold">
-                      {formatCurrency(Number(settlement.ytd_gross ?? 0))}
-                    </p>
+                    <p className="font-semibold">{formatCurrency(ytdGross)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">YTD Reimbursements</p>
-                    <p className="font-semibold">
-                      {formatCurrency(Number(settlement.ytd_reimbursements ?? 0))}
+                    <p className="font-semibold">{formatCurrency(ytdReimb)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">YTD Deductions</p>
+                    <p className="font-semibold text-red-600">
+                      {formatCurrency(-Math.abs(ytdDed))}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">YTD Net</p>
-                    <p className="font-semibold text-primary">
-                      {formatCurrency(Number(settlement.ytd_net ?? 0))}
-                    </p>
+                    <p className="font-semibold text-primary">{formatCurrency(ytdNet)}</p>
                   </div>
                 </div>
+                <p className="text-[11px] italic text-muted-foreground mt-3">
+                  Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions
+                </p>
               </CardContent>
             </Card>
 
             <EarningsBreakdown breakdown={breakdown} />
-            <ReimbursementSection
-              rows={reimbursements}
-              settlementId={settlement.id}
-              orgId={settlement.org_id}
-              editable={settlement.status === 'draft'}
-            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ReimbursementSection
+                rows={reimbursements}
+                settlementId={settlement.id}
+                orgId={settlement.org_id}
+                editable={settlement.status === 'draft'}
+              />
+              <DeductionSection
+                rows={deductions}
+                settlementId={settlement.id}
+                orgId={settlement.org_id}
+                editable={settlement.status === 'draft'}
+              />
+            </div>
           </div>
         )}
+
 
         <div className="border-t px-4 sm:px-6 py-3 bg-background flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
           <Button
@@ -411,24 +428,228 @@ function ReimbursementSection({
   );
 }
 
+const DEDUCTION_PRESETS = [
+  'Escrow',
+  'Plate Fee',
+  'Insurance',
+  'Fuel Advance',
+  'IFTA',
+  'Truck Lease',
+  'ELD / Tech Fee',
+  'Other',
+];
+
+function DeductionSection({
+  rows,
+  settlementId,
+  orgId,
+  editable,
+}: {
+  rows: any[];
+  settlementId: string;
+  orgId: string;
+  editable: boolean;
+}) {
+  const qc = useQueryClient();
+  const [preset, setPreset] = useState<string>('Escrow');
+  const [customLabel, setCustomLabel] = useState('');
+  const [amount, setAmount] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['driver_settlement_items', settlementId] });
+    qc.invalidateQueries({ queryKey: ['driver_settlement', settlementId] });
+    qc.invalidateQueries({ queryKey: ['driver_settlements'] });
+  };
+
+  const addMut = useMutation({
+    mutationFn: async () => {
+      const amt = Math.abs(parseFloat(amount));
+      const label = preset === 'Other' ? customLabel.trim() : preset;
+      if (!label) throw new Error('Description required');
+      if (!Number.isFinite(amt) || amt === 0) throw new Error('Enter a non-zero amount');
+      const { error } = await supabase.from('driver_settlement_items').insert({
+        org_id: orgId,
+        settlement_id: settlementId,
+        item_type: 'deduction',
+        description: label,
+        amount: amt,
+      });
+      if (error) throw error;
+      const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
+        _settlement_id: settlementId,
+      });
+      if (rpcErr) throw rpcErr;
+    },
+    onSuccess: () => {
+      setPreset('Escrow');
+      setCustomLabel('');
+      setAmount('');
+      setAdding(false);
+      toast.success('Deduction added');
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? 'Failed to add deduction'),
+  });
+
+  const delMut = useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await supabase
+        .from('driver_settlement_items')
+        .delete()
+        .eq('id', itemId);
+      if (error) throw error;
+      const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
+        _settlement_id: settlementId,
+      });
+      if (rpcErr) throw rpcErr;
+    },
+    onSuccess: () => {
+      toast.success('Deduction removed');
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? 'Failed to remove'),
+  });
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold">Deductions &amp; Escrows</h4>
+        {editable && !adding && (
+          <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add
+          </Button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="rounded-md border p-3 space-y-2 bg-muted/30">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2">
+            <div>
+              <Label className="text-xs">Type</Label>
+              <select
+                value={preset}
+                onChange={(e) => setPreset(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {DEDUCTION_PRESETS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">Amount</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+          {preset === 'Other' && (
+            <div>
+              <Label className="text-xs">Description</Label>
+              <Input
+                value={customLabel}
+                onChange={(e) => setCustomLabel(e.target.value)}
+                placeholder="e.g. Tire chains, Permit"
+              />
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setAdding(false);
+                setCustomLabel('');
+                setAmount('');
+              }}
+              disabled={addMut.isPending}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => addMut.mutate()} disabled={addMut.isPending}>
+              {addMut.isPending ? 'Adding…' : 'Add deduction'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {rows.length === 0 && !adding ? (
+        <p className="text-sm text-muted-foreground py-2">
+          No deductions in this period. {editable && 'Click Add to record one.'}
+        </p>
+      ) : rows.length > 0 ? (
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <Table className="min-w-[420px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                {editable && <TableHead className="w-12" />}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="text-muted-foreground">{r.description ?? '—'}</TableCell>
+                  <TableCell className="text-right font-medium text-red-600 tabular-nums">
+                    {formatCurrency(-Math.abs(Number(r.amount ?? 0)))}
+                  </TableCell>
+                  {editable && (
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => delMut.mutate(r.id)}
+                        disabled={delMut.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+
+
 function SummaryStat({
   label,
   value,
   primary,
+  negative,
 }: {
   label: string;
   value: number;
   primary?: boolean;
+  negative?: boolean;
 }) {
   return (
     <div className={`rounded-md border p-3 ${primary ? 'border-primary/40 bg-primary/5' : 'border-border'}`}>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`font-semibold ${primary ? 'text-primary text-lg' : ''}`}>
+      <p
+        className={`font-semibold ${primary ? 'text-primary text-lg' : ''} ${negative ? 'text-red-600' : ''}`}
+      >
         {formatCurrency(value)}
       </p>
     </div>
   );
 }
+
 
 function EarningsBreakdown({ breakdown }: { breakdown: PayBreakdown | undefined }) {
   if (!breakdown) {

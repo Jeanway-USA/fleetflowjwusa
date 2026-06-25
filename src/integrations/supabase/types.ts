@@ -1535,6 +1535,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           created_at: string
+          deductions: number
           driver_id: string
           generated_at: string
           generated_by: string | null
@@ -1550,6 +1551,7 @@ export type Database = {
           reimbursements: number
           status: string
           updated_at: string
+          ytd_deductions: number
           ytd_gross: number
           ytd_net: number
           ytd_reimbursements: number
@@ -1558,6 +1560,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string
+          deductions?: number
           driver_id: string
           generated_at?: string
           generated_by?: string | null
@@ -1573,6 +1576,7 @@ export type Database = {
           reimbursements?: number
           status?: string
           updated_at?: string
+          ytd_deductions?: number
           ytd_gross?: number
           ytd_net?: number
           ytd_reimbursements?: number
@@ -1581,6 +1585,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           created_at?: string
+          deductions?: number
           driver_id?: string
           generated_at?: string
           generated_by?: string | null
@@ -1596,6 +1601,7 @@ export type Database = {
           reimbursements?: number
           status?: string
           updated_at?: string
+          ytd_deductions?: number
           ytd_gross?: number
           ytd_net?: number
           ytd_reimbursements?: number
@@ -5094,6 +5100,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           created_at: string
+          deductions: number
           driver_id: string
           generated_at: string
           generated_by: string | null
@@ -5109,6 +5116,7 @@ export type Database = {
           reimbursements: number
           status: string
           updated_at: string
+          ytd_deductions: number
           ytd_gross: number
           ytd_net: number
           ytd_reimbursements: number
@@ -5153,6 +5161,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           created_at: string
+          deductions: number
           driver_id: string
           generated_at: string
           generated_by: string | null
@@ -5168,6 +5177,7 @@ export type Database = {
           reimbursements: number
           status: string
           updated_at: string
+          ytd_deductions: number
           ytd_gross: number
           ytd_net: number
           ytd_reimbursements: number
