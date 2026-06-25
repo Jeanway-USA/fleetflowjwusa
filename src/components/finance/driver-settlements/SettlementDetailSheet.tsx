@@ -267,8 +267,9 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
           {settlement && (
             <Button
               onClick={handleDownload}
-              disabled={downloading}
+              disabled={downloading || hasBlockingDiscrepancy}
               className="w-full sm:w-auto hidden sm:inline-flex"
+              title={hasBlockingDiscrepancy ? 'Resolve discrepancies before generating PDF' : undefined}
             >
               <Download className="h-4 w-4 mr-2" />
               {downloading ? 'Generating…' : 'Download PDF'}
