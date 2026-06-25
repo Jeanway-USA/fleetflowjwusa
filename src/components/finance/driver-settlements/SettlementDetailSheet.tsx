@@ -116,15 +116,19 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="w-full sm:max-w-2xl flex flex-col p-0">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b">
-          <SheetTitle className="flex items-center justify-between gap-3">
-            <span>Settlement Statement — {driverName}</span>
-            {settlement && <StatusBadge status={settlement.status} />}
+      <SheetContent className="w-full sm:max-w-2xl flex flex-col p-0 overflow-hidden">
+        <SheetHeader className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 border-b pr-12">
+          <SheetTitle className="text-base sm:text-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <span className="truncate">Settlement — {driverName}</span>
+            {settlement && (
+              <span className="shrink-0">
+                <StatusBadge status={settlement.status} />
+              </span>
+            )}
           </SheetTitle>
           {settlement && (
-            <SheetDescription className="flex items-center justify-between gap-3 flex-wrap">
-              <span>
+            <SheetDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <span className="text-xs sm:text-sm">
                 Period{' '}
                 {format(parseISO(`${settlement.period_start}T00:00:00`), 'MMM d')} –{' '}
                 {format(parseISO(`${settlement.period_end}T00:00:00`), 'MMM d, yyyy')}
@@ -140,6 +144,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                 variant="outline"
                 onClick={handleDownload}
                 disabled={downloading}
+                className="w-full sm:w-auto"
               >
                 <Download className="h-4 w-4 mr-2" />
                 {downloading ? 'Generating…' : 'Download PDF'}
@@ -149,8 +154,8 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
         </SheetHeader>
 
         {settlement && (
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <SummaryStat label="Gross Pay" value={Number(settlement.gross_pay ?? 0)} />
               <SummaryStat
                 label="Reimbursements"
@@ -168,7 +173,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                 <CardTitle className="text-sm">Year-to-Date (Proof of Income)</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground">YTD Gross</p>
                     <p className="font-semibold">
@@ -200,10 +205,31 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
             />
           </div>
         )}
+
+        <div className="border-t px-4 sm:px-6 py-3 bg-background flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="w-full sm:w-auto"
+          >
+            Close
+          </Button>
+          {settlement && (
+            <Button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="w-full sm:w-auto hidden sm:inline-flex"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {downloading ? 'Generating…' : 'Download PDF'}
+            </Button>
+          )}
+        </div>
       </SheetContent>
     </Sheet>
   );
 }
+
 
 function ReimbursementSection({
   rows,
