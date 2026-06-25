@@ -50,6 +50,7 @@ function getFormType(contact: UnifiedContact): string {
   if (contact.source === 'facility') {
     return contact.contact_type === 'receiver' ? 'receiver' : 'shipper';
   }
+  if (contact.contact_type === 'vendor') return 'vendor-other';
   return contact.contact_type;
 }
 
