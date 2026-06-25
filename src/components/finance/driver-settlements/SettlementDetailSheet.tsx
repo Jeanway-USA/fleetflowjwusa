@@ -28,6 +28,8 @@ import { Download, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
 import { fetchPayBreakdown, type PayBreakdown } from '@/lib/settlement-pay-breakdown';
+import { useSettlementDiscrepancies } from '@/hooks/useSettlementDiscrepancies';
+import { StatementDiscrepancyPanel } from '@/components/finance/StatementDiscrepancyPanel';
 
 
 interface Driver {
