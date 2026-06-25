@@ -110,19 +110,19 @@ function actionsColumn(ctx: ColumnCtx) {
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => ctx.setDetailContact(contact)}>
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); ctx.setDetailContact(contact); }}>
             <Eye className="mr-2 h-4 w-4" /> View Details
           </DropdownMenuItem>
           {ctx.canEdit && (
-            <DropdownMenuItem onClick={() => ctx.handleEdit(contact)}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); ctx.handleEdit(contact); }}>
               <Edit2 className="mr-2 h-4 w-4" /> Edit
             </DropdownMenuItem>
           )}
           {ctx.canEdit && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive" onClick={() => ctx.setDeleteTarget(contact)}>
+              <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); ctx.setDeleteTarget(contact); }}>
                 <Trash2 className="mr-2 h-4 w-4" /> Delete
               </DropdownMenuItem>
             </>
