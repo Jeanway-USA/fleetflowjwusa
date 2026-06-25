@@ -428,6 +428,205 @@ function ReimbursementSection({
   );
 }
 
+const DEDUCTION_PRESETS = [
+  'Escrow',
+  'Plate Fee',
+  'Insurance',
+  'Fuel Advance',
+  'IFTA',
+  'Truck Lease',
+  'ELD / Tech Fee',
+  'Other',
+];
+
+function DeductionSection({
+  rows,
+  settlementId,
+  orgId,
+  editable,
+}: {
+  rows: any[];
+  settlementId: string;
+  orgId: string;
+  editable: boolean;
+}) {
+  const qc = useQueryClient();
+  const [preset, setPreset] = useState<string>('Escrow');
+  const [customLabel, setCustomLabel] = useState('');
+  const [amount, setAmount] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['driver_settlement_items', settlementId] });
+    qc.invalidateQueries({ queryKey: ['driver_settlement', settlementId] });
+    qc.invalidateQueries({ queryKey: ['driver_settlements'] });
+  };
+
+  const addMut = useMutation({
+    mutationFn: async () => {
+      const amt = Math.abs(parseFloat(amount));
+      const label = preset === 'Other' ? customLabel.trim() : preset;
+      if (!label) throw new Error('Description required');
+      if (!Number.isFinite(amt) || amt === 0) throw new Error('Enter a non-zero amount');
+      const { error } = await supabase.from('driver_settlement_items').insert({
+        org_id: orgId,
+        settlement_id: settlementId,
+        item_type: 'deduction',
+        description: label,
+        amount: amt,
+      });
+      if (error) throw error;
+      const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
+        _settlement_id: settlementId,
+      });
+      if (rpcErr) throw rpcErr;
+    },
+    onSuccess: () => {
+      setPreset('Escrow');
+      setCustomLabel('');
+      setAmount('');
+      setAdding(false);
+      toast.success('Deduction added');
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? 'Failed to add deduction'),
+  });
+
+  const delMut = useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await supabase
+        .from('driver_settlement_items')
+        .delete()
+        .eq('id', itemId);
+      if (error) throw error;
+      const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
+        _settlement_id: settlementId,
+      });
+      if (rpcErr) throw rpcErr;
+    },
+    onSuccess: () => {
+      toast.success('Deduction removed');
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? 'Failed to remove'),
+  });
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold">Deductions &amp; Escrows</h4>
+        {editable && !adding && (
+          <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add
+          </Button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="rounded-md border p-3 space-y-2 bg-muted/30">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2">
+            <div>
+              <Label className="text-xs">Type</Label>
+              <select
+                value={preset}
+                onChange={(e) => setPreset(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {DEDUCTION_PRESETS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">Amount</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+          {preset === 'Other' && (
+            <div>
+              <Label className="text-xs">Description</Label>
+              <Input
+                value={customLabel}
+                onChange={(e) => setCustomLabel(e.target.value)}
+                placeholder="e.g. Tire chains, Permit"
+              />
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setAdding(false);
+                setCustomLabel('');
+                setAmount('');
+              }}
+              disabled={addMut.isPending}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => addMut.mutate()} disabled={addMut.isPending}>
+              {addMut.isPending ? 'Adding…' : 'Add deduction'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {rows.length === 0 && !adding ? (
+        <p className="text-sm text-muted-foreground py-2">
+          No deductions in this period. {editable && 'Click Add to record one.'}
+        </p>
+      ) : rows.length > 0 ? (
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <Table className="min-w-[420px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                {editable && <TableHead className="w-12" />}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="text-muted-foreground">{r.description ?? '—'}</TableCell>
+                  <TableCell className="text-right font-medium text-red-600 tabular-nums">
+                    {formatCurrency(-Math.abs(Number(r.amount ?? 0)))}
+                  </TableCell>
+                  {editable && (
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => delMut.mutate(r.id)}
+                        disabled={delMut.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+
+
 function SummaryStat({
   label,
   value,
