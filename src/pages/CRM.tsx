@@ -110,19 +110,19 @@ function actionsColumn(ctx: ColumnCtx) {
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => ctx.setDetailContact(contact)}>
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); ctx.setDetailContact(contact); }}>
             <Eye className="mr-2 h-4 w-4" /> View Details
           </DropdownMenuItem>
           {ctx.canEdit && (
-            <DropdownMenuItem onClick={() => ctx.handleEdit(contact)}>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); ctx.handleEdit(contact); }}>
               <Edit2 className="mr-2 h-4 w-4" /> Edit
             </DropdownMenuItem>
           )}
           {ctx.canEdit && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive" onClick={() => ctx.setDeleteTarget(contact)}>
+              <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); ctx.setDeleteTarget(contact); }}>
                 <Trash2 className="mr-2 h-4 w-4" /> Delete
               </DropdownMenuItem>
             </>
@@ -169,15 +169,18 @@ function getColumnsFor(typeFilter: string, scope: 'agencies' | 'shops', ctx: Col
 
   if (typeFilter === 'agent') {
     return [
-      { key: 'company_name', header: 'Agent', render: (c: UnifiedContact) => (
+      { key: 'company_name', header: 'Agency Name', render: (c: UnifiedContact) => (
         <div className="font-medium">{c.company_name}</div>
       )},
       { key: 'agent_code', header: 'Agent Code', render: (c: UnifiedContact) => renderCode(c.agent_code) },
-      { key: 'agency', header: 'Agency', hiddenOnMobile: true, render: (c: UnifiedContact) => c.contact_name || '—' },
       { key: 'status', header: 'Status', hiddenOnMobile: true, render: (c: UnifiedContact) => renderAgentStatus(c.agent_status) },
       { key: 'phone', header: 'Phone', hiddenOnMobile: true, render: (c: UnifiedContact) => c.phone || '—' },
       { key: 'email', header: 'Email', hiddenOnMobile: true, render: (c: UnifiedContact) => c.email || '—' },
-      { key: 'service_area', header: 'Service Area', hiddenOnMobile: true, render: (c: UnifiedContact) => c.service_area || '—' },
+      { key: 'website', header: 'Website', hiddenOnMobile: true, render: (c: UnifiedContact) =>
+        c.website
+          ? <a href={c.website.startsWith('http') ? c.website : `https://${c.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate inline-block max-w-[180px]" onClick={(e) => e.stopPropagation()}>{c.website}</a>
+          : <span className="text-muted-foreground">—</span>
+      },
       actionsColumn(ctx),
     ];
   }

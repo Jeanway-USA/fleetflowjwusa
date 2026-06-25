@@ -1,81 +1,55 @@
-## Goal
+## Three fixes
 
-Make the CRM table columns type-aware so each tab (Brokers, Agents, Shippers, Receivers, Vendors/Shops, All) shows the columns that actually have data for that contact type — eliminating the empty `—` cells caused by the current one-size-fits-all column set.
+### 1. Detail sheet pops up when clicking Edit in row dropdown
 
-## Current problem
+Root cause: in `src/pages/CRM.tsx` the table row has `onRowClick={(c) => setDetailContact(c)}`. The `DropdownMenuTrigger` button stops propagation, but `DropdownMenuItem` clicks (Edit / Delete / View) do not — so clicking "Edit" in the menu bubbles up to the row, which opens the detail sheet. `handleEdit` then sets `detailContact` back to `null`, but in the meantime Radix mounts the Sheet and steals focus.
 
-`src/pages/CRM.tsx` renders a single column set for every tab:
+**Fix:** add `onClick={(e) => e.stopPropagation()}` (or `onSelect={(e) => e.preventDefault()}` + manual stop) on each `DropdownMenuItem` inside the actions column, and on the `DropdownMenuContent` itself as a safety net. Result: row click handler never fires when interacting with the menu, so the detail sheet stops appearing during Edit/Delete.
 
-`Company | Contact | Type | Phone | Location | Details`
+### 2. Auto-added agents land in the wrong table and can duplicate
 
-Because `UnifiedContact` is normalized from three sources (`crm_contacts`, `company_resources`, `facilities`), most rows are missing fields the column expects:
+Auto-harvest trigger `public.autoharvest_crm_agent_from_load` (migration `20260624030643…`) inserts into `crm_contacts` with `contact_type='agent'`. But the real "Load Agent" record lives in `company_resources` with `resource_type='load_agent'` — that's what the Agents tab, edit form, and detail sheet treat as a true Load Agent. The trigger's existence check also only looks at `crm_contacts`, so a load can re-create an agent even when a `company_resources` entry already exists. End result: duplicates and "half-agents" that miss fields.
 
-- **Agents** (`source: 'resource'`) — `contact_name` is always `null` → blank, `city`/`state` are always `null` → blank; agent_code/status/service area never get a column.
-- **Facilities (Shipper/Receiver/Warehouse/Terminal)** — `contact_name` often blank, no agent code, hours/dock/appointment hidden inside "Details".
-- **Vendors – Roadside** — service area is the key field but only shows up in "Location" as a fallback.
-- **Vendors – Mechanic / Truck Wash / Shops** — address column blank because city/state aren't stored on resources (only `address`).
-- **Brokers** — MC# (agent_code) is buried in a small caption under company name and credit/days-to-pay tags are jammed into "Details".
+**Fix (new migration):** rewrite `autoharvest_crm_agent_from_load` so that:
 
-## Plan
+- It inserts into `public.company_resources` instead of `crm_contacts`, with:
+  - `resource_type = 'load_agent'`
+  - `name = COALESCE(v_name, v_code)` (Agency Name)
+  - `agent_code = v_code`
+  - `agent_status = 'safe'`
+  - `notes = 'Auto-added from load ' || v_load_id`
+  - `org_id = NEW.org_id`
+- Duplicate guard checks BOTH tables before inserting:
+  - skip if any `company_resources` row in this org has `resource_type='load_agent'` AND (`lower(agent_code)=lower(v_code)` OR `lower(name)=lower(v_name)`)
+  - skip if any `crm_contacts` row in this org has `contact_type IN ('agent','broker')` AND matches by `agent_code` or `company_name` (covers legacy auto-added rows so we don't double-create)
+- Keep `ON CONFLICT DO NOTHING` and the existing `EXCEPTION WHEN OTHERS THEN NULL` swallow so loads never fail because of CRM harvesting.
 
-Replace the single static `columns` array in `src/pages/CRM.tsx` with a `getColumnsFor(typeFilter, scope)` helper that returns a column set tailored to the active tab. Actions column stays identical across all sets.
+One-time data cleanup in the same migration:
 
-### Column sets
+- For each legacy `crm_contacts` row where `contact_type='agent'` AND `notes LIKE 'Auto-added from load %'`:
+  - If no matching `company_resources` Load Agent exists in that org (by agent_code or name), move it: insert into `company_resources` with the values above.
+  - Then delete the legacy `crm_contacts` row (regardless of whether it was moved or skipped as duplicate).
+- De-dupe existing `company_resources` Load Agents per org: keep the oldest row per (org_id, lower(agent_code)) and per (org_id, lower(name)) where agent_code is null; delete the rest. Only delete rows that have no dependents (no `crm_contact_loads`/no FK references) — if a candidate dup has dependents, keep it and just log nothing (silent).
 
-**Brokers tab** (`typeFilter === 'broker'`)
-`Company | Contact Name | MC# | Phone | Email | Location | Tags`
-- MC# from `agent_code` (mono badge, "—" only when truly missing)
-- Location = `city, state`
-- Tags from `tags[]`
+### 3. Agents table still shows irrelevant columns
 
-**Agents tab** (`typeFilter === 'agent'`)
-`Agent Name | Agent Code | Agency | Status | Phone | Email | Service Area`
-- Agent Name from `company_name`
-- Agency from `contact_name` (mirrors how the agent form stores agency name) with fallback to `—`
-- Status badge from `agent_status` (Safe / Unsafe / Unknown)
-- Service Area from `service_area`
+`ContactFormDialog` Agent form only collects: Agent Code, Agent Status, Agency Name (`company_name`), Phone, Email, Website, Notes. My previous column set still included an "Agency" column mapped to `contact_name` (always blank for resources) and a "Service Area" column (only used for roadside vendors).
 
-**Shippers / Receivers tabs** (`typeFilter === 'shipper' | 'receiver'`)
-`Facility Name | Sub-Type | Address | Contact | Phone | Hours | Appt`
-- Sub-Type = `getSubTypeLabel(contact)` (Shipper Facility / Receiver Facility / Both / Warehouse / Terminal)
-- Address = `address, city, state zip` assembled with proper fallbacks
-- Contact = `contact_name`
-- Hours = `operating_hours`
-- Appt = badge when `appointment_required`
+**Fix:** in `src/pages/CRM.tsx` `getColumnsFor('agent', …)`, replace columns with exactly:
 
-**Maintenance Shops scope** (`scope === 'shops'`)
-`Shop Name | Sub-Type | Phone | Email | Service Area | Address | Tags`
-- Sub-Type from `resource_type` via `getSubTypeLabel` (Mechanic / Roadside / Truck Wash)
-- For Roadside, Service Area is prominent
+`Agency Name (company_name) | Agent Code | Status | Phone | Email | Website | Actions`
 
-**All tab** (`typeFilter === 'all'` in agencies scope)
-Keep the current generic columns but improve them:
-`Company | Type (badge + sub-type) | Identifier | Phone | Location/Service Area | Flags`
-- Identifier column = MC# for brokers, Agent Code for agents, Sub-Type for facilities, "—" otherwise
-- Location = `city, state` with fallback to `service_area`, then to `address`, then `—`
-- Flags = the existing Auto-added / Appt Req / Safe / Unsafe / tag chips
+- Drop the bogus "Agency" (contact_name) column.
+- Drop "Service Area" — agents don't have one.
+- Make Agent Code render via the existing `renderCode` helper (mono chip).
+- Status uses `renderAgentStatus` (Safe / Unsafe / Unrated).
+- Website renders as a truncated link when present, `—` otherwise.
 
-### Render helpers
-
-Add small inline helpers at the top of `AgentCRM`:
-- `formatAddress(c)` — joins `address`, `city`, `state`, `zip`, trims, returns `—` if empty.
-- `formatLocation(c)` — `city, state` || `service_area` || `—`.
-- `renderAgentStatus(c)` — colored badge for `safe` / `unsafe` / null.
-- `renderMC(code)` — `<code>` chip when present.
-
-These keep the column render functions short.
-
-### Things that do NOT change
-
-- `useUnifiedContacts` hook, mutations, detail sheet, edit dialog, filtering/search logic.
-- Action menu (View / Edit / Delete) and bulk-select behavior.
-- Summary cards, scope tabs, type filter tabs.
-- `tableId` / `exportFilename` (CSV export still works because DataTable iterates the active columns).
-- `BrokerDatabase` (Independent mode) is untouched — it already has its own purpose-built columns.
+No other tab's columns change.
 
 ## Technical notes
 
-- All changes live in `src/pages/CRM.tsx`. No hook, schema, or detail-sheet edits.
-- `DataTable` accepts a fresh `columns` array per render, so swapping based on `typeFilter`/`scope` inside a `useMemo` is safe and won't break the existing `selectable` / `bulkActions` props.
-- Mobile: keep `hiddenOnMobile` on secondary columns (everything except Company/Name, primary identifier, and Actions) so the responsive layout stays usable.
-- Empty-state fallbacks render `—` only when a field is genuinely absent for that type (e.g. a broker with no MC#), not because the column was wrong for the row.
+- Files touched in this change: `src/pages/CRM.tsx` (column set + dropdown stopPropagation) and one new SQL migration for the trigger rewrite + cleanup.
+- No changes to `ContactFormDialog`, `ContactDetailSheet`, `useCRMData`, or schemas — only the trigger function body and a one-shot data backfill.
+- Migration is idempotent: `CREATE OR REPLACE FUNCTION` for the trigger; cleanup uses `WHERE NOT EXISTS` guards so re-running is safe.
+- No new GRANTs needed (function is SECURITY DEFINER; `company_resources` already has policies).
