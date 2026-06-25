@@ -1539,15 +1539,24 @@ export type Database = {
           created_at: string
           deductions: number
           driver_id: string
+          fuel_advances: number
+          generated_at: string
+          generated_by: string | null
+          gross_pay: number
           id: string
           net_pay: number | null
           notes: string | null
           org_id: string
           paid_at: string | null
+          payment_date: string | null
           period_end: string
           period_start: string
+          reimbursements: number
           status: string
           updated_at: string
+          ytd_deductions: number
+          ytd_gross: number
+          ytd_net: number
         }
         Insert: {
           approved_at?: string | null
@@ -1557,15 +1566,24 @@ export type Database = {
           created_at?: string
           deductions?: number
           driver_id: string
+          fuel_advances?: number
+          generated_at?: string
+          generated_by?: string | null
+          gross_pay?: number
           id?: string
           net_pay?: number | null
           notes?: string | null
           org_id: string
           paid_at?: string | null
+          payment_date?: string | null
           period_end: string
           period_start: string
+          reimbursements?: number
           status?: string
           updated_at?: string
+          ytd_deductions?: number
+          ytd_gross?: number
+          ytd_net?: number
         }
         Update: {
           approved_at?: string | null
@@ -1575,15 +1593,24 @@ export type Database = {
           created_at?: string
           deductions?: number
           driver_id?: string
+          fuel_advances?: number
+          generated_at?: string
+          generated_by?: string | null
+          gross_pay?: number
           id?: string
           net_pay?: number | null
           notes?: string | null
           org_id?: string
           paid_at?: string | null
+          payment_date?: string | null
           period_end?: string
           period_start?: string
+          reimbursements?: number
           status?: string
           updated_at?: string
+          ytd_deductions?: number
+          ytd_gross?: number
+          ytd_net?: number
         }
         Relationships: []
       }
@@ -5068,6 +5095,46 @@ export type Database = {
             Args: { _name: string; _tier?: string; _tms_mode?: string }
             Returns: string
           }
+      generate_driver_settlements: {
+        Args: {
+          _driver_ids: string[]
+          _payment_date: string
+          _period_end: string
+        }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          base_pay: number
+          bonus_pay: number
+          created_at: string
+          deductions: number
+          driver_id: string
+          fuel_advances: number
+          generated_at: string
+          generated_by: string | null
+          gross_pay: number
+          id: string
+          net_pay: number | null
+          notes: string | null
+          org_id: string
+          paid_at: string | null
+          payment_date: string | null
+          period_end: string
+          period_start: string
+          reimbursements: number
+          status: string
+          updated_at: string
+          ytd_deductions: number
+          ytd_gross: number
+          ytd_net: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "driver_settlements"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_driver_banking: {
         Args: { _driver_id: string }
         Returns: {

@@ -1,36 +1,75 @@
-# Fix CRM "Failed to save contact / Cannot coerce…" error
+## Goal
+Replace the existing week-based settlement generator with a manual "Settlement Statement" generator that the payroll admin triggers on demand. Generation accepts target drivers + a Pay Period End date + a Payment Date, aggregates everything since each driver's last settlement, and persists a permanent record with YTD totals.
 
-## What's happening
+## Database changes (single migration)
 
-That exact PostgREST message is thrown by `.single()` when the query returns 0 rows. Every CRM mutation in `src/hooks/useCRMData.ts` uses `.insert(...).select().single()` / `.update(...).select().single()`, so any one of these will surface as "Failed to save contact" in the UI:
+Extend `driver_settlements` with the fields a real paystub needs and the YTD snapshot:
 
-1. **INSERT returns 0 rows under RLS** — Postgres inserts the row, but the `RETURNING` step is filtered by the SELECT policy. If `org_id` on the payload doesn't match the user's org (or the user briefly has no org context), the row is hidden and `.single()` blows up even though the write succeeded. This is the most common cause on live.
-2. **UPDATE matches 0 rows** — for example editing a record whose `id` no longer exists in `crm_contacts` (it was migrated to `company_resources`, or another tab/user deleted it). `.single()` errors instead of giving a clean message.
-3. **Trigger side-effects** — the auto-harvest trigger on `fleet_loads` writes to `crm_contacts`, but a trigger on `crm_contacts` itself that changes/removes the row would also empty the `RETURNING` set. Worth a quick look while we're in there.
+- `payment_date date` — date pay is initiated (user-selected)
+- `period_start date` becomes auto-derived (day after previous settlement's `period_end`, or driver hire date / earliest delivered load if none)
+- `gross_pay numeric` — sum of load pay
+- `fuel_advances numeric` — sum of fuel/cash advances pulled from `expenses`
+- `reimbursements numeric` — sum of reimbursement-type expenses (adds back)
+- `ytd_gross numeric`, `ytd_deductions numeric`, `ytd_net numeric` — snapshot at generation time
+- `generated_by uuid`, `generated_at timestamptz default now()`
+- Recompute `net_pay` generated column: `gross_pay + bonus_pay + reimbursements - deductions - fuel_advances`
+- Add unique index `(org_id, driver_id, period_end)` to prevent duplicate periods
 
-The user only sees a red toast with no recovery, and we don't actually know whether the write landed.
+Keep `driver_settlement_items` as-is; it already supports `load_pay`, `advance`, `deduction`, `reimbursement`, `bonus`, `adjustment`.
 
-## Fix (frontend only)
+Deprecate `driver_payroll` for new writes (leave table for historical reads) and remove any Saturday auto-generator (no DB cron exists today; nothing to drop server-side — the previous "auto" path was a client button in `SettlementsTab.tsx`).
 
-In `src/hooks/useCRMData.ts`, replace `.single()` with `.maybeSingle()` for all six CRM-related mutations (`createContact`, `updateContact`, `createResource`, plus the matching facility/resource create mutations on lines 196, 216, 273, 346, 467) and handle the null case explicitly:
+### `generate_driver_settlements` SECURITY DEFINER function
 
-- On INSERT: if `data` is null, re-fetch by the inserted payload's natural key (or just invalidate and trust the write) and show a soft warning instead of an error. Don't throw — the row was written.
-- On UPDATE: if `data` is null, throw a clear error: "This contact no longer exists or you don't have permission to edit it" so the toast actually tells the user what went wrong.
+```text
+generate_driver_settlements(
+  _driver_ids uuid[] | null,   -- null = all active drivers in org
+  _period_end date,
+  _payment_date date
+) returns setof driver_settlements
+```
 
-Also tighten `ContactFormDialog.handleSubmit`:
+For each target driver (org-scoped, payroll/owner only):
+1. Resolve `period_start` = `max(period_end) + 1` from prior settlements, else earliest delivered load date.
+2. Pull `fleet_loads` where `driver_id = X`, `status = 'delivered'`, `delivery_date BETWEEN period_start AND _period_end`, and NOT already attached to a settlement item.
+3. Compute load pay via the same formula as `calculateWeeklyPay` (percentage / per-mile / flat) — re-implemented in SQL using `truck_percentage` company setting and accessorials.
+4. Pull `expenses` for the driver in the window: fuel advances, cash advances, reimbursements, other deductions.
+5. Insert one `driver_settlements` row with status `draft`, then insert `driver_settlement_items` for each load + expense.
+6. Recompute YTD: sum of all settlements for that driver where `period_end >= date_trunc('year', _period_end)` including the new row → write `ytd_gross/deductions/net`.
+7. Skip drivers with zero activity (return nothing for them; surface in UI summary).
 
-- Guard against missing `orgId` before calling any mutation (toast + return). Right now if `orgId` is briefly undefined we send `org_id: undefined` and RLS hides the row.
-- Trim/normalize empty strings to `null` before insert so policies / unique constraints behave consistently.
+## Frontend changes
 
-## Verify
+Replace the current week-stepper UI in `src/components/finance/driver-settlements/DriverSettlementsTab.tsx` (and remove the auto-generate button in `src/components/finance/SettlementsTab.tsx`):
 
-- Add a CRM contact of each type (broker, agent, shipper/receiver, maintenance shop) — no red toast, row appears in table.
-- Edit each type — saves cleanly; if the row was deleted in another tab, you now get the "no longer exists" message instead of the coerce error.
-- Confirm on the live preview by reproducing the original flow that triggered the screenshot.
+- New **"Generate Settlements"** dialog with:
+  - Driver picker: multi-select with "All active drivers" toggle
+  - `Pay Period End Date` (date picker)
+  - `Payment Date` (date picker, defaults to period end + 5 days)
+  - Preview table showing per-driver gross / deductions / net before commit
+  - Confirm → calls `supabase.rpc('generate_driver_settlements', ...)`
+- Settlement list shows `period_start → period_end`, `payment_date`, gross, deductions, net, YTD net, status
+- Detail sheet shows itemized loads + expenses pulled from `driver_settlement_items`, with YTD block for proof-of-income
+- Print/PDF view already exists for paystubs; bind it to the new fields
+
+Driver-side `MyPaystubsDialog` reads from `driver_settlements` (already does) — just surface the new YTD fields.
+
+## Technical notes
+
+- The RPC runs as `SECURITY DEFINER`, guarded by `is_owner(auth.uid()) OR has_role(auth.uid(),'payroll_admin')`, and stamps `org_id = get_user_org_id(auth.uid())`.
+- All money math uses `numeric`; no floats.
+- "Last settlement" lookup uses the new unique `(org_id, driver_id, period_end)` index so re-running for the same end date is idempotent (raises a clear error).
+- YTD is recomputed from stored settlements (not recomputed on every read), so historical paystubs remain frozen even if later loads are edited.
+- No changes to `driver_payroll`; it's left intact for backward compatibility but the UI no longer writes to it.
 
 ## Files touched
 
-- `src/hooks/useCRMData.ts` — switch `.single()` → `.maybeSingle()` in the 5 mutations, handle null.
-- `src/components/crm/ContactFormDialog.tsx` — `orgId` guard + null-empties normalization in `handleSubmit`.
+- `supabase/migrations/<new>.sql` — schema + `generate_driver_settlements` function
+- `src/components/finance/driver-settlements/DriverSettlementsTab.tsx` — new UI
+- `src/components/finance/driver-settlements/GenerateSettlementsDialog.tsx` — new
+- `src/components/finance/driver-settlements/SettlementDetailSheet.tsx` — new (or extend existing)
+- `src/components/finance/SettlementsTab.tsx` — remove client-side auto-generate
+- `src/components/driver/MyPaystubsDialog.tsx` — show YTD block
 
-No DB migration, no schema change, no edits to RLS or triggers in this pass. If after deploy we still see the toast, next step is to inspect the `crm_contacts` SELECT policy and the auto-harvest trigger.
+## Open question
+Should `Payment Date` be allowed in the past (e.g. back-dating a missed pay run), or restricted to today/future?
