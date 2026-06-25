@@ -361,12 +361,18 @@ export function ActiveLoadsBoard() {
                   : null;
 
                 return (
-                  <div key={load.id} className="p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <div key={load.id} className={`p-3 rounded-lg border ${load.has_statement_discrepancy ? 'border-destructive bg-destructive/5' : 'border-border bg-muted/30'} hover:bg-muted/50 transition-colors`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-sm">{load.landstar_load_id || load.id.slice(0, 8)}</span>
                           <Badge variant="outline" className={statusColors[load.status] || ''}>{load.status.replace('_', ' ')}</Badge>
+                          {load.has_statement_discrepancy && (
+                            <Badge variant="destructive" className="gap-1 animate-pulse">
+                              <ShieldAlert className="h-3 w-3" />
+                              STATEMENT MISMATCH
+                            </Badge>
+                          )}
                           {rpm && <span className="text-xs text-muted-foreground">${rpm}/mi</span>}
                         </div>
                         <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
