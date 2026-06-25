@@ -62,13 +62,16 @@ export function GenerateSettlementsDialog({
   onGenerated,
 }: Props) {
   const [periodEnd, setPeriodEnd] = useState<Date>(new Date());
+  const [periodStart, setPeriodStart] = useState<Date>(addDays(new Date(), -6));
   const [paymentDate, setPaymentDate] = useState<Date>(nextThursday());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setPeriodEnd(new Date());
+      const end = new Date();
+      setPeriodEnd(end);
+      setPeriodStart(addDays(end, -6));
       setPaymentDate(nextThursday());
       setSelected(new Set());
       setPickerOpen(false);
