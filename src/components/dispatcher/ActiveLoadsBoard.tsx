@@ -151,6 +151,7 @@ export function ActiveLoadsBoard() {
           agency_code,
           pickup_time_type,
           delivery_time_type,
+          has_statement_discrepancy,
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
           truck:trucks!fleet_loads_truck_id_fkey(unit_number),
           load_accessorials(amount)
