@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Package, MapPin, User, Truck, Eye, MoreHorizontal, Calendar, DollarSign, Route, Pencil, Trash2, LayoutGrid, Table as TableIcon, ChevronDown } from 'lucide-react';
+import { Package, MapPin, User, Truck, Eye, MoreHorizontal, Calendar, DollarSign, Route, Pencil, Trash2, LayoutGrid, Table as TableIcon, ChevronDown, ShieldAlert } from 'lucide-react';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { StopTime } from '@/components/shared/StopTime';
 import { format, parseISO } from 'date-fns';
@@ -25,6 +25,14 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import { useLoadDiscrepancies } from '@/hooks/useSettlementDiscrepancies';
+import { StatementDiscrepancyPanel } from '@/components/finance/StatementDiscrepancyPanel';
+
+function LoadDiscrepancyPanel({ loadId }: { loadId: string }) {
+  const { data } = useLoadDiscrepancies(loadId);
+  if (!data || data.length === 0) return null;
+  return <StatementDiscrepancyPanel discrepancies={data} title="Statement Discrepancies" canResolve />;
+}
 
 interface ActiveLoad {
   id: string;
@@ -50,6 +58,7 @@ interface ActiveLoad {
   driver: { first_name: string; last_name: string } | null;
   truck: { unit_number: string } | null;
   load_accessorials: { amount: number }[] | null;
+  has_statement_discrepancy?: boolean | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -150,6 +159,7 @@ export function ActiveLoadsBoard() {
           agency_code,
           pickup_time_type,
           delivery_time_type,
+          has_statement_discrepancy,
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
           truck:trucks!fleet_loads_truck_id_fkey(unit_number),
           load_accessorials(amount)
@@ -289,7 +299,17 @@ export function ActiveLoadsBoard() {
                   key: 'landstar_load_id',
                   header: 'Load #',
                   width: '12%',
-                  render: (l) => <span className="font-medium">{l.landstar_load_id || l.id.slice(0, 8)}</span>,
+                  render: (l) => (
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium">{l.landstar_load_id || l.id.slice(0, 8)}</span>
+                      {l.has_statement_discrepancy && (
+                        <Badge variant="destructive" className="gap-1 h-5 px-1.5 text-[10px]">
+                          <ShieldAlert className="h-3 w-3" />
+                          MISMATCH
+                        </Badge>
+                      )}
+                    </span>
+                  ),
                   filter: { type: 'text', accessor: (l) => l.landstar_load_id || l.id },
                 },
                 {
@@ -359,12 +379,18 @@ export function ActiveLoadsBoard() {
                   : null;
 
                 return (
-                  <div key={load.id} className="p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors">
+                  <div key={load.id} className={`p-3 rounded-lg border ${load.has_statement_discrepancy ? 'border-destructive bg-destructive/5' : 'border-border bg-muted/30'} hover:bg-muted/50 transition-colors`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-sm">{load.landstar_load_id || load.id.slice(0, 8)}</span>
                           <Badge variant="outline" className={statusColors[load.status] || ''}>{load.status.replace('_', ' ')}</Badge>
+                          {load.has_statement_discrepancy && (
+                            <Badge variant="destructive" className="gap-1 animate-pulse">
+                              <ShieldAlert className="h-3 w-3" />
+                              STATEMENT MISMATCH
+                            </Badge>
+                          )}
                           {rpm && <span className="text-xs text-muted-foreground">${rpm}/mi</span>}
                         </div>
                         <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
@@ -473,6 +499,8 @@ export function ActiveLoadsBoard() {
                     {getStatusLabel(selectedLoad.status)}
                   </Badge>
                 </div>
+
+                <LoadDiscrepancyPanel loadId={selectedLoad.id} />
 
                 {/* Origin */}
                 <div className="space-y-1">

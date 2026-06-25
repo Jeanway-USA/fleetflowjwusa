@@ -28,6 +28,8 @@ import { Download, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
 import { fetchPayBreakdown, type PayBreakdown } from '@/lib/settlement-pay-breakdown';
+import { useSettlementDiscrepancies } from '@/hooks/useSettlementDiscrepancies';
+import { StatementDiscrepancyPanel } from '@/components/finance/StatementDiscrepancyPanel';
 
 
 interface Driver {
@@ -45,6 +47,9 @@ interface Props {
 export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Props) {
   const open = !!settlementId;
   const [downloading, setDownloading] = useState(false);
+  const { data: discrepancies = [] } = useSettlementDiscrepancies(settlementId);
+  const unresolvedDiscrepancies = discrepancies.filter(d => !d.resolved_at);
+  const hasBlockingDiscrepancy = unresolvedDiscrepancies.length > 0;
 
   const { data: settlement } = useQuery({
     queryKey: ['driver_settlement', settlementId],
@@ -165,8 +170,9 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                   size="sm"
                   variant="outline"
                   onClick={handleDownload}
-                  disabled={downloading}
+                  disabled={downloading || hasBlockingDiscrepancy}
                   className="w-full sm:w-auto"
+                  title={hasBlockingDiscrepancy ? 'Resolve discrepancies before generating PDF' : undefined}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   {downloading ? 'Generating…' : 'Download PDF'}
@@ -184,6 +190,20 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
               <SummaryStat label="Deductions" value={-Math.abs(currentDed)} negative />
               <SummaryStat label="Net Pay" value={currentNet} primary />
             </div>
+
+            {hasBlockingDiscrepancy && (
+              <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm font-medium text-destructive">
+                Settlement locked — {unresolvedDiscrepancies.length} unresolved statement discrepancy/ies. Approval, generation, and PDF export are disabled until resolved.
+              </div>
+            )}
+
+            {discrepancies.length > 0 && (
+              <StatementDiscrepancyPanel
+                discrepancies={discrepancies}
+                title="Statement Line Errors"
+                canResolve
+              />
+            )}
 
             <Card>
               <CardHeader className="pb-2">
@@ -247,8 +267,9 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
           {settlement && (
             <Button
               onClick={handleDownload}
-              disabled={downloading}
+              disabled={downloading || hasBlockingDiscrepancy}
               className="w-full sm:w-auto hidden sm:inline-flex"
+              title={hasBlockingDiscrepancy ? 'Resolve discrepancies before generating PDF' : undefined}
             >
               <Download className="h-4 w-4 mr-2" />
               {downloading ? 'Generating…' : 'Download PDF'}

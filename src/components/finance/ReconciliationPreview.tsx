@@ -7,11 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Link, Unlink, Edit2, X, AlertTriangle, TrendingUp, TrendingDown, Layers, CheckCircle, Banknote, CreditCard } from 'lucide-react';
+import { Loader2, Link, Unlink, Edit2, X, AlertTriangle, TrendingUp, TrendingDown, Layers, CheckCircle, Banknote, CreditCard, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
-import type { ReconciliationResult, ReconciledExpense } from '@/lib/settlement-reconciliation';
+import type { ReconciliationResult, ReconciledExpense, RevenueTripMismatch } from '@/lib/settlement-reconciliation';
 
 interface FleetLoad {
   id: string;
@@ -264,6 +264,65 @@ export function ReconciliationPreview({
     }
   };
 
+  // ---------- Revenue reconciliation (per-trip + period total) ----------
+  const revenue = result.revenue;
+  const formatSigned = (n: number) =>
+    `${n >= 0 ? '+' : ''}${formatCurrency(Math.abs(n) * (n < 0 ? -1 : 1))}`;
+
+  const persistDiscrepanciesAndHalt = async () => {
+    if (!orgId) { toast.error('No organization context'); return; }
+    setIsImporting(true);
+    try {
+      const rows = revenue.tripMismatches.map(m => ({
+        org_id: orgId,
+        load_id: m.load_id,
+        settlement_id: null,
+        trip_number: m.trip_number,
+        expected_amount: m.expected_amount,
+        actual_amount: m.actual_amount,
+        delta_amount: m.delta_amount,
+        reason_code: m.reason === 'no_load_match' ? 'no_load_match' : 'trip_rate_mismatch',
+        detail: m.load_label,
+      }));
+      if (revenue.period?.exceedsTolerance) {
+        rows.push({
+          org_id: orgId,
+          load_id: null,
+          settlement_id: null,
+          trip_number: null,
+          expected_amount: revenue.period.expected_total,
+          actual_amount: revenue.period.actual_total,
+          delta_amount: revenue.period.delta,
+          reason_code: 'period_total_mismatch',
+          detail: `Pay cycle ${result.periodStart ?? '?'} → ${result.periodEnd ?? '?'}`,
+        });
+      }
+      if (rows.length > 0) {
+        const { error } = await supabase.from('settlement_discrepancies').insert(rows);
+        if (error) throw error;
+      }
+      const flaggedLoadIds = Array.from(
+        new Set(revenue.tripMismatches.map(m => m.load_id).filter((x): x is string => !!x)),
+      );
+      if (flaggedLoadIds.length > 0) {
+        const { error } = await supabase
+          .from('fleet_loads')
+          .update({ has_statement_discrepancy: true })
+          .in('id', flaggedLoadIds);
+        if (error) throw error;
+      }
+      toast.error(
+        `Settlement halted — ${rows.length} discrepancy${rows.length === 1 ? '' : 'ies'} logged. Resolve before import.`,
+      );
+      onImported();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to log discrepancies');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+
   const renderTable = (
     rows: ExpenseRow[],
     setter: React.Dispatch<React.SetStateAction<ExpenseRow[]>>,
@@ -415,6 +474,67 @@ export function ReconciliationPreview({
   return (
     <TooltipProvider>
       <div className="space-y-4">
+        {/* Revenue Reconciliation — halts import if mismatched */}
+        {(revenue.tripMismatches.length > 0 || revenue.period?.exceedsTolerance) && (
+          <div className="rounded-lg border-2 border-destructive bg-destructive/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              <p className="text-sm font-semibold text-destructive">
+                Settlement halted — flat-rate discrepancies detected
+              </p>
+            </div>
+            {revenue.tripMismatches.length > 0 && (
+              <div className="rounded border border-destructive/30 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Trip #</TableHead>
+                      <TableHead>Dispatch Load</TableHead>
+                      <TableHead className="text-right">Expected (dispatch)</TableHead>
+                      <TableHead className="text-right">Statement</TableHead>
+                      <TableHead className="text-right">Δ</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {revenue.tripMismatches.map((m: RevenueTripMismatch, i: number) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-mono text-xs">{m.trip_number}</TableCell>
+                        <TableCell className="text-xs">
+                          {m.load_label || <span className="text-destructive font-medium">No matching load</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">{formatCurrency(m.expected_amount)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">{formatCurrency(m.actual_amount)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs font-semibold text-destructive">
+                          {formatSigned(m.delta_amount)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            {revenue.period?.exceedsTolerance && (
+              <div className="rounded border border-destructive/30 p-2 text-xs flex items-center justify-between">
+                <span>
+                  Period total mismatch ({result.periodStart} → {result.periodEnd}):
+                  expected <span className="font-mono">{formatCurrency(revenue.period.expected_total)}</span>,
+                  statement <span className="font-mono">{formatCurrency(revenue.period.actual_total)}</span>.
+                </span>
+                <span className="font-mono font-semibold text-destructive">Δ {formatSigned(revenue.period.delta)}</span>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Tolerance: ±$1 per trip, ±$5 per pay cycle. Logging the line errors will block this settlement until an owner or payroll admin resolves each row.
+            </p>
+            <div className="flex justify-end">
+              <Button variant="destructive" size="sm" onClick={persistDiscrepanciesAndHalt} disabled={isImporting}>
+                {isImporting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Log discrepancies & halt settlement
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Stats Bar */}
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <Badge variant="outline" className="gap-1">
@@ -514,8 +634,9 @@ export function ReconciliationPreview({
             <Button variant="outline" onClick={onCancel} disabled={isImporting}>Cancel</Button>
             <Button
               onClick={handleImport}
-              disabled={totalSelectedCount === 0 || isImporting}
+              disabled={totalSelectedCount === 0 || isImporting || revenue.hasBlockingDiscrepancy}
               className="gradient-gold text-primary-foreground"
+              title={revenue.hasBlockingDiscrepancy ? 'Resolve flat-rate discrepancies before importing' : undefined}
             >
               {isImporting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Confirm & Import Data ({totalSelectedCount})
