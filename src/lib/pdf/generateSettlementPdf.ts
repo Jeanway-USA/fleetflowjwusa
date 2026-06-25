@@ -100,8 +100,9 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
 
   // ---------- Corporate header banner ----------
   const HEADER_H = 110;
-  doc.setFillColor(15, 23, 42);
+  doc.setFillColor(24, 24, 27); // zinc-900
   doc.rect(0, 0, W, HEADER_H, 'F');
+
 
   let leftX = margin;
   if (logoData) {
