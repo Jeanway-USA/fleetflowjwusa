@@ -1,44 +1,66 @@
-# Fix: Company/Local time toggle has no effect
+## Goal
+Backfill `load_intermediate_stops` rows for existing loads that already have stops embedded in their `notes` field, so drivers can confirm each stop and log Remaining HOS like they can on new multi-stop loads.
 
-## Root cause
-
-`TimeDisplayProvider` is mounted in `App.tsx` and the toggle in `DashboardLayout` writes the preference correctly. But only **one** component in the app actually reads it: `src/components/loads/IndependentLoadBuilder.tsx` via `<StopTime>`.
-
-Every other surface that shows pickup/delivery times still reads the legacy `pickup_time` / `delivery_time` strings directly and formats them with `format()` or raw concatenation. Those renderers ignore `useTimeDisplay()`, so flipping the toggle changes nothing on screen.
-
-Surfaces still on legacy strings (confirmed via grep on `pickup_time` / `delivery_time` / `pickup_date` / `delivery_date`):
-
-- `src/pages/FleetLoads.tsx`
-- `src/pages/DispatcherDashboard.tsx` (+ `UpcomingPickups`, `ActiveLoadsBoard`, `FleetTimelineScheduler`, `RapidCallModal`, `DriverAssignmentPanel`)
-- `src/pages/DriverDashboard.tsx` + `src/components/driver/ActiveLoadCard.tsx` and `IntermediateStopsTimeline.tsx`
-- `src/pages/DriverSpectatorView.tsx`, `DriverStats.tsx`
-- `src/pages/ExecutiveDashboard.tsx` + `MorningBriefingWidget`
-- `src/pages/PublicLoadTracker.tsx`
-- `src/pages/CompanyInsights.tsx`, `IFTA.tsx`, `Finance.tsx`
-- `src/components/crm/ContactLoadHistory.tsx`
-- `src/components/finance/*` (InvoicePreviewDialog, LoadProfitabilityTab, RevenueTab, SettlementsTab, AuditReconciliation, InvoicingTab, DriverSettlementsTab)
-- `src/components/loads/IntermediateStopsView.tsx`
+## Findings
+- 62 total loads in `fleet_loads`.
+- 17 loads contain an `=== INTERMEDIATE STOPS ===` block in `notes`.
+- 0 of them have matching rows in `load_intermediate_stops` — every existing multi-stop load is unprepared.
+- Existing format is consistent with `src/lib/parseIntermediateStops.ts`, e.g.:
+  `Stop 2 (Drop): Facility, Facility, 8030 Park Ln, DALLAS, TX 75231 - 2026-06-19`
 
 ## Plan
+One-time data migration (via the insert tool, no schema change) that:
 
-1. **Replace pickup/delivery time rendering** in user-facing load views with `<StopTime utcIso={load.pickup_at} tz={load.pickup_tz} withDate />` (and the delivery equivalent). The component already subscribes to `useTimeDisplay`, so the toggle will start working everywhere it's used.
+1. Iterates over each `fleet_loads` row whose `notes` contains an `=== INTERMEDIATE STOPS ===` block and has no rows in `load_intermediate_stops` yet.
+2. For every `Stop N (Type): …` line, extracts:
+   - `stop_number` (integer)
+   - `stop_type` (`Pickup` / `Drop`)
+   - `facility_name` (first comma segment)
+   - `location` (segments from index 2 onward — same de-duplication the TS parser does)
+   - `scheduled_date` (trailing `YYYY-MM-DD`, nullable)
+3. Inserts a row into `load_intermediate_stops` with:
+   - `load_id`, `org_id` (copied from the parent load)
+   - `status = 'pending'`
+   - `remaining_hos = NULL`, `completed_at = NULL`
+4. Runs in a single transaction, idempotent (skips loads that already have stops), so it's safe to re-run.
 
-2. **Fallback for old rows** that have `pickup_date`/`pickup_time` but null `pickup_at`/`pickup_tz`: inside `StopTime` (or a small wrapper), when `utcIso` is null, derive an instant from the legacy fields using `combineToUtc(date, time, tz ?? companyTz)` so historical loads still display and still respond to the toggle.
+No UI, schema, RLS, or business-logic changes — `ConfirmStopDialog`, `IntermediateStopsView`, and the dispatcher/fleet surfaces already read from `load_intermediate_stops` and will light up automatically once the rows exist.
 
-3. **Scope of this pass** — visible appointment timestamps only. Limit edits to:
-   - Driver-facing: `ActiveLoadCard`, `IntermediateStopsTimeline`, `DriverDashboard`, `DriverLoads`, `DriverSpectatorView`.
-   - Dispatcher: `DispatcherDashboard`, `ActiveLoadsBoard`, `UpcomingPickups`, `FleetTimelineScheduler`, `RapidCallModal`, `DriverAssignmentPanel`.
-   - Loads: `FleetLoads`, `AgencyLoads`, `IntermediateStopsView`, `PublicLoadTracker`.
-   - Executive: `MorningBriefingWidget`, `ExecutiveDashboard` load lists.
+## Technical detail
+SQL outline:
 
-4. **Out of scope** (keep on raw dates — these are accounting/report contexts where timezone display isn't the user concern, and changing them risks breaking IFTA/settlement math):
-   - `src/components/finance/*`, `src/pages/Finance.tsx`, `IFTA.tsx`, `CompanyInsights.tsx`, `ContactLoadHistory.tsx`, `DriverStats.tsx`.
-   These will continue to use `formatDate(pickup_date)` for date-only display.
+```sql
+WITH parsed AS (
+  SELECT
+    fl.id        AS load_id,
+    fl.org_id,
+    m[1]::int    AS stop_number,
+    m[2]         AS stop_type,
+    m[3]         AS body
+  FROM fleet_loads fl,
+       regexp_matches(
+         split_part(fl.notes, '--- Updated from Rate Confirmation ---', 1),
+         '^Stop\s+(\d+)\s+\((\w+)\):\s*(.+)$',
+         'gm'
+       ) AS m
+  WHERE fl.notes ILIKE '%=== INTERMEDIATE STOPS ===%'
+    AND NOT EXISTS (
+      SELECT 1 FROM load_intermediate_stops s WHERE s.load_id = fl.id
+    )
+)
+INSERT INTO load_intermediate_stops
+  (load_id, org_id, stop_number, stop_type, facility_name, location, scheduled_date, status)
+SELECT
+  load_id,
+  org_id,
+  stop_number,
+  stop_type,
+  -- facility_name = first comma segment of body (after stripping trailing date)
+  -- location      = segments[2..] joined, matching parseIntermediateStops.ts
+  -- scheduled_date= trailing YYYY-MM-DD if present
+  ...,
+  'pending'
+FROM parsed;
+```
 
-5. **Verify** by loading `/fleet-loads`, `/dispatcher`, `/dashboard` (driver), toggling Company↔Local in the header, and confirming stop times re-render (secondary `(HH:mm TZ) your time` line appears when zones differ).
-
-## Technical notes
-
-- No schema or business-logic changes. Pure presentation swap from legacy string formatting to `<StopTime>`.
-- One small enhancement to `StopTime` (or a new `LegacyStopTime` wrapper) for the legacy-row fallback so the toggle works on old data too.
-- No changes to `combineToUtc` payloads on writes — that contract already works in form code.
+After running I'll re-check with a count query to confirm all 17 loads now have rows, and report the totals back.
