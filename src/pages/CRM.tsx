@@ -184,9 +184,6 @@ function getColumnsFor(typeFilter: string, scope: 'agencies' | 'shops', ctx: Col
       actionsColumn(ctx),
     ];
   }
-      actionsColumn(ctx),
-    ];
-  }
 
   if (typeFilter === 'shipper' || typeFilter === 'receiver') {
     return [
