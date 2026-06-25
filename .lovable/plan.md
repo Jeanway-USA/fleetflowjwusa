@@ -1,75 +1,96 @@
 ## Goal
-Replace the existing week-based settlement generator with a manual "Settlement Statement" generator that the payroll admin triggers on demand. Generation accepts target drivers + a Pay Period End date + a Payment Date, aggregates everything since each driver's last settlement, and persists a permanent record with YTD totals.
+Overhaul the existing **Finances → Driver Settlements** tab to match the simplified model (Gross + Reimbursements = Net, no advances/deductions), with a polished generation modal and per-row PDF download.
 
-## Database changes (single migration)
+## 1. Database migration
 
-Extend `driver_settlements` with the fields a real paystub needs and the YTD snapshot:
+`driver_settlements`:
+- Drop `fuel_advances`, `deductions`, `bonus_pay`, `ytd_deductions` (and the `net_pay` generated column that depends on them).
+- Re-add `net_pay` as `gross_pay + reimbursements` (stored generated).
+- Add `ytd_reimbursements numeric not null default 0`.
+- Keep `period_start`, `period_end`, `payment_date`, `gross_pay`, `reimbursements`, `ytd_gross`, `ytd_net`, `status`, `generated_by`, `generated_at`, unique `(org_id, driver_id, period_end)`.
 
-- `payment_date date` — date pay is initiated (user-selected)
-- `period_start date` becomes auto-derived (day after previous settlement's `period_end`, or driver hire date / earliest delivered load if none)
-- `gross_pay numeric` — sum of load pay
-- `fuel_advances numeric` — sum of fuel/cash advances pulled from `expenses`
-- `reimbursements numeric` — sum of reimbursement-type expenses (adds back)
-- `ytd_gross numeric`, `ytd_deductions numeric`, `ytd_net numeric` — snapshot at generation time
-- `generated_by uuid`, `generated_at timestamptz default now()`
-- Recompute `net_pay` generated column: `gross_pay + bonus_pay + reimbursements - deductions - fuel_advances`
-- Add unique index `(org_id, driver_id, period_end)` to prevent duplicate periods
+`driver_settlement_items.item_type` → restrict to `'load_pay' | 'reimbursement'`.
 
-Keep `driver_settlement_items` as-is; it already supports `load_pay`, `advance`, `deduction`, `reimbursement`, `bonus`, `adjustment`.
+## 2. Replace `generate_driver_settlements(_driver_ids uuid[], _period_end date, _payment_date date)`
 
-Deprecate `driver_payroll` for new writes (leave table for historical reads) and remove any Saturday auto-generator (no DB cron exists today; nothing to drop server-side — the previous "auto" path was a client button in `SettlementsTab.tsx`).
+For each target driver (specific IDs, or all active when `_driver_ids` is null):
+1. `period_start = max(prior period_end)+1`, else earliest delivered load, else `hire_date`, else `1900-01-01`.
+2. **Gross Pay** — aggregate delivered `fleet_loads` in the window by driver `pay_type` (percentage × org truck split, per-mile × actual/booked miles, or flat), plus driver-pay accessorials + fuel surcharge passthroughs.
+3. **Reimbursements** — sum `expenses` joined to driver via load, where `expense_type IN ('Reimbursement','Parking','Tolls','Scale','Lumper','Fuel Discount')` (absolute value).
+4. Skip drivers with zero activity. Insert settlement (`status='draft'`) + itemized rows.
+5. Recompute YTD over `period_end >= date_trunc('year', _period_end)`: `ytd_gross`, `ytd_reimbursements`, `ytd_net`.
 
-### `generate_driver_settlements` SECURITY DEFINER function
+`SECURITY DEFINER`, gated by `is_owner` OR `payroll_admin`.
+
+## 3. Tab UI (`DriverSettlementsTab.tsx`)
+
+Table columns become exactly: **Driver · Pay Period · Gross Pay · Reimbursements · Net Pay · Status · Actions**.
+
+Row dropdown actions: **Download PDF**, View Details, Approve / Mark Paid / Revert, Delete.
+
+Status filter chips and the prominent **Generate Settlements** button stay in the header.
+
+## 4. Generate Settlements modal (`GenerateSettlementsDialog.tsx`)
+
+Rebuild as:
+
+- **Drivers**: searchable multi-select combobox (shadcn `Popover` + `Command` + `CommandInput`/`CommandList`), with a sticky **"Select all active drivers"** row at the top. Selected drivers render as removable chips above the trigger. No separate "All drivers" checkbox — "Select all" simply toggles every active driver into the selection.
+- **Pay Period End Date**: shadcn date-picker (Popover + Calendar with `pointer-events-auto`), defaults to today.
+- **Payment Date**: shadcn date-picker, defaults to the **upcoming Thursday** (today if today is Thursday, else the next Thursday).
+- Primary button uses `LoadingButton` and is disabled while `generate.isPending` to prevent duplicate submits; Cancel is also disabled during processing.
+- Validation: must have ≥1 driver selected and both dates set, else inline error + toast.
+
+## 5. Settlement detail sheet (`SettlementDetailSheet.tsx`)
+
+- Summary block: **Gross · Reimbursements · Net Pay** (drop Deductions / Fuel-Advances tiles).
+- YTD block: **YTD Gross · YTD Reimbursements · YTD Net**.
+- Two item tables: **Earnings** (load_pay) and **Reimbursements** (reimbursement). Drop the "Deductions & Advances" section.
+- Header gains a **Download PDF** button (same generator used by the table row action).
+
+## 6. PDF generation
+
+New `src/lib/pdf/generateSettlementPdf.ts` using `jspdf` (already installed) + `jspdf-autotable` (new dep).
+
+Layout (US Letter):
 
 ```text
-generate_driver_settlements(
-  _driver_ids uuid[] | null,   -- null = all active drivers in org
-  _period_end date,
-  _payment_date date
-) returns setof driver_settlements
++---------------------------------------------------------------+
+| [LOGO] {Org Name}              |  Driver: {Name}              |
+|        {Org address if set}    |  Pay Period: {start} – {end} |
+|                                |  Payment Date: {paymentDate} |
++---------------------------------------------------------------+
+|                SETTLEMENT STATEMENT                            |
++---------------------------------------------------------------+
+| EARNINGS                                                       |
+| Date | Load # | Origin → Destination | Miles | Rate | Amount  |
++---------------------------------------------------------------+
+| REIMBURSEMENTS                                                 |
+| Date | Type | Description | Amount                             |
++---------------------------------------------------------------+
+| CURRENT PERIOD            |  YEAR-TO-DATE                      |
+| Gross  $...               |  YTD Gross  $...                   |
+| Reimb. $...               |  YTD Reimb. $...                   |
+| NET    $...               |  YTD Net    $...                   |
++---------------------------------------------------------------+
+| Footer: generated timestamp + page n of N                      |
++---------------------------------------------------------------+
 ```
 
-For each target driver (org-scoped, payroll/owner only):
-1. Resolve `period_start` = `max(period_end) + 1` from prior settlements, else earliest delivered load date.
-2. Pull `fleet_loads` where `driver_id = X`, `status = 'delivered'`, `delivery_date BETWEEN period_start AND _period_end`, and NOT already attached to a settlement item.
-3. Compute load pay via the same formula as `calculateWeeklyPay` (percentage / per-mile / flat) — re-implemented in SQL using `truck_percentage` company setting and accessorials.
-4. Pull `expenses` for the driver in the window: fuel advances, cash advances, reimbursements, other deductions.
-5. Insert one `driver_settlements` row with status `draft`, then insert `driver_settlement_items` for each load + expense.
-6. Recompute YTD: sum of all settlements for that driver where `period_end >= date_trunc('year', _period_end)` including the new row → write `ytd_gross/deductions/net`.
-7. Skip drivers with zero activity (return nothing for them; surface in UI summary).
+Filename: `Settlement_{LastName}_{period_end}.pdf`. Triggered from the row dropdown and from the detail sheet header.
 
-## Frontend changes
+## 7. Files touched
 
-Replace the current week-stepper UI in `src/components/finance/driver-settlements/DriverSettlementsTab.tsx` (and remove the auto-generate button in `src/components/finance/SettlementsTab.tsx`):
+- `supabase/migrations/<new>.sql`
+- `src/components/finance/driver-settlements/DriverSettlementsTab.tsx`
+- `src/components/finance/driver-settlements/GenerateSettlementsDialog.tsx`
+- `src/components/finance/driver-settlements/SettlementDetailSheet.tsx`
+- `src/lib/pdf/generateSettlementPdf.ts` (new)
+- `package.json` (add `jspdf-autotable`)
 
-- New **"Generate Settlements"** dialog with:
-  - Driver picker: multi-select with "All active drivers" toggle
-  - `Pay Period End Date` (date picker)
-  - `Payment Date` (date picker, defaults to period end + 5 days)
-  - Preview table showing per-driver gross / deductions / net before commit
-  - Confirm → calls `supabase.rpc('generate_driver_settlements', ...)`
-- Settlement list shows `period_start → period_end`, `payment_date`, gross, deductions, net, YTD net, status
-- Detail sheet shows itemized loads + expenses pulled from `driver_settlement_items`, with YTD block for proof-of-income
-- Print/PDF view already exists for paystubs; bind it to the new fields
+## 8. QA
 
-Driver-side `MyPaystubsDialog` reads from `driver_settlements` (already does) — just surface the new YTD fields.
+After generating a real settlement: render the PDF, convert with `pdftoppm -r 150`, eyeball every page for clipped text, table overflow, missing logo, and YTD math. Iterate until clean.
 
-## Technical notes
+## Note on the reimbursement list
 
-- The RPC runs as `SECURITY DEFINER`, guarded by `is_owner(auth.uid()) OR has_role(auth.uid(),'payroll_admin')`, and stamps `org_id = get_user_org_id(auth.uid())`.
-- All money math uses `numeric`; no floats.
-- "Last settlement" lookup uses the new unique `(org_id, driver_id, period_end)` index so re-running for the same end date is idempotent (raises a clear error).
-- YTD is recomputed from stored settlements (not recomputed on every read), so historical paystubs remain frozen even if later loads are edited.
-- No changes to `driver_payroll`; it's left intact for backward compatibility but the UI no longer writes to it.
-
-## Files touched
-
-- `supabase/migrations/<new>.sql` — schema + `generate_driver_settlements` function
-- `src/components/finance/driver-settlements/DriverSettlementsTab.tsx` — new UI
-- `src/components/finance/driver-settlements/GenerateSettlementsDialog.tsx` — new
-- `src/components/finance/driver-settlements/SettlementDetailSheet.tsx` — new (or extend existing)
-- `src/components/finance/SettlementsTab.tsx` — remove client-side auto-generate
-- `src/components/driver/MyPaystubsDialog.tsx` — show YTD block
-
-## Open question
-Should `Payment Date` be allowed in the past (e.g. back-dating a missed pay run), or restricted to today/future?
+I'm classifying these expense types as reimbursements: **Reimbursement, Parking, Tolls, Scale, Lumper, Fuel Discount**. All other expense types are excluded from the settlement entirely. Tell me to adjust if your books use a different list.
