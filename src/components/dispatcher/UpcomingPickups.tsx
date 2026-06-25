@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar, MapPin, AlertTriangle, Clock, User, Truck } from 'lucide-react';
 import { format, formatDistanceToNow, addHours, isBefore } from 'date-fns';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
+import { StopTime } from '@/components/shared/StopTime';
 import { useNavigate } from 'react-router-dom';
 
 interface UpcomingLoad {
@@ -18,6 +19,8 @@ interface UpcomingLoad {
   pickup_date: string | null;
   pickup_time: string | null;
   pickup_time_type: string | null;
+  pickup_at?: string | null;
+  pickup_tz?: string | null;
   driver_id: string | null;
   truck_id: string | null;
   driver: { first_name: string; last_name: string } | null;
@@ -53,6 +56,8 @@ export function UpcomingPickups() {
           pickup_date,
           pickup_time,
           pickup_time_type,
+          pickup_at,
+          pickup_tz,
           driver_id,
           truck_id,
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
@@ -149,7 +154,13 @@ export function UpcomingPickups() {
                       {formatDistanceToNow(parsePickupDate(load.pickup_date), { addSuffix: true })}
                     </span>
                     <span className="text-muted-foreground">
-                      ({format(parsePickupDate(load.pickup_date), 'MMM d, h:mm a')})
+                      (<StopTime
+                        utcIso={load.pickup_at}
+                        tz={load.pickup_tz}
+                        legacyDate={load.pickup_date}
+                        legacyTime={load.pickup_time}
+                        withDate
+                      />)
                     </span>
                     {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="compact" />}
                   </div>
