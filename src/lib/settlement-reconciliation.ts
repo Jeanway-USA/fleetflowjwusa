@@ -279,5 +279,108 @@ export function reconcileDocuments(
     periodStart,
     periodEnd,
     unitNumber,
+    revenue: { tripMismatches: [], period: null, hasBlockingDiscrepancy: false },
   };
+}
+
+// --------------------------------------------------------------------------
+// Revenue reconciliation: flat-rate cross-check between statement & dispatch
+// --------------------------------------------------------------------------
+
+export interface RevenueReconcileLoad {
+  id: string;
+  landstar_load_id: string | null;
+  origin: string;
+  destination: string;
+  rate: number | null;
+  delivery_date: string | null;
+}
+
+function normalizeTrip(value: string | null | undefined): string {
+  return (value || '').replace(/[^0-9]/g, '').trim();
+}
+
+export function reconcileRevenue(
+  stagedFiles: StagedFile[],
+  loads: RevenueReconcileLoad[],
+  periodStart: string | null,
+  periodEnd: string | null,
+): RevenueReconciliation {
+  const tripMismatches: RevenueTripMismatch[] = [];
+
+  // Aggregate parsed revenue across contractor PDFs by normalized trip number
+  const revenueByTrip = new Map<string, { flat: number; description: string; raw: string }>();
+  let unmatchedTotal = 0;
+
+  for (const sf of stagedFiles) {
+    if (sf.status !== 'parsed' || !sf.data || sf.type !== 'contractor_pdf') continue;
+    const items = sf.data.revenue || [];
+    for (const r of items) {
+      const trip = normalizeTrip(r.trip_number);
+      const amount = Number(r.flat_rate) || 0;
+      if (!trip) {
+        unmatchedTotal += amount;
+        continue;
+      }
+      const existing = revenueByTrip.get(trip);
+      if (existing) {
+        existing.flat += amount;
+      } else {
+        revenueByTrip.set(trip, { flat: amount, description: r.description || '', raw: r.trip_number || trip });
+      }
+    }
+  }
+
+  // Pass 1: per-trip match against fleet_loads
+  for (const [trip, parsed] of revenueByTrip) {
+    const load = loads.find(l => normalizeTrip(l.landstar_load_id) === trip);
+    if (!load) {
+      tripMismatches.push({
+        trip_number: trip,
+        load_id: null,
+        load_label: null,
+        expected_amount: 0,
+        actual_amount: parsed.flat,
+        delta_amount: parsed.flat,
+        reason: 'no_load_match',
+      });
+      unmatchedTotal += parsed.flat;
+      continue;
+    }
+    const expected = Number(load.rate) || 0;
+    const delta = parsed.flat - expected;
+    if (Math.abs(delta) > TRIP_RATE_TOLERANCE) {
+      tripMismatches.push({
+        trip_number: trip,
+        load_id: load.id,
+        load_label: load.landstar_load_id || `${load.origin} → ${load.destination}`,
+        expected_amount: expected,
+        actual_amount: parsed.flat,
+        delta_amount: delta,
+        reason: 'rate_mismatch',
+      });
+    }
+  }
+
+  // Pass 2: period total fallback
+  let period: RevenuePeriodCheck | null = null;
+  if (periodStart && periodEnd) {
+    const inWindow = loads.filter(l =>
+      l.delivery_date && l.delivery_date >= periodStart && l.delivery_date <= periodEnd,
+    );
+    const expectedTotal = inWindow.reduce((s, l) => s + (Number(l.rate) || 0), 0);
+    let actualTotal = 0;
+    for (const v of revenueByTrip.values()) actualTotal += v.flat;
+    actualTotal += unmatchedTotal;
+    const delta = actualTotal - expectedTotal;
+    period = {
+      expected_total: expectedTotal,
+      actual_total: actualTotal,
+      delta,
+      exceedsTolerance: Math.abs(delta) > PERIOD_TOTAL_TOLERANCE,
+    };
+  }
+
+  const hasBlockingDiscrepancy = tripMismatches.length > 0 || (period?.exceedsTolerance ?? false);
+  return { tripMismatches, period, hasBlockingDiscrepancy };
 }
