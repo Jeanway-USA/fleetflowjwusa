@@ -262,7 +262,7 @@ export function GenerateSettlementsDialog({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodStart ? format(periodStart, 'PPP') : <span>Pick a date</span>}
+                    {periodStart ? format(periodStart, 'MMM d, yyyy') : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -290,7 +290,7 @@ export function GenerateSettlementsDialog({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodEnd ? format(periodEnd, 'PPP') : <span>Pick a date</span>}
+                    {periodEnd ? format(periodEnd, 'MMM d, yyyy') : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -318,7 +318,7 @@ export function GenerateSettlementsDialog({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {paymentDate ? format(paymentDate, 'PPP') : <span>Pick a date</span>}
+                    {paymentDate ? format(paymentDate, 'MMM d, yyyy') : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
