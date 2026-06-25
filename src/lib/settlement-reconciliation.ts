@@ -15,6 +15,7 @@ export interface ParsedStatement {
   period_end: string | null;
   unit_number: string | null;
   expenses: ExtractedExpense[];
+  revenue?: ExtractedRevenue[];
 }
 
 export interface ExtractedExpense {
@@ -30,10 +31,41 @@ export interface ExtractedExpense {
   is_advance: boolean;
 }
 
+export interface ExtractedRevenue {
+  date: string | null;
+  trip_number: string | null;
+  flat_rate: number;
+  reimbursement_total: number;
+  description: string;
+}
+
 export interface ReconciledExpense extends ExtractedExpense {
   merged: boolean;
   sources: string[];
   selected: boolean;
+}
+
+export interface RevenueTripMismatch {
+  trip_number: string;
+  load_id: string | null;
+  load_label: string | null;
+  expected_amount: number; // from fleet_loads.rate
+  actual_amount: number;   // from statement
+  delta_amount: number;
+  reason: 'no_load_match' | 'rate_mismatch';
+}
+
+export interface RevenuePeriodCheck {
+  expected_total: number; // Σ fleet_loads.rate in period
+  actual_total: number;   // Σ statement flat_rate
+  delta: number;
+  exceedsTolerance: boolean;
+}
+
+export interface RevenueReconciliation {
+  tripMismatches: RevenueTripMismatch[];
+  period: RevenuePeriodCheck | null;
+  hasBlockingDiscrepancy: boolean;
 }
 
 export interface ReconciliationResult {
@@ -43,7 +75,12 @@ export interface ReconciliationResult {
   periodStart: string | null;
   periodEnd: string | null;
   unitNumber: string | null;
+  revenue: RevenueReconciliation;
 }
+
+// Tolerances for revenue reconciliation
+export const TRIP_RATE_TOLERANCE = 1.0;   // $1.00 per trip
+export const PERIOD_TOTAL_TOLERANCE = 5.0; // $5.00 per pay cycle
 
 const FILE_TYPE_LABELS: Record<StagedFile['type'], string> = {
   settlement_xlsx: 'Settlement Details XLSX',
