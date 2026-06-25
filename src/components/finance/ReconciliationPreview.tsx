@@ -7,11 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Link, Unlink, Edit2, X, AlertTriangle, TrendingUp, TrendingDown, Layers, CheckCircle, Banknote, CreditCard } from 'lucide-react';
+import { Loader2, Link, Unlink, Edit2, X, AlertTriangle, TrendingUp, TrendingDown, Layers, CheckCircle, Banknote, CreditCard, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
-import type { ReconciliationResult, ReconciledExpense } from '@/lib/settlement-reconciliation';
+import type { ReconciliationResult, ReconciledExpense, RevenueTripMismatch } from '@/lib/settlement-reconciliation';
 
 interface FleetLoad {
   id: string;
