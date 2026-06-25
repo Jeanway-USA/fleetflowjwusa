@@ -226,6 +226,22 @@ serve(async (req) => {
 
     logStep("Checkout session created", { sessionId: session.id, url: session.url });
 
+    // Atomically increment the promo code usage counter. The conditional
+    // WHERE ensures concurrent checkouts can't push times_used past max_uses.
+    if (appliedPromo) {
+      const update = supabaseAdmin
+        .from("promo_codes")
+        .update({ times_used: appliedPromo.times_used + 1 })
+        .eq("code", appliedPromo.code)
+        .eq("times_used", appliedPromo.times_used);
+      const { error: promoUpdateError } = appliedPromo.max_uses == null
+        ? await update
+        : await update.lt("times_used", appliedPromo.max_uses);
+      if (promoUpdateError) {
+        logStep("WARNING: failed to increment promo usage", { code: appliedPromo.code, error: promoUpdateError.message });
+      }
+    }
+
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
