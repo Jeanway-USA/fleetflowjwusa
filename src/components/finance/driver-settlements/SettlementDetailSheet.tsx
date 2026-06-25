@@ -388,32 +388,212 @@ function SummaryStat({
   );
 }
 
-function ItemSection({ title, rows }: { title: string; rows: any[] }) {
+function EarningsBreakdown({ breakdown }: { breakdown: PayBreakdown | undefined }) {
+  if (!breakdown) {
+    return (
+      <div className="space-y-1">
+        <h4 className="text-sm font-semibold">Earnings Breakdown</h4>
+        <p className="text-sm text-muted-foreground py-2">Loading…</p>
+      </div>
+    );
+  }
+
+  const fmtMi = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+
   return (
-    <div className="space-y-1">
-      <h4 className="text-sm font-semibold">{title}</h4>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-2">None in this period.</p>
-      ) : (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h4 className="text-sm font-semibold">Earnings Breakdown</h4>
+        <Badge variant="outline" className="font-medium">
+          {breakdown.methodLabel}
+        </Badge>
+      </div>
+
+      <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm flex items-center justify-between gap-3 flex-wrap">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+          Pay Calculation
+        </span>
+        <span className="font-semibold text-foreground">{breakdown.formulaLabel}</span>
+      </div>
+
+      {breakdown.payType === 'flat' && (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Description</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Load #</TableHead>
+              <TableHead>Origin → Destination</TableHead>
+              <TableHead className="text-right">Miles</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {breakdown.loads.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  No loads recorded in this period
+                </TableCell>
+              </TableRow>
+            ) : (
+              breakdown.loads.map((l) => (
+                <TableRow key={l.id}>
+                  <TableCell>
+                    {l.delivery_date || l.pickup_date
+                      ? format(
+                          parseISO(`${l.delivery_date ?? l.pickup_date}T00:00:00`),
+                          'MM/dd/yyyy',
+                        )
+                      : '—'}
+                  </TableCell>
+                  <TableCell>{l.landstar_load_id || l.id.slice(0, 8)}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {l.origin} → {l.destination}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {fmtMi(Number(l.booked_miles ?? l.actual_miles ?? 0))}
+                  </TableCell>
+                  <TableCell className="capitalize">
+                    {(l.status ?? '').replace('_', ' ')}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+            <TableRow className="bg-muted/40">
+              <TableCell colSpan={4} className="text-right font-semibold">
+                Flat Rate Base Pay
+              </TableCell>
+              <TableCell className="text-right font-semibold">
+                {formatCurrency(breakdown.basePay)}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      )}
+
+      {breakdown.payType === 'per_mile' && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Load #</TableHead>
+              <TableHead>Origin → Destination</TableHead>
+              <TableHead className="text-right">Loaded Miles</TableHead>
+              <TableHead className="text-right">Rate</TableHead>
               <TableHead className="text-right">Amount</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="text-muted-foreground">{r.description ?? '—'}</TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatCurrency(Number(r.amount ?? 0))}
+            {breakdown.loads.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  No completed loads in this period
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              breakdown.loads.map((l) => {
+                const mi = Number(l.booked_miles ?? l.actual_miles ?? 0);
+                return (
+                  <TableRow key={l.id}>
+                    <TableCell>
+                      {l.delivery_date
+                        ? format(parseISO(`${l.delivery_date}T00:00:00`), 'MM/dd/yyyy')
+                        : '—'}
+                    </TableCell>
+                    <TableCell>{l.landstar_load_id || l.id.slice(0, 8)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {l.origin} → {l.destination}
+                    </TableCell>
+                    <TableCell className="text-right">{fmtMi(mi)}</TableCell>
+                    <TableCell className="text-right">
+                      ${breakdown.payRate.toFixed(2)}/mi
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(mi * breakdown.payRate)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+            <TableRow className="bg-muted/40">
+              <TableCell colSpan={3} className="font-semibold">
+                Totals
+              </TableCell>
+              <TableCell className="text-right font-semibold">
+                {fmtMi(breakdown.totalLoadedMiles)} mi
+              </TableCell>
+              <TableCell />
+              <TableCell className="text-right font-semibold">
+                {formatCurrency(breakdown.basePay)}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      )}
+
+      {breakdown.payType === 'percentage' && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Load #</TableHead>
+              <TableHead>Origin → Destination</TableHead>
+              <TableHead className="text-right">Linehaul</TableHead>
+              <TableHead className="text-right">
+                After {(breakdown.truckSplit * 100).toFixed(0)}% Split
+              </TableHead>
+              <TableHead className="text-right">Driver {breakdown.payRate}%</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {breakdown.loads.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  No completed loads in this period
+                </TableCell>
+              </TableRow>
+            ) : (
+              breakdown.loads.map((l) => {
+                const linehaul = Number(l.rate ?? 0);
+                const afterSplit = linehaul * breakdown.truckSplit;
+                const driverShare = afterSplit * (breakdown.payRate / 100);
+                return (
+                  <TableRow key={l.id}>
+                    <TableCell>
+                      {l.delivery_date
+                        ? format(parseISO(`${l.delivery_date}T00:00:00`), 'MM/dd/yyyy')
+                        : '—'}
+                    </TableCell>
+                    <TableCell>{l.landstar_load_id || l.id.slice(0, 8)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {l.origin} → {l.destination}
+                    </TableCell>
+                    <TableCell className="text-right">{formatCurrency(linehaul)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(afterSplit)}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(driverShare)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+            <TableRow className="bg-muted/40">
+              <TableCell colSpan={3} className="font-semibold">
+                Totals
+              </TableCell>
+              <TableCell className="text-right font-semibold">
+                {formatCurrency(breakdown.totalLinehaul)}
+              </TableCell>
+              <TableCell className="text-right font-semibold">
+                {formatCurrency(breakdown.totalAfterSplit)}
+              </TableCell>
+              <TableCell className="text-right font-semibold">
+                {formatCurrency(breakdown.basePay)}
+              </TableCell>
+            </TableRow>
           </TableBody>
         </Table>
       )}
     </div>
   );
 }
+
