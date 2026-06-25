@@ -273,6 +273,8 @@ export function reconcileDocuments(
     }
   }
 
+  const revenue = reconcileRevenue(stagedFiles, loadsForRevenue, periodStart, periodEnd);
+
   return {
     expenses,
     advances,
@@ -280,7 +282,7 @@ export function reconcileDocuments(
     periodStart,
     periodEnd,
     unitNumber,
-    revenue: { tripMismatches: [], period: null, hasBlockingDiscrepancy: false },
+    revenue,
   };
 }
 
