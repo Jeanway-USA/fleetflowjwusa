@@ -191,7 +191,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
               </CardContent>
             </Card>
 
-            <ItemSection title="Earnings" rows={earnings} />
+            <EarningsBreakdown breakdown={breakdown} />
             <ReimbursementSection
               rows={reimbursements}
               settlementId={settlement.id}
