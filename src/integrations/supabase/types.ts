@@ -5146,6 +5146,38 @@ export type Database = {
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       parse_legacy_time: { Args: { _t: string }; Returns: string }
+      recalc_settlement_totals: {
+        Args: { _settlement_id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          driver_id: string
+          generated_at: string
+          generated_by: string | null
+          gross_pay: number
+          id: string
+          net_pay: number | null
+          notes: string | null
+          org_id: string
+          paid_at: string | null
+          payment_date: string | null
+          period_end: string
+          period_start: string
+          reimbursements: number
+          status: string
+          updated_at: string
+          ytd_gross: number
+          ytd_net: number
+          ytd_reimbursements: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "driver_settlements"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       state_to_iana: { Args: { _location: string }; Returns: string }
       storage_user_same_org: {
         Args: { folder_owner_id: string }
