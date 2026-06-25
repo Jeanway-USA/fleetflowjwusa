@@ -1,96 +1,37 @@
-## Goal
-Overhaul the existing **Finances → Driver Settlements** tab to match the simplified model (Gross + Reimbursements = Net, no advances/deductions), with a polished generation modal and per-row PDF download.
+## Overhaul `generate_driver_settlements` pay logic
 
-## 1. Database migration
+Rewrite the RPC so each driver's gross pay follows their `pay_type`, and stop skipping drivers whose only work in the period is still in transit.
 
-`driver_settlements`:
-- Drop `fuel_advances`, `deductions`, `bonus_pay`, `ytd_deductions` (and the `net_pay` generated column that depends on them).
-- Re-add `net_pay` as `gross_pay + reimbursements` (stored generated).
-- Add `ytd_reimbursements numeric not null default 0`.
-- Keep `period_start`, `period_end`, `payment_date`, `gross_pay`, `reimbursements`, `ytd_gross`, `ytd_net`, `status`, `generated_by`, `generated_at`, unique `(org_id, driver_id, period_end)`.
+### Per-pay-type rules
 
-`driver_settlement_items.item_type` → restrict to `'load_pay' | 'reimbursement'`.
+- **flat**: look for any `fleet_loads` assigned to the driver in the period where `status IN ('in_transit','delivered')` (pickup_date OR delivery_date inside the window). If at least one exists → gross = driver `pay_rate` (flat fee). Accessorials are not added.
+- **per_mile / cpm**: only `status = 'delivered'` loads with `delivery_date` in window. Gross = SUM(`booked_miles`) × `pay_rate`. (Uses "loaded miles" = `booked_miles`, our canonical loaded-miles field; falls back to `actual_miles` only if booked is null.)
+- **percentage**: only `status = 'delivered'` loads with `delivery_date` in window. Gross = SUM(`rate` × 0.65 [truck_percentage setting] × `pay_rate`/100). FSC and accessorials excluded, matching `calculateLoadPay`.
 
-## 2. Replace `generate_driver_settlements(_driver_ids uuid[], _period_end date, _payment_date date)`
+Reimbursements stay manual (0 at generation, recomputed by `recalc_settlement_totals` when line items are added). Net pay stays generated column `gross + reimbursements`. YTD recompute unchanged.
 
-For each target driver (specific IDs, or all active when `_driver_ids` is null):
-1. `period_start = max(prior period_end)+1`, else earliest delivered load, else `hire_date`, else `1900-01-01`.
-2. **Gross Pay** — aggregate delivered `fleet_loads` in the window by driver `pay_type` (percentage × org truck split, per-mile × actual/booked miles, or flat), plus driver-pay accessorials + fuel surcharge passthroughs.
-3. **Reimbursements** — sum `expenses` joined to driver via load, where `expense_type IN ('Reimbursement','Parking','Tolls','Scale','Lumper','Fuel Discount')` (absolute value).
-4. Skip drivers with zero activity. Insert settlement (`status='draft'`) + itemized rows.
-5. Recompute YTD over `period_end >= date_trunc('year', _period_end)`: `ytd_gross`, `ytd_reimbursements`, `ytd_net`.
+### Fix the "no work done" skip
 
-`SECURITY DEFINER`, gated by `is_owner` OR `payroll_admin`.
+Today the RPC does `IF _gross = 0 THEN CONTINUE`, so flat-rate drivers mid-trip get dropped. New behavior:
 
-## 3. Tab UI (`DriverSettlementsTab.tsx`)
+- For **flat** drivers: if any qualifying in-transit/delivered load exists in the window, create the settlement with the full flat `pay_rate` even though no load is delivered yet.
+- For **cpm / percentage**: keep skipping when there are zero delivered loads in the window (nothing to pay yet), but surface this as an informational return (the driver simply isn't returned in the result set, same as today).
+- A driver passed explicitly in `_driver_ids` with no qualifying work for their pay type still won't generate a row — but flat drivers with active loads now will, removing the blocker the user described.
 
-Table columns become exactly: **Driver · Pay Period · Gross Pay · Reimbursements · Net Pay · Status · Actions**.
+### Settlement line items
 
-Row dropdown actions: **Download PDF**, View Details, Approve / Mark Paid / Revert, Delete.
+Rebuild the per-load items insert to match the new rules:
 
-Status filter chips and the prominent **Generate Settlements** button stay in the header.
+- flat → one line item `'Flat weekly pay'` for the full `pay_rate`, plus one informational line per in-transit/delivered load (`item_type = 'load_pay'`, amount `0`) so the PDF still lists the loads worked.
+- per_mile → one `load_pay` line per delivered load: `miles × rate`.
+- percentage → one `load_pay` line per delivered load: `rate × 0.65 × pct`.
 
-## 4. Generate Settlements modal (`GenerateSettlementsDialog.tsx`)
+### Files touched
 
-Rebuild as:
+- `supabase/migrations/<new>.sql` — `CREATE OR REPLACE FUNCTION public.generate_driver_settlements(...)` with the new logic. Signature unchanged: `(_driver_ids uuid[], _period_end date, _payment_date date)`. `recalc_settlement_totals` untouched.
 
-- **Drivers**: searchable multi-select combobox (shadcn `Popover` + `Command` + `CommandInput`/`CommandList`), with a sticky **"Select all active drivers"** row at the top. Selected drivers render as removable chips above the trigger. No separate "All drivers" checkbox — "Select all" simply toggles every active driver into the selection.
-- **Pay Period End Date**: shadcn date-picker (Popover + Calendar with `pointer-events-auto`), defaults to today.
-- **Payment Date**: shadcn date-picker, defaults to the **upcoming Thursday** (today if today is Thursday, else the next Thursday).
-- Primary button uses `LoadingButton` and is disabled while `generate.isPending` to prevent duplicate submits; Cancel is also disabled during processing.
-- Validation: must have ≥1 driver selected and both dates set, else inline error + toast.
+No frontend or PDF changes required — the table/PDF already render `gross_pay`, `reimbursements`, `net_pay`, and the load line items as-is.
 
-## 5. Settlement detail sheet (`SettlementDetailSheet.tsx`)
+### Open question
 
-- Summary block: **Gross · Reimbursements · Net Pay** (drop Deductions / Fuel-Advances tiles).
-- YTD block: **YTD Gross · YTD Reimbursements · YTD Net**.
-- Two item tables: **Earnings** (load_pay) and **Reimbursements** (reimbursement). Drop the "Deductions & Advances" section.
-- Header gains a **Download PDF** button (same generator used by the table row action).
-
-## 6. PDF generation
-
-New `src/lib/pdf/generateSettlementPdf.ts` using `jspdf` (already installed) + `jspdf-autotable` (new dep).
-
-Layout (US Letter):
-
-```text
-+---------------------------------------------------------------+
-| [LOGO] {Org Name}              |  Driver: {Name}              |
-|        {Org address if set}    |  Pay Period: {start} – {end} |
-|                                |  Payment Date: {paymentDate} |
-+---------------------------------------------------------------+
-|                SETTLEMENT STATEMENT                            |
-+---------------------------------------------------------------+
-| EARNINGS                                                       |
-| Date | Load # | Origin → Destination | Miles | Rate | Amount  |
-+---------------------------------------------------------------+
-| REIMBURSEMENTS                                                 |
-| Date | Type | Description | Amount                             |
-+---------------------------------------------------------------+
-| CURRENT PERIOD            |  YEAR-TO-DATE                      |
-| Gross  $...               |  YTD Gross  $...                   |
-| Reimb. $...               |  YTD Reimb. $...                   |
-| NET    $...               |  YTD Net    $...                   |
-+---------------------------------------------------------------+
-| Footer: generated timestamp + page n of N                      |
-+---------------------------------------------------------------+
-```
-
-Filename: `Settlement_{LastName}_{period_end}.pdf`. Triggered from the row dropdown and from the detail sheet header.
-
-## 7. Files touched
-
-- `supabase/migrations/<new>.sql`
-- `src/components/finance/driver-settlements/DriverSettlementsTab.tsx`
-- `src/components/finance/driver-settlements/GenerateSettlementsDialog.tsx`
-- `src/components/finance/driver-settlements/SettlementDetailSheet.tsx`
-- `src/lib/pdf/generateSettlementPdf.ts` (new)
-- `package.json` (add `jspdf-autotable`)
-
-## 8. QA
-
-After generating a real settlement: render the PDF, convert with `pdftoppm -r 150`, eyeball every page for clipped text, table overflow, missing logo, and YTD math. Iterate until clean.
-
-## Note on the reimbursement list
-
-I'm classifying these expense types as reimbursements: **Reimbursement, Parking, Tolls, Scale, Lumper, Fuel Discount**. All other expense types are excluded from the settlement entirely. Tell me to adjust if your books use a different list.
+For **flat** drivers, should the in-transit detection use `pickup_date <= _period_end` (load picked up in or before the period and still moving), or strictly require pickup_date inside `[_period_start, _period_end]`? Defaulting to "pickup_date <= period_end AND (delivery_date IS NULL OR delivery_date >= _period_start)" so a load that straddles a period still counts — confirm if you want stricter.
