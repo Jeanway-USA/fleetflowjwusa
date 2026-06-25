@@ -192,7 +192,14 @@ AMOUNT HANDLING:
 
 GALLONS:
 - For Fuel and DEF purchases, extract the gallons if shown
-- Look for patterns like "50.000 GAL" or "45.5 gallons"`;
+- Look for patterns like "50.000 GAL" or "45.5 gallons"
+
+REVENUE / LINEHAUL (NEW — CONTRACTOR PDF ONLY):
+- On contractor statements, in addition to expenses, also extract the per-trip revenue lines
+- Look for "TRACTOR L/H", "LINE HAUL", "LINEHAUL", "1099 REVENUE", "FLAT RATE", "TRIP RATE"
+- For each trip, capture the 7-digit numeric trip number and the gross flat-rate dollar amount paid for that trip
+- Also capture per-trip reimbursements (REIMB, REIMBURSEMENT, REFUND, REBATE, ADJUSTMENT CR) and sum them per trip
+- Emit one entry per unique trip number in the "revenue" array`;
 
     const userPrompt = `Analyze this Landstar statement PDF and extract ALL expense line items.
 
@@ -215,6 +222,15 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
       "is_reimbursement": true/false (true if this is a reimbursement, refund, or money returned),
       "is_advance": true/false (true if this is a cash advance, card pre-trip/load, SPEC ADV, or direct-deposit bank transfer — NOT for DD Fee which is a real expense)
     }
+  ],
+  "revenue": [
+    {
+      "date": "YYYY-MM-DD or null",
+      "trip_number": "7-digit numeric trip number",
+      "flat_rate": number (gross linehaul/flat rate paid for the trip — positive),
+      "reimbursement_total": number (sum of trip-level reimbursements — 0 if none),
+      "description": "Original description"
+    }
   ]
 }
 
@@ -228,7 +244,8 @@ IMPORTANT:
 - If the document has multiple pages, process all of them
 - Group related items (like fuel purchase + NATS discount) as separate line items
 - Advances (Cash Advance, Card Pre-Trip, Card Load, SPEC ADV, Direct-Deposit Bank) must have is_advance: true
-- Direct-Deposit Fee / DD Fee is a REAL expense (is_advance: false) — do not confuse with Direct-Deposit Bank transfers`;
+- Direct-Deposit Fee / DD Fee is a REAL expense (is_advance: false) — do not confuse with Direct-Deposit Bank transfers
+- Always populate the "revenue" array for contractor PDFs; use an empty array [] for card_activity PDFs`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
