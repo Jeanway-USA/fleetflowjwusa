@@ -89,7 +89,7 @@ export function IntermediateStopsView({ loadId, compact = false }: IntermediateS
           const isCompleted = status === 'completed';
           const isLast = idx === stops.length - 1;
           const scheduled = formatScheduled(stop.scheduled_date);
-          const completedAt = formatCompletedAt(stop.completed_at);
+          const completedAt = formatCompletedAt(stop.completed_at, viewerTz);
           const hosLow = isCompleted
             && stop.remaining_hos !== null
             && stop.remaining_hos < 2;
