@@ -194,7 +194,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
         const trimmedAgentCode = form.agent_code.trim().toUpperCase();
         const crmPayload = {
           contact_type: crmContactType,
-          company_name: isAgent ? (trimmedAgentCode || form.company_name || trimmedAgentCode) : form.company_name,
+          company_name: isAgent ? (form.company_name || trimmedAgentCode) : form.company_name,
           contact_name: form.contact_name || null,
           phone: form.phone || null,
           email: form.email || null,
