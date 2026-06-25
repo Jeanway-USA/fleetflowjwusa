@@ -282,17 +282,31 @@ Deno.serve(async (req) => {
 
     const orgId = profile.org_id;
 
-    // Role-based authorization: only roles allowed to write to the documents bucket
-    // (matches storage.objects RLS policies). Drivers and other roles are forbidden
-    // from upload/delete/migrate even though the proxy uses the service role key.
+    // Role-based authorization: mirror the storage.objects RLS policies on the
+    // documents bucket. Both mutating actions (upload/delete/migrate) AND read
+    // actions (download/signed-url) on org-scoped buckets must enforce role,
+    // because the proxy uses the service role key and bypasses storage RLS.
     const url = new URL(req.url);
     const action = url.searchParams.get('action');
     const isMutatingAction =
       (req.method === 'POST' && (action === 'upload' || action === 'delete' || action === 'migrate')) ||
       req.method === 'DELETE';
+    const isReadAction =
+      req.method === 'GET' && (action === 'download' || action === 'signed-url');
+
+    // Resolve the bucket of the current request to decide whether role gating
+    // is required. Org-scoped buckets (e.g. `documents`) are role-gated;
+    // user-scoped buckets are gated by the per-user path check in
+    // assertOwnsPath() and don't need an additional role restriction.
+    let requestedBucket: string | null = null;
+    if (isReadAction) {
+      requestedBucket = url.searchParams.get('bucket') || 'documents';
+    }
+    const orgScopedBuckets = new Set(['documents']);
+    const readNeedsRoleCheck = isReadAction && orgScopedBuckets.has(requestedBucket || '');
 
     let callerRole: string | null = null;
-    if (isMutatingAction) {
+    if (isMutatingAction || readNeedsRoleCheck) {
       const { data: roleRows } = await supabase
         .from('user_roles')
         .select('role')
