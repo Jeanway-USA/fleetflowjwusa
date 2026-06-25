@@ -295,8 +295,8 @@ export interface RevenueReconcileLoad {
   landstar_load_id: string | null;
   origin: string;
   destination: string;
-  rate: number | null;
-  delivery_date: string | null;
+  rate?: number | null;
+  delivery_date?: string | null;
 }
 
 function normalizeTrip(value: string | null | undefined): string {
