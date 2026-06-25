@@ -264,6 +264,65 @@ export function ReconciliationPreview({
     }
   };
 
+  // ---------- Revenue reconciliation (per-trip + period total) ----------
+  const revenue = result.revenue;
+  const formatSigned = (n: number) =>
+    `${n >= 0 ? '+' : ''}${formatCurrency(Math.abs(n) * (n < 0 ? -1 : 1))}`;
+
+  const persistDiscrepanciesAndHalt = async () => {
+    if (!orgId) { toast.error('No organization context'); return; }
+    setIsImporting(true);
+    try {
+      const rows = revenue.tripMismatches.map(m => ({
+        org_id: orgId,
+        load_id: m.load_id,
+        settlement_id: null,
+        trip_number: m.trip_number,
+        expected_amount: m.expected_amount,
+        actual_amount: m.actual_amount,
+        delta_amount: m.delta_amount,
+        reason_code: m.reason === 'no_load_match' ? 'no_load_match' : 'trip_rate_mismatch',
+        detail: m.load_label,
+      }));
+      if (revenue.period?.exceedsTolerance) {
+        rows.push({
+          org_id: orgId,
+          load_id: null,
+          settlement_id: null,
+          trip_number: null,
+          expected_amount: revenue.period.expected_total,
+          actual_amount: revenue.period.actual_total,
+          delta_amount: revenue.period.delta,
+          reason_code: 'period_total_mismatch',
+          detail: `Pay cycle ${result.periodStart ?? '?'} → ${result.periodEnd ?? '?'}`,
+        });
+      }
+      if (rows.length > 0) {
+        const { error } = await supabase.from('settlement_discrepancies').insert(rows);
+        if (error) throw error;
+      }
+      const flaggedLoadIds = Array.from(
+        new Set(revenue.tripMismatches.map(m => m.load_id).filter((x): x is string => !!x)),
+      );
+      if (flaggedLoadIds.length > 0) {
+        const { error } = await supabase
+          .from('fleet_loads')
+          .update({ has_statement_discrepancy: true })
+          .in('id', flaggedLoadIds);
+        if (error) throw error;
+      }
+      toast.error(
+        `Settlement halted — ${rows.length} discrepancy${rows.length === 1 ? '' : 'ies'} logged. Resolve before import.`,
+      );
+      onImported();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to log discrepancies');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+
   const renderTable = (
     rows: ExpenseRow[],
     setter: React.Dispatch<React.SetStateAction<ExpenseRow[]>>,
