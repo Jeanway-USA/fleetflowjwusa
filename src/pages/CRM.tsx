@@ -110,8 +110,12 @@ function AgentCRM() {
 
   const handleEdit = (contact: UnifiedContact) => {
     setDetailContact(null);
-    setEditContact(contact);
-    setFormOpen(true);
+    // Let Radix Sheet finish its close animation before opening the Dialog
+    // so the sheet's focus trap / overlay doesn't block the edit form.
+    setTimeout(() => {
+      setEditContact(contact);
+      setFormOpen(true);
+    }, 180);
   };
 
   const handleDelete = async () => {

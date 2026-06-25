@@ -1,40 +1,62 @@
-## What's broken on the Agent CRM
+## Issues
 
-After tracing every contact type through create → list → edit → display (`ContactFormDialog`, `useCRMData`, `ContactDetailSheet`, `CRM.tsx`), I found four real mismatches between the data being collected, what gets saved, and what the edit dialog re-loads.
+### 1. Detail sheet blocks the Edit dialog
+`CRM.tsx` already calls `setDetailContact(null)` inside `handleEdit`, but when the Edit button is pressed **from inside** the open `ContactDetailSheet`, React closes the Sheet and opens the Dialog in the same tick. Radix's Sheet keeps its overlay/focus-trap mounted for one animation frame, so the Dialog renders underneath and pointer events are blocked.
 
-### Bug 1 — Editing "Vendor — Other" (CRM vendors) opens an empty/wrong form
-- Saved as `crm_contacts.contact_type = 'vendor'`.
-- On edit, `getFormType()` returns the raw `'vendor'`, but the type Select only knows `vendor-mechanic / -roadside / -truck_wash / -other`. None of the `isAgent / isFacility / isVendor / isBroker` branches match, so the dialog renders generic fields with no tags, no sub-type, no save target awareness.
-- Fix: in `getFormType`, when a CRM contact has `contact_type === 'vendor'` return `'vendor-other'`.
+Fix: in `ContactDetailSheet`, when the Edit (pencil) button is clicked, first close the sheet (`onOpenChange(false)`), then invoke `onEdit(contact)` after a short timeout (~150ms — matches Radix close animation). Same handling when the row's dropdown Edit is used while a sheet is already mounted — `handleEdit` in `CRM.tsx` will follow the same pattern (close detail, wait one tick, open form).
 
-### Bug 2 — Facility sub-type can never be edited
-- Facilities support 5 sub-types (`shipper / receiver / both / warehouse / terminal`), but the Facility-Type selector is gated by `!isEditing`, so once created it's locked.
-- Additionally `mapFacilityType()` collapses `both / warehouse / terminal` into `'shipper'`, meaning the badge in the list + detail sheet says "Shipper" for a warehouse.
-- Fix:
-  - Always show the Facility-Type selector when `isFacility` (create AND edit), and persist `facility_type` on update.
-  - Add `'warehouse' | 'terminal' | 'both'` to the `ContactType` union so the badge reflects what was actually saved; update `mapFacilityType` to return the real value; extend `TYPE_COLORS` and the agency tab filters accordingly (or keep tab filter as `shipper|receiver` but stop forcing the badge to lie).
+### 2. Detail sheet must show all relevant fields per CRM type
+Currently `ContactDetailSheet` renders one generic block (name, phone, email, website, address, facility-only hours/dock, tags, notes) and tabs are only shown for CRM-source contacts. That means agent codes, vendor service areas, facility sub-types, etc. are inconsistent.
 
-### Bug 3 — Agent "Company Name" field is mislabeled and loses data on edit
-- For agents the dialog shows one input labeled "Notes / Name" bound to `company_name`, plus a separate Notes textarea bound to `notes`. On save, `company_name` is overwritten with `agent_code || company_name`, so whatever the user typed as the agency name is silently replaced by the 3-letter code. On re-open the "Name" field then shows the code.
-- Fix:
-  - Rename the field to "Agency Name" (optional), keep it bound to `company_name`, and stop overwriting it — save `company_name: form.company_name || trimmedAgentCode`.
-  - Apply the same rule to both the resource path (`company_resources.name`) and the CRM path (`crm_contacts.company_name`) so auto-harvested agents (which start as just the code) become editable to a real name.
+Restructure the body into a single, type-aware information section driven by `contact.contact_type` + `contact.source`:
 
-### Bug 4 — Facility contact fields don't round-trip
-- `normalizeFacility` maps `contact_phone → phone` and `contact_email → email`, but the form's Phone/Email inputs are bound to `form.phone / form.email` and on update we write back to `contact_phone / contact_email`. That part is fine — but `contact_name` is shown only inside the `!isAgent` "Contact Person" input, which is correct. However the dialog never loads `zip`, `operating_hours`, `dock_info`, or `appointment_required` into the form unless `editContact.facility_type` exists; verify the normalizer returns those fields (it does) and that the form's facility section renders during edit (it does once Bug 2 unlocks `isFacility`-aware rendering — confirm no other gate hides it).
-- Fix: nothing extra beyond Bug 2; just verify after Bug 2 that ZIP / hours / dock / appointment all populate on edit. (Quick test pass.)
+- **Broker** (`source: 'crm'`, `contact_type: 'broker'`)
+  - Company, primary contact name, phone, email, website, full address
+  - Tags
+  - Notes
+  - Tabs: Activity / Load History / Revenue
+
+- **Agent** (`source: 'resource'` with `resource_type: 'load_agent'`, or CRM-source `contact_type: 'agent'`)
+  - Agent Code (large), Agent Status badge (Safe/Unsafe with color)
+  - Agency Name, phone, email
+  - Information / Notes (full text)
+  - Tabs: Activity / Load History / Revenue (CRM-source only); for resource-source agents, show only the info block
+
+- **Facility** (`source: 'facility'`, sub-types: shipper / receiver / both / warehouse / terminal)
+  - Facility Name + facility-type badge (real sub-type, including warehouse/terminal/both)
+  - Full address with ZIP
+  - Contact name, phone, email
+  - Operating hours, dock info, appointment-required badge
+  - Notes
+  - No tabs (existing behavior)
+
+- **Vendor — Mechanic / Truck Wash** (`source: 'resource'`)
+  - Company, phone, email, website
+  - Address (mechanic/truck wash)
+  - Notes
+  - No tabs
+
+- **Vendor — Roadside** (`source: 'resource'`, `resource_type: 'roadside'`)
+  - Company, phone, email, website
+  - Service Area (states) — prominent
+  - Notes
+  - No tabs
+
+- **Vendor — Other** (`source: 'crm'`, `contact_type: 'vendor'`)
+  - Company, contact, phone, email, website, address, tags, notes
+  - No tabs (no activity/loads concept for generic vendors)
+
+Implementation: keep one `<SheetContent>` shell + header (badges, edit button), then render one of six small renderers chosen by a `kind` helper that classifies the contact. Reuse the existing icon set (`Phone`, `Mail`, `Globe`, `MapPin`, `Clock`, `Info`) and `Badge` for status pills. Tabs section only renders for the variants that support it.
 
 ### Files to change
-
 ```text
-src/components/crm/ContactFormDialog.tsx   — getFormType, agent label, facility-type select gating, agent company_name save rule
-src/hooks/useCRMData.ts                    — ContactType union, mapFacilityType, normalizers (no functional change beyond returning real facility_type)
-src/pages/CRM.tsx                          — TYPE_COLORS additions for new facility sub-types (badge styling)
+src/components/crm/ContactDetailSheet.tsx  — rebuild body into type-aware sections; edit button closes sheet before invoking onEdit
+src/pages/CRM.tsx                          — handleEdit: close detail first, defer setFormOpen by ~150ms to release Radix focus trap
 ```
 
-No DB schema changes, no migrations, no RLS changes — purely client-side data/display fixes.
+No data, schema, or hook changes.
 
 ### Out of scope
-- Restructuring agent storage (resource vs crm_contacts duality) — leaving as-is.
-- Activity timeline / revenue tabs for non-CRM contacts — unchanged.
-- Independent-mode `BrokerDatabase` view — unchanged.
+- Adding new fields to the database (only fields already collected by `ContactFormDialog` are surfaced).
+- Independent-mode `BrokerDatabase` view.
+- Activity/Loads/Revenue logic — tabs continue to use the existing CRM-only sub-components.
