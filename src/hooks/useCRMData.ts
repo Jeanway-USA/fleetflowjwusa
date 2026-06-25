@@ -465,7 +465,7 @@ export function useCreateActivity() {
         .from('crm_activities')
         .insert(activity)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
