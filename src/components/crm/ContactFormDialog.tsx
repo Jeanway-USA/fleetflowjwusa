@@ -173,7 +173,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
         const resourceType = isAgent ? 'load_agent' : formType.replace('vendor-', '');
         const resourcePayload = {
           resource_type: resourceType,
-          name: isAgent ? (form.agent_code || form.company_name) : form.company_name,
+          name: isAgent ? (form.company_name || form.agent_code) : form.company_name,
           phone: form.phone || null,
           email: form.email || null,
           website: form.website || null,
