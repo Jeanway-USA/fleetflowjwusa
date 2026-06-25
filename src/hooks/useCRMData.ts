@@ -8,10 +8,10 @@ export type CRMActivity = Tables<'crm_activities'>;
 export type CRMContactLoad = Tables<'crm_contact_loads'>;
 export type CompanyResource = Tables<'company_resources'>;
 export type Facility = Tables<'facilities'>;
-export type ContactType = 'broker' | 'agent' | 'shipper' | 'receiver' | 'vendor' | 'shop';
+export type ContactType = 'broker' | 'agent' | 'shipper' | 'receiver' | 'vendor' | 'shop' | 'warehouse' | 'terminal' | 'both';
 export type CRMScope = 'agencies' | 'shops';
 
-const AGENCY_TYPES: ContactType[] = ['agent', 'broker'];
+const AGENCY_TYPES: ContactType[] = ['agent', 'broker', 'shipper', 'receiver', 'warehouse', 'terminal', 'both'];
 const SHOP_TYPES: ContactType[] = ['shop', 'vendor'];
 
 // Unified shape for display across all data sources
@@ -55,8 +55,8 @@ function mapResourceType(resourceType: string): ContactType {
 }
 
 function mapFacilityType(facilityType: string): ContactType {
-  if (facilityType === 'receiver') return 'receiver';
-  return 'shipper'; // shipper, both, warehouse, terminal → shipper
+  const allowed: ContactType[] = ['shipper', 'receiver', 'warehouse', 'terminal', 'both'];
+  return (allowed.includes(facilityType as ContactType) ? facilityType : 'shipper') as ContactType;
 }
 
 export function normalizeCRMContact(c: CRMContact): UnifiedContact {
@@ -420,9 +420,13 @@ export function useUnifiedContacts(typeFilter?: string, scope?: CRMScope) {
     );
   }
 
-  // Apply type filter
+  // Apply type filter (shipper tab includes warehouse/terminal/both; receiver tab includes both)
   const filtered = typeFilter && typeFilter !== 'all'
-    ? unified.filter(c => c.contact_type === typeFilter)
+    ? unified.filter(c => {
+        if (typeFilter === 'shipper') return ['shipper', 'warehouse', 'terminal', 'both'].includes(c.contact_type);
+        if (typeFilter === 'receiver') return ['receiver', 'both'].includes(c.contact_type);
+        return c.contact_type === typeFilter;
+      })
     : unified;
 
   // Sort by company name

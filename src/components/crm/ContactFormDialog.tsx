@@ -50,6 +50,7 @@ function getFormType(contact: UnifiedContact): string {
   if (contact.source === 'facility') {
     return contact.contact_type === 'receiver' ? 'receiver' : 'shipper';
   }
+  if (contact.contact_type === 'vendor') return 'vendor-other';
   return contact.contact_type;
 }
 
@@ -119,6 +120,13 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
     }
   }, [editContact, open]);
 
+  // Keep facility sub-type aligned with the top-level type when creating a new facility
+  useEffect(() => {
+    if (!editContact && (formType === 'shipper' || formType === 'receiver')) {
+      setForm((prev) => ({ ...prev, facility_type: formType }));
+    }
+  }, [formType, editContact]);
+
   const isFacility = formType === 'shipper' || formType === 'receiver';
   const isAgent = formType === 'agent';
   const isVendor = formType.startsWith('vendor-');
@@ -142,7 +150,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
       if (target === 'facility') {
         const facilityPayload = {
           name: form.company_name,
-          facility_type: isFacility && !isEditing ? (formType === 'receiver' ? 'receiver' : form.facility_type) : form.facility_type,
+          facility_type: form.facility_type,
           address: form.address,
           city: form.city || null,
           state: form.state || null,
@@ -165,7 +173,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
         const resourceType = isAgent ? 'load_agent' : formType.replace('vendor-', '');
         const resourcePayload = {
           resource_type: resourceType,
-          name: isAgent ? (form.agent_code || form.company_name) : form.company_name,
+          name: isAgent ? (form.company_name || form.agent_code) : form.company_name,
           phone: form.phone || null,
           email: form.email || null,
           website: form.website || null,
@@ -186,7 +194,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
         const trimmedAgentCode = form.agent_code.trim().toUpperCase();
         const crmPayload = {
           contact_type: crmContactType,
-          company_name: isAgent ? (trimmedAgentCode || form.company_name || trimmedAgentCode) : form.company_name,
+          company_name: isAgent ? (form.company_name || trimmedAgentCode) : form.company_name,
           contact_name: form.contact_name || null,
           phone: form.phone || null,
           email: form.email || null,
@@ -270,7 +278,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
           )}
 
           {/* Facility sub-type */}
-          {isFacility && !isEditing && (
+          {isFacility && (
             <div className="space-y-2">
               <Label>Facility Type</Label>
               <Select value={form.facility_type} onValueChange={(v) => setForm({ ...form, facility_type: v })}>
@@ -286,7 +294,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
 
           {/* Company / Name */}
           <div className="space-y-2">
-            <Label>{isFacility ? 'Facility Name *' : isAgent ? 'Notes / Name' : 'Company Name *'}</Label>
+            <Label>{isFacility ? 'Facility Name *' : isAgent ? 'Agency Name' : 'Company Name *'}</Label>
             <Input
               value={form.company_name}
               onChange={(e) => setForm({ ...form, company_name: e.target.value })}

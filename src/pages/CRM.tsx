@@ -47,6 +47,9 @@ const TYPE_COLORS: Record<string, string> = {
   receiver: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
   vendor: 'bg-red-500/10 text-red-600 border-red-500/30',
   shop: 'bg-orange-500/10 text-orange-600 border-orange-500/30',
+  warehouse: 'bg-teal-500/10 text-teal-600 border-teal-500/30',
+  terminal: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30',
+  both: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
 };
 
 export default function CRM() {
