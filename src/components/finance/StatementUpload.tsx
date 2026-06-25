@@ -20,6 +20,8 @@ interface FleetLoad {
   landstar_load_id: string | null;
   origin: string;
   destination: string;
+  rate?: number | null;
+  delivery_date?: string | null;
 }
 
 interface Truck {
