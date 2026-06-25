@@ -144,6 +144,10 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!orgId) {
+      toast.error('Your organization is still loading', { description: 'Please wait a moment and try again.' });
+      return;
+    }
     try {
       const target = getTargetTable();
 
