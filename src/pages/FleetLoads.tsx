@@ -14,6 +14,7 @@ import { RateConfirmationUpload } from '@/components/loads/RateConfirmationUploa
 import { SmartLoadCreator } from '@/components/loads/SmartLoadCreator';
 import { IndependentLoadBuilder } from '@/components/loads/IndependentLoadBuilder';
 import { IntermediateStopsView } from '@/components/loads/IntermediateStopsView';
+import { StopTime } from '@/components/shared/StopTime';
 import DriverLoadsView from '@/components/driver/DriverLoadsView';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -891,7 +892,7 @@ export default function FleetLoads() {
           ) : (
           <DataTable
             columns={[
-              { key: 'pickup_date', header: 'Date', render: (load: any) => formatDate(load.pickup_date) },
+              { key: 'pickup_date', header: 'Date', render: (load: any) => (load.pickup_at || load.pickup_date) ? <StopTime utcIso={load.pickup_at} tz={load.pickup_tz} legacyDate={load.pickup_date} legacyTime={load.pickup_time} dateOnly /> : '-' },
               { key: 'landstar_load_id', header: isLandstar ? 'Landstar ID' : 'Load ID', hiddenOnMobile: true, render: (load: any) => (
                 <div className="flex items-center gap-1.5">
                   <span className="font-mono">{load.landstar_load_id || '-'}</span>

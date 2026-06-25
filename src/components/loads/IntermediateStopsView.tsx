@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle2, Circle, Clock, MapPin, Loader2, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { Badge } from '@/components/ui/badge';
+import { useTimeDisplay } from '@/contexts/TimeDisplayContext';
 
 interface IntermediateStop {
   id: string;
@@ -31,9 +33,9 @@ function formatScheduled(date: string | null): string | null {
   } catch { return null; }
 }
 
-function formatCompletedAt(ts: string | null): string | null {
+function formatCompletedAt(ts: string | null, tz: string): string | null {
   if (!ts) return null;
-  try { return format(parseISO(ts), 'MMM d, yyyy · h:mm a'); }
+  try { return formatInTimeZone(ts, tz, 'MMM d, yyyy · h:mm a zzz'); }
   catch { return null; }
 }
 
@@ -43,6 +45,7 @@ function formatCompletedAt(ts: string | null): string | null {
  * logged < 2 hours remaining at a stop.
  */
 export function IntermediateStopsView({ loadId, compact = false }: IntermediateStopsViewProps) {
+  const { viewerTz } = useTimeDisplay();
   const { data: stops, isLoading } = useQuery({
     queryKey: ['load-intermediate-stops', loadId],
     queryFn: async () => {
@@ -86,7 +89,7 @@ export function IntermediateStopsView({ loadId, compact = false }: IntermediateS
           const isCompleted = status === 'completed';
           const isLast = idx === stops.length - 1;
           const scheduled = formatScheduled(stop.scheduled_date);
-          const completedAt = formatCompletedAt(stop.completed_at);
+          const completedAt = formatCompletedAt(stop.completed_at, viewerTz);
           const hosLow = isCompleted
             && stop.remaining_hos !== null
             && stop.remaining_hos < 2;

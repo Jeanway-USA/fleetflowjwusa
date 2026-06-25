@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CheckCircle2, Circle, Clock, MapPin, Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+import { useTimeDisplay } from '@/contexts/TimeDisplayContext';
 import { ConfirmStopDialog } from './ConfirmStopDialog';
 
 interface IntermediateStop {
@@ -35,16 +37,17 @@ function formatScheduled(date: string | null): string | null {
   }
 }
 
-function formatCompletedAt(ts: string | null): string | null {
+function formatCompletedAt(ts: string | null, tz: string): string | null {
   if (!ts) return null;
   try {
-    return format(parseISO(ts), 'MMM d, h:mm a');
+    return formatInTimeZone(ts, tz, 'MMM d, h:mm a zzz');
   } catch {
     return null;
   }
 }
 
 export function IntermediateStopsTimeline({ loadId }: IntermediateStopsTimelineProps) {
+  const { viewerTz } = useTimeDisplay();
   const queryClient = useQueryClient();
   const [activeStop, setActiveStop] = useState<IntermediateStop | null>(null);
 
@@ -94,7 +97,7 @@ export function IntermediateStopsTimeline({ loadId }: IntermediateStopsTimelineP
           const isNext = stop.id === firstPendingId;
           const isLast = idx === stops.length - 1;
           const scheduled = formatScheduled(stop.scheduled_date);
-          const completedAt = formatCompletedAt(stop.completed_at);
+          const completedAt = formatCompletedAt(stop.completed_at, viewerTz);
 
           return (
             <li key={stop.id} className="relative flex gap-3">
