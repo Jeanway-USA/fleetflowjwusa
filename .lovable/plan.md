@@ -1,27 +1,43 @@
-## Problem
+## Goal
+Clean up the visual bugs in the generated settlement PDF so it renders as a pristine, official paystub.
 
-Generating a settlement for Timothy Ames (flat-rate, active) returns **"No drivers had activity in this period."** even though he has 4 current loads tied to him.
+## Issues confirmed from the attached PDF
+1. **Garbled `!'` next to "Origin"** — the Unicode arrow `→` we pass into headers and load rows isn't in the default helvetica WinAnsi encoding, so the PDF reader prints `!'` instead of an arrow. Visible in both the column header ("Origin !' Destination") and every load row ("Lewisville, TX … !' Hughes Supply, …").
+2. **Address column stretching / squeezing other columns** — the Origin → Destination column has no explicit width, so a long combined origin+destination string consumes most of the row width and pushes the Miles/Status columns to the edge of the page.
+3. **Other small clipping/spacing artifacts** — long single-line strings (full statement ID, long addresses, long reimbursement descriptions) can clip because columns rely on autotable's auto-sizing instead of explicit widths with `overflow: 'linebreak'`.
 
-Root cause from the DB: all 4 of his loads have `status = 'assigned'` (one is `in_transit`, but its `delivery_date` 2026‑06‑25 is fine — actually one *is* in_transit and should match, but the others are `assigned`). The `generate_driver_settlements` SQL function only treats `delivered` and `in_transit` as activity for flat-rate drivers, so `assigned` / dispatched loads are invisible to payroll. If the user picks a period end before the in_transit load's pickup window, Timothy gets skipped entirely and (when he's the only selected driver) the toast fires.
+## Fix (scope: PDF generator only)
+Edit `src/lib/pdf/generateSettlementPdf.ts`:
 
-The original spec for flat-rate was: *"any load assignment within the pay period dates, whether its status is in transit or [delivered]"* — i.e. **any assigned work in the window counts**, since flat drivers are paid a fixed weekly rate regardless of completion.
+1. **Replace the Unicode arrow with a WinAnsi-safe separator** everywhere it appears in PDF text:
+   - Column headers: `'Origin → Destination'` → `'Origin / Destination'` (or `'Origin to Destination'`).
+   - Load row body cells: `` `${origin} → ${destination}` `` → `` `${origin}  →  ${destination}` `` replaced with `` `${origin}\n→\n${destination}` `` won't help — instead use a plain ASCII separator like `' → '` swapped to `'  »  '`… use a safe glyph: switch to ` / ` (slash) for the visible separator, or better, split origin and destination into **two separate columns** so the relationship is obvious without any special character.
+   - Decision: split into two columns (`Origin` and `Destination`) for the Flat / CPM / Percentage tables. This both removes the arrow problem and makes long addresses wrap naturally inside their own column.
+   - Also scrub the period strip dash (`–`) and the formula label (e.g. `1,200 mi × $0.65/mi`): replace `×` with `x` and `–` with `-` to stay inside WinAnsi.
 
-## Fix
+2. **Pin column widths and enable line-break overflow** on every autotable so nothing overflows the page:
+   - Compute `tableWidth = W - margin*2` and assign explicit `columnStyles[i].cellWidth` for every column. Suggested widths for the Flat table (in pts, total ≈ 515): Date 60, Load # 70, Origin 150, Destination 150, Miles 45, Status 40.
+   - Set `styles.overflow: 'linebreak'` and `styles.cellWidth: 'wrap'` on all autotables so long addresses wrap inside the cell instead of pushing the table.
+   - Same treatment for CPM (Date/Load/Origin/Destination/Miles/Rate/Amount) and Percentage (Date/Load/Origin/Destination/Linehaul/After Split/Driver %) tables, recomputing widths so they sum to the available content width.
+   - Reimbursements table: explicit `cellWidth` for Description and Amount with `overflow: 'linebreak'` for long descriptions.
 
-Update the `generate_driver_settlements` SQL function so the flat-rate activity check counts **any non-cancelled load assignment** that overlaps the period window, not just delivered/in_transit. Concretely, replace the status filter for the flat branch with:
+3. **Header right-column safety** — the driver block in the dark header right-aligns email/phone. Clamp it with `doc.splitTextToSize(..., 240)` so a long email never bleeds into the org name on the left.
 
-```sql
-AND l.status NOT IN ('cancelled','canceled','voided','draft')
-```
+4. **Pay Calculation band** — the formula string is right-aligned and can theoretically overrun the label on the left. Truncate with `splitTextToSize` to `(W - margin*2 - 130)` and shrink font to 10pt if it wraps.
 
-(and apply the same broadened filter to the "first activity" lookup that derives `_period_start` when no prior settlement exists, so flat drivers' very first period also starts from their earliest assigned load).
+5. **Footer tax-note wrap math** — `contactWrapped` is positioned using `wrapped.length * 9`, but font size is 7.5 so line height should be ~10. Adjust to `wrapped.length * 10` so the contact line doesn't sit on top of the tax note when the tax note wraps to two lines.
 
-CPM and percentage branches stay on `status = 'delivered'` — those pay types only earn when the load actually completes, per spec.
-
-No UI, RLS, or schema changes. One new migration that `CREATE OR REPLACE`s the function with the broadened flat-rate status filter; everything else in the function is preserved.
+## What's NOT changing
+- No changes to settlement business logic, SQL, breakdown helper, or UI components.
+- No font embedding (keeps bundle size and avoids new assets); we stay in WinAnsi-safe characters instead.
 
 ## Verification
+After implementing, re-render a settlement PDF (same Timothy Ames example), convert to image with `pdftoppm -jpeg -r 150`, and visually confirm:
+- No `!'` artifacts anywhere.
+- Origin and Destination each occupy their own column and wrap cleanly.
+- Miles and Status columns are fully visible on the right edge.
+- Header, formula band, and footer text never clip or overlap.
 
-After the migration:
-- Re-run the generator for Timothy with period end 2026‑06‑26 → should produce a $1,700 flat-rate settlement (his 4 assigned/in_transit loads count as activity).
-- Siadrak (percentage) and Andrew (CPM) behavior unchanged — they still require `delivered` loads.
+## Technical Details
+- File touched: `src/lib/pdf/generateSettlementPdf.ts` only.
+- jsPDF + jspdf-autotable APIs used: `columnStyles[i].cellWidth`, `styles.overflow: 'linebreak'`, `doc.splitTextToSize`.
