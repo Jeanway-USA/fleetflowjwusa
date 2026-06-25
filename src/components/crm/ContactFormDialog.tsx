@@ -120,6 +120,13 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
     }
   }, [editContact, open]);
 
+  // Keep facility sub-type aligned with the top-level type when creating a new facility
+  useEffect(() => {
+    if (!editContact && (formType === 'shipper' || formType === 'receiver')) {
+      setForm((prev) => ({ ...prev, facility_type: formType }));
+    }
+  }, [formType, editContact]);
+
   const isFacility = formType === 'shipper' || formType === 'receiver';
   const isAgent = formType === 'agent';
   const isVendor = formType.startsWith('vendor-');
