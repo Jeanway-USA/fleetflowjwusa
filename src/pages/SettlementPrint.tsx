@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loader2, Printer, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { SettlementPrintable } from '@/components/finance/driver-settlements/SettlementPrintable';
 import {
@@ -15,6 +17,7 @@ export default function SettlementPrint() {
   const [data, setData] = useState<SettlementDocumentData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [includeVoucher, setIncludeVoucher] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +47,7 @@ export default function SettlementPrint() {
     if (!id) return;
     setDownloading(true);
     try {
-      await generateSettlementPdf(id);
+      await generateSettlementPdf(id, { includeVoucher });
     } catch (e: any) {
       toast.error(e?.message ?? 'Could not generate PDF');
     } finally {
@@ -70,7 +73,17 @@ export default function SettlementPrint() {
 
   return (
     <div className="min-h-screen bg-zinc-100 py-6 print:bg-white print:py-0">
-      <div className="max-w-4xl mx-auto px-4 mb-4 flex flex-wrap gap-2 justify-end print:hidden">
+      <div className="max-w-4xl mx-auto px-4 mb-4 flex flex-wrap gap-3 items-center justify-end print:hidden">
+        <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-1.5">
+          <Switch
+            id="include-voucher"
+            checked={includeVoucher}
+            onCheckedChange={setIncludeVoucher}
+          />
+          <Label htmlFor="include-voucher" className="text-sm cursor-pointer">
+            Include Check Voucher Summary
+          </Label>
+        </div>
         <Button variant="outline" onClick={() => window.print()}>
           <Printer className="h-4 w-4 mr-2" />
           Print / Save as PDF
@@ -80,7 +93,7 @@ export default function SettlementPrint() {
           {downloading ? 'Generating…' : 'Download PDF'}
         </Button>
       </div>
-      <SettlementPrintable data={data} />
+      <SettlementPrintable data={data} includeVoucher={includeVoucher} />
     </div>
   );
 }
