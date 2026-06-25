@@ -178,17 +178,11 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
 
         {settlement && (
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <SummaryStat label="Gross Pay" value={Number(settlement.gross_pay ?? 0)} />
-              <SummaryStat
-                label="Reimbursements"
-                value={Number(settlement.reimbursements ?? 0)}
-              />
-              <SummaryStat
-                label="Net Pay"
-                value={Number(settlement.net_pay ?? 0)}
-                primary
-              />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <SummaryStat label="Gross Pay" value={currentGross} />
+              <SummaryStat label="Reimbursements" value={currentReimb} />
+              <SummaryStat label="Deductions" value={-Math.abs(currentDed)} negative />
+              <SummaryStat label="Net Pay" value={currentNet} primary />
             </div>
 
             <Card>
@@ -196,38 +190,51 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                 <CardTitle className="text-sm">Year-to-Date (Proof of Income)</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground">YTD Gross</p>
-                    <p className="font-semibold">
-                      {formatCurrency(Number(settlement.ytd_gross ?? 0))}
-                    </p>
+                    <p className="font-semibold">{formatCurrency(ytdGross)}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">YTD Reimbursements</p>
-                    <p className="font-semibold">
-                      {formatCurrency(Number(settlement.ytd_reimbursements ?? 0))}
+                    <p className="font-semibold">{formatCurrency(ytdReimb)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">YTD Deductions</p>
+                    <p className="font-semibold text-red-600">
+                      {formatCurrency(-Math.abs(ytdDed))}
                     </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">YTD Net</p>
-                    <p className="font-semibold text-primary">
-                      {formatCurrency(Number(settlement.ytd_net ?? 0))}
-                    </p>
+                    <p className="font-semibold text-primary">{formatCurrency(ytdNet)}</p>
                   </div>
                 </div>
+                <p className="text-[11px] italic text-muted-foreground mt-3">
+                  Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions
+                </p>
               </CardContent>
             </Card>
 
             <EarningsBreakdown breakdown={breakdown} />
-            <ReimbursementSection
-              rows={reimbursements}
-              settlementId={settlement.id}
-              orgId={settlement.org_id}
-              editable={settlement.status === 'draft'}
-            />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ReimbursementSection
+                rows={reimbursements}
+                settlementId={settlement.id}
+                orgId={settlement.org_id}
+                editable={settlement.status === 'draft'}
+              />
+              <DeductionSection
+                rows={deductions}
+                settlementId={settlement.id}
+                orgId={settlement.org_id}
+                editable={settlement.status === 'draft'}
+              />
+            </div>
           </div>
         )}
+
 
         <div className="border-t px-4 sm:px-6 py-3 bg-background flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
           <Button
