@@ -47,6 +47,9 @@ interface Props {
 export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Props) {
   const open = !!settlementId;
   const [downloading, setDownloading] = useState(false);
+  const { data: discrepancies = [] } = useSettlementDiscrepancies(settlementId);
+  const unresolvedDiscrepancies = discrepancies.filter(d => !d.resolved_at);
+  const hasBlockingDiscrepancy = unresolvedDiscrepancies.length > 0;
 
   const { data: settlement } = useQuery({
     queryKey: ['driver_settlement', settlementId],
