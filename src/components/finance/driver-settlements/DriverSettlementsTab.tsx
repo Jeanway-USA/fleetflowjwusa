@@ -44,7 +44,10 @@ interface Driver {
   first_name: string | null;
   last_name: string | null;
   status: string | null;
+  pay_type: string | null;
+  pay_rate: number | null;
 }
+
 
 const STATUS_OPTIONS = ['all', 'draft', 'approved', 'paid'] as const;
 
