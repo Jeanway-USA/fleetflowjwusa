@@ -25,6 +25,14 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import { useLoadDiscrepancies } from '@/hooks/useSettlementDiscrepancies';
+import { StatementDiscrepancyPanel } from '@/components/finance/StatementDiscrepancyPanel';
+
+function LoadDiscrepancyPanel({ loadId }: { loadId: string }) {
+  const { data } = useLoadDiscrepancies(loadId);
+  if (!data || data.length === 0) return null;
+  return <StatementDiscrepancyPanel discrepancies={data} title="Statement Discrepancies" canResolve />;
+}
 
 interface ActiveLoad {
   id: string;
