@@ -190,6 +190,20 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
               <SummaryStat label="Net Pay" value={currentNet} primary />
             </div>
 
+            {hasBlockingDiscrepancy && (
+              <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm font-medium text-destructive">
+                Settlement locked — {unresolvedDiscrepancies.length} unresolved statement discrepancy/ies. Approval, generation, and PDF export are disabled until resolved.
+              </div>
+            )}
+
+            {discrepancies.length > 0 && (
+              <StatementDiscrepancyPanel
+                discrepancies={discrepancies}
+                title="Statement Line Errors"
+                canResolve
+              />
+            )}
+
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Year-to-Date (Proof of Income)</CardTitle>
