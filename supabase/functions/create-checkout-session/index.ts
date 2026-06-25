@@ -117,10 +117,11 @@ serve(async (req) => {
     logStep("Base price from DB", { unitAmount, tier: plan.tier });
 
     // Apply promo code discount if provided
+    let appliedPromo: { code: string; max_uses: number | null; times_used: number } | null = null;
     if (promoCode) {
       const { data: promo } = await supabaseAdmin
         .from("promo_codes")
-        .select("discount_percentage, discount_amount, valid_from, valid_until, max_redemptions, times_redeemed")
+        .select("code, discount_percentage, discount_amount, valid_from, valid_until, max_uses, times_used")
         .eq("code", promoCode.toUpperCase())
         .eq("is_active", true)
         .single();
@@ -130,7 +131,9 @@ serve(async (req) => {
         const validFrom = promo.valid_from ? new Date(promo.valid_from) : null;
         const validUntil = promo.valid_until ? new Date(promo.valid_until) : null;
         const withinDates = (!validFrom || now >= validFrom) && (!validUntil || now <= validUntil);
-        const withinLimit = !promo.max_redemptions || promo.times_redeemed < promo.max_redemptions;
+        const currentUses = Number(promo.times_used ?? 0);
+        const maxUses = promo.max_uses == null ? null : Number(promo.max_uses);
+        const withinLimit = maxUses == null || currentUses < maxUses;
 
         if (withinDates && withinLimit) {
           if (promo.discount_percentage) {
@@ -140,6 +143,7 @@ serve(async (req) => {
             unitAmount = Math.max(0, unitAmount - Math.round(Number(promo.discount_amount) * 100));
             logStep("Applied fixed discount", { discount: promo.discount_amount });
           }
+          appliedPromo = { code: promo.code, max_uses: maxUses, times_used: currentUses };
         }
       }
     }
