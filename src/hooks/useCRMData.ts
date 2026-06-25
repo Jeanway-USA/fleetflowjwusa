@@ -11,7 +11,7 @@ export type Facility = Tables<'facilities'>;
 export type ContactType = 'broker' | 'agent' | 'shipper' | 'receiver' | 'vendor' | 'shop' | 'warehouse' | 'terminal' | 'both';
 export type CRMScope = 'agencies' | 'shops';
 
-const AGENCY_TYPES: ContactType[] = ['agent', 'broker'];
+const AGENCY_TYPES: ContactType[] = ['agent', 'broker', 'shipper', 'receiver', 'warehouse', 'terminal', 'both'];
 const SHOP_TYPES: ContactType[] = ['shop', 'vendor'];
 
 // Unified shape for display across all data sources
