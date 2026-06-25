@@ -219,8 +219,8 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
       return;
     }
 
-    // Reconcile
-    const result = reconcileDocuments(updatedFiles);
+    // Reconcile (includes per-trip + period revenue cross-check against fleet_loads)
+    const result = reconcileDocuments(updatedFiles, existingLoads);
     setReconciliationResult(result);
 
     // Save files to documents
