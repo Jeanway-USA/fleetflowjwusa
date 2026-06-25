@@ -143,7 +143,7 @@ export function ContactFormDialog({ open, onOpenChange, editContact }: ContactFo
       if (target === 'facility') {
         const facilityPayload = {
           name: form.company_name,
-          facility_type: isFacility && !isEditing ? (formType === 'receiver' ? 'receiver' : form.facility_type) : form.facility_type,
+          facility_type: form.facility_type,
           address: form.address,
           city: form.city || null,
           state: form.state || null,
