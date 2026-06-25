@@ -35,9 +35,13 @@ interface ActiveLoad {
   pickup_date: string | null;
   pickup_time: string | null;
   pickup_time_type: string | null;
+  pickup_at?: string | null;
+  pickup_tz?: string | null;
   delivery_date: string | null;
   delivery_time: string | null;
   delivery_time_type: string | null;
+  delivery_at?: string | null;
+  delivery_tz?: string | null;
   rate: number | null;
   booked_miles: number | null;
   empty_miles: number | null;
@@ -133,8 +137,12 @@ export function ActiveLoadsBoard() {
           status,
           pickup_date,
           pickup_time,
+          pickup_at,
+          pickup_tz,
           delivery_date,
           delivery_time,
+          delivery_at,
+          delivery_tz,
           rate,
           booked_miles,
           empty_miles,
