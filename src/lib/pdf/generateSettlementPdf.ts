@@ -3,12 +3,16 @@ import autoTable from 'jspdf-autotable';
 import { format, parseISO } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/formatters';
+import { fetchPayBreakdown } from '@/lib/settlement-pay-breakdown';
 
 const fmtDate = (d?: string | null) =>
   d ? format(parseISO(`${d}T00:00:00`), 'MMM d, yyyy') : '—';
 
 const fmtDateShort = (d?: string | null) =>
   d ? format(parseISO(`${d}T00:00:00`), 'MM/dd/yyyy') : '—';
+
+const fmtMiles = (n: number) =>
+  n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
 async function loadLogo(url: string | null | undefined): Promise<string | null> {
   if (!url) return null;
@@ -48,7 +52,7 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
       supabase
         .from('drivers')
         .select(
-          'first_name, last_name, email, phone, landstar_operator_id, hire_date, pay_type',
+          'first_name, last_name, email, phone, landstar_operator_id, hire_date, pay_type, pay_rate',
         )
         .eq('id', s.driver_id)
         .maybeSingle(),
@@ -74,27 +78,9 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   const companyAddress = settingMap.get('company_address') ?? '';
   const payrollContact = settingMap.get('payroll_contact') ?? '';
 
-  const loadItems = (items ?? []).filter((i: any) => i.item_type === 'load_pay');
   const reimbItems = (items ?? []).filter((i: any) => i.item_type === 'reimbursement');
 
-  const loadIds = loadItems.map((i: any) => i.load_id).filter(Boolean);
-  const { data: loads } = loadIds.length
-    ? await supabase
-        .from('fleet_loads')
-        .select(
-          'id, landstar_load_id, origin, destination, actual_miles, booked_miles, rate, delivery_date',
-        )
-        .in('id', loadIds)
-    : { data: [] as any[] };
-
-  const loadMap = new Map<string, any>((loads ?? []).map((l: any) => [l.id, l]));
-
-  // Chronological order by delivery date
-  const sortedLoads = [...loadItems].sort((a: any, b: any) => {
-    const da = loadMap.get(a.load_id)?.delivery_date ?? '';
-    const db = loadMap.get(b.load_id)?.delivery_date ?? '';
-    return da.localeCompare(db);
-  });
+  const breakdown = await fetchPayBreakdown(s, driver as any);
 
   const logoData = await loadLogo(org?.logo_url);
   const logoFmt = logoData ? detectLogoFormat(logoData) : 'PNG';
@@ -117,7 +103,6 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   doc.setFillColor(15, 23, 42);
   doc.rect(0, 0, W, HEADER_H, 'F');
 
-  // Left: logo + company
   let leftX = margin;
   if (logoData) {
     try {
@@ -144,11 +129,8 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   const ids: string[] = [];
   if (org?.dot_number) ids.push(`USDOT ${org.dot_number}`);
   if (org?.mc_number) ids.push(`MC ${org.mc_number}`);
-  if (ids.length) {
-    doc.text(ids.join('  ·  '), leftX, leftY);
-  }
+  if (ids.length) doc.text(ids.join('  ·  '), leftX, leftY);
 
-  // Right: driver block
   const rx = W - margin;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
@@ -191,79 +173,202 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   doc.line(margin, y, W - margin, y);
   y += 16;
 
-  // Period info grid
+  // Period info grid (4 columns: period, payment, method, status)
   doc.setTextColor(100, 116, 139);
   doc.setFontSize(8);
-  doc.text('PAY PERIOD', margin, y);
-  doc.text('PAYMENT DATE', margin + 200, y);
-  doc.text('STATUS', rx - 60, y);
+  const col1 = margin;
+  const col2 = margin + 170;
+  const col3 = margin + 320;
+  doc.text('PAY PERIOD', col1, y);
+  doc.text('PAYMENT DATE', col2, y);
+  doc.text('EARNINGS METHOD', col3, y);
+  doc.text('STATUS', rx - 50, y);
 
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.text(
     `${fmtDate(s.period_start)} – ${fmtDate(s.period_end)}`,
-    margin,
+    col1,
     y + 14,
   );
-  doc.text(fmtDate(s.payment_date), margin + 200, y + 14);
+  doc.text(fmtDate(s.payment_date), col2, y + 14);
+  doc.setFontSize(9);
+  doc.text(breakdown.methodLabel, col3, y + 14);
+  doc.setFontSize(10);
   doc.text(String(s.status || 'draft').toUpperCase(), rx, y + 14, {
     align: 'right',
   });
 
-  y += 30;
+  y += 34;
 
-  // ---------- Earnings table ----------
+  // ---------- Pay Calculation band ----------
+  doc.setDrawColor(226, 232, 240);
+  doc.setFillColor(241, 245, 249);
+  doc.rect(margin, y, W - margin * 2, 28, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text('PAY CALCULATION', margin + 10, y + 11);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text(breakdown.formulaLabel, W - margin - 10, y + 19, { align: 'right' });
+  y += 40;
+
+  // ---------- Earnings table (per pay type) ----------
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
   doc.text('Load Earnings', margin, y);
   y += 6;
 
-  autoTable(doc, {
-    startY: y,
-    head: [['Date', 'Load #', 'Origin → Destination', 'Miles', 'Linehaul', 'Amount']],
-    body:
-      sortedLoads.length === 0
-        ? [['—', '—', 'No load earnings in this period', '—', '—', formatCurrency(0)]]
-        : sortedLoads.map((i: any) => {
-            const l = loadMap.get(i.load_id) || {};
-            const miles = l.actual_miles ?? l.booked_miles ?? '';
-            const od = `${l.origin ?? ''} → ${l.destination ?? ''}`;
-            return [
-              fmtDateShort(l.delivery_date),
-              l.landstar_load_id || (l.id ? String(l.id).slice(0, 8) : '—'),
-              od.trim() === '→' ? '—' : od,
-              miles !== '' ? String(miles) : '—',
-              l.rate != null ? formatCurrency(Number(l.rate)) : '—',
-              formatCurrency(Number(i.amount ?? 0)),
-            ];
-          }),
-    headStyles: {
-      fillColor: [15, 23, 42],
-      textColor: 255,
-      fontSize: 9,
-      halign: 'left',
-    },
-    styles: { fontSize: 9, cellPadding: 5, textColor: [30, 41, 59] },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    columnStyles: {
-      3: { halign: 'right' },
-      4: { halign: 'right' },
-      5: { halign: 'right', fontStyle: 'bold' },
-    },
-    margin: { left: margin, right: margin },
-    foot: [
-      [
-        { content: 'Gross Pay', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
-        {
-          content: formatCurrency(Number(s.gross_pay ?? 0)),
-          styles: { halign: 'right', fontStyle: 'bold' },
-        },
+  const headStyles = {
+    fillColor: [15, 23, 42] as [number, number, number],
+    textColor: 255,
+    fontSize: 9,
+    halign: 'left' as const,
+  };
+  const baseStyles = { fontSize: 9, cellPadding: 5, textColor: [30, 41, 59] as [number, number, number] };
+  const alt = { fillColor: [248, 250, 252] as [number, number, number] };
+  const footStyles = { fillColor: [241, 245, 249] as [number, number, number], textColor: [15, 23, 42] as [number, number, number] };
+
+  if (breakdown.payType === 'flat') {
+    autoTable(doc, {
+      startY: y,
+      head: [['Date', 'Load #', 'Origin → Destination', 'Miles', 'Status']],
+      body:
+        breakdown.loads.length === 0
+          ? [['—', '—', 'No loads recorded in this period', '—', '—']]
+          : breakdown.loads.map((l) => [
+              fmtDateShort(l.delivery_date ?? l.pickup_date),
+              l.landstar_load_id || String(l.id).slice(0, 8),
+              `${l.origin ?? ''} → ${l.destination ?? ''}`,
+              fmtMiles(Number(l.booked_miles ?? l.actual_miles ?? 0)),
+              String(l.status ?? '—').replace('_', ' '),
+            ]),
+      headStyles,
+      styles: baseStyles,
+      alternateRowStyles: alt,
+      columnStyles: { 3: { halign: 'right' } },
+      margin: { left: margin, right: margin },
+      foot: [
+        [
+          { content: 'Flat Rate Base Pay', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: formatCurrency(breakdown.basePay), styles: { halign: 'right', fontStyle: 'bold' } },
+        ],
       ],
-    ],
-    footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] },
-  });
+      footStyles,
+    });
+  } else if (breakdown.payType === 'per_mile') {
+    autoTable(doc, {
+      startY: y,
+      head: [['Date', 'Load #', 'Origin → Destination', 'Loaded Miles', 'Rate', 'Amount']],
+      body:
+        breakdown.loads.length === 0
+          ? [['—', '—', 'No completed loads in this period', '—', '—', formatCurrency(0)]]
+          : breakdown.loads.map((l) => {
+              const mi = Number(l.booked_miles ?? l.actual_miles ?? 0);
+              return [
+                fmtDateShort(l.delivery_date),
+                l.landstar_load_id || String(l.id).slice(0, 8),
+                `${l.origin ?? ''} → ${l.destination ?? ''}`,
+                fmtMiles(mi),
+                `$${breakdown.payRate.toFixed(2)}/mi`,
+                formatCurrency(mi * breakdown.payRate),
+              ];
+            }),
+      headStyles,
+      styles: baseStyles,
+      alternateRowStyles: alt,
+      columnStyles: {
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+        5: { halign: 'right', fontStyle: 'bold' },
+      },
+      margin: { left: margin, right: margin },
+      foot: [
+        [
+          { content: 'Totals', styles: { fontStyle: 'bold' } },
+          { content: '', styles: {} },
+          { content: '', styles: {} },
+          {
+            content: `${fmtMiles(breakdown.totalLoadedMiles)} mi`,
+            styles: { halign: 'right', fontStyle: 'bold' },
+          },
+          { content: '', styles: {} },
+          {
+            content: formatCurrency(breakdown.basePay),
+            styles: { halign: 'right', fontStyle: 'bold' },
+          },
+        ],
+      ],
+      footStyles,
+    });
+  } else if (breakdown.payType === 'percentage') {
+    const pct = breakdown.payRate;
+    const split = breakdown.truckSplit;
+    autoTable(doc, {
+      startY: y,
+      head: [
+        [
+          'Date',
+          'Load #',
+          'Origin → Destination',
+          'Linehaul',
+          `After ${(split * 100).toFixed(0)}% Split`,
+          `Driver ${pct}%`,
+        ],
+      ],
+      body:
+        breakdown.loads.length === 0
+          ? [['—', '—', 'No completed loads in this period', '—', '—', formatCurrency(0)]]
+          : breakdown.loads.map((l) => {
+              const linehaul = Number(l.rate ?? 0);
+              const afterSplit = linehaul * split;
+              const driverShare = afterSplit * (pct / 100);
+              return [
+                fmtDateShort(l.delivery_date),
+                l.landstar_load_id || String(l.id).slice(0, 8),
+                `${l.origin ?? ''} → ${l.destination ?? ''}`,
+                formatCurrency(linehaul),
+                formatCurrency(afterSplit),
+                formatCurrency(driverShare),
+              ];
+            }),
+      headStyles,
+      styles: baseStyles,
+      alternateRowStyles: alt,
+      columnStyles: {
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+        5: { halign: 'right', fontStyle: 'bold' },
+      },
+      margin: { left: margin, right: margin },
+      foot: [
+        [
+          { content: 'Totals', styles: { fontStyle: 'bold' } },
+          { content: '', styles: {} },
+          { content: '', styles: {} },
+          { content: formatCurrency(breakdown.totalLinehaul), styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: formatCurrency(breakdown.totalAfterSplit), styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: formatCurrency(breakdown.basePay), styles: { halign: 'right', fontStyle: 'bold' } },
+        ],
+      ],
+      footStyles,
+    });
+  } else {
+    autoTable(doc, {
+      startY: y,
+      head: [['Description', 'Amount']],
+      body: [['Base Pay', formatCurrency(breakdown.basePay)]],
+      headStyles,
+      styles: baseStyles,
+      alternateRowStyles: alt,
+      columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+      margin: { left: margin, right: margin },
+    });
+  }
 
   y = (doc as any).lastAutoTable.finalY + 18;
 
@@ -283,36 +388,27 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
             i.description || '—',
             formatCurrency(Number(i.amount ?? 0)),
           ]),
-    headStyles: {
-      fillColor: [15, 23, 42],
-      textColor: 255,
-      fontSize: 9,
-      halign: 'left',
-    },
-    styles: { fontSize: 9, cellPadding: 5, textColor: [30, 41, 59] },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
+    headStyles,
+    styles: baseStyles,
+    alternateRowStyles: alt,
     columnStyles: { 1: { halign: 'right', fontStyle: 'bold', cellWidth: 110 } },
     margin: { left: margin, right: margin },
     foot: [
       [
-        {
-          content: 'Total Reimbursements',
-          styles: { halign: 'right', fontStyle: 'bold' },
-        },
+        { content: 'Total Reimbursements', styles: { halign: 'right', fontStyle: 'bold' } },
         {
           content: formatCurrency(Number(s.reimbursements ?? 0)),
           styles: { halign: 'right', fontStyle: 'bold' },
         },
       ],
     ],
-    footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42] },
+    footStyles,
   });
 
   y = (doc as any).lastAutoTable.finalY + 22;
 
   // ---------- Summary + YTD side-by-side ----------
-  // Page-break guard
-  const blockHeight = 28 + 3 * 20 + 12;
+  const blockHeight = 30 + 3 * 22 + 24;
   if (y + blockHeight > H - 90) {
     doc.addPage();
     y = margin;
@@ -331,7 +427,6 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
     doc.setFillColor(248, 250, 252);
     doc.rect(x, y, colW, h, 'FD');
 
-    // Title bar
     doc.setFillColor(15, 23, 42);
     doc.rect(x, y, colW, 22, 'F');
     doc.setFont('helvetica', 'bold');
@@ -379,6 +474,17 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
     true,
   );
 
+  // Net Pay formula line below the blocks
+  const blocksH = 30 + 3 * 22;
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text(
+    'Net Pay = Gross Pay + Reimbursements',
+    margin,
+    y + blocksH + 14,
+  );
+
   // ---------- Footer (every page) ----------
   const taxNote = isContractor
     ? 'This settlement reflects payment for independent contractor services. No federal, state, or local taxes have been withheld. The recipient is responsible for all applicable self-employment and income tax obligations.'
@@ -406,11 +512,7 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
 
     doc.setFontSize(7);
     doc.setTextColor(140, 148, 165);
-    doc.text(
-      `Generated ${format(new Date(), 'PPpp')}`,
-      margin,
-      H - 16,
-    );
+    doc.text(`Generated ${format(new Date(), 'PPpp')}`, margin, H - 16);
     doc.text(`Page ${p} of ${pageCount}`, W - margin, H - 16, { align: 'right' });
   }
 
