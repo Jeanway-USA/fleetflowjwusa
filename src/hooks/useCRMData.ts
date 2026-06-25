@@ -193,7 +193,7 @@ export function useContactMutations() {
         .from('crm_contacts')
         .insert(contact)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -213,8 +213,9 @@ export function useContactMutations() {
         .update(updates)
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("This contact no longer exists or you don't have permission to edit it.");
       return data;
     },
     onSuccess: () => {
