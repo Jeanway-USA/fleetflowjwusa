@@ -27,7 +27,7 @@ interface Props {
 }
 
 export function SettlementPrintable({ data }: Props) {
-  const { settlement, driver, items, reimbursementItems, breakdown, ytd } = data;
+  const { settlement, driver, reimbursementItems, deductionItems, breakdown, ytd } = data;
   const status = statusLabel(settlement.status);
   const driverName =
     `${driver?.first_name ?? ''} ${driver?.last_name ?? ''}`.trim() || 'Driver';
@@ -40,29 +40,36 @@ export function SettlementPrintable({ data }: Props) {
 
   const currentGross = Number(settlement.gross_pay ?? 0);
   const currentReimb = Number(settlement.reimbursements ?? 0);
-  const currentNet = currentGross + currentReimb;
-  const ytdNet = ytd.gross + ytd.reimbursements;
+  const currentDed = Number(settlement.deductions ?? 0);
+  const currentNet = currentGross + currentReimb - currentDed;
+  const ytdNet = ytd.gross + ytd.reimbursements - ytd.deductions;
 
   return (
     <div className="max-w-4xl mx-auto p-8 bg-white text-zinc-900 shadow-sm print:shadow-none print:p-0">
       {/* Header banner */}
-      <header className="bg-slate-900 text-white px-10 py-8 flex items-start justify-between gap-6 print:break-inside-avoid">
+      <header className="bg-zinc-900 text-white px-10 py-8 flex items-start justify-between gap-6 print:break-inside-avoid">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-wide">
             {CORPORATE_HEADER.name}
           </h1>
-          <p className="text-sm tracking-normal text-slate-300">
+          <p className="text-sm tracking-normal text-zinc-300">
             {CORPORATE_HEADER.subtitle}
           </p>
-          <p className="text-xs tracking-normal text-slate-400">
+          <p className="text-xs tracking-normal text-zinc-400">
             {CORPORATE_HEADER.address}
           </p>
         </div>
         <div className="text-right space-y-2">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-slate-300">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-300">
             Settlement &amp; Earnings Statement
           </p>
-          <p className="text-xs text-slate-300">Statement #{statementNo}</p>
+          <p className="text-xs text-zinc-300">Statement #{statementNo}</p>
+          <p className="text-xs text-zinc-300">
+            Pay Period {fmtDateShort(settlement.period_start)} – {fmtDateShort(settlement.period_end)}
+          </p>
+          <p className="text-xs text-zinc-300">
+            Payment Date {fmtDateShort(settlement.payment_date)}
+          </p>
           <span
             className={`inline-block px-2.5 py-1 text-[11px] font-semibold tracking-wider rounded ${STATUS_STYLES[status]}`}
           >
@@ -114,7 +121,7 @@ export function SettlementPrintable({ data }: Props) {
         </h2>
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-slate-900 text-white text-left text-[11px] uppercase tracking-wider">
+            <tr className="bg-zinc-900 text-white text-left text-[11px] uppercase tracking-wider">
               <th className="px-3 py-2 font-semibold">Date</th>
               <th className="px-3 py-2 font-semibold">Load #</th>
               <th className="px-3 py-2 font-semibold text-right">Miles</th>
@@ -137,7 +144,7 @@ export function SettlementPrintable({ data }: Props) {
               breakdown.loads.map((l) => (
                 <tr
                   key={l.id}
-                  className="align-top even:bg-zinc-50 border-b border-zinc-100"
+                  className="align-top even:bg-slate-50/50 border-b border-zinc-100 print:break-inside-avoid"
                 >
                   <td className="px-3 py-2 whitespace-nowrap">
                     {fmtDateShort(l.delivery_date ?? l.pickup_date)}
@@ -164,48 +171,64 @@ export function SettlementPrintable({ data }: Props) {
         </table>
       </section>
 
-      {/* Earnings & Reimbursements */}
+      {/* Dual-column itemization: Earnings & Additions / Deductions & Escrows */}
       <section className="border-t border-zinc-200 py-6 print:break-inside-avoid">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 mb-3">
-          Earnings &amp; Reimbursements
-        </h2>
-        <div className="divide-y divide-zinc-100">
-          <LineItem label="Flat Rate Base Pay" value={breakdown.basePay} />
-          {reimbursementItems.length === 0 ? (
-            <div className="flex justify-between py-2 text-sm text-zinc-500 italic">
-              <span>No reimbursements in this period</span>
-              <span className="tabular-nums">{formatCurrency(0)}</span>
-            </div>
-          ) : (
-            reimbursementItems.map((r) => (
-              <LineItem
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ItemColumn title="Earnings & Additions" emptyText="No earnings recorded">
+            <ItemRow label={breakdown.methodLabel} value={breakdown.basePay} bold />
+            {reimbursementItems.map((r) => (
+              <ItemRow
                 key={r.id}
                 label={`Reimbursement — ${r.description ?? 'Other'}`}
                 value={Number(r.amount ?? 0)}
               />
-            ))
-          )}
+            ))}
+            {reimbursementItems.length === 0 && (
+              <p className="text-xs italic text-zinc-500 py-1">
+                No reimbursements in this period
+              </p>
+            )}
+          </ItemColumn>
+
+          <ItemColumn title="Deductions & Escrows" emptyText="No deductions in this period">
+            {deductionItems.length === 0 ? (
+              <p className="text-xs italic text-zinc-500 py-1">
+                No deductions in this period
+              </p>
+            ) : (
+              deductionItems.map((d) => (
+                <ItemRow
+                  key={d.id}
+                  label={d.description ?? 'Deduction'}
+                  value={-Math.abs(Number(d.amount ?? 0))}
+                  negative
+                />
+              ))
+            )}
+          </ItemColumn>
         </div>
       </section>
 
-      {/* Dual summary cards */}
+      {/* Dual summary cards: CURRENT PERIOD vs YEAR-TO-DATE */}
       <section className="border-t border-zinc-200 py-6 print:break-inside-avoid">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SummaryCard
             title="Current Period"
             gross={currentGross}
             reimbursements={currentReimb}
+            deductions={currentDed}
             net={currentNet}
           />
           <SummaryCard
             title="Year-to-Date"
             gross={ytd.gross}
             reimbursements={ytd.reimbursements}
+            deductions={ytd.deductions}
             net={ytdNet}
           />
         </div>
         <p className="text-[11px] italic text-zinc-500 mt-3 text-center">
-          Net Pay = Gross Pay + Reimbursements
+          Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions
         </p>
       </section>
 
@@ -234,11 +257,43 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function LineItem({ label, value }: { label: string; value: number }) {
+function ItemColumn({
+  title,
+  children,
+}: {
+  title: string;
+  emptyText: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="flex justify-between py-2 text-sm">
+    <div className="border border-zinc-200 rounded-lg overflow-hidden">
+      <div className="bg-zinc-900 text-white px-4 py-2 text-[11px] font-semibold tracking-wider uppercase">
+        {title}
+      </div>
+      <div className="px-4 py-2 divide-y divide-zinc-100">{children}</div>
+    </div>
+  );
+}
+
+function ItemRow({
+  label,
+  value,
+  bold,
+  negative,
+}: {
+  label: string;
+  value: number;
+  bold?: boolean;
+  negative?: boolean;
+}) {
+  return (
+    <div className="flex justify-between py-2 text-sm gap-3">
       <span className="text-zinc-700">{label}</span>
-      <span className="font-medium tabular-nums">{formatCurrency(value)}</span>
+      <span
+        className={`tabular-nums shrink-0 ${bold ? 'font-semibold' : 'font-medium'} ${negative ? 'text-red-600' : ''}`}
+      >
+        {formatCurrency(value)}
+      </span>
     </div>
   );
 }
@@ -247,16 +302,18 @@ function SummaryCard({
   title,
   gross,
   reimbursements,
+  deductions,
   net,
 }: {
   title: string;
   gross: number;
   reimbursements: number;
+  deductions: number;
   net: number;
 }) {
   return (
     <div className="border border-zinc-200 rounded-lg overflow-hidden">
-      <div className="bg-slate-900 text-white px-4 py-2 text-xs font-semibold tracking-wider uppercase">
+      <div className="bg-zinc-900 text-white px-4 py-2 text-xs font-semibold tracking-wider uppercase">
         {title}
       </div>
       <div className="px-4 py-3 text-sm divide-y divide-zinc-100">
@@ -265,8 +322,14 @@ function SummaryCard({
           <span className="tabular-nums">{formatCurrency(gross)}</span>
         </div>
         <div className="flex justify-between py-2">
-          <span className="text-zinc-600">Reimbursements</span>
+          <span className="text-zinc-600">Total Reimbursements</span>
           <span className="tabular-nums">{formatCurrency(reimbursements)}</span>
+        </div>
+        <div className="flex justify-between py-2">
+          <span className="text-zinc-600">Total Deductions</span>
+          <span className="tabular-nums text-red-600">
+            {formatCurrency(-Math.abs(deductions))}
+          </span>
         </div>
         <div className="flex justify-between py-2 bg-slate-50 -mx-4 px-4 font-semibold text-base">
           <span>Net Pay</span>
