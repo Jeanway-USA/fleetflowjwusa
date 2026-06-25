@@ -1,58 +1,43 @@
-## Add "Include Check Voucher Summary" toggle to Settlement print view
+## Make `useDocumentUpload` offline-first (POD + general document attach)
 
-Append an optional, tear-off style check voucher block to the bottom of the settlement document. The voucher is purely presentational (record-only, non-negotiable) — no schema or financial-logic changes.
+### Context — what already works
+- **IndexedDB queue**: `src/lib/offline-document-queue.ts` stores Blobs (not base64) keyed by UUID — already implemented.
+- **Sync observer**: `useOfflineDocumentQueue` watches `online`/`offline`, auto-drains to Supabase Storage + `documents` table, fires success/error toasts.
+- **Global bootstrap**: `<DocumentSyncBootstrap />` is mounted inside `DashboardLayout`, so the observer runs on every authenticated page (driver and back-office).
+- **Driver scan/POD flow** (`DocumentScanButton.tsx`) is already offline-first: detects `!navigator.onLine`, enqueues, and surfaces a "queued — safe to drive" toast plus a synced badge.
 
-### 1. New component: `SettlementCheckVoucher.tsx`
-Location: `src/components/finance/driver-settlements/SettlementCheckVoucher.tsx`
+### Gap to close
+`useDocumentUpload.uploadDocument` (used by the shared `<DocumentUpload />` component on Drivers, Trucks, Trailers pages and any in-app POD attach UI that isn't the driver scan button) still calls Storage directly and `toast.error`'s on network failure — so a dead-zone POD attempt crashes the flow instead of queueing.
 
-Props: `{ data: SettlementDocumentData }`
+### Changes
 
-Layout:
-- Outer wrapper: `mt-6 relative border-dashed border-2 border-zinc-300 rounded-md p-6 bg-white print:break-inside-avoid`
-- Top tear-line label: small uppercase "Detach Here — Non-Negotiable Voucher" with scissors icon, centered above border
-- Diagonal watermark overlay: absolutely-positioned `<div>` with `rotate-[-18deg]`, `text-zinc-200/60`, large bold tracking-widest text **"NON-NEGOTIABLE – FOR RECORD PURPOSES ONLY"**, `pointer-events-none select-none`, centered with flex
-- Header row: "JEANWAY LLC" left / "VOUCHER" + check number right
-- Grid (`grid-cols-1 md:grid-cols-2 gap-4`) of fields:
-  - **Pay To The Order Of**: driver full name
-  - **Amount**: net pay (numeric + written-out English amount, e.g. "Two Thousand Four Hundred and 00/100 — USD")
-  - **Pay Date**: settlement payment_date
-  - **Check Number**: `VCH-{statementNo}` (derived, not stored)
-  - **Bank / Routing**: placeholder line `XXXX-XXXX-XXXX` + "ACH Direct Deposit on File"
-  - **Memo**: `Settlement {period_start} – {period_end}`
-- Signature row at bottom:
-  - Left: "Authorized Signature" with cursive font (`font-[cursive]` / Tailwind `italic` + Google "Great Vibes" via inline style fallback) rendering "Jean-Way Payroll" above a thin `border-t border-zinc-800` line
-  - Right: small "Date" with payment_date above a signature line
+**1. `src/hooks/useDocumentUpload.ts` — wrap uploads with a connectivity guard**
+- Inject the existing offline queue (`enqueueDocument` from `@/lib/offline-document-queue`) directly — keep the hook independent of `useOfflineDocumentQueue` to avoid extra subscriptions per call site.
+- New flow in `uploadDocument(file, options)`:
+  1. Get current user (still required for `uploaded_by`).
+  2. If `!navigator.onLine` **or** IndexedDB is supported and the file is an image/PDF that should survive disconnects → `enqueueDocument(...)` immediately, dispatch the existing `lovable:doc-queue-changed` event, toast `"Saved offline — will upload when signal returns"`, return.
+  3. Otherwise attempt the live `upload(...)` → `supabase.insert(...)` chain inside a try/catch.
+  4. On network-shaped failures (`TypeError: Failed to fetch`, `err.message` containing `network`/`fetch`, or `!navigator.onLine` after the throw) → fall back to `enqueueDocument` instead of `toast.error`. Same "saved offline" toast.
+  5. Only show `toast.error` for true validation/auth errors (HTTP 4xx with a server message).
+- Keep `documentType`, `relatedType`, `relatedId`, `org_id`, `uploaded_by` on the queued record so the existing drain logic in `useOfflineDocumentQueue` writes the same `documents` row when it eventually syncs.
 
-### 2. Toggle UI on `SettlementPrint.tsx`
-- Add local state `const [includeVoucher, setIncludeVoucher] = useState(false)`
-- In the top action bar (next to Print/Download buttons), add a `<Switch>` + `<Label>` block (shadcn): **"Include Check Voucher Summary"**, hidden via `print:hidden`
-- Pass `includeVoucher` to `<SettlementPrintable data={data} includeVoucher={includeVoucher} />`
+**2. `src/components/shared/DocumentUpload.tsx` — surface queue state**
+- Consume `useOfflineDocumentQueue()` (read-only: `isOnline`, `queuedCount`, `isSyncing`).
+- Add a small inline status pill above the file input:
+  - `Offline — new attachments will queue` (amber) when `!isOnline`
+  - `Syncing N queued…` (blue, with spinner) when `isSyncing`
+  - Hidden otherwise
+- No behavior change beyond the visual indicator — the hook already handles the actual queue/drain.
 
-### 3. Wire into `SettlementPrintable.tsx`
-- Accept new optional prop `includeVoucher?: boolean`
-- Render `{includeVoucher && <SettlementCheckVoucher data={data} />}` **after** the legal footer block so it sits at the absolute bottom of the page
-- Keep `print:break-inside-avoid` so the voucher never splits across pages
+**3. Toast copy + crash safety**
+- Replace the generic `toast.error(error.message)` in the upload catch with the offline-aware branching above. Re-throw only when the caller (mutation) still needs to know about a non-recoverable error; for queued-instead-of-failed cases, resolve cleanly so the dialog closes normally.
 
-### 4. PDF export sync (`generateSettlementPdf.ts`)
-- Accept second arg `{ includeVoucher?: boolean }`
-- When true, after the existing footer, draw:
-  - Dashed rectangle (`doc.setLineDash([3,3])`) sized to remaining bottom margin
-  - Faint diagonal watermark text using `doc.saveGraphicsState()` + `setGState({opacity:0.12})` + 35° rotation
-  - 2-column field grid via `autoTable` with `theme:'plain'`
-  - Signature line + cursive "Jean-Way Payroll" using an italic font fallback
-- Update `handleDownload` in `SettlementPrint.tsx` to pass `{ includeVoucher }`
-
-### 5. Helpers
-- Add small util `numberToEnglishUsd(amount: number): string` in `src/lib/formatters.ts` (or co-located in the voucher component) for the written amount line
-
-### Scope guardrails
-- No database, RLS, or settlement-totals changes
-- No new dependencies (use existing Switch, Label, jsPDF, autoTable)
-- Voucher is record-only; explicit non-negotiable watermark on both web and PDF
+### Out of scope
+- No DB schema, RLS, or Storage bucket changes (queue already drains into the existing `documents` table + `documents` bucket).
+- No new dependencies.
+- No changes to `DocumentScanButton` (already offline-first).
+- No service-worker / Background Sync API work — the in-app `online` listener + bootstrap already covers reconnect drain while the tab is open.
 
 ### File touch list
-- **new** `src/components/finance/driver-settlements/SettlementCheckVoucher.tsx`
-- **edit** `src/components/finance/driver-settlements/SettlementPrintable.tsx` (prop + render)
-- **edit** `src/pages/SettlementPrint.tsx` (Switch + state, pass flag to PDF)
-- **edit** `src/lib/pdf/generateSettlementPdf.ts` (optional voucher block)
-- **edit** `src/lib/formatters.ts` (number-to-words helper)
+- **edit** `src/hooks/useDocumentUpload.ts` — connectivity guard + queue fallback
+- **edit** `src/components/shared/DocumentUpload.tsx` — offline/sync status pill
