@@ -244,6 +244,8 @@ export function SettlementPrintable({ data, includeVoucher = false }: Props) {
           <span>Page 1 of 1</span>
         </div>
       </footer>
+
+      {includeVoucher && <SettlementCheckVoucher data={data} />}
     </div>
   );
 }
