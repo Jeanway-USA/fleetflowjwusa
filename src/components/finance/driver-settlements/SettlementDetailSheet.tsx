@@ -432,20 +432,25 @@ function SummaryStat({
   label,
   value,
   primary,
+  negative,
 }: {
   label: string;
   value: number;
   primary?: boolean;
+  negative?: boolean;
 }) {
   return (
     <div className={`rounded-md border p-3 ${primary ? 'border-primary/40 bg-primary/5' : 'border-border'}`}>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`font-semibold ${primary ? 'text-primary text-lg' : ''}`}>
+      <p
+        className={`font-semibold ${primary ? 'text-primary text-lg' : ''} ${negative ? 'text-red-600' : ''}`}
+      >
         {formatCurrency(value)}
       </p>
     </div>
   );
 }
+
 
 function EarningsBreakdown({ breakdown }: { breakdown: PayBreakdown | undefined }) {
   if (!breakdown) {
