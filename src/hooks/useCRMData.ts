@@ -193,7 +193,7 @@ export function useContactMutations() {
         .from('crm_contacts')
         .insert(contact)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -213,8 +213,9 @@ export function useContactMutations() {
         .update(updates)
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("This contact no longer exists or you don't have permission to edit it.");
       return data;
     },
     onSuccess: () => {
@@ -270,7 +271,7 @@ export function useResourceMutations() {
         .from('company_resources')
         .insert(resource)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -343,7 +344,7 @@ export function useFacilityMutations() {
         .from('facilities')
         .insert(facility)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -464,7 +465,7 @@ export function useCreateActivity() {
         .from('crm_activities')
         .insert(activity)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },

@@ -1,55 +1,36 @@
-## Three fixes
+# Fix CRM "Failed to save contact / Cannot coerce…" error
 
-### 1. Detail sheet pops up when clicking Edit in row dropdown
+## What's happening
 
-Root cause: in `src/pages/CRM.tsx` the table row has `onRowClick={(c) => setDetailContact(c)}`. The `DropdownMenuTrigger` button stops propagation, but `DropdownMenuItem` clicks (Edit / Delete / View) do not — so clicking "Edit" in the menu bubbles up to the row, which opens the detail sheet. `handleEdit` then sets `detailContact` back to `null`, but in the meantime Radix mounts the Sheet and steals focus.
+That exact PostgREST message is thrown by `.single()` when the query returns 0 rows. Every CRM mutation in `src/hooks/useCRMData.ts` uses `.insert(...).select().single()` / `.update(...).select().single()`, so any one of these will surface as "Failed to save contact" in the UI:
 
-**Fix:** add `onClick={(e) => e.stopPropagation()}` (or `onSelect={(e) => e.preventDefault()}` + manual stop) on each `DropdownMenuItem` inside the actions column, and on the `DropdownMenuContent` itself as a safety net. Result: row click handler never fires when interacting with the menu, so the detail sheet stops appearing during Edit/Delete.
+1. **INSERT returns 0 rows under RLS** — Postgres inserts the row, but the `RETURNING` step is filtered by the SELECT policy. If `org_id` on the payload doesn't match the user's org (or the user briefly has no org context), the row is hidden and `.single()` blows up even though the write succeeded. This is the most common cause on live.
+2. **UPDATE matches 0 rows** — for example editing a record whose `id` no longer exists in `crm_contacts` (it was migrated to `company_resources`, or another tab/user deleted it). `.single()` errors instead of giving a clean message.
+3. **Trigger side-effects** — the auto-harvest trigger on `fleet_loads` writes to `crm_contacts`, but a trigger on `crm_contacts` itself that changes/removes the row would also empty the `RETURNING` set. Worth a quick look while we're in there.
 
-### 2. Auto-added agents land in the wrong table and can duplicate
+The user only sees a red toast with no recovery, and we don't actually know whether the write landed.
 
-Auto-harvest trigger `public.autoharvest_crm_agent_from_load` (migration `20260624030643…`) inserts into `crm_contacts` with `contact_type='agent'`. But the real "Load Agent" record lives in `company_resources` with `resource_type='load_agent'` — that's what the Agents tab, edit form, and detail sheet treat as a true Load Agent. The trigger's existence check also only looks at `crm_contacts`, so a load can re-create an agent even when a `company_resources` entry already exists. End result: duplicates and "half-agents" that miss fields.
+## Fix (frontend only)
 
-**Fix (new migration):** rewrite `autoharvest_crm_agent_from_load` so that:
+In `src/hooks/useCRMData.ts`, replace `.single()` with `.maybeSingle()` for all six CRM-related mutations (`createContact`, `updateContact`, `createResource`, plus the matching facility/resource create mutations on lines 196, 216, 273, 346, 467) and handle the null case explicitly:
 
-- It inserts into `public.company_resources` instead of `crm_contacts`, with:
-  - `resource_type = 'load_agent'`
-  - `name = COALESCE(v_name, v_code)` (Agency Name)
-  - `agent_code = v_code`
-  - `agent_status = 'safe'`
-  - `notes = 'Auto-added from load ' || v_load_id`
-  - `org_id = NEW.org_id`
-- Duplicate guard checks BOTH tables before inserting:
-  - skip if any `company_resources` row in this org has `resource_type='load_agent'` AND (`lower(agent_code)=lower(v_code)` OR `lower(name)=lower(v_name)`)
-  - skip if any `crm_contacts` row in this org has `contact_type IN ('agent','broker')` AND matches by `agent_code` or `company_name` (covers legacy auto-added rows so we don't double-create)
-- Keep `ON CONFLICT DO NOTHING` and the existing `EXCEPTION WHEN OTHERS THEN NULL` swallow so loads never fail because of CRM harvesting.
+- On INSERT: if `data` is null, re-fetch by the inserted payload's natural key (or just invalidate and trust the write) and show a soft warning instead of an error. Don't throw — the row was written.
+- On UPDATE: if `data` is null, throw a clear error: "This contact no longer exists or you don't have permission to edit it" so the toast actually tells the user what went wrong.
 
-One-time data cleanup in the same migration:
+Also tighten `ContactFormDialog.handleSubmit`:
 
-- For each legacy `crm_contacts` row where `contact_type='agent'` AND `notes LIKE 'Auto-added from load %'`:
-  - If no matching `company_resources` Load Agent exists in that org (by agent_code or name), move it: insert into `company_resources` with the values above.
-  - Then delete the legacy `crm_contacts` row (regardless of whether it was moved or skipped as duplicate).
-- De-dupe existing `company_resources` Load Agents per org: keep the oldest row per (org_id, lower(agent_code)) and per (org_id, lower(name)) where agent_code is null; delete the rest. Only delete rows that have no dependents (no `crm_contact_loads`/no FK references) — if a candidate dup has dependents, keep it and just log nothing (silent).
+- Guard against missing `orgId` before calling any mutation (toast + return). Right now if `orgId` is briefly undefined we send `org_id: undefined` and RLS hides the row.
+- Trim/normalize empty strings to `null` before insert so policies / unique constraints behave consistently.
 
-### 3. Agents table still shows irrelevant columns
+## Verify
 
-`ContactFormDialog` Agent form only collects: Agent Code, Agent Status, Agency Name (`company_name`), Phone, Email, Website, Notes. My previous column set still included an "Agency" column mapped to `contact_name` (always blank for resources) and a "Service Area" column (only used for roadside vendors).
+- Add a CRM contact of each type (broker, agent, shipper/receiver, maintenance shop) — no red toast, row appears in table.
+- Edit each type — saves cleanly; if the row was deleted in another tab, you now get the "no longer exists" message instead of the coerce error.
+- Confirm on the live preview by reproducing the original flow that triggered the screenshot.
 
-**Fix:** in `src/pages/CRM.tsx` `getColumnsFor('agent', …)`, replace columns with exactly:
+## Files touched
 
-`Agency Name (company_name) | Agent Code | Status | Phone | Email | Website | Actions`
+- `src/hooks/useCRMData.ts` — switch `.single()` → `.maybeSingle()` in the 5 mutations, handle null.
+- `src/components/crm/ContactFormDialog.tsx` — `orgId` guard + null-empties normalization in `handleSubmit`.
 
-- Drop the bogus "Agency" (contact_name) column.
-- Drop "Service Area" — agents don't have one.
-- Make Agent Code render via the existing `renderCode` helper (mono chip).
-- Status uses `renderAgentStatus` (Safe / Unsafe / Unrated).
-- Website renders as a truncated link when present, `—` otherwise.
-
-No other tab's columns change.
-
-## Technical notes
-
-- Files touched in this change: `src/pages/CRM.tsx` (column set + dropdown stopPropagation) and one new SQL migration for the trigger rewrite + cleanup.
-- No changes to `ContactFormDialog`, `ContactDetailSheet`, `useCRMData`, or schemas — only the trigger function body and a one-shot data backfill.
-- Migration is idempotent: `CREATE OR REPLACE FUNCTION` for the trigger; cleanup uses `WHERE NOT EXISTS` guards so re-running is safe.
-- No new GRANTs needed (function is SECURITY DEFINER; `company_resources` already has policies).
+No DB migration, no schema change, no edits to RLS or triggers in this pass. If after deploy we still see the toast, next step is to inspect the `crm_contacts` SELECT policy and the auto-harvest trigger.
