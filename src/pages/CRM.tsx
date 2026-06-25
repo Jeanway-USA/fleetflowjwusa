@@ -181,87 +181,13 @@ function AgentCRM() {
 
         {/* Contacts Table */}
         <DataTable
-          columns={[
-            { key: 'company_name', header: 'Company', render: (contact: UnifiedContact) => (
-              <div>
-                <div className="font-medium">{contact.company_name}</div>
-                {contact.agent_code && (
-                  <span className="text-xs text-muted-foreground">Code: {contact.agent_code}</span>
-                )}
-              </div>
-            )},
-            { key: 'contact_name', header: 'Contact', hiddenOnMobile: true, render: (contact: UnifiedContact) => contact.contact_name || '—' },
-            { key: 'contact_type', header: 'Type', render: (contact: UnifiedContact) => {
-              const subType = getSubTypeLabel(contact);
-              return (
-                <div className="flex flex-col gap-1">
-                  <Badge variant="outline" className={`text-xs capitalize w-fit ${TYPE_COLORS[contact.contact_type] || ''}`}>
-                    {contact.contact_type}
-                  </Badge>
-                  {subType && <span className="text-[10px] text-muted-foreground">{subType}</span>}
-                </div>
-              );
-            }},
-            { key: 'phone', header: 'Phone', hiddenOnMobile: true, render: (contact: UnifiedContact) => contact.phone || '—' },
-            { key: 'location', header: 'Location', hiddenOnMobile: true, render: (contact: UnifiedContact) => 
-              [contact.city, contact.state].filter(Boolean).join(', ') || contact.service_area || '—'
-            },
-            { key: 'details', header: 'Details', hiddenOnMobile: true, render: (contact: UnifiedContact) => (
-              <div className="flex flex-wrap gap-1">
-                {contact.source === 'crm' && contact.agent_status === 'safe' && (contact.notes || '').startsWith('Auto-added from') && (
-                  <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/30">Auto-added</Badge>
-                )}
-                {contact.source === 'facility' && contact.appointment_required && (
-                  <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/20">Appt Req</Badge>
-                )}
-                {contact.agent_status === 'unsafe' && (
-                  <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/20">Unsafe</Badge>
-                )}
-                {contact.agent_status === 'safe' && contact.source === 'resource' && (
-                  <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/20">Safe</Badge>
-                )}
-                {(contact.tags || []).slice(0, 2).map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
-                ))}
-                {(contact.tags || []).length > 2 && (
-                  <Badge variant="secondary" className="text-[10px]">+{contact.tags!.length - 2}</Badge>
-                )}
-              </div>
-            )},
-            { key: 'actions', header: '', render: (contact: UnifiedContact) => (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setDetailContact(contact)}>
-                    <Eye className="mr-2 h-4 w-4" /> View Details
-                  </DropdownMenuItem>
-                  {canEdit && (
-                    <DropdownMenuItem onClick={() => handleEdit(contact)}>
-                      <Edit2 className="mr-2 h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                  )}
-                  {canEdit && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(contact)}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )},
-          ]}
+          columns={getColumnsFor(typeFilter, scope, { canEdit, setDetailContact, handleEdit, setDeleteTarget })}
           data={filtered}
           loading={isLoading}
           emptyMessage={search ? 'No contacts match your search.' : 'No contacts yet. Add your first contact to get started.'}
           onRowClick={(contact) => setDetailContact(contact)}
           onRowDoubleClick={(contact) => setDetailContact(contact)}
-          tableId="crm-contacts"
+          tableId={`crm-contacts-${scope}-${typeFilter}`}
           exportFilename="crm-contacts"
           selectable={canEdit}
           selectedIds={selectedIds}
