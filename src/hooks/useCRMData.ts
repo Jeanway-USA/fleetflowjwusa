@@ -55,8 +55,8 @@ function mapResourceType(resourceType: string): ContactType {
 }
 
 function mapFacilityType(facilityType: string): ContactType {
-  if (facilityType === 'receiver') return 'receiver';
-  return 'shipper'; // shipper, both, warehouse, terminal → shipper
+  const allowed: ContactType[] = ['shipper', 'receiver', 'warehouse', 'terminal', 'both'];
+  return (allowed.includes(facilityType as ContactType) ? facilityType : 'shipper') as ContactType;
 }
 
 export function normalizeCRMContact(c: CRMContact): UnifiedContact {
