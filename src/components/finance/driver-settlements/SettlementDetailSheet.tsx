@@ -100,6 +100,16 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
     : 'Driver';
 
   const reimbursements = (items as any[]).filter((i) => i.item_type === 'reimbursement');
+  const deductions = (items as any[]).filter((i) => i.item_type === 'deduction');
+  const currentGross = Number(settlement?.gross_pay ?? 0);
+  const currentReimb = Number(settlement?.reimbursements ?? 0);
+  const currentDed = Number(settlement?.deductions ?? 0);
+  const currentNet = currentGross + currentReimb - currentDed;
+  const ytdGross = Number(settlement?.ytd_gross ?? 0);
+  const ytdReimb = Number(settlement?.ytd_reimbursements ?? 0);
+  const ytdDed = Number(settlement?.ytd_deductions ?? 0);
+  const ytdNet = ytdGross + ytdReimb - ytdDed;
+
 
 
   const handleDownload = async () => {
