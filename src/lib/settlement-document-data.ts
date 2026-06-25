@@ -14,7 +14,9 @@ export interface SettlementDocSettlement {
   net_pay: number | null;
   ytd_gross?: number | null;
   ytd_reimbursements?: number | null;
+  ytd_deductions?: number | null;
   ytd_net?: number | null;
+  deductions?: number | null;
 }
 
 export interface SettlementDocDriver {
@@ -47,6 +49,7 @@ export interface SettlementDocItem {
 export interface SettlementYtd {
   gross: number;
   reimbursements: number;
+  deductions: number;
   net: number;
 }
 
@@ -56,10 +59,12 @@ export interface SettlementDocumentData {
   org: SettlementDocOrg | null;
   items: SettlementDocItem[];
   reimbursementItems: SettlementDocItem[];
+  deductionItems: SettlementDocItem[];
   breakdown: PayBreakdown;
   ytd: SettlementYtd;
   payrollContact: string;
 }
+
 
 export async function buildSettlementDocumentData(
   settlementId: string,
