@@ -18,7 +18,13 @@ interface TrackingData {
   destination_full: string;
   status: string;
   pickup_date: string | null;
+  pickup_time?: string | null;
+  pickup_at?: string | null;
+  pickup_tz?: string | null;
   delivery_date: string | null;
+  delivery_time?: string | null;
+  delivery_at?: string | null;
+  delivery_tz?: string | null;
   booked_miles: number | null;
   load_number: string | null;
   current_route_geometry: [number, number][] | null;
@@ -205,18 +211,30 @@ export default function PublicLoadTracker() {
                 <div>
                   <p className="text-sm text-muted-foreground">Origin</p>
                   <p className="font-medium">{data.origin}</p>
-                  {data.pickup_date && (
+                  {(data.pickup_at || data.pickup_date) && (
                     <p className="text-xs text-muted-foreground">
-                      {format(parseISO(data.pickup_date), 'MMM d, yyyy')}
+                      <StopTime
+                        utcIso={data.pickup_at}
+                        tz={data.pickup_tz}
+                        legacyDate={data.pickup_date}
+                        legacyTime={data.pickup_time}
+                        withDate
+                      />
                     </p>
                   )}
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Destination</p>
                   <p className="font-medium">{data.destination}</p>
-                  {data.delivery_date && (
+                  {(data.delivery_at || data.delivery_date) && (
                     <p className="text-xs text-muted-foreground">
-                      {format(parseISO(data.delivery_date), 'MMM d, yyyy')}
+                      <StopTime
+                        utcIso={data.delivery_at}
+                        tz={data.delivery_tz}
+                        legacyDate={data.delivery_date}
+                        legacyTime={data.delivery_time}
+                        withDate
+                      />
                     </p>
                   )}
                 </div>
