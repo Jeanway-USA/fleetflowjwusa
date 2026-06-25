@@ -2012,6 +2012,7 @@ export type Database = {
           fuel_advance: number | null
           fuel_surcharge: number | null
           gross_revenue: number | null
+          has_statement_discrepancy: boolean
           height_inches: number | null
           id: string
           invoice_email: string | null
@@ -2080,6 +2081,7 @@ export type Database = {
           fuel_advance?: number | null
           fuel_surcharge?: number | null
           gross_revenue?: number | null
+          has_statement_discrepancy?: boolean
           height_inches?: number | null
           id?: string
           invoice_email?: string | null
@@ -2148,6 +2150,7 @@ export type Database = {
           fuel_advance?: number | null
           fuel_surcharge?: number | null
           gross_revenue?: number | null
+          has_statement_discrepancy?: boolean
           height_inches?: number | null
           id?: string
           invoice_email?: string | null
@@ -4028,6 +4031,75 @@ export type Database = {
             columns: ["truck_id"]
             isOneToOne: false
             referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settlement_discrepancies: {
+        Row: {
+          actual_amount: number
+          created_at: string
+          created_by: string | null
+          delta_amount: number
+          detail: string | null
+          expected_amount: number
+          id: string
+          load_id: string | null
+          org_id: string
+          reason_code: string
+          resolved_at: string | null
+          resolved_by: string | null
+          settlement_id: string | null
+          trip_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          actual_amount?: number
+          created_at?: string
+          created_by?: string | null
+          delta_amount?: number
+          detail?: string | null
+          expected_amount?: number
+          id?: string
+          load_id?: string | null
+          org_id: string
+          reason_code: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          settlement_id?: string | null
+          trip_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actual_amount?: number
+          created_at?: string
+          created_by?: string | null
+          delta_amount?: number
+          detail?: string | null
+          expected_amount?: number
+          id?: string
+          load_id?: string | null
+          org_id?: string
+          reason_code?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          settlement_id?: string | null
+          trip_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlement_discrepancies_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_loads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlement_discrepancies_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "driver_settlements"
             referencedColumns: ["id"]
           },
         ]
