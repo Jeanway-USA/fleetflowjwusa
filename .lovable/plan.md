@@ -1,37 +1,54 @@
-## Overhaul `generate_driver_settlements` pay logic
+## Pay-type-aware breakdown in Settlements UI + PDF
 
-Rewrite the RPC so each driver's gross pay follows their `pay_type`, and stop skipping drivers whose only work in the period is still in transit.
+Render an "Earnings Breakdown" that adapts to the driver's `pay_type`, in both the Driver Settlements table (detail sheet/expanded row) and the official PDF. Reimbursements continue to roll into Net Pay for all types.
 
-### Per-pay-type rules
+### Detection
 
-- **flat**: look for any `fleet_loads` assigned to the driver in the period where `status IN ('in_transit','delivered')` (pickup_date OR delivery_date inside the window). If at least one exists → gross = driver `pay_rate` (flat fee). Accessorials are not added.
-- **per_mile / cpm**: only `status = 'delivered'` loads with `delivery_date` in window. Gross = SUM(`booked_miles`) × `pay_rate`. (Uses "loaded miles" = `booked_miles`, our canonical loaded-miles field; falls back to `actual_miles` only if booked is null.)
-- **percentage**: only `status = 'delivered'` loads with `delivery_date` in window. Gross = SUM(`rate` × 0.65 [truck_percentage setting] × `pay_rate`/100). FSC and accessorials excluded, matching `calculateLoadPay`.
+Pull `drivers.pay_type` and `drivers.pay_rate` alongside the settlement (already fetched in PDF). Normalize `cpm → per_mile`. Decide layout from the type.
 
-Reimbursements stay manual (0 at generation, recomputed by `recalc_settlement_totals` when line items are added). Net pay stays generated column `gross + reimbursements`. YTD recompute unchanged.
+### What each variant shows
 
-### Fix the "no work done" skip
+**Flat Rate**
+- Single "Base Pay" line: label `Flat Rate Base Pay`, amount = driver's `pay_rate`.
+- Below it, an informational "Loads Worked This Period" mini-table (Date · Load # · Origin → Destination · Status) so reviewers see the activity behind the flat fee. No per-load amount column.
 
-Today the RPC does `IF _gross = 0 THEN CONTINUE`, so flat-rate drivers mid-trip get dropped. New behavior:
+**CPM (per_mile)**
+- "Pay Calculation" summary row: `Loaded Miles  ×  Rate Per Mile  =  Base Pay`
+  - e.g. `1,842 mi × $0.65/mi = $1,197.30`
+- Full "Load Earnings" table: Date · Load # · Origin → Destination · Loaded Miles · Amount, with a footer row totaling Loaded Miles and Base Pay.
 
-- For **flat** drivers: if any qualifying in-transit/delivered load exists in the window, create the settlement with the full flat `pay_rate` even though no load is delivered yet.
-- For **cpm / percentage**: keep skipping when there are zero delivered loads in the window (nothing to pay yet), but surface this as an informational return (the driver simply isn't returned in the result set, same as today).
-- A driver passed explicitly in `_driver_ids` with no qualifying work for their pay type still won't generate a row — but flat drivers with active loads now will, removing the blocker the user described.
+**Percentage**
+- "Pay Calculation" summary row: `Gross After Truck Split (65%)  ×  Driver %  =  Base Pay`
+  - e.g. `$4,500.00 × 25% = $1,125.00`
+- Full "Load Earnings" table: Date · Load # · Origin → Destination · Linehaul · After 65% Split · Driver Share, footer totals each numeric column.
 
-### Settlement line items
+All three variants then show the existing "Reimbursements" table and the existing "Current Period / YTD" summary blocks. Net Pay (gross + reimbursements) stays the headline number on both surfaces.
 
-Rebuild the per-load items insert to match the new rules:
+### PDF polish (official-looking)
 
-- flat → one line item `'Flat weekly pay'` for the full `pay_rate`, plus one informational line per in-transit/delivered load (`item_type = 'load_pay'`, amount `0`) so the PDF still lists the loads worked.
-- per_mile → one `load_pay` line per delivered load: `miles × rate`.
-- percentage → one `load_pay` line per delivered load: `rate × 0.65 × pct`.
+- Add a small "EARNINGS METHOD" chip in the period strip showing `Flat Rate`, `Cost Per Mile @ $X.XX/mi`, or `Percentage @ X%` so the calculation context is visible at a glance.
+- Right-align the formula in a thin bordered "Pay Calculation" band above the load table.
+- Light footer rule reading: `Net Pay = Gross Pay + Reimbursements` under the Current Period block, reinforcing the math for proof-of-income reviewers.
+- Keep slate-900 header band, conservative typography, page numbers, and tax/contractor note already in place.
 
 ### Files touched
 
-- `supabase/migrations/<new>.sql` — `CREATE OR REPLACE FUNCTION public.generate_driver_settlements(...)` with the new logic. Signature unchanged: `(_driver_ids uuid[], _period_end date, _payment_date date)`. `recalc_settlement_totals` untouched.
+- `src/lib/pdf/generateSettlementPdf.ts` — branch the Earnings section by pay type, add the calculation band, add method chip. Reuses existing data fetch (already pulls `pay_type`; add `pay_rate`).
+- `src/components/finance/driver-settlements/SettlementDetailSheet.tsx` — add an "Earnings Breakdown" card above the existing reimbursement section that mirrors the PDF layout (formula line + load table variant by pay type). Pulls driver `pay_type`/`pay_rate` (extend the existing driver query).
+- `src/components/finance/driver-settlements/DriverSettlementsTab.tsx` — no structural change; the existing row already shows Gross / Reimbursements / Net. Add a small subtitle under the Gross Pay cell showing the method (`Flat`, `$0.65/mi × 1,842 mi`, `25% of $4,500`) so the table communicates the calculation at a glance.
 
-No frontend or PDF changes required — the table/PDF already render `gross_pay`, `reimbursements`, `net_pay`, and the load line items as-is.
+### Data needs
 
-### Open question
+- Driver: `pay_type`, `pay_rate` (already mostly fetched).
+- Loads: already fetched (`booked_miles`, `actual_miles`, `rate`, `delivery_date`, origin/destination, landstar id). For flat drivers we need in-transit loads too — query `fleet_loads` by `driver_id` in `[period_start, period_end]` with status in (`delivered`,`in_transit`) instead of relying on settlement line items.
+- Truck split: read `company_settings.truck_percentage` (same lookup the RPC uses) so the percentage formula shows the same 65% the back-end applied.
 
-For **flat** drivers, should the in-transit detection use `pickup_date <= _period_end` (load picked up in or before the period and still moving), or strictly require pickup_date inside `[_period_start, _period_end]`? Defaulting to "pickup_date <= period_end AND (delivery_date IS NULL OR delivery_date >= _period_start)" so a load that straddles a period still counts — confirm if you want stricter.
+### Out of scope
+
+- No schema changes. No changes to `generate_driver_settlements` (already pay-type aware).
+- No changes to reimbursement add/delete flow.
+
+### Verification
+
+- Typecheck with `tsgo`.
+- Render PDFs for one flat, one CPM, one percentage settlement against the live preview, convert to images with `pdftoppm`, and visually QA: no overlapping text, formula band fits, tables not clipped, footer present on every page.
