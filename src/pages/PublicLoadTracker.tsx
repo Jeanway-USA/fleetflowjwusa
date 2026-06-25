@@ -8,6 +8,7 @@ const LoadRouteMap = lazy(() =>
 );
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { format, parseISO } from 'date-fns';
+import { StopTime } from '@/components/shared/StopTime';
 
 interface TrackingData {
   load_id?: string;
