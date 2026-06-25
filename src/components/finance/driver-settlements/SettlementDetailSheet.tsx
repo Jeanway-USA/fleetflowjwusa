@@ -74,13 +74,33 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
     enabled: open,
   });
 
+  const { data: driverProfile } = useQuery({
+    queryKey: ['driver_for_settlement', settlement?.driver_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('drivers')
+        .select('pay_type, pay_rate')
+        .eq('id', settlement!.driver_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!settlement?.driver_id,
+  });
+
+  const { data: breakdown } = useQuery({
+    queryKey: ['settlement_breakdown', settlementId, driverProfile?.pay_type],
+    queryFn: () => fetchPayBreakdown(settlement, driverProfile ?? null),
+    enabled: !!settlement && !!driverProfile,
+  });
+
   const driver = settlement ? driverMap.get(settlement.driver_id) : null;
   const driverName = driver
     ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || 'Driver'
     : 'Driver';
 
-  const earnings = (items as any[]).filter((i) => i.item_type === 'load_pay');
   const reimbursements = (items as any[]).filter((i) => i.item_type === 'reimbursement');
+
 
   const handleDownload = async () => {
     if (!settlementId) return;
