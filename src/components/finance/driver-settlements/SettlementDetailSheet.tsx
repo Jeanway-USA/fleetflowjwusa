@@ -359,38 +359,41 @@ function ReimbursementSection({
           No reimbursements yet. {editable && 'Click Add to record one.'}
         </p>
       ) : rows.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Description</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              {editable && <TableHead className="w-12" />}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="text-muted-foreground">{r.description ?? '—'}</TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatCurrency(Number(r.amount ?? 0))}
-                </TableCell>
-                {editable && (
-                  <TableCell>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => delMut.mutate(r.id)}
-                      disabled={delMut.isPending}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                )}
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <Table className="min-w-[420px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                {editable && <TableHead className="w-12" />}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="text-muted-foreground">{r.description ?? '—'}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {formatCurrency(Number(r.amount ?? 0))}
+                  </TableCell>
+                  {editable && (
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => delMut.mutate(r.id)}
+                        disabled={delMut.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       ) : null}
+
     </div>
   );
 }
