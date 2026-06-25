@@ -325,7 +325,9 @@ export function ActiveLoadsBoard() {
                   key: 'pickup_date',
                   header: 'Pickup',
                   width: '12%',
-                  render: (l) => l.pickup_date ? format(new Date(l.pickup_date + 'T00:00:00'), 'MMM d') : '—',
+                  render: (l) => (l.pickup_at || l.pickup_date)
+                    ? <StopTime utcIso={l.pickup_at} tz={l.pickup_tz} legacyDate={l.pickup_date} legacyTime={l.pickup_time} dateOnly />
+                    : '—',
                   filter: { type: 'date-range', accessor: (l) => l.pickup_date },
                 },
                 {
@@ -406,17 +408,31 @@ export function ActiveLoadsBoard() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                    {(load.pickup_date || load.delivery_date) && (
-                      <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border text-xs text-muted-foreground">
-                        {load.pickup_date && (
-                          <span className="inline-flex items-center gap-1">
-                            Pickup: {format(new Date(load.pickup_date), 'MMM d')}
+                    {(load.pickup_at || load.pickup_date || load.delivery_at || load.delivery_date) && (
+                      <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border text-xs text-muted-foreground flex-wrap">
+                        {(load.pickup_at || load.pickup_date) && (
+                          <span className="inline-flex items-center gap-1 flex-wrap">
+                            Pickup:{' '}
+                            <StopTime
+                              utcIso={load.pickup_at}
+                              tz={load.pickup_tz}
+                              legacyDate={load.pickup_date}
+                              legacyTime={load.pickup_time}
+                              withDate
+                            />
                             {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="compact" />}
                           </span>
                         )}
-                        {load.delivery_date && (
-                          <span className="inline-flex items-center gap-1">
-                            Delivery: {format(new Date(load.delivery_date), 'MMM d')}
+                        {(load.delivery_at || load.delivery_date) && (
+                          <span className="inline-flex items-center gap-1 flex-wrap">
+                            Delivery:{' '}
+                            <StopTime
+                              utcIso={load.delivery_at}
+                              tz={load.delivery_tz}
+                              legacyDate={load.delivery_date}
+                              legacyTime={load.delivery_time}
+                              withDate
+                            />
                             {load.delivery_time && <TimeTypeBadge timeType={load.delivery_time_type} time={load.delivery_time} variant="compact" />}
                           </span>
                         )}
@@ -465,11 +481,18 @@ export function ActiveLoadsBoard() {
                     Origin
                   </div>
                   <p className="font-medium pl-6">{selectedLoad.origin}</p>
-                  {selectedLoad.pickup_date && (
-                    <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1">
+                  {(selectedLoad.pickup_at || selectedLoad.pickup_date) && (
+                    <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1 flex-wrap">
                       <Calendar className="h-3 w-3" />
-                      Pickup: {format(parseISO(selectedLoad.pickup_date), 'EEE, MMM d, yyyy')}
-                      {selectedLoad.pickup_time && <span className="font-medium text-foreground ml-1">@ {selectedLoad.pickup_time}</span>}
+                      Pickup:{' '}
+                      <StopTime
+                        utcIso={selectedLoad.pickup_at}
+                        tz={selectedLoad.pickup_tz}
+                        legacyDate={selectedLoad.pickup_date}
+                        legacyTime={selectedLoad.pickup_time}
+                        withDate
+                        className="font-medium text-foreground"
+                      />
                     </p>
                   )}
                 </div>
@@ -481,11 +504,18 @@ export function ActiveLoadsBoard() {
                     Destination
                   </div>
                   <p className="font-medium pl-6">{selectedLoad.destination}</p>
-                  {selectedLoad.delivery_date && (
-                    <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1">
+                  {(selectedLoad.delivery_at || selectedLoad.delivery_date) && (
+                    <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1 flex-wrap">
                       <Calendar className="h-3 w-3" />
-                      Delivery: {format(parseISO(selectedLoad.delivery_date), 'EEE, MMM d, yyyy')}
-                      {selectedLoad.delivery_time && <span className="font-medium text-foreground ml-1">@ {selectedLoad.delivery_time}</span>}
+                      Delivery:{' '}
+                      <StopTime
+                        utcIso={selectedLoad.delivery_at}
+                        tz={selectedLoad.delivery_tz}
+                        legacyDate={selectedLoad.delivery_date}
+                        legacyTime={selectedLoad.delivery_time}
+                        withDate
+                        className="font-medium text-foreground"
+                      />
                     </p>
                   )}
                 </div>
