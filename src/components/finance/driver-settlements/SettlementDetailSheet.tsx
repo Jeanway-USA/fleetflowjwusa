@@ -170,11 +170,180 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
             </Card>
 
             <ItemSection title="Earnings" rows={earnings} />
-            <ItemSection title="Reimbursements" rows={reimbursements} />
+            <ReimbursementSection
+              rows={reimbursements}
+              settlementId={settlement.id}
+              orgId={settlement.org_id}
+              editable={settlement.status === 'draft'}
+            />
           </div>
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+function ReimbursementSection({
+  rows,
+  settlementId,
+  orgId,
+  editable,
+}: {
+  rows: any[];
+  settlementId: string;
+  orgId: string;
+  editable: boolean;
+}) {
+  const qc = useQueryClient();
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['driver_settlement_items', settlementId] });
+    qc.invalidateQueries({ queryKey: ['driver_settlement', settlementId] });
+    qc.invalidateQueries({ queryKey: ['driver_settlements'] });
+  };
+
+  const addMut = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(amount);
+      if (!description.trim()) throw new Error('Description required');
+      if (!Number.isFinite(amt) || amt === 0) throw new Error('Enter a non-zero amount');
+      const { error } = await supabase.from('driver_settlement_items').insert({
+        org_id: orgId,
+        settlement_id: settlementId,
+        item_type: 'reimbursement',
+        description: description.trim(),
+        amount: amt,
+      });
+      if (error) throw error;
+      const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
+        _settlement_id: settlementId,
+      });
+      if (rpcErr) throw rpcErr;
+    },
+    onSuccess: () => {
+      setDescription('');
+      setAmount('');
+      setAdding(false);
+      toast.success('Reimbursement added');
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? 'Failed to add reimbursement'),
+  });
+
+  const delMut = useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await supabase
+        .from('driver_settlement_items')
+        .delete()
+        .eq('id', itemId);
+      if (error) throw error;
+      const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
+        _settlement_id: settlementId,
+      });
+      if (rpcErr) throw rpcErr;
+    },
+    onSuccess: () => {
+      toast.success('Reimbursement removed');
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? 'Failed to remove'),
+  });
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold">Reimbursements</h4>
+        {editable && !adding && (
+          <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add
+          </Button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="rounded-md border p-3 space-y-2 bg-muted/30">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2">
+            <div>
+              <Label className="text-xs">Description</Label>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. Truck parking, Tolls, Lumper"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Amount</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setAdding(false);
+                setDescription('');
+                setAmount('');
+              }}
+              disabled={addMut.isPending}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => addMut.mutate()} disabled={addMut.isPending}>
+              {addMut.isPending ? 'Adding…' : 'Add reimbursement'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {rows.length === 0 && !adding ? (
+        <p className="text-sm text-muted-foreground py-2">
+          No reimbursements yet. {editable && 'Click Add to record one.'}
+        </p>
+      ) : rows.length > 0 ? (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
+              {editable && <TableHead className="w-12" />}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell className="text-muted-foreground">{r.description ?? '—'}</TableCell>
+                <TableCell className="text-right font-medium">
+                  {formatCurrency(Number(r.amount ?? 0))}
+                </TableCell>
+                {editable && (
+                  <TableCell>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => delMut.mutate(r.id)}
+                      disabled={delMut.isPending}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      ) : null}
+    </div>
   );
 }
 
