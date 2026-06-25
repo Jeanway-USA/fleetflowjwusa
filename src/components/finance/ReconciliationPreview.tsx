@@ -474,6 +474,67 @@ export function ReconciliationPreview({
   return (
     <TooltipProvider>
       <div className="space-y-4">
+        {/* Revenue Reconciliation — halts import if mismatched */}
+        {(revenue.tripMismatches.length > 0 || revenue.period?.exceedsTolerance) && (
+          <div className="rounded-lg border-2 border-destructive bg-destructive/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              <p className="text-sm font-semibold text-destructive">
+                Settlement halted — flat-rate discrepancies detected
+              </p>
+            </div>
+            {revenue.tripMismatches.length > 0 && (
+              <div className="rounded border border-destructive/30 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Trip #</TableHead>
+                      <TableHead>Dispatch Load</TableHead>
+                      <TableHead className="text-right">Expected (dispatch)</TableHead>
+                      <TableHead className="text-right">Statement</TableHead>
+                      <TableHead className="text-right">Δ</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {revenue.tripMismatches.map((m: RevenueTripMismatch, i: number) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-mono text-xs">{m.trip_number}</TableCell>
+                        <TableCell className="text-xs">
+                          {m.load_label || <span className="text-destructive font-medium">No matching load</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">{formatCurrency(m.expected_amount)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">{formatCurrency(m.actual_amount)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs font-semibold text-destructive">
+                          {formatSigned(m.delta_amount)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            {revenue.period?.exceedsTolerance && (
+              <div className="rounded border border-destructive/30 p-2 text-xs flex items-center justify-between">
+                <span>
+                  Period total mismatch ({result.periodStart} → {result.periodEnd}):
+                  expected <span className="font-mono">{formatCurrency(revenue.period.expected_total)}</span>,
+                  statement <span className="font-mono">{formatCurrency(revenue.period.actual_total)}</span>.
+                </span>
+                <span className="font-mono font-semibold text-destructive">Δ {formatSigned(revenue.period.delta)}</span>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Tolerance: ±$1 per trip, ±$5 per pay cycle. Logging the line errors will block this settlement until an owner or payroll admin resolves each row.
+            </p>
+            <div className="flex justify-end">
+              <Button variant="destructive" size="sm" onClick={persistDiscrepanciesAndHalt} disabled={isImporting}>
+                {isImporting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Log discrepancies & halt settlement
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Stats Bar */}
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <Badge variant="outline" className="gap-1">
