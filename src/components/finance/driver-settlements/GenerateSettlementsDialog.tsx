@@ -339,18 +339,24 @@ export function GenerateSettlementsDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={busy}
+            className="w-full sm:w-auto"
+          >
             Cancel
           </Button>
           <LoadingButton
             loading={busy}
             disabled={busy || selected.size === 0}
             onClick={() => generate.mutate()}
-            className="gradient-gold text-primary-foreground"
+            className="w-full sm:w-auto gradient-gold text-primary-foreground"
           >
             Generate
           </LoadingButton>
         </DialogFooter>
+
       </DialogContent>
     </Dialog>
   );
