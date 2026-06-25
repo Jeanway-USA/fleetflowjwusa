@@ -160,7 +160,8 @@ export function detectFileType(file: File): StagedFile['type'] {
  * Splits into 3 buckets: expenses, advances, credits.
  */
 export function reconcileDocuments(
-  stagedFiles: StagedFile[]
+  stagedFiles: StagedFile[],
+  loadsForRevenue: RevenueReconcileLoad[] = [],
 ): ReconciliationResult {
   const allExpenses: (ExtractedExpense & { source: string; sourceType: StagedFile['type'] })[] = [];
   let periodStart: string | null = null;
