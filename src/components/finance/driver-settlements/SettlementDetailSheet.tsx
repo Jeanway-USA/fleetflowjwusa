@@ -503,7 +503,9 @@ function EarningsBreakdown({ breakdown }: { breakdown: PayBreakdown | undefined 
 
 
       {breakdown.payType === 'per_mile' && (
-        <Table>
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <Table className="min-w-[640px]">
+
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
