@@ -68,11 +68,12 @@ export function DriverSettlementsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, first_name, last_name, status');
+        .select('id, first_name, last_name, status, pay_type, pay_rate');
       if (error) throw error;
       return (data ?? []) as Driver[];
     },
   });
+
 
   const { data: settlements = [], isLoading } = useQuery<DriverSettlement[]>({
     queryKey: ['driver_settlements'],
