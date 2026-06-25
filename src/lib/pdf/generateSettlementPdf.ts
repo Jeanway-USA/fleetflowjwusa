@@ -516,9 +516,9 @@ export async function generateSettlementPdf(
     // Dashed border
     doc.setDrawColor(212, 212, 216);
     doc.setLineWidth(1);
-    doc.setLineDash([4, 3], 0);
+    (doc as any).setLineDashPattern?.([4, 3], 0);
     doc.roundedRect(vx, vy, vw, vh, 4, 4, 'S');
-    doc.setLineDash([], 0);
+    (doc as any).setLineDashPattern?.([], 0);
 
     // Watermark
     const gs: any = (doc as any).GState
