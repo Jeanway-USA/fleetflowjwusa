@@ -14,6 +14,23 @@ const fmtDateShort = (d?: string | null) =>
 const fmtMiles = (n: number) =>
   n.toLocaleString('en-US', { maximumFractionDigits: 0 });
 
+/**
+ * jsPDF's default helvetica uses WinAnsi encoding, which does not include
+ * many common typographic glyphs (→ × – — • etc.). Passing them through
+ * produces garbage like `!'`. This swaps them for safe ASCII equivalents
+ * before any text reaches the PDF.
+ */
+const safe = (s: unknown): string =>
+  String(s ?? '')
+    .replace(/\u2192/g, '->') // →
+    .replace(/\u2190/g, '<-') // ←
+    .replace(/\u00d7/g, 'x') // ×
+    .replace(/[\u2013\u2014]/g, '-') // – —
+    .replace(/[\u2018\u2019]/g, "'") // ‘ ’
+    .replace(/[\u201c\u201d]/g, '"') // “ ”
+    .replace(/\u2022/g, '*') // •
+    .replace(/\u00a0/g, ' '); // nbsp
+
 async function loadLogo(url: string | null | undefined): Promise<string | null> {
   if (!url) return null;
   try {
@@ -97,6 +114,7 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const margin = 40;
+  const contentW = W - margin * 2;
 
   // ---------- Header band ----------
   const HEADER_H = 110;
@@ -112,44 +130,59 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
       /* ignore */
     }
   }
+  const leftMaxW = W / 2 - leftX - 10;
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text(orgName, leftX, 38);
+  doc.text(
+    doc.splitTextToSize(safe(orgName), leftMaxW)[0] ?? safe(orgName),
+    leftX,
+    38,
+  );
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   let leftY = 54;
   if (companyAddress) {
-    companyAddress.split(/\r?\n/).forEach((line) => {
-      doc.text(line, leftX, leftY);
-      leftY += 11;
-    });
+    safe(companyAddress)
+      .split(/\r?\n/)
+      .forEach((line) => {
+        const wrapped = doc.splitTextToSize(line, leftMaxW);
+        wrapped.forEach((ln: string) => {
+          doc.text(ln, leftX, leftY);
+          leftY += 11;
+        });
+      });
   }
   const ids: string[] = [];
   if (org?.dot_number) ids.push(`USDOT ${org.dot_number}`);
   if (org?.mc_number) ids.push(`MC ${org.mc_number}`);
-  if (ids.length) doc.text(ids.join('  ·  '), leftX, leftY);
+  if (ids.length) doc.text(safe(ids.join('  ·  ')), leftX, leftY);
 
   const rx = W - margin;
+  const rightMaxW = 240;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text(driverName, rx, 32, { align: 'right' });
+  doc.text(
+    doc.splitTextToSize(safe(driverName), rightMaxW)[0] ?? safe(driverName),
+    rx,
+    32,
+    { align: 'right' },
+  );
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   let rightY = 46;
-  if (driverIdLabel) {
-    doc.text(driverIdLabel, rx, rightY, { align: 'right' });
-    rightY += 11;
-  }
-  if (driver?.email) {
-    doc.text(driver.email, rx, rightY, { align: 'right' });
-    rightY += 11;
-  }
-  if (driver?.phone) {
-    doc.text(driver.phone, rx, rightY, { align: 'right' });
-    rightY += 11;
-  }
+  const rightLine = (val?: string | null) => {
+    if (!val) return;
+    const wrapped = doc.splitTextToSize(safe(val), rightMaxW);
+    wrapped.forEach((ln: string) => {
+      doc.text(ln, rx, rightY, { align: 'right' });
+      rightY += 11;
+    });
+  };
+  if (driverIdLabel) rightLine(driverIdLabel);
+  if (driver?.email) rightLine(driver.email);
+  if (driver?.phone) rightLine(driver.phone);
 
   // ---------- Title + period strip ----------
   let y = HEADER_H + 22;
@@ -173,7 +206,7 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   doc.line(margin, y, W - margin, y);
   y += 16;
 
-  // Period info grid (4 columns: period, payment, method, status)
+  // Period info grid (4 columns)
   doc.setTextColor(100, 116, 139);
   doc.setFontSize(8);
   const col1 = margin;
@@ -182,21 +215,26 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   doc.text('PAY PERIOD', col1, y);
   doc.text('PAYMENT DATE', col2, y);
   doc.text('EARNINGS METHOD', col3, y);
-  doc.text('STATUS', rx - 50, y);
+  doc.text('STATUS', rx, y, { align: 'right' });
 
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
   doc.text(
-    `${fmtDate(s.period_start)} – ${fmtDate(s.period_end)}`,
+    safe(`${fmtDate(s.period_start)} - ${fmtDate(s.period_end)}`),
     col1,
     y + 14,
   );
   doc.text(fmtDate(s.payment_date), col2, y + 14);
   doc.setFontSize(9);
-  doc.text(breakdown.methodLabel, col3, y + 14);
+  doc.text(
+    doc.splitTextToSize(safe(breakdown.methodLabel), rx - col3 - 60)[0] ??
+      safe(breakdown.methodLabel),
+    col3,
+    y + 14,
+  );
   doc.setFontSize(10);
-  doc.text(String(s.status || 'draft').toUpperCase(), rx, y + 14, {
+  doc.text(safe(String(s.status || 'draft').toUpperCase()), rx, y + 14, {
     align: 'right',
   });
 
@@ -205,7 +243,7 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   // ---------- Pay Calculation band ----------
   doc.setDrawColor(226, 232, 240);
   doc.setFillColor(241, 245, 249);
-  doc.rect(margin, y, W - margin * 2, 28, 'FD');
+  doc.rect(margin, y, contentW, 28, 'FD');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(71, 85, 105);
@@ -213,7 +251,10 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.setTextColor(15, 23, 42);
-  doc.text(breakdown.formulaLabel, W - margin - 10, y + 19, { align: 'right' });
+  const formulaMaxW = contentW - 140;
+  const formulaSafe = safe(breakdown.formulaLabel);
+  const formulaLines = doc.splitTextToSize(formulaSafe, formulaMaxW);
+  doc.text(formulaLines[0], W - margin - 10, y + 19, { align: 'right' });
   y += 40;
 
   // ---------- Earnings table (per pay type) ----------
@@ -229,50 +270,72 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
     fontSize: 9,
     halign: 'left' as const,
   };
-  const baseStyles = { fontSize: 9, cellPadding: 5, textColor: [30, 41, 59] as [number, number, number] };
+  const baseStyles = {
+    fontSize: 9,
+    cellPadding: 5,
+    textColor: [30, 41, 59] as [number, number, number],
+    overflow: 'linebreak' as const,
+    valign: 'top' as const,
+  };
   const alt = { fillColor: [248, 250, 252] as [number, number, number] };
-  const footStyles = { fillColor: [241, 245, 249] as [number, number, number], textColor: [15, 23, 42] as [number, number, number] };
+  const footStyles = {
+    fillColor: [241, 245, 249] as [number, number, number],
+    textColor: [15, 23, 42] as [number, number, number],
+  };
 
   if (breakdown.payType === 'flat') {
+    // total contentW ≈ 532. widths sum to 532.
+    const widths = { date: 62, load: 64, origin: 156, dest: 156, miles: 44, status: 50 };
     autoTable(doc, {
       startY: y,
-      head: [['Date', 'Load #', 'Origin → Destination', 'Miles', 'Status']],
+      head: [['Date', 'Load #', 'Origin', 'Destination', 'Miles', 'Status']],
       body:
         breakdown.loads.length === 0
-          ? [['—', '—', 'No loads recorded in this period', '—', '—']]
+          ? [['—', '—', 'No loads recorded in this period', '', '—', '—']]
           : breakdown.loads.map((l) => [
               fmtDateShort(l.delivery_date ?? l.pickup_date),
-              l.landstar_load_id || String(l.id).slice(0, 8),
-              `${l.origin ?? ''} → ${l.destination ?? ''}`,
+              safe(l.landstar_load_id || String(l.id).slice(0, 8)),
+              safe(l.origin ?? ''),
+              safe(l.destination ?? ''),
               fmtMiles(Number(l.booked_miles ?? l.actual_miles ?? 0)),
-              String(l.status ?? '—').replace('_', ' '),
+              safe(String(l.status ?? '—').replace(/_/g, ' ')),
             ]),
       headStyles,
       styles: baseStyles,
       alternateRowStyles: alt,
-      columnStyles: { 3: { halign: 'right' } },
+      columnStyles: {
+        0: { cellWidth: widths.date },
+        1: { cellWidth: widths.load },
+        2: { cellWidth: widths.origin },
+        3: { cellWidth: widths.dest },
+        4: { cellWidth: widths.miles, halign: 'right' },
+        5: { cellWidth: widths.status },
+      },
       margin: { left: margin, right: margin },
+      tableWidth: contentW,
       foot: [
         [
-          { content: 'Flat Rate Base Pay', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: 'Flat Rate Base Pay', colSpan: 5, styles: { halign: 'right', fontStyle: 'bold' } },
           { content: formatCurrency(breakdown.basePay), styles: { halign: 'right', fontStyle: 'bold' } },
         ],
       ],
       footStyles,
     });
   } else if (breakdown.payType === 'per_mile') {
+    const widths = { date: 58, load: 60, origin: 130, dest: 130, miles: 50, rate: 50, amt: 54 };
     autoTable(doc, {
       startY: y,
-      head: [['Date', 'Load #', 'Origin → Destination', 'Loaded Miles', 'Rate', 'Amount']],
+      head: [['Date', 'Load #', 'Origin', 'Destination', 'Miles', 'Rate', 'Amount']],
       body:
         breakdown.loads.length === 0
-          ? [['—', '—', 'No completed loads in this period', '—', '—', formatCurrency(0)]]
+          ? [['—', '—', 'No completed loads in this period', '', '—', '—', formatCurrency(0)]]
           : breakdown.loads.map((l) => {
               const mi = Number(l.booked_miles ?? l.actual_miles ?? 0);
               return [
                 fmtDateShort(l.delivery_date),
-                l.landstar_load_id || String(l.id).slice(0, 8),
-                `${l.origin ?? ''} → ${l.destination ?? ''}`,
+                safe(l.landstar_load_id || String(l.id).slice(0, 8)),
+                safe(l.origin ?? ''),
+                safe(l.destination ?? ''),
                 fmtMiles(mi),
                 `$${breakdown.payRate.toFixed(2)}/mi`,
                 formatCurrency(mi * breakdown.payRate),
@@ -282,25 +345,22 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
       styles: baseStyles,
       alternateRowStyles: alt,
       columnStyles: {
-        3: { halign: 'right' },
-        4: { halign: 'right' },
-        5: { halign: 'right', fontStyle: 'bold' },
+        0: { cellWidth: widths.date },
+        1: { cellWidth: widths.load },
+        2: { cellWidth: widths.origin },
+        3: { cellWidth: widths.dest },
+        4: { cellWidth: widths.miles, halign: 'right' },
+        5: { cellWidth: widths.rate, halign: 'right' },
+        6: { cellWidth: widths.amt, halign: 'right', fontStyle: 'bold' },
       },
       margin: { left: margin, right: margin },
+      tableWidth: contentW,
       foot: [
         [
-          { content: 'Totals', styles: { fontStyle: 'bold' } },
+          { content: 'Totals', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
+          { content: `${fmtMiles(breakdown.totalLoadedMiles)} mi`, styles: { halign: 'right', fontStyle: 'bold' } },
           { content: '', styles: {} },
-          { content: '', styles: {} },
-          {
-            content: `${fmtMiles(breakdown.totalLoadedMiles)} mi`,
-            styles: { halign: 'right', fontStyle: 'bold' },
-          },
-          { content: '', styles: {} },
-          {
-            content: formatCurrency(breakdown.basePay),
-            styles: { halign: 'right', fontStyle: 'bold' },
-          },
+          { content: formatCurrency(breakdown.basePay), styles: { halign: 'right', fontStyle: 'bold' } },
         ],
       ],
       footStyles,
@@ -308,13 +368,15 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
   } else if (breakdown.payType === 'percentage') {
     const pct = breakdown.payRate;
     const split = breakdown.truckSplit;
+    const widths = { date: 56, load: 56, origin: 116, dest: 116, lh: 60, split: 64, drv: 64 };
     autoTable(doc, {
       startY: y,
       head: [
         [
           'Date',
           'Load #',
-          'Origin → Destination',
+          'Origin',
+          'Destination',
           'Linehaul',
           `After ${(split * 100).toFixed(0)}% Split`,
           `Driver ${pct}%`,
@@ -322,15 +384,16 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
       ],
       body:
         breakdown.loads.length === 0
-          ? [['—', '—', 'No completed loads in this period', '—', '—', formatCurrency(0)]]
+          ? [['—', '—', 'No completed loads in this period', '', '—', '—', formatCurrency(0)]]
           : breakdown.loads.map((l) => {
               const linehaul = Number(l.rate ?? 0);
               const afterSplit = linehaul * split;
               const driverShare = afterSplit * (pct / 100);
               return [
                 fmtDateShort(l.delivery_date),
-                l.landstar_load_id || String(l.id).slice(0, 8),
-                `${l.origin ?? ''} → ${l.destination ?? ''}`,
+                safe(l.landstar_load_id || String(l.id).slice(0, 8)),
+                safe(l.origin ?? ''),
+                safe(l.destination ?? ''),
                 formatCurrency(linehaul),
                 formatCurrency(afterSplit),
                 formatCurrency(driverShare),
@@ -340,16 +403,19 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
       styles: baseStyles,
       alternateRowStyles: alt,
       columnStyles: {
-        3: { halign: 'right' },
-        4: { halign: 'right' },
-        5: { halign: 'right', fontStyle: 'bold' },
+        0: { cellWidth: widths.date },
+        1: { cellWidth: widths.load },
+        2: { cellWidth: widths.origin },
+        3: { cellWidth: widths.dest },
+        4: { cellWidth: widths.lh, halign: 'right' },
+        5: { cellWidth: widths.split, halign: 'right' },
+        6: { cellWidth: widths.drv, halign: 'right', fontStyle: 'bold' },
       },
       margin: { left: margin, right: margin },
+      tableWidth: contentW,
       foot: [
         [
-          { content: 'Totals', styles: { fontStyle: 'bold' } },
-          { content: '', styles: {} },
-          { content: '', styles: {} },
+          { content: 'Totals', colSpan: 4, styles: { halign: 'right', fontStyle: 'bold' } },
           { content: formatCurrency(breakdown.totalLinehaul), styles: { halign: 'right', fontStyle: 'bold' } },
           { content: formatCurrency(breakdown.totalAfterSplit), styles: { halign: 'right', fontStyle: 'bold' } },
           { content: formatCurrency(breakdown.basePay), styles: { halign: 'right', fontStyle: 'bold' } },
@@ -365,8 +431,12 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
       headStyles,
       styles: baseStyles,
       alternateRowStyles: alt,
-      columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+      columnStyles: {
+        0: { cellWidth: contentW - 120 },
+        1: { cellWidth: 120, halign: 'right', fontStyle: 'bold' },
+      },
       margin: { left: margin, right: margin },
+      tableWidth: contentW,
     });
   }
 
@@ -385,14 +455,18 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
       reimbItems.length === 0
         ? [['No reimbursements in this period', formatCurrency(0)]]
         : reimbItems.map((i: any) => [
-            i.description || '—',
+            safe(i.description || '—'),
             formatCurrency(Number(i.amount ?? 0)),
           ]),
     headStyles,
     styles: baseStyles,
     alternateRowStyles: alt,
-    columnStyles: { 1: { halign: 'right', fontStyle: 'bold', cellWidth: 110 } },
+    columnStyles: {
+      0: { cellWidth: contentW - 120 },
+      1: { cellWidth: 120, halign: 'right', fontStyle: 'bold' },
+    },
     margin: { left: margin, right: margin },
+    tableWidth: contentW,
     foot: [
       [
         { content: 'Total Reimbursements', styles: { halign: 'right', fontStyle: 'bold' } },
@@ -414,7 +488,7 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
     y = margin;
   }
 
-  const colW = (W - margin * 2 - 16) / 2;
+  const colW = (contentW - 16) / 2;
 
   const drawBlock = (
     x: number,
@@ -432,7 +506,7 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
-    doc.text(title, x + 10, y + 15);
+    doc.text(safe(title), x + 10, y + 15);
 
     doc.setTextColor(15, 23, 42);
     let ry = y + 38;
@@ -445,9 +519,9 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
       doc.setFont('helvetica', isLast ? 'bold' : 'normal');
       doc.setFontSize(isLast ? 11 : 10);
       doc.setTextColor(isLast ? 15 : 71, isLast ? 23 : 85, isLast ? 42 : 105);
-      doc.text(label, x + 10, ry);
+      doc.text(safe(label), x + 10, ry);
       doc.setTextColor(15, 23, 42);
-      doc.text(val, x + colW - 10, ry, { align: 'right' });
+      doc.text(safe(val), x + colW - 10, ry, { align: 'right' });
       ry += 22;
     });
     return h;
@@ -474,7 +548,6 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
     true,
   );
 
-  // Net Pay formula line below the blocks
   const blocksH = 30 + 3 * 22;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8);
@@ -501,14 +574,14 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139);
-    const wrapped = doc.splitTextToSize(taxNote, W - margin * 2);
+    const wrapped = doc.splitTextToSize(safe(taxNote), contentW);
     doc.text(wrapped, margin, footerY + 12);
 
     const contactLine = payrollContact
       ? `For payroll inquiries or disputes, contact: ${payrollContact}`
       : 'For payroll inquiries or disputes, please contact your dispatcher or payroll administrator.';
-    const contactWrapped = doc.splitTextToSize(contactLine, W - margin * 2);
-    doc.text(contactWrapped, margin, footerY + 12 + wrapped.length * 9);
+    const contactWrapped = doc.splitTextToSize(safe(contactLine), contentW);
+    doc.text(contactWrapped, margin, footerY + 12 + wrapped.length * 10);
 
     doc.setFontSize(7);
     doc.setTextColor(140, 148, 165);
