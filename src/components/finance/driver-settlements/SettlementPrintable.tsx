@@ -21,12 +21,14 @@ const STATUS_STYLES: Record<SettlementStatusLabel, string> = {
   APPROVED: 'bg-slate-700 text-white',
   PAID: 'bg-emerald-600 text-white',
 };
+import { SettlementCheckVoucher } from './SettlementCheckVoucher';
 
 interface Props {
   data: SettlementDocumentData;
+  includeVoucher?: boolean;
 }
 
-export function SettlementPrintable({ data }: Props) {
+export function SettlementPrintable({ data, includeVoucher = false }: Props) {
   const { settlement, driver, reimbursementItems, deductionItems, breakdown, ytd } = data;
   const status = statusLabel(settlement.status);
   const driverName =
@@ -242,6 +244,8 @@ export function SettlementPrintable({ data }: Props) {
           <span>Page 1 of 1</span>
         </div>
       </footer>
+
+      {includeVoucher && <SettlementCheckVoucher data={data} />}
     </div>
   );
 }
