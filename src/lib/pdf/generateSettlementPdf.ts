@@ -59,7 +59,7 @@ function detectLogoFormat(dataUrl: string): 'PNG' | 'JPEG' {
 
 export async function generateSettlementPdf(settlementId: string): Promise<void> {
   const data = await buildSettlementDocumentData(settlementId);
-  const { settlement: s, driver, org, reimbursementItems, breakdown, ytd } = data;
+  const { settlement: s, driver, org, reimbursementItems, deductionItems, breakdown, ytd } = data;
 
   const driverName =
     `${driver?.first_name ?? ''} ${driver?.last_name ?? ''}`.trim() || 'Driver';
@@ -71,8 +71,10 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
 
   const currentGross = Number(s.gross_pay ?? 0);
   const currentReimb = Number(s.reimbursements ?? 0);
-  const currentNet = currentGross + currentReimb;
-  const ytdNet = ytd.gross + ytd.reimbursements;
+  const currentDed = Number(s.deductions ?? 0);
+  const currentNet = currentGross + currentReimb - currentDed;
+  const ytdNet = ytd.gross + ytd.reimbursements - ytd.deductions;
+
 
   const logoData = await loadLogo(org?.logo_url);
   const logoFmt = logoData ? detectLogoFormat(logoData) : 'PNG';
