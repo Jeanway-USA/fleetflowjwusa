@@ -634,8 +634,9 @@ export function ReconciliationPreview({
             <Button variant="outline" onClick={onCancel} disabled={isImporting}>Cancel</Button>
             <Button
               onClick={handleImport}
-              disabled={totalSelectedCount === 0 || isImporting}
+              disabled={totalSelectedCount === 0 || isImporting || revenue.hasBlockingDiscrepancy}
               className="gradient-gold text-primary-foreground"
+              title={revenue.hasBlockingDiscrepancy ? 'Resolve flat-rate discrepancies before importing' : undefined}
             >
               {isImporting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Confirm & Import Data ({totalSelectedCount})
