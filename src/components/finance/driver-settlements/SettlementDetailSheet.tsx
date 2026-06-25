@@ -629,7 +629,9 @@ function EarningsBreakdown({ breakdown }: { breakdown: PayBreakdown | undefined 
             </TableRow>
           </TableBody>
         </Table>
+        </div>
       )}
+
     </div>
   );
 }
