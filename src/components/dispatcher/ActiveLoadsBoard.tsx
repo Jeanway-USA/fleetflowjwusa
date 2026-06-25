@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Package, MapPin, User, Truck, Eye, MoreHorizontal, Calendar, DollarSign, Route, Pencil, Trash2, LayoutGrid, Table as TableIcon, ChevronDown } from 'lucide-react';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
+import { StopTime } from '@/components/shared/StopTime';
 import { format, parseISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 const LoadRouteMap = lazy(() =>
