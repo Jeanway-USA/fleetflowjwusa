@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
-import { Upload, FileText, Trash2 } from 'lucide-react';
+import { Upload, FileText, Trash2, CloudOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDocumentUpload, useDocuments } from '@/hooks/useDocumentUpload';
+import { useOfflineDocumentQueue } from '@/hooks/useOfflineDocumentQueue';
 import { DocumentViewer } from '@/components/shared/DocumentViewer';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -28,6 +29,7 @@ export function DocumentUpload({
   const [selectedType, setSelectedType] = useState(documentTypes[0]);
   const { uploadDocument, deleteDocument, uploading } = useDocumentUpload();
   const { data: documents = [], isLoading } = useDocuments(relatedType, relatedId);
+  const { isOnline, queuedCount, isSyncing } = useOfflineDocumentQueue();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,6 +62,27 @@ export function DocumentUpload({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {(!isOnline || isSyncing) && (
+          <div
+            className={`flex items-center gap-2 text-xs rounded-md px-3 py-1.5 border ${
+              !isOnline
+                ? 'bg-amber-50 border-amber-200 text-amber-800'
+                : 'bg-sky-50 border-sky-200 text-sky-800'
+            }`}
+          >
+            {!isOnline ? (
+              <>
+                <CloudOff className="h-3.5 w-3.5" />
+                <span>Offline — new attachments will queue and upload automatically.</span>
+              </>
+            ) : (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>Syncing {queuedCount} queued document{queuedCount === 1 ? '' : 's'}…</span>
+              </>
+            )}
+          </div>
+        )}
         <div className="flex gap-2">
           <Select value={selectedType} onValueChange={setSelectedType}>
             <SelectTrigger className="w-40">
