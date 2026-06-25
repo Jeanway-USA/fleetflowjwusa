@@ -271,7 +271,7 @@ export function useResourceMutations() {
         .from('company_resources')
         .insert(resource)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
