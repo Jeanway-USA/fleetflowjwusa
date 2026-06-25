@@ -8,7 +8,7 @@ export type CRMActivity = Tables<'crm_activities'>;
 export type CRMContactLoad = Tables<'crm_contact_loads'>;
 export type CompanyResource = Tables<'company_resources'>;
 export type Facility = Tables<'facilities'>;
-export type ContactType = 'broker' | 'agent' | 'shipper' | 'receiver' | 'vendor' | 'shop';
+export type ContactType = 'broker' | 'agent' | 'shipper' | 'receiver' | 'vendor' | 'shop' | 'warehouse' | 'terminal' | 'both';
 export type CRMScope = 'agencies' | 'shops';
 
 const AGENCY_TYPES: ContactType[] = ['agent', 'broker'];
