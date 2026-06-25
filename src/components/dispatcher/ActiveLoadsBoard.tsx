@@ -291,7 +291,17 @@ export function ActiveLoadsBoard() {
                   key: 'landstar_load_id',
                   header: 'Load #',
                   width: '12%',
-                  render: (l) => <span className="font-medium">{l.landstar_load_id || l.id.slice(0, 8)}</span>,
+                  render: (l) => (
+                    <span className="flex items-center gap-1">
+                      <span className="font-medium">{l.landstar_load_id || l.id.slice(0, 8)}</span>
+                      {l.has_statement_discrepancy && (
+                        <Badge variant="destructive" className="gap-1 h-5 px-1.5 text-[10px]">
+                          <ShieldAlert className="h-3 w-3" />
+                          MISMATCH
+                        </Badge>
+                      )}
+                    </span>
+                  ),
                   filter: { type: 'text', accessor: (l) => l.landstar_load_id || l.id },
                 },
                 {
