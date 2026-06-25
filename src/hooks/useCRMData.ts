@@ -420,9 +420,13 @@ export function useUnifiedContacts(typeFilter?: string, scope?: CRMScope) {
     );
   }
 
-  // Apply type filter
+  // Apply type filter (shipper tab includes warehouse/terminal/both; receiver tab includes both)
   const filtered = typeFilter && typeFilter !== 'all'
-    ? unified.filter(c => c.contact_type === typeFilter)
+    ? unified.filter(c => {
+        if (typeFilter === 'shipper') return ['shipper', 'warehouse', 'terminal', 'both'].includes(c.contact_type);
+        if (typeFilter === 'receiver') return ['receiver', 'both'].includes(c.contact_type);
+        return c.contact_type === typeFilter;
+      })
     : unified;
 
   // Sort by company name
