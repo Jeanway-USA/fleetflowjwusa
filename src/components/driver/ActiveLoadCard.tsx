@@ -487,11 +487,18 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
                   </div>
                 </div>
               )}
-              {load.pickup_date && (
-                <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1">
+              {(load.pickup_at || load.pickup_date) && (
+                <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1 flex-wrap">
                   <Calendar className="h-3 w-3" />
-                  Pickup: {format(parseISO(load.pickup_date), 'EEE, MMM d, yyyy')}
-                  {load.pickup_time && <span className="font-medium text-foreground ml-1">@ {load.pickup_time}</span>}
+                  Pickup:{' '}
+                  <StopTime
+                    utcIso={load.pickup_at}
+                    tz={load.pickup_tz}
+                    legacyDate={load.pickup_date}
+                    legacyTime={load.pickup_time}
+                    withDate
+                    className="font-medium text-foreground"
+                  />
                 </p>
               )}
             </div>
@@ -503,11 +510,18 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
                 Destination
               </div>
               <p className="font-medium pl-6">{load.destination}</p>
-              {load.delivery_date && (
-                <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1">
+              {(load.delivery_at || load.delivery_date) && (
+                <p className="text-sm text-muted-foreground pl-6 flex items-center gap-1 flex-wrap">
                   <Calendar className="h-3 w-3" />
-                  Delivery: {format(parseISO(load.delivery_date), 'EEE, MMM d, yyyy')}
-                  {load.delivery_time && <span className="font-medium text-foreground ml-1">@ {load.delivery_time}</span>}
+                  Delivery:{' '}
+                  <StopTime
+                    utcIso={load.delivery_at}
+                    tz={load.delivery_tz}
+                    legacyDate={load.delivery_date}
+                    legacyTime={load.delivery_time}
+                    withDate
+                    className="font-medium text-foreground"
+                  />
                 </p>
               )}
             </div>
