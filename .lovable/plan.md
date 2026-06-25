@@ -1,80 +1,59 @@
+# Automated Geofence Check-Calls
 
-# Statement Reconciliation & Discrepancy Halt
+Today the driver app already computes distance-to-destination and pops a `GeofenceArrivalDrawer` asking the driver to tap "Confirm Arrival" before the status moves to `unloading`. We will keep the math, drop the manual tap, and extend the logic to cover the origin facility as well, so dispatchers see status flips on their board automatically.
 
-Layer flat-rate validation on top of the existing statement upload pipeline. When parsed carrier statement rates disagree with `fleet_loads.rate`, halt the settlement, flag the load row red on the Active Loads Board, and write a queryable line-error to a new audit table.
+## 1. Extend the geofence hook — `src/hooks/useGeofenceStatus.ts`
 
-## 1. Database migration
+- Accept BOTH `originAddress` and `destinationAddress` (plus the current `status`).
+- Geocode whichever endpoint is currently relevant:
+  - `assigned` / `loading` → watch origin (e.g. Rheem Manufacturing Warehouse).
+  - `in_transit` → watch destination (e.g. Hughes Supply).
+- Return `{ atOrigin, atDestination, distanceMiles }` instead of the dismiss-driven shape.
+- Radius stays 2 mi (configurable constant).
+- Add a small ref-based debounce so a single GPS jitter inside the radius doesn't refire.
 
-New table + one column.
+## 2. New silent auto-arrival hook — `src/hooks/useAutoArrival.ts`
 
-```sql
--- settlement_discrepancies
-id uuid PK, org_id uuid, load_id uuid NULL FK fleet_loads, settlement_id uuid NULL FK driver_settlements,
-trip_number text NULL, expected_amount numeric, actual_amount numeric, delta_amount numeric,
-reason_code text  -- 'trip_rate_mismatch' | 'period_total_mismatch'
-detail text NULL, resolved_at timestamptz NULL, created_at timestamptz default now()
-```
-- GRANTs: `SELECT,INSERT,UPDATE,DELETE` to `authenticated`; `ALL` to `service_role`.
-- RLS: org-scoped via `get_user_org_id(auth.uid())`; only owners/payroll_admin can write.
+A new hook that owns the side effect. Driven by the values from `useGeofenceStatus`:
 
-Columns added:
-- `fleet_loads.has_statement_discrepancy boolean default false`
-- `driver_settlements.status` enum extended to allow `'discrepancy'` (text column today — just a value).
+- When `atOrigin` becomes true AND status is `assigned`/`loading`, transition load → `loading` (if not already) — origin arrival.
+- When `atDestination` becomes true AND status is `in_transit`, transition load → `unloading` ("Arrived").
+- Each transition:
+  1. Optimistic patch via the existing `useOptimisticLoadStatus` so the UI flips immediately and survives flaky signal.
+  2. `supabase.from('fleet_loads').update({ status: <next> })` for the load.
+  3. Insert a row into `load_status_logs` with `source = 'geofence_auto'`, `previous_status`, `new_status`, lat/lng, and the matched facility label. This is the "silent log timestamp event."
+  4. No toast, no drawer — silent per the spec. A subtle inline badge ("Auto-arrived") shows on the driver card so the driver knows what happened.
+- Per-load idempotency: keep a ref of `${loadId}:${transition}` already fired this session, and gate on the DB row's current status so we never re-trigger on refetch.
 
-## 2. Edge function parser changes — `supabase/functions/parse-landstar-statement/index.ts`
+## 3. Wire-up — `src/pages/DriverDashboard.tsx`
 
-- Remove `REVENUE_IGNORE_PATTERNS` filtering for linehaul/flat-rate lines.
-- Extend prompt + JSON schema with `revenue` array:
-  ```
-  revenue: [{ trip_number, flat_rate, reimbursement_total, description, date }]
-  ```
-- Still strip TRIP% ESCROW PAYMENT and other deductions per existing rules.
+- Replace the current `useGeofenceStatus(driverCoords, destination, loadId)` call + `GeofenceArrivalDrawer` render with the new hook signature and `useAutoArrival(activeLoad, driverCoords)`.
+- Remove `showGeofenceDrawer` and the `<GeofenceArrivalDrawer />` JSX. Drawer file stays for now (unused) so we don't churn unrelated tests — it can be deleted in a follow-up.
+- `LocationSharing` already pushes GPS every 10 min and on every `watchPosition` tick we use locally, so no changes needed there. The auto-arrival hook reads `currentPosition` straight from `LocationSharing`'s parent state via a small lift: `DriverDashboard` will own the latest `driverCoords` (already partially the case) and pass it to both `LocationSharing` and `useAutoArrival`.
 
-## 3. Client reconciliation engine — `src/lib/settlement-reconciliation.ts`
+## 4. Dispatcher view
 
-Add `reconcileRevenue(parsed, existingLoads)` producing:
-```ts
-{ tripMismatches: [...], periodTotal: { expected, actual, delta }, hasBlockingDiscrepancy: boolean }
-```
-- **Pass 1 (per-trip)**: join `revenue[i].trip_number` → `fleet_loads.landstar_load_id`. Flag if `|expected − actual| > $1.00`.
-- **Pass 2 (period total)**: sum unmatched + all-period revenue, compare to `Σ fleet_loads.rate` for loads with `delivery_date ∈ [period_start, period_end]`. Flag if `|Δ| > $5.00`.
-- Within-tolerance variance is silently absorbed (display = statement value).
+No code changes required. `ActiveLoadsBoard` already renders `status` live from `fleet_loads`; the silent DB update propagates through the existing query/subscription, so "In Transit" flips to "Arrived/Unloading" without dispatcher input.
 
-## 4. Reconciliation UI — `src/components/finance/ReconciliationPreview.tsx`
+## 5. Edge cases & guardrails
 
-- New "Rate Reconciliation" section above the existing expense table listing each mismatch (trip #, expected, actual, Δ) in destructive styling.
-- If `hasBlockingDiscrepancy`, disable the Import / Approve button, show inline alert: "Settlement halted — resolve N discrepancies before import."
-- On import, write each mismatch to `settlement_discrepancies` and set `fleet_loads.has_statement_discrepancy = true` for affected loads.
-
-## 5. Active Loads Board — `src/components/dispatch/ActiveLoadsBoard.tsx`
-
-- Pull `has_statement_discrepancy` in the loads query.
-- Render a red `STATEMENT MISMATCH` badge on the affected row (destructive variant, AlertTriangle icon).
-- Clicking opens the load detail with a new "Statement Discrepancies" section listing rows from `settlement_discrepancies` for that `load_id`.
-
-## 6. Settlements tab — `src/components/finance/SettlementsTab.tsx` + `driver-settlements/SettlementDetailSheet.tsx`
-
-- Settlements with `status = 'discrepancy'` render a red banner + locked Generate/Approve actions.
-- Detail sheet adds a "Line Errors" panel that queries `settlement_discrepancies` by `settlement_id` (trip #, expected, actual, Δ, reason).
-- Owner / payroll_admin can mark a discrepancy resolved (`resolved_at = now()`), which clears the lock if no unresolved rows remain.
+- **No origin/destination coords**: hook no-ops, status stays as-is.
+- **Driver disabled GPS sharing**: no `driverCoords` → no firing. Manual status buttons on `ActiveLoadCard` keep working as a fallback.
+- **Offline**: optimistic patch + the existing offline queue cover it; the real update reconciles on reconnect.
+- **Same facility for origin and destination**: status gate (`in_transit` only for destination match) prevents double-fires.
+- **Driver loops in/out of radius**: idempotency ref + DB status check ensures we only transition forward, never backward.
 
 ## Files
 
 **New**
-- `supabase/migrations/<ts>_settlement_discrepancies.sql`
-- `src/hooks/useSettlementDiscrepancies.ts`
-- `src/components/finance/StatementDiscrepancyPanel.tsx`
+- `src/hooks/useAutoArrival.ts`
 
 **Edited**
-- `supabase/functions/parse-landstar-statement/index.ts` (capture revenue lines)
-- `src/lib/settlement-reconciliation.ts` (revenue reconcile + tolerance)
-- `src/components/finance/StatementUpload.tsx` (pass loads through; surface block)
-- `src/components/finance/ReconciliationPreview.tsx` (mismatch UI + writeback + halt)
-- `src/components/finance/SettlementsTab.tsx` + `driver-settlements/SettlementDetailSheet.tsx`
-- `src/components/dispatch/ActiveLoadsBoard.tsx` (red badge + detail panel)
+- `src/hooks/useGeofenceStatus.ts` (origin + destination, return shape)
+- `src/pages/DriverDashboard.tsx` (swap drawer for silent hook)
 
-## Out of scope
-
-- No changes to escrow/advance handling (existing rules stay).
-- No auto-resolution of mismatches — admins resolve manually.
-- No changes to `generate_driver_settlements` RPC; halt is enforced at import + at approve in the UI layer.
+**Unchanged / out of scope**
+- `GeofenceArrivalDrawer.tsx` left in place but no longer rendered.
+- No schema changes; reusing existing `fleet_loads.status` + `load_status_logs`.
+- No dispatcher UI changes.
+- No changes to `LocationSharing` upload cadence.

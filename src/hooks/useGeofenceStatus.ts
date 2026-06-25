@@ -7,9 +7,11 @@ interface Coordinates {
 }
 
 interface UseGeofenceStatusResult {
-  isNearDestination: boolean;
+  atOrigin: boolean;
+  atDestination: boolean;
   distanceMiles: number | null;
-  dismiss: () => void;
+  originCoords: Coordinates | null;
+  destinationCoords: Coordinates | null;
 }
 
 const GEOFENCE_RADIUS_MILES = 2;
@@ -27,46 +29,57 @@ function haversineDistance(a: Coordinates, b: Coordinates): number {
 
 export function useGeofenceStatus(
   driverCoords: Coordinates | null,
+  originAddress: string | null,
   destinationAddress: string | null,
-  loadId: string | null
+  loadId: string | null,
+  status: string | null,
 ): UseGeofenceStatusResult {
+  const [originCoords, setOriginCoords] = useState<Coordinates | null>(null);
   const [destCoords, setDestCoords] = useState<Coordinates | null>(null);
-  const [dismissed, setDismissed] = useState(false);
   const lastLoadIdRef = useRef<string | null>(null);
 
-  // Reset dismissed state when load changes
+  // Reset cached coords when load changes
   useEffect(() => {
     if (loadId !== lastLoadIdRef.current) {
       lastLoadIdRef.current = loadId;
-      setDismissed(false);
+      setOriginCoords(null);
       setDestCoords(null);
     }
   }, [loadId]);
 
-  // Geocode destination address
+  // Geocode origin
   useEffect(() => {
-    if (!destinationAddress) {
-      setDestCoords(null);
-      return;
-    }
+    if (!originAddress) { setOriginCoords(null); return; }
+    let cancelled = false;
+    geocodeLocationAsync(originAddress).then((coords) => {
+      if (!cancelled && coords) setOriginCoords(coords);
+    });
+    return () => { cancelled = true; };
+  }, [originAddress]);
+
+  // Geocode destination
+  useEffect(() => {
+    if (!destinationAddress) { setDestCoords(null); return; }
     let cancelled = false;
     geocodeLocationAsync(destinationAddress).then((coords) => {
-      if (!cancelled && coords) {
-        setDestCoords(coords);
-      }
+      if (!cancelled && coords) setDestCoords(coords);
     });
     return () => { cancelled = true; };
   }, [destinationAddress]);
 
-  const distanceMiles = driverCoords && destCoords
-    ? haversineDistance(driverCoords, destCoords)
-    : null;
+  // Choose the active endpoint based on current status
+  const watchingOrigin = status === 'assigned' || status === 'pending' || status === 'loading';
+  const watchingDest = status === 'in_transit';
 
-  const isNearDestination = !dismissed && distanceMiles !== null && distanceMiles < GEOFENCE_RADIUS_MILES;
+  const originDist = driverCoords && originCoords
+    ? haversineDistance(driverCoords, originCoords) : null;
+  const destDist = driverCoords && destCoords
+    ? haversineDistance(driverCoords, destCoords) : null;
 
-  return {
-    isNearDestination,
-    distanceMiles,
-    dismiss: () => setDismissed(true),
-  };
+  const distanceMiles = watchingDest ? destDist : watchingOrigin ? originDist : null;
+
+  const atOrigin = !!(watchingOrigin && originDist !== null && originDist < GEOFENCE_RADIUS_MILES);
+  const atDestination = !!(watchingDest && destDist !== null && destDist < GEOFENCE_RADIUS_MILES);
+
+  return { atOrigin, atDestination, distanceMiles, originCoords, destinationCoords: destCoords };
 }

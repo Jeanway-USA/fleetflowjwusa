@@ -6,8 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ActiveLoadCard } from '@/components/driver/ActiveLoadCard';
 
-import { GeofenceArrivalDrawer } from '@/components/driver/GeofenceArrivalDrawer';
-import { useGeofenceStatus } from '@/hooks/useGeofenceStatus';
+import { useAutoArrival } from '@/hooks/useAutoArrival';
 import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
 import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
 import { WeeklyPerformanceWidget } from '@/components/driver/WeeklyPerformanceWidget';
@@ -124,13 +123,9 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
     ? { lat: driverLocation.latitude, lng: driverLocation.longitude }
     : null;
 
-  const { isNearDestination, distanceMiles, dismiss: dismissGeofence } = useGeofenceStatus(
-    driverCoords,
-    activeLoad?.status === 'in_transit' ? activeLoad.destination : null,
-    activeLoad?.id ?? null,
-  );
-
-  const showGeofenceDrawer = isNearDestination && activeLoad?.status === 'in_transit';
+  // Silent background geofence — auto-arrival at origin or destination,
+  // flips fleet_loads.status without a driver prompt and writes a log row.
+  useAutoArrival(activeLoad ?? null, driverCoords, refetchLoads);
 
   if (isLoading) {
     return (
@@ -278,16 +273,6 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
 
       </div>
 
-      {/* Geofence Arrival Drawer */}
-      {activeLoad && (
-        <GeofenceArrivalDrawer
-          open={!!showGeofenceDrawer}
-          onOpenChange={(open) => { if (!open) dismissGeofence(); }}
-          loadId={activeLoad.id}
-          distanceMiles={distanceMiles}
-          onConfirmed={refetchLoads}
-        />
-      )}
     </>
   );
 });
