@@ -344,7 +344,7 @@ export function useFacilityMutations() {
         .from('facilities')
         .insert(facility)
         .select()
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
