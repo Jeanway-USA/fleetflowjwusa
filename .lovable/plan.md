@@ -1,101 +1,83 @@
-## Goal
+# ADP-Grade Settlement Statement — Deductions + 4-Row Summary
 
-Deliver a verification-grade Settlement Statement in two surfaces that share the exact same layout & data:
+Builds on what shipped last turn. Header stays **JEANWAY LLC / LANDSTAR BCO** (you confirmed Inway agent status isn't live yet — only that label changes when you flip).
 
-1. A new **on-screen printable React view** (`SettlementPrintable.tsx`) styled per the Tailwind spec — opens in a dedicated print route and is what the user actually sees before downloading.
-2. The **downloadable PDF** (`generateSettlementPdf.ts`) rebuilt with `jsPDF` to mirror that exact layout, saved as `Settlement_<LastName>_<period_end>.pdf` (e.g. `Settlement_Ames_2026-06-23.pdf`).
+## 1. Database migration
 
-The detail sheet keeps its existing "Download PDF" button and gains a "Preview Statement" button that opens the printable view in a new tab.
+Extend `driver_settlement_items` to support deductions, plus aggregate deductions on `driver_settlements`:
 
-## Corporate header (clarified)
+```sql
+ALTER TABLE public.driver_settlement_items
+  DROP CONSTRAINT driver_settlement_items_item_type_check;
+ALTER TABLE public.driver_settlement_items
+  ADD CONSTRAINT driver_settlement_items_item_type_check
+  CHECK (item_type IN ('load_pay','reimbursement','deduction'));
 
-User is a Landstar BCO with a fleet — **not a Landstar agent yet**. So the hardcoded header is:
-
-- Title 1: `JEANWAY LLC`
-- Title 2: `LANDSTAR BCO` *(replaces the originally-requested "LANDSTAR INWAY, INC. AGENT")*
-- Address: `4700 DIPLOMACY RD, FORT WORTH, TX 76155-2627`
-
-When the org later promotes to an Inway agent we can flip this single constant (or make it pull from `company_settings`) without touching layout. Flagging this as the only spec deviation from the original message.
-
-## Layout (identical on screen and in PDF)
-
-```
-+--------------------------------------------------------------+
-|  [bg-slate-900 / text-white band, py-8 px-10]                |
-|   JEANWAY LLC                       SETTLEMENT &             |
-|   LANDSTAR BCO                      EARNINGS STATEMENT       |
-|   4700 DIPLOMACY RD,                Statement #XXXXXXXX      |
-|   FORT WORTH, TX 76155-2627         [STATUS BADGE]           |
-+--------------------------------------------------------------+
-|  STATEMENT DETAILS         |  CONTRACTOR INFORMATION         |
-|  Statement # / Pay Period  |  Driver Name / Driver ID        |
-|  Payment Date / Status     |  Email / Phone                  |
-+--------------------------------------------------------------+
-|  LOAD EARNINGS & ROUTES                                      |
-|  Date | Load # | Miles | Status | Origin | Destination       |
-|  (multi-line address wrapping, no truncation)                |
-+--------------------------------------------------------------+
-|  EARNINGS & REIMBURSEMENTS (itemized, right-aligned $)       |
-+--------------------------------------------------------------+
-|  +-- CURRENT PERIOD ----+   +-- YEAR-TO-DATE -----+          |
-|  | Gross / Reimb / NET  |   | YTD Gross/Reimb/NET |          |
-|  +----------------------+   +---------------------+          |
-|     Net Pay = Gross Pay + Reimbursements                     |
-+--------------------------------------------------------------+
-| 12px italic legal disclosure (full width)                    |
-| Generated …                              Page X of Y         |
-+--------------------------------------------------------------+
+ALTER TABLE public.driver_settlements
+  ADD COLUMN deductions numeric NOT NULL DEFAULT 0,
+  ADD COLUMN ytd_deductions numeric NOT NULL DEFAULT 0;
 ```
 
-## Files
+Update `net_pay` generated column (or trigger — confirm in migration) so:
+`net_pay = gross_pay + reimbursements − deductions`.
 
-### NEW `src/components/finance/driver-settlements/SettlementPrintable.tsx`
-Pure presentational React component, container:
-```
-max-w-4xl mx-auto p-8 bg-white text-zinc-900 shadow-sm print:shadow-none print:p-0
-```
-- Header banner: `bg-slate-900 text-white px-10 py-8` with the three hardcoded lines above, status pill on the right (DRAFT zinc / PENDING amber / APPROVED slate / PAID-FINAL emerald).
-- Sections separated by `border-t border-zinc-200`, each marked `print:break-inside-avoid`.
-- Two-column metadata via `grid grid-cols-1 md:grid-cols-2 gap-8 py-6`. Contractor card wrapped in `border border-zinc-200 rounded-md p-4`.
-- Load table: `<table class="w-full text-sm border-collapse">`, `whitespace-normal align-top`, `even:bg-zinc-50`.
-- Itemized rows: `flex justify-between border-b border-zinc-100 py-2 tabular-nums`.
-- Dual summary cards: `grid md:grid-cols-2 gap-4`, each `border rounded-lg overflow-hidden` with a `bg-slate-900 text-white` header bar and a highlighted Net row (`bg-slate-50 font-semibold text-base`).
-- Footer: `text-[12px] italic text-zinc-600 border-t pt-4` exact disclosure text, plus `flex justify-between text-[10px] text-zinc-500 pt-2` for `Generated …` / `Page 1 of 1`.
+Update `generate_driver_settlements(...)` RPC: initialize `deductions = 0`, fold into the YTD rollup block (sum `deductions` across same-year settlements into `ytd_deductions`).
 
-Takes a fully-resolved `SettlementDocumentData` prop. No data fetching inside.
+Update `driver_payroll`-style aggregations only if needed for the Detail Sheet; no other tables touched. No new RLS policies — existing item policies already cover all `item_type`s.
 
-### NEW `src/lib/settlement-document-data.ts`
-`buildSettlementDocumentData(settlementId)` — shared loader returning `{ settlement, driver, org, items, breakdown, ytd }`. Wraps the existing queries in `generateSettlementPdf` plus a YTD aggregate (`SUM(gross_pay)/reimbursements/net_pay` over the driver's `approved|paid|pending_approval` settlements in the same calendar year as `period_end`). Both the printable view and the PDF renderer consume it.
+## 2. Net Pay logic (`src/utils/payCalculations.ts`)
 
-### NEW route `src/pages/SettlementPrint.tsx` + register in `App.tsx`
-- Route: `/settlements/:id/print` (protected: owner / dispatcher / payroll_admin / the settlement's own driver).
-- Renders `<SettlementPrintable data={...} />` plus a no-print toolbar with **Print / Save as PDF** (`window.print()`) and **Download PDF** (calls `generateSettlementPdf(id)`).
+Add `totalDeductions` to the breakdown shape. Update `calculateNet`:
+`net = gross + reimbursements − deductions`.
+Update unit tests in `payCalculations.test.ts` to cover the new branch (one fixture with a deduction line, one without).
+Propagate the new field through `src/lib/settlement-pay-breakdown.ts` and `src/lib/settlement-document-data.ts` so YTD payload now carries `{ gross, reimbursements, deductions, net }`.
 
-### EDIT `src/lib/pdf/generateSettlementPdf.ts` (full rewrite)
-- Consume `buildSettlementDocumentData` instead of fetching inline.
-- Hardcode the 3-line corporate header in the navy banner (`JEANWAY LLC` / `LANDSTAR BCO` / address). Org `logo_url` still loads to the left when present.
-- Status pill → filled rounded rect with white bold text. Mapping: `pending_approval` PENDING (`#D97706`), `approved` APPROVED (`#475569`), `paid` PAID (`#059669`), else DRAFT (`#71717A`).
-- Two-column Statement Details / Contractor Information block under the banner with hairline `#E4E4E7` dividers.
-- Load table via `autoTable`: Date · Load # · Miles · Status · Origin · Destination. `overflow: 'linebreak'`, `cellPadding: 6`, `minCellHeight: 22`. Origin/Destination get the widest share — addresses wrap, never ellipsize. Pay-type-aware footer totals (Flat / CPM / Percentage variants preserved).
-- Itemized Earnings & Reimbursements list (text rows, right-aligned $) drawn before summary cards.
-- Dual summary cards: CURRENT PERIOD + YEAR-TO-DATE. Navy header, highlighted Net row (`bg #F1F5F9`, 13pt bold). Numbers recomputed defensively as `net = gross + reimb`.
-- "Net Pay = Gross Pay + Reimbursements" caption directly under the cards (8pt italic zinc).
-- Every-page footer: 10pt italic full-width disclosure (exact spec text) above a hairline rule, `Generated <ts>` bottom-left, `Page X of Y` bottom-right (zinc-500, 8pt).
-- Pagination safety: before each major block check remaining height against `H − footerReserve` and `addPage()` if needed. Footer reserve derived from wrapped disclosure line count so it never overlaps or produces a trailing blank page.
-- Filename: `Settlement_<LastName>_<period_end YYYY-MM-DD>.pdf` (already matches `Settlement_Ames_2026-06-23.pdf` — verified).
+## 3. Detail Sheet UI — admin deduction editor
 
-### EDIT `src/components/finance/driver-settlements/SettlementDetailSheet.tsx`
-Add a **Preview Statement** button next to **Download PDF** that opens `/settlements/:id/print` in a new tab (`window.open(url, '_blank', 'noopener')`). No other layout / logic changes.
+`src/components/finance/driver-settlements/SettlementDetailSheet.tsx`
 
-## Technical notes
+- Split the current single items list into a **dual-column grid** (`grid-cols-1 md:grid-cols-2 gap-6`):
+  - **Left — Earnings & Additions**: items where `item_type ∈ {'load_pay','reimbursement'}`.
+  - **Right — Deductions & Escrows**: items where `item_type = 'deduction'`. When empty, render the column with a muted "No deductions in this period" placeholder so the grid stays balanced.
+- Under the Deductions column, when settlement `status === 'draft'` and viewer has `payroll_admin`/`owner` role, render a lightweight inline editor row: a `<Select>` of preset labels (Escrow, Plate Fee, Insurance, Fuel Advance, IFTA, Other), an `Input` for amount, and an Add button. Submits an `insert` into `driver_settlement_items` with `item_type = 'deduction'`, then invalidates the query. Each deduction row gets a small trash icon (admin-only, draft-only) to delete.
+- Recompute the summary block (and the net pay shown at the top) from `gross + reimb − deductions`.
 
-- Currency via existing `formatCurrency`; dates via `date-fns` with the `T00:00:00` guard.
-- Print styles live inside the printable component as Tailwind `print:` variants — no global CSS.
-- YTD aggregate is one extra query in the shared loader; no SQL / schema / edge-function changes.
-- Pure frontend + PDF renderer; no business-logic changes.
+## 4. Printable view — `SettlementPrintable.tsx`
 
-## Out of scope
+- Keep the `bg-zinc-900` corporate banner (matches your spec; we used `bg-slate-900` last turn — switch to `zinc-900` for consistency with the brief).
+- **Itemized Loads table**: keep the full-width loads grid (Date, Load #, Miles, Status, Origin, Destination) with `even:bg-slate-50/50` zebra striping and `print:break-inside-avoid` on each row group.
+- **Dual-column block** below the loads table: left card "EARNINGS & ADDITIONS" (load pay rows + reimbursements), right card "DEDUCTIONS & ESCROWS" (deduction rows or empty-state).
+- **Dual summary cards** (`grid grid-cols-2`): CURRENT PERIOD vs YEAR-TO-DATE, each rendering 4 rows:
+  1. Gross Pay
+  2. Total Reimbursements
+  3. Total Deductions (shown as negative, red text)
+  4. **Net Pay** (bold, highlighted row `bg-slate-50`)
+- Under the cards, italic helper: *"Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions"*.
+- Keep existing legal disclosure footer + `Page X of Y` alignment.
 
-- Making the corporate subtitle (`LANDSTAR BCO` ↔ `LANDSTAR INWAY, INC. AGENT`) configurable through `company_settings`. Flagged as a follow-up the moment Inway agent status is approved.
-- Settlement generation / approval / payment flows.
-- Detail-sheet mobile tweaks beyond the new Preview button.
+## 5. PDF engine — `src/lib/pdf/generateSettlementPdf.ts`
+
+Mirror the printable changes:
+- Header banner → zinc-900 hex `#18181B`.
+- After the load `autoTable`, render two side-by-side `autoTable`s: Earnings & Additions / Deductions & Escrows. Empty deductions table renders one "No deductions in this period" row so column widths stay symmetric.
+- Replace 3-row summary cards with 4-row cards (Gross, Reimb, Deductions, Net). Deductions row uses red text `#DC2626`. Net row uses bold + slate fill.
+- Same calculation helper line above the legal footer.
+- Filename unchanged: `Settlement_<LastName>_<period_end>.pdf`.
+
+## 6. Out of scope
+
+- No changes to settlement approval/paid flow, no driver-side mutations (drivers stay read-only).
+- No new role required — existing `payroll_admin`/`owner` gating reused.
+- Corporate header text stays hardcoded; configurable subtitle deferred.
+
+## Technical summary
+
+| File | Change |
+|---|---|
+| `supabase/migrations/<ts>_settlement_deductions.sql` | New `deduction` item type, `deductions` + `ytd_deductions` columns, net_pay recompute, RPC update |
+| `src/utils/payCalculations.ts` (+ test) | Add deductions to breakdown + net formula |
+| `src/lib/settlement-pay-breakdown.ts` | Surface `totalDeductions` |
+| `src/lib/settlement-document-data.ts` | Include deductions in current + YTD payload |
+| `src/components/finance/driver-settlements/SettlementDetailSheet.tsx` | Dual-column items grid + admin deduction editor |
+| `src/components/finance/driver-settlements/SettlementPrintable.tsx` | zinc-900 banner, zebra loads table, dual-column block, 4-row dual summary cards |
+| `src/lib/pdf/generateSettlementPdf.ts` | Mirror printable: dual tables + 4-row cards |
