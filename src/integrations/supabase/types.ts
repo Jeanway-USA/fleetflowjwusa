@@ -5088,6 +5088,7 @@ export type Database = {
           _driver_ids: string[]
           _payment_date: string
           _period_end: string
+          _period_start: string
         }
         Returns: {
           approved_at: string | null

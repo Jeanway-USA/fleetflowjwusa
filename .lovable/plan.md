@@ -1,43 +1,38 @@
 ## Goal
-Clean up the visual bugs in the generated settlement PDF so it renders as a pristine, official paystub.
+Let admins explicitly set both ends of the pay period when generating settlements, so the period reflects exactly what they entered (e.g., Jun 23 – Jun 26).
 
-## Issues confirmed from the attached PDF
-1. **Garbled `!'` next to "Origin"** — the Unicode arrow `→` we pass into headers and load rows isn't in the default helvetica WinAnsi encoding, so the PDF reader prints `!'` instead of an arrow. Visible in both the column header ("Origin !' Destination") and every load row ("Lewisville, TX … !' Hughes Supply, …").
-2. **Address column stretching / squeezing other columns** — the Origin → Destination column has no explicit width, so a long combined origin+destination string consumes most of the row width and pushes the Miles/Status columns to the edge of the page.
-3. **Other small clipping/spacing artifacts** — long single-line strings (full statement ID, long addresses, long reimbursement descriptions) can clip because columns rely on autotable's auto-sizing instead of explicit widths with `overflow: 'linebreak'`.
+## Root cause
+The Generate Settlements dialog only collects **one date** (`periodEnd`) and calls the RPC `generate_driver_settlements(_driver_ids, _period_end, _payment_date)`. The SQL function derives `period_start` automatically as "day after the last settlement, else first activity, else hire date." For Timothy Ames there was no prior settlement and the only activity row's pickup date is Jun 23, so `period_start = period_end = Jun 23`. Even though the user intended a Jun 23 – Jun 26 window, the UI gave them no way to express it.
 
-## Fix (scope: PDF generator only)
-Edit `src/lib/pdf/generateSettlementPdf.ts`:
+## Fix
 
-1. **Replace the Unicode arrow with a WinAnsi-safe separator** everywhere it appears in PDF text:
-   - Column headers: `'Origin → Destination'` → `'Origin / Destination'` (or `'Origin to Destination'`).
-   - Load row body cells: `` `${origin} → ${destination}` `` → `` `${origin}  →  ${destination}` `` replaced with `` `${origin}\n→\n${destination}` `` won't help — instead use a plain ASCII separator like `' → '` swapped to `'  »  '`… use a safe glyph: switch to ` / ` (slash) for the visible separator, or better, split origin and destination into **two separate columns** so the relationship is obvious without any special character.
-   - Decision: split into two columns (`Origin` and `Destination`) for the Flat / CPM / Percentage tables. This both removes the arrow problem and makes long addresses wrap naturally inside their own column.
-   - Also scrub the period strip dash (`–`) and the formula label (e.g. `1,200 mi × $0.65/mi`): replace `×` with `x` and `–` with `-` to stay inside WinAnsi.
+### 1. Database migration — add `_period_start` parameter to the RPC
+- `CREATE OR REPLACE FUNCTION public.generate_driver_settlements(_driver_ids uuid[], _period_start date, _period_end date, _payment_date date)` with the same return type.
+- Behavior:
+  - If `_period_start` is provided, use it verbatim — skip the auto-derivation block entirely.
+  - If `_period_start` is NULL, keep the existing auto-derivation fallback (day after last settlement → first activity → hire date) for backward compatibility.
+  - Validate `_period_start <= _period_end` (raise exception otherwise).
+- All `BETWEEN _period_start AND _period_end` queries and the flat-rate overlap check already use `_period_start`, so they pick up the new value automatically.
+- Drop the prior signature with `DROP FUNCTION IF EXISTS public.generate_driver_settlements(uuid[], date, date);` so PostgREST routes to the new one without ambiguity.
 
-2. **Pin column widths and enable line-break overflow** on every autotable so nothing overflows the page:
-   - Compute `tableWidth = W - margin*2` and assign explicit `columnStyles[i].cellWidth` for every column. Suggested widths for the Flat table (in pts, total ≈ 515): Date 60, Load # 70, Origin 150, Destination 150, Miles 45, Status 40.
-   - Set `styles.overflow: 'linebreak'` and `styles.cellWidth: 'wrap'` on all autotables so long addresses wrap inside the cell instead of pushing the table.
-   - Same treatment for CPM (Date/Load/Origin/Destination/Miles/Rate/Amount) and Percentage (Date/Load/Origin/Destination/Linehaul/After Split/Driver %) tables, recomputing widths so they sum to the available content width.
-   - Reimbursements table: explicit `cellWidth` for Description and Amount with `overflow: 'linebreak'` for long descriptions.
+### 2. Generate Settlements dialog — collect both dates
+File: `src/components/finance/driver-settlements/GenerateSettlementsDialog.tsx`
+- Add `periodStart` state (default: 6 days before `periodEnd`, mirroring a typical weekly cycle).
+- Render a "Pay Period Start" date picker next to the existing "Pay Period End" picker (two-column grid on desktop, stacked on mobile).
+- Validate `periodStart <= periodEnd` before submitting; show inline error if not.
+- Pass `_period_start: format(periodStart, 'yyyy-MM-dd')` in the RPC call alongside the existing `_period_end` and `_payment_date`.
+- Reset `periodStart` whenever the dialog reopens.
 
-3. **Header right-column safety** — the driver block in the dark header right-aligns email/phone. Clamp it with `doc.splitTextToSize(..., 240)` so a long email never bleeds into the org name on the left.
-
-4. **Pay Calculation band** — the formula string is right-aligned and can theoretically overrun the label on the left. Truncate with `splitTextToSize` to `(W - margin*2 - 130)` and shrink font to 10pt if it wraps.
-
-5. **Footer tax-note wrap math** — `contactWrapped` is positioned using `wrapped.length * 9`, but font size is 7.5 so line height should be ~10. Adjust to `wrapped.length * 10` so the contact line doesn't sit on top of the tax note when the tax note wraps to two lines.
-
-## What's NOT changing
-- No changes to settlement business logic, SQL, breakdown helper, or UI components.
-- No font embedding (keeps bundle size and avoids new assets); we stay in WinAnsi-safe characters instead.
+### 3. No other surfaces affected
+- The PDF generator, detail sheet, and dashboard table already read `period_start` from the row and will display the correct range automatically once the row is stored properly.
 
 ## Verification
-After implementing, re-render a settlement PDF (same Timothy Ames example), convert to image with `pdftoppm -jpeg -r 150`, and visually confirm:
-- No `!'` artifacts anywhere.
-- Origin and Destination each occupy their own column and wrap cleanly.
-- Miles and Status columns are fully visible on the right edge.
-- Header, formula band, and footer text never clip or overlap.
+- Generate a new settlement for Timothy Ames with start = Jun 23, end = Jun 26, payment = Jun 26.
+- Confirm the saved row stores `period_start = 2026-06-23`, `period_end = 2026-06-26`.
+- Open the PDF and confirm the period strip reads "Jun 23, 2026 - Jun 26, 2026".
+- Re-run a generation with `_period_start` omitted from a manual SQL call to confirm the auto-derivation fallback still works.
 
 ## Technical Details
-- File touched: `src/lib/pdf/generateSettlementPdf.ts` only.
-- jsPDF + jspdf-autotable APIs used: `columnStyles[i].cellWidth`, `styles.overflow: 'linebreak'`, `doc.splitTextToSize`.
+- One new migration that `DROP`s the old 3-arg signature and `CREATE OR REPLACE`s the 4-arg signature with the new optional `_period_start`.
+- One UI file edit to add the second date picker and pass the new arg.
+- No schema/table changes; `driver_settlements` already has `period_start`.

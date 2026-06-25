@@ -62,13 +62,16 @@ export function GenerateSettlementsDialog({
   onGenerated,
 }: Props) {
   const [periodEnd, setPeriodEnd] = useState<Date>(new Date());
+  const [periodStart, setPeriodStart] = useState<Date>(addDays(new Date(), -6));
   const [paymentDate, setPaymentDate] = useState<Date>(nextThursday());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setPeriodEnd(new Date());
+      const end = new Date();
+      setPeriodEnd(end);
+      setPeriodStart(addDays(end, -6));
       setPaymentDate(nextThursday());
       setSelected(new Set());
       setPickerOpen(false);
@@ -100,12 +103,16 @@ export function GenerateSettlementsDialog({
       if (selected.size === 0) {
         throw new Error('Select at least one driver.');
       }
-      if (!periodEnd || !paymentDate) {
-        throw new Error('Pay period end and payment date are required.');
+      if (!periodEnd || !paymentDate || !periodStart) {
+        throw new Error('Pay period start, end, and payment date are required.');
+      }
+      if (periodStart > periodEnd) {
+        throw new Error('Pay period start must be on or before the end date.');
       }
       const targetIds = allSelected ? null : Array.from(selected);
       const { data, error } = await supabase.rpc('generate_driver_settlements', {
         _driver_ids: targetIds,
+        _period_start: format(periodStart, 'yyyy-MM-dd'),
         _period_end: format(periodEnd, 'yyyy-MM-dd'),
         _payment_date: format(paymentDate, 'yyyy-MM-dd'),
       });
@@ -241,9 +248,37 @@ export function GenerateSettlementsDialog({
           </div>
 
           {/* Dates */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Pay Period End Date</Label>
+              <Label>Pay Period Start</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    className={cn(
+                      'w-full justify-start text-left font-normal',
+                      !periodStart && 'text-muted-foreground',
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {periodStart ? format(periodStart, 'PPP') : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={periodStart}
+                    onSelect={(d) => d && setPeriodStart(d)}
+                    initialFocus
+                    className={cn('p-3 pointer-events-auto')}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Pay Period End</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
