@@ -116,15 +116,19 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="w-full sm:max-w-2xl flex flex-col p-0">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b">
-          <SheetTitle className="flex items-center justify-between gap-3">
-            <span>Settlement Statement — {driverName}</span>
-            {settlement && <StatusBadge status={settlement.status} />}
+      <SheetContent className="w-full sm:max-w-2xl flex flex-col p-0 overflow-hidden">
+        <SheetHeader className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 border-b pr-12">
+          <SheetTitle className="text-base sm:text-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <span className="truncate">Settlement — {driverName}</span>
+            {settlement && (
+              <span className="shrink-0">
+                <StatusBadge status={settlement.status} />
+              </span>
+            )}
           </SheetTitle>
           {settlement && (
-            <SheetDescription className="flex items-center justify-between gap-3 flex-wrap">
-              <span>
+            <SheetDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <span className="text-xs sm:text-sm">
                 Period{' '}
                 {format(parseISO(`${settlement.period_start}T00:00:00`), 'MMM d')} –{' '}
                 {format(parseISO(`${settlement.period_end}T00:00:00`), 'MMM d, yyyy')}
@@ -140,6 +144,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                 variant="outline"
                 onClick={handleDownload}
                 disabled={downloading}
+                className="w-full sm:w-auto"
               >
                 <Download className="h-4 w-4 mr-2" />
                 {downloading ? 'Generating…' : 'Download PDF'}
@@ -149,8 +154,8 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
         </SheetHeader>
 
         {settlement && (
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <SummaryStat label="Gross Pay" value={Number(settlement.gross_pay ?? 0)} />
               <SummaryStat
                 label="Reimbursements"
@@ -168,7 +173,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                 <CardTitle className="text-sm">Year-to-Date (Proof of Income)</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground">YTD Gross</p>
                     <p className="font-semibold">
@@ -200,10 +205,31 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
             />
           </div>
         )}
+
+        <div className="border-t px-4 sm:px-6 py-3 bg-background flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="w-full sm:w-auto"
+          >
+            Close
+          </Button>
+          {settlement && (
+            <Button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="w-full sm:w-auto hidden sm:inline-flex"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {downloading ? 'Generating…' : 'Download PDF'}
+            </Button>
+          )}
+        </div>
       </SheetContent>
     </Sheet>
   );
 }
+
 
 function ReimbursementSection({
   rows,
@@ -333,38 +359,41 @@ function ReimbursementSection({
           No reimbursements yet. {editable && 'Click Add to record one.'}
         </p>
       ) : rows.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Description</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              {editable && <TableHead className="w-12" />}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="text-muted-foreground">{r.description ?? '—'}</TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatCurrency(Number(r.amount ?? 0))}
-                </TableCell>
-                {editable && (
-                  <TableCell>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => delMut.mutate(r.id)}
-                      disabled={delMut.isPending}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                )}
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <Table className="min-w-[420px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                {editable && <TableHead className="w-12" />}
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="text-muted-foreground">{r.description ?? '—'}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {formatCurrency(Number(r.amount ?? 0))}
+                  </TableCell>
+                  {editable && (
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => delMut.mutate(r.id)}
+                        disabled={delMut.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       ) : null}
+
     </div>
   );
 }
@@ -417,61 +446,66 @@ function EarningsBreakdown({ breakdown }: { breakdown: PayBreakdown | undefined 
       </div>
 
       {breakdown.payType === 'flat' && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Load #</TableHead>
-              <TableHead>Origin → Destination</TableHead>
-              <TableHead className="text-right">Miles</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {breakdown.loads.length === 0 ? (
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+          <Table className="min-w-[560px]">
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
-                  No loads recorded in this period
-                </TableCell>
+                <TableHead>Date</TableHead>
+                <TableHead>Load #</TableHead>
+                <TableHead>Origin → Destination</TableHead>
+                <TableHead className="text-right">Miles</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
-            ) : (
-              breakdown.loads.map((l) => (
-                <TableRow key={l.id}>
-                  <TableCell>
-                    {l.delivery_date || l.pickup_date
-                      ? format(
-                          parseISO(`${l.delivery_date ?? l.pickup_date}T00:00:00`),
-                          'MM/dd/yyyy',
-                        )
-                      : '—'}
-                  </TableCell>
-                  <TableCell>{l.landstar_load_id || l.id.slice(0, 8)}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {l.origin} → {l.destination}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {fmtMi(Number(l.booked_miles ?? l.actual_miles ?? 0))}
-                  </TableCell>
-                  <TableCell className="capitalize">
-                    {(l.status ?? '').replace('_', ' ')}
+            </TableHeader>
+            <TableBody>
+              {breakdown.loads.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    No loads recorded in this period
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-            <TableRow className="bg-muted/40">
-              <TableCell colSpan={4} className="text-right font-semibold">
-                Flat Rate Base Pay
-              </TableCell>
-              <TableCell className="text-right font-semibold">
-                {formatCurrency(breakdown.basePay)}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+              ) : (
+                breakdown.loads.map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell>
+                      {l.delivery_date || l.pickup_date
+                        ? format(
+                            parseISO(`${l.delivery_date ?? l.pickup_date}T00:00:00`),
+                            'MM/dd/yyyy',
+                          )
+                        : '—'}
+                    </TableCell>
+                    <TableCell>{l.landstar_load_id || l.id.slice(0, 8)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {l.origin} → {l.destination}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {fmtMi(Number(l.booked_miles ?? l.actual_miles ?? 0))}
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {(l.status ?? '').replace('_', ' ')}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+              <TableRow className="bg-muted/40">
+                <TableCell colSpan={4} className="text-right font-semibold">
+                  Flat Rate Base Pay
+                </TableCell>
+                <TableCell className="text-right font-semibold">
+                  {formatCurrency(breakdown.basePay)}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
       )}
 
+
       {breakdown.payType === 'per_mile' && (
-        <Table>
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <Table className="min-w-[640px]">
+
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
@@ -528,10 +562,13 @@ function EarningsBreakdown({ breakdown }: { breakdown: PayBreakdown | undefined 
             </TableRow>
           </TableBody>
         </Table>
+        </div>
       )}
 
       {breakdown.payType === 'percentage' && (
-        <Table>
+        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+        <Table className="min-w-[640px]">
+
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
@@ -592,7 +629,9 @@ function EarningsBreakdown({ breakdown }: { breakdown: PayBreakdown | undefined 
             </TableRow>
           </TableBody>
         </Table>
+        </div>
       )}
+
     </div>
   );
 }

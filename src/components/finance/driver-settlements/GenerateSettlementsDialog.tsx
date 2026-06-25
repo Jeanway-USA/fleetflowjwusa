@@ -262,7 +262,7 @@ export function GenerateSettlementsDialog({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodStart ? format(periodStart, 'PPP') : <span>Pick a date</span>}
+                    {periodStart ? format(periodStart, 'MMM d, yyyy') : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -290,7 +290,7 @@ export function GenerateSettlementsDialog({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {periodEnd ? format(periodEnd, 'PPP') : <span>Pick a date</span>}
+                    {periodEnd ? format(periodEnd, 'MMM d, yyyy') : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -318,7 +318,7 @@ export function GenerateSettlementsDialog({
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {paymentDate ? format(paymentDate, 'PPP') : <span>Pick a date</span>}
+                    {paymentDate ? format(paymentDate, 'MMM d, yyyy') : <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -339,18 +339,24 @@ export function GenerateSettlementsDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={busy}
+            className="w-full sm:w-auto"
+          >
             Cancel
           </Button>
           <LoadingButton
             loading={busy}
             disabled={busy || selected.size === 0}
             onClick={() => generate.mutate()}
-            className="gradient-gold text-primary-foreground"
+            className="w-full sm:w-auto gradient-gold text-primary-foreground"
           >
             Generate
           </LoadingButton>
         </DialogFooter>
+
       </DialogContent>
     </Dialog>
   );
