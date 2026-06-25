@@ -105,6 +105,7 @@ export async function buildSettlementDocumentData(
 
   const itemRows = (items ?? []) as SettlementDocItem[];
   const reimbursementItems = itemRows.filter((i) => i.item_type === 'reimbursement');
+  const deductionItems = itemRows.filter((i) => i.item_type === 'deduction');
 
   const breakdown = await fetchPayBreakdown(s, driver as any);
 
@@ -113,12 +114,13 @@ export async function buildSettlementDocumentData(
   let ytd: SettlementYtd = {
     gross: Number(s.ytd_gross ?? 0),
     reimbursements: Number(s.ytd_reimbursements ?? 0),
+    deductions: Number(s.ytd_deductions ?? 0),
     net: Number(s.ytd_net ?? 0),
   };
   if (year) {
     const { data: ytdRows } = await supabase
       .from('driver_settlements')
-      .select('gross_pay, reimbursements, net_pay, status, period_end')
+      .select('gross_pay, reimbursements, deductions, net_pay, status, period_end')
       .eq('org_id', s.org_id)
       .eq('driver_id', s.driver_id)
       .gte('period_end', `${year}-01-01`)
@@ -129,10 +131,11 @@ export async function buildSettlementDocumentData(
         (acc, r: any) => {
           acc.gross += Number(r.gross_pay ?? 0);
           acc.reimbursements += Number(r.reimbursements ?? 0);
+          acc.deductions += Number(r.deductions ?? 0);
           acc.net += Number(r.net_pay ?? 0);
           return acc;
         },
-        { gross: 0, reimbursements: 0, net: 0 },
+        { gross: 0, reimbursements: 0, deductions: 0, net: 0 },
       );
       ytd = agg;
     }
@@ -148,11 +151,13 @@ export async function buildSettlementDocumentData(
     org: (org ?? null) as SettlementDocOrg | null,
     items: itemRows,
     reimbursementItems,
+    deductionItems,
     breakdown,
     ytd,
     payrollContact: settingMap.get('payroll_contact') ?? '',
   };
 }
+
 
 export const CORPORATE_HEADER = {
   name: 'JEANWAY LLC',
