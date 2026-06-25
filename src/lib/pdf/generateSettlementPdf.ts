@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format, parseISO } from 'date-fns';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, numberToEnglishUsd } from '@/lib/formatters';
 import {
   buildSettlementDocumentData,
   CORPORATE_HEADER,
@@ -57,7 +57,10 @@ function detectLogoFormat(dataUrl: string): 'PNG' | 'JPEG' {
     : 'PNG';
 }
 
-export async function generateSettlementPdf(settlementId: string): Promise<void> {
+export async function generateSettlementPdf(
+  settlementId: string,
+  opts: { includeVoucher?: boolean } = {},
+): Promise<void> {
   const data = await buildSettlementDocumentData(settlementId);
   const { settlement: s, driver, org, reimbursementItems, deductionItems, breakdown, ytd } = data;
 
@@ -487,6 +490,159 @@ export async function generateSettlementPdf(settlementId: string): Promise<void>
     { align: 'center' },
   );
 
+
+  // ---------- Optional Check Voucher block ----------
+  if (opts.includeVoucher) {
+    const voucherH = 200;
+    if (y + voucherH > H - FOOTER_RESERVE) {
+      doc.addPage();
+      y = margin;
+    }
+    y += 16;
+
+    const vx = margin;
+    const vy = y;
+    const vw = contentW;
+    const vh = voucherH;
+
+    // Tear label
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(113, 113, 122);
+    doc.text('-- DETACH HERE - NON-NEGOTIABLE VOUCHER --', W / 2, vy - 4, {
+      align: 'center',
+    });
+
+    // Dashed border
+    doc.setDrawColor(212, 212, 216);
+    doc.setLineWidth(1);
+    doc.setLineDash([4, 3], 0);
+    doc.roundedRect(vx, vy, vw, vh, 4, 4, 'S');
+    doc.setLineDash([], 0);
+
+    // Watermark
+    const gs: any = (doc as any).GState
+      ? new (doc as any).GState({ opacity: 0.12 })
+      : null;
+    if (gs) (doc as any).setGState(gs);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(120, 120, 130);
+    doc.text(
+      'NON-NEGOTIABLE - FOR RECORD PURPOSES ONLY',
+      vx + vw / 2,
+      vy + vh / 2 + 4,
+      { align: 'center', angle: 18 },
+    );
+    if (gs) {
+      const gsReset: any = new (doc as any).GState({ opacity: 1 });
+      (doc as any).setGState(gsReset);
+    }
+
+    // Header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(24, 24, 27);
+    doc.text(safe(CORPORATE_HEADER.name), vx + 14, vy + 20);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(113, 113, 122);
+    doc.text('PAYROLL VOUCHER', vx + 14, vy + 32);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.text('CHECK NO.', vx + vw - 14, vy + 20, { align: 'right' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(24, 24, 27);
+    doc.text(`VCH-${statementNo}`, vx + vw - 14, vy + 34, { align: 'right' });
+
+    // Separator
+    doc.setDrawColor(228, 228, 231);
+    doc.line(vx + 14, vy + 44, vx + vw - 14, vy + 44);
+
+    // Pay to / amount
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(113, 113, 122);
+    doc.text('PAY TO THE ORDER OF', vx + 14, vy + 58);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(24, 24, 27);
+    doc.text(safe(driverName), vx + 14, vy + 74);
+    doc.setDrawColor(160, 160, 170);
+    doc.line(vx + 14, vy + 78, vx + vw / 2 - 10, vy + 78);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(113, 113, 122);
+    doc.text('AMOUNT', vx + vw - 14, vy + 58, { align: 'right' });
+    doc.setDrawColor(160, 160, 170);
+    doc.roundedRect(vx + vw / 2 + 10, vy + 62, vw / 2 - 24, 20, 2, 2, 'S');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(24, 24, 27);
+    doc.text(formatCurrency(currentNet), vx + vw - 20, vy + 77, { align: 'right' });
+
+    // Amount in words
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(113, 113, 122);
+    doc.text('AMOUNT IN WORDS', vx + 14, vy + 96);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9.5);
+    doc.setTextColor(40, 40, 50);
+    const words = safe(numberToEnglishUsd(currentNet));
+    doc.text(words, vx + 14, vy + 110);
+    doc.line(vx + 14, vy + 113, vx + vw - 14, vy + 113);
+
+    // Field grid
+    const fieldRowY = vy + 128;
+    const colMid = vx + vw / 2;
+    const labelField = (lx: number, ly: number, label: string, value: string) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(113, 113, 122);
+      doc.text(label, lx, ly);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(24, 24, 27);
+      doc.text(safe(value), lx, ly + 11);
+    };
+    labelField(vx + 14, fieldRowY, 'PAY DATE', fmtDate(s.payment_date));
+    labelField(
+      colMid + 6,
+      fieldRowY,
+      'MEMO',
+      `Settlement ${fmtDate(s.period_start)} - ${fmtDate(s.period_end)}`,
+    );
+    labelField(vx + 14, fieldRowY + 26, 'BANK ROUTING', 'XXXX-XXXX-XXXX');
+    labelField(colMid + 6, fieldRowY + 26, 'METHOD', 'ACH Direct Deposit on File');
+
+    // Signature
+    const sigY = vy + vh - 24;
+    doc.setFont('times', 'italic');
+    doc.setFontSize(16);
+    doc.setTextColor(30, 30, 40);
+    doc.text('Jean-Way Payroll', vx + 14, sigY - 6);
+    doc.setDrawColor(40, 40, 50);
+    doc.line(vx + 14, sigY, vx + vw / 2 - 20, sigY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(113, 113, 122);
+    doc.text('AUTHORIZED SIGNATURE', vx + 14, sigY + 9);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(24, 24, 27);
+    doc.text(fmtDate(s.payment_date), colMid + 6, sigY - 6);
+    doc.line(colMid + 6, sigY, vx + vw - 14, sigY);
+    doc.setFontSize(7);
+    doc.setTextColor(113, 113, 122);
+    doc.text('DATE', colMid + 6, sigY + 9);
+
+    y = vy + vh + 12;
+  }
 
   // ---------- Footer on every page ----------
   const pageCount = (doc as any).internal.getNumberOfPages();
