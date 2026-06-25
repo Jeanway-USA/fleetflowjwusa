@@ -492,6 +492,8 @@ export function ActiveLoadsBoard() {
                   </Badge>
                 </div>
 
+                <LoadDiscrepancyPanel loadId={selectedLoad.id} />
+
                 {/* Origin */}
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
