@@ -50,6 +50,7 @@ interface ActiveLoad {
   driver: { first_name: string; last_name: string } | null;
   truck: { unit_number: string } | null;
   load_accessorials: { amount: number }[] | null;
+  has_statement_discrepancy?: boolean | null;
 }
 
 const statusColors: Record<string, string> = {
