@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { MapPin, Clock, Truck, Package, CheckCircle, Loader2, FileText, Calendar, DollarSign, Route, Link2, ChevronDown, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
+import { StopTime } from '@/components/shared/StopTime';
 const LoadRouteMap = lazy(() => import('./LoadRouteMap').then(m => ({ default: m.LoadRouteMap })));
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
@@ -59,9 +60,13 @@ interface Load {
   pickup_date: string | null;
   pickup_time: string | null;
   pickup_time_type: string | null;
+  pickup_at?: string | null;
+  pickup_tz?: string | null;
   delivery_date: string | null;
   delivery_time: string | null;
   delivery_time_type: string | null;
+  delivery_at?: string | null;
+  delivery_tz?: string | null;
   status: string;
   rate: number | null;
   booked_miles: number | null;
@@ -288,12 +293,26 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
                   {getRelativeTimestamp(load.delivery_date, null)}
                 </span>
               ) : load.status === 'in_transit' ? (
-                <span>
-                  Delivery: {formatDate(load.delivery_date)}
+                <span className="inline-flex items-center gap-1">
+                  Delivery:{' '}
+                  <StopTime
+                    utcIso={load.delivery_at}
+                    tz={load.delivery_tz}
+                    legacyDate={load.delivery_date}
+                    legacyTime={load.delivery_time}
+                    withDate
+                  />
                 </span>
               ) : (
-                <span>
-                  Pickup: {formatDate(load.pickup_date)}
+                <span className="inline-flex items-center gap-1">
+                  Pickup:{' '}
+                  <StopTime
+                    utcIso={load.pickup_at}
+                    tz={load.pickup_tz}
+                    legacyDate={load.pickup_date}
+                    legacyTime={load.pickup_time}
+                    withDate
+                  />
                 </span>
               )}
             </div>
