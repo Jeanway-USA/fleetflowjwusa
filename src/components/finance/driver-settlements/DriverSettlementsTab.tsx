@@ -222,18 +222,32 @@ export function DriverSettlementsTab() {
                 ) : (
                   filtered.map((s: any) => {
                     const isDownloading = downloadingId === s.id;
+                    const drv = driverMap.get(s.driver_id);
+                    const pt = (drv?.pay_type ?? '').toLowerCase();
+                    const rate = Number(drv?.pay_rate ?? 0);
+                    let method = '';
+                    if (pt === 'flat') method = `Flat ${formatCurrency(rate)}`;
+                    else if (pt === 'per_mile' || pt === 'cpm')
+                      method = `$${rate.toFixed(2)}/mi`;
+                    else if (pt === 'percentage') method = `${rate}% split`;
                     return (
                       <TableRow key={s.id}>
                         <TableCell className="font-medium">
-                          {driverName(driverMap.get(s.driver_id))}
+                          {driverName(drv)}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(parseISO(`${s.period_start}T00:00:00`), 'MMM d')} –{' '}
                           {format(parseISO(`${s.period_end}T00:00:00`), 'MMM d, yyyy')}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(Number(s.gross_pay ?? 0))}
+                          <div>{formatCurrency(Number(s.gross_pay ?? 0))}</div>
+                          {method && (
+                            <div className="text-xs text-muted-foreground font-normal">
+                              {method}
+                            </div>
+                          )}
                         </TableCell>
+
                         <TableCell className="text-right">
                           {formatCurrency(Number(s.reimbursements ?? 0))}
                         </TableCell>
