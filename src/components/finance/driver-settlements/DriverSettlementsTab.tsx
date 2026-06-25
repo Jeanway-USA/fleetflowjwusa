@@ -2,7 +2,14 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -21,22 +28,16 @@ import {
   DollarSign,
   Receipt,
   Eye,
+  Download,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
 import { GenerateSettlementsDialog } from './GenerateSettlementsDialog';
 import { SettlementDetailSheet } from './SettlementDetailSheet';
+import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
 
-type DriverSettlement = Database['public']['Tables']['driver_settlements']['Row'] & {
-  payment_date?: string | null;
-  gross_pay?: number | null;
-  fuel_advances?: number | null;
-  reimbursements?: number | null;
-  ytd_gross?: number | null;
-  ytd_deductions?: number | null;
-  ytd_net?: number | null;
-};
+type DriverSettlement = Database['public']['Tables']['driver_settlements']['Row'];
 
 interface Driver {
   id: string;
@@ -57,6 +58,7 @@ export function DriverSettlementsTab() {
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_OPTIONS)[number]>('all');
   const [generateOpen, setGenerateOpen] = useState(false);
   const [viewSettlementId, setViewSettlementId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const { data: drivers = [] } = useQuery<Driver[]>({
     queryKey: ['drivers'],
@@ -129,6 +131,17 @@ export function DriverSettlementsTab() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const handleDownload = async (id: string) => {
+    setDownloadingId(id);
+    try {
+      await generateSettlementPdf(id);
+    } catch (e: any) {
+      toast.error(e.message ?? 'Could not generate PDF');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card className="card-elevated">
@@ -138,7 +151,7 @@ export function DriverSettlementsTab() {
               <DollarSign className="h-5 w-5" /> Settlement Statements
             </CardTitle>
             <CardDescription>
-              Generate paystubs on demand. Pick the drivers, pay period end, and payment date.
+              Generate paystubs on demand. Pick drivers, pay period end, and payment date.
             </CardDescription>
           </div>
           <Button
@@ -157,9 +170,11 @@ export function DriverSettlementsTab() {
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" /> Generated Statements
             </CardTitle>
-            <CardDescription>All settlement statements across drivers and pay periods.</CardDescription>
+            <CardDescription>
+              All settlement statements across drivers and pay periods.
+            </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {STATUS_OPTIONS.map((s) => (
               <Button
                 key={s}
@@ -179,12 +194,10 @@ export function DriverSettlementsTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Driver</TableHead>
-                  <TableHead>Period</TableHead>
-                  <TableHead>Payment Date</TableHead>
-                  <TableHead className="text-right">Gross</TableHead>
-                  <TableHead className="text-right">Deductions</TableHead>
-                  <TableHead className="text-right">Net</TableHead>
-                  <TableHead className="text-right">YTD Net</TableHead>
+                  <TableHead>Pay Period</TableHead>
+                  <TableHead className="text-right">Gross Pay</TableHead>
+                  <TableHead className="text-right">Reimbursements</TableHead>
+                  <TableHead className="text-right">Net Pay</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -192,24 +205,19 @@ export function DriverSettlementsTab() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8">
+                    <TableCell colSpan={7} className="text-center py-8">
                       Loading…
                     </TableCell>
                   </TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No settlement statements yet. Click "Generate Settlements" to create one.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((s) => {
-                    const grossTotal =
-                      Number(s.gross_pay ?? s.base_pay ?? 0) +
-                      Number(s.bonus_pay ?? 0) +
-                      Number(s.reimbursements ?? 0);
-                    const deductTotal =
-                      Number(s.deductions ?? 0) + Number(s.fuel_advances ?? 0);
+                  filtered.map((s: any) => {
+                    const isDownloading = downloadingId === s.id;
                     return (
                       <TableRow key={s.id}>
                         <TableCell className="font-medium">
@@ -219,79 +227,91 @@ export function DriverSettlementsTab() {
                           {format(parseISO(`${s.period_start}T00:00:00`), 'MMM d')} –{' '}
                           {format(parseISO(`${s.period_end}T00:00:00`), 'MMM d, yyyy')}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {s.payment_date
-                            ? format(parseISO(`${s.payment_date}T00:00:00`), 'MMM d, yyyy')
-                            : '—'}
+                        <TableCell className="text-right">
+                          {formatCurrency(Number(s.gross_pay ?? 0))}
                         </TableCell>
-                        <TableCell className="text-right">{formatCurrency(grossTotal)}</TableCell>
-                        <TableCell className="text-right text-destructive">
-                          {formatCurrency(deductTotal)}
+                        <TableCell className="text-right">
+                          {formatCurrency(Number(s.reimbursements ?? 0))}
                         </TableCell>
                         <TableCell className="text-right font-semibold text-primary">
                           {formatCurrency(Number(s.net_pay ?? 0))}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="secondary">
-                            {formatCurrency(Number(s.ytd_net ?? 0))}
-                          </Badge>
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={s.status} />
                         </TableCell>
                         <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => setViewSettlementId(s.id)}>
-                                <Eye className="mr-2 h-4 w-4" /> View Details
-                              </DropdownMenuItem>
-                              {s.status === 'draft' && (
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    updateStatus.mutate({ id: s.id, status: 'approved' })
-                                  }
-                                >
-                                  <CheckCircle2 className="mr-2 h-4 w-4" /> Approve
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDownload(s.id)}
+                              disabled={isDownloading}
+                              title="Download PDF"
+                            >
+                              <Download className="h-4 w-4" />
+                              <span className="sr-only">Download PDF</span>
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setViewSettlementId(s.id)}>
+                                  <Eye className="mr-2 h-4 w-4" /> View Details
                                 </DropdownMenuItem>
-                              )}
-                              {s.status === 'approved' && (
                                 <DropdownMenuItem
-                                  onClick={() => updateStatus.mutate({ id: s.id, status: 'paid' })}
+                                  onClick={() => handleDownload(s.id)}
+                                  disabled={isDownloading}
                                 >
-                                  <DollarSign className="mr-2 h-4 w-4" /> Mark Paid
+                                  <Download className="mr-2 h-4 w-4" /> Download PDF
                                 </DropdownMenuItem>
-                              )}
-                              {s.status !== 'draft' && (
+                                {s.status === 'draft' && (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      updateStatus.mutate({ id: s.id, status: 'approved' })
+                                    }
+                                  >
+                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Approve
+                                  </DropdownMenuItem>
+                                )}
+                                {s.status === 'approved' && (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      updateStatus.mutate({ id: s.id, status: 'paid' })
+                                    }
+                                  >
+                                    <DollarSign className="mr-2 h-4 w-4" /> Mark Paid
+                                  </DropdownMenuItem>
+                                )}
+                                {s.status !== 'draft' && (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      updateStatus.mutate({ id: s.id, status: 'draft' })
+                                    }
+                                  >
+                                    Revert to Draft
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  onClick={() =>
-                                    updateStatus.mutate({ id: s.id, status: 'draft' })
-                                  }
+                                  className="text-destructive"
+                                  onClick={() => {
+                                    if (
+                                      confirm(
+                                        'Delete this settlement statement? This cannot be undone.',
+                                      )
+                                    ) {
+                                      deleteSettlement.mutate(s.id);
+                                    }
+                                  }}
                                 >
-                                  Revert to Draft
+                                  Delete
                                 </DropdownMenuItem>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => {
-                                  if (
-                                    confirm(
-                                      'Delete this settlement statement? This cannot be undone.',
-                                    )
-                                  ) {
-                                    deleteSettlement.mutate(s.id);
-                                  }
-                                }}
-                              >
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

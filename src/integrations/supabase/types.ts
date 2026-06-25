@@ -1534,12 +1534,8 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
-          base_pay: number
-          bonus_pay: number
           created_at: string
-          deductions: number
           driver_id: string
-          fuel_advances: number
           generated_at: string
           generated_by: string | null
           gross_pay: number
@@ -1554,19 +1550,15 @@ export type Database = {
           reimbursements: number
           status: string
           updated_at: string
-          ytd_deductions: number
           ytd_gross: number
           ytd_net: number
+          ytd_reimbursements: number
         }
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
-          base_pay?: number
-          bonus_pay?: number
           created_at?: string
-          deductions?: number
           driver_id: string
-          fuel_advances?: number
           generated_at?: string
           generated_by?: string | null
           gross_pay?: number
@@ -1581,19 +1573,15 @@ export type Database = {
           reimbursements?: number
           status?: string
           updated_at?: string
-          ytd_deductions?: number
           ytd_gross?: number
           ytd_net?: number
+          ytd_reimbursements?: number
         }
         Update: {
           approved_at?: string | null
           approved_by?: string | null
-          base_pay?: number
-          bonus_pay?: number
           created_at?: string
-          deductions?: number
           driver_id?: string
-          fuel_advances?: number
           generated_at?: string
           generated_by?: string | null
           gross_pay?: number
@@ -1608,9 +1596,9 @@ export type Database = {
           reimbursements?: number
           status?: string
           updated_at?: string
-          ytd_deductions?: number
           ytd_gross?: number
           ytd_net?: number
+          ytd_reimbursements?: number
         }
         Relationships: []
       }
@@ -5104,12 +5092,8 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
-          base_pay: number
-          bonus_pay: number
           created_at: string
-          deductions: number
           driver_id: string
-          fuel_advances: number
           generated_at: string
           generated_by: string | null
           gross_pay: number
@@ -5124,9 +5108,9 @@ export type Database = {
           reimbursements: number
           status: string
           updated_at: string
-          ytd_deductions: number
           ytd_gross: number
           ytd_net: number
+          ytd_reimbursements: number
         }[]
         SetofOptions: {
           from: "*"
