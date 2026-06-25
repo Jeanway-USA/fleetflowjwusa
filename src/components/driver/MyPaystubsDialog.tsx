@@ -154,9 +154,9 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
         y += sub ? 30 : 22;
       };
 
-      drawLine(baseLabel, Number(p.base_pay ?? 0));
-      const bonus = Number(p.bonus_pay ?? 0);
-      if (bonus > 0) drawLine('Bonus Pay', bonus, 'Safety / Performance');
+      drawLine(baseLabel, Number(p.gross_pay ?? 0));
+      const reimb = Number(p.reimbursements ?? 0);
+      if (reimb > 0) drawLine('Reimbursements', reimb, 'Parking, tolls, etc.');
 
       y += 6;
       doc.setDrawColor(226, 232, 240);
@@ -170,7 +170,7 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
       doc.setFontSize(13);
       doc.text('NET PAY', 56, y + 6);
       doc.setFontSize(18);
-      const net = Number(p.net_pay ?? Number(p.base_pay ?? 0) + bonus);
+      const net = Number(p.net_pay ?? Number(p.gross_pay ?? 0) + reimb);
       const netStr = formatCurrency(net);
       const nw = doc.getTextWidth(netStr);
       doc.text(netStr, W - 56 - nw, y + 8);
@@ -240,18 +240,18 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
                       </p>
                     </div>
                     <p className="font-semibold tabular-nums">
-                      {formatCurrency(Number(selected.base_pay ?? 0))}
+                      {formatCurrency(Number(selected.gross_pay ?? 0))}
                     </p>
                   </div>
 
-                  {Number(selected.bonus_pay ?? 0) > 0 && (
+                  {Number(selected.reimbursements ?? 0) > 0 && (
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="font-medium">Bonus Pay</p>
-                        <p className="text-xs text-muted-foreground">Safety / Performance</p>
+                        <p className="font-medium">Reimbursements</p>
+                        <p className="text-xs text-muted-foreground">Parking, tolls, etc.</p>
                       </div>
                       <p className="font-semibold tabular-nums text-success">
-                        +{formatCurrency(Number(selected.bonus_pay ?? 0))}
+                        +{formatCurrency(Number(selected.reimbursements ?? 0))}
                       </p>
                     </div>
                   )}
@@ -317,7 +317,7 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
                   </div>
                   <p className="text-3xl font-bold text-primary tabular-nums">
                     {formatCurrency(
-                      Number(selected.net_pay ?? Number(selected.base_pay ?? 0) + Number(selected.bonus_pay ?? 0)),
+                      Number(selected.net_pay ?? Number(selected.gross_pay ?? 0) + Number(selected.reimbursements ?? 0)),
                     )}
                   </p>
                 </div>
@@ -350,7 +350,7 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
                 </div>
               ) : (
                 paystubs.map((p) => {
-                  const net = Number(p.net_pay ?? Number(p.base_pay ?? 0) + Number(p.bonus_pay ?? 0));
+                  const net = Number(p.net_pay ?? Number(p.gross_pay ?? 0) + Number(p.reimbursements ?? 0));
                   return (
                     <button
                       key={p.id}
