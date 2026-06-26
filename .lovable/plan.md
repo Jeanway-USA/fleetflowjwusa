@@ -1,65 +1,57 @@
-# Settlement Detail: dual-column paystub layout
+## Goal
+Make the settlement PDF compiler render two distinct branded layouts based on the driver's `employment_type`:
+- `w2_company` → "W-2 EARNINGS STATEMENT" paystub wrapper with statutory tax metadata block.
+- `1099_contractor` / `lease_purchase` → "CONTRACTOR SETTLEMENT STATEMENT" wrapper with a detachable check voucher at the base.
 
-Scope is only `src/components/finance/driver-settlements/SettlementDetailSheet.tsx`. No DB or pricing logic changes.
+Both variants share a new top-edge monospaced legacy system line.
 
-## 1. Replace the two stacked sections with a single split grid
+## Scope (frontend/presentation only)
+Files touched:
+- `src/lib/settlement-document-data.ts` — extend `SettlementDocDriver` to fetch `employment_type` from `drivers`.
+- `src/components/finance/driver-settlements/SettlementPrintable.tsx` — branch layout and inject new chrome.
+- (Reuse existing `SettlementCheckVoucher.tsx` only if it already matches the spec; otherwise the voucher will be re-implemented inline in `SettlementPrintable` per the exact spec below. The existing `includeVoucher` prop becomes derived automatically from `employment_type` rather than a manual flag.)
 
-Today the sheet renders `<ReimbursementSection />` and `<DeductionSection />` side-by-side (lg+) but each owns its own table, header, and add-row state. I'll consolidate into a single `<LineItemsSplit />` block placed below trip routing/earnings:
+No DB changes, no PDF engine changes (`generateSettlementPdf.ts` already renders the printable React tree). No business-logic/math changes.
 
-```text
-┌─────────────────────────────────┬─────────────────────────────────┐
-│ EARNINGS & ADDITIONS            │ DEDUCTIONS & ESCROWS            │
-├─────────────────────────────────┼─────────────────────────────────┤
-│ Description           Amount    │ Description           Amount    │
-│ Load 8821 DFW → ATL    $1,420   │ Truck Lease            -$650    │
-│ Detention               $120    │ Escrow @ $0.10/mi      -$94     │
-│ Lumper reimbursement    $85     │                                 │
-│ + Add Manual Line Item          │ + Add Manual Line Item          │
-└─────────────────────────────────┴─────────────────────────────────┘
+## Layout spec
+
+### 1. Top metadata row (both variants)
+Absolute top edge of canvas, above the dark header banner:
 ```
-
-- **Left "EARNINGS & ADDITIONS"** — rows where `item_type IN ('load_pay', 'accessorial', 'reimbursement')`. Schema uses `load_pay` (verified via the generate-settlements RPC); I'll also accept `load_earnings` defensively in case a future seed uses that name. Empty fallback: `"No earnings recorded yet"`.
-- **Right "DEDUCTIONS & ESCROWS"** — rows where `item_type = 'deduction'`. Escrow-flagged rows (`is_escrow = true`, added in the previous migration) get a small `Escrow` chip next to the description. Empty fallback (literal copy from the spec): `"No deductions in this period"` in `text-muted-foreground text-sm italic`.
-
-Both columns share a column-header row and identical row structure so they read like opposing halves of a paystub.
-
-## 2. Inline "+ Add Manual Line Item" affordance
-
-Replace the current "Add" button + collapsible card pattern with a persistent inline row at the bottom of each column, visible only when `settlement.status === 'draft'`:
-
-```text
-+ Add Manual Line Item           [ description ] [ $ amount ] [ Add ]
+CO: JW    FILE: {driver_id}    DEPT: DISPATCH    CLOCK: {driver_id}    NUMBER: 00000000
 ```
+Classes: `font-mono text-[10px] text-zinc-400 tracking-wider px-10 py-1 border-b border-zinc-100`.
 
-- Click on the `+ Add Manual Line Item` text expands the input row in place (no modal, no card).
-- Description is free text. Amount is `<Input type="number" step="0.01">` so cents are preserved exactly.
-- Submit calls `supabase.from('driver_settlement_items').insert({...})` with the matching `item_type` (`reimbursement` for left, `deduction` for right) then `recalc_settlement_totals` to refresh gross/net.
-- Left column inserts as `reimbursement`. To keep the existing deduction preset list ("Escrow", "Plate Fee", …) accessible, the right column gets a small `Preset ▾` chooser inline next to description — picking a preset autofills description and toggles `is_escrow=true` for "Escrow".
+### 2. W-2 wrapper (`employment_type === 'w2_company'`)
+- Header title swapped to **"W-2 EARNINGS STATEMENT"** (replaces the current "Settlement & Earnings Statement" eyebrow + corporate H1 styling stays).
+- New **Tax & Withholding** metadata block rendered directly below the header, before "Statement Details":
+  - Bordered box, 4-column grid: Filing Status, Federal Allowances, State Allowances, State Code.
+  - Followed by a statutory withholding sub-grid: Federal Income Tax, Social Security (6.2%), Medicare (1.45%), State Tax — each with current period + YTD columns.
+  - Values pulled from `settlement.tax_withholding` where available; allowances/filing status shown as placeholder dashes when the drivers table has no field for them (display-only — no schema change this turn).
+- Voucher is NOT rendered.
 
-Per-row delete (trash icon) remains, gated on draft status.
+### 3. 1099 / Lease wrapper (`employment_type` in `['1099_contractor','lease_purchase']`)
+- Header title swapped to **"CONTRACTOR SETTLEMENT STATEMENT"**.
+- Existing body (loads, dual-column itemization, summary cards) unchanged.
+- Existing legal disclaimer footer unchanged.
+- **Below the legal disclaimer**, append a detachable-style check voucher block:
+  - Wrapper: `border-2 border-dashed border-zinc-300 bg-zinc-50/40 p-4 mt-6 relative overflow-hidden print:break-inside-avoid`.
+  - Diagonal watermark: absolutely-positioned `<span>` with `rotate(-20deg)`, `text-zinc-300/40`, `text-3xl font-bold tracking-widest pointer-events-none select-none` reading `NON-NEGOTIABLE — FOR RECORD PURPOSES ONLY`.
+  - 4-column grid (`grid-cols-2 md:grid-cols-4 gap-4 relative z-10`):
+    1. **BANK DEPOSIT ROUTING** — masked routing/account from driver record (or `—`).
+    2. **VOUCHER NUMBER** — `V-{statementNo}`.
+    3. **NET DISTRIBUTION** — formatted `currentNet`.
+    4. **AUTHORIZED SIGNATURE** — empty underline (`border-b border-zinc-400 h-8`) with caption.
+  - Each column: `text-[10px] uppercase tracking-wider text-zinc-500` label + value below.
 
-## 3. Data density & zebra striping
-
-Apply paystub-density styles to every row in both tables:
-
-- Cells: `className="py-1.5 px-3"` on both `<TableHead>` and `<TableCell>`.
-- Rows: `className="even:bg-muted/40"` for zebra striping.
-
-The user's spec says `even:bg-slate-50/50`, but per the project's design-token rule we never hardcode `slate-*`. `even:bg-muted/40` is the semantic equivalent and preserves dark-mode support. I'll call this swap out in the closing message.
-
-Numbers stay right-aligned and tabular-num for paystub readability. Negative (deduction) amounts render in `text-destructive` and prefixed with `-`.
-
-## 4. Cleanup
-
-- Delete the standalone `ReimbursementSection` and `DeductionSection` components from this file (they're not imported elsewhere — verified by the search that surfaced this file).
-- Keep the four `SummaryStat` tiles, the Year-to-Date card, the discrepancy panel, and `<EarningsBreakdown />` unchanged.
-- PDF export, status badges, and the recalc RPC wiring are unchanged.
+### 4. Fallback
+If `employment_type` is `null`/unknown → default to the contractor wrapper (matches current behavior and tenant default for this TMS).
 
 ## Out of scope
+- Math, totals, recalc RPCs.
+- New DB columns for filing status / allowances / routing numbers (W-2 metadata is rendered with dashes when source data isn't present).
+- Print/PDF generator engine changes — `generateSettlementPdf` already snapshots whatever `SettlementPrintable` renders.
 
-- Sub-table for trip-level load pay (lives in `<EarningsBreakdown />` already).
-- Editing existing line items in place (current behavior is delete + re-add; keeping that).
-- New columns on `driver_settlement_items`.
-- Print/PDF template changes — only the on-screen sheet is updated.
-
-Approve to implement.
+## Verification
+- `tsgo` typecheck.
+- Render `/settlement/print/:id` for one W-2 driver and one lease driver via Playwright screenshot to confirm both variants paint correctly (header title, top monospace line, voucher presence/absence).

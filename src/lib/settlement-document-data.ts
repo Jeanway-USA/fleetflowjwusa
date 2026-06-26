@@ -27,6 +27,7 @@ export interface SettlementDocDriver {
   landstar_operator_id: string | null;
   pay_type: string | null;
   pay_rate: number | null;
+  employment_type: string | null;
 }
 
 export interface SettlementDocOrg {
@@ -83,7 +84,7 @@ export async function buildSettlementDocumentData(
       supabase
         .from('drivers')
         .select(
-          'first_name, last_name, email, phone, landstar_operator_id, pay_type, pay_rate',
+          'first_name, last_name, email, phone, landstar_operator_id, pay_type, pay_rate, employment_type',
         )
         .eq('id', s.driver_id)
         .maybeSingle(),
