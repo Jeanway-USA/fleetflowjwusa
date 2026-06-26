@@ -91,6 +91,7 @@ const App = () => {
             <AuthProvider>
               <TimeDisplayProvider>
                 <BrandColorInjector />
+                <RouteTitle />
                 <ErrorBoundary>
                   <Suspense fallback={<LoadingFallback />}>
                   <Routes>
