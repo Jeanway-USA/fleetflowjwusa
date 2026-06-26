@@ -1,51 +1,51 @@
-# Settlements UI: Type Tabs + Manual Edit Mode
+# Settlement Printable: ADP Paystub Styling Pass
 
-## 1. Driver-type tabs — `DriverSettlementsTab.tsx`
+Single-file styling refactor of `src/components/finance/driver-settlements/SettlementPrintable.tsx` to match an enterprise ADP-style stub. No data layer or component API changes.
 
-- Extend the existing `Driver` shape to include `employment_type` and add it to the `drivers` select.
-- Add a new `typeFilter` state: `'all' | 'w2' | 'contractor'`.
-- Render a row of pill buttons above the existing status filter:
-  - **All** → no filter
-  - **W-2 Company Payroll** → `employment_type === 'w2_company'`
-  - **1099/Lease Settlements** → `employment_type` in `('1099_contractor', 'lease_purchase')`
-- Combine with the existing status filter inside the `filtered` memo (filter by driver's employment_type via `driverMap`).
-- Visual style: matches the current status `Button` pills, sitting on its own row.
+## 1. Sharper grids, tighter density
 
-## 2. Edit Settlement mode — `SettlementDetailSheet.tsx`
+Replace soft cards with explicit table-matrix grids.
 
-- Add a new "Edit Settlement" button in the sheet header (next to Preview / Download). Visible only when `settlement.status === 'draft'` (matches existing editability rule). Toggles a local `editMode` boolean. Label flips to "Done Editing" when active.
-- Pass `editMode` down to `LineItemsSplit` → `LineItemColumn` alongside the existing `editable` flag. Rows become editable only when **both** `editable` (draft) AND `editMode` (user opted in) are true — preserves current read-only-by-default UX.
-- When `editMode` is on, each existing row swaps its plain text cells for:
-  - Description: `<Input>` bound to local row state, seeded from `r.description`.
-  - Amount: `<Input type="number" step="0.01">` bound to local row state, seeded from `|r.amount|`.
-  - Inline **Save** icon button (CheckIcon) appears beside the trash icon when the row has unsaved local changes.
-- Add `updateMut` in `LineItemColumn` calling:
-  ```ts
-  supabase.from('driver_settlement_items')
-    .update({ description, amount })
-    .eq('id', rowId)
-  ```
-  then `rpc('recalc_settlement_totals', { _settlement_id })`, then invalidate the same query keys as `addMut`/`delMut`.
-- Toast: `Line item updated`.
+- `ItemColumn`: drop `rounded-lg` → use `border border-zinc-200 rounded-none shadow-none`. Convert the inner `divide-y` div into a real `<table>` with two `<th>` columns ("Description" / "Amount") and rows that apply `py-1 px-3` + `even:bg-slate-50/50`. Negative amounts stay red.
+- `ItemRow`: refactored as a `<tr>` consumed by `ItemColumn`'s table.
+- `SummaryCard`: same treatment — `rounded-none`, no shadow, body becomes a `<table>` with `py-1 px-3` and zebra rows. Net Pay row keeps bold + larger type for the headline number.
+- `Load Earnings & Routes` table: tighten existing `px-3 py-2` → `py-1 px-3`, keep the dark `<thead>`, retain the existing `even:bg-slate-50/50` zebra.
+- `Tax & Withholding` block (W-2 only): swap `rounded-md` for `rounded-none`, keep existing `even:bg-slate-50/50` on `WithholdingRow`, tighten its padding to `py-1 px-3`.
+- `Statement Details` / `Employee Information` panel: switch to `border border-zinc-200 rounded-none` and render the field list as a 2-column `<table>` matrix so labels and values line up on the same grid as the rest.
 
-## 3. Inline row creation — already present, polish only
+## 2. Monospace system header row
 
-The "+ Add Manual Line Item" workflow already exists at the bottom of both columns with description + amount inputs and per-row trash buttons. Two small refinements so it matches the spec exactly:
+Already present at line 63 (`CO: JW … NUMBER: 00000000`). No structural change; verify class string is exactly `font-mono text-[10px] text-zinc-400 tracking-wider` and keep the thin `border-b border-zinc-100`. No code change unless the class drifted.
 
-- Make the "+ Add Manual Line Item" trigger more visibly button-like (dashed border + clearer hover state) instead of the current subtle link-style row, so users see it at a glance on both grids.
-- Ensure the trash icon (already present on saved rows via `delMut`) is also shown on the unsaved-in-progress add form so users can dismiss the pending row with the same affordance, not just a "Cancel" text button. The Cancel button stays as the keyboard fallback.
+## 3. Compliance check voucher — make universal
 
-No backend / schema changes — `driver_settlement_items` already supports insert/update/delete and the `recalc_settlement_totals` RPC already exists.
+The dashed-border voucher currently only renders for non-W-2 drivers. Per the spec it must sit at the **absolute bottom** of every statement.
+
+- Move the voucher block out of the `!isW2` conditional so it renders for W-2, 1099, and Lease.
+- Render it after the legal `<footer>` so it is the last element inside the document container.
+- Container classes exactly as specified: `relative overflow-hidden border-2 border-dashed border-zinc-300 bg-zinc-50/40 p-4 min-h-[110px]`.
+
+## 4. Diagonal "NON-NEGOTIABLE" watermark + voucher grid
+
+Already implemented but refine:
+
+- Watermark span: keep absolute positioning, set color to `text-zinc-300/40` (light opacity), `text-3xl font-extrabold tracking-[0.25em]`, `transform: rotate(-20deg)`, `pointer-events-none select-none`, `aria-hidden="true"`. Confirm it spans the full block via `inset-0 flex items-center justify-center`.
+- Internal grid (`relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4`) keeps the four cells:
+  1. **Bank Deposit Routing** — masked routing string (`•••• •••• ••••` fallback) via `VoucherCell`.
+  2. **Voucher / Check Number** — `V-${statementNo}`.
+  3. **Net Pay Distribution** — `formatCurrency(currentNet)`, rendered with `text-2xl font-bold tabular-nums` (currently `text-lg` — bump up so the dollar amount is the visual anchor like an ADP stub).
+  4. **Authorized Signature** — underline field: `border-b border-zinc-500 h-10` followed by the 10px uppercase label.
 
 ## Out of scope
 
-- No change to how drafts auto-recalc on the server.
-- No new aggregation, no new tabs other than the three specified.
-- W-2 vs contractor totals still come from the existing recalc RPC; we are not splitting the totals math.
+- No PDF compiler / `generateSettlementPdf` changes — this component is what html2canvas captures, so styling is enough.
+- No data field changes (no real routing number wiring).
+- No print-only CSS additions beyond keeping existing `print:break-inside-avoid` markers.
 
 ## Verification
 
 - `tsgo` typecheck.
-- Open Finance → Driver Settlements: confirm the three driver-type pills filter the list correctly when combined with the status filter.
-- Open a draft settlement → click **Edit Settlement** → confirm description + amount inputs appear inline on existing rows, edits save and update the summary totals.
-- Confirm the "+ Add Manual Line Item" button is visible and styled distinctly on both EARNINGS and DEDUCTIONS grids.
+- Open a settlement in `/settlements/:id/print` for a W-2 and a contractor driver; confirm:
+  - Monospace `CO: JW …` strip at top with light-gray 10px font.
+  - All itemization / summary blocks render as flat bordered tables with zebra rows and 1-line-tight padding.
+  - Dashed-border voucher appears at the very bottom for BOTH driver types, with the diagonal watermark centered and the Net Distribution number in large bold.
