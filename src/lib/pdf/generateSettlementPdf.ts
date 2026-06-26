@@ -412,6 +412,9 @@ export async function generateSettlementPdf(
   const itemsStartY = y;
 
   autoTable(doc, {
+    theme: 'grid',
+    tableLineColor: HAIRLINE,
+    tableLineWidth: 0.4,
     startY: itemsStartY,
     head: [[{ content: 'EARNINGS & ADDITIONS', colSpan: 2 }]],
     body: earningsBody,
