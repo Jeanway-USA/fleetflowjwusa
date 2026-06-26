@@ -455,7 +455,30 @@ function LineItemColumn({
     onError: (e: any) => toast.error(e.message ?? 'Failed to remove'),
   });
 
+  const updateMut = useMutation({
+    mutationFn: async ({ id, description, amount }: { id: string; description: string; amount: number }) => {
+      const amt = Math.abs(amount);
+      if (!description.trim()) throw new Error('Description required');
+      if (!Number.isFinite(amt)) throw new Error('Invalid amount');
+      const { error } = await supabase
+        .from('driver_settlement_items')
+        .update({ description: description.trim(), amount: amt })
+        .eq('id', id);
+      if (error) throw error;
+      const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
+        _settlement_id: settlementId,
+      });
+      if (rpcErr) throw rpcErr;
+    },
+    onSuccess: () => {
+      toast.success('Line item updated');
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? 'Failed to update line item'),
+  });
+
   const negative = side === 'deductions';
+
 
   return (
     <div className="flex flex-col">
