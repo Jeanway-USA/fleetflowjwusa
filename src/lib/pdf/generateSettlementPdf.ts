@@ -286,6 +286,9 @@ export async function generateSettlementPdf(
 
   const loadWidths = { date: 56, load: 60, miles: 44, status: 56, origin: 158, dest: 158 };
   autoTable(doc, {
+    theme: 'grid',
+    tableLineColor: HAIRLINE,
+    tableLineWidth: 0.4,
     startY: y,
     head: [['Date', 'Load #', 'Miles', 'Status', 'Origin', 'Destination']],
     body:
