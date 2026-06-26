@@ -260,23 +260,27 @@ export async function generateSettlementPdf(
   y += 6;
 
   const headStyles = {
-    fillColor: [24, 24, 27] as [number, number, number],
-    textColor: 255,
-    fontSize: 9,
+    fillColor: HEAD_BG,
+    textColor: HEAD_FG,
+    fontSize: 8,
+    fontStyle: 'bold' as const,
     halign: 'left' as const,
+    cellPadding: { top: 3, bottom: 3, left: 6, right: 6 } as any,
   };
   const baseStyles = {
     fontSize: 9,
-    cellPadding: 6,
-    textColor: [30, 41, 59] as [number, number, number],
+    cellPadding: { top: 2.5, bottom: 2.5, left: 6, right: 6 } as any,
+    textColor: TEXT,
+    lineColor: HAIRLINE,
+    lineWidth: 0.4,
     overflow: 'linebreak' as const,
-    valign: 'top' as const,
-    minCellHeight: 22,
+    valign: 'middle' as const,
+    minCellHeight: 16,
   };
-  const alt = { fillColor: [248, 250, 252] as [number, number, number] };
+  const alt = { fillColor: ZEBRA };
   const footStyles = {
     fillColor: [241, 245, 249] as [number, number, number],
-    textColor: [24, 24, 27] as [number, number, number],
+    textColor: TEXT,
   };
 
 
