@@ -27,6 +27,7 @@ export interface SettlementDocDriver {
   landstar_operator_id: string | null;
   pay_type: string | null;
   pay_rate: number | null;
+  employment_type: string | null;
 }
 
 export interface SettlementDocOrg {
