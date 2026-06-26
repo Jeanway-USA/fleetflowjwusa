@@ -132,91 +132,15 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
   const isFlat = (payType || '').toLowerCase() === 'flat';
   const baseLabel = isFlat ? 'Flat Rate Guarantee' : 'Load Earnings';
 
-  const handleDownload = (p: DriverSettlement) => {
+  const handleDownload = async (p: DriverSettlement) => {
     try {
-      const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-      const W = doc.internal.pageSize.getWidth();
-      let y = 60;
-
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, W, 80, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(20);
-      doc.text('PAYSTUB', 40, 45);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(11);
-      doc.text(fmtPeriod(p.period_start, p.period_end), 40, 65);
-
-      y = 120;
-      doc.setTextColor(15, 23, 42);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.text('Paid To', 40, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text(driverName, 40, y + 16);
-
-      doc.setFont('helvetica', 'bold');
-      doc.text('Status', W - 200, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text((p.status || 'approved').toUpperCase(), W - 200, y + 16);
-
-      y = 200;
-      doc.setDrawColor(226, 232, 240);
-      doc.line(40, y, W - 40, y);
-      y += 24;
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.text('Earnings', 40, y);
-      y += 20;
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(11);
-
-      const drawLine = (label: string, amount: number, sub?: string) => {
-        doc.text(label, 40, y);
-        if (sub) {
-          doc.setTextColor(120, 120, 120);
-          doc.setFontSize(9);
-          doc.text(sub, 40, y + 12);
-          doc.setTextColor(15, 23, 42);
-          doc.setFontSize(11);
-        }
-        const amt = formatCurrency(amount);
-        const aw = doc.getTextWidth(amt);
-        doc.text(amt, W - 40 - aw, y);
-        y += sub ? 30 : 22;
-      };
-
-      drawLine(baseLabel, Number(p.gross_pay ?? 0));
-      const reimb = Number(p.reimbursements ?? 0);
-      if (reimb > 0) drawLine('Reimbursements', reimb, 'Parking, tolls, etc.');
-
-      y += 6;
-      doc.setDrawColor(226, 232, 240);
-      doc.line(40, y, W - 40, y);
-      y += 28;
-
-      doc.setFillColor(241, 245, 249);
-      doc.rect(40, y - 22, W - 80, 50, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(13);
-      doc.text('NET PAY', 56, y + 6);
-      doc.setFontSize(18);
-      const net = Number(p.net_pay ?? Number(p.gross_pay ?? 0) + reimb);
-      const netStr = formatCurrency(net);
-      const nw = doc.getTextWidth(netStr);
-      doc.text(netStr, W - 56 - nw, y + 8);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(140, 140, 140);
-      doc.text(`Generated ${format(new Date(), 'PPpp')}`, 40, doc.internal.pageSize.getHeight() - 30);
-
-      doc.save(`paystub-${p.period_start}-to-${p.period_end}.pdf`);
+      await generateSettlementPdf(p.id);
     } catch (e: any) {
-      toast.error(e.message ?? 'Could not generate PDF');
+      toast.error(e?.message ?? 'Could not generate PDF');
     }
   };
+
+
 
   return (
     <Dialog
