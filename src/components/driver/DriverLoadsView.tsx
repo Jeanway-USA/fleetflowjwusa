@@ -211,6 +211,26 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
             <span className="font-medium">{getCondensedAddress(load.destination)}</span>
           </div>
 
+          {/* PU# — high-visibility for guard-shack scanning */}
+          {load.pickup_number && (
+            <div className="inline-flex items-center gap-2 rounded-md border-2 border-orange-500 bg-orange-500/15 px-2.5 py-1 text-orange-700 dark:text-orange-300 font-bold tracking-wide shadow-sm">
+              <FileText className="h-3.5 w-3.5" />
+              <span className="text-[11px] uppercase">Pickup #:</span>
+              <span className="font-mono text-sm">{load.pickup_number}</span>
+            </div>
+          )}
+
+          {/* Trailer */}
+          {(load.trailers?.unit_number || load.trailer_id) && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Truck className="h-4 w-4 shrink-0" />
+              <span className="uppercase text-[11px] tracking-wide">Trailer:</span>
+              <span className="font-mono font-medium text-foreground">
+                {load.trailers?.unit_number || 'Assigned'}
+              </span>
+            </div>
+          )}
+
           {/* Date & Time - Show relative for delivered, hide time for cancelled */}
           {!['cancelled'].includes(load.status) && (
             <div className="flex flex-col gap-1 text-sm text-muted-foreground">
