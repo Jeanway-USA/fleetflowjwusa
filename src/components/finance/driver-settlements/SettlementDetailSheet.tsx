@@ -24,7 +24,7 @@ import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { formatCurrency } from '@/lib/formatters';
 import { format, parseISO } from 'date-fns';
-import { Download, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Check, Download, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
 import { fetchPayBreakdown, type PayBreakdown } from '@/lib/settlement-pay-breakdown';
