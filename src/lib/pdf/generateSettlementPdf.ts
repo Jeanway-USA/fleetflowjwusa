@@ -59,7 +59,7 @@ function detectLogoFormat(dataUrl: string): 'PNG' | 'JPEG' {
 
 export async function generateSettlementPdf(
   settlementId: string,
-  opts: { includeVoucher?: boolean } = {},
+  _opts: { includeVoucher?: boolean } = {},
 ): Promise<void> {
   const data = await buildSettlementDocumentData(settlementId);
   const { settlement: s, driver, org, reimbursementItems, deductionItems, breakdown, ytd } = data;
