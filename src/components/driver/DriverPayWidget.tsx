@@ -175,11 +175,11 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
         </div>
       </CardContent>
 
-      {paystubsOpen && (
+      {settlementsOpen && (
         <Suspense fallback={null}>
-          <MyPaystubsDialog
-            open={paystubsOpen}
-            onOpenChange={setPaystubsOpen}
+          <MySettlementsDialog
+            open={settlementsOpen}
+            onOpenChange={setSettlementsOpen}
             driverId={driverId}
             driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim() || 'Driver'}
             payType={payType}
