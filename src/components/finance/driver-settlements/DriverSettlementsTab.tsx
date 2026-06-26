@@ -210,7 +210,22 @@ export function DriverSettlementsTab() {
             ))}
           </div>
         </CardHeader>
+        <div className="px-6 pb-3 flex items-center gap-2 flex-wrap border-b">
+          <span className="text-[11px] uppercase tracking-wide text-muted-foreground mr-1">Driver Type:</span>
+          {TYPE_OPTIONS.map((opt) => (
+            <Button
+              key={opt.value}
+              size="sm"
+              variant={typeFilter === opt.value ? 'default' : 'outline'}
+              onClick={() => setTypeFilter(opt.value)}
+              className="rounded-full"
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
         <CardContent>
+
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
