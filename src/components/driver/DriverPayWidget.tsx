@@ -9,7 +9,7 @@ import { useState, lazy, Suspense } from 'react';
 import { calculateWeeklyPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
 import { useDriverSettlementsRealtime } from '@/hooks/useDriverSettlementsRealtime';
-const MyPaystubsDialog = lazy(() =>
+const MySettlementsDialog = lazy(() =>
   import('./MyPaystubsDialog').then(m => ({ default: m.MyPaystubsDialog })),
 );
 
@@ -20,9 +20,9 @@ interface DriverPayWidgetProps {
 }
 
 export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetProps) {
-  const [paystubsOpen, setPaystubsOpen] = useState(false);
+  const [settlementsOpen, setSettlementsOpen] = useState(false);
 
-  // Keep widget + paystubs in sync with admin settlement changes in real-time.
+  // Keep widget + settlements list in sync with admin changes in real-time.
   useDriverSettlementsRealtime(driverId);
 
   const { data: driverRow } = useQuery({
