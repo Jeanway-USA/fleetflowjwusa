@@ -340,6 +340,32 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
               <p className="text-sm font-medium">{load.destination}</p>
             </div>
 
+            {/* PU# + Trailer */}
+            {(load.pickup_number || load.trailers?.unit_number || load.trailer_id) && (
+              <div className="grid grid-cols-2 gap-4">
+                {load.pickup_number && (
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <FileText className="h-3 w-3" /> Pickup #
+                    </span>
+                    <div className="inline-flex items-center rounded-md border-2 border-orange-500 bg-orange-500/15 px-2 py-0.5 text-orange-700 dark:text-orange-300 font-bold">
+                      <span className="font-mono text-sm">{load.pickup_number}</span>
+                    </div>
+                  </div>
+                )}
+                {(load.trailers?.unit_number || load.trailer_id) && (
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Truck className="h-3 w-3" /> Trailer
+                    </span>
+                    <p className="text-sm font-mono font-medium">
+                      {load.trailers?.unit_number || 'Assigned'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Dates & Times */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
