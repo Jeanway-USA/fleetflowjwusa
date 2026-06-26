@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/formatters';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
+import { useDriverSettlementsRealtime } from '@/hooks/useDriverSettlementsRealtime';
 
 type DriverSettlement = Database['public']['Tables']['driver_settlements']['Row'];
 
