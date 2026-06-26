@@ -104,8 +104,8 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
     ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || 'Driver'
     : 'Driver';
 
-  const reimbursements = (items as any[]).filter((i) => i.item_type === 'reimbursement');
-  const deductions = (items as any[]).filter((i) => i.item_type === 'deduction');
+
+
   const currentGross = Number(settlement?.gross_pay ?? 0);
   const currentReimb = Number(settlement?.reimbursements ?? 0);
   const currentDed = Number(settlement?.deductions ?? 0);
