@@ -238,20 +238,13 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
 
             <EarningsBreakdown breakdown={breakdown} />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ReimbursementSection
-                rows={reimbursements}
-                settlementId={settlement.id}
-                orgId={settlement.org_id}
-                editable={settlement.status === 'draft'}
-              />
-              <DeductionSection
-                rows={deductions}
-                settlementId={settlement.id}
-                orgId={settlement.org_id}
-                editable={settlement.status === 'draft'}
-              />
-            </div>
+            <LineItemsSplit
+              items={items as any[]}
+              settlementId={settlement.id}
+              orgId={settlement.org_id}
+              editable={settlement.status === 'draft'}
+            />
+
           </div>
         )}
 
