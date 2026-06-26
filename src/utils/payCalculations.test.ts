@@ -159,3 +159,89 @@ describe('weekly aggregation for percentage', () => {
     expect(r.total).toBeCloseTo(910 + 455 + 75);
   });
 });
+
+describe('employment_type routing', () => {
+  it('W-2 hourly: net = gross * (1 - 0.22)', () => {
+    const r = calculateWeeklyPay({
+      loads: [load()],
+      driver: { pay_type: 'hourly', pay_rate: 25, employment_type: 'w2_company' },
+      hoursWorked: 40,
+    });
+    expect(r.employmentClass).toBe('w2');
+    expect(r.grossPay).toBe(1000);
+    expect(r.taxWithholding).toBeCloseTo(220);
+    expect(r.netPay).toBeCloseTo(780);
+    // Accessorials are NOT tracked for W-2
+    expect(r.accessorialsTotal).toBe(0);
+  });
+
+  it('W-2 per_mile: net = miles*rate * 0.78', () => {
+    const r = calculateWeeklyPay({
+      loads: [load()],
+      driver: { pay_type: 'per_mile', pay_rate: 0.5, employment_type: 'w2_company' },
+    });
+    expect(r.grossPay).toBe(500);
+    expect(r.taxWithholding).toBeCloseTo(110);
+    expect(r.netPay).toBeCloseTo(390);
+  });
+
+  it('W-2 percentage is illegal — returns zero', () => {
+    const r = calculateWeeklyPay({
+      loads: [load()],
+      driver: { pay_type: 'percentage', pay_rate: 70, employment_type: 'w2_company' },
+    });
+    expect(r.grossPay).toBe(0);
+    expect(r.netPay).toBe(0);
+    expect(r.payType).toBe('unknown');
+  });
+
+  it('W-2 honors configurable withholding rate', () => {
+    const r = calculateWeeklyPay({
+      loads: [],
+      driver: { pay_type: 'hourly', pay_rate: 30, employment_type: 'w2_company' },
+      hoursWorked: 40,
+      settings: { w2WithholdingRate: 0.25 },
+    });
+    expect(r.grossPay).toBe(1200);
+    expect(r.taxWithholding).toBeCloseTo(300);
+    expect(r.netPay).toBeCloseTo(900);
+  });
+
+  it('1099 contractor: net = gross + reimbursements - deductions', () => {
+    const r = calculateWeeklyPay({
+      loads: [load()],
+      driver: { pay_type: 'per_mile', pay_rate: 0.65, employment_type: '1099_contractor' },
+      reimbursements: 200,
+      deductions: 150,
+    });
+    expect(r.employmentClass).toBe('contractor');
+    expect(r.taxWithholding).toBe(0);
+    // gross = 1000*0.65 + 75 = 725 ; net = 725 + 200 - 150 = 775
+    expect(r.grossPay).toBeCloseTo(725);
+    expect(r.netPay).toBeCloseTo(775);
+  });
+
+  it('lease_purchase: same math as 1099 (escrow handled in DB)', () => {
+    const r = calculateWeeklyPay({
+      loads: [load()],
+      driver: { pay_type: 'percentage', pay_rate: 70, employment_type: 'lease_purchase' },
+      settings: { tmsMode: 'landstar' },
+      deductions: 600, // weekly lease + escrow modeled in DB
+    });
+    expect(r.employmentClass).toBe('contractor');
+    expect(r.taxWithholding).toBe(0);
+    // 2000*0.65*0.7 + 75 = 985 ; net = 985 - 600 = 385
+    expect(r.grossPay).toBeCloseTo(985);
+    expect(r.netPay).toBeCloseTo(385);
+  });
+
+  it('missing employment_type defaults to contractor (backwards compat)', () => {
+    const r = calculateWeeklyPay({
+      loads: [load()],
+      driver: { pay_type: 'per_mile', pay_rate: 0.5 },
+    });
+    expect(r.employmentClass).toBe('contractor');
+    expect(r.taxWithholding).toBe(0);
+    expect(r.netPay).toBeCloseTo(575);
+  });
+});
