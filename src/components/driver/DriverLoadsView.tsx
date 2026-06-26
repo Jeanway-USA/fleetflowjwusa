@@ -123,6 +123,9 @@ interface Load {
   driver_id: string | null;
   start_miles?: number | null;
   end_miles?: number | null;
+  pickup_number: string | null;
+  trailer_id: string | null;
+  trailers?: { unit_number: string | null } | null;
 }
 
 interface DriverLoadCardProps {
