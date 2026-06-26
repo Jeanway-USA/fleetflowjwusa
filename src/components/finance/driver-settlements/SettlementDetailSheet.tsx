@@ -319,11 +319,13 @@ function LineItemsSplit({
   settlementId,
   orgId,
   editable,
+  editMode,
 }: {
   items: LineItemRow[];
   settlementId: string;
   orgId: string;
   editable: boolean;
+  editMode: boolean;
 }) {
   const earnings = items.filter((i) => EARNINGS_TYPES.has(i.item_type));
   const deductions = items.filter((i) => i.item_type === 'deduction');
@@ -338,6 +340,7 @@ function LineItemsSplit({
           settlementId={settlementId}
           orgId={orgId}
           editable={editable}
+          editMode={editMode}
           emptyText="No earnings recorded yet"
         />
         <LineItemColumn
@@ -347,12 +350,14 @@ function LineItemsSplit({
           settlementId={settlementId}
           orgId={orgId}
           editable={editable}
+          editMode={editMode}
           emptyText="No deductions in this period"
         />
       </div>
     </div>
   );
 }
+
 
 function LineItemColumn({
   side,
