@@ -380,13 +380,19 @@ export async function generateSettlementPdf(
   const itemColGap = 16;
   const itemColW = (contentW - itemColGap) / 2;
 
+  // Accessorials are folded into base gross pay — never surface a dedicated
+  // "Accessorial" line item in the PDF.
+  const visibleReimb = reimbursementItems.filter((r) => {
+    const t = String(r.description ?? '').toLowerCase();
+    return !t.includes('accessorial');
+  });
   const earningsBody: Array<[string, string]> = [
     [breakdown.methodLabel, formatCurrency(breakdown.basePay)],
   ];
-  if (reimbursementItems.length === 0) {
+  if (visibleReimb.length === 0) {
     earningsBody.push(['No reimbursements in this period', formatCurrency(0)]);
   } else {
-    reimbursementItems.forEach((r) => {
+    visibleReimb.forEach((r) => {
       earningsBody.push([
         `Reimbursement — ${r.description ?? 'Other'}`,
         formatCurrency(Number(r.amount ?? 0)),
