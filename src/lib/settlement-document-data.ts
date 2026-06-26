@@ -84,7 +84,7 @@ export async function buildSettlementDocumentData(
       supabase
         .from('drivers')
         .select(
-          'first_name, last_name, email, phone, landstar_operator_id, pay_type, pay_rate',
+          'first_name, last_name, email, phone, landstar_operator_id, pay_type, pay_rate, employment_type',
         )
         .eq('id', s.driver_id)
         .maybeSingle(),
