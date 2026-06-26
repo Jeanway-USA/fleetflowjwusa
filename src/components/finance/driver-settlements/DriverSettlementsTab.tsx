@@ -143,11 +143,19 @@ export function DriverSettlementsTab() {
 
   const deleteSettlement = useMutation({
     mutationFn: async (id: string) => {
+      // Belt-and-suspenders: FK is ON DELETE CASCADE, but explicitly purge
+      // child line items first so legacy DBs without the cascade also clean up.
+      await supabase.from('driver_settlement_items').delete().eq('settlement_id', id);
       const { error } = await supabase.from('driver_settlements').delete().eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      // Admin-side caches
       qc.invalidateQueries({ queryKey: ['driver_settlements'] });
+      qc.invalidateQueries({ queryKey: ['driver_settlement_items'] });
+      qc.invalidateQueries({ queryKey: ['driver_settlement', id] });
+      // Driver-side caches are purged in real-time via the Realtime publication
+      // on `driver_settlements` (see useDriverSettlementsRealtime).
       toast.success('Settlement deleted');
     },
     onError: (e: any) => toast.error(e.message),
