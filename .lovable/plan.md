@@ -1,57 +1,74 @@
 ## Goal
-Make the settlement PDF compiler render two distinct branded layouts based on the driver's `employment_type`:
-- `w2_company` → "W-2 EARNINGS STATEMENT" paystub wrapper with statutory tax metadata block.
-- `1099_contractor` / `lease_purchase` → "CONTRACTOR SETTLEMENT STATEMENT" wrapper with a detachable check voucher at the base.
+Convert `PLSummaryTab.tsx` into a true executive P&L workspace with three KPI cards, a timeframe-aware CPM calculator, and a 12-week revenue-vs-expense trend chart. Existing detail tables (Revenue Summary, Miles Summary, Net Profit Calculation) stay below the new executive header so nothing in the workflow is lost.
 
-Both variants share a new top-edge monospaced legacy system line.
-
-## Scope (frontend/presentation only)
+## Scope (frontend only)
 Files touched:
-- `src/lib/settlement-document-data.ts` — extend `SettlementDocDriver` to fetch `employment_type` from `drivers`.
-- `src/components/finance/driver-settlements/SettlementPrintable.tsx` — branch layout and inject new chrome.
-- (Reuse existing `SettlementCheckVoucher.tsx` only if it already matches the spec; otherwise the voucher will be re-implemented inline in `SettlementPrintable` per the exact spec below. The existing `includeVoucher` prop becomes derived automatically from `employment_type` rather than a manual flag.)
+- `src/components/finance/PLSummaryTab.tsx` — add executive header (KPIs + CPM + chart) above current content.
+- `src/hooks/usePLTrend.ts` *(new)* — fetches the last 12 ISO weeks of loads, expenses, and payroll for the current org and rolls them up per week + per timeframe.
 
-No DB changes, no PDF engine changes (`generateSettlementPdf.ts` already renders the printable React tree). No business-logic/math changes.
+No new DB tables, no edits to `Finance.tsx` props, no business-logic changes to existing totals.
 
-## Layout spec
+## Layout
 
-### 1. Top metadata row (both variants)
-Absolute top edge of canvas, above the dark header banner:
 ```
-CO: JW    FILE: {driver_id}    DEPT: DISPATCH    CLOCK: {driver_id}    NUMBER: 00000000
+┌─────────────── EXECUTIVE P&L ───────────────┐
+│  [Gross Revenue]  [Combined Costs]  [NOI / Margin] │
+│                                                    │
+│  CPM Calculator   Week ▾ Month ▾ Quarter ▾        │
+│   RPM  $X.XX     EPM  $X.XX     NPM  $X.XX        │
+│                                                    │
+│  ┌──────── Revenue vs Expenses (12w) ────────┐   │
+│  │  area/line chart, x = ISO week, y = $     │   │
+│  └────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────┘
+
+(existing Revenue Flow strip + Revenue Summary / Miles Summary / Net Profit Calculation render below, unchanged)
 ```
-Classes: `font-mono text-[10px] text-zinc-400 tracking-wider px-10 py-1 border-b border-zinc-100`.
 
-### 2. W-2 wrapper (`employment_type === 'w2_company'`)
-- Header title swapped to **"W-2 EARNINGS STATEMENT"** (replaces the current "Settlement & Earnings Statement" eyebrow + corporate H1 styling stays).
-- New **Tax & Withholding** metadata block rendered directly below the header, before "Statement Details":
-  - Bordered box, 4-column grid: Filing Status, Federal Allowances, State Allowances, State Code.
-  - Followed by a statutory withholding sub-grid: Federal Income Tax, Social Security (6.2%), Medicare (1.45%), State Tax — each with current period + YTD columns.
-  - Values pulled from `settlement.tax_withholding` where available; allowances/filing status shown as placeholder dashes when the drivers table has no field for them (display-only — no schema change this turn).
-- Voucher is NOT rendered.
+## Section specs
 
-### 3. 1099 / Lease wrapper (`employment_type` in `['1099_contractor','lease_purchase']`)
-- Header title swapped to **"CONTRACTOR SETTLEMENT STATEMENT"**.
-- Existing body (loads, dual-column itemization, summary cards) unchanged.
-- Existing legal disclaimer footer unchanged.
-- **Below the legal disclaimer**, append a detachable-style check voucher block:
-  - Wrapper: `border-2 border-dashed border-zinc-300 bg-zinc-50/40 p-4 mt-6 relative overflow-hidden print:break-inside-avoid`.
-  - Diagonal watermark: absolutely-positioned `<span>` with `rotate(-20deg)`, `text-zinc-300/40`, `text-3xl font-bold tracking-widest pointer-events-none select-none` reading `NON-NEGOTIABLE — FOR RECORD PURPOSES ONLY`.
-  - 4-column grid (`grid-cols-2 md:grid-cols-4 gap-4 relative z-10`):
-    1. **BANK DEPOSIT ROUTING** — masked routing/account from driver record (or `—`).
-    2. **VOUCHER NUMBER** — `V-{statementNo}`.
-    3. **NET DISTRIBUTION** — formatted `currentNet`.
-    4. **AUTHORIZED SIGNATURE** — empty underline (`border-b border-zinc-400 h-8`) with caption.
-  - Each column: `text-[10px] uppercase tracking-wider text-zinc-500` label + value below.
+### 1. Triple KPI blocks
+Three `Card`s in a `grid-cols-1 md:grid-cols-3 gap-4` row.
 
-### 4. Fallback
-If `employment_type` is `null`/unknown → default to the contractor wrapper (matches current behavior and tenant default for this TMS).
+- **Fleet Top-Line Gross Revenue** = `revenueTotals.grossRevenue` (sum of all completed load earnings — already aggregated upstream from delivered loads). Icon: `DollarSign` in `text-success`.
+- **Combined Fleet Overhead Costs** = `totalExpenses + payrollTotals.netPay + commissionTotals.amount`. Subtitle lists the four contributors (driver flat/mileage payouts, reimbursements, asset upkeep). Icon: `TrendingDown` in `text-destructive`.
+- **Net Operating Income / Margin** = `grossRevenue − combinedCosts`; show margin % beside the dollar figure with green/red coloring. Icon: `PiggyBank`.
+
+Each card uses semantic tokens (`text-success`, `text-destructive`, `bg-card`) — no hardcoded colors.
+
+### 2. CPM calculator with timeframe toggle
+- ShadCN `ToggleGroup` (single-select) with `week | month | quarter`. Default `week`.
+- Hook `usePLTrend(orgId)` returns:
+  ```
+  { week: PeriodRollup, month: PeriodRollup, quarter: PeriodRollup, weekly: WeekPoint[] }
+  PeriodRollup = { revenue, costs, miles }
+  WeekPoint = { weekStart: 'YYYY-MM-DD', label: 'W## MMM dd', revenue, costs, net }
+  ```
+  - `week` = trailing 7 days, `month` = trailing 30 days, `quarter` = trailing 90 days from today, in user's local TZ (use existing `date-fns` `subDays`/`startOfWeek` helpers, with `T00:00:00` guard from the date memory).
+  - Fetches in parallel from `fleet_loads` (delivered, `delivery_date >= today-84d`, sums `booked_rate`/`actual_miles`), `expenses` (org-scoped, `expense_date` window), `driver_payroll` (`pay_period_end` window), `agent_commissions` (revenue side). All filtered by `org_id = current org`.
+  - Org id pulled via the existing `useAuth` / `useOrgContext` pattern already used elsewhere in `src/hooks/` (will mirror whichever `useOperationalCPM` already uses).
+- Three readouts per selected timeframe:
+  - **RPM** = `revenue / miles`
+  - **EPM** = `costs / miles`
+  - **NPM** = `(revenue − costs) / miles`
+  - Show `—` when `miles === 0`; tabular-nums; `text-success` for positive NPM, `text-destructive` for negative.
+
+### 3. 12-week trend chart
+- Recharts `ComposedChart` (already in dependencies). Two stacked datasets:
+  - Filled area for **Gross Revenue** in `hsl(var(--success))` at 30% opacity with a solid 2px line on top.
+  - Filled area for **Combined Costs** in `hsl(var(--destructive))` at 25% opacity with a solid 2px line on top.
+  - Optional thin dashed line for **Net** in `hsl(var(--primary))`.
+- X axis: ISO week labels from `weekly[]` (oldest → newest). Y axis: currency, abbreviated (`$12k`).
+- Uses the existing `ChartContainer` from `src/components/ui/chart.tsx` so tooltips, legend, and accessibility match the rest of the app.
+- Height ~320px, `Suspense`-friendly skeleton (`ChartSkeleton`) while `usePLTrend` is loading.
 
 ## Out of scope
-- Math, totals, recalc RPCs.
-- New DB columns for filing status / allowances / routing numbers (W-2 metadata is rendered with dashes when source data isn't present).
-- Print/PDF generator engine changes — `generateSettlementPdf` already snapshots whatever `SettlementPrintable` renders.
+- Cross-tab data changes in `Finance.tsx`.
+- Real-time subscriptions — TanStack defaults (`5m staleTime`, `refetchOnWindowFocus:false` per project memory) are sufficient.
+- New schema, RLS, or seed data.
+- Exporting / printing the new section.
 
 ## Verification
 - `tsgo` typecheck.
-- Render `/settlement/print/:id` for one W-2 driver and one lease driver via Playwright screenshot to confirm both variants paint correctly (header title, top monospace line, voucher presence/absence).
+- Visit `/finance` → Overview tab via Playwright; screenshot full page to confirm KPI strip + CPM toggle + chart render with no overflow and that legacy tables still appear below.
+- Toggle CPM between Week / Month / Quarter and confirm the three numbers update.
