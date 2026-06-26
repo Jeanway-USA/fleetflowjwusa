@@ -428,10 +428,10 @@ export default function DriverLoadsView() {
       if (!driverRecord?.id) return [];
       const { data, error } = await supabase
         .from('fleet_loads')
-        .select('*')
+        .select('*, trailers:trailer_id(unit_number)')
         .eq('driver_id', driverRecord.id);
       if (error) throw error;
-      return data;
+      return data as unknown as Load[];
     },
     enabled: !!driverRecord?.id,
     staleTime: 2 * 60 * 1000,
