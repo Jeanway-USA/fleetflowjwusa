@@ -1487,6 +1487,7 @@ export type Database = {
           description: string | null
           expense_id: string | null
           id: string
+          is_escrow: boolean
           item_type: string
           load_id: string | null
           org_id: string
@@ -1500,6 +1501,7 @@ export type Database = {
           description?: string | null
           expense_id?: string | null
           id?: string
+          is_escrow?: boolean
           item_type: string
           load_id?: string | null
           org_id: string
@@ -1513,6 +1515,7 @@ export type Database = {
           description?: string | null
           expense_id?: string | null
           id?: string
+          is_escrow?: boolean
           item_type?: string
           load_id?: string | null
           org_id?: string
@@ -1537,6 +1540,7 @@ export type Database = {
           created_at: string
           deductions: number
           driver_id: string
+          escrow_credited_amount: number
           generated_at: string
           generated_by: string | null
           gross_pay: number
@@ -1550,6 +1554,7 @@ export type Database = {
           period_start: string
           reimbursements: number
           status: string
+          tax_withholding: number
           updated_at: string
           ytd_deductions: number
           ytd_gross: number
@@ -1562,6 +1567,7 @@ export type Database = {
           created_at?: string
           deductions?: number
           driver_id: string
+          escrow_credited_amount?: number
           generated_at?: string
           generated_by?: string | null
           gross_pay?: number
@@ -1575,6 +1581,7 @@ export type Database = {
           period_start: string
           reimbursements?: number
           status?: string
+          tax_withholding?: number
           updated_at?: string
           ytd_deductions?: number
           ytd_gross?: number
@@ -1587,6 +1594,7 @@ export type Database = {
           created_at?: string
           deductions?: number
           driver_id?: string
+          escrow_credited_amount?: number
           generated_at?: string
           generated_by?: string | null
           gross_pay?: number
@@ -1600,6 +1608,7 @@ export type Database = {
           period_start?: string
           reimbursements?: number
           status?: string
+          tax_withholding?: number
           updated_at?: string
           ytd_deductions?: number
           ytd_gross?: number
@@ -5244,6 +5253,7 @@ export type Database = {
           created_at: string
           deductions: number
           driver_id: string
+          escrow_credited_amount: number
           generated_at: string
           generated_by: string | null
           gross_pay: number
@@ -5257,6 +5267,7 @@ export type Database = {
           period_start: string
           reimbursements: number
           status: string
+          tax_withholding: number
           updated_at: string
           ytd_deductions: number
           ytd_gross: number
@@ -5305,6 +5316,7 @@ export type Database = {
           created_at: string
           deductions: number
           driver_id: string
+          escrow_credited_amount: number
           generated_at: string
           generated_by: string | null
           gross_pay: number
@@ -5318,6 +5330,7 @@ export type Database = {
           period_start: string
           reimbursements: number
           status: string
+          tax_withholding: number
           updated_at: string
           ytd_deductions: number
           ytd_gross: number
