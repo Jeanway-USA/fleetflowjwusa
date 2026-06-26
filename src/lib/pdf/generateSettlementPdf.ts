@@ -59,7 +59,7 @@ function detectLogoFormat(dataUrl: string): 'PNG' | 'JPEG' {
 
 export async function generateSettlementPdf(
   settlementId: string,
-  opts: { includeVoucher?: boolean } = {},
+  _opts: { includeVoucher?: boolean } = {},
 ): Promise<void> {
   const data = await buildSettlementDocumentData(settlementId);
   const { settlement: s, driver, org, reimbursementItems, deductionItems, breakdown, ytd } = data;
@@ -101,16 +101,30 @@ export async function generateSettlementPdf(
     }
   };
 
+  // ---------- Top monospace administrative tracker line ----------
+  const TRACKER_H = 16;
+  const id8 = String(s.driver_id ?? s.id).slice(0, 8).toUpperCase().padEnd(8, '0');
+  doc.setFillColor(255, 255, 255);
+  doc.rect(0, 0, W, TRACKER_H, 'F');
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(113, 113, 122);
+  doc.text(
+    `CO: JW    FILE: ${id8}    DEPT: DISPATCH    CLOCK: ${id8}    NUMBER: 00000000`,
+    margin,
+    11,
+  );
+
   // ---------- Corporate header banner ----------
+  const HEADER_TOP = TRACKER_H;
   const HEADER_H = 110;
   doc.setFillColor(24, 24, 27); // zinc-900
-  doc.rect(0, 0, W, HEADER_H, 'F');
-
+  doc.rect(0, HEADER_TOP, W, HEADER_H, 'F');
 
   let leftX = margin;
   if (logoData) {
     try {
-      doc.addImage(logoData, logoFmt, margin, 22, 56, 56);
+      doc.addImage(logoData, logoFmt, margin, HEADER_TOP + 22, 56, 56);
       leftX = margin + 68;
     } catch {
       /* ignore */
@@ -120,27 +134,27 @@ export async function generateSettlementPdf(
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
-  doc.text(safe(CORPORATE_HEADER.name), leftX, 44);
+  doc.text(safe(CORPORATE_HEADER.name), leftX, HEADER_TOP + 44);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(203, 213, 225);
-  doc.text(safe(CORPORATE_HEADER.subtitle), leftX, 62);
+  doc.text(safe(CORPORATE_HEADER.subtitle), leftX, HEADER_TOP + 62);
 
   doc.setFontSize(9);
   doc.setTextColor(148, 163, 184);
-  doc.text(safe(CORPORATE_HEADER.address), leftX, 78);
+  doc.text(safe(CORPORATE_HEADER.address), leftX, HEADER_TOP + 78);
 
   // Right side: title, statement #, status pill
   const rx = W - margin;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(203, 213, 225);
-  doc.text('SETTLEMENT & EARNINGS STATEMENT', rx, 40, { align: 'right' });
+  doc.text('SETTLEMENT & EARNINGS STATEMENT', rx, HEADER_TOP + 40, { align: 'right' });
 
   doc.setFontSize(9);
   doc.setTextColor(226, 232, 240);
-  doc.text(`Statement #${statementNo}`, rx, 56, { align: 'right' });
+  doc.text(`Statement #${statementNo}`, rx, HEADER_TOP + 56, { align: 'right' });
 
   // Status pill
   const pillText = status;
@@ -150,79 +164,92 @@ export async function generateSettlementPdf(
   const pillW = doc.getTextWidth(pillText) + 16;
   const pillH = 16;
   const pillX = rx - pillW;
-  const pillY = 66;
+  const pillY = HEADER_TOP + 66;
   doc.setFillColor(pr, pg, pb);
   doc.roundedRect(pillX, pillY, pillW, pillH, 3, 3, 'F');
   doc.setTextColor(255, 255, 255);
   doc.text(pillText, pillX + pillW / 2, pillY + 11, { align: 'center' });
 
-  // ---------- Statement Details + Contractor Information ----------
-  let y = HEADER_H + 22;
-  doc.setDrawColor(228, 228, 231);
-  doc.setLineWidth(0.5);
+  // ---------- Statement Details + Contractor Information (dense grid) ----------
+  let y = HEADER_TOP + HEADER_H + 18;
 
-  const colMidGap = 18;
+  const colMidGap = 16;
   const colW = (contentW - colMidGap) / 2;
 
-  // Section labels
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(113, 113, 122);
-  doc.text('STATEMENT DETAILS', margin, y);
-  doc.text('CONTRACTOR INFORMATION', margin + colW + colMidGap, y);
-  y += 6;
-  doc.line(margin, y, margin + colW, y);
-  doc.line(margin + colW + colMidGap, y, margin + contentW, y);
-  y += 14;
+  const HAIRLINE: [number, number, number] = [228, 228, 231]; // zinc-200
+  const ZEBRA: [number, number, number] = [248, 250, 252];    // slate-50
+  const HEAD_BG: [number, number, number] = [244, 244, 245];  // zinc-100
+  const HEAD_FG: [number, number, number] = [82, 82, 91];     // zinc-600
+  const TEXT: [number, number, number] = [24, 24, 27];
 
-  const leftDetails: [string, string][] = [
-    ['Statement #', statementNo],
-    ['Pay Period', `${fmtDate(s.period_start)} - ${fmtDate(s.period_end)}`],
-    ['Payment Date', fmtDate(s.payment_date)],
-    ['Status', status],
-    ['Earnings Method', breakdown.methodLabel],
-  ];
-  const rightDetails: [string, string][] = [
-    ['Driver Name', driverName],
-    ['Driver ID', driverIdLabel],
-    ['Email', driver?.email || '—'],
-    ['Phone', driver?.phone || '—'],
-  ];
-
-  const drawDetails = (
-    rows: [string, string][],
-    x: number,
-    boxed: boolean,
-  ) => {
-    const rowH = 16;
-    const padTop = boxed ? 10 : 0;
-    const padBottom = boxed ? 10 : 0;
-    const h = padTop + rows.length * rowH + padBottom;
-    if (boxed) {
-      doc.setDrawColor(228, 228, 231);
-      doc.roundedRect(x, y - 4, colW, h, 4, 4, 'S');
-    }
-    let ry = y + padTop + 4;
-    rows.forEach(([label, value]) => {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(113, 113, 122);
-      doc.text(safe(label.toUpperCase()), x + (boxed ? 10 : 0), ry);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
-      doc.setTextColor(24, 24, 27);
-      const valX = x + (boxed ? 10 : 0) + 96;
-      const valMaxW = colW - (boxed ? 20 : 0) - 96;
-      const wrapped = doc.splitTextToSize(safe(value), valMaxW);
-      doc.text(wrapped[0] ?? safe(value), valX, ry);
-      ry += rowH;
-    });
-    return h;
+  const denseStyles = {
+    fontSize: 9,
+    cellPadding: { top: 2.5, bottom: 2.5, left: 6, right: 6 } as any,
+    textColor: TEXT,
+    lineColor: HAIRLINE,
+    lineWidth: 0.4,
+    overflow: 'linebreak' as const,
+    valign: 'middle' as const,
   };
+  const denseHead = {
+    fillColor: HEAD_BG,
+    textColor: HEAD_FG,
+    fontStyle: 'bold' as const,
+    fontSize: 8,
+    halign: 'left' as const,
+    cellPadding: { top: 3, bottom: 3, left: 6, right: 6 } as any,
+  };
+  const denseAlt = { fillColor: ZEBRA };
 
-  const lh = drawDetails(leftDetails, margin, false);
-  const rh = drawDetails(rightDetails, margin + colW + colMidGap, true);
-  y += Math.max(lh, rh) + 10;
+  autoTable(doc, {
+    startY: y,
+    theme: 'grid',
+    head: [[{ content: 'STATEMENT DETAILS', colSpan: 2 }]],
+    body: [
+      ['Statement #', statementNo],
+      ['Pay Period', `${fmtDate(s.period_start)} - ${fmtDate(s.period_end)}`],
+      ['Payment Date', fmtDate(s.payment_date)],
+      ['Status', status],
+      ['Earnings Method', breakdown.methodLabel],
+    ],
+    headStyles: denseHead,
+    styles: denseStyles,
+    alternateRowStyles: denseAlt,
+    columnStyles: {
+      0: { cellWidth: 100, textColor: HEAD_FG, fontSize: 8 },
+      1: { cellWidth: colW - 100, fontStyle: 'bold' },
+    },
+    margin: { left: margin, right: margin + colW + colMidGap, bottom: FOOTER_RESERVE },
+    tableWidth: colW,
+    tableLineColor: HAIRLINE,
+    tableLineWidth: 0.4,
+  });
+  const lEndY = (doc as any).lastAutoTable.finalY;
+
+  autoTable(doc, {
+    startY: y,
+    theme: 'grid',
+    head: [[{ content: 'CONTRACTOR INFORMATION', colSpan: 2 }]],
+    body: [
+      ['Driver Name', driverName],
+      ['Driver ID', driverIdLabel],
+      ['Email', driver?.email || '—'],
+      ['Phone', driver?.phone || '—'],
+    ],
+    headStyles: denseHead,
+    styles: denseStyles,
+    alternateRowStyles: denseAlt,
+    columnStyles: {
+      0: { cellWidth: 100, textColor: HEAD_FG, fontSize: 8 },
+      1: { cellWidth: colW - 100, fontStyle: 'bold' },
+    },
+    margin: { left: margin + colW + colMidGap, right: margin, bottom: FOOTER_RESERVE },
+    tableWidth: colW,
+    tableLineColor: HAIRLINE,
+    tableLineWidth: 0.4,
+  });
+  const rEndY = (doc as any).lastAutoTable.finalY;
+  y = Math.max(lEndY, rEndY) + 16;
 
   // ---------- Load Earnings & Routes table ----------
   ensureSpace(60);
@@ -233,28 +260,35 @@ export async function generateSettlementPdf(
   y += 6;
 
   const headStyles = {
-    fillColor: [24, 24, 27] as [number, number, number],
-    textColor: 255,
-    fontSize: 9,
+    fillColor: HEAD_BG,
+    textColor: HEAD_FG,
+    fontSize: 8,
+    fontStyle: 'bold' as const,
     halign: 'left' as const,
+    cellPadding: { top: 3, bottom: 3, left: 6, right: 6 } as any,
   };
   const baseStyles = {
     fontSize: 9,
-    cellPadding: 6,
-    textColor: [30, 41, 59] as [number, number, number],
+    cellPadding: { top: 2.5, bottom: 2.5, left: 6, right: 6 } as any,
+    textColor: TEXT,
+    lineColor: HAIRLINE,
+    lineWidth: 0.4,
     overflow: 'linebreak' as const,
-    valign: 'top' as const,
-    minCellHeight: 22,
+    valign: 'middle' as const,
+    minCellHeight: 16,
   };
-  const alt = { fillColor: [248, 250, 252] as [number, number, number] };
+  const alt = { fillColor: ZEBRA };
   const footStyles = {
     fillColor: [241, 245, 249] as [number, number, number],
-    textColor: [24, 24, 27] as [number, number, number],
+    textColor: TEXT,
   };
 
 
   const loadWidths = { date: 56, load: 60, miles: 44, status: 56, origin: 158, dest: 158 };
   autoTable(doc, {
+    theme: 'grid',
+    tableLineColor: HAIRLINE,
+    tableLineWidth: 0.4,
     startY: y,
     head: [['Date', 'Load #', 'Miles', 'Status', 'Origin', 'Destination']],
     body:
@@ -346,13 +380,19 @@ export async function generateSettlementPdf(
   const itemColGap = 16;
   const itemColW = (contentW - itemColGap) / 2;
 
+  // Accessorials are folded into base gross pay — never surface a dedicated
+  // "Accessorial" line item in the PDF.
+  const visibleReimb = reimbursementItems.filter((r) => {
+    const t = String(r.description ?? '').toLowerCase();
+    return !t.includes('accessorial');
+  });
   const earningsBody: Array<[string, string]> = [
     [breakdown.methodLabel, formatCurrency(breakdown.basePay)],
   ];
-  if (reimbursementItems.length === 0) {
+  if (visibleReimb.length === 0) {
     earningsBody.push(['No reimbursements in this period', formatCurrency(0)]);
   } else {
-    reimbursementItems.forEach((r) => {
+    visibleReimb.forEach((r) => {
       earningsBody.push([
         `Reimbursement — ${r.description ?? 'Other'}`,
         formatCurrency(Number(r.amount ?? 0)),
@@ -372,6 +412,9 @@ export async function generateSettlementPdf(
   const itemsStartY = y;
 
   autoTable(doc, {
+    theme: 'grid',
+    tableLineColor: HAIRLINE,
+    tableLineWidth: 0.4,
     startY: itemsStartY,
     head: [[{ content: 'EARNINGS & ADDITIONS', colSpan: 2 }]],
     body: earningsBody,
@@ -387,6 +430,9 @@ export async function generateSettlementPdf(
   const earningsEndY = (doc as any).lastAutoTable.finalY;
 
   autoTable(doc, {
+    theme: 'grid',
+    tableLineColor: HAIRLINE,
+    tableLineWidth: 0.4,
     startY: itemsStartY,
     head: [[{ content: 'DEDUCTIONS & ESCROWS', colSpan: 2 }]],
     body: deductionsBody,
@@ -491,8 +537,8 @@ export async function generateSettlementPdf(
   );
 
 
-  // ---------- Optional Check Voucher block ----------
-  if (opts.includeVoucher) {
+  // ---------- Detachable Check Voucher (always at base) ----------
+  {
     const voucherH = 200;
     if (y + voucherH > H - FOOTER_RESERVE) {
       doc.addPage();
@@ -513,26 +559,28 @@ export async function generateSettlementPdf(
       align: 'center',
     });
 
-    // Dashed border
-    doc.setDrawColor(212, 212, 216);
-    doc.setLineWidth(1);
-    (doc as any).setLineDashPattern?.([4, 3], 0);
-    doc.roundedRect(vx, vy, vw, vh, 4, 4, 'S');
+    // Background fill (~ bg-zinc-50/40) + squared dashed border
+    doc.setFillColor(250, 250, 251);
+    doc.rect(vx, vy, vw, vh, 'F');
+    doc.setDrawColor(212, 212, 216); // zinc-300
+    doc.setLineWidth(1.5);
+    (doc as any).setLineDashPattern?.([5, 4], 0);
+    doc.rect(vx, vy, vw, vh, 'S');
     (doc as any).setLineDashPattern?.([], 0);
 
-    // Watermark
+    // Diagonal 45° watermark
     const gs: any = (doc as any).GState
-      ? new (doc as any).GState({ opacity: 0.12 })
+      ? new (doc as any).GState({ opacity: 0.1 })
       : null;
     if (gs) (doc as any).setGState(gs);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22);
+    doc.setFontSize(20);
     doc.setTextColor(120, 120, 130);
     doc.text(
       'NON-NEGOTIABLE - FOR RECORD PURPOSES ONLY',
       vx + vw / 2,
-      vy + vh / 2 + 4,
-      { align: 'center', angle: 18 },
+      vy + vh / 2 + 6,
+      { align: 'center', angle: 45 },
     );
     if (gs) {
       const gsReset: any = new (doc as any).GState({ opacity: 1 });
