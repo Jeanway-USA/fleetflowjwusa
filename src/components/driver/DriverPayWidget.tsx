@@ -22,6 +22,9 @@ interface DriverPayWidgetProps {
 export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetProps) {
   const [paystubsOpen, setPaystubsOpen] = useState(false);
 
+  // Keep widget + paystubs in sync with admin settlement changes in real-time.
+  useDriverSettlementsRealtime(driverId);
+
   const { data: driverRow } = useQuery({
     queryKey: ['driver-name', driverId],
     queryFn: async () => {
