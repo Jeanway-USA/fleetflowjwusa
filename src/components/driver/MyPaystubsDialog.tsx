@@ -346,20 +346,19 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5" /> My Paystubs
+                <Receipt className="h-5 w-5" /> My Settlements
               </DialogTitle>
-              <DialogDescription>Approved and paid paystubs for your records.</DialogDescription>
+              <DialogDescription>Approved and paid settlements for your records.</DialogDescription>
             </DialogHeader>
 
             <div className="overflow-y-auto pr-1 -mr-1">
-              <CorporateHeader driverId={driverId} />
-              <div className="mt-3 border border-zinc-200 rounded-none bg-white">
+              <div className="border border-zinc-200 rounded-none bg-white">
                 {isLoading ? (
                   <p className="text-center text-sm text-muted-foreground py-8">Loading…</p>
                 ) : paystubs.length === 0 ? (
                   <div className="text-center py-10">
                     <FileText className="h-10 w-10 mx-auto text-muted-foreground/40 mb-2" />
-                    <p className="text-sm text-muted-foreground">No paystubs yet.</p>
+                    <p className="text-sm text-muted-foreground">No settlements yet.</p>
                   </div>
                 ) : (
                   paystubs.map((p) => {
@@ -370,11 +369,9 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
                         onClick={() => setSelectedId(p.id)}
                         className="w-full flex items-center justify-between border-b border-zinc-100 even:bg-slate-50/50 hover:bg-zinc-100/60 transition-colors px-3 py-2 text-left"
                       >
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex items-center gap-3">
                           <p className="font-medium truncate text-sm">{fmtPeriod(p.period_start, p.period_end)}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <Badge variant="secondary" className="capitalize text-[10px] rounded-none">{p.status}</Badge>
-                          </div>
+                          <Badge variant="secondary" className="capitalize text-[10px] rounded-none">{p.status}</Badge>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="font-mono font-semibold text-zinc-900 tabular-nums">{formatCurrency(net)}</span>
