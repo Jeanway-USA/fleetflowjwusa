@@ -7,10 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, ChevronRight, Download, Receipt, FileText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { formatCurrency } from '@/lib/formatters';
-import jsPDF from 'jspdf';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 import { useDriverSettlementsRealtime } from '@/hooks/useDriverSettlementsRealtime';
+import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
 
 type DriverSettlement = Database['public']['Tables']['driver_settlements']['Row'];
 
