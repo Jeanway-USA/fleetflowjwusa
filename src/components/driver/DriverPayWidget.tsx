@@ -8,6 +8,7 @@ import { startOfWeek, endOfWeek, format } from 'date-fns';
 import { useState, lazy, Suspense } from 'react';
 import { calculateWeeklyPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
+import { useDriverSettlementsRealtime } from '@/hooks/useDriverSettlementsRealtime';
 const MyPaystubsDialog = lazy(() =>
   import('./MyPaystubsDialog').then(m => ({ default: m.MyPaystubsDialog })),
 );
@@ -20,6 +21,9 @@ interface DriverPayWidgetProps {
 
 export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetProps) {
   const [paystubsOpen, setPaystubsOpen] = useState(false);
+
+  // Keep widget + paystubs in sync with admin settlement changes in real-time.
+  useDriverSettlementsRealtime(driverId);
 
   const { data: driverRow } = useQuery({
     queryKey: ['driver-name', driverId],

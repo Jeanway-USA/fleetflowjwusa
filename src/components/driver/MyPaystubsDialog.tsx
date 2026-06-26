@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/formatters';
 import jsPDF from 'jspdf';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
+import { useDriverSettlementsRealtime } from '@/hooks/useDriverSettlementsRealtime';
 
 type DriverSettlement = Database['public']['Tables']['driver_settlements']['Row'];
 
@@ -84,12 +85,24 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
       return (data ?? []) as DriverSettlement[];
     },
     enabled: !!driverId && open,
+    refetchOnWindowFocus: true,
   });
+
+  // Live-invalidate when admin deletes / reverts a settlement
+  useDriverSettlementsRealtime(driverId, open);
 
   const selected = useMemo(
     () => paystubs.find((p) => p.id === selectedId) ?? null,
     [paystubs, selectedId],
   );
+
+  // If the currently-open settlement disappears (deleted or reverted to draft),
+  // auto-return to the list so the driver cannot interact with an obsolete row.
+  useEffect(() => {
+    if (selectedId && paystubs.length > 0 && !paystubs.some((p) => p.id === selectedId)) {
+      setSelectedId(null);
+    }
+  }, [paystubs, selectedId]);
 
   // Itemized reimbursements / deductions for the selected paystub
   const { data: settlementItems = [] } = useQuery({
