@@ -229,6 +229,27 @@ export function DriverDetailSheet({
           )}
         </div>
 
+        {driver.employment_type === 'lease_purchase' && leaseAgreement && (
+          <>
+            <Separator />
+            <div className="py-4 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Current Escrow Pool Balance</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Weekly Lease {formatCurrency(Number(leaseAgreement.weekly_lease_amount))} • {formatCurrency(Number(leaseAgreement.escrow_cpm_rate), { maximumFractionDigits: 4 })}/mi escrow • {leaseAgreement.total_weeks_remaining} weeks remaining
+                  </p>
+                </div>
+                <Badge variant="secondary" className="text-base font-semibold px-3 py-1">
+                  {formatCurrency(Number(leaseAgreement.current_escrow_balance))}
+                </Badge>
+              </div>
+            </div>
+          </>
+        )}
+
+
+
         {/* Emergency Contact */}
         <Separator />
         <div className="py-4 space-y-3">
