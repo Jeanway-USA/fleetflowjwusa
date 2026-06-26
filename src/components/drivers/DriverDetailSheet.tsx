@@ -123,11 +123,33 @@ export function DriverDetailSheet({
     },
   });
 
+  const { data: leaseAgreement } = useQuery({
+    enabled: !!driver?.id && driver?.employment_type === 'lease_purchase',
+    queryKey: ['lease-agreement', driver?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lease_purchase_agreements')
+        .select('*')
+        .eq('driver_id', driver.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   if (!driver) return null;
 
 
   const initials = `${(driver.first_name?.[0] ?? '').toUpperCase()}${(driver.last_name?.[0] ?? '').toUpperCase()}` || 'D';
   const hireDate = parseDateSafe(driver.hire_date);
+  const employmentLabel = driver.employment_type === 'lease_purchase'
+    ? 'Lease-Purchase'
+    : driver.employment_type === '1099_contractor'
+      ? '1099 Contractor'
+      : 'W-2 Company';
+
+
 
   return (
     <>
