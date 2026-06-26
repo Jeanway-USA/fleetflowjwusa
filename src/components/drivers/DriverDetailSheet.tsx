@@ -168,6 +168,10 @@ export function DriverDetailSheet({
                   <Badge variant={driver.status === 'active' ? 'default' : 'secondary'} className="text-[10px] capitalize">
                     {driver.status || 'active'}
                   </Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    {employmentLabel}
+                  </Badge>
+
                   {hireDate && (
                     <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
                       <Calendar className="h-3 w-3" /> Hired {format(hireDate, 'MMM d, yyyy')}
