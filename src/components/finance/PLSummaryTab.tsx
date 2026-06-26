@@ -584,3 +584,33 @@ function CpmStat({
     </div>
   );
 }
+
+function RatioCell({
+  code,
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  code: string;
+  label: string;
+  value: string;
+  sub: string;
+  tone: 'up' | 'down';
+}) {
+  const toneClass = tone === 'up' ? 'text-emerald-400' : 'text-rose-400';
+  return (
+    <div className="px-5 py-4">
+      <div className="flex items-baseline justify-between mb-1">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+          {label}
+        </p>
+        <span className={`font-mono text-[10px] tracking-widest ${toneClass}`}>{code}</span>
+      </div>
+      <p className={`font-mono text-2xl tabular-nums ${toneClass}`}>{value}</p>
+      <p className="font-mono text-[10px] text-zinc-600 mt-1 tracking-wider uppercase truncate">
+        {sub}
+      </p>
+    </div>
+  );
+}
