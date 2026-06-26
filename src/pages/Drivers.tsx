@@ -242,9 +242,30 @@ export default function Drivers() {
     entityName: 'Driver',
   });
 
-  const openDialog = (driver?: any) => {
+  const openDialog = async (driver?: any) => {
     setEditingDriver(driver || null);
-    setFormData(driver || { status: 'active', pay_type: 'percentage', pay_rate: 0, has_twic: false, endorsements: [], dod_clearance_level: 'None' });
+    setFormData(driver || { status: 'active', pay_type: 'percentage', pay_rate: 0, has_twic: false, endorsements: [], dod_clearance_level: 'None', employment_type: 'w2_company' });
+    // Seed lease form
+    if (driver?.id) {
+      const { data: lease } = await supabase
+        .from('lease_purchase_agreements')
+        .select('*')
+        .eq('driver_id', driver.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (lease) {
+        setLeaseForm({
+          id: lease.id,
+          weekly_lease_amount: Number(lease.weekly_lease_amount) || 0,
+          escrow_cpm_rate: Number(lease.escrow_cpm_rate) || 0,
+          total_weeks_remaining: Number(lease.total_weeks_remaining) || 0,
+        });
+      } else {
+        setLeaseForm({ weekly_lease_amount: 0, escrow_cpm_rate: 0, total_weeks_remaining: 0 });
+      }
+    } else {
+      setLeaseForm({ weekly_lease_amount: 0, escrow_cpm_rate: 0, total_weeks_remaining: 0 });
+    }
     setDialogOpen(true);
   };
 
@@ -252,9 +273,38 @@ export default function Drivers() {
     setDialogOpen(false);
     setEditingDriver(null);
     setFormData({});
+    setLeaseForm({ weekly_lease_amount: 0, escrow_cpm_rate: 0, total_weeks_remaining: 0 });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const upsertLeaseAgreement = async (driverId: string) => {
+    if (formData.employment_type !== 'lease_purchase') return;
+    if (!orgId) return;
+    if (leaseForm.id) {
+      const { error } = await supabase
+        .from('lease_purchase_agreements')
+        .update({
+          weekly_lease_amount: leaseForm.weekly_lease_amount,
+          escrow_cpm_rate: leaseForm.escrow_cpm_rate,
+          total_weeks_remaining: leaseForm.total_weeks_remaining,
+        })
+        .eq('id', leaseForm.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('lease_purchase_agreements').insert({
+        driver_id: driverId,
+        org_id: orgId,
+        weekly_lease_amount: leaseForm.weekly_lease_amount,
+        escrow_cpm_rate: leaseForm.escrow_cpm_rate,
+        total_weeks_remaining: leaseForm.total_weeks_remaining,
+        status: 'active',
+        current_escrow_balance: 0,
+      });
+      if (error) throw error;
+    }
+    queryClient.invalidateQueries({ queryKey: ['lease-agreement', driverId] });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.first_name || !formData.last_name) {
       toast.error('First and last name are required');
@@ -264,12 +314,26 @@ export default function Drivers() {
       ...formData,
       landstar_operator_id: formData.landstar_operator_id?.trim() ? formData.landstar_operator_id.trim() : null,
     };
-    if (editingDriver) {
-      updateMutation.mutate({ id: editingDriver.id, ...payload });
-    } else {
-      createMutation.mutate(payload);
+    try {
+      if (editingDriver) {
+        await new Promise<void>((resolve, reject) =>
+          updateMutation.mutate({ id: editingDriver.id, ...payload }, { onSuccess: () => resolve(), onError: (e) => reject(e) })
+        );
+        await upsertLeaseAgreement(editingDriver.id);
+      } else {
+        if (!orgId) throw new Error('Organization not loaded yet. Please try again.');
+        const { data: inserted, error } = await supabase.from('drivers').insert({ ...payload, org_id: orgId }).select('id').single();
+        if (error) throw error;
+        await upsertLeaseAgreement(inserted.id);
+        queryClient.invalidateQueries({ queryKey: ['drivers'] });
+        toast.success('Driver added successfully');
+        closeDialog();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save driver');
     }
   };
+
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>, driverId: string) => {
     const file = e.target.files?.[0];
