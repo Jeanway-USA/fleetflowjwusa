@@ -24,7 +24,7 @@ const STATUS_STYLES: Record<SettlementStatusLabel, string> = {
 
 interface Props {
   data: SettlementDocumentData;
-  /** @deprecated Voucher is now auto-rendered for contractor/lease drivers. */
+  /** @deprecated Voucher is now auto-rendered for every statement. */
   includeVoucher?: boolean;
 }
 
@@ -90,7 +90,7 @@ export function SettlementPrintable({ data }: Props) {
             Payment Date {fmtDateShort(settlement.payment_date)}
           </p>
           <span
-            className={`inline-block px-2.5 py-1 text-[11px] font-semibold tracking-wider rounded ${STATUS_STYLES[status]}`}
+            className={`inline-block px-2.5 py-1 text-[11px] font-semibold tracking-wider rounded-none ${STATUS_STYLES[status]}`}
           >
             {status}
           </span>
@@ -103,7 +103,7 @@ export function SettlementPrintable({ data }: Props) {
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 mb-3">
             Tax &amp; Withholding
           </h2>
-          <div className="border border-zinc-200 rounded-md overflow-hidden">
+          <div className="border border-zinc-200 rounded-none shadow-none overflow-hidden">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-zinc-200">
               <TaxCell label="Filing Status" value="—" />
               <TaxCell label="Federal Allowances" value="—" />
@@ -111,15 +111,15 @@ export function SettlementPrintable({ data }: Props) {
               <TaxCell label="State Code" value="—" />
             </div>
             <div className="border-t border-zinc-200">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-500">
-                    <th className="px-3 py-2 text-left font-semibold">Statutory Withholding</th>
-                    <th className="px-3 py-2 text-right font-semibold">Current Period</th>
-                    <th className="px-3 py-2 text-right font-semibold">Year-to-Date</th>
+                    <th className="px-3 py-1 text-left font-semibold border-b border-zinc-200">Statutory Withholding</th>
+                    <th className="px-3 py-1 text-right font-semibold border-b border-zinc-200">Current Period</th>
+                    <th className="px-3 py-1 text-right font-semibold border-b border-zinc-200">Year-to-Date</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100">
+                <tbody>
                   <WithholdingRow label="Federal Income Tax" current={taxWithholding} ytd={0} />
                   <WithholdingRow label="Social Security (6.2%)" current={currentGross * 0.062} ytd={ytd.gross * 0.062} />
                   <WithholdingRow label="Medicare (1.45%)" current={currentGross * 0.0145} ytd={ytd.gross * 0.0145} />
@@ -132,39 +132,24 @@ export function SettlementPrintable({ data }: Props) {
       )}
 
       {/* Statement details + Contractor/Employee information */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-8 py-6 border-t border-zinc-200 print:break-inside-avoid">
-        <div className="space-y-3">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-            Statement Details
-          </h2>
-          <Field label="Statement #" value={statementNo} />
-          <Field
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 border-t border-zinc-200 print:break-inside-avoid">
+        <InfoTable title="Statement Details">
+          <InfoRow label="Statement #" value={statementNo} />
+          <InfoRow
             label="Pay Period"
             value={`${fmtDate(settlement.period_start)} – ${fmtDate(settlement.period_end)}`}
           />
-          <Field label="Payment Date" value={fmtDate(settlement.payment_date)} />
-          <div className="flex items-baseline gap-3">
-            <span className="text-[11px] uppercase tracking-wider text-zinc-500 w-32 shrink-0">
-              Status
-            </span>
-            <span
-              className={`inline-block px-2 py-0.5 text-[10px] font-semibold tracking-wider rounded ${STATUS_STYLES[status]}`}
-            >
-              {status}
-            </span>
-          </div>
-          <Field label="Earnings Method" value={breakdown.methodLabel} />
-        </div>
+          <InfoRow label="Payment Date" value={fmtDate(settlement.payment_date)} />
+          <InfoRow label="Status" value={status} />
+          <InfoRow label="Earnings Method" value={breakdown.methodLabel} />
+        </InfoTable>
 
-        <div className="border border-zinc-200 rounded-md p-4 space-y-3">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-            {isW2 ? 'Employee Information' : 'Contractor Information'}
-          </h2>
-          <Field label="Driver Name" value={driverName} />
-          <Field label="Driver ID" value={driverIdLabel} />
-          <Field label="Email" value={driver?.email || '—'} />
-          <Field label="Phone" value={driver?.phone || '—'} />
-        </div>
+        <InfoTable title={isW2 ? 'Employee Information' : 'Contractor Information'}>
+          <InfoRow label="Driver Name" value={driverName} />
+          <InfoRow label="Driver ID" value={driverIdLabel} />
+          <InfoRow label="Email" value={driver?.email || '—'} />
+          <InfoRow label="Phone" value={driver?.phone || '—'} />
+        </InfoTable>
       </section>
 
       {/* Load Earnings & Routes */}
@@ -172,15 +157,15 @@ export function SettlementPrintable({ data }: Props) {
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 mb-3">
           Load Earnings &amp; Routes
         </h2>
-        <table className="w-full text-sm border-collapse">
+        <table className="w-full text-sm border-collapse border border-zinc-200 rounded-none shadow-none">
           <thead>
             <tr className="bg-zinc-900 text-white text-left text-[11px] uppercase tracking-wider">
-              <th className="px-3 py-2 font-semibold">Date</th>
-              <th className="px-3 py-2 font-semibold">Load #</th>
-              <th className="px-3 py-2 font-semibold text-right">Miles</th>
-              <th className="px-3 py-2 font-semibold">Status</th>
-              <th className="px-3 py-2 font-semibold">Origin</th>
-              <th className="px-3 py-2 font-semibold">Destination</th>
+              <th className="px-3 py-1 font-semibold">Date</th>
+              <th className="px-3 py-1 font-semibold">Load #</th>
+              <th className="px-3 py-1 font-semibold text-right">Miles</th>
+              <th className="px-3 py-1 font-semibold">Status</th>
+              <th className="px-3 py-1 font-semibold">Origin</th>
+              <th className="px-3 py-1 font-semibold">Destination</th>
             </tr>
           </thead>
           <tbody>
@@ -188,7 +173,7 @@ export function SettlementPrintable({ data }: Props) {
               <tr>
                 <td
                   colSpan={6}
-                  className="px-3 py-4 text-center text-zinc-500 italic border-b border-zinc-100"
+                  className="px-3 py-2 text-center text-zinc-500 italic border-b border-zinc-100"
                 >
                   No loads recorded in this period
                 </td>
@@ -199,22 +184,22 @@ export function SettlementPrintable({ data }: Props) {
                   key={l.id}
                   className="align-top even:bg-slate-50/50 border-b border-zinc-100 print:break-inside-avoid"
                 >
-                  <td className="px-3 py-2 whitespace-nowrap">
+                  <td className="px-3 py-1 whitespace-nowrap">
                     {fmtDateShort(l.delivery_date ?? l.pickup_date)}
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap font-medium">
+                  <td className="px-3 py-1 whitespace-nowrap font-medium">
                     {l.landstar_load_id || l.id.slice(0, 8)}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
+                  <td className="px-3 py-1 text-right tabular-nums">
                     {fmtMiles(Number(l.booked_miles ?? l.actual_miles ?? 0))}
                   </td>
-                  <td className="px-3 py-2 capitalize">
+                  <td className="px-3 py-1 capitalize">
                     {(l.status ?? '—').replace(/_/g, ' ')}
                   </td>
-                  <td className="px-3 py-2 whitespace-normal text-zinc-700">
+                  <td className="px-3 py-1 whitespace-normal text-zinc-700">
                     {l.origin ?? '—'}
                   </td>
-                  <td className="px-3 py-2 whitespace-normal text-zinc-700">
+                  <td className="px-3 py-1 whitespace-normal text-zinc-700">
                     {l.destination ?? '—'}
                   </td>
                 </tr>
@@ -227,7 +212,7 @@ export function SettlementPrintable({ data }: Props) {
       {/* Dual-column itemization: Earnings & Additions / Deductions & Escrows */}
       <section className="border-t border-zinc-200 py-6 print:break-inside-avoid">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ItemColumn title="Earnings & Additions" emptyText="No earnings recorded">
+          <ItemColumn title="Earnings & Additions">
             <ItemRow label={breakdown.methodLabel} value={breakdown.basePay} bold />
             {reimbursementItems.map((r) => (
               <ItemRow
@@ -237,17 +222,13 @@ export function SettlementPrintable({ data }: Props) {
               />
             ))}
             {reimbursementItems.length === 0 && (
-              <p className="text-xs italic text-zinc-500 py-1">
-                No reimbursements in this period
-              </p>
+              <ItemEmpty text="No reimbursements in this period" />
             )}
           </ItemColumn>
 
-          <ItemColumn title="Deductions & Escrows" emptyText="No deductions in this period">
+          <ItemColumn title="Deductions & Escrows">
             {deductionItems.length === 0 ? (
-              <p className="text-xs italic text-zinc-500 py-1">
-                No deductions in this period
-              </p>
+              <ItemEmpty text="No deductions in this period" />
             ) : (
               deductionItems.map((d) => (
                 <ItemRow
@@ -299,54 +280,68 @@ export function SettlementPrintable({ data }: Props) {
         </div>
       </footer>
 
-      {/* Detachable check voucher for contractor / lease */}
-      {!isW2 && (
-        <section className="mt-6 print:break-inside-avoid">
-          <div className="relative overflow-hidden border-2 border-dashed border-zinc-300 bg-zinc-50/40 p-4">
-            <span
-              className="pointer-events-none select-none absolute inset-0 flex items-center justify-center text-zinc-300/40 text-3xl font-bold tracking-widest whitespace-nowrap"
-              style={{ transform: 'rotate(-20deg)' }}
-              aria-hidden="true"
-            >
-              NON-NEGOTIABLE — FOR RECORD PURPOSES ONLY
-            </span>
-            <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <VoucherCell label="Bank Deposit Routing" value="•••• •••• ••••" />
-              <VoucherCell label="Voucher Number" value={`V-${statementNo}`} />
-              <VoucherCell
-                label="Net Distribution"
-                value={formatCurrency(currentNet)}
-                emphasis
-              />
-              <div className="space-y-1">
-                <div className="border-b border-zinc-400 h-8" />
-                <p className="text-[10px] uppercase tracking-wider text-zinc-500">
-                  Authorized Signature
-                </p>
-              </div>
+      {/* Compliance check voucher — always at the absolute bottom */}
+      <section className="mt-6 print:break-inside-avoid">
+        <div className="relative overflow-hidden border-2 border-dashed border-zinc-300 bg-zinc-50/40 p-4 min-h-[110px]">
+          <span
+            className="pointer-events-none select-none absolute inset-0 flex items-center justify-center text-zinc-300/40 text-3xl font-extrabold tracking-[0.25em] whitespace-nowrap"
+            style={{ transform: 'rotate(-20deg)' }}
+            aria-hidden="true"
+          >
+            NON-NEGOTIABLE — FOR RECORD PURPOSES ONLY
+          </span>
+          <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <VoucherCell label="Bank Deposit Routing" value="•••• •••• ••••" />
+            <VoucherCell label="Voucher / Check Number" value={`V-${statementNo}`} />
+            <div className="space-y-1">
+              <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                Net Pay Distribution
+              </p>
+              <p className="tabular-nums text-zinc-900 text-2xl font-bold">
+                {formatCurrency(currentNet)}
+              </p>
+            </div>
+            <div className="flex flex-col justify-end space-y-1">
+              <div className="border-b border-zinc-500 h-10" />
+              <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                Authorized Signature
+              </p>
             </div>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
       </div>
     </div>
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function InfoTable({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline gap-3">
-      <span className="text-[11px] uppercase tracking-wider text-zinc-500 w-32 shrink-0">
-        {label}
-      </span>
-      <span className="text-sm font-medium text-zinc-900">{value}</span>
+    <div className="border border-zinc-200 rounded-none shadow-none">
+      <div className="bg-zinc-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 border-b border-zinc-200">
+        {title}
+      </div>
+      <table className="w-full text-sm border-collapse">
+        <tbody>{children}</tbody>
+      </table>
     </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <tr className="even:bg-slate-50/50 border-b border-zinc-100 last:border-b-0">
+      <td className="px-3 py-1 text-[11px] uppercase tracking-wider text-zinc-500 w-2/5">
+        {label}
+      </td>
+      <td className="px-3 py-1 text-sm font-medium text-zinc-900">{value}</td>
+    </tr>
   );
 }
 
 function TaxCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-white px-3 py-2">
+    <div className="bg-white px-3 py-1">
       <p className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
       <p className="text-sm font-medium text-zinc-900 mt-0.5">{value}</p>
     </div>
@@ -363,10 +358,10 @@ function WithholdingRow({
   ytd: number;
 }) {
   return (
-    <tr className="even:bg-slate-50/50">
-      <td className="px-3 py-1.5 text-zinc-700">{label}</td>
-      <td className="px-3 py-1.5 text-right tabular-nums">{formatCurrency(current)}</td>
-      <td className="px-3 py-1.5 text-right tabular-nums text-zinc-600">{formatCurrency(ytd)}</td>
+    <tr className="even:bg-slate-50/50 border-b border-zinc-100 last:border-b-0">
+      <td className="px-3 py-1 text-zinc-700">{label}</td>
+      <td className="px-3 py-1 text-right tabular-nums">{formatCurrency(current)}</td>
+      <td className="px-3 py-1 text-right tabular-nums text-zinc-600">{formatCurrency(ytd)}</td>
     </tr>
   );
 }
@@ -374,20 +369,14 @@ function WithholdingRow({
 function VoucherCell({
   label,
   value,
-  emphasis,
 }: {
   label: string;
   value: string;
-  emphasis?: boolean;
 }) {
   return (
     <div className="space-y-1">
       <p className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
-      <p
-        className={`tabular-nums text-zinc-900 ${emphasis ? 'text-lg font-bold' : 'text-sm font-medium'}`}
-      >
-        {value}
-      </p>
+      <p className="tabular-nums text-zinc-900 text-sm font-medium">{value}</p>
     </div>
   );
 }
@@ -397,15 +386,22 @@ function ItemColumn({
   children,
 }: {
   title: string;
-  emptyText: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="border border-zinc-200 rounded-lg overflow-hidden">
-      <div className="bg-zinc-900 text-white px-4 py-2 text-[11px] font-semibold tracking-wider uppercase">
+    <div className="border border-zinc-200 rounded-none shadow-none overflow-hidden">
+      <div className="bg-zinc-900 text-white px-3 py-1 text-[11px] font-semibold tracking-wider uppercase">
         {title}
       </div>
-      <div className="px-4 py-2 divide-y divide-zinc-100">{children}</div>
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-500 border-b border-zinc-200">
+            <th className="px-3 py-1 text-left font-semibold">Description</th>
+            <th className="px-3 py-1 text-right font-semibold">Amount</th>
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
     </div>
   );
 }
@@ -422,14 +418,28 @@ function ItemRow({
   negative?: boolean;
 }) {
   return (
-    <div className="flex justify-between py-2 text-sm gap-3">
-      <span className="text-zinc-700">{label}</span>
-      <span
-        className={`tabular-nums shrink-0 ${bold ? 'font-semibold' : 'font-medium'} ${negative ? 'text-red-600' : ''}`}
+    <tr className="even:bg-slate-50/50 border-b border-zinc-100 last:border-b-0">
+      <td className={`px-3 py-1 text-zinc-700 ${bold ? 'font-semibold text-zinc-900' : ''}`}>
+        {label}
+      </td>
+      <td
+        className={`px-3 py-1 text-right tabular-nums ${bold ? 'font-semibold' : 'font-medium'} ${
+          negative ? 'text-red-600' : 'text-zinc-900'
+        }`}
       >
         {formatCurrency(value)}
-      </span>
-    </div>
+      </td>
+    </tr>
+  );
+}
+
+function ItemEmpty({ text }: { text: string }) {
+  return (
+    <tr>
+      <td colSpan={2} className="px-3 py-2 text-xs italic text-zinc-500 text-center">
+        {text}
+      </td>
+    </tr>
   );
 }
 
@@ -449,38 +459,42 @@ function SummaryCard({
   net: number;
 }) {
   return (
-    <div className="border border-zinc-200 rounded-lg overflow-hidden">
-      <div className="bg-zinc-900 text-white px-4 py-2 text-xs font-semibold tracking-wider uppercase">
+    <div className="border border-zinc-200 rounded-none shadow-none overflow-hidden">
+      <div className="bg-zinc-900 text-white px-3 py-1 text-xs font-semibold tracking-wider uppercase">
         {title}
       </div>
-      <div className="px-4 py-3 text-sm divide-y divide-zinc-100">
-        <div className="flex justify-between py-2">
-          <span className="text-zinc-600">Gross Pay</span>
-          <span className="tabular-nums">{formatCurrency(gross)}</span>
-        </div>
-        <div className="flex justify-between py-2">
-          <span className="text-zinc-600">Total Reimbursements</span>
-          <span className="tabular-nums">{formatCurrency(reimbursements)}</span>
-        </div>
-        <div className="flex justify-between py-2">
-          <span className="text-zinc-600">Total Deductions</span>
-          <span className="tabular-nums text-red-600">
-            {formatCurrency(-Math.abs(deductions))}
-          </span>
-        </div>
-        {taxWithholding !== undefined && (
-          <div className="flex justify-between py-2">
-            <span className="text-zinc-600">Statutory Withholdings</span>
-            <span className="tabular-nums text-red-600">
-              {formatCurrency(-Math.abs(taxWithholding))}
-            </span>
-          </div>
-        )}
-        <div className="flex justify-between py-2 bg-slate-50 -mx-4 px-4 font-semibold text-base">
-          <span>Net Pay</span>
-          <span className="tabular-nums">{formatCurrency(net)}</span>
-        </div>
-      </div>
+      <table className="w-full text-sm border-collapse">
+        <tbody>
+          <tr className="even:bg-slate-50/50 border-b border-zinc-100">
+            <td className="px-3 py-1 text-zinc-600">Gross Pay</td>
+            <td className="px-3 py-1 text-right tabular-nums">{formatCurrency(gross)}</td>
+          </tr>
+          <tr className="even:bg-slate-50/50 border-b border-zinc-100">
+            <td className="px-3 py-1 text-zinc-600">Total Reimbursements</td>
+            <td className="px-3 py-1 text-right tabular-nums">{formatCurrency(reimbursements)}</td>
+          </tr>
+          <tr className="even:bg-slate-50/50 border-b border-zinc-100">
+            <td className="px-3 py-1 text-zinc-600">Total Deductions</td>
+            <td className="px-3 py-1 text-right tabular-nums text-red-600">
+              {formatCurrency(-Math.abs(deductions))}
+            </td>
+          </tr>
+          {taxWithholding !== undefined && (
+            <tr className="even:bg-slate-50/50 border-b border-zinc-100">
+              <td className="px-3 py-1 text-zinc-600">Statutory Withholdings</td>
+              <td className="px-3 py-1 text-right tabular-nums text-red-600">
+                {formatCurrency(-Math.abs(taxWithholding))}
+              </td>
+            </tr>
+          )}
+          <tr className="bg-slate-100 border-t-2 border-zinc-900">
+            <td className="px-3 py-1.5 font-semibold text-zinc-900 text-base">Net Pay</td>
+            <td className="px-3 py-1.5 text-right tabular-nums font-bold text-zinc-900 text-base">
+              {formatCurrency(net)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
