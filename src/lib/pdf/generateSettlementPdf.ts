@@ -101,16 +101,30 @@ export async function generateSettlementPdf(
     }
   };
 
+  // ---------- Top monospace administrative tracker line ----------
+  const TRACKER_H = 16;
+  const id8 = String(s.driver_id ?? s.id).slice(0, 8).toUpperCase().padEnd(8, '0');
+  doc.setFillColor(255, 255, 255);
+  doc.rect(0, 0, W, TRACKER_H, 'F');
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(113, 113, 122);
+  doc.text(
+    `CO: JW    FILE: ${id8}    DEPT: DISPATCH    CLOCK: ${id8}    NUMBER: 00000000`,
+    margin,
+    11,
+  );
+
   // ---------- Corporate header banner ----------
+  const HEADER_TOP = TRACKER_H;
   const HEADER_H = 110;
   doc.setFillColor(24, 24, 27); // zinc-900
-  doc.rect(0, 0, W, HEADER_H, 'F');
-
+  doc.rect(0, HEADER_TOP, W, HEADER_H, 'F');
 
   let leftX = margin;
   if (logoData) {
     try {
-      doc.addImage(logoData, logoFmt, margin, 22, 56, 56);
+      doc.addImage(logoData, logoFmt, margin, HEADER_TOP + 22, 56, 56);
       leftX = margin + 68;
     } catch {
       /* ignore */
@@ -120,27 +134,27 @@ export async function generateSettlementPdf(
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(20);
-  doc.text(safe(CORPORATE_HEADER.name), leftX, 44);
+  doc.text(safe(CORPORATE_HEADER.name), leftX, HEADER_TOP + 44);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(203, 213, 225);
-  doc.text(safe(CORPORATE_HEADER.subtitle), leftX, 62);
+  doc.text(safe(CORPORATE_HEADER.subtitle), leftX, HEADER_TOP + 62);
 
   doc.setFontSize(9);
   doc.setTextColor(148, 163, 184);
-  doc.text(safe(CORPORATE_HEADER.address), leftX, 78);
+  doc.text(safe(CORPORATE_HEADER.address), leftX, HEADER_TOP + 78);
 
   // Right side: title, statement #, status pill
   const rx = W - margin;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(203, 213, 225);
-  doc.text('SETTLEMENT & EARNINGS STATEMENT', rx, 40, { align: 'right' });
+  doc.text('SETTLEMENT & EARNINGS STATEMENT', rx, HEADER_TOP + 40, { align: 'right' });
 
   doc.setFontSize(9);
   doc.setTextColor(226, 232, 240);
-  doc.text(`Statement #${statementNo}`, rx, 56, { align: 'right' });
+  doc.text(`Statement #${statementNo}`, rx, HEADER_TOP + 56, { align: 'right' });
 
   // Status pill
   const pillText = status;
@@ -150,7 +164,7 @@ export async function generateSettlementPdf(
   const pillW = doc.getTextWidth(pillText) + 16;
   const pillH = 16;
   const pillX = rx - pillW;
-  const pillY = 66;
+  const pillY = HEADER_TOP + 66;
   doc.setFillColor(pr, pg, pb);
   doc.roundedRect(pillX, pillY, pillW, pillH, 3, 3, 'F');
   doc.setTextColor(255, 255, 255);
