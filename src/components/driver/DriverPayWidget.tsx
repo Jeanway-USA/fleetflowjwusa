@@ -8,6 +8,7 @@ import { startOfWeek, endOfWeek, format } from 'date-fns';
 import { useState, lazy, Suspense } from 'react';
 import { calculateWeeklyPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
+import { useDriverSettlementsRealtime } from '@/hooks/useDriverSettlementsRealtime';
 const MyPaystubsDialog = lazy(() =>
   import('./MyPaystubsDialog').then(m => ({ default: m.MyPaystubsDialog })),
 );
