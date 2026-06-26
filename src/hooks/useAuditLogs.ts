@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { safeChannel } from '@/lib/safe-channel';
 
 export interface AuditLogRow {
   id: string;
@@ -64,20 +65,16 @@ export function useAuditLogs(filters: AuditFilters) {
   // Realtime: prepend new rows for this org
   useEffect(() => {
     if (!orgId) return;
-    const channel = supabase
-      .channel(`audit_logs_${orgId}`)
-      .on(
+    return safeChannel(`audit_logs_${orgId}`, (ch) =>
+      ch.on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'audit_logs', filter: `org_id=eq.${orgId}` },
         () => {
           queryClient.invalidateQueries({ queryKey: ['audit-logs', orgId] });
           queryClient.invalidateQueries({ queryKey: ['audit-logs-metrics', orgId] });
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+        },
+      ),
+    );
   }, [orgId, queryClient]);
 
   return query;
