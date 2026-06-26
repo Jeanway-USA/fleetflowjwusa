@@ -5240,6 +5240,7 @@ export type Database = {
             Args: { _name: string; _tier?: string; _tms_mode?: string }
             Returns: string
           }
+      current_org_has_feature: { Args: { _feature: string }; Returns: boolean }
       generate_driver_settlements: {
         Args: {
           _driver_ids: string[]
