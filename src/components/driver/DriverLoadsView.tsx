@@ -123,6 +123,9 @@ interface Load {
   driver_id: string | null;
   start_miles?: number | null;
   end_miles?: number | null;
+  pickup_number: string | null;
+  trailer_id: string | null;
+  trailers?: { unit_number: string | null } | null;
 }
 
 interface DriverLoadCardProps {
@@ -207,6 +210,26 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
             <span className="text-muted-foreground">→</span>
             <span className="font-medium">{getCondensedAddress(load.destination)}</span>
           </div>
+
+          {/* PU# — high-visibility for guard-shack scanning */}
+          {load.pickup_number && (
+            <div className="inline-flex items-center gap-2 rounded-md border-2 border-orange-500 bg-orange-500/15 px-2.5 py-1 text-orange-700 dark:text-orange-300 font-bold tracking-wide shadow-sm">
+              <FileText className="h-3.5 w-3.5" />
+              <span className="text-[11px] uppercase">Pickup #:</span>
+              <span className="font-mono text-sm">{load.pickup_number}</span>
+            </div>
+          )}
+
+          {/* Trailer */}
+          {(load.trailers?.unit_number || load.trailer_id) && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Truck className="h-4 w-4 shrink-0" />
+              <span className="uppercase text-[11px] tracking-wide">Trailer:</span>
+              <span className="font-mono font-medium text-foreground">
+                {load.trailers?.unit_number || 'Assigned'}
+              </span>
+            </div>
+          )}
 
           {/* Date & Time - Show relative for delivered, hide time for cancelled */}
           {!['cancelled'].includes(load.status) && (
@@ -316,6 +339,32 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
               </span>
               <p className="text-sm font-medium">{load.destination}</p>
             </div>
+
+            {/* PU# + Trailer */}
+            {(load.pickup_number || load.trailers?.unit_number || load.trailer_id) && (
+              <div className="grid grid-cols-2 gap-4">
+                {load.pickup_number && (
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <FileText className="h-3 w-3" /> Pickup #
+                    </span>
+                    <div className="inline-flex items-center rounded-md border-2 border-orange-500 bg-orange-500/15 px-2 py-0.5 text-orange-700 dark:text-orange-300 font-bold">
+                      <span className="font-mono text-sm">{load.pickup_number}</span>
+                    </div>
+                  </div>
+                )}
+                {(load.trailers?.unit_number || load.trailer_id) && (
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Truck className="h-3 w-3" /> Trailer
+                    </span>
+                    <p className="text-sm font-mono font-medium">
+                      {load.trailers?.unit_number || 'Assigned'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Dates & Times */}
             <div className="grid grid-cols-2 gap-4">
@@ -428,7 +477,24 @@ export default function DriverLoadsView() {
         .select('*')
         .eq('driver_id', driverRecord.id);
       if (error) throw error;
-      return data;
+      const rows = (data || []) as unknown as Load[];
+
+      // Hydrate trailer unit numbers (no FK relationship for nested embed).
+      const trailerIds = Array.from(
+        new Set(rows.map((r) => r.trailer_id).filter((id): id is string => !!id)),
+      );
+      let trailerMap = new Map<string, string | null>();
+      if (trailerIds.length > 0) {
+        const { data: trailerRows } = await supabase
+          .from('trailers')
+          .select('id, unit_number')
+          .in('id', trailerIds);
+        trailerMap = new Map((trailerRows || []).map((t) => [t.id, t.unit_number]));
+      }
+      return rows.map((r) => ({
+        ...r,
+        trailers: r.trailer_id ? { unit_number: trailerMap.get(r.trailer_id) ?? null } : null,
+      }));
     },
     enabled: !!driverRecord?.id,
     staleTime: 2 * 60 * 1000,

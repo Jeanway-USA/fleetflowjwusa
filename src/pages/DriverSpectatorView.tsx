@@ -220,22 +220,33 @@ export default function DriverSpectatorView() {
         <CredentialsCompliance driver={driver} />
       </ErrorBoundary>
 
-      {/* Active Load Card (read-only) */}
+      {/* Active Load Card (read-only) — same prioritization as mobile driver */}
       <ErrorBoundary compact>
         <ReadOnly>
-          <ActiveLoadCard
-            load={activeLoad}
-            payRate={driver.pay_rate}
-            payType={driver.pay_type}
-            driverId={driver.id}
-          />
+          {activeLoad ? (
+            <ActiveLoadCard
+              load={activeLoad}
+              payRate={driver.pay_rate}
+              payType={driver.pay_type}
+              driverId={driver.id}
+            />
+          ) : nextLoad ? (
+            <NextLoadPreview load={nextLoad} payRate={driver.pay_rate} payType={driver.pay_type} />
+          ) : (
+            <ActiveLoadCard
+              load={undefined}
+              payRate={driver.pay_rate}
+              payType={driver.pay_type}
+              driverId={driver.id}
+            />
+          )}
         </ReadOnly>
       </ErrorBoundary>
 
-      {/* Next Load Preview */}
-      {nextLoad && (
+      {/* Next Load Preview — only when an active load is already showing above */}
+      {activeLoad && nextLoad && (
         <ErrorBoundary compact>
-          <NextLoadPreview load={nextLoad} />
+          <NextLoadPreview load={nextLoad} payRate={driver.pay_rate} payType={driver.pay_type} />
         </ErrorBoundary>
       )}
 
