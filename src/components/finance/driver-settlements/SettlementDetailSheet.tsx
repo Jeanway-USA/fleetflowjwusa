@@ -257,7 +257,9 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
               settlementId={settlement.id}
               orgId={settlement.org_id}
               editable={settlement.status === 'draft'}
+              editMode={editMode && settlement.status === 'draft'}
             />
+
 
           </div>
         )}
