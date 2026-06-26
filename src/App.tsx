@@ -59,6 +59,8 @@ const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const DocumentTemplates = lazy(() => import("./pages/admin/DocumentTemplates"));
 const DriverOnboarding = lazy(() => import("./pages/DriverOnboarding"));
 const SettlementPrint = lazy(() => import("./pages/SettlementPrint"));
+const AuditTrail = lazy(() => import("./pages/AuditTrail"));
+const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -264,6 +266,13 @@ const App = () => {
                         <SettlementPrint />
                       </ProtectedRoute>
                     } />
+
+                    <Route path="/audit-trail" element={
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin']}>
+                        <AuditTrail />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/401" element={<Unauthorized />} />
 
                     <Route path="/super-admin" element={
                       <SuperAdminGuard>
