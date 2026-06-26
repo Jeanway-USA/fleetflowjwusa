@@ -192,22 +192,35 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
           <MyEquipmentCard driverId={driver.id} assignedTruck={assignedTruck as any} />
         </ErrorBoundary>
 
-        {/* Active Load Card */}
+        {/* Active Load Card — prioritized at the top. If no active load,
+            fall back to the Up Next pre-plan as the primary feed item. */}
         <div id="tour-active-load">
           <ErrorBoundary compact>
-            <ActiveLoadCard 
-              load={activeLoad} 
-              payRate={driver.pay_rate} 
-              payType={driver.pay_type}
-              driverId={driver.id}
-              onStatusUpdate={refetchLoads}
-            />
+            {activeLoad ? (
+              <ActiveLoadCard
+                load={activeLoad}
+                payRate={driver.pay_rate}
+                payType={driver.pay_type}
+                driverId={driver.id}
+                onStatusUpdate={refetchLoads}
+              />
+            ) : nextLoad ? (
+              <NextLoadPreview load={nextLoad} payRate={driver.pay_rate} payType={driver.pay_type} />
+            ) : (
+              <ActiveLoadCard
+                load={undefined}
+                payRate={driver.pay_rate}
+                payType={driver.pay_type}
+                driverId={driver.id}
+                onStatusUpdate={refetchLoads}
+              />
+            )}
           </ErrorBoundary>
         </div>
 
 
-        {/* Up Next (Pre-Plan) */}
-        {nextLoad && (
+        {/* Up Next (Pre-Plan) — only when an active load is already showing above */}
+        {activeLoad && nextLoad && (
           <NextLoadPreview load={nextLoad} payRate={driver.pay_rate} payType={driver.pay_type} />
         )}
 
