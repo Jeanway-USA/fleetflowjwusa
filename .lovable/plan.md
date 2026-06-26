@@ -1,24 +1,70 @@
-## Problem
+# Workforce Architecture Schema Migration
 
-`src/pages/Auth.tsx` sets the tab title to "Sign In or Join the Free Beta — FleetFlow TMS" via `react-helmet-async`. Once a user signs in and navigates into the app (Executive Dashboard, Finance, Fleet Loads, etc.), none of those authenticated pages render their own `<Helmet>`, so Helmet has nothing to swap the title to and the Auth-page title stays pinned in the browser tab. Only the handful of public pages with Helmet (Landing, Pricing, About, Contact, Privacy, Terms, 404, Reset, Accept Invite, Public Tracker) update the title correctly.
+Scope is strictly database. No frontend/UI changes in this plan.
 
-## Fix
+## 1. `drivers.employment_type` column
 
-Add one small route-aware title component that runs inside the Router and renders a `<Helmet>` with a title derived from the current pathname. Mount it once so every route — including all authenticated dashboard pages that don't have their own Helmet — gets a correct, changing tab title without touching ~30 page files.
+Add an enum-backed column to `public.drivers`:
 
-### Implementation
+- Create Postgres enum `public.employment_type_enum` with values: `w2_company`, `1099_contractor`, `lease_purchase`.
+- Add column `employment_type employment_type_enum NOT NULL DEFAULT 'w2_company'`.
+  - Default lets the migration succeed on existing rows without guessing classification.
+  - Owners/payroll admins can re-classify drivers via existing driver edit flow later.
 
-1. **New file `src/components/shared/RouteTitle.tsx`**
-   - Read `useLocation().pathname`.
-   - Look up a friendly label from a `Record<string, string>` map covering the app's routes (executive-dashboard, dispatcher-dashboard, driver-dashboard, fleet-loads, agency-loads, finance, ledger, insights, ifta, maintenance, safety, incidents, crm, documents, resources, load-optimizer, drivers, trucks, trailers, settings, super-admin, driver-performance, driver-settings, driver-stats, onboarding, pending-access, account-deactivated, checkout-success, executive-dashboard, etc.).
-   - For unmatched paths fall back to the brand default.
-   - Render `<Helmet><title>{label} — FleetFlow TMS</title></Helmet>`.
-   - Pages that already render their own `<Helmet>` (Landing, Auth, Pricing, About, Contact, Privacy, Terms, NotFound, ResetPassword, AcceptInvite, PublicLoadTracker) keep working — Helmet dedupes by tag and the page-level title wins because it mounts deeper in the tree.
+The existing `prevent_driver_self_sensitive_update` trigger already blocks drivers from self-editing sensitive identity/pay fields; I'll extend it to also block `employment_type` so drivers can't reclassify themselves.
 
-2. **Mount once in `src/App.tsx`** inside `<BrowserRouter>` (above `<Routes>`) so it re-evaluates on every navigation.
+## 2. `lease_purchase_agreements` table
 
-### Out of scope
+```text
+id                        uuid PK (gen_random_uuid)
+org_id                    uuid NOT NULL  -- multi-tenant key
+driver_id                 uuid NOT NULL REFERENCES drivers(id) ON DELETE CASCADE
+truck_id                  uuid NULL     REFERENCES trucks(id)  ON DELETE SET NULL
+weekly_lease_amount       numeric(12,2) NOT NULL DEFAULT 0
+escrow_cpm_rate           numeric(8,4)  NOT NULL DEFAULT 0     -- e.g. 0.10
+current_escrow_balance    numeric(12,2) NOT NULL DEFAULT 0
+total_weeks_remaining     integer       NOT NULL DEFAULT 0
+status                    text          NOT NULL DEFAULT 'active'  -- active | paid_off | terminated
+notes                     text
+created_at                timestamptz   NOT NULL DEFAULT now()
+updated_at                timestamptz   NOT NULL DEFAULT now()
+```
 
-- No changes to existing per-page `<Helmet>` blocks.
-- No SEO/meta-description rewrites — title only, matching the user's report.
-- No changes to `index.html` default title (still used on first paint before React hydrates).
+Notes:
+- `truck_id` is `uuid` because `public.trucks.id` is uuid in this project — keeping a real FK gives referential integrity.
+- `org_id` added (not in your column list) because the tenant-isolation requirement (#3) needs a column to filter on. This matches every other tenant table.
+- Indexes: `(org_id)`, `(driver_id)`, `(truck_id)`, partial `(driver_id) WHERE status = 'active'` so the dashboard can quickly find an active lease per driver.
+- `updated_at` trigger reuses existing `public.update_updated_at_column()`.
+- Auto-fill `org_id` from `auth.uid()` via a BEFORE INSERT trigger (same pattern as `set_trucks_org_id`, `set_driver_request_org_id`).
+
+## 3. Security (RLS, GRANTs, tenant scoping)
+
+Follow the project's standard four-step pattern:
+
+1. CREATE TABLE (above).
+2. GRANTs:
+   ```sql
+   GRANT SELECT, INSERT, UPDATE, DELETE ON public.lease_purchase_agreements TO authenticated;
+   GRANT ALL ON public.lease_purchase_agreements TO service_role;
+   ```
+   No `anon` grant — leases are never publicly readable.
+3. `ENABLE ROW LEVEL SECURITY`.
+4. Policies (all scoped through `get_user_org_id(auth.uid())`):
+   - **SELECT** — `org_id = get_user_org_id(auth.uid())` AND (
+       `is_owner(auth.uid())` OR
+       `has_role(auth.uid(),'payroll_admin')` OR
+       `has_role(auth.uid(),'dispatcher')` OR
+       `driver_id = get_driver_id_for_user(auth.uid())`  -- drivers see only their own lease
+     )
+   - **INSERT / UPDATE / DELETE** — `org_id = get_user_org_id(auth.uid())` AND (`is_owner(...)` OR `has_role(...,'payroll_admin')`). Drivers and dispatchers cannot mutate lease terms.
+
+All policies use the existing security-definer helpers (`get_user_org_id`, `is_owner`, `has_role`, `get_driver_id_for_user`) so there is no recursion risk and tenant isolation matches every other table in the project.
+
+## Out of scope (will be follow-up turns if you want)
+
+- UI to pick `employment_type` in the driver create/edit form.
+- UI to create/manage lease agreements and surface escrow balance on the driver detail sheet.
+- Payroll/settlement integration that auto-deducts `weekly_lease_amount` and accrues `escrow_cpm_rate * miles` into `current_escrow_balance`.
+- Backfilling existing drivers to `1099_contractor` or `lease_purchase` instead of the default `w2_company`.
+
+Approve to run the migration.
