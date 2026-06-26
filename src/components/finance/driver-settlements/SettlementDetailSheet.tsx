@@ -651,13 +651,82 @@ function LineItemColumn({
 }
 
 
+function EditableLineItemRow({
+  row,
+  negative,
+  onSave,
+  onDelete,
+  saving,
+  deleting,
+}: {
+  row: LineItemRow;
+  negative: boolean;
+  onSave: (description: string, amount: number) => void;
+  onDelete: () => void;
+  saving: boolean;
+  deleting: boolean;
+}) {
+  const initialDesc = row.description ?? '';
+  const initialAmt = Math.abs(Number(row.amount ?? 0)).toString();
+  const [desc, setDesc] = useState(initialDesc);
+  const [amt, setAmt] = useState(initialAmt);
+  const dirty = desc !== initialDesc || amt !== initialAmt;
 
+  return (
+    <TableRow className="even:bg-muted/40">
+      <TableCell className="py-1.5 px-3">
+        <Input
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          className="h-8 text-sm"
+        />
+      </TableCell>
+      <TableCell className="py-1.5 px-3 text-right">
+        <Input
+          type="number"
+          step="0.01"
+          min="0"
+          value={amt}
+          onChange={(e) => setAmt(e.target.value)}
+          className={`h-8 text-sm text-right tabular-nums ${negative ? 'text-destructive' : ''}`}
+        />
+      </TableCell>
+      <TableCell className="py-1.5 px-2 text-right">
+        <div className="inline-flex items-center gap-0.5">
+          {dirty && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => onSave(desc, parseFloat(amt) || 0)}
+              disabled={saving}
+              title="Save changes"
+            >
+              <Check className="h-3.5 w-3.5 text-primary" />
+            </Button>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={onDelete}
+            disabled={deleting}
+            title="Delete row"
+          >
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
 
 
 function SummaryStat({
   label,
   value,
   primary,
+
   negative,
 }: {
   label: string;
