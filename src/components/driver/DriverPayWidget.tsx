@@ -9,7 +9,7 @@ import { useState, lazy, Suspense } from 'react';
 import { calculateWeeklyPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
 import { useDriverSettlementsRealtime } from '@/hooks/useDriverSettlementsRealtime';
-const MyPaystubsDialog = lazy(() =>
+const MySettlementsDialog = lazy(() =>
   import('./MyPaystubsDialog').then(m => ({ default: m.MyPaystubsDialog })),
 );
 
@@ -20,9 +20,9 @@ interface DriverPayWidgetProps {
 }
 
 export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetProps) {
-  const [paystubsOpen, setPaystubsOpen] = useState(false);
+  const [settlementsOpen, setSettlementsOpen] = useState(false);
 
-  // Keep widget + paystubs in sync with admin settlement changes in real-time.
+  // Keep widget + settlements list in sync with admin changes in real-time.
   useDriverSettlementsRealtime(driverId);
 
   const { data: driverRow } = useQuery({
@@ -113,7 +113,7 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
           variant="ghost"
           size="sm"
           className="h-8 text-xs"
-          onClick={() => setPaystubsOpen(true)}
+          onClick={() => setSettlementsOpen(true)}
         >
           <Receipt className="h-3.5 w-3.5 mr-1.5" />
           My Settlements
@@ -175,11 +175,11 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
         </div>
       </CardContent>
 
-      {paystubsOpen && (
+      {settlementsOpen && (
         <Suspense fallback={null}>
-          <MyPaystubsDialog
-            open={paystubsOpen}
-            onOpenChange={setPaystubsOpen}
+          <MySettlementsDialog
+            open={settlementsOpen}
+            onOpenChange={setSettlementsOpen}
             driverId={driverId}
             driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim() || 'Driver'}
             payType={payType}
