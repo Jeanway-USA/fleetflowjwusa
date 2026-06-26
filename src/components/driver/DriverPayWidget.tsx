@@ -165,42 +165,8 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
           )}
         </div>
 
-        {/* Accessorials Collapsible */}
-        {allAccessorials.length > 0 && (
-          <Collapsible open={accessorialsOpen} onOpenChange={setAccessorialsOpen}>
-            <CollapsibleTrigger className="flex items-center justify-between w-full py-2 px-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-              <div className="flex items-center gap-2">
-                <Package className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Accessorials & Extras</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">
-                  ${accessorialsTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </Badge>
-                <ChevronDown className={`h-4 w-4 transition-transform ${accessorialsOpen ? 'rotate-180' : ''}`} />
-              </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pt-2">
-              <div className="space-y-2 pl-2 border-l-2 border-muted ml-2">
-                {allAccessorials.map((accessorial, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-sm py-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground font-mono text-xs">
-                        #{accessorial.loadId}
-                      </span>
-                      <span className="capitalize">
-                        {accessorial.accessorial_type?.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <span className="font-medium">
-                      ${accessorial.amount?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+
+
 
         {/* Pay Rate Info */}
         <div className="text-xs text-muted-foreground pt-2 border-t">
