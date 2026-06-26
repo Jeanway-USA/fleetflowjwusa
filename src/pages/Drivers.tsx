@@ -82,6 +82,9 @@ export default function Drivers() {
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [signedDocsDriver, setSignedDocsDriver] = useState<any>(null);
   const [profileDriver, setProfileDriver] = useState<any>(null);
+  const [leaseForm, setLeaseForm] = useState<{ id?: string; weekly_lease_amount: number; escrow_cpm_rate: number; total_weeks_remaining: number }>({ weekly_lease_amount: 0, escrow_cpm_rate: 0, total_weeks_remaining: 0 });
+
+
 
 
   const driverFields = [
