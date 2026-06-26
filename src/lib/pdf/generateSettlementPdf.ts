@@ -491,8 +491,8 @@ export async function generateSettlementPdf(
   );
 
 
-  // ---------- Optional Check Voucher block ----------
-  if (opts.includeVoucher) {
+  // ---------- Detachable Check Voucher (always at base) ----------
+  {
     const voucherH = 200;
     if (y + voucherH > H - FOOTER_RESERVE) {
       doc.addPage();
