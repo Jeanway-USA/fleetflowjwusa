@@ -238,10 +238,15 @@ export type Database = {
           details: Json | null
           id: string
           ip_address: string | null
+          new_values: Json | null
           org_id: string | null
+          previous_values: Json | null
           record_id: string | null
+          resource_type: string | null
           table_name: string
           user_id: string | null
+          user_name: string | null
+          user_role: string | null
         }
         Insert: {
           action: string
@@ -249,10 +254,15 @@ export type Database = {
           details?: Json | null
           id?: string
           ip_address?: string | null
+          new_values?: Json | null
           org_id?: string | null
+          previous_values?: Json | null
           record_id?: string | null
+          resource_type?: string | null
           table_name: string
           user_id?: string | null
+          user_name?: string | null
+          user_role?: string | null
         }
         Update: {
           action?: string
@@ -260,10 +270,15 @@ export type Database = {
           details?: Json | null
           id?: string
           ip_address?: string | null
+          new_values?: Json | null
           org_id?: string | null
+          previous_values?: Json | null
           record_id?: string | null
+          resource_type?: string | null
           table_name?: string
           user_id?: string | null
+          user_name?: string | null
+          user_role?: string | null
         }
         Relationships: [
           {
