@@ -157,6 +157,17 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                 )}
               </span>
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                {settlement.status === 'draft' && (
+                  <Button
+                    size="sm"
+                    variant={editMode ? 'default' : 'outline'}
+                    onClick={() => setEditMode((v) => !v)}
+                    className="w-full sm:w-auto"
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    {editMode ? 'Done Editing' : 'Edit Settlement'}
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -168,6 +179,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Preview Statement
                 </Button>
+
                 <Button
                   size="sm"
                   variant="outline"
