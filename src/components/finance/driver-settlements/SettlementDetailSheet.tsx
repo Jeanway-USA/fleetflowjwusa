@@ -366,6 +366,7 @@ function LineItemColumn({
   settlementId,
   orgId,
   editable,
+  editMode,
   emptyText,
 }: {
   side: Side;
@@ -374,8 +375,10 @@ function LineItemColumn({
   settlementId: string;
   orgId: string;
   editable: boolean;
+  editMode: boolean;
   emptyText: string;
 }) {
+
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [description, setDescription] = useState('');
