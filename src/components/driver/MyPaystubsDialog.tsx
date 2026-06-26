@@ -226,7 +226,7 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <DialogTitle>Paystub</DialogTitle>
+                <DialogTitle>Settlement</DialogTitle>
               </div>
               <DialogDescription>{fmtPeriod(selected.period_start, selected.period_end)}</DialogDescription>
             </DialogHeader>
