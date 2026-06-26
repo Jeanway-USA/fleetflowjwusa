@@ -104,9 +104,17 @@ export function DriverSettlementsTab() {
   }, [drivers]);
 
   const filtered = useMemo(() => {
-    if (statusFilter === 'all') return settlements;
-    return settlements.filter((s) => s.status === statusFilter);
-  }, [settlements, statusFilter]);
+    return settlements.filter((s) => {
+      if (statusFilter !== 'all' && s.status !== statusFilter) return false;
+      if (typeFilter !== 'all') {
+        const et = driverMap.get(s.driver_id)?.employment_type ?? 'w2_company';
+        if (typeFilter === 'w2' && et !== 'w2_company') return false;
+        if (typeFilter === 'contractor' && et !== '1099_contractor' && et !== 'lease_purchase') return false;
+      }
+      return true;
+    });
+  }, [settlements, statusFilter, typeFilter, driverMap]);
+
 
   const updateStatus = useMutation({
     mutationFn: async ({
