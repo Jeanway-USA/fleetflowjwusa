@@ -474,10 +474,27 @@ export default function DriverLoadsView() {
       if (!driverRecord?.id) return [];
       const { data, error } = await supabase
         .from('fleet_loads')
-        .select('*, trailers:trailer_id(unit_number)')
+        .select('*')
         .eq('driver_id', driverRecord.id);
       if (error) throw error;
-      return data as unknown as Load[];
+      const rows = (data || []) as unknown as Load[];
+
+      // Hydrate trailer unit numbers (no FK relationship for nested embed).
+      const trailerIds = Array.from(
+        new Set(rows.map((r) => r.trailer_id).filter((id): id is string => !!id)),
+      );
+      let trailerMap = new Map<string, string | null>();
+      if (trailerIds.length > 0) {
+        const { data: trailerRows } = await supabase
+          .from('trailers')
+          .select('id, unit_number')
+          .in('id', trailerIds);
+        trailerMap = new Map((trailerRows || []).map((t) => [t.id, t.unit_number]));
+      }
+      return rows.map((r) => ({
+        ...r,
+        trailers: r.trailer_id ? { unit_number: trailerMap.get(r.trailer_id) ?? null } : null,
+      }));
     },
     enabled: !!driverRecord?.id,
     staleTime: 2 * 60 * 1000,
