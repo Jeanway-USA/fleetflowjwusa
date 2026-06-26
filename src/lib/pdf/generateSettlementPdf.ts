@@ -170,73 +170,86 @@ export async function generateSettlementPdf(
   doc.setTextColor(255, 255, 255);
   doc.text(pillText, pillX + pillW / 2, pillY + 11, { align: 'center' });
 
-  // ---------- Statement Details + Contractor Information ----------
-  let y = HEADER_H + 22;
-  doc.setDrawColor(228, 228, 231);
-  doc.setLineWidth(0.5);
+  // ---------- Statement Details + Contractor Information (dense grid) ----------
+  let y = HEADER_TOP + HEADER_H + 18;
 
-  const colMidGap = 18;
+  const colMidGap = 16;
   const colW = (contentW - colMidGap) / 2;
 
-  // Section labels
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(113, 113, 122);
-  doc.text('STATEMENT DETAILS', margin, y);
-  doc.text('CONTRACTOR INFORMATION', margin + colW + colMidGap, y);
-  y += 6;
-  doc.line(margin, y, margin + colW, y);
-  doc.line(margin + colW + colMidGap, y, margin + contentW, y);
-  y += 14;
+  const HAIRLINE: [number, number, number] = [228, 228, 231]; // zinc-200
+  const ZEBRA: [number, number, number] = [248, 250, 252];    // slate-50
+  const HEAD_BG: [number, number, number] = [244, 244, 245];  // zinc-100
+  const HEAD_FG: [number, number, number] = [82, 82, 91];     // zinc-600
+  const TEXT: [number, number, number] = [24, 24, 27];
 
-  const leftDetails: [string, string][] = [
-    ['Statement #', statementNo],
-    ['Pay Period', `${fmtDate(s.period_start)} - ${fmtDate(s.period_end)}`],
-    ['Payment Date', fmtDate(s.payment_date)],
-    ['Status', status],
-    ['Earnings Method', breakdown.methodLabel],
-  ];
-  const rightDetails: [string, string][] = [
-    ['Driver Name', driverName],
-    ['Driver ID', driverIdLabel],
-    ['Email', driver?.email || '—'],
-    ['Phone', driver?.phone || '—'],
-  ];
-
-  const drawDetails = (
-    rows: [string, string][],
-    x: number,
-    boxed: boolean,
-  ) => {
-    const rowH = 16;
-    const padTop = boxed ? 10 : 0;
-    const padBottom = boxed ? 10 : 0;
-    const h = padTop + rows.length * rowH + padBottom;
-    if (boxed) {
-      doc.setDrawColor(228, 228, 231);
-      doc.roundedRect(x, y - 4, colW, h, 4, 4, 'S');
-    }
-    let ry = y + padTop + 4;
-    rows.forEach(([label, value]) => {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(113, 113, 122);
-      doc.text(safe(label.toUpperCase()), x + (boxed ? 10 : 0), ry);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
-      doc.setTextColor(24, 24, 27);
-      const valX = x + (boxed ? 10 : 0) + 96;
-      const valMaxW = colW - (boxed ? 20 : 0) - 96;
-      const wrapped = doc.splitTextToSize(safe(value), valMaxW);
-      doc.text(wrapped[0] ?? safe(value), valX, ry);
-      ry += rowH;
-    });
-    return h;
+  const denseStyles = {
+    fontSize: 9,
+    cellPadding: { top: 2.5, bottom: 2.5, left: 6, right: 6 } as any,
+    textColor: TEXT,
+    lineColor: HAIRLINE,
+    lineWidth: 0.4,
+    overflow: 'linebreak' as const,
+    valign: 'middle' as const,
   };
+  const denseHead = {
+    fillColor: HEAD_BG,
+    textColor: HEAD_FG,
+    fontStyle: 'bold' as const,
+    fontSize: 8,
+    halign: 'left' as const,
+    cellPadding: { top: 3, bottom: 3, left: 6, right: 6 } as any,
+  };
+  const denseAlt = { fillColor: ZEBRA };
 
-  const lh = drawDetails(leftDetails, margin, false);
-  const rh = drawDetails(rightDetails, margin + colW + colMidGap, true);
-  y += Math.max(lh, rh) + 10;
+  autoTable(doc, {
+    startY: y,
+    theme: 'grid',
+    head: [[{ content: 'STATEMENT DETAILS', colSpan: 2 }]],
+    body: [
+      ['Statement #', statementNo],
+      ['Pay Period', `${fmtDate(s.period_start)} - ${fmtDate(s.period_end)}`],
+      ['Payment Date', fmtDate(s.payment_date)],
+      ['Status', status],
+      ['Earnings Method', breakdown.methodLabel],
+    ],
+    headStyles: denseHead,
+    styles: denseStyles,
+    alternateRowStyles: denseAlt,
+    columnStyles: {
+      0: { cellWidth: 100, textColor: HEAD_FG, fontSize: 8 },
+      1: { cellWidth: colW - 100, fontStyle: 'bold' },
+    },
+    margin: { left: margin, right: margin + colW + colMidGap, bottom: FOOTER_RESERVE },
+    tableWidth: colW,
+    tableLineColor: HAIRLINE,
+    tableLineWidth: 0.4,
+  });
+  const lEndY = (doc as any).lastAutoTable.finalY;
+
+  autoTable(doc, {
+    startY: y,
+    theme: 'grid',
+    head: [[{ content: 'CONTRACTOR INFORMATION', colSpan: 2 }]],
+    body: [
+      ['Driver Name', driverName],
+      ['Driver ID', driverIdLabel],
+      ['Email', driver?.email || '—'],
+      ['Phone', driver?.phone || '—'],
+    ],
+    headStyles: denseHead,
+    styles: denseStyles,
+    alternateRowStyles: denseAlt,
+    columnStyles: {
+      0: { cellWidth: 100, textColor: HEAD_FG, fontSize: 8 },
+      1: { cellWidth: colW - 100, fontStyle: 'bold' },
+    },
+    margin: { left: margin + colW + colMidGap, right: margin, bottom: FOOTER_RESERVE },
+    tableWidth: colW,
+    tableLineColor: HAIRLINE,
+    tableLineWidth: 0.4,
+  });
+  const rEndY = (doc as any).lastAutoTable.finalY;
+  y = Math.max(lEndY, rEndY) + 16;
 
   // ---------- Load Earnings & Routes table ----------
   ensureSpace(60);
