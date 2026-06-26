@@ -112,7 +112,7 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
           onClick={() => setPaystubsOpen(true)}
         >
           <Receipt className="h-3.5 w-3.5 mr-1.5" />
-          My Paystubs
+          My Settlements
         </Button>
       </CardHeader>
 
