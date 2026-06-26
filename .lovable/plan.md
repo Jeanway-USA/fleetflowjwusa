@@ -1,93 +1,87 @@
-# PLSummaryTab — Bloomberg Terminal Executive Command Center
+## Goal
+Align the driver-facing paystub UI (`DriverPayWidget.tsx` + `MyPaystubsDialog.tsx`) with the admin ADP-style settlement layout — same corporate header, dense bordered grids, zebra rows, and detachable check voucher — while hiding accessorial breakdowns from the contractor view.
 
-Refactor `src/components/finance/PLSummaryTab.tsx` only. Data hooks (`useOperationalCPM`, `usePLTrend`) and props stay as-is — this is a pure presentation pass anchored on the locked tokens.
+## Files to change
+- `src/components/driver/DriverPayWidget.tsx`
+- `src/components/driver/MyPaystubsDialog.tsx`
 
-## Locked tokens
+(No changes to admin components, calculations, or data fetching. Pay total math stays unchanged — accessorials remain rolled into gross/net; only the *visible breakdown* is removed.)
 
-- **Palette**: bg `#0A0E14`, surface `#11151C`, elevated `#1E2530`, hairline `#1E2530`, text `#E5E7EB`, muted `#6B7280`, gain `#22C55E`, loss `#EF4444`, warn `#F59E0B`.
-- **Type**: JetBrains Mono for every number, label, axis tick, and ticker chip; Inter for prose / card titles.
-- **Layout**: Dense Dashboard — top KPI row, ratios mini-tape below, wide chart band beneath, no marketing chrome.
+## 1. Corporate ADP Header Block (shared)
+Build a small `<PaystubCorporateHeader driverId={driverId} />` helper inside `MyPaystubsDialog.tsx` (and reuse the same markup at the top of the expanded view in `DriverPayWidget.tsx`'s paystub dialog path).
 
-Font wiring: `bun add @fontsource/jetbrains-mono @fontsource/inter`, import both in `src/main.tsx`, register `font-mono: 'JetBrains Mono'` and `font-sans: 'Inter'` in `tailwind.config.ts`. Skip if already present.
-
-## Component structure
-
-```text
-+------------------------------------------------------------------+
-| Ticker strip — mono, muted: "FLEET P&L · LIVE · <generated_at>"  |
-+------------------------------------------------------------------+
-| KPI 1: GROSS REVENUE | KPI 2: DISPATCHED EXP | KPI 3: NET MARGIN |
-|  green accent rail   |  plain                |  bold highlight   |
-+------------------------------------------------------------------+
-| CPM RATIOS TAPE                       [ WEEK | MONTH | QUARTER ] |
-|  RPM   $ x.xx   |   EPM   $ x.xx   |   NPM   $ x.xx             |
-+------------------------------------------------------------------+
-| TREND — Gross Revenue vs Overhead Expense · 12-week rolling      |
-| <area chart, green over red, mono axes>                          |
-+------------------------------------------------------------------+
+Structure (top → bottom):
 ```
+[ font-mono text-[10px] text-zinc-400 row ]
+CO: JW    FILE: {driverId8}    DEPT: DISPATCH    CLOCK: {driverId8}    NUMBER: 00000000
 
-### 1. Top KPI row
+[ bg-zinc-900 text-white px-5 py-4 border border-zinc-900 rounded-none ]
+JEANWAY USA                              (text-xl font-bold tracking-wide)
+LANDSTAR INWAY, INC. AGENT               (text-xs uppercase tracking-[0.2em] text-zinc-300)
+4700 DIPLOMACY RD, FORT WORTH, TX 76155-2627  (text-[11px] text-zinc-400)
+```
+`driverId8` = `driverId.slice(0,8).toUpperCase()`.
 
-Three flex-equal cards in `grid grid-cols-1 md:grid-cols-3 gap-3`. Card chrome:
+## 2. Dense Grid Matrix (paystub detail view in `MyPaystubsDialog`)
+Replace the rounded gradient card (lines 222–324) with a bordered matrix:
 
-- `bg-[#11151C] border border-[#1E2530] rounded-sm p-5 relative`
-- Eyebrow: `font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500`
-- Value: `font-mono text-4xl tabular-nums text-zinc-100`
-- Delta chip: `font-mono text-[11px]` with `text-emerald-400` / `text-rose-400`
-- Sparkline (12-week, from `usePLTrend` series): 28px tall, no axes, color matches metric sign.
+- Outer wrapper: `border border-zinc-200 rounded-none shadow-none bg-white`
+- Section header bars: `bg-zinc-100 border-b border-zinc-200 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-600`
+- Rows: 2-col grid (label / amount), `py-1.5 px-3 even:bg-slate-50/50 border-b border-zinc-100 text-sm`
+- Amount column: `font-mono tabular-nums text-right`
 
-Per-card emphasis:
+Sections rendered:
+1. **EARNINGS** — single row: `{baseLabel}` → `gross_pay`
+2. **REIMBURSEMENTS** — itemized when present (Parking, Tolls, etc. — kept). If only a lump-sum is available, show "Reimbursements" row.
+3. **DEDUCTIONS** — itemized if any exist on the settlement; otherwise omit the section.
+4. **NET PAY** footer row inside the same grid: `bg-zinc-900 text-white px-3 py-2 font-mono text-lg` with label left, amount right.
 
-- **Card 1 — Fleet Gross Revenue**: 3px left rail `bg-emerald-500` via `before:` pseudo (`before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-emerald-500`).
-- **Card 2 — Total Dispatched Expenses**: plain card, value `text-zinc-200`. Sums `loadExpenseTotals + standaloneExpenseTotals + payrollTotals + commissionTotals` (already on props).
-- **Card 3 — Net Operating Margin**: highlighted — `bg-gradient-to-br from-[#11151C] to-[#1E2530]` + `ring-1 ring-emerald-500/40` when `netProfit >= 0`, `ring-rose-500/40` otherwise. Value rendered larger (`text-5xl`) and colored by sign. Sub-line: profit margin % in mono.
+## 3. Remove Accessorial Surfaces from Driver View
+- `MyPaystubsDialog.tsx`: delete the entire Accessorials `Collapsible` block (lines 260–310), the `accessorialLines` query, `accessorialsTotal`, `accessorialsOpen` state, and the `Package`/`Collapsible*`/`Skeleton` imports that become unused. The accessorial $ stays inside `gross_pay` (no math change).
+- `DriverPayWidget.tsx`: delete the "Accessorials & Extras" `Collapsible` block (the section iterating `allAccessorials`) plus `accessorialsOpen` state and unused `Package`/`Collapsible*` imports. Keep `accessorialsTotal` computation only if still used by `calculateWeeklyPay` internals — drop the local `allAccessorials` / `accessorialsTotal` variables since they're only used by the removed UI.
 
-### 2. CPM ratios tape
+## 4. Detachable Check Voucher Footer
+Append below the dense grid in the paystub detail view (mirrors `SettlementCheckVoucher` styling):
 
-Single card under KPI row: `bg-[#11151C] border border-[#1E2530] rounded-sm`. Header row holds the title `OPERATIONAL RATIOS · PER MILE` (mono eyebrow) on the left and the timeframe `ToggleGroup` on the right styled as a segmented mono pill:
+```
+<div className="mt-6 border-2 border-dashed border-zinc-300 bg-zinc-50/40 p-4 relative min-h-[110px] overflow-hidden">
+  {/* diagonal watermark */}
+  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+    <span className="-rotate-12 font-mono text-[13px] tracking-[0.3em] text-zinc-300/70 whitespace-nowrap">
+      NON-NEGOTIABLE — FOR RECORD PURPOSES ONLY
+    </span>
+  </div>
+  {/* 3-col voucher grid */}
+  <div className="relative grid grid-cols-3 gap-4 text-[11px] font-mono">
+    <div>
+      <p className="text-zinc-500 uppercase tracking-wider">Bank Routing</p>
+      <p className="text-zinc-800">XXXX-XXXX-{lastFour}</p>
+      <p className="text-zinc-500 mt-2">Acct ••••{lastFour}</p>
+    </div>
+    <div>
+      <p className="text-zinc-500 uppercase tracking-wider">Voucher #</p>
+      <p className="text-zinc-800">JW-{settlementIdShort}</p>
+    </div>
+    <div className="text-right">
+      <p className="text-zinc-500 uppercase tracking-wider">Net Pay Distribution</p>
+      <p className="font-bold text-lg text-zinc-900 tabular-nums">{formatCurrency(net)}</p>
+    </div>
+  </div>
+  <div className="relative mt-4 pt-2 border-t border-zinc-400/50 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+    Authorized Signature ____________________
+  </div>
+</div>
+```
+`lastFour` = static placeholder `'0000'` (no banking data on driver side). `settlementIdShort` = `selected.id.slice(0,8).toUpperCase()`.
 
-- Container: `bg-[#0A0E14] border border-[#1E2530] rounded-sm p-0.5`
-- Items: `font-mono text-[11px] uppercase tracking-wider px-3 py-1 data-[state=on]:bg-[#1E2530] data-[state=on]:text-emerald-400`
-
-Body: 3 columns separated by 1px vertical hairlines.
-
-- **RPM** — revenue / miles, label "REV / MILE", value mono `text-2xl`, secondary line shows raw totals "$X over Y mi".
-- **EPM** — expense / miles, label "EXP / MILE", rose-tinted.
-- **NPM** — net / miles, label "NET / MILE", green/rose by sign.
-
-Source: `useOperationalCPM(timeframe)` — already wired.
-
-### 3. Trend band (12-week)
-
-Card: `bg-[#11151C] border border-[#1E2530] rounded-sm p-5`.
-Header: mono eyebrow `TREND · GROSS vs OVERHEAD · 12-WEEK ROLLING`, right-side legend with two mono swatches (green square + red square).
-
-Recharts `ComposedChart` with `data` from `usePLTrend(12)`:
-
-- `<CartesianGrid stroke="#1E2530" vertical={false} />`
-- `<XAxis dataKey="weekLabel" stroke="#6B7280" tick={{ fontFamily: 'JetBrains Mono', fontSize: 10 }} />`
-- `<YAxis stroke="#6B7280" tick={{ fontFamily: 'JetBrains Mono', fontSize: 10 }} tickFormatter={abbrevCurrency} />`
-- Two `<Area>` layers: expense (`#EF4444`, fillOpacity 0.18) underneath, revenue (`#22C55E`, fillOpacity 0.22) on top; both `strokeWidth={1.5}`, `type="monotone"`.
-- Tooltip: dark surface `#0A0E14`, mono font, formatted via `formatCurrency`.
-- Height: `h-[320px]`.
-
-### 4. Ticker strip
-
-Thin top bar above KPI row: `font-mono text-[10px] tracking-[0.18em] text-zinc-500 border-b border-[#1E2530] px-1 py-2` reading `FLEET P&L · LIVE · UPDATED ${time}` left-aligned, period label right-aligned. Pure chrome — no data dependency beyond `new Date()`.
-
-## Loading + empty
-
-Reuse existing `Skeleton` blocks but restyle to `bg-[#1E2530]`. Empty trend renders the chart frame with a centered mono "NO DATA" label.
+## 5. List View (paystub picker)
+Keep current list behavior but restyle each row to the same flat aesthetic: replace `rounded-lg` with `rounded-none border border-zinc-200`, `font-mono tabular-nums` on the amount, `even:bg-slate-50/50`. No structural change.
 
 ## Out of scope
-
-- No prop changes; parent in `src/pages/Finance.tsx` keeps its existing call site.
-- No data-fetching changes; keep `useOperationalCPM` + `usePLTrend` exactly as-is.
-- No new routes, no new tabs.
-- Don't touch other Finance tabs.
+- No changes to `DriverPayWidget` summary card chrome above the "My Paystubs" button (current week summary remains as is, minus the accessorial collapsible).
+- No PDF generator changes (`handleDownload` keeps existing output).
+- No data layer changes.
 
 ## Verification
-
 - `tsgo` typecheck.
-- Playwright capture of `/finance` → P&L tab at 1280×1800; confirm: dark bg, mono numerals, green rail on Card 1, highlighted Net Margin card, segmented timeframe toggle, 12-week chart with green-over-red areas.
+- Playwright at 1280×1800: load `/driver-dashboard`, open "My Paystubs", pick a paystub, screenshot header + grid + voucher. Confirm: no "Accessorial" string visible, header banner present, watermark visible, zebra rows render.
