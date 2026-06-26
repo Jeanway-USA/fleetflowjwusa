@@ -571,11 +571,12 @@ function LineItemColumn({
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="w-full text-left py-2 px-3 text-sm text-primary hover:bg-muted/40 inline-flex items-center gap-1.5 transition-colors"
+              className="m-2 w-[calc(100%-1rem)] py-2 px-3 text-sm font-medium text-primary border-2 border-dashed border-primary/40 rounded-md hover:bg-primary/5 hover:border-primary inline-flex items-center justify-center gap-1.5 transition-colors"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               Add Manual Line Item
             </button>
+
           ) : (
             <div className="p-3 space-y-2 bg-muted/20">
               {side === 'deductions' && (
