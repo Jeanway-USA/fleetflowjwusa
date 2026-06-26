@@ -559,26 +559,28 @@ export async function generateSettlementPdf(
       align: 'center',
     });
 
-    // Dashed border
-    doc.setDrawColor(212, 212, 216);
-    doc.setLineWidth(1);
-    (doc as any).setLineDashPattern?.([4, 3], 0);
-    doc.roundedRect(vx, vy, vw, vh, 4, 4, 'S');
+    // Background fill (~ bg-zinc-50/40) + squared dashed border
+    doc.setFillColor(250, 250, 251);
+    doc.rect(vx, vy, vw, vh, 'F');
+    doc.setDrawColor(212, 212, 216); // zinc-300
+    doc.setLineWidth(1.5);
+    (doc as any).setLineDashPattern?.([5, 4], 0);
+    doc.rect(vx, vy, vw, vh, 'S');
     (doc as any).setLineDashPattern?.([], 0);
 
-    // Watermark
+    // Diagonal 45° watermark
     const gs: any = (doc as any).GState
-      ? new (doc as any).GState({ opacity: 0.12 })
+      ? new (doc as any).GState({ opacity: 0.1 })
       : null;
     if (gs) (doc as any).setGState(gs);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22);
+    doc.setFontSize(20);
     doc.setTextColor(120, 120, 130);
     doc.text(
       'NON-NEGOTIABLE - FOR RECORD PURPOSES ONLY',
       vx + vw / 2,
-      vy + vh / 2 + 4,
-      { align: 'center', angle: 18 },
+      vy + vh / 2 + 6,
+      { align: 'center', angle: 45 },
     );
     if (gs) {
       const gsReset: any = new (doc as any).GState({ opacity: 1 });
