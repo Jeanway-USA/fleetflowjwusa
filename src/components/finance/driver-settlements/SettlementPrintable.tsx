@@ -21,14 +21,14 @@ const STATUS_STYLES: Record<SettlementStatusLabel, string> = {
   APPROVED: 'bg-slate-700 text-white',
   PAID: 'bg-emerald-600 text-white',
 };
-import { SettlementCheckVoucher } from './SettlementCheckVoucher';
 
 interface Props {
   data: SettlementDocumentData;
+  /** @deprecated Voucher is now auto-rendered for contractor/lease drivers. */
   includeVoucher?: boolean;
 }
 
-export function SettlementPrintable({ data, includeVoucher = false }: Props) {
+export function SettlementPrintable({ data }: Props) {
   const { settlement, driver, reimbursementItems, deductionItems, breakdown, ytd } = data;
   const status = statusLabel(settlement.status);
   const driverName =
@@ -39,15 +39,32 @@ export function SettlementPrintable({ data, includeVoucher = false }: Props) {
       ? `ID ${String(settlement.driver_id).slice(0, 8).toUpperCase()}`
       : '—');
   const statementNo = String(settlement.id).slice(0, 8).toUpperCase();
+  const driverIdShort = settlement.driver_id
+    ? String(settlement.driver_id).slice(0, 8).toUpperCase()
+    : '00000000';
+
+  const isW2 = driver?.employment_type === 'w2_company';
+  const wrapperTitle = isW2
+    ? 'W-2 EARNINGS STATEMENT'
+    : 'CONTRACTOR SETTLEMENT STATEMENT';
 
   const currentGross = Number(settlement.gross_pay ?? 0);
   const currentReimb = Number(settlement.reimbursements ?? 0);
   const currentDed = Number(settlement.deductions ?? 0);
-  const currentNet = currentGross + currentReimb - currentDed;
+  const taxWithholding = Number((settlement as any).tax_withholding ?? 0);
+  const currentNet = isW2
+    ? currentGross + currentReimb - currentDed - taxWithholding
+    : currentGross + currentReimb - currentDed;
   const ytdNet = ytd.gross + ytd.reimbursements - ytd.deductions;
 
   return (
-    <div className="max-w-4xl mx-auto p-8 bg-white text-zinc-900 shadow-sm print:shadow-none print:p-0">
+    <div className="max-w-4xl mx-auto bg-white text-zinc-900 shadow-sm print:shadow-none">
+      {/* Top legacy system metadata line */}
+      <div className="font-mono text-[10px] text-zinc-400 tracking-wider px-10 py-1 border-b border-zinc-100 whitespace-nowrap overflow-hidden">
+        CO: JW&nbsp;&nbsp;&nbsp;&nbsp;FILE: {driverIdShort}&nbsp;&nbsp;&nbsp;&nbsp;DEPT: DISPATCH&nbsp;&nbsp;&nbsp;&nbsp;CLOCK: {driverIdShort}&nbsp;&nbsp;&nbsp;&nbsp;NUMBER: 00000000
+      </div>
+
+      <div className="p-8 print:p-0">
       {/* Header banner */}
       <header className="bg-zinc-900 text-white px-10 py-8 flex items-start justify-between gap-6 print:break-inside-avoid">
         <div className="space-y-1">
@@ -62,8 +79,8 @@ export function SettlementPrintable({ data, includeVoucher = false }: Props) {
           </p>
         </div>
         <div className="text-right space-y-2">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-300">
-            Settlement &amp; Earnings Statement
+          <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-200 font-semibold">
+            {wrapperTitle}
           </p>
           <p className="text-xs text-zinc-300">Statement #{statementNo}</p>
           <p className="text-xs text-zinc-300">
@@ -80,7 +97,41 @@ export function SettlementPrintable({ data, includeVoucher = false }: Props) {
         </div>
       </header>
 
-      {/* Statement details + Contractor information */}
+      {/* W-2 Tax & Withholding metadata block */}
+      {isW2 && (
+        <section className="border-t border-zinc-200 py-6 print:break-inside-avoid">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 mb-3">
+            Tax &amp; Withholding
+          </h2>
+          <div className="border border-zinc-200 rounded-md overflow-hidden">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-zinc-200">
+              <TaxCell label="Filing Status" value="—" />
+              <TaxCell label="Federal Allowances" value="—" />
+              <TaxCell label="State Allowances" value="—" />
+              <TaxCell label="State Code" value="—" />
+            </div>
+            <div className="border-t border-zinc-200">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-zinc-50 text-[10px] uppercase tracking-wider text-zinc-500">
+                    <th className="px-3 py-2 text-left font-semibold">Statutory Withholding</th>
+                    <th className="px-3 py-2 text-right font-semibold">Current Period</th>
+                    <th className="px-3 py-2 text-right font-semibold">Year-to-Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  <WithholdingRow label="Federal Income Tax" current={taxWithholding} ytd={0} />
+                  <WithholdingRow label="Social Security (6.2%)" current={currentGross * 0.062} ytd={ytd.gross * 0.062} />
+                  <WithholdingRow label="Medicare (1.45%)" current={currentGross * 0.0145} ytd={ytd.gross * 0.0145} />
+                  <WithholdingRow label="State Tax" current={0} ytd={0} />
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Statement details + Contractor/Employee information */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-8 py-6 border-t border-zinc-200 print:break-inside-avoid">
         <div className="space-y-3">
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
@@ -107,7 +158,7 @@ export function SettlementPrintable({ data, includeVoucher = false }: Props) {
 
         <div className="border border-zinc-200 rounded-md p-4 space-y-3">
           <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
-            Contractor Information
+            {isW2 ? 'Employee Information' : 'Contractor Information'}
           </h2>
           <Field label="Driver Name" value={driverName} />
           <Field label="Driver ID" value={driverIdLabel} />
@@ -219,6 +270,7 @@ export function SettlementPrintable({ data, includeVoucher = false }: Props) {
             gross={currentGross}
             reimbursements={currentReimb}
             deductions={currentDed}
+            taxWithholding={isW2 ? taxWithholding : undefined}
             net={currentNet}
           />
           <SummaryCard
@@ -230,7 +282,9 @@ export function SettlementPrintable({ data, includeVoucher = false }: Props) {
           />
         </div>
         <p className="text-[11px] italic text-zinc-500 mt-3 text-center">
-          Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions
+          {isW2
+            ? 'Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions − Statutory Withholdings'
+            : 'Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions'}
         </p>
       </section>
 
@@ -245,7 +299,36 @@ export function SettlementPrintable({ data, includeVoucher = false }: Props) {
         </div>
       </footer>
 
-      {includeVoucher && <SettlementCheckVoucher data={data} />}
+      {/* Detachable check voucher for contractor / lease */}
+      {!isW2 && (
+        <section className="mt-6 print:break-inside-avoid">
+          <div className="relative overflow-hidden border-2 border-dashed border-zinc-300 bg-zinc-50/40 p-4">
+            <span
+              className="pointer-events-none select-none absolute inset-0 flex items-center justify-center text-zinc-300/40 text-3xl font-bold tracking-widest whitespace-nowrap"
+              style={{ transform: 'rotate(-20deg)' }}
+              aria-hidden="true"
+            >
+              NON-NEGOTIABLE — FOR RECORD PURPOSES ONLY
+            </span>
+            <div className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <VoucherCell label="Bank Deposit Routing" value="•••• •••• ••••" />
+              <VoucherCell label="Voucher Number" value={`V-${statementNo}`} />
+              <VoucherCell
+                label="Net Distribution"
+                value={formatCurrency(currentNet)}
+                emphasis
+              />
+              <div className="space-y-1">
+                <div className="border-b border-zinc-400 h-8" />
+                <p className="text-[10px] uppercase tracking-wider text-zinc-500">
+                  Authorized Signature
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+      </div>
     </div>
   );
 }
@@ -257,6 +340,54 @@ function Field({ label, value }: { label: string; value: string }) {
         {label}
       </span>
       <span className="text-sm font-medium text-zinc-900">{value}</span>
+    </div>
+  );
+}
+
+function TaxCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-white px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
+      <p className="text-sm font-medium text-zinc-900 mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function WithholdingRow({
+  label,
+  current,
+  ytd,
+}: {
+  label: string;
+  current: number;
+  ytd: number;
+}) {
+  return (
+    <tr className="even:bg-slate-50/50">
+      <td className="px-3 py-1.5 text-zinc-700">{label}</td>
+      <td className="px-3 py-1.5 text-right tabular-nums">{formatCurrency(current)}</td>
+      <td className="px-3 py-1.5 text-right tabular-nums text-zinc-600">{formatCurrency(ytd)}</td>
+    </tr>
+  );
+}
+
+function VoucherCell({
+  label,
+  value,
+  emphasis,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</p>
+      <p
+        className={`tabular-nums text-zinc-900 ${emphasis ? 'text-lg font-bold' : 'text-sm font-medium'}`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -307,12 +438,14 @@ function SummaryCard({
   gross,
   reimbursements,
   deductions,
+  taxWithholding,
   net,
 }: {
   title: string;
   gross: number;
   reimbursements: number;
   deductions: number;
+  taxWithholding?: number;
   net: number;
 }) {
   return (
@@ -335,6 +468,14 @@ function SummaryCard({
             {formatCurrency(-Math.abs(deductions))}
           </span>
         </div>
+        {taxWithholding !== undefined && (
+          <div className="flex justify-between py-2">
+            <span className="text-zinc-600">Statutory Withholdings</span>
+            <span className="tabular-nums text-red-600">
+              {formatCurrency(-Math.abs(taxWithholding))}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between py-2 bg-slate-50 -mx-4 px-4 font-semibold text-base">
           <span>Net Pay</span>
           <span className="tabular-nums">{formatCurrency(net)}</span>
