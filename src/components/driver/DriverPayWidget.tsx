@@ -82,13 +82,6 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
     settings: paySettings,
   });
   const totalMiles = weekly.totalMiles;
-  const allAccessorials = weeklyLoads.flatMap(load =>
-    (load.load_accessorials || []).map((a: any) => ({
-      ...a,
-      loadId: load.landstar_load_id || load.id.slice(0, 8),
-    }))
-  );
-  const accessorialsTotal = weekly.accessorialsTotal;
   const weeklyEarnings = weekly.total;
 
   // Weekly goals from driver settings
