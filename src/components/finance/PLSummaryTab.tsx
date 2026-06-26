@@ -96,147 +96,233 @@ export function PLSummaryTab({
 
   const npmValue = selected.miles > 0 ? (selected.revenue - selected.costs) / selected.miles : 0;
 
+  const now = new Date();
+  const stamp = now.toLocaleTimeString('en-US', { hour12: false });
+  const tfLabel = timeframe === 'week' ? '7-DAY' : timeframe === 'month' ? '30-DAY' : '90-DAY';
+
   return (
     <>
-      {/* ============ EXECUTIVE P&L HEADER ============ */}
-      <Card className="card-elevated mb-6 border-2">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-            Executive P&amp;L
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Triple KPI blocks */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <KpiCard
-              icon={<DollarSign className="h-5 w-5 text-success" />}
-              label="Fleet Top-Line Gross Revenue"
-              value={formatCurrency(grossRevenue)}
-              sub="Sum of all completed load earnings"
-              valueClass="text-success"
-            />
-            <KpiCard
-              icon={<TrendingDown className="h-5 w-5 text-destructive" />}
-              label="Combined Fleet Overhead Costs"
-              value={formatCurrency(combinedCosts)}
-              sub="Driver pay + reimbursements + asset upkeep + commissions"
-              valueClass="text-destructive"
-            />
-            <KpiCard
-              icon={<PiggyBank className={`h-5 w-5 ${noi >= 0 ? 'text-success' : 'text-destructive'}`} />}
-              label="Net Operating Income"
-              value={formatCurrency(noi)}
-              sub={`Margin ${noiMargin.toFixed(1)}%`}
-              valueClass={noi >= 0 ? 'text-success' : 'text-destructive'}
-            />
+      {/* ============ BLOOMBERG-STYLE P&L COMMAND CENTER ============ */}
+      <div className="mb-6 rounded-sm border border-[#1E2530] bg-[#0A0E14] text-zinc-100 overflow-hidden">
+        {/* Ticker strip */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-[#1E2530] bg-[#11151C]">
+          <span className="font-mono text-[10px] tracking-[0.22em] text-zinc-500">
+            FLEET&nbsp;P&amp;L · LIVE · UPDATED&nbsp;{stamp}
+          </span>
+          <span className="font-mono text-[10px] tracking-[0.22em] text-zinc-500">
+            WINDOW · {tfLabel}
+          </span>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* ---------- Triple KPI row ---------- */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Card 1 — Gross Revenue (green rail) */}
+            <div className="relative bg-[#11151C] border border-[#1E2530] rounded-sm p-5 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-emerald-500">
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+                  Fleet Gross Revenue
+                </p>
+                <DollarSign className="h-4 w-4 text-emerald-500" />
+              </div>
+              <p className="font-mono text-4xl tabular-nums text-zinc-50">
+                {formatCurrency(grossRevenue)}
+              </p>
+              <p className="font-mono text-[11px] text-zinc-500 mt-2 tracking-wider">
+                {revenueTotals.loadCount} LOADS · {revenueTotals.bookedMiles.toLocaleString()} MI
+              </p>
+            </div>
+
+            {/* Card 2 — Dispatched Expenses (plain) */}
+            <div className="bg-[#11151C] border border-[#1E2530] rounded-sm p-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+                  Total Dispatched Expenses
+                </p>
+                <TrendingDown className="h-4 w-4 text-rose-500" />
+              </div>
+              <p className="font-mono text-4xl tabular-nums text-zinc-200">
+                {formatCurrency(combinedCosts)}
+              </p>
+              <p className="font-mono text-[11px] text-zinc-500 mt-2 tracking-wider">
+                PAYROLL · COMMISSIONS · OPEX
+              </p>
+            </div>
+
+            {/* Card 3 — Net Operating Margin (highlight) */}
+            <div
+              className={`relative bg-gradient-to-br from-[#11151C] to-[#1E2530] border border-[#1E2530] rounded-sm p-5 ring-1 ${
+                noi >= 0 ? 'ring-emerald-500/40' : 'ring-rose-500/40'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-400">
+                  Net Operating Margin
+                </p>
+                <PiggyBank
+                  className={`h-4 w-4 ${noi >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
+                />
+              </div>
+              <p
+                className={`font-mono text-5xl tabular-nums tracking-tight ${
+                  noi >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                }`}
+              >
+                {formatCurrency(noi)}
+              </p>
+              <p className="font-mono text-[11px] mt-2 tracking-wider">
+                <span className="text-zinc-500">MARGIN&nbsp;</span>
+                <span className={noi >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                  {noiMargin.toFixed(2)}%
+                </span>
+              </p>
+            </div>
           </div>
 
-          {/* CPM Calculator */}
-          <div className="rounded-lg border bg-muted/30 p-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          {/* ---------- CPM Ratios Tape ---------- */}
+          <div className="bg-[#11151C] border border-[#1E2530] rounded-sm">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-[#1E2530]">
               <div className="flex items-center gap-2">
-                <Gauge className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-semibold uppercase tracking-wider">
-                  Live Cost-Per-Mile Calculator
+                <Gauge className="h-3.5 w-3.5 text-amber-500" />
+                <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-400">
+                  Operational Ratios · Per Mile
                 </h3>
               </div>
               <ToggleGroup
                 type="single"
                 value={timeframe}
                 onValueChange={(v) => v && setTimeframe(v as Timeframe)}
-                size="sm"
+                className="bg-[#0A0E14] border border-[#1E2530] rounded-sm p-0.5"
               >
-                <ToggleGroupItem value="week">Week</ToggleGroupItem>
-                <ToggleGroupItem value="month">Month</ToggleGroupItem>
-                <ToggleGroupItem value="quarter">Quarter</ToggleGroupItem>
+                {(['week', 'month', 'quarter'] as Timeframe[]).map((t) => (
+                  <ToggleGroupItem
+                    key={t}
+                    value={t}
+                    className="font-mono text-[10px] uppercase tracking-wider px-3 py-1 h-auto border-0 text-zinc-500 data-[state=on]:bg-[#1E2530] data-[state=on]:text-emerald-400"
+                  >
+                    {t}
+                  </ToggleGroupItem>
+                ))}
               </ToggleGroup>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <CpmStat
-                label="Revenue / Mile"
-                hint="RPM"
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#1E2530]">
+              <RatioCell
+                code="RPM"
+                label="Rev / Mile"
                 value={trendLoading ? '—' : perMile(selected.revenue, selected.miles)}
-                valueClass="text-success"
+                tone="up"
+                sub={`${abbrevCurrency(selected.revenue)} over ${selected.miles.toLocaleString()} mi`}
               />
-              <CpmStat
-                label="Expense / Mile"
-                hint="EPM"
+              <RatioCell
+                code="EPM"
+                label="Exp / Mile"
                 value={trendLoading ? '—' : perMile(selected.costs, selected.miles)}
-                valueClass="text-destructive"
+                tone="down"
+                sub={`${abbrevCurrency(selected.costs)} over ${selected.miles.toLocaleString()} mi`}
               />
-              <CpmStat
-                label="Net Profit / Mile"
-                hint="NPM"
-                value={trendLoading ? '—' : (selected.miles > 0 ? formatCurrency(npmValue) : '—')}
-                valueClass={npmValue >= 0 ? 'text-success' : 'text-destructive'}
+              <RatioCell
+                code="NPM"
+                label="Net / Mile"
+                value={trendLoading ? '—' : selected.miles > 0 ? formatCurrency(npmValue) : '—'}
+                tone={npmValue >= 0 ? 'up' : 'down'}
+                sub={`${abbrevCurrency(selected.revenue - selected.costs)} net · ${tfLabel}`}
               />
             </div>
-            <p className="text-[11px] text-muted-foreground mt-3">
-              Totals across {selected.miles.toLocaleString()} miles in the trailing {timeframe === 'week' ? '7 days' : timeframe === 'month' ? '30 days' : '90 days'}.
-            </p>
           </div>
 
-          {/* 12-week trend chart */}
-          <div className="rounded-lg border bg-card p-4">
+          {/* ---------- 12-Week Trend Band ---------- */}
+          <div className="bg-[#11151C] border border-[#1E2530] rounded-sm p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                Revenue vs Expenses · 12-Week Trend
-              </h3>
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-400">
+                  Trend · Gross vs Overhead · 12-Week Rolling
+                </h3>
+              </div>
+              <div className="flex items-center gap-4 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 bg-emerald-500" /> Revenue
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block h-2 w-2 bg-rose-500" /> Overhead
+                </span>
+              </div>
             </div>
             {trendLoading || !trend ? (
-              <Skeleton className="h-[320px] w-full" />
+              <Skeleton className="h-[320px] w-full bg-[#1E2530]" />
+            ) : trend.weekly.length === 0 ? (
+              <div className="h-[320px] w-full flex items-center justify-center font-mono text-xs tracking-[0.3em] text-zinc-600">
+                NO DATA
+              </div>
             ) : (
               <div className="h-[320px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={trend.weekly} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                  <ComposedChart
+                    data={trend.weekly}
+                    margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+                  >
                     <defs>
                       <linearGradient id="plRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0.02} />
+                        <stop offset="0%" stopColor="#22C55E" stopOpacity={0.32} />
+                        <stop offset="100%" stopColor="#22C55E" stopOpacity={0.02} />
                       </linearGradient>
                       <linearGradient id="plCost" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.02} />
+                        <stop offset="0%" stopColor="#EF4444" stopOpacity={0.28} />
+                        <stop offset="100%" stopColor="#EF4444" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={11} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickFormatter={abbrevCurrency} width={56} />
+                    <CartesianGrid stroke="#1E2530" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      stroke="#6B7280"
+                      tick={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 10, fill: '#6B7280' }}
+                      tickLine={false}
+                      axisLine={{ stroke: '#1E2530' }}
+                    />
+                    <YAxis
+                      stroke="#6B7280"
+                      tick={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 10, fill: '#6B7280' }}
+                      tickFormatter={abbrevCurrency}
+                      tickLine={false}
+                      axisLine={{ stroke: '#1E2530' }}
+                      width={56}
+                    />
                     <Tooltip
                       formatter={(v: any) => formatCurrency(Number(v))}
                       contentStyle={{
-                        background: 'hsl(var(--popover))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: 8,
-                        fontSize: 12,
+                        background: '#0A0E14',
+                        border: '1px solid #1E2530',
+                        borderRadius: 2,
+                        fontFamily: '"JetBrains Mono", monospace',
+                        fontSize: 11,
+                        color: '#E5E7EB',
                       }}
-                      labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 600 }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Area
-                      type="monotone"
-                      dataKey="revenue"
-                      name="Gross Revenue"
-                      stroke="hsl(var(--success))"
-                      strokeWidth={2}
-                      fill="url(#plRev)"
+                      labelStyle={{ color: '#E5E7EB', fontWeight: 600 }}
+                      cursor={{ stroke: '#F59E0B', strokeWidth: 1 }}
                     />
                     <Area
                       type="monotone"
                       dataKey="costs"
-                      name="Combined Costs"
-                      stroke="hsl(var(--destructive))"
-                      strokeWidth={2}
+                      name="Overhead"
+                      stroke="#EF4444"
+                      strokeWidth={1.5}
                       fill="url(#plCost)"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      name="Revenue"
+                      stroke="#22C55E"
+                      strokeWidth={1.5}
+                      fill="url(#plRev)"
                     />
                     <Line
                       type="monotone"
                       dataKey="net"
                       name="Net"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      strokeDasharray="5 4"
+                      stroke="#F59E0B"
+                      strokeWidth={1}
+                      strokeDasharray="4 4"
                       dot={false}
                     />
                   </ComposedChart>
@@ -244,8 +330,9 @@ export function PLSummaryTab({
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
 
       {/* Revenue Flow */}
       <Card className="card-elevated mb-6">
@@ -493,6 +580,36 @@ function CpmStat({
       </div>
       <p className={`text-xl sm:text-2xl font-bold tabular-nums mt-1 ${valueClass ?? ''}`}>
         {value}
+      </p>
+    </div>
+  );
+}
+
+function RatioCell({
+  code,
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  code: string;
+  label: string;
+  value: string;
+  sub: string;
+  tone: 'up' | 'down';
+}) {
+  const toneClass = tone === 'up' ? 'text-emerald-400' : 'text-rose-400';
+  return (
+    <div className="px-5 py-4">
+      <div className="flex items-baseline justify-between mb-1">
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+          {label}
+        </p>
+        <span className={`font-mono text-[10px] tracking-widest ${toneClass}`}>{code}</span>
+      </div>
+      <p className={`font-mono text-2xl tabular-nums ${toneClass}`}>{value}</p>
+      <p className="font-mono text-[10px] text-zinc-600 mt-1 tracking-wider uppercase truncate">
+        {sub}
       </p>
     </div>
   );
