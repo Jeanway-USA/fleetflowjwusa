@@ -80,6 +80,7 @@ export function MyPaystubsDialog({ open, onOpenChange, driverId, driverName, pay
         .select('*')
         .eq('driver_id', driverId)
         .in('status', ['approved', 'paid'])
+        .neq('status', 'draft')
         .order('period_end', { ascending: false });
       if (error) throw error;
       return (data ?? []) as DriverSettlement[];
