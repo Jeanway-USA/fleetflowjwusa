@@ -46,10 +46,18 @@ interface Driver {
   status: string | null;
   pay_type: string | null;
   pay_rate: number | null;
+  employment_type: string | null;
 }
 
 
 const STATUS_OPTIONS = ['all', 'draft', 'approved', 'paid'] as const;
+type TypeFilter = 'all' | 'w2' | 'contractor';
+const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'w2', label: 'W-2 Company Payroll' },
+  { value: 'contractor', label: '1099/Lease Settlements' },
+];
+
 
 function driverName(d?: Driver | null) {
   if (!d) return '—';
