@@ -1676,6 +1676,7 @@ export type Database = {
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           emergency_contact_relationship: string | null
+          employment_type: Database["public"]["Enums"]["employment_type_enum"]
           endorsements: string[] | null
           fast_card_passport_expiry: string | null
           first_name: string
@@ -1715,6 +1716,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
+          employment_type?: Database["public"]["Enums"]["employment_type_enum"]
           endorsements?: string[] | null
           fast_card_passport_expiry?: string | null
           first_name: string
@@ -1754,6 +1756,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           emergency_contact_relationship?: string | null
+          employment_type?: Database["public"]["Enums"]["employment_type_enum"]
           endorsements?: string[] | null
           fast_card_passport_expiry?: string | null
           first_name?: string
@@ -2791,6 +2794,73 @@ export type Database = {
           token?: string
         }
         Relationships: []
+      }
+      lease_purchase_agreements: {
+        Row: {
+          created_at: string
+          current_escrow_balance: number
+          driver_id: string
+          escrow_cpm_rate: number
+          id: string
+          notes: string | null
+          org_id: string
+          status: string
+          total_weeks_remaining: number
+          truck_id: string | null
+          updated_at: string
+          weekly_lease_amount: number
+        }
+        Insert: {
+          created_at?: string
+          current_escrow_balance?: number
+          driver_id: string
+          escrow_cpm_rate?: number
+          id?: string
+          notes?: string | null
+          org_id: string
+          status?: string
+          total_weeks_remaining?: number
+          truck_id?: string | null
+          updated_at?: string
+          weekly_lease_amount?: number
+        }
+        Update: {
+          created_at?: string
+          current_escrow_balance?: number
+          driver_id?: string
+          escrow_cpm_rate?: number
+          id?: string
+          notes?: string | null
+          org_id?: string
+          status?: string
+          total_weeks_remaining?: number
+          truck_id?: string | null
+          updated_at?: string
+          weekly_lease_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lease_purchase_agreements_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lease_purchase_agreements_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lease_purchase_agreements_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       load_accessorials: {
         Row: {
@@ -5321,6 +5391,7 @@ export type Database = {
         | "safety"
         | "driver"
         | "maintenance"
+      employment_type_enum: "w2_company" | "1099_contractor" | "lease_purchase"
       onboarding_review_status: "pending" | "approved" | "revision_requested"
     }
     CompositeTypes: {
@@ -5457,6 +5528,7 @@ export const Constants = {
         "driver",
         "maintenance",
       ],
+      employment_type_enum: ["w2_company", "1099_contractor", "lease_purchase"],
       onboarding_review_status: ["pending", "approved", "revision_requested"],
     },
   },
