@@ -275,173 +275,6 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
 }
 
 
-function ReimbursementSection({
-  rows,
-  settlementId,
-  orgId,
-  editable,
-}: {
-  rows: any[];
-  settlementId: string;
-  orgId: string;
-  editable: boolean;
-}) {
-  const qc = useQueryClient();
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [adding, setAdding] = useState(false);
-
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['driver_settlement_items', settlementId] });
-    qc.invalidateQueries({ queryKey: ['driver_settlement', settlementId] });
-    qc.invalidateQueries({ queryKey: ['driver_settlements'] });
-  };
-
-  const addMut = useMutation({
-    mutationFn: async () => {
-      const amt = parseFloat(amount);
-      if (!description.trim()) throw new Error('Description required');
-      if (!Number.isFinite(amt) || amt === 0) throw new Error('Enter a non-zero amount');
-      const { error } = await supabase.from('driver_settlement_items').insert({
-        org_id: orgId,
-        settlement_id: settlementId,
-        item_type: 'reimbursement',
-        description: description.trim(),
-        amount: amt,
-      });
-      if (error) throw error;
-      const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
-        _settlement_id: settlementId,
-      });
-      if (rpcErr) throw rpcErr;
-    },
-    onSuccess: () => {
-      setDescription('');
-      setAmount('');
-      setAdding(false);
-      toast.success('Reimbursement added');
-      invalidate();
-    },
-    onError: (e: any) => toast.error(e.message ?? 'Failed to add reimbursement'),
-  });
-
-  const delMut = useMutation({
-    mutationFn: async (itemId: string) => {
-      const { error } = await supabase
-        .from('driver_settlement_items')
-        .delete()
-        .eq('id', itemId);
-      if (error) throw error;
-      const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
-        _settlement_id: settlementId,
-      });
-      if (rpcErr) throw rpcErr;
-    },
-    onSuccess: () => {
-      toast.success('Reimbursement removed');
-      invalidate();
-    },
-    onError: (e: any) => toast.error(e.message ?? 'Failed to remove'),
-  });
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold">Reimbursements</h4>
-        {editable && !adding && (
-          <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add
-          </Button>
-        )}
-      </div>
-
-      {adding && (
-        <div className="rounded-md border p-3 space-y-2 bg-muted/30">
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2">
-            <div>
-              <Label className="text-xs">Description</Label>
-              <Input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g. Truck parking, Tolls, Lumper"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Amount</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setAdding(false);
-                setDescription('');
-                setAmount('');
-              }}
-              disabled={addMut.isPending}
-            >
-              Cancel
-            </Button>
-            <Button size="sm" onClick={() => addMut.mutate()} disabled={addMut.isPending}>
-              {addMut.isPending ? 'Adding…' : 'Add reimbursement'}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {rows.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-2">
-          No reimbursements yet. {editable && 'Click Add to record one.'}
-        </p>
-      ) : rows.length > 0 ? (
-        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <Table className="min-w-[420px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                {editable && <TableHead className="w-12" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="text-muted-foreground">{r.description ?? '—'}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(Number(r.amount ?? 0))}
-                  </TableCell>
-                  {editable && (
-                    <TableCell>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => delMut.mutate(r.id)}
-                        disabled={delMut.isPending}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : null}
-
-    </div>
-  );
-}
-
 const DEDUCTION_PRESETS = [
   'Escrow',
   'Plate Fee',
@@ -453,22 +286,80 @@ const DEDUCTION_PRESETS = [
   'Other',
 ];
 
-function DeductionSection({
-  rows,
+const EARNINGS_TYPES = new Set(['load_pay', 'load_earnings', 'accessorial', 'reimbursement']);
+
+type Side = 'earnings' | 'deductions';
+
+interface LineItemRow {
+  id: string;
+  description: string | null;
+  amount: number | null;
+  item_type: string;
+  is_escrow?: boolean | null;
+}
+
+function LineItemsSplit({
+  items,
   settlementId,
   orgId,
   editable,
 }: {
-  rows: any[];
+  items: LineItemRow[];
   settlementId: string;
   orgId: string;
   editable: boolean;
 }) {
+  const earnings = items.filter((i) => EARNINGS_TYPES.has(i.item_type));
+  const deductions = items.filter((i) => i.item_type === 'deduction');
+
+  return (
+    <div className="rounded-md border bg-card overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 lg:divide-x divide-border">
+        <LineItemColumn
+          side="earnings"
+          title="EARNINGS & ADDITIONS"
+          rows={earnings}
+          settlementId={settlementId}
+          orgId={orgId}
+          editable={editable}
+          emptyText="No earnings recorded yet"
+        />
+        <LineItemColumn
+          side="deductions"
+          title="DEDUCTIONS & ESCROWS"
+          rows={deductions}
+          settlementId={settlementId}
+          orgId={orgId}
+          editable={editable}
+          emptyText="No deductions in this period"
+        />
+      </div>
+    </div>
+  );
+}
+
+function LineItemColumn({
+  side,
+  title,
+  rows,
+  settlementId,
+  orgId,
+  editable,
+  emptyText,
+}: {
+  side: Side;
+  title: string;
+  rows: LineItemRow[];
+  settlementId: string;
+  orgId: string;
+  editable: boolean;
+  emptyText: string;
+}) {
   const qc = useQueryClient();
-  const [preset, setPreset] = useState<string>('Escrow');
-  const [customLabel, setCustomLabel] = useState('');
-  const [amount, setAmount] = useState('');
   const [adding, setAdding] = useState(false);
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+  const [preset, setPreset] = useState<string>('Escrow');
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['driver_settlement_items', settlementId] });
@@ -476,19 +367,37 @@ function DeductionSection({
     qc.invalidateQueries({ queryKey: ['driver_settlements'] });
   };
 
+  const resetForm = () => {
+    setAdding(false);
+    setDescription('');
+    setAmount('');
+    setPreset('Escrow');
+  };
+
   const addMut = useMutation({
     mutationFn: async () => {
       const amt = Math.abs(parseFloat(amount));
-      const label = preset === 'Other' ? customLabel.trim() : preset;
+      const label =
+        side === 'deductions'
+          ? preset === 'Other'
+            ? description.trim()
+            : preset
+          : description.trim();
       if (!label) throw new Error('Description required');
       if (!Number.isFinite(amt) || amt === 0) throw new Error('Enter a non-zero amount');
-      const { error } = await supabase.from('driver_settlement_items').insert({
+
+      const payload: Record<string, unknown> = {
         org_id: orgId,
         settlement_id: settlementId,
-        item_type: 'deduction',
+        item_type: side === 'deductions' ? 'deduction' : 'reimbursement',
         description: label,
         amount: amt,
-      });
+      };
+      if (side === 'deductions' && (preset === 'Escrow' || /escrow/i.test(label))) {
+        payload.is_escrow = true;
+      }
+
+      const { error } = await supabase.from('driver_settlement_items').insert(payload as any);
       if (error) throw error;
       const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
         _settlement_id: settlementId,
@@ -496,14 +405,11 @@ function DeductionSection({
       if (rpcErr) throw rpcErr;
     },
     onSuccess: () => {
-      setPreset('Escrow');
-      setCustomLabel('');
-      setAmount('');
-      setAdding(false);
-      toast.success('Deduction added');
+      toast.success(side === 'deductions' ? 'Deduction added' : 'Line item added');
+      resetForm();
       invalidate();
     },
-    onError: (e: any) => toast.error(e.message ?? 'Failed to add deduction'),
+    onError: (e: any) => toast.error(e.message ?? 'Failed to add line item'),
   });
 
   const delMut = useMutation({
@@ -519,125 +425,170 @@ function DeductionSection({
       if (rpcErr) throw rpcErr;
     },
     onSuccess: () => {
-      toast.success('Deduction removed');
+      toast.success('Removed');
       invalidate();
     },
     onError: (e: any) => toast.error(e.message ?? 'Failed to remove'),
   });
 
+  const negative = side === 'deductions';
+
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold">Deductions &amp; Escrows</h4>
-        {editable && !adding && (
-          <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add
-          </Button>
-        )}
+    <div className="flex flex-col">
+      <div className="px-3 py-2 border-b bg-muted/30">
+        <h4 className="text-[11px] font-bold tracking-wider text-muted-foreground">{title}</h4>
       </div>
 
-      {adding && (
-        <div className="rounded-md border p-3 space-y-2 bg-muted/30">
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-2">
-            <div>
-              <Label className="text-xs">Type</Label>
-              <select
-                value={preset}
-                onChange={(e) => setPreset(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="py-1.5 px-3 text-[11px] uppercase tracking-wide text-muted-foreground">
+              Description
+            </TableHead>
+            <TableHead className="py-1.5 px-3 text-right text-[11px] uppercase tracking-wide text-muted-foreground">
+              Amount
+            </TableHead>
+            {editable && <TableHead className="w-8 py-1.5 px-2" />}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 ? (
+            <TableRow>
+              <TableCell
+                colSpan={editable ? 3 : 2}
+                className="py-3 px-3 text-sm italic text-muted-foreground text-center"
               >
-                {DEDUCTION_PRESETS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label className="text-xs">Amount</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-          {preset === 'Other' && (
-            <div>
-              <Label className="text-xs">Description</Label>
-              <Input
-                value={customLabel}
-                onChange={(e) => setCustomLabel(e.target.value)}
-                placeholder="e.g. Tire chains, Permit"
-              />
-            </div>
-          )}
-          <div className="flex justify-end gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setAdding(false);
-                setCustomLabel('');
-                setAmount('');
-              }}
-              disabled={addMut.isPending}
-            >
-              Cancel
-            </Button>
-            <Button size="sm" onClick={() => addMut.mutate()} disabled={addMut.isPending}>
-              {addMut.isPending ? 'Adding…' : 'Add deduction'}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {rows.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground py-2">
-          No deductions in this period. {editable && 'Click Add to record one.'}
-        </p>
-      ) : rows.length > 0 ? (
-        <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <Table className="min-w-[420px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                {editable && <TableHead className="w-12" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="text-muted-foreground">{r.description ?? '—'}</TableCell>
-                  <TableCell className="text-right font-medium text-red-600 tabular-nums">
-                    {formatCurrency(-Math.abs(Number(r.amount ?? 0)))}
+                {emptyText}
+              </TableCell>
+            </TableRow>
+          ) : (
+            rows.map((r) => {
+              const amt = Number(r.amount ?? 0);
+              return (
+                <TableRow key={r.id} className="even:bg-muted/40">
+                  <TableCell className="py-1.5 px-3 text-sm">
+                    <span className="text-foreground">{r.description ?? '—'}</span>
+                    {r.is_escrow && (
+                      <Badge
+                        variant="outline"
+                        className="ml-2 text-[10px] py-0 px-1.5 align-middle"
+                      >
+                        Escrow
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell
+                    className={`py-1.5 px-3 text-right font-medium tabular-nums ${
+                      negative ? 'text-destructive' : ''
+                    }`}
+                  >
+                    {formatCurrency(negative ? -Math.abs(amt) : amt)}
                   </TableCell>
                   {editable && (
-                    <TableCell>
+                    <TableCell className="py-1.5 px-2 text-right">
                       <Button
                         size="icon"
                         variant="ghost"
+                        className="h-7 w-7"
                         onClick={() => delMut.mutate(r.id)}
                         disabled={delMut.isPending}
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
                     </TableCell>
                   )}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              );
+            })
+          )}
+        </TableBody>
+      </Table>
+
+      {editable && (
+        <div className="border-t">
+          {!adding ? (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="w-full text-left py-2 px-3 text-sm text-primary hover:bg-muted/40 inline-flex items-center gap-1.5 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Manual Line Item
+            </button>
+          ) : (
+            <div className="p-3 space-y-2 bg-muted/20">
+              {side === 'deductions' && (
+                <div>
+                  <Label className="text-xs">Preset</Label>
+                  <select
+                    value={preset}
+                    onChange={(e) => {
+                      setPreset(e.target.value);
+                      if (e.target.value !== 'Other') setDescription('');
+                    }}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    {DEDUCTION_PRESETS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {(side === 'earnings' || preset === 'Other') && (
+                <div>
+                  <Label className="text-xs">Description</Label>
+                  <Input
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder={
+                      side === 'earnings'
+                        ? 'e.g. Tolls, Lumper, Layover'
+                        : 'e.g. Tire chains, Permit'
+                    }
+                    className="h-9"
+                  />
+                </div>
+              )}
+              <div>
+                <Label className="text-xs">Amount</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="h-9 tabular-nums"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={resetForm}
+                  disabled={addMut.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => addMut.mutate()}
+                  disabled={addMut.isPending}
+                >
+                  {addMut.isPending ? 'Adding…' : 'Add'}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
+
+
 
 
 
