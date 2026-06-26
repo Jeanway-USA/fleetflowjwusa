@@ -511,6 +511,19 @@ function LineItemColumn({
           ) : (
             rows.map((r) => {
               const amt = Number(r.amount ?? 0);
+              if (editMode) {
+                return (
+                  <EditableLineItemRow
+                    key={r.id}
+                    row={r}
+                    negative={negative}
+                    onSave={(description, amount) => updateMut.mutate({ id: r.id, description, amount })}
+                    onDelete={() => delMut.mutate(r.id)}
+                    saving={updateMut.isPending}
+                    deleting={delMut.isPending}
+                  />
+                );
+              }
               return (
                 <TableRow key={r.id} className="even:bg-muted/40">
                   <TableCell className="py-1.5 px-3 text-sm">
@@ -546,6 +559,7 @@ function LineItemColumn({
                   )}
                 </TableRow>
               );
+
             })
           )}
         </TableBody>
