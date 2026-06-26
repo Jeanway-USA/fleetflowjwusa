@@ -1,66 +1,51 @@
-# Driver Classification & Lease-Purchase UI
+# Settlements UI: Type Tabs + Manual Edit Mode
 
-Expose the existing `drivers.employment_type` enum and `lease_purchase_agreements` table through the driver add/edit form and the profile sheet.
+## 1. Driver-type tabs — `DriverSettlementsTab.tsx`
 
-## 1. Employment Type dropdown — `src/pages/Drivers.tsx` (edit dialog)
+- Extend the existing `Driver` shape to include `employment_type` and add it to the `drivers` select.
+- Add a new `typeFilter` state: `'all' | 'w2' | 'contractor'`.
+- Render a row of pill buttons above the existing status filter:
+  - **All** → no filter
+  - **W-2 Company Payroll** → `employment_type === 'w2_company'`
+  - **1099/Lease Settlements** → `employment_type` in `('1099_contractor', 'lease_purchase')`
+- Combine with the existing status filter inside the `filtered` memo (filter by driver's employment_type via `driverMap`).
+- Visual style: matches the current status `Button` pills, sitting on its own row.
 
-Add a new "Classification" section above the existing "Pay Information" block:
+## 2. Edit Settlement mode — `SettlementDetailSheet.tsx`
 
-- shadcn `Select` labeled **Employment Type**, bound to `formData.employment_type`
-- Options (enum values → labels):
-  - `w2_company` → "W-2 Company Driver"
-  - `contractor_1099` → "1099 Contractor"
-  - `lease_purchase` → "Lease-Purchase"
-- Default new drivers to `w2_company` (matches DB default) inside `openDialog`.
-- Persisted via existing `createMutation` / `updateMutation` (already spread `formData`).
+- Add a new "Edit Settlement" button in the sheet header (next to Preview / Download). Visible only when `settlement.status === 'draft'` (matches existing editability rule). Toggles a local `editMode` boolean. Label flips to "Done Editing" when active.
+- Pass `editMode` down to `LineItemsSplit` → `LineItemColumn` alongside the existing `editable` flag. Rows become editable only when **both** `editable` (draft) AND `editMode` (user opted in) are true — preserves current read-only-by-default UX.
+- When `editMode` is on, each existing row swaps its plain text cells for:
+  - Description: `<Input>` bound to local row state, seeded from `r.description`.
+  - Amount: `<Input type="number" step="0.01">` bound to local row state, seeded from `|r.amount|`.
+  - Inline **Save** icon button (CheckIcon) appears beside the trash icon when the row has unsaved local changes.
+- Add `updateMut` in `LineItemColumn` calling:
+  ```ts
+  supabase.from('driver_settlement_items')
+    .update({ description, amount })
+    .eq('id', rowId)
+  ```
+  then `rpc('recalc_settlement_totals', { _settlement_id })`, then invalidate the same query keys as `addMut`/`delMut`.
+- Toast: `Line item updated`.
 
-Verify the exact enum string values via `select enum_range(null::employment_type_enum)` before wiring; map UI labels to whatever values the enum reports (likely `w2_company`, `contractor_1099`, `lease_purchase`).
+## 3. Inline row creation — already present, polish only
 
-## 2. Lease-Purchase Agreement sub-form
+The "+ Add Manual Line Item" workflow already exists at the bottom of both columns with description + amount inputs and per-row trash buttons. Two small refinements so it matches the spec exactly:
 
-When `formData.employment_type === 'lease_purchase'`, render an inline `Card` titled **"Lease Purchase Agreement Configuration"** with three numeric inputs:
+- Make the "+ Add Manual Line Item" trigger more visibly button-like (dashed border + clearer hover state) instead of the current subtle link-style row, so users see it at a glance on both grids.
+- Ensure the trash icon (already present on saved rows via `delMut`) is also shown on the unsaved-in-progress add form so users can dismiss the pending row with the same affordance, not just a "Cancel" text button. The Cancel button stays as the keyboard fallback.
 
-- **Weekly Fixed Lease Amount ($)** → `weekly_lease_amount` (step `0.01`)
-- **Maintenance Escrow Rate Per Mile ($)** → `escrow_cpm_rate` (step `0.0001`, placeholder `0.10`)
-- **Weeks Remaining on Agreement** → `total_weeks_remaining` (integer)
-
-Held in local `leaseForm` state, seeded from a new query:
-
-```ts
-useQuery(['lease-agreement', editingDriver?.id], () =>
-  supabase.from('lease_purchase_agreements')
-    .select('*').eq('driver_id', editingDriver.id).eq('status','active')
-    .maybeSingle())
-```
-
-On submit (only when employment_type is `lease_purchase`):
-- If no active row exists → `insert` with `driver_id`, `org_id`, the three fields, `status:'active'`, `current_escrow_balance: 0`.
-- If row exists → `update` the three fields by `id`.
-- Run after the driver create/update succeeds, then invalidate `['lease-agreement', driverId]` and `['drivers']`.
-
-If user switches OFF lease_purchase on an existing lease driver, leave the row intact (status preserved) — do not auto-archive. We are only adding visible controls.
-
-## 3. Escrow ledger badge — `src/components/drivers/DriverDetailSheet.tsx`
-
-Below the existing Credentials & Compliance section (or directly under the contact strip when `driver.employment_type === 'lease_purchase'`):
-
-- Fetch active lease agreement for the driver via TanStack Query (same query shape as above).
-- Render a small panel:
-  - Label: "Current Escrow Pool Balance"
-  - Value: formatted USD (`formatCurrency(current_escrow_balance)`) inside a prominent `Badge` (variant `secondary`, larger text)
-  - Subtext: `Weekly Lease $X • $Y/mi escrow • N weeks remaining`
-- Read-only. Hidden when no active agreement OR when employment_type is not `lease_purchase`.
-
-Also surface a tiny `Badge` next to the driver name showing the employment type label (W-2 / 1099 / Lease) so the classification is always visible at a glance.
+No backend / schema changes — `driver_settlement_items` already supports insert/update/delete and the `recalc_settlement_totals` RPC already exists.
 
 ## Out of scope
 
-- No schema changes, no new tables, no RLS edits — the backend is already in place.
-- No automatic escrow ledger postings (settlement engine already handles that).
-- No bulk migration of existing drivers.
+- No change to how drafts auto-recalc on the server.
+- No new aggregation, no new tabs other than the three specified.
+- W-2 vs contractor totals still come from the existing recalc RPC; we are not splitting the totals math.
 
 ## Verification
 
 - `tsgo` typecheck.
-- Manually open the Add Driver dialog, select Lease-Purchase, confirm the sub-card appears and saves.
-- Open an existing lease driver's profile sheet and confirm the escrow balance badge renders with seeded data.
+- Open Finance → Driver Settlements: confirm the three driver-type pills filter the list correctly when combined with the status filter.
+- Open a draft settlement → click **Edit Settlement** → confirm description + amount inputs appear inline on existing rows, edits save and update the summary totals.
+- Confirm the "+ Add Manual Line Item" button is visible and styled distinctly on both EARNINGS and DEDUCTIONS grids.

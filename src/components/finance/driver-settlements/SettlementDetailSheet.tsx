@@ -24,7 +24,7 @@ import { Label } from '@/components/ui/label';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { formatCurrency } from '@/lib/formatters';
 import { format, parseISO } from 'date-fns';
-import { Download, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Check, Download, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
 import { fetchPayBreakdown, type PayBreakdown } from '@/lib/settlement-pay-breakdown';
@@ -47,9 +47,11 @@ interface Props {
 export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Props) {
   const open = !!settlementId;
   const [downloading, setDownloading] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const { data: discrepancies = [] } = useSettlementDiscrepancies(settlementId);
   const unresolvedDiscrepancies = discrepancies.filter(d => !d.resolved_at);
   const hasBlockingDiscrepancy = unresolvedDiscrepancies.length > 0;
+
 
   const { data: settlement } = useQuery({
     queryKey: ['driver_settlement', settlementId],
@@ -155,6 +157,17 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                 )}
               </span>
               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                {settlement.status === 'draft' && (
+                  <Button
+                    size="sm"
+                    variant={editMode ? 'default' : 'outline'}
+                    onClick={() => setEditMode((v) => !v)}
+                    className="w-full sm:w-auto"
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    {editMode ? 'Done Editing' : 'Edit Settlement'}
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -166,6 +179,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Preview Statement
                 </Button>
+
                 <Button
                   size="sm"
                   variant="outline"
@@ -243,7 +257,9 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
               settlementId={settlement.id}
               orgId={settlement.org_id}
               editable={settlement.status === 'draft'}
+              editMode={editMode && settlement.status === 'draft'}
             />
+
 
           </div>
         )}
@@ -303,11 +319,13 @@ function LineItemsSplit({
   settlementId,
   orgId,
   editable,
+  editMode,
 }: {
   items: LineItemRow[];
   settlementId: string;
   orgId: string;
   editable: boolean;
+  editMode: boolean;
 }) {
   const earnings = items.filter((i) => EARNINGS_TYPES.has(i.item_type));
   const deductions = items.filter((i) => i.item_type === 'deduction');
@@ -322,6 +340,7 @@ function LineItemsSplit({
           settlementId={settlementId}
           orgId={orgId}
           editable={editable}
+          editMode={editMode}
           emptyText="No earnings recorded yet"
         />
         <LineItemColumn
@@ -331,12 +350,14 @@ function LineItemsSplit({
           settlementId={settlementId}
           orgId={orgId}
           editable={editable}
+          editMode={editMode}
           emptyText="No deductions in this period"
         />
       </div>
     </div>
   );
 }
+
 
 function LineItemColumn({
   side,
@@ -345,6 +366,7 @@ function LineItemColumn({
   settlementId,
   orgId,
   editable,
+  editMode,
   emptyText,
 }: {
   side: Side;
@@ -353,8 +375,10 @@ function LineItemColumn({
   settlementId: string;
   orgId: string;
   editable: boolean;
+  editMode: boolean;
   emptyText: string;
 }) {
+
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
   const [description, setDescription] = useState('');
@@ -431,7 +455,30 @@ function LineItemColumn({
     onError: (e: any) => toast.error(e.message ?? 'Failed to remove'),
   });
 
+  const updateMut = useMutation({
+    mutationFn: async ({ id, description, amount }: { id: string; description: string; amount: number }) => {
+      const amt = Math.abs(amount);
+      if (!description.trim()) throw new Error('Description required');
+      if (!Number.isFinite(amt)) throw new Error('Invalid amount');
+      const { error } = await supabase
+        .from('driver_settlement_items')
+        .update({ description: description.trim(), amount: amt })
+        .eq('id', id);
+      if (error) throw error;
+      const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
+        _settlement_id: settlementId,
+      });
+      if (rpcErr) throw rpcErr;
+    },
+    onSuccess: () => {
+      toast.success('Line item updated');
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message ?? 'Failed to update line item'),
+  });
+
   const negative = side === 'deductions';
+
 
   return (
     <div className="flex flex-col">
@@ -464,6 +511,19 @@ function LineItemColumn({
           ) : (
             rows.map((r) => {
               const amt = Number(r.amount ?? 0);
+              if (editMode) {
+                return (
+                  <EditableLineItemRow
+                    key={r.id}
+                    row={r}
+                    negative={negative}
+                    onSave={(description, amount) => updateMut.mutate({ id: r.id, description, amount })}
+                    onDelete={() => delMut.mutate(r.id)}
+                    saving={updateMut.isPending}
+                    deleting={delMut.isPending}
+                  />
+                );
+              }
               return (
                 <TableRow key={r.id} className="even:bg-muted/40">
                   <TableCell className="py-1.5 px-3 text-sm">
@@ -499,6 +559,7 @@ function LineItemColumn({
                   )}
                 </TableRow>
               );
+
             })
           )}
         </TableBody>
@@ -510,11 +571,12 @@ function LineItemColumn({
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="w-full text-left py-2 px-3 text-sm text-primary hover:bg-muted/40 inline-flex items-center gap-1.5 transition-colors"
+              className="m-2 w-[calc(100%-1rem)] py-2 px-3 text-sm font-medium text-primary border-2 border-dashed border-primary/40 rounded-md hover:bg-primary/5 hover:border-primary inline-flex items-center justify-center gap-1.5 transition-colors"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               Add Manual Line Item
             </button>
+
           ) : (
             <div className="p-3 space-y-2 bg-muted/20">
               {side === 'deductions' && (
@@ -589,13 +651,82 @@ function LineItemColumn({
 }
 
 
+function EditableLineItemRow({
+  row,
+  negative,
+  onSave,
+  onDelete,
+  saving,
+  deleting,
+}: {
+  row: LineItemRow;
+  negative: boolean;
+  onSave: (description: string, amount: number) => void;
+  onDelete: () => void;
+  saving: boolean;
+  deleting: boolean;
+}) {
+  const initialDesc = row.description ?? '';
+  const initialAmt = Math.abs(Number(row.amount ?? 0)).toString();
+  const [desc, setDesc] = useState(initialDesc);
+  const [amt, setAmt] = useState(initialAmt);
+  const dirty = desc !== initialDesc || amt !== initialAmt;
 
+  return (
+    <TableRow className="even:bg-muted/40">
+      <TableCell className="py-1.5 px-3">
+        <Input
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          className="h-8 text-sm"
+        />
+      </TableCell>
+      <TableCell className="py-1.5 px-3 text-right">
+        <Input
+          type="number"
+          step="0.01"
+          min="0"
+          value={amt}
+          onChange={(e) => setAmt(e.target.value)}
+          className={`h-8 text-sm text-right tabular-nums ${negative ? 'text-destructive' : ''}`}
+        />
+      </TableCell>
+      <TableCell className="py-1.5 px-2 text-right">
+        <div className="inline-flex items-center gap-0.5">
+          {dirty && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => onSave(desc, parseFloat(amt) || 0)}
+              disabled={saving}
+              title="Save changes"
+            >
+              <Check className="h-3.5 w-3.5 text-primary" />
+            </Button>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={onDelete}
+            disabled={deleting}
+            title="Delete row"
+          >
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
 
 
 function SummaryStat({
   label,
   value,
   primary,
+
   negative,
 }: {
   label: string;

@@ -46,10 +46,18 @@ interface Driver {
   status: string | null;
   pay_type: string | null;
   pay_rate: number | null;
+  employment_type: string | null;
 }
 
 
 const STATUS_OPTIONS = ['all', 'draft', 'approved', 'paid'] as const;
+type TypeFilter = 'all' | 'w2' | 'contractor';
+const TYPE_OPTIONS: { value: TypeFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'w2', label: 'W-2 Company Payroll' },
+  { value: 'contractor', label: '1099/Lease Settlements' },
+];
+
 
 function driverName(d?: Driver | null) {
   if (!d) return '—';
@@ -59,6 +67,7 @@ function driverName(d?: Driver | null) {
 export function DriverSettlementsTab() {
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_OPTIONS)[number]>('all');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [generateOpen, setGenerateOpen] = useState(false);
   const [viewSettlementId, setViewSettlementId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -68,11 +77,12 @@ export function DriverSettlementsTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, first_name, last_name, status, pay_type, pay_rate');
+        .select('id, first_name, last_name, status, pay_type, pay_rate, employment_type');
       if (error) throw error;
       return (data ?? []) as Driver[];
     },
   });
+
 
 
   const { data: settlements = [], isLoading } = useQuery<DriverSettlement[]>({
@@ -94,9 +104,17 @@ export function DriverSettlementsTab() {
   }, [drivers]);
 
   const filtered = useMemo(() => {
-    if (statusFilter === 'all') return settlements;
-    return settlements.filter((s) => s.status === statusFilter);
-  }, [settlements, statusFilter]);
+    return settlements.filter((s) => {
+      if (statusFilter !== 'all' && s.status !== statusFilter) return false;
+      if (typeFilter !== 'all') {
+        const et = driverMap.get(s.driver_id)?.employment_type ?? 'w2_company';
+        if (typeFilter === 'w2' && et !== 'w2_company') return false;
+        if (typeFilter === 'contractor' && et !== '1099_contractor' && et !== 'lease_purchase') return false;
+      }
+      return true;
+    });
+  }, [settlements, statusFilter, typeFilter, driverMap]);
+
 
   const updateStatus = useMutation({
     mutationFn: async ({
@@ -192,7 +210,22 @@ export function DriverSettlementsTab() {
             ))}
           </div>
         </CardHeader>
+        <div className="px-6 pb-3 flex items-center gap-2 flex-wrap border-b">
+          <span className="text-[11px] uppercase tracking-wide text-muted-foreground mr-1">Driver Type:</span>
+          {TYPE_OPTIONS.map((opt) => (
+            <Button
+              key={opt.value}
+              size="sm"
+              variant={typeFilter === opt.value ? 'default' : 'outline'}
+              onClick={() => setTypeFilter(opt.value)}
+              className="rounded-full"
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
         <CardContent>
+
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
