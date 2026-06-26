@@ -1,40 +1,43 @@
-## Driver Settlements UI Refactor
+## Realtime sync: admin settlement delete → driver view
 
-Scope: `src/components/driver/MyPaystubsDialog.tsx` and `src/components/driver/DriverPayWidget.tsx`. Presentation-only changes — no data, query, or pay-math edits.
+### Findings
+- Admin "delete settlement" lives in `DriverSettlementsTab.tsx` (`deleteSettlement` mutation), not `SettlementDetailSheet.tsx`. The Sheet only deletes individual line items. I'll harden both, and explicitly note in the diff comment that the parent tab owns settlement deletion.
+- DB FK `driver_settlement_items.settlement_id → driver_settlements.id` is already `ON DELETE CASCADE`, so deleting a settlement row already purges its items at the DB level. No migration needed for cascade.
+- Driver query in `MyPaystubsDialog.tsx` is `status in ('approved','paid')`, so reverting a settlement to `draft` should also remove it from the driver list — but only on refetch. Today there is no realtime listener or focus refetch, so a deleted/un-approved settlement stays visible (and clickable) on the driver side until the dialog is reopened.
 
-### 1. Terminology: "Paystub(s)" → "Settlement(s)"
+### Changes
 
-Rename all user-visible strings only (keep file names, prop names, query keys, PDF internal labels untouched to avoid churn):
+**1. Enable Realtime on settlement tables** — migration:
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.driver_settlements;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.driver_settlement_items;
+```
+(Wrapped in `DO $$ ... EXCEPTION WHEN duplicate_object THEN NULL; END $$;` so the migration is idempotent.)
 
-- `DriverPayWidget.tsx`
-  - Button label: `My Paystubs` → `My Settlements`
-- `MyPaystubsDialog.tsx`
-  - List `DialogTitle`: `My Paystubs` → `My Settlements`
-  - List `DialogDescription`: "Approved and paid paystubs for your records." → "Approved and paid settlements for your records."
-  - Detail `DialogTitle`: `Paystub` → `Settlement`
-  - Empty state: "No paystubs yet." → "No settlements yet."
+**2. Driver realtime hook** — new `src/hooks/useDriverSettlementsRealtime.ts`:
+- `useEffect` subscribes to `postgres_changes` on `public.driver_settlements` filtered `driver_id=eq.<driverId>` and listens for `*` events.
+- On any payload: `queryClient.invalidateQueries({ queryKey: ['my-paystubs', driverId] })` and `['paystub-items']` and `['driver-weekly-loads', driverId]`.
+- Cleanup with `supabase.removeChannel(channel)`. Guard: skip if `!driverId`.
 
-### 2. Fix list nesting — remove branding from history view
+**3. `MyPaystubsDialog.tsx`**:
+- Call `useDriverSettlementsRealtime(driverId)` when `open`.
+- Add `refetchOnWindowFocus: true` to the `my-paystubs` query as a safety net.
+- After realtime invalidation, if the currently-`selectedId` no longer exists in the refetched list (deleted or reverted to draft), auto-close the detail view: `useEffect(() => { if (selectedId && !paystubs.some(p => p.id === selectedId)) setSelectedId(null); }, [paystubs, selectedId])`. This prevents the user from staying on an obsolete detail screen.
 
-In `MyPaystubsDialog.tsx`, the list-view branch currently renders `<CorporateHeader />` above the row container. Remove it from the list branch entirely so the history screen is a clean stack.
+**4. `DriverPayWidget.tsx`**:
+- Same realtime hook so the "My Settlements" button badge/count stays fresh; invalidates `driver-weekly-loads` too.
 
-List row spec (unchanged data, tightened presentation):
-- Sort: already `order('period_end', { ascending: false })` — keep (most recent on top).
-- Each row shows only:
-  - Date range (`fmtPeriod`)
-  - Status `Badge` (compact)
-  - Net pay (`font-mono tabular-nums`, right-aligned)
-  - `ChevronRight` indicator
-- Keep zebra striping and hover; drop any secondary metadata.
-
-### 3. Move corporate header into detail view only
-
-`<CorporateHeader />` (the `CO: JW … NUMBER:` mono metadata strip + the dark `JEANWAY USA / LANDSTAR INWAY, INC. AGENT / address` banner) renders exclusively inside the detail branch, above the "PAID TO / status / PDF" row and the earnings grid. It already lives there — just ensure it is removed from the list branch (step 2) so it appears uniquely in the detail screen.
+**5. Admin delete handler hardening** (`DriverSettlementsTab.tsx` `deleteSettlement`):
+- Keep DB cascade as the primary purge mechanism (already in place).
+- Belt-and-suspenders: before deleting the settlement, explicitly `supabase.from('driver_settlement_items').delete().eq('settlement_id', id)` so older databases without the FK cascade still purge children. Ignore "no rows" errors.
+- On success, invalidate `['driver_settlements']`, `['driver_settlement_items']`, and `['driver_settlement', id]` to clear any admin-side detail caches.
+- Add a brief comment that driver-side cache is purged via Realtime publication on `driver_settlements`.
 
 ### Out of scope
-- No changes to queries, pay math, accessorial omission, voucher footer, or PDF generator.
-- No changes to admin-side components.
+- No changes to settlement generation, PDF, or pay math.
+- No new RLS — existing driver SELECT policy already constrains which rows the driver receives over Realtime.
 
 ### Verification
 - `tsgo` typecheck.
-- Playwright at 1280×1800 against `/driver-view/...`: open "My Settlements", confirm list screen has no JEANWAY banner and shows compact rows; click a row and confirm the JEANWAY header + mono metadata appear above the earnings grid.
+- Playwright: open driver `/driver-view/...`, open "My Settlements" list. In a second psql session, `DELETE FROM driver_settlements WHERE id = '<one shown>'`. Confirm the row disappears from the list within ~1s with no reload, and that if it was open in detail view it auto-returns to the list.
+- Repeat with `UPDATE driver_settlements SET status='draft' WHERE id=...` → row should also disappear (filtered by `status in ('approved','paid')`).
