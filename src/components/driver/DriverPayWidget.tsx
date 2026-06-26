@@ -19,7 +19,6 @@ interface DriverPayWidgetProps {
 }
 
 export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetProps) {
-  const [accessorialsOpen, setAccessorialsOpen] = useState(false);
   const [paystubsOpen, setPaystubsOpen] = useState(false);
 
   const { data: driverRow } = useQuery({
