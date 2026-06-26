@@ -1,74 +1,66 @@
-## Goal
-Convert `PLSummaryTab.tsx` into a true executive P&L workspace with three KPI cards, a timeframe-aware CPM calculator, and a 12-week revenue-vs-expense trend chart. Existing detail tables (Revenue Summary, Miles Summary, Net Profit Calculation) stay below the new executive header so nothing in the workflow is lost.
+# Driver Classification & Lease-Purchase UI
 
-## Scope (frontend only)
-Files touched:
-- `src/components/finance/PLSummaryTab.tsx` — add executive header (KPIs + CPM + chart) above current content.
-- `src/hooks/usePLTrend.ts` *(new)* — fetches the last 12 ISO weeks of loads, expenses, and payroll for the current org and rolls them up per week + per timeframe.
+Expose the existing `drivers.employment_type` enum and `lease_purchase_agreements` table through the driver add/edit form and the profile sheet.
 
-No new DB tables, no edits to `Finance.tsx` props, no business-logic changes to existing totals.
+## 1. Employment Type dropdown — `src/pages/Drivers.tsx` (edit dialog)
 
-## Layout
+Add a new "Classification" section above the existing "Pay Information" block:
 
+- shadcn `Select` labeled **Employment Type**, bound to `formData.employment_type`
+- Options (enum values → labels):
+  - `w2_company` → "W-2 Company Driver"
+  - `contractor_1099` → "1099 Contractor"
+  - `lease_purchase` → "Lease-Purchase"
+- Default new drivers to `w2_company` (matches DB default) inside `openDialog`.
+- Persisted via existing `createMutation` / `updateMutation` (already spread `formData`).
+
+Verify the exact enum string values via `select enum_range(null::employment_type_enum)` before wiring; map UI labels to whatever values the enum reports (likely `w2_company`, `contractor_1099`, `lease_purchase`).
+
+## 2. Lease-Purchase Agreement sub-form
+
+When `formData.employment_type === 'lease_purchase'`, render an inline `Card` titled **"Lease Purchase Agreement Configuration"** with three numeric inputs:
+
+- **Weekly Fixed Lease Amount ($)** → `weekly_lease_amount` (step `0.01`)
+- **Maintenance Escrow Rate Per Mile ($)** → `escrow_cpm_rate` (step `0.0001`, placeholder `0.10`)
+- **Weeks Remaining on Agreement** → `total_weeks_remaining` (integer)
+
+Held in local `leaseForm` state, seeded from a new query:
+
+```ts
+useQuery(['lease-agreement', editingDriver?.id], () =>
+  supabase.from('lease_purchase_agreements')
+    .select('*').eq('driver_id', editingDriver.id).eq('status','active')
+    .maybeSingle())
 ```
-┌─────────────── EXECUTIVE P&L ───────────────┐
-│  [Gross Revenue]  [Combined Costs]  [NOI / Margin] │
-│                                                    │
-│  CPM Calculator   Week ▾ Month ▾ Quarter ▾        │
-│   RPM  $X.XX     EPM  $X.XX     NPM  $X.XX        │
-│                                                    │
-│  ┌──────── Revenue vs Expenses (12w) ────────┐   │
-│  │  area/line chart, x = ISO week, y = $     │   │
-│  └────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────┘
 
-(existing Revenue Flow strip + Revenue Summary / Miles Summary / Net Profit Calculation render below, unchanged)
-```
+On submit (only when employment_type is `lease_purchase`):
+- If no active row exists → `insert` with `driver_id`, `org_id`, the three fields, `status:'active'`, `current_escrow_balance: 0`.
+- If row exists → `update` the three fields by `id`.
+- Run after the driver create/update succeeds, then invalidate `['lease-agreement', driverId]` and `['drivers']`.
 
-## Section specs
+If user switches OFF lease_purchase on an existing lease driver, leave the row intact (status preserved) — do not auto-archive. We are only adding visible controls.
 
-### 1. Triple KPI blocks
-Three `Card`s in a `grid-cols-1 md:grid-cols-3 gap-4` row.
+## 3. Escrow ledger badge — `src/components/drivers/DriverDetailSheet.tsx`
 
-- **Fleet Top-Line Gross Revenue** = `revenueTotals.grossRevenue` (sum of all completed load earnings — already aggregated upstream from delivered loads). Icon: `DollarSign` in `text-success`.
-- **Combined Fleet Overhead Costs** = `totalExpenses + payrollTotals.netPay + commissionTotals.amount`. Subtitle lists the four contributors (driver flat/mileage payouts, reimbursements, asset upkeep). Icon: `TrendingDown` in `text-destructive`.
-- **Net Operating Income / Margin** = `grossRevenue − combinedCosts`; show margin % beside the dollar figure with green/red coloring. Icon: `PiggyBank`.
+Below the existing Credentials & Compliance section (or directly under the contact strip when `driver.employment_type === 'lease_purchase'`):
 
-Each card uses semantic tokens (`text-success`, `text-destructive`, `bg-card`) — no hardcoded colors.
+- Fetch active lease agreement for the driver via TanStack Query (same query shape as above).
+- Render a small panel:
+  - Label: "Current Escrow Pool Balance"
+  - Value: formatted USD (`formatCurrency(current_escrow_balance)`) inside a prominent `Badge` (variant `secondary`, larger text)
+  - Subtext: `Weekly Lease $X • $Y/mi escrow • N weeks remaining`
+- Read-only. Hidden when no active agreement OR when employment_type is not `lease_purchase`.
 
-### 2. CPM calculator with timeframe toggle
-- ShadCN `ToggleGroup` (single-select) with `week | month | quarter`. Default `week`.
-- Hook `usePLTrend(orgId)` returns:
-  ```
-  { week: PeriodRollup, month: PeriodRollup, quarter: PeriodRollup, weekly: WeekPoint[] }
-  PeriodRollup = { revenue, costs, miles }
-  WeekPoint = { weekStart: 'YYYY-MM-DD', label: 'W## MMM dd', revenue, costs, net }
-  ```
-  - `week` = trailing 7 days, `month` = trailing 30 days, `quarter` = trailing 90 days from today, in user's local TZ (use existing `date-fns` `subDays`/`startOfWeek` helpers, with `T00:00:00` guard from the date memory).
-  - Fetches in parallel from `fleet_loads` (delivered, `delivery_date >= today-84d`, sums `booked_rate`/`actual_miles`), `expenses` (org-scoped, `expense_date` window), `driver_payroll` (`pay_period_end` window), `agent_commissions` (revenue side). All filtered by `org_id = current org`.
-  - Org id pulled via the existing `useAuth` / `useOrgContext` pattern already used elsewhere in `src/hooks/` (will mirror whichever `useOperationalCPM` already uses).
-- Three readouts per selected timeframe:
-  - **RPM** = `revenue / miles`
-  - **EPM** = `costs / miles`
-  - **NPM** = `(revenue − costs) / miles`
-  - Show `—` when `miles === 0`; tabular-nums; `text-success` for positive NPM, `text-destructive` for negative.
-
-### 3. 12-week trend chart
-- Recharts `ComposedChart` (already in dependencies). Two stacked datasets:
-  - Filled area for **Gross Revenue** in `hsl(var(--success))` at 30% opacity with a solid 2px line on top.
-  - Filled area for **Combined Costs** in `hsl(var(--destructive))` at 25% opacity with a solid 2px line on top.
-  - Optional thin dashed line for **Net** in `hsl(var(--primary))`.
-- X axis: ISO week labels from `weekly[]` (oldest → newest). Y axis: currency, abbreviated (`$12k`).
-- Uses the existing `ChartContainer` from `src/components/ui/chart.tsx` so tooltips, legend, and accessibility match the rest of the app.
-- Height ~320px, `Suspense`-friendly skeleton (`ChartSkeleton`) while `usePLTrend` is loading.
+Also surface a tiny `Badge` next to the driver name showing the employment type label (W-2 / 1099 / Lease) so the classification is always visible at a glance.
 
 ## Out of scope
-- Cross-tab data changes in `Finance.tsx`.
-- Real-time subscriptions — TanStack defaults (`5m staleTime`, `refetchOnWindowFocus:false` per project memory) are sufficient.
-- New schema, RLS, or seed data.
-- Exporting / printing the new section.
+
+- No schema changes, no new tables, no RLS edits — the backend is already in place.
+- No automatic escrow ledger postings (settlement engine already handles that).
+- No bulk migration of existing drivers.
 
 ## Verification
+
 - `tsgo` typecheck.
-- Visit `/finance` → Overview tab via Playwright; screenshot full page to confirm KPI strip + CPM toggle + chart render with no overflow and that legacy tables still appear below.
-- Toggle CPM between Week / Month / Quarter and confirm the three numbers update.
+- Manually open the Add Driver dialog, select Lease-Purchase, confirm the sub-card appears and saves.
+- Open an existing lease driver's profile sheet and confirm the escrow balance badge renders with seeded data.

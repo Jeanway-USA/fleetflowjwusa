@@ -28,11 +28,13 @@ import {
   Loader2,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
+import { formatCurrency } from '@/lib/formatters';
+
 import { CredentialsCompliance } from './CredentialsCompliance';
 import { SignedOnboardingDocuments } from './SignedOnboardingDocuments';
 import { DriverBankingDetails } from './DriverBankingDetails';
@@ -121,11 +123,33 @@ export function DriverDetailSheet({
     },
   });
 
+  const { data: leaseAgreement } = useQuery({
+    enabled: !!driver?.id && driver?.employment_type === 'lease_purchase',
+    queryKey: ['lease-agreement', driver?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lease_purchase_agreements')
+        .select('*')
+        .eq('driver_id', driver.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   if (!driver) return null;
 
 
   const initials = `${(driver.first_name?.[0] ?? '').toUpperCase()}${(driver.last_name?.[0] ?? '').toUpperCase()}` || 'D';
   const hireDate = parseDateSafe(driver.hire_date);
+  const employmentLabel = driver.employment_type === 'lease_purchase'
+    ? 'Lease-Purchase'
+    : driver.employment_type === '1099_contractor'
+      ? '1099 Contractor'
+      : 'W-2 Company';
+
+
 
   return (
     <>
@@ -144,6 +168,10 @@ export function DriverDetailSheet({
                   <Badge variant={driver.status === 'active' ? 'default' : 'secondary'} className="text-[10px] capitalize">
                     {driver.status || 'active'}
                   </Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    {employmentLabel}
+                  </Badge>
+
                   {hireDate && (
                     <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
                       <Calendar className="h-3 w-3" /> Hired {format(hireDate, 'MMM d, yyyy')}
@@ -200,6 +228,27 @@ export function DriverDetailSheet({
             </p>
           )}
         </div>
+
+        {driver.employment_type === 'lease_purchase' && leaseAgreement && (
+          <>
+            <Separator />
+            <div className="py-4 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Current Escrow Pool Balance</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Weekly Lease {formatCurrency(Number(leaseAgreement.weekly_lease_amount))} • {formatCurrency(Number(leaseAgreement.escrow_cpm_rate), { maximumFractionDigits: 4 })}/mi escrow • {leaseAgreement.total_weeks_remaining} weeks remaining
+                  </p>
+                </div>
+                <Badge variant="secondary" className="text-base font-semibold px-3 py-1">
+                  {formatCurrency(Number(leaseAgreement.current_escrow_balance))}
+                </Badge>
+              </div>
+            </div>
+          </>
+        )}
+
+
 
         {/* Emergency Contact */}
         <Separator />

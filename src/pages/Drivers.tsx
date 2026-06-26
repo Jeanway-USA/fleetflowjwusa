@@ -82,6 +82,9 @@ export default function Drivers() {
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [signedDocsDriver, setSignedDocsDriver] = useState<any>(null);
   const [profileDriver, setProfileDriver] = useState<any>(null);
+  const [leaseForm, setLeaseForm] = useState<{ id?: string; weekly_lease_amount: number; escrow_cpm_rate: number; total_weeks_remaining: number }>({ weekly_lease_amount: 0, escrow_cpm_rate: 0, total_weeks_remaining: 0 });
+
+
 
 
   const driverFields = [
@@ -239,9 +242,30 @@ export default function Drivers() {
     entityName: 'Driver',
   });
 
-  const openDialog = (driver?: any) => {
+  const openDialog = async (driver?: any) => {
     setEditingDriver(driver || null);
-    setFormData(driver || { status: 'active', pay_type: 'percentage', pay_rate: 0, has_twic: false, endorsements: [], dod_clearance_level: 'None' });
+    setFormData(driver || { status: 'active', pay_type: 'percentage', pay_rate: 0, has_twic: false, endorsements: [], dod_clearance_level: 'None', employment_type: 'w2_company' });
+    // Seed lease form
+    if (driver?.id) {
+      const { data: lease } = await supabase
+        .from('lease_purchase_agreements')
+        .select('*')
+        .eq('driver_id', driver.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (lease) {
+        setLeaseForm({
+          id: lease.id,
+          weekly_lease_amount: Number(lease.weekly_lease_amount) || 0,
+          escrow_cpm_rate: Number(lease.escrow_cpm_rate) || 0,
+          total_weeks_remaining: Number(lease.total_weeks_remaining) || 0,
+        });
+      } else {
+        setLeaseForm({ weekly_lease_amount: 0, escrow_cpm_rate: 0, total_weeks_remaining: 0 });
+      }
+    } else {
+      setLeaseForm({ weekly_lease_amount: 0, escrow_cpm_rate: 0, total_weeks_remaining: 0 });
+    }
     setDialogOpen(true);
   };
 
@@ -249,9 +273,38 @@ export default function Drivers() {
     setDialogOpen(false);
     setEditingDriver(null);
     setFormData({});
+    setLeaseForm({ weekly_lease_amount: 0, escrow_cpm_rate: 0, total_weeks_remaining: 0 });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const upsertLeaseAgreement = async (driverId: string) => {
+    if (formData.employment_type !== 'lease_purchase') return;
+    if (!orgId) return;
+    if (leaseForm.id) {
+      const { error } = await supabase
+        .from('lease_purchase_agreements')
+        .update({
+          weekly_lease_amount: leaseForm.weekly_lease_amount,
+          escrow_cpm_rate: leaseForm.escrow_cpm_rate,
+          total_weeks_remaining: leaseForm.total_weeks_remaining,
+        })
+        .eq('id', leaseForm.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('lease_purchase_agreements').insert({
+        driver_id: driverId,
+        org_id: orgId,
+        weekly_lease_amount: leaseForm.weekly_lease_amount,
+        escrow_cpm_rate: leaseForm.escrow_cpm_rate,
+        total_weeks_remaining: leaseForm.total_weeks_remaining,
+        status: 'active',
+        current_escrow_balance: 0,
+      });
+      if (error) throw error;
+    }
+    queryClient.invalidateQueries({ queryKey: ['lease-agreement', driverId] });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.first_name || !formData.last_name) {
       toast.error('First and last name are required');
@@ -261,12 +314,26 @@ export default function Drivers() {
       ...formData,
       landstar_operator_id: formData.landstar_operator_id?.trim() ? formData.landstar_operator_id.trim() : null,
     };
-    if (editingDriver) {
-      updateMutation.mutate({ id: editingDriver.id, ...payload });
-    } else {
-      createMutation.mutate(payload);
+    try {
+      if (editingDriver) {
+        await new Promise<void>((resolve, reject) =>
+          updateMutation.mutate({ id: editingDriver.id, ...payload }, { onSuccess: () => resolve(), onError: (e) => reject(e) })
+        );
+        await upsertLeaseAgreement(editingDriver.id);
+      } else {
+        if (!orgId) throw new Error('Organization not loaded yet. Please try again.');
+        const { data: inserted, error } = await supabase.from('drivers').insert({ ...payload, org_id: orgId }).select('id').single();
+        if (error) throw error;
+        await upsertLeaseAgreement(inserted.id);
+        queryClient.invalidateQueries({ queryKey: ['drivers'] });
+        toast.success('Driver added successfully');
+        closeDialog();
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save driver');
     }
   };
+
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>, driverId: string) => {
     const file = e.target.files?.[0];
@@ -734,9 +801,71 @@ export default function Drivers() {
               </div>
             </div>
 
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-3">Classification</h4>
+              <div className="space-y-2">
+                <Label htmlFor="employment_type">Employment Type</Label>
+                <Select
+                  value={formData.employment_type || 'w2_company'}
+                  onValueChange={(v) => setFormData({ ...formData, employment_type: v })}
+                >
+                  <SelectTrigger id="employment_type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="w2_company">W-2 Company Driver</SelectItem>
+                    <SelectItem value="1099_contractor">1099 Contractor</SelectItem>
+                    <SelectItem value="lease_purchase">Lease-Purchase</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formData.employment_type === 'lease_purchase' && (
+                <Card className="mt-4 border-primary/30">
+                  <CardHeader className="pb-3">
+                    <h5 className="font-medium text-sm">Lease Purchase Agreement Configuration</h5>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="weekly_lease_amount">Weekly Fixed Lease Amount ($)</Label>
+                      <Input
+                        id="weekly_lease_amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={leaseForm.weekly_lease_amount || ''}
+                        onChange={(e) => setLeaseForm({ ...leaseForm, weekly_lease_amount: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="escrow_cpm_rate">Maintenance Escrow Rate Per Mile ($)</Label>
+                      <Input
+                        id="escrow_cpm_rate"
+                        type="number"
+                        step="0.0001"
+                        min="0"
+                        placeholder="0.10"
+                        value={leaseForm.escrow_cpm_rate || ''}
+                        onChange={(e) => setLeaseForm({ ...leaseForm, escrow_cpm_rate: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="total_weeks_remaining">Weeks Remaining on Agreement</Label>
+                      <Input
+                        id="total_weeks_remaining"
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={leaseForm.total_weeks_remaining || ''}
+                        onChange={(e) => setLeaseForm({ ...leaseForm, total_weeks_remaining: parseInt(e.target.value, 10) || 0 })}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
             <div className="border-t pt-4">
               <h4 className="font-medium mb-3">Pay Information</h4>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="pay_type">Pay Type</Label>
