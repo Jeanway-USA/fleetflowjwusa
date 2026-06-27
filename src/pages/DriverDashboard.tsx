@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ActiveLoadCard } from '@/components/driver/ActiveLoadCard';
+import { useDriverHomeData } from '@/hooks/useDriverHomeData';
 
 import { useAutoArrival } from '@/hooks/useAutoArrival';
 import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
@@ -35,63 +36,26 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ['driver-for-user'] });
-    await queryClient.invalidateQueries({ queryKey: ['driver-active-loads'] });
-    await queryClient.invalidateQueries({ queryKey: ['driver-truck'] });
-    await queryClient.invalidateQueries({ queryKey: ['driver-trailer'] });
+    await queryClient.invalidateQueries({ queryKey: ['driver-home/driver'] });
+    await queryClient.invalidateQueries({ queryKey: ['driver-home/loads'] });
+    await queryClient.invalidateQueries({ queryKey: ['driver-home/truck'] });
     await queryClient.invalidateQueries({ queryKey: ['driver-equipment-work-orders'] });
     setTimeout(() => setIsRefreshing(false), 600);
   }, [queryClient]);
 
-  // Get driver record for current user
-  const { data: driver, isLoading: driverLoading } = useQuery({
-    queryKey: ['driver-for-user', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('*, trucks!trucks_current_driver_id_fkey(*)')
-        .eq('user_id', user?.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
+  // Shared driver-home payload (same source spectator view uses → guaranteed parity)
+  const {
+    driver,
+    activeLoad,
+    nextLoad,
+    assignedTruck,
+    isLoading,
+    refetchLoads,
+  } = useDriverHomeData({ userId: user?.id });
 
-  // Get active loads for this driver
-  const { data: activeLoads = [], isLoading: loadsLoading, refetch: refetchLoads } = useQuery({
-    queryKey: ['driver-active-loads', driver?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fleet_loads')
-        .select('*, trucks(*), load_accessorials(*)')
-        .eq('driver_id', driver?.id)
-        .in('status', ['assigned', 'loading', 'in_transit', 'pending'])
-        .order('pickup_date', { ascending: true });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!driver?.id,
-  });
-
-  // Get driver's truck
-  const { data: assignedTruck } = useQuery({
-    queryKey: ['driver-truck', driver?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('trucks')
-        .select('*')
-        .eq('current_driver_id', driver?.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!driver?.id,
-  });
-
-  // Get driver's current GPS position for geofencing
+  // Driver-only: live GPS coords for geofence auto-arrival (requires is_sharing=true)
   const { data: driverLocation } = useQuery({
-    queryKey: ['driver-location', driver?.id],
+    queryKey: ['driver-location-sharing', driver?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('driver_locations')
@@ -108,20 +72,10 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
     staleTime: 30 * 1000,
   });
 
-  const isLoading = driverLoading || loadsLoading;
-  const activeLoad = activeLoads.find(l => l.status === 'in_transit' || l.status === 'loading') || activeLoads[0];
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const nextLoad = activeLoads
-    .filter(l =>
-      l.id !== activeLoad?.id &&
-      (l.status === 'assigned' || l.status === 'pending') &&
-      l.pickup_date &&
-      l.pickup_date >= todayStr,
-    )[0];
-
   const driverCoords = driverLocation
     ? { lat: driverLocation.latitude, lng: driverLocation.longitude }
     : null;
+
 
   // Silent background geofence — auto-arrival at origin or destination,
   // flips fleet_loads.status without a driver prompt and writes a log row.

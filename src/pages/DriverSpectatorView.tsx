@@ -1,25 +1,28 @@
 import { useParams, useNavigate } from 'react-router-dom';
-
 import { useAuth } from '@/contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+
 import { ActiveLoadCard } from '@/components/driver/ActiveLoadCard';
 import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
 import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
 import { WeeklyPerformanceWidget } from '@/components/driver/WeeklyPerformanceWidget';
 import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
+import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
+import { LocationSharing } from '@/components/driver/LocationSharing';
 import { DriverRequestsCard } from '@/components/driver/DriverRequestsCard';
 import { MaintenanceRequestCard } from '@/components/driver/MaintenanceRequestCard';
+import { MyEquipmentCard } from '@/components/driver/MyEquipmentCard';
+import { OnboardingRevisionBanner } from '@/components/driver/OnboardingRevisionBanner';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, Eye, Truck, MapPin, Phone, Mail } from 'lucide-react';
 import { useSignedUrl } from '@/hooks/useSignedUrl';
-import { CredentialsCompliance } from '@/components/drivers/CredentialsCompliance';
+import { useDriverHomeData } from '@/hooks/useDriverHomeData';
 
 function DriverAvatar({ avatarPath, initials }: { avatarPath: string | null; initials: string }) {
   const isStoragePath = avatarPath && !avatarPath.startsWith('http');
@@ -64,70 +67,14 @@ export default function DriverSpectatorView() {
     return null;
   }
 
-  const { data: driver, isLoading: driverLoading } = useQuery({
-    queryKey: ['driver-spectator', driverId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('*, trucks!trucks_current_driver_id_fkey(*)')
-        .eq('id', driverId)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!driverId,
-  });
-
-  const { data: activeLoads = [], isLoading: loadsLoading } = useQuery({
-    queryKey: ['driver-active-loads-spectator', driverId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fleet_loads')
-        .select('*, trucks(*), load_accessorials(*)')
-        .eq('driver_id', driverId)
-        .in('status', ['assigned', 'loading', 'in_transit', 'pending'])
-        .order('pickup_date', { ascending: true });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!driverId,
-  });
-
-  const { data: assignedTruck } = useQuery({
-    queryKey: ['driver-truck-spectator', driverId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('trucks')
-        .select('*')
-        .eq('current_driver_id', driverId)
-        .single();
-      if (error && error.code !== 'PGRST116') throw error;
-      return data;
-    },
-    enabled: !!driverId,
-  });
-
-  const { data: driverLocation } = useQuery({
-    queryKey: ['driver-location-spectator', driverId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('driver_locations')
-        .select('*')
-        .eq('driver_id', driverId!)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!driverId,
-    refetchInterval: 30000,
-  });
-
-  const isLoading = driverLoading || loadsLoading;
-  const activeLoad =
-    activeLoads.find((l) => l.status === 'in_transit' || l.status === 'loading') || activeLoads[0];
-  const nextLoad = activeLoads.find((l) => l.id !== activeLoad?.id);
+  const {
+    driver,
+    activeLoad,
+    nextLoad,
+    assignedTruck,
+    driverLocation,
+    isLoading,
+  } = useDriverHomeData({ driverId });
 
   if (isLoading) {
     return (
@@ -154,10 +101,9 @@ export default function DriverSpectatorView() {
 
   const initials = `${driver.first_name?.[0] || ''}${driver.last_name?.[0] || ''}`;
   const isFlatPay = driver.pay_type === 'flat';
-  const activeLoadId = activeLoad?.id ?? undefined;
 
   return (
-    <div className="space-y-4 pb-6 max-w-4xl mx-auto">
+    <div className="space-y-3 pb-6 max-w-4xl mx-auto">
       {/* Spectator Mode Banner */}
       <Card className="border-primary/50 bg-primary/5">
         <CardContent className="py-4">
@@ -215,12 +161,18 @@ export default function DriverSpectatorView() {
         Viewing driver dashboard in read-only mode. Actions are disabled.
       </div>
 
-      {/* Credentials & Compliance */}
+      {/* Onboarding Revision banner — same as driver home */}
+      <OnboardingRevisionBanner
+        driverId={driver.id}
+        credentialsStatus={(driver as any).credentials_review_status ?? null}
+      />
+
+      {/* My Equipment Card */}
       <ErrorBoundary compact>
-        <CredentialsCompliance driver={driver} />
+        <MyEquipmentCard driverId={driver.id} assignedTruck={assignedTruck as any} />
       </ErrorBoundary>
 
-      {/* Active Load Card (read-only) — same prioritization as mobile driver */}
+      {/* Active Load Card — same prioritization as mobile driver */}
       <ErrorBoundary compact>
         <ReadOnly>
           {activeLoad ? (
@@ -243,46 +195,45 @@ export default function DriverSpectatorView() {
         </ReadOnly>
       </ErrorBoundary>
 
-      {/* Next Load Preview — only when an active load is already showing above */}
+      {/* Up Next (Pre-Plan) */}
       {activeLoad && nextLoad && (
         <ErrorBoundary compact>
           <NextLoadPreview load={nextLoad} payRate={driver.pay_rate} payType={driver.pay_type} />
         </ErrorBoundary>
       )}
 
-      {/* GPS Location Status */}
-      {driverLocation && (
-        <Card>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
-                <span className="text-sm font-medium">GPS Active</span>
-              </div>
-              <span className="text-sm text-muted-foreground">
-                Last update: {format(new Date(driverLocation.updated_at), 'MMM d, h:mm a')}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Scan Doc Button (read-only) */}
+      <ReadOnly>
+        <DocumentScanButton driverId={driver.id} />
+      </ReadOnly>
 
-      {/* Weekly Goal — Performance widget for flat-pay, $-based widget otherwise */}
-      <ErrorBoundary compact>
-        {isFlatPay ? (
-          <WeeklyPerformanceWidget
-            driverId={driver.id}
-            payRate={driver.pay_rate}
-            payType={driver.pay_type}
-          />
-        ) : (
-          <DriverPayWidget
-            driverId={driver.id}
-            payRate={driver.pay_rate}
-            payType={driver.pay_type}
-          />
-        )}
-      </ErrorBoundary>
+      {/* GPS + Pay row — matches driver layout exactly */}
+      <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+        <ErrorBoundary compact>
+          <ReadOnly>
+            <LocationSharing
+              driverId={driver.id}
+              truckId={assignedTruck?.id}
+              loadId={activeLoad?.id}
+            />
+          </ReadOnly>
+        </ErrorBoundary>
+        <ErrorBoundary compact>
+          {isFlatPay ? (
+            <WeeklyPerformanceWidget
+              driverId={driver.id}
+              payRate={driver.pay_rate}
+              payType={driver.pay_type}
+            />
+          ) : (
+            <DriverPayWidget
+              driverId={driver.id}
+              payRate={driver.pay_rate}
+              payType={driver.pay_type}
+            />
+          )}
+        </ErrorBoundary>
+      </div>
 
       {/* Monthly Bonus Goal */}
       <ErrorBoundary compact>
@@ -294,23 +245,25 @@ export default function DriverSpectatorView() {
         <DriverLeaderboard readOnly />
       </ErrorBoundary>
 
-      {/* Driver Requests (read-only via overlay) */}
-      <ErrorBoundary compact>
-        <ReadOnly>
-          <DriverRequestsCard
-            driverId={driver.id}
-            truckId={assignedTruck?.id ?? undefined}
-            activeLoadId={activeLoadId}
-          />
-        </ReadOnly>
-      </ErrorBoundary>
+      {/* Unified Driver Requests & Maintenance (read-only via overlay) */}
+      <div className="space-y-3">
+        <ErrorBoundary compact>
+          <ReadOnly>
+            <DriverRequestsCard
+              driverId={driver.id}
+              truckId={assignedTruck?.id ?? undefined}
+              activeLoadId={activeLoad?.id}
+              activeLoadNumber={activeLoad?.landstar_load_id}
+            />
+          </ReadOnly>
+        </ErrorBoundary>
 
-      {/* Maintenance Requests (read-only via overlay) */}
-      <ErrorBoundary compact>
-        <ReadOnly>
-          <MaintenanceRequestCard driverId={driver.id} truckId={assignedTruck?.id ?? undefined} />
-        </ReadOnly>
-      </ErrorBoundary>
+        <ErrorBoundary compact>
+          <ReadOnly>
+            <MaintenanceRequestCard driverId={driver.id} truckId={assignedTruck?.id ?? undefined} />
+          </ReadOnly>
+        </ErrorBoundary>
+      </div>
     </div>
   );
 }
