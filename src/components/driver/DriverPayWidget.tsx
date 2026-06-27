@@ -5,13 +5,10 @@ import { DollarSign, TrendingUp, Receipt } from 'lucide-react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
-import { useState, lazy, Suspense } from 'react';
+import { Link } from 'react-router-dom';
 import { calculateWeeklyPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
 import { useDriverSettlementsRealtime } from '@/hooks/useDriverSettlementsRealtime';
-const MySettlementsDialog = lazy(() =>
-  import('./MyPaystubsDialog').then(m => ({ default: m.MyPaystubsDialog })),
-);
 
 interface DriverPayWidgetProps {
   driverId: string;
