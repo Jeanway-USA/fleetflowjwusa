@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Download, FileSpreadsheet, TrendingUp } from 'lucide-react';
+import { Download, FileSpreadsheet, TrendingUp, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/formatters';
 import type { SettlementRow } from '@/hooks/useDriverSettlementsPage';
+import {
+  downloadTaxDocument,
+  useMyTaxDocuments,
+} from '@/hooks/useDriverTaxDocuments';
 
 interface Props {
   settlements: SettlementRow[];
@@ -22,24 +26,43 @@ interface Props {
 }
 
 export function TaxAndYtdPanel({ settlements, ytd, ytdLoading }: Props) {
+  const { data: taxDocs = [], isLoading: taxLoading } = useMyTaxDocuments();
+
   const years = useMemo(() => {
     const set = new Set<number>();
-    settlements.forEach((s) => {
-      const y = Number((s.period_start ?? '').slice(0, 4));
-      if (Number.isFinite(y) && y > 1900) set.add(y);
-    });
-    const currentYear = new Date().getFullYear();
-    set.add(currentYear);
+    taxDocs.forEach((d) => set.add(d.tax_year));
     return Array.from(set).sort((a, b) => b - a);
-  }, [settlements]);
+  }, [taxDocs]);
 
-  const [year, setYear] = useState<string>(String(years[0] ?? new Date().getFullYear()));
+  const [year, setYear] = useState<string>('');
+  const [downloading, setDownloading] = useState(false);
 
-  const handle1099Download = () => {
-    toast.info(
-      `${year} 1099-NEC will be available in early January ${Number(year) + 1}. We'll email you when it's ready.`,
-    );
+  // Default to newest available year once data loads
+  useEffect(() => {
+    if (!year && years.length > 0) setYear(String(years[0]));
+    if (year && !years.includes(Number(year))) {
+      setYear(years[0] ? String(years[0]) : '');
+    }
+  }, [years, year]);
+
+  const hasDocs = years.length > 0;
+
+  const handle1099Download = async () => {
+    const doc = taxDocs.find((d) => d.tax_year === Number(year));
+    if (!doc) {
+      toast.error('No 1099 found for that year');
+      return;
+    }
+    try {
+      setDownloading(true);
+      await downloadTaxDocument(doc.file_path, `1099-NEC-${doc.tax_year}.pdf`);
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Download failed');
+    } finally {
+      setDownloading(false);
+    }
   };
+
 
   return (
     <div className="space-y-4">
