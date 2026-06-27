@@ -40,6 +40,7 @@ import { SignedOnboardingDocuments } from './SignedOnboardingDocuments';
 import { DriverBankingDetails } from './DriverBankingDetails';
 import { DriverChatSheet } from './DriverChatSheet';
 import { CredentialsReviewCard } from './CredentialsReviewCard';
+import { DriverTaxDocuments } from './DriverTaxDocuments';
 
 
 
