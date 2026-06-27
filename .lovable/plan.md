@@ -1,33 +1,92 @@
-## Why "Current Load" disappears on mobile
+## My Settlements — full-page 3-column dashboard for 1099 owner-operators
 
-On mobile (especially iOS Safari) something inside the lazy-loaded map / live-route subscription that `ActiveLoadCard` renders throws an error whose message contains `websocket` or `insecure` (mixed-content tile fetch or a wss handshake failure). The `<ErrorBoundary compact>` that wraps the whole card catches it and — because the message matches `/websocket|insecure/i` — replaces the **entire Active Load card** with the small gray strip:
+Replaces the cramped "My Paystubs" modal with a dedicated route, premium fintech layout, and proper truck-driver terminology.
 
-> "Live updates aren't available in this browser. Pull to refresh to see the latest."
+### Task 1 — Routing & navigation
 
-That's why you only see `UP NEXT (PRE-PLAN)` below it, and why a refresh never helps: the same render path keeps throwing. Desktop Chrome doesn't trip the same throw, so the card renders normally there.
+- **Remove** the visible "My Paystubs" button + its `MyPaystubsDialog` lazy-load in `src/components/driver/WeeklyPerformanceWidget.tsx`. Replace it with a subtle `<Link to="/driver/settlements">View Settlements →</Link>` button so the entry point doesn't disappear.
+- Clean up the unused `MyPaystubsDialog` import in `src/components/driver/DriverPayWidget.tsx`.
+- Leave `MyPaystubsDialog.tsx` on disk for now (still imported by other tools) — only the driver-dashboard button is removed.
+- Add a new route in `src/App.tsx`: `/driver/settlements` → `<DriverSettlements />`, guarded by the existing `driver` role `ProtectedRoute`.
+- In `src/components/layout/AppSidebar.tsx`, insert a new driver-only menu item between "My Loads" and "My Stats":
+  - Title: **My Settlements**, icon: `Receipt` from lucide, path: `/driver/settlements`.
+- Create `src/pages/DriverSettlements.tsx` as the page entry, plus child components under `src/components/driver/settlements/`.
 
-## Fix (UI only, no DB)
+### Task 2 — Left column: Settlement History
 
-### 1. `src/components/shared/ErrorBoundary.tsx`
-- Always `console.error('[ErrorBoundary]', error, errorInfo)` before rendering the fallback, so the real underlying error stack stops being hidden by the friendly banner.
-- Stop letting the "websocket / insecure" banner shadow the wrapped component. Render it as a small **footer notice underneath** `this.props.children` when a non-fatal WS/insecure-only error is caught, instead of replacing the children entirely. If the error is anything else, keep current compact error UI.
+`SettlementHistoryList.tsx`
 
-### 2. `src/components/driver/ActiveLoadCard.tsx`
-- Move the live-route / map subscription out of the main render tree of the card:
-  - Wrap the lazy `LoadRouteMap` `<Suspense>` block in its own **local** `<ErrorBoundary compact>` so a map/Leaflet/tile failure can no longer take down stop info, status buttons, pay, POD, etc.
-  - If `LoadRouteMap` fails, render a tiny "Map unavailable on this connection" placeholder in that slot only.
+- Scrollable list, fixed width (`w-80`), sticky on `lg` screens.
+- Query: `driver_settlements` for the signed-in driver, ordered `period_end desc`, joined to settlement totals already on the row.
+- For each row show:
+  - **Period end date** (large, e.g. `Jun 22, 2026`) and small period range underneath.
+  - **Total Miles** (replaces "Hours") — sum of `booked_miles` from `fleet_loads` in the settlement period (driver delivered loads), fetched in one batched RPC-style query via `buildSettlementDocumentData`-style helper, OR derived in a `useSettlementMiles(settlementIds)` hook that runs a single grouped query.
+  - **Gross Revenue** = `gross_pay`.
+  - **Net Settlement** = `net_pay` (fallback `gross_pay - deductions + reimbursements + escrow_credited_amount`).
+  - Status pill (`paid`, `approved`, `draft`).
+- Selected row highlighted with `bg-primary/10 border-l-2 border-primary`. Default selection = most recent.
 
-### 3. `src/hooks/useActiveLoadRoute.ts`
-- Guard the realtime subscription so a `wss` handshake failure can never bubble out of the hook: wrap `supabase.channel(...).subscribe(...)` in `try/catch`, and pass a status callback that just `console.warn`s on `CHANNEL_ERROR` / `TIMED_OUT` instead of throwing. The initial REST fetch already works fine without realtime.
+### Task 3 — Center column: visuals & breakdown
 
-### 4. `src/pages/DriverDashboard.tsx` and `src/pages/DriverSpectatorView.tsx`
-- No logic change — both already share `useDriverHomeData`, so parity stays intact. The fix above restores the Current Load card on both surfaces simultaneously on mobile.
+`SettlementDetailPanel.tsx`
 
-## Verification
+- **Top bar**: settlement period (`MMM d – MMM d, yyyy`), status badge, prominent `Download PDF` button (calls existing `generateSettlementPdf(selected.id)`).
+- **Hero number**: "Net Settlement" as the page's largest element — `text-5xl lg:text-6xl font-bold tracking-tight`, currency-formatted, in `text-foreground` with a small "Take-Home Pay" caption above.
+- **Donut chart** (recharts `PieChart` + `Pie` with `innerRadius=70 outerRadius=110`, center label = Gross Revenue):
+  - Slices (semantic tokens, not hardcoded hex):
+    - **Net Settlement** — `hsl(var(--success))` (green)
+    - **Brokerage/Agency Split** — `hsl(var(--primary))` (blue/brand)
+    - **Fuel Advances** — `hsl(var(--destructive))` (red)
+    - **Deductions/Escrow** — `hsl(var(--accent))` (purple/secondary token)
+  - Legend below with $ + % per slice.
+  - Source: `driver_settlement_items` (`item_type` filter: `deduction` + description heuristics for fuel/escrow/agency), with `gross_pay` total as the chart total.
+- **Accordions** (`@/components/ui/accordion`, three sections, allow multi-open):
+  1. **Revenue** — Booked Linehaul, 100% Fuel Surcharge (FSC), Detention / Lumpers / Accessorials (rows pulled from `fleet_loads` + `load_accessorials` joined for the period via existing `settlement-pay-breakdown` helpers — already implemented).
+  2. **Deductions** — Fuel Card Advances, Trailer Rental, Escrow, Insurance (Bobtail / OccAcc). Itemized from `driver_settlement_items` where `item_type='deduction'`, bucketed by description keyword.
+  3. **Totals** — Gross Revenue, Total Deductions, Final Net Settlement (bold).
 
-After the change, on the same mobile browser:
-- The Active Load card for the `in_transit` load renders with route, stops, pay, and POD button.
-- If the embedded map can't load, only the map area shows a small "Map unavailable" placeholder; the rest of the card stays usable.
-- Console shows the actual original error (was previously hidden), so any remaining mobile-only issue is diagnosable in one more pass.
+### Task 4 — Right column: Tax & YTD
 
-Out of scope: no changes to RLS, DB schema, the shared `useDriverHomeData` query, Audit Trail, or Executive portal.
+`TaxAndYtdPanel.tsx`
+
+- **1099 Tax Statements card**:
+  - `Select` dropdown of tax years derived from `min(period_start)…current year` for that driver.
+  - "Download 1099-NEC (PDF)" button. For now wired to a placeholder toast — actual generator will hook in later; the button just dispatches the year so we don't ship dead UI.
+  - Note line: "1099-NEC forms are issued each January for the prior tax year. Contact dispatch if you need a correction."
+- **YTD Snapshot card** (current calendar year):
+  - **YTD Gross Revenue** — `sum(gross_pay)`.
+  - **YTD Loaded Miles** — sum of delivered `fleet_loads.booked_miles` for the driver year-to-date.
+  - **YTD Net Pay** — `sum(net_pay)`.
+  - Small "as of {today}" timestamp, refetch on settlement realtime channel (`useDriverSettlementsRealtime` already exists).
+
+### Task 5 — UI aesthetics
+
+- Page header: `My Settlements` (`text-3xl font-semibold tracking-tight`) + subtitle "1099 Owner-Operator Pay Statements".
+- 3-column layout: `grid grid-cols-1 lg:grid-cols-[20rem_minmax(0,1fr)_22rem] gap-6`. Stacks vertically on mobile (history collapses to a horizontally-scrollable strip on `<lg`).
+- All colors via semantic tokens (`bg-card`, `text-card-foreground`, `border-border`, `text-muted-foreground`, `bg-primary`, etc.) — no `text-white`/`bg-black`/hex literals.
+- Cards use existing `card-elevated` utility for the premium fintech feel.
+- Typography: section labels `text-xs uppercase tracking-wider text-muted-foreground`; numbers tabular-nums.
+- Hero net-settlement number dominates visually — every other amount on the page is smaller.
+
+### Technical notes
+
+- New folder: `src/components/driver/settlements/`
+  - `SettlementHistoryList.tsx`
+  - `SettlementDetailPanel.tsx`
+  - `SettlementDonutChart.tsx`
+  - `SettlementAccordions.tsx`
+  - `TaxAndYtdPanel.tsx`
+- New page: `src/pages/DriverSettlements.tsx`
+- New hook: `src/hooks/useDriverSettlementsPage.ts` — wraps:
+  - `driver_settlements` list query
+  - `driver_settlement_items` for selected
+  - `fleet_loads` joined for period (delivered + driver_id + date range) to compute total miles and revenue line items
+  - YTD aggregates (single query: `gte('period_start', start-of-year)`)
+- Reuses existing `generateSettlementPdf` for downloads.
+- Reuses existing `useDriverSettlementsRealtime` so list + YTD refresh when a new settlement is generated/approved.
+
+### Out of scope
+
+- No DB schema changes, no RLS edits — `driver_settlements` policies already allow drivers to read their own rows.
+- Actual 1099-NEC PDF generator (button stubbed with a toast pointing at the future generator).
+- Old `MyPaystubsDialog.tsx` file stays so other surfaces that still reference it keep working; only the driver-dashboard entry point switches to the new page.

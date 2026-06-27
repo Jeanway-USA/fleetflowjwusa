@@ -6,10 +6,7 @@ import { Gauge, Truck, Receipt } from 'lucide-react';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfWeek, endOfWeek } from 'date-fns';
-import { useState, lazy, Suspense } from 'react';
-const MyPaystubsDialog = lazy(() =>
-  import('./MyPaystubsDialog').then(m => ({ default: m.MyPaystubsDialog })),
-);
+import { Link } from 'react-router-dom';
 
 interface WeeklyPerformanceWidgetProps {
   driverId: string;
@@ -17,24 +14,7 @@ interface WeeklyPerformanceWidgetProps {
   payType?: string | null;
 }
 
-export function WeeklyPerformanceWidget({ driverId, payRate = null, payType = null }: WeeklyPerformanceWidgetProps) {
-  const [paystubsOpen, setPaystubsOpen] = useState(false);
-
-  const { data: driverRow } = useQuery({
-    queryKey: ['driver-name', driverId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('first_name, last_name')
-        .eq('id', driverId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!driverId,
-    staleTime: 15 * 60 * 1000,
-  });
-
+export function WeeklyPerformanceWidget({ driverId }: WeeklyPerformanceWidgetProps) {
   const { data: driverSettings } = useQuery({
     queryKey: ['driver-settings', driverId],
     queryFn: async () => {
@@ -86,14 +66,11 @@ export function WeeklyPerformanceWidget({ driverId, payRate = null, payType = nu
           <Gauge className="h-4 w-4 text-primary" />
           Weekly Performance
         </CardTitle>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 text-xs"
-          onClick={() => setPaystubsOpen(true)}
-        >
-          <Receipt className="h-3.5 w-3.5 mr-1.5" />
-          My Paystubs
+        <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
+          <Link to="/driver/settlements">
+            <Receipt className="h-3.5 w-3.5 mr-1.5" />
+            My Settlements
+          </Link>
         </Button>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -132,19 +109,6 @@ export function WeeklyPerformanceWidget({ driverId, payRate = null, payType = nu
           </TooltipProvider>
         </div>
       </CardContent>
-
-      {paystubsOpen && (
-        <Suspense fallback={null}>
-          <MyPaystubsDialog
-            open={paystubsOpen}
-            onOpenChange={setPaystubsOpen}
-            driverId={driverId}
-            driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim() || 'Driver'}
-            payType={payType}
-            payRate={payRate}
-          />
-        </Suspense>
-      )}
     </Card>
   );
 }

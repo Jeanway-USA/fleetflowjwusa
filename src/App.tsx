@@ -33,6 +33,7 @@ const Safety = lazy(() => import("./pages/Safety"));
 const Settings = lazy(() => import("./pages/Settings"));
 const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
 const DriverLoads = lazy(() => import("./pages/DriverLoads"));
+const DriverSettlements = lazy(() => import("./pages/DriverSettlements"));
 const DispatcherDashboard = lazy(() => import("./pages/DispatcherDashboard"));
 const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
 const DriverSettings = lazy(() => import("./pages/DriverSettings"));
@@ -133,6 +134,11 @@ const App = () => {
                     <Route path="/driver/loads" element={
                       <ProtectedRoute allowedRoles={['owner', 'driver']}>
                         <DriverLoads />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/driver/settlements" element={
+                      <ProtectedRoute allowedRoles={['owner', 'driver']}>
+                        <DriverSettlements />
                       </ProtectedRoute>
                     } />
                     <Route path="/driver/onboarding" element={
