@@ -57,31 +57,49 @@ export function useActiveLoadRoute(loadId: string | null | undefined): UseActive
         setUpdatedAt(typeof ts === 'string' ? ts : null);
       });
 
-    // Realtime subscription
-    const channel = supabase
-      .channel(`active-load-route:${loadId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'fleet_loads',
-          filter: `id=eq.${loadId}`,
-        },
-        (payload) => {
-          const next = normalize(
-            (payload.new as Record<string, unknown>)?.current_route_geometry,
-          );
-          if (next) setGeometry(next);
-          const ts = (payload.new as Record<string, unknown>)?.current_route_updated_at;
-          if (typeof ts === 'string') setUpdatedAt(ts);
-        },
-      )
-      .subscribe();
+    // Realtime subscription — guarded so a wss handshake failure (common on
+    // mobile carriers / Safari) can never bubble out of the hook and crash
+    // the component tree that hosts the Active Load card.
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(`active-load-route:${loadId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'fleet_loads',
+            filter: `id=eq.${loadId}`,
+          },
+          (payload) => {
+            const next = normalize(
+              (payload.new as Record<string, unknown>)?.current_route_geometry,
+            );
+            if (next) setGeometry(next);
+            const ts = (payload.new as Record<string, unknown>)?.current_route_updated_at;
+            if (typeof ts === 'string') setUpdatedAt(ts);
+          },
+        )
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            // Non-fatal — initial REST fetch already populated geometry.
+            console.warn('[useActiveLoadRoute] realtime status:', status);
+          }
+        });
+    } catch (err) {
+      console.warn('[useActiveLoadRoute] realtime subscribe failed:', err);
+    }
 
     return () => {
       cancelled = true;
-      supabase.removeChannel(channel);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch {
+          // ignore
+        }
+      }
     };
   }, [loadId]);
 
