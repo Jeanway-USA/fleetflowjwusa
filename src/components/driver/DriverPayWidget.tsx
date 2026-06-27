@@ -20,20 +20,6 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
   // Keep widget + settlements list in sync with admin changes in real-time.
   useDriverSettlementsRealtime(driverId);
 
-  const { data: driverRow } = useQuery({
-    queryKey: ['driver-name', driverId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('drivers')
-        .select('first_name, last_name')
-        .eq('id', driverId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!driverId,
-    staleTime: 15 * 60 * 1000,
-  });
 
   // Get driver settings for goals and pay week start day
   const { data: driverSettings } = useQuery({
