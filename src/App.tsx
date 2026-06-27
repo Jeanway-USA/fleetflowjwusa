@@ -136,6 +136,11 @@ const App = () => {
                         <DriverLoads />
                       </ProtectedRoute>
                     } />
+                    <Route path="/driver/settlements" element={
+                      <ProtectedRoute allowedRoles={['owner', 'driver']}>
+                        <DriverSettlements />
+                      </ProtectedRoute>
+                    } />
                     <Route path="/driver/onboarding" element={
                       <ProtectedRoute allowedRoles={['driver']}>
                         <DriverOnboarding />
