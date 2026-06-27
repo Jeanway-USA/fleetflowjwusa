@@ -19,6 +19,7 @@ import {
   Award,
   Fuel,
   BarChart,
+  Receipt,
   ShieldCheck,
   ChevronsUpDown,
   Plus,
