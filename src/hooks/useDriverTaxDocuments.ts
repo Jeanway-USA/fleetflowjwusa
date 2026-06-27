@@ -79,11 +79,14 @@ export function useUploadTaxDocument() {
         .upload(path, file, { contentType: 'application/pdf', upsert: false });
       if (upErr) throw upErr;
 
-      const { error: dbErr } = await supabase.from('tax_documents').insert({
-        driver_id: driverUserId,
-        tax_year: taxYear,
-        file_path: path,
-      });
+      const { error: dbErr } = await supabase.from('tax_documents').insert([
+        {
+          driver_id: driverUserId,
+          tax_year: taxYear,
+          file_path: path,
+          org_id: '00000000-0000-0000-0000-000000000000', // overridden by trigger
+        },
+      ]);
       if (dbErr) {
         // best effort cleanup
         await supabase.storage.from(BUCKET).remove([path]);
