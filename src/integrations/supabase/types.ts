@@ -4411,6 +4411,36 @@ export type Database = {
         }
         Relationships: []
       }
+      tax_documents: {
+        Row: {
+          created_at: string
+          driver_id: string
+          file_path: string
+          id: string
+          org_id: string
+          tax_year: number
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          driver_id: string
+          file_path: string
+          id?: string
+          org_id: string
+          tax_year: number
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string
+          file_path?: string
+          id?: string
+          org_id?: string
+          tax_year?: number
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
       trailer_assignments: {
         Row: {
           assigned_at: string
