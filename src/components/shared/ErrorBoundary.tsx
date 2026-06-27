@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 type Props = {
   children: React.ReactNode;
   compact?: boolean;
+  /** Custom fallback rendered in place of the default compact error UI. */
+  fallback?: React.ReactNode;
 };
 
 type State = {
@@ -36,8 +38,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("App crashed:", error);
-    console.error("Component stack:", errorInfo.componentStack);
+    // Always log the real underlying error so a friendly fallback can't hide it.
+    console.error('[ErrorBoundary]', error, errorInfo);
 
     if (isChunkLoadError(error)) {
       try {
@@ -94,6 +96,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
       }
 
       if (this.props.compact) {
+        if (this.props.fallback !== undefined) {
+          return <>{this.props.fallback}</>;
+        }
         if (isWsIssue) {
           // Live updates aren't critical — degrade gracefully instead of alarming the user.
           return (

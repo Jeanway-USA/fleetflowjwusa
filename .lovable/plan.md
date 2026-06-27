@@ -1,49 +1,33 @@
-# Spectator View ↔ Driver Dashboard: 1:1 Parity Fix
+## Why "Current Load" disappears on mobile
 
-## Problem
-`DriverSpectatorView` was supposed to render the *exact same* layout, widgets, and data the driver sees — just read-only. It currently drifts from `DriverDashboard` in several places, so dispatch/owners see a different picture than the driver in the cab.
+On mobile (especially iOS Safari) something inside the lazy-loaded map / live-route subscription that `ActiveLoadCard` renders throws an error whose message contains `websocket` or `insecure` (mixed-content tile fetch or a wss handshake failure). The `<ErrorBoundary compact>` that wraps the whole card catches it and — because the message matches `/websocket|insecure/i` — replaces the **entire Active Load card** with the small gray strip:
 
-## Gaps found (spectator vs. driver)
+> "Live updates aren't available in this browser. Pull to refresh to see the latest."
 
-| Area | Driver Dashboard | Spectator (current) |
-|---|---|---|
-| My Equipment card | ✅ shown | ❌ missing |
-| Document Scan button | ✅ shown | ❌ missing |
-| Location Sharing widget | ✅ shown (left col) | ❌ missing |
-| Driver Notifications bell | ✅ shown | ❌ missing (fine to hide, but layout differs) |
-| Onboarding Revision banner | ✅ shown | ❌ missing |
-| Pay/Performance + GPS row | 2-column grid on md+ | Stacked single column |
-| Next-load filter | status ∈ assigned/pending AND pickup_date ≥ today | No filter — can show stale loads |
-| `DriverRequestsCard` props | passes `activeLoadNumber` | omits `activeLoadNumber` |
-| Extra widgets in spectator | — | `CredentialsCompliance` injected (not on driver home) |
-| GPS card | uses `LocationSharing` widget | custom "GPS Active" card |
+That's why you only see `UP NEXT (PRE-PLAN)` below it, and why a refresh never helps: the same render path keeps throwing. Desktop Chrome doesn't trip the same throw, so the card renders normally there.
 
-## Changes
+## Fix (UI only, no DB)
 
-### `src/pages/DriverSpectatorView.tsx`
-Rebuild the body so the JSX, ordering, and props match `DriverDashboard` 1:1, wrapped in the existing `ReadOnly` overlay for interactive widgets:
+### 1. `src/components/shared/ErrorBoundary.tsx`
+- Always `console.error('[ErrorBoundary]', error, errorInfo)` before rendering the fallback, so the real underlying error stack stops being hidden by the friendly banner.
+- Stop letting the "websocket / insecure" banner shadow the wrapped component. Render it as a small **footer notice underneath** `this.props.children` when a non-fatal WS/insecure-only error is caught, instead of replacing the children entirely. If the error is anything else, keep current compact error UI.
 
-1. **Header row**: keep the Spectator banner card at the top (driver identity + "Back to Drivers"), then render the same compact `OnboardingRevisionBanner` driver sees.
-2. **My Equipment**: add `<MyEquipmentCard driverId truckId/assignedTruck>` immediately above the Active Load card.
-3. **Active Load**: keep current logic but apply the same `nextLoad` filter the driver uses (`status assigned|pending` AND `pickup_date >= today`).
-4. **Document Scan**: add `<DocumentScanButton driverId>` wrapped in `<ReadOnly>`.
-5. **GPS + Pay row**: replace the standalone "GPS Active" card with the same 2-col grid (`grid-cols-1 md:grid-cols-2`) containing `<LocationSharing>` (read-only) and the pay/performance widget — matching the driver layout exactly.
-6. **Monthly Bonus, Leaderboard**: already match; leave as-is.
-7. **DriverRequestsCard**: pass `activeLoadNumber={activeLoad?.landstar_load_id}` so the spectator sees the same load reference text.
-8. **Remove** the extra `CredentialsCompliance` block from the home view (it isn't on the driver's home; keeps parity). Credentials remain accessible from the driver detail sheet.
-9. Keep the small "Read-only" notice strip and the `ReadOnly` overlay on every interactive widget (`ActiveLoadCard`, `DocumentScanButton`, `LocationSharing`, `DriverRequestsCard`, `MaintenanceRequestCard`).
+### 2. `src/components/driver/ActiveLoadCard.tsx`
+- Move the live-route / map subscription out of the main render tree of the card:
+  - Wrap the lazy `LoadRouteMap` `<Suspense>` block in its own **local** `<ErrorBoundary compact>` so a map/Leaflet/tile failure can no longer take down stop info, status buttons, pay, POD, etc.
+  - If `LoadRouteMap` fails, render a tiny "Map unavailable on this connection" placeholder in that slot only.
 
-### Shared data hook (parity guarantee)
-To prevent future drift when new fields are added to the load object, extract the driver-home data fetching into a reusable hook:
+### 3. `src/hooks/useActiveLoadRoute.ts`
+- Guard the realtime subscription so a `wss` handshake failure can never bubble out of the hook: wrap `supabase.channel(...).subscribe(...)` in `try/catch`, and pass a status callback that just `console.warn`s on `CHANNEL_ERROR` / `TIMED_OUT` instead of throwing. The initial REST fetch already works fine without realtime.
 
-- **New file** `src/hooks/useDriverHomeData.ts` exporting `useDriverHomeData(driverId)` that returns `{ driver, activeLoads, assignedTruck, driverLocation, activeLoad, nextLoad, isLoading, refetchLoads }` using the exact queries currently in `DriverDashboard` (same `select('*, trucks(*), load_accessorials(*)')`, same status filter, same activeLoad/nextLoad derivation).
-- Refactor both `DriverDashboard.tsx` and `DriverSpectatorView.tsx` to consume this hook. Driver passes `user.id → driver.id`; spectator passes `driverId` from URL params.
-- Result: any future column added to `fleet_loads` (PU#, trailer, etc.) automatically flows to both views because they share one query.
-
-## Out of scope
-- No DB/RLS changes.
-- No edits to `ActiveLoadCard`, `NextLoadPreview`, `MyEquipmentCard`, `LocationSharing`, etc. — they already render whatever fields exist on the load object.
-- Audit Trail / executive portal untouched.
+### 4. `src/pages/DriverDashboard.tsx` and `src/pages/DriverSpectatorView.tsx`
+- No logic change — both already share `useDriverHomeData`, so parity stays intact. The fix above restores the Current Load card on both surfaces simultaneously on mobile.
 
 ## Verification
-After the edits, open `/driver-view/:driverId` as an owner and `/driver` as the assigned driver side-by-side: every card, every order, every value should match (spectator just has the banner on top and grey overlays blocking clicks).
+
+After the change, on the same mobile browser:
+- The Active Load card for the `in_transit` load renders with route, stops, pay, and POD button.
+- If the embedded map can't load, only the map area shows a small "Map unavailable" placeholder; the rest of the card stays usable.
+- Console shows the actual original error (was previously hidden), so any remaining mobile-only issue is diagnosable in one more pass.
+
+Out of scope: no changes to RLS, DB schema, the shared `useDriverHomeData` query, Audit Trail, or Executive portal.

@@ -11,6 +11,7 @@ import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { StopTime } from '@/components/shared/StopTime';
 const LoadRouteMap = lazy(() => import('./LoadRouteMap').then(m => ({ default: m.LoadRouteMap })));
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProofOfDeliveryDialog } from './ProofOfDeliveryDialog';
 import { IntermediateStopsTimeline } from './IntermediateStopsTimeline';
 import { StartingOdometerDialog } from './StartingOdometerDialog';
@@ -327,10 +328,20 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
             )}
           </div>
 
-          {/* Route Map Preview */}
-          <Suspense fallback={<MapSkeleton height={200} />}>
-            <LoadRouteMap origin={load.origin} destination={load.destination} notes={load.notes} loadId={load.id} />
-          </Suspense>
+          {/* Route Map Preview — isolated so mixed-content / WebSocket failures
+              on mobile can't take down the rest of the Active Load card. */}
+          <ErrorBoundary
+            compact
+            fallback={
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+                Map unavailable on this connection.
+              </div>
+            }
+          >
+            <Suspense fallback={<MapSkeleton height={200} />}>
+              <LoadRouteMap origin={load.origin} destination={load.destination} notes={load.notes} loadId={load.id} />
+            </Suspense>
+          </ErrorBoundary>
 
           {/* Miles and Estimated Pay */}
           <div className="flex items-center justify-between pt-2 border-t">
