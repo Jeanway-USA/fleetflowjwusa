@@ -38,8 +38,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("App crashed:", error);
-    console.error("Component stack:", errorInfo.componentStack);
+    // Always log the real underlying error so a friendly fallback can't hide it.
+    console.error('[ErrorBoundary]', error, errorInfo);
 
     if (isChunkLoadError(error)) {
       try {
