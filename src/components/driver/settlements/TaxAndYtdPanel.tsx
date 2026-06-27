@@ -85,33 +85,52 @@ export function TaxAndYtdPanel({ settlements, ytd, ytdLoading }: Props) {
             <label className="text-xs uppercase tracking-wider text-muted-foreground">
               Tax Year
             </label>
-            <Select value={year} onValueChange={setYear}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select year" />
-              </SelectTrigger>
-              <SelectContent>
-                {years.map((y) => (
-                  <SelectItem key={y} value={String(y)}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {taxLoading ? (
+              <Skeleton className="h-10 w-full" />
+            ) : (
+              <Select
+                value={year}
+                onValueChange={setYear}
+                disabled={!hasDocs}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={hasDocs ? 'Select year' : 'No forms available'}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <Button
             variant="outline"
             className="w-full gap-2"
             onClick={handle1099Download}
+            disabled={!hasDocs || !year || downloading || taxLoading}
           >
-            <Download className="h-4 w-4" />
-            Download 1099-NEC ({year})
+            {downloading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {hasDocs && year
+              ? `Download 1099-NEC (${year})`
+              : 'Download 1099-NEC'}
           </Button>
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            1099-NEC forms are issued each January for the prior tax year. Contact
-            dispatch if you need a correction.
+            {hasDocs
+              ? '1099-NEC forms are issued each January for the prior tax year. Contact dispatch if you need a correction.'
+              : "Your administrator hasn't uploaded a 1099 yet. You'll be notified when one is available."}
           </p>
+
         </CardContent>
       </Card>
 
