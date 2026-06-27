@@ -1,92 +1,96 @@
-## My Settlements — full-page 3-column dashboard for 1099 owner-operators
+## Goal
+Activate the "1099 Tax Statements" card by letting admins/dispatchers upload 1099 PDFs to a driver's profile and letting drivers download their own forms by tax year.
 
-Replaces the cramped "My Paystubs" modal with a dedicated route, premium fintech layout, and proper truck-driver terminology.
+## Task 1 — Backend (Storage + DB)
 
-### Task 1 — Routing & navigation
+**Storage bucket** (via tool, not SQL):
+- Create private bucket `tax-documents`.
+- File path convention: `{driver_user_id}/{tax_year}/{uuid}.pdf` so RLS can match the first folder segment to `auth.uid()`.
 
-- **Remove** the visible "My Paystubs" button + its `MyPaystubsDialog` lazy-load in `src/components/driver/WeeklyPerformanceWidget.tsx`. Replace it with a subtle `<Link to="/driver/settlements">View Settlements →</Link>` button so the entry point doesn't disappear.
-- Clean up the unused `MyPaystubsDialog` import in `src/components/driver/DriverPayWidget.tsx`.
-- Leave `MyPaystubsDialog.tsx` on disk for now (still imported by other tools) — only the driver-dashboard button is removed.
-- Add a new route in `src/App.tsx`: `/driver/settlements` → `<DriverSettlements />`, guarded by the existing `driver` role `ProtectedRoute`.
-- In `src/components/layout/AppSidebar.tsx`, insert a new driver-only menu item between "My Loads" and "My Stats":
-  - Title: **My Settlements**, icon: `Receipt` from lucide, path: `/driver/settlements`.
-- Create `src/pages/DriverSettlements.tsx` as the page entry, plus child components under `src/components/driver/settlements/`.
+**Storage RLS** on `storage.objects` for bucket `tax-documents`:
+- `SELECT`: admins/dispatchers in same org (via `has_admin_access(auth.uid())`) OR `auth.uid()::text = (storage.foldername(name))[1]` (driver self).
+- `INSERT` / `UPDATE` / `DELETE`: admins/dispatchers only (`has_admin_access`).
 
-### Task 2 — Left column: Settlement History
+**Table `public.tax_documents`** (single migration):
+```
+id uuid pk default gen_random_uuid()
+org_id uuid not null            -- for tenant isolation, set via trigger
+driver_id uuid not null         -- references auth.users(id); equals drivers.user_id
+tax_year integer not null check (tax_year between 1990 and 2100)
+file_path text not null
+uploaded_by uuid                -- auth.uid() of admin
+created_at timestamptz default now()
+unique (driver_id, tax_year, file_path)
+```
+- `GRANT SELECT, INSERT, UPDATE, DELETE ON public.tax_documents TO authenticated;`
+- `GRANT ALL ON public.tax_documents TO service_role;`
+- `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`
+- Trigger `set_tax_documents_org_id` on insert: sets `org_id = get_user_org_id(auth.uid())` if null, and sets `uploaded_by = auth.uid()`.
+- Policies:
+  - `SELECT`: `driver_id = auth.uid()` OR (`has_admin_access(auth.uid())` AND `org_id = get_user_org_id(auth.uid())`).
+  - `INSERT`: `has_admin_access(auth.uid())` AND `org_id = get_user_org_id(auth.uid())` AND the target `driver_id` belongs to a driver in the same org (sub-select on `public.drivers` where `user_id = driver_id`).
+  - `UPDATE` / `DELETE`: admin-only, same-org.
+- Index on `(driver_id, tax_year desc)`.
 
-`SettlementHistoryList.tsx`
+> Note: the user's spec said "fk to profiles". Because the RLS check is `driver_id = auth.uid()`, the column must store the auth user id (i.e. `drivers.user_id` / `profiles.user_id`). FK target is `auth.users(id)` since `profiles.user_id` is not unique-constrained as a FK target everywhere in this project.
 
-- Scrollable list, fixed width (`w-80`), sticky on `lg` screens.
-- Query: `driver_settlements` for the signed-in driver, ordered `period_end desc`, joined to settlement totals already on the row.
-- For each row show:
-  - **Period end date** (large, e.g. `Jun 22, 2026`) and small period range underneath.
-  - **Total Miles** (replaces "Hours") — sum of `booked_miles` from `fleet_loads` in the settlement period (driver delivered loads), fetched in one batched RPC-style query via `buildSettlementDocumentData`-style helper, OR derived in a `useSettlementMiles(settlementIds)` hook that runs a single grouped query.
-  - **Gross Revenue** = `gross_pay`.
-  - **Net Settlement** = `net_pay` (fallback `gross_pay - deductions + reimbursements + escrow_credited_amount`).
-  - Status pill (`paid`, `approved`, `draft`).
-- Selected row highlighted with `bg-primary/10 border-l-2 border-primary`. Default selection = most recent.
+## Task 2 — Admin Upload UI
 
-### Task 3 — Center column: visuals & breakdown
+Add a new collapsible "Tax Documents" section inside `src/components/drivers/DriverDetailSheet.tsx` (visible only when `!readOnly`), or a new component `src/components/drivers/DriverTaxDocuments.tsx` imported by the sheet.
 
-`SettlementDetailPanel.tsx`
+UI:
+- Header: "Tax Documents (1099-NEC)" with `FileSpreadsheet` icon.
+- Upload form (inline, not modal):
+  - `Select` for Tax Year — options = last 7 years, default = previous calendar year.
+  - `Input type="file" accept="application/pdf"` (max 10 MB client check).
+  - Submit button "Upload 1099" with loading state.
+- On submit:
+  1. Resolve `driver_user_id` from `driver.user_id` (guard: if missing, toast "Driver has no linked user account").
+  2. Upload to bucket `tax-documents` at `{driver_user_id}/{tax_year}/{uuid}.pdf` using `supabase.storage.from('tax-documents').upload(...)`.
+  3. Insert row in `public.tax_documents`.
+  4. Invalidate query `['tax-documents', driver_user_id]`.
+- List below: existing tax documents (year desc), each row shows `Tax Year`, upload date, filename, View (signed URL, opens new tab), Delete (with `AlertDialog` confirm — deletes storage object then DB row).
+- New hook: `src/hooks/useDriverTaxDocuments.ts` with `useTaxDocuments(driverUserId)`, `useUploadTaxDocument()`, `useDeleteTaxDocument()`.
 
-- **Top bar**: settlement period (`MMM d – MMM d, yyyy`), status badge, prominent `Download PDF` button (calls existing `generateSettlementPdf(selected.id)`).
-- **Hero number**: "Net Settlement" as the page's largest element — `text-5xl lg:text-6xl font-bold tracking-tight`, currency-formatted, in `text-foreground` with a small "Take-Home Pay" caption above.
-- **Donut chart** (recharts `PieChart` + `Pie` with `innerRadius=70 outerRadius=110`, center label = Gross Revenue):
-  - Slices (semantic tokens, not hardcoded hex):
-    - **Net Settlement** — `hsl(var(--success))` (green)
-    - **Brokerage/Agency Split** — `hsl(var(--primary))` (blue/brand)
-    - **Fuel Advances** — `hsl(var(--destructive))` (red)
-    - **Deductions/Escrow** — `hsl(var(--accent))` (purple/secondary token)
-  - Legend below with $ + % per slice.
-  - Source: `driver_settlement_items` (`item_type` filter: `deduction` + description heuristics for fuel/escrow/agency), with `gross_pay` total as the chart total.
-- **Accordions** (`@/components/ui/accordion`, three sections, allow multi-open):
-  1. **Revenue** — Booked Linehaul, 100% Fuel Surcharge (FSC), Detention / Lumpers / Accessorials (rows pulled from `fleet_loads` + `load_accessorials` joined for the period via existing `settlement-pay-breakdown` helpers — already implemented).
-  2. **Deductions** — Fuel Card Advances, Trailer Rental, Escrow, Insurance (Bobtail / OccAcc). Itemized from `driver_settlement_items` where `item_type='deduction'`, bucketed by description keyword.
-  3. **Totals** — Gross Revenue, Total Deductions, Final Net Settlement (bold).
+## Task 3 — Driver Side Wire-Up
 
-### Task 4 — Right column: Tax & YTD
+Update `src/components/driver/settlements/TaxAndYtdPanel.tsx`:
+- Replace the local `years` memo (currently derived from settlement periods) with a query against `public.tax_documents` filtered to `driver_id = auth.uid()`, returning distinct `tax_year` values desc.
+- New small hook `useMyTaxDocuments()` in `src/hooks/useDriverTaxDocuments.ts` (shared file).
+- Behaviour:
+  - Loading → skeleton on the select + disabled button.
+  - Empty → disabled `Select` with placeholder "No forms available" and disabled download button with helper text "Your administrator hasn't uploaded a 1099 yet."
+  - Populated → `Select` shows available years, default = newest. Download button enabled.
+- Download flow:
+  1. Look up the most recent `tax_documents` row for `(auth.uid(), selectedYear)`.
+  2. Call `supabase.storage.from('tax-documents').createSignedUrl(file_path, 60)`.
+  3. Fetch the URL as a blob, create object URL, trigger anchor click with `download="1099-NEC-{year}.pdf"`, revoke object URL.
+  4. Toast success / error.
 
-`TaxAndYtdPanel.tsx`
+## Technical Notes
 
-- **1099 Tax Statements card**:
-  - `Select` dropdown of tax years derived from `min(period_start)…current year` for that driver.
-  - "Download 1099-NEC (PDF)" button. For now wired to a placeholder toast — actual generator will hook in later; the button just dispatches the year so we don't ship dead UI.
-  - Note line: "1099-NEC forms are issued each January for the prior tax year. Contact dispatch if you need a correction."
-- **YTD Snapshot card** (current calendar year):
-  - **YTD Gross Revenue** — `sum(gross_pay)`.
-  - **YTD Loaded Miles** — sum of delivered `fleet_loads.booked_miles` for the driver year-to-date.
-  - **YTD Net Pay** — `sum(net_pay)`.
-  - Small "as of {today}" timestamp, refetch on settlement realtime channel (`useDriverSettlementsRealtime` already exists).
+- All new queries use TanStack Query with the project-standard `refetchOnWindowFocus: false` and 5m `staleTime`.
+- No changes to `DashboardLayout` wrapping rules.
+- No changes to existing settlements logic — only the Tax Year dropdown source + download handler change.
+- Semantic tokens only (no hex/`text-white`).
+- Driver self-upload is NOT permitted (matches user spec — admins only).
 
-### Task 5 — UI aesthetics
+## Files
 
-- Page header: `My Settlements` (`text-3xl font-semibold tracking-tight`) + subtitle "1099 Owner-Operator Pay Statements".
-- 3-column layout: `grid grid-cols-1 lg:grid-cols-[20rem_minmax(0,1fr)_22rem] gap-6`. Stacks vertically on mobile (history collapses to a horizontally-scrollable strip on `<lg`).
-- All colors via semantic tokens (`bg-card`, `text-card-foreground`, `border-border`, `text-muted-foreground`, `bg-primary`, etc.) — no `text-white`/`bg-black`/hex literals.
-- Cards use existing `card-elevated` utility for the premium fintech feel.
-- Typography: section labels `text-xs uppercase tracking-wider text-muted-foreground`; numbers tabular-nums.
-- Hero net-settlement number dominates visually — every other amount on the page is smaller.
+**New**
+- `src/hooks/useDriverTaxDocuments.ts`
+- `src/components/drivers/DriverTaxDocuments.tsx`
 
-### Technical notes
+**Edited**
+- `src/components/drivers/DriverDetailSheet.tsx` — mount `<DriverTaxDocuments driver={driver} />` in a new section (hidden when `readOnly`).
+- `src/components/driver/settlements/TaxAndYtdPanel.tsx` — swap year source + real download handler.
 
-- New folder: `src/components/driver/settlements/`
-  - `SettlementHistoryList.tsx`
-  - `SettlementDetailPanel.tsx`
-  - `SettlementDonutChart.tsx`
-  - `SettlementAccordions.tsx`
-  - `TaxAndYtdPanel.tsx`
-- New page: `src/pages/DriverSettlements.tsx`
-- New hook: `src/hooks/useDriverSettlementsPage.ts` — wraps:
-  - `driver_settlements` list query
-  - `driver_settlement_items` for selected
-  - `fleet_loads` joined for period (delivered + driver_id + date range) to compute total miles and revenue line items
-  - YTD aggregates (single query: `gte('period_start', start-of-year)`)
-- Reuses existing `generateSettlementPdf` for downloads.
-- Reuses existing `useDriverSettlementsRealtime` so list + YTD refresh when a new settlement is generated/approved.
+**Migrations / tool calls**
+- `supabase--storage_create_bucket` → `tax-documents`, private.
+- `supabase--migration` → create `tax_documents` table, grants, RLS policies, trigger, plus `storage.objects` policies scoped to bucket `tax-documents`.
 
-### Out of scope
+## Out of Scope
 
-- No DB schema changes, no RLS edits — `driver_settlements` policies already allow drivers to read their own rows.
-- Actual 1099-NEC PDF generator (button stubbed with a toast pointing at the future generator).
-- Old `MyPaystubsDialog.tsx` file stays so other surfaces that still reference it keep working; only the driver-dashboard entry point switches to the new page.
+- Generating 1099 PDFs server-side (admins upload externally produced PDFs).
+- Bulk upload / CSV import.
+- Email notification to driver on upload (can be a follow-up).
