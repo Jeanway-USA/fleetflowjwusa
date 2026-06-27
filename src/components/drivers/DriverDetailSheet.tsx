@@ -308,7 +308,9 @@ export function DriverDetailSheet({
               {(isOwner || hasRole('payroll_admin')) && (
                 <DriverBankingDetails driverId={driver.id} />
               )}
+              {!readOnly && <DriverTaxDocuments driver={driver} />}
             </div>
+
 
 
             {canForceReonboard && !readOnly && (
