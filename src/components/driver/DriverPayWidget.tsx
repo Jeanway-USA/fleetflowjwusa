@@ -104,14 +104,11 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
           <DollarSign className="h-5 w-5 text-primary" />
           My Pay This Week
         </CardTitle>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 text-xs"
-          onClick={() => setSettlementsOpen(true)}
-        >
-          <Receipt className="h-3.5 w-3.5 mr-1.5" />
-          My Settlements
+        <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
+          <Link to="/driver/settlements">
+            <Receipt className="h-3.5 w-3.5 mr-1.5" />
+            My Settlements
+          </Link>
         </Button>
       </CardHeader>
 
