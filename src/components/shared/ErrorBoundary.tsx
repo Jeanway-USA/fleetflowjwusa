@@ -96,6 +96,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
       }
 
       if (this.props.compact) {
+        if (this.props.fallback !== undefined) {
+          return <>{this.props.fallback}</>;
+        }
         if (isWsIssue) {
           // Live updates aren't critical — degrade gracefully instead of alarming the user.
           return (
