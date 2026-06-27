@@ -17,8 +17,6 @@ interface DriverPayWidgetProps {
 }
 
 export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetProps) {
-  const [settlementsOpen, setSettlementsOpen] = useState(false);
-
   // Keep widget + settlements list in sync with admin changes in real-time.
   useDriverSettlementsRealtime(driverId);
 
