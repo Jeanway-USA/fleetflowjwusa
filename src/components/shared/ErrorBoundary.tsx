@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 type Props = {
   children: React.ReactNode;
   compact?: boolean;
+  /** Custom fallback rendered in place of the default compact error UI. */
+  fallback?: React.ReactNode;
 };
 
 type State = {
