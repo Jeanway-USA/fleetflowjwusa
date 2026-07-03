@@ -666,7 +666,12 @@ export default function Trucks() {
                   title="Truck Documents"
                 />
               </TabsContent>
-              <TabsContent value="financing" className="mt-4">
+              <TabsContent value="financing" className="mt-4 space-y-4">
+                <TruckLoanPaymentsSection
+                  truckId={viewingTruck.id}
+                  loanBalance={viewingTruck.loan_balance ?? null}
+                  originalLoanAmount={(viewingTruck as any).original_loan_amount ?? null}
+                />
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
@@ -674,15 +679,11 @@ export default function Trucks() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {viewingTruck.lender_name || viewingTruck.loan_balance ? (
+                    {viewingTruck.lender_name || viewingTruck.loan_balance || (viewingTruck as any).original_loan_amount ? (
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="text-muted-foreground">Lender</p>
                           <p className="font-medium">{viewingTruck.lender_name || '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Remaining Balance</p>
-                          <p className="font-medium">{viewingTruck.loan_balance ? formatCurrency(viewingTruck.loan_balance) : '—'}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Monthly Payment</p>
@@ -715,6 +716,7 @@ export default function Trucks() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
             </Tabs>
           )}
         </DialogContent>
