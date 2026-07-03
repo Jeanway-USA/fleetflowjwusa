@@ -570,10 +570,22 @@ export default function Trucks() {
                     <Input id="lender_name" value={(formData as any).lender_name || ''} onChange={(e) => setFormData({ ...formData, lender_name: e.target.value || null } as any)} placeholder="e.g. Daimler Truck Financial" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="loan_balance">Loan Balance ($)</Label>
-                    <Input id="loan_balance" type="number" step="0.01" value={(formData as any).loan_balance || ''} onChange={(e) => setFormData({ ...formData, loan_balance: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                    <Label htmlFor="original_loan_amount">Original Loan Amount ($)</Label>
+                    <Input id="original_loan_amount" type="number" step="0.01" value={(formData as any).original_loan_amount || ''} onChange={(e) => setFormData({ ...formData, original_loan_amount: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="loan_balance">Remaining Loan Balance ($)</Label>
+                    <Input id="loan_balance" type="number" step="0.01" value={(formData as any).loan_balance || ''} onChange={(e) => setFormData({ ...formData, loan_balance: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                    <p className="text-xs text-muted-foreground">Use "Log Loan Payment" in the truck details view to decrement this over time.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="monthly_payment">Monthly Payment ($)</Label>
+                    <Input id="monthly_payment" type="number" step="0.01" value={(formData as any).monthly_payment || ''} onChange={(e) => setFormData({ ...formData, monthly_payment: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="monthly_payment">Monthly Payment ($)</Label>
