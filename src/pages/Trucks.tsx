@@ -588,14 +588,12 @@ export default function Trucks() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="monthly_payment">Monthly Payment ($)</Label>
-                    <Input id="monthly_payment" type="number" step="0.01" value={(formData as any).monthly_payment || ''} onChange={(e) => setFormData({ ...formData, monthly_payment: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="interest_rate">Interest Rate (%)</Label>
                     <Input id="interest_rate" type="number" step="0.01" value={(formData as any).interest_rate || ''} onChange={(e) => setFormData({ ...formData, interest_rate: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
                   </div>
+                  <div />
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="loan_term_months">Loan Term (months)</Label>
