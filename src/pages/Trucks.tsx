@@ -64,6 +64,7 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     loan_start_date,
     lender_name,
   } = truck;
+  const original_loan_amount = (truck as any).original_loan_amount as number | null | undefined;
 
   return {
     unit_number: unit_number ?? undefined,
@@ -78,13 +79,15 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     current_driver_id: current_driver_id ?? null,
     purchase_mileage: purchase_mileage ?? null,
     loan_balance: loan_balance ?? null,
+    original_loan_amount: original_loan_amount ?? null,
     monthly_payment: monthly_payment ?? null,
     interest_rate: interest_rate ?? null,
     loan_term_months: loan_term_months ?? null,
     loan_start_date: loan_start_date ?? null,
     lender_name: lender_name ?? null,
-  };
+  } as Partial<TruckInsert>;
 };
+
 
 export default function Trucks() {
   const queryClient = useQueryClient();
