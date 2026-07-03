@@ -266,14 +266,27 @@ export default function Trucks() {
     { key: 'status', header: 'Status', render: (truck: TruckWithDriver) => <StatusBadge status={truck.status} /> },
     {
       key: 'loan',
-      header: 'Loan',
+      header: 'Loan Balance',
       hiddenOnMobile: true,
       render: (truck: TruckWithDriver) => {
-        const balance = truck.loan_balance;
-        if (!balance || balance <= 0) return <span className="text-muted-foreground">—</span>;
-        return <Badge variant="secondary" className="text-xs font-mono">{formatCurrency(balance, { maximumFractionDigits: 0 })}</Badge>;
+        const balance = Number(truck.loan_balance ?? 0);
+        const original = Number((truck as any).original_loan_amount ?? 0);
+        if (balance <= 0 && original > 0) {
+          return (
+            <Badge className="bg-green-600/10 text-green-700 border border-green-600/20 hover:bg-green-600/10 text-xs">
+              Paid Off
+            </Badge>
+          );
+        }
+        if (balance <= 0) return <span className="text-muted-foreground">—</span>;
+        return (
+          <Badge variant="secondary" className="text-xs font-mono">
+            {formatCurrency(balance, { maximumFractionDigits: 0 })} Remaining
+          </Badge>
+        );
       },
     },
+
     { 
       key: 'next_120_inspection', 
       header: '120-Day Inspection',
