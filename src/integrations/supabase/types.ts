@@ -4591,6 +4591,50 @@ export type Database = {
           },
         ]
       }
+      truck_loan_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          org_id: string
+          payment_date: string
+          truck_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          org_id: string
+          payment_date?: string
+          truck_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          org_id?: string
+          payment_date?: string
+          truck_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "truck_loan_payments_truck_id_fkey"
+            columns: ["truck_id"]
+            isOneToOne: false
+            referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       truck_stops: {
         Row: {
           amenities: string[] | null
@@ -4656,6 +4700,7 @@ export type Database = {
           monthly_payment: number | null
           next_inspection_date: string | null
           org_id: string
+          original_loan_amount: number | null
           purchase_mileage: number | null
           status: string
           unit_number: string
@@ -4682,6 +4727,7 @@ export type Database = {
           monthly_payment?: number | null
           next_inspection_date?: string | null
           org_id: string
+          original_loan_amount?: number | null
           purchase_mileage?: number | null
           status?: string
           unit_number: string
@@ -4708,6 +4754,7 @@ export type Database = {
           monthly_payment?: number | null
           next_inspection_date?: string | null
           org_id?: string
+          original_loan_amount?: number | null
           purchase_mileage?: number | null
           status?: string
           unit_number?: string

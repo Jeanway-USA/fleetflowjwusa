@@ -28,6 +28,8 @@ import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { addDays, addMonths, differenceInDays, format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
+import { TruckLoanPaymentsSection } from '@/components/trucks/TruckLoanPaymentsSection';
+
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
 type TruckInsert = Database['public']['Tables']['trucks']['Insert'];
@@ -64,6 +66,7 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     loan_start_date,
     lender_name,
   } = truck;
+  const original_loan_amount = (truck as any).original_loan_amount as number | null | undefined;
 
   return {
     unit_number: unit_number ?? undefined,
@@ -78,13 +81,15 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
     current_driver_id: current_driver_id ?? null,
     purchase_mileage: purchase_mileage ?? null,
     loan_balance: loan_balance ?? null,
+    original_loan_amount: original_loan_amount ?? null,
     monthly_payment: monthly_payment ?? null,
     interest_rate: interest_rate ?? null,
     loan_term_months: loan_term_months ?? null,
     loan_start_date: loan_start_date ?? null,
     lender_name: lender_name ?? null,
-  };
+  } as Partial<TruckInsert>;
 };
+
 
 export default function Trucks() {
   const queryClient = useQueryClient();
@@ -263,14 +268,27 @@ export default function Trucks() {
     { key: 'status', header: 'Status', render: (truck: TruckWithDriver) => <StatusBadge status={truck.status} /> },
     {
       key: 'loan',
-      header: 'Loan',
+      header: 'Loan Balance',
       hiddenOnMobile: true,
       render: (truck: TruckWithDriver) => {
-        const balance = truck.loan_balance;
-        if (!balance || balance <= 0) return <span className="text-muted-foreground">—</span>;
-        return <Badge variant="secondary" className="text-xs font-mono">{formatCurrency(balance, { maximumFractionDigits: 0 })}</Badge>;
+        const balance = Number(truck.loan_balance ?? 0);
+        const original = Number((truck as any).original_loan_amount ?? 0);
+        if (balance <= 0 && original > 0) {
+          return (
+            <Badge className="bg-green-600/10 text-green-700 border border-green-600/20 hover:bg-green-600/10 text-xs">
+              Paid Off
+            </Badge>
+          );
+        }
+        if (balance <= 0) return <span className="text-muted-foreground">—</span>;
+        return (
+          <Badge variant="secondary" className="text-xs font-mono">
+            {formatCurrency(balance, { maximumFractionDigits: 0 })} Remaining
+          </Badge>
+        );
       },
     },
+
     { 
       key: 'next_120_inspection', 
       header: '120-Day Inspection',
@@ -554,20 +572,30 @@ export default function Trucks() {
                     <Input id="lender_name" value={(formData as any).lender_name || ''} onChange={(e) => setFormData({ ...formData, lender_name: e.target.value || null } as any)} placeholder="e.g. Daimler Truck Financial" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="loan_balance">Loan Balance ($)</Label>
-                    <Input id="loan_balance" type="number" step="0.01" value={(formData as any).loan_balance || ''} onChange={(e) => setFormData({ ...formData, loan_balance: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                    <Label htmlFor="original_loan_amount">Original Loan Amount ($)</Label>
+                    <Input id="original_loan_amount" type="number" step="0.01" value={(formData as any).original_loan_amount || ''} onChange={(e) => setFormData({ ...formData, original_loan_amount: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label htmlFor="loan_balance">Remaining Loan Balance ($)</Label>
+                    <Input id="loan_balance" type="number" step="0.01" value={(formData as any).loan_balance || ''} onChange={(e) => setFormData({ ...formData, loan_balance: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                    <p className="text-xs text-muted-foreground">Use "Log Loan Payment" in the truck details view to decrement this over time.</p>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="monthly_payment">Monthly Payment ($)</Label>
                     <Input id="monthly_payment" type="number" step="0.01" value={(formData as any).monthly_payment || ''} onChange={(e) => setFormData({ ...formData, monthly_payment: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="interest_rate">Interest Rate (%)</Label>
                     <Input id="interest_rate" type="number" step="0.01" value={(formData as any).interest_rate || ''} onChange={(e) => setFormData({ ...formData, interest_rate: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
                   </div>
+                  <div />
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="loan_term_months">Loan Term (months)</Label>
@@ -640,7 +668,12 @@ export default function Trucks() {
                   title="Truck Documents"
                 />
               </TabsContent>
-              <TabsContent value="financing" className="mt-4">
+              <TabsContent value="financing" className="mt-4 space-y-4">
+                <TruckLoanPaymentsSection
+                  truckId={viewingTruck.id}
+                  loanBalance={viewingTruck.loan_balance ?? null}
+                  originalLoanAmount={(viewingTruck as any).original_loan_amount ?? null}
+                />
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
@@ -648,15 +681,11 @@ export default function Trucks() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {viewingTruck.lender_name || viewingTruck.loan_balance ? (
+                    {viewingTruck.lender_name || viewingTruck.loan_balance || (viewingTruck as any).original_loan_amount ? (
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="text-muted-foreground">Lender</p>
                           <p className="font-medium">{viewingTruck.lender_name || '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Remaining Balance</p>
-                          <p className="font-medium">{viewingTruck.loan_balance ? formatCurrency(viewingTruck.loan_balance) : '—'}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Monthly Payment</p>
@@ -689,6 +718,7 @@ export default function Trucks() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
             </Tabs>
           )}
         </DialogContent>

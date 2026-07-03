@@ -1,96 +1,50 @@
-## Goal
-Activate the "1099 Tax Statements" card by letting admins/dispatchers upload 1099 PDFs to a driver's profile and letting drivers download their own forms by tax year.
+## Truck Loan Balance — Fix & Payment Logging
 
-## Task 1 — Backend (Storage + DB)
+### Problem
+The Trucks table "Loan" column reads `loan_balance`, but admins have been entering the **original loan amount** there and never decrementing it. There's no way to log payments and no visual signal when a loan is paid off.
 
-**Storage bucket** (via tool, not SQL):
-- Create private bucket `tax-documents`.
-- File path convention: `{driver_user_id}/{tax_year}/{uuid}.pdf` so RLS can match the first folder segment to `auth.uid()`.
+### Task 1 — Schema (migration)
+Add to `public.trucks`:
+- `original_loan_amount numeric` — the starting principal (immutable reference).
+- Keep existing `loan_balance numeric` as the **remaining balance**.
+- Backfill: `UPDATE trucks SET original_loan_amount = loan_balance WHERE original_loan_amount IS NULL AND loan_balance IS NOT NULL;`
 
-**Storage RLS** on `storage.objects` for bucket `tax-documents`:
-- `SELECT`: admins/dispatchers in same org (via `has_admin_access(auth.uid())`) OR `auth.uid()::text = (storage.foldername(name))[1]` (driver self).
-- `INSERT` / `UPDATE` / `DELETE`: admins/dispatchers only (`has_admin_access`).
+New ledger table `public.truck_loan_payments`:
+- `id`, `org_id`, `truck_id` (FK trucks), `payment_date date`, `amount numeric`, `note text`, `created_by uuid`, `created_at`, `updated_at`.
+- GRANTs to `authenticated` + `service_role`, RLS enabled.
+- Policies: SELECT/INSERT/UPDATE/DELETE limited to same-org users with `has_admin_access(auth.uid())` (owner/payroll_admin/dispatcher/safety per existing helper) — matches how other truck-financial data is scoped.
+- Trigger to auto-set `org_id` from `get_user_org_id(auth.uid())` when null (mirrors existing `set_trucks_org_id` pattern).
+- Trigger on INSERT: `UPDATE trucks SET loan_balance = COALESCE(loan_balance,0) - NEW.amount WHERE id = NEW.truck_id AND org_id = NEW.org_id;`
+- Trigger on DELETE: reverse (`+ OLD.amount`).
+- Trigger on UPDATE of amount: apply delta.
+- `updated_at` trigger.
 
-**Table `public.tax_documents`** (single migration):
-```
-id uuid pk default gen_random_uuid()
-org_id uuid not null            -- for tenant isolation, set via trigger
-driver_id uuid not null         -- references auth.users(id); equals drivers.user_id
-tax_year integer not null check (tax_year between 1990 and 2100)
-file_path text not null
-uploaded_by uuid                -- auth.uid() of admin
-created_at timestamptz default now()
-unique (driver_id, tax_year, file_path)
-```
-- `GRANT SELECT, INSERT, UPDATE, DELETE ON public.tax_documents TO authenticated;`
-- `GRANT ALL ON public.tax_documents TO service_role;`
-- `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`
-- Trigger `set_tax_documents_org_id` on insert: sets `org_id = get_user_org_id(auth.uid())` if null, and sets `uploaded_by = auth.uid()`.
-- Policies:
-  - `SELECT`: `driver_id = auth.uid()` OR (`has_admin_access(auth.uid())` AND `org_id = get_user_org_id(auth.uid())`).
-  - `INSERT`: `has_admin_access(auth.uid())` AND `org_id = get_user_org_id(auth.uid())` AND the target `driver_id` belongs to a driver in the same org (sub-select on `public.drivers` where `user_id = driver_id`).
-  - `UPDATE` / `DELETE`: admin-only, same-org.
-- Index on `(driver_id, tax_year desc)`.
+### Task 2 — Trucks list column
+`src/pages/Trucks.tsx`, `loan` column render:
+- Read `truck.loan_balance` (still the remaining balance).
+- If `loan_balance <= 0` **and** `original_loan_amount > 0` → green "Paid Off" badge (`bg-success/10 text-success border-success/20`).
+- If `loan_balance > 0` → `${formatCurrency(loan_balance, {maximumFractionDigits:0})} Remaining` in the mono badge.
+- If both null/0 → em dash.
+- Rename header to "Loan Balance".
 
-> Note: the user's spec said "fk to profiles". Because the RLS check is `driver_id = auth.uid()`, the column must store the auth user id (i.e. `drivers.user_id` / `profiles.user_id`). FK target is `auth.users(id)` since `profiles.user_id` is not unique-constrained as a FK target everywhere in this project.
+### Task 3 — Edit form + Log Payment
+In the truck edit dialog (`src/pages/Trucks.tsx`):
+- Add `original_loan_amount` input right above `loan_balance`; relabel `loan_balance` to "Remaining Loan Balance ($)".
+- Add a "Log Loan Payment" section (only visible when editing an existing truck with a loan): amount input + optional date + note + "Record Payment" button. On submit, insert into `truck_loan_payments` (trigger decrements `loan_balance`), invalidate the trucks query, toast confirmation.
+- Below the button, show a compact recent-payments list (last 5) with delete buttons that reverse the payment via row delete.
 
-## Task 2 — Admin Upload UI
+In the truck detail view (`viewingTruck` block), show both:
+- Original Loan Amount
+- Remaining Balance (or "Paid Off" badge)
+- Small payments history table.
 
-Add a new collapsible "Tax Documents" section inside `src/components/drivers/DriverDetailSheet.tsx` (visible only when `!readOnly`), or a new component `src/components/drivers/DriverTaxDocuments.tsx` imported by the sheet.
+### Task 4 — Zero-state
+Handled in the badge logic above; also shown as a green "Paid Off" pill in the detail view when `loan_balance <= 0 && original_loan_amount > 0`.
 
-UI:
-- Header: "Tax Documents (1099-NEC)" with `FileSpreadsheet` icon.
-- Upload form (inline, not modal):
-  - `Select` for Tax Year — options = last 7 years, default = previous calendar year.
-  - `Input type="file" accept="application/pdf"` (max 10 MB client check).
-  - Submit button "Upload 1099" with loading state.
-- On submit:
-  1. Resolve `driver_user_id` from `driver.user_id` (guard: if missing, toast "Driver has no linked user account").
-  2. Upload to bucket `tax-documents` at `{driver_user_id}/{tax_year}/{uuid}.pdf` using `supabase.storage.from('tax-documents').upload(...)`.
-  3. Insert row in `public.tax_documents`.
-  4. Invalidate query `['tax-documents', driver_user_id]`.
-- List below: existing tax documents (year desc), each row shows `Tax Year`, upload date, filename, View (signed URL, opens new tab), Delete (with `AlertDialog` confirm — deletes storage object then DB row).
-- New hook: `src/hooks/useDriverTaxDocuments.ts` with `useTaxDocuments(driverUserId)`, `useUploadTaxDocument()`, `useDeleteTaxDocument()`.
+### Files
+- `supabase/migrations/*` — new column, table, GRANTs, RLS, triggers.
+- `src/pages/Trucks.tsx` — column render, form fields, payment logger UI, detail view update.
+- Supabase types will regenerate after migration approval.
 
-## Task 3 — Driver Side Wire-Up
-
-Update `src/components/driver/settlements/TaxAndYtdPanel.tsx`:
-- Replace the local `years` memo (currently derived from settlement periods) with a query against `public.tax_documents` filtered to `driver_id = auth.uid()`, returning distinct `tax_year` values desc.
-- New small hook `useMyTaxDocuments()` in `src/hooks/useDriverTaxDocuments.ts` (shared file).
-- Behaviour:
-  - Loading → skeleton on the select + disabled button.
-  - Empty → disabled `Select` with placeholder "No forms available" and disabled download button with helper text "Your administrator hasn't uploaded a 1099 yet."
-  - Populated → `Select` shows available years, default = newest. Download button enabled.
-- Download flow:
-  1. Look up the most recent `tax_documents` row for `(auth.uid(), selectedYear)`.
-  2. Call `supabase.storage.from('tax-documents').createSignedUrl(file_path, 60)`.
-  3. Fetch the URL as a blob, create object URL, trigger anchor click with `download="1099-NEC-{year}.pdf"`, revoke object URL.
-  4. Toast success / error.
-
-## Technical Notes
-
-- All new queries use TanStack Query with the project-standard `refetchOnWindowFocus: false` and 5m `staleTime`.
-- No changes to `DashboardLayout` wrapping rules.
-- No changes to existing settlements logic — only the Tax Year dropdown source + download handler change.
-- Semantic tokens only (no hex/`text-white`).
-- Driver self-upload is NOT permitted (matches user spec — admins only).
-
-## Files
-
-**New**
-- `src/hooks/useDriverTaxDocuments.ts`
-- `src/components/drivers/DriverTaxDocuments.tsx`
-
-**Edited**
-- `src/components/drivers/DriverDetailSheet.tsx` — mount `<DriverTaxDocuments driver={driver} />` in a new section (hidden when `readOnly`).
-- `src/components/driver/settlements/TaxAndYtdPanel.tsx` — swap year source + real download handler.
-
-**Migrations / tool calls**
-- `supabase--storage_create_bucket` → `tax-documents`, private.
-- `supabase--migration` → create `tax_documents` table, grants, RLS policies, trigger, plus `storage.objects` policies scoped to bucket `tax-documents`.
-
-## Out of Scope
-
-- Generating 1099 PDFs server-side (admins upload externally produced PDFs).
-- Bulk upload / CSV import.
-- Email notification to driver on upload (can be a follow-up).
+### Out of scope
+No changes to interest/APR math, amortization schedules, or maintenance columns.
