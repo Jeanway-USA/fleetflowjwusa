@@ -28,6 +28,8 @@ import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { addDays, addMonths, differenceInDays, format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
+import { TruckLoanPaymentsSection } from '@/components/trucks/TruckLoanPaymentsSection';
+
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
 type TruckInsert = Database['public']['Tables']['trucks']['Insert'];
