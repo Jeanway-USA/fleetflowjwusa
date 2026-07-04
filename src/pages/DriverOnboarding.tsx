@@ -813,6 +813,7 @@ export default function DriverOnboarding() {
                 onAccountNumberChange={(v) => updateCurrent({ accountNumber: v })}
                 bankAccountType={currentState.bankAccountType}
                 onBankAccountTypeChange={(v) => updateCurrent({ bankAccountType: v })}
+                employmentType={employmentType}
               />
 
               {chunkCount > 1 && (
