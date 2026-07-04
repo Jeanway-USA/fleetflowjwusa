@@ -147,12 +147,31 @@ export function RunW2PayrollDialog({
         extra_withholding: r.extra_withholding,
         dependents_amount: r.dependents_amount,
       };
+      const driver = w2Drivers.find((d) => d.id === r.driver_id);
+      const resolvedState = (driver?.tax_state || defaultState || 'FL').toUpperCase();
+      const sc = stateMap.get(resolvedState);
+      const stateConfig = sc
+        ? {
+            state_code: sc.state_code,
+            suta_rate: Number(sc.suta_rate),
+            suta_wage_base: Number(sc.suta_wage_base),
+            has_state_income_tax: !!sc.has_state_income_tax,
+            sit_rate: Number(sc.sit_rate),
+          }
+        : {
+            state_code: resolvedState,
+            suta_rate: 0,
+            suta_wage_base: 0,
+            has_state_income_tax: false,
+            sit_rate: 0,
+          };
       return {
         row: r,
-        b: calculateW2Payroll({ grossPay: r.gross_pay, settings, w4, ytd: EMPTY_YTD }),
+        state: resolvedState,
+        b: calculateW2Payroll({ grossPay: r.gross_pay, settings, w4, ytd: EMPTY_YTD, stateConfig }),
       };
     });
-  }, [rowList, settings]);
+  }, [rowList, settings, w2Drivers, defaultState, stateMap]);
 
   const totals = useMemo(() => {
     const acc = {
@@ -161,6 +180,7 @@ export function RunW2PayrollDialog({
       ss: 0,
       med: 0,
       addlMed: 0,
+      sit: 0,
       net: 0,
       empFica: 0,
       suta: 0,
@@ -171,12 +191,14 @@ export function RunW2PayrollDialog({
       acc.ss += b.socialSecurityTax;
       acc.med += b.medicareTax;
       acc.addlMed += b.additionalMedicareTax;
+      acc.sit += b.stateIncomeTax;
       acc.net += b.netPay;
       acc.empFica += b.employerFicaTotal;
       acc.suta += b.flSutaTax;
     });
     return acc;
   }, [previews]);
+
 
   const employerLiability = totals.empFica + totals.suta;
 
