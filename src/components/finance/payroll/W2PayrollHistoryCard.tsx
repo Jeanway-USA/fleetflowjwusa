@@ -128,13 +128,13 @@ export function W2PayrollHistoryCard() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-6 text-muted-foreground">
                       Loading…
                     </TableCell>
                   </TableRow>
                 ) : payrolls.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-6 text-muted-foreground">
                       No W-2 payroll runs yet. Click "Run W-2 Payroll" to create one.
                     </TableCell>
                   </TableRow>
@@ -142,6 +142,9 @@ export function W2PayrollHistoryCard() {
                   payrolls.map((p: any) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{getDriverName(p.driver_id, drivers)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">{p.tax_state ?? '—'}</Badge>
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {formatDate(p.period_start)} – {formatDate(p.period_end)}
                       </TableCell>
@@ -158,6 +161,9 @@ export function W2PayrollHistoryCard() {
                         {formatCurrency(
                           Number(p.medicare_tax ?? 0) + Number(p.additional_medicare_tax ?? 0),
                         )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(Number(p.state_income_tax ?? 0))}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
                         {formatCurrency(Number(p.employer_fica_total ?? 0))}
@@ -187,6 +193,7 @@ export function W2PayrollHistoryCard() {
                   ))
                 )}
               </TableBody>
+
             </Table>
           </div>
         </CardContent>
