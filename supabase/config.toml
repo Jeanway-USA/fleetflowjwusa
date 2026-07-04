@@ -46,3 +46,6 @@ verify_jwt = false
 
 [functions.accept-invitation]
 verify_jwt = true
+
+[functions.run-w2-payroll]
+verify_jwt = true
