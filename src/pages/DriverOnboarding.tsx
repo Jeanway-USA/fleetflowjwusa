@@ -496,13 +496,13 @@ export default function DriverOnboarding() {
           const idx = templates.findIndex(
             (t) => docRevisions[t.document_type]?.status === 'revision_requested',
           );
-          setStepIndex(idx >= 0 ? idx + 1 : 1);
+          setStepIndex(idx >= 0 ? idx + 2 : 2);
           window.scrollTo({ top: 0, behavior: 'smooth' });
           return;
         }
 
-        if (totalSteps > 1) {
-          setStepIndex(1);
+        if (totalSteps > 2) {
+          setStepIndex(2);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
           // No documents — credentials alone complete the flow
