@@ -406,6 +406,72 @@ Deno.serve(async (req) => {
       });
     }
 
+    // -------------------------------------------------------------------------
+    // Passthrough proxy for the @gusto/embedded-react-sdk.
+    // The SDK is configured with baseUrl = <this function's URL>, and issues
+    // regular Gusto REST calls like GET /v1/companies/:uuid/payrolls. Forward
+    // any /v1/* request upstream using the org's stored company access token.
+    // -------------------------------------------------------------------------
+    const url = new URL(req.url);
+    // Strip the function mount prefix (e.g. /functions/v1/run-w2-payroll)
+    const mountIdx = url.pathname.indexOf("/run-w2-payroll");
+    const subPath = mountIdx >= 0
+      ? url.pathname.slice(mountIdx + "/run-w2-payroll".length)
+      : url.pathname;
+
+    if (subPath.startsWith("/v1/")) {
+      // Block server-only endpoints from browser passthrough.
+      if (subPath.startsWith("/v1/partner_managed_companies")) {
+        return new Response(
+          JSON.stringify({ error: "Endpoint not available via proxy" }),
+          { status: 403, headers: { ...cors, "Content-Type": "application/json" } },
+        );
+      }
+
+      // All proxied calls require payroll access (owner or payroll_admin).
+      const { data: allowedProxy } = await admin.rpc("has_payroll_access", {
+        _user_id: userId,
+      });
+      if (!allowedProxy) {
+        return new Response(JSON.stringify({ error: "Access denied" }), {
+          status: 403,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+
+      const { token, companyUuid } = await getAccessToken(admin, orgId);
+      if (!token || !companyUuid) {
+        return new Response(
+          JSON.stringify({ error: "Gusto company not provisioned" }),
+          { status: 409, headers: { ...cors, "Content-Type": "application/json" } },
+        );
+      }
+
+      const upstreamUrl = `${GUSTO_BASE}${subPath}${url.search}`;
+      const fwdHeaders = new Headers();
+      fwdHeaders.set("Authorization", `Bearer ${token}`);
+      fwdHeaders.set("Accept", "application/json");
+      fwdHeaders.set("X-Gusto-API-Version", GUSTO_API_VERSION);
+      const ct = req.headers.get("Content-Type");
+      if (ct) fwdHeaders.set("Content-Type", ct);
+
+      const hasBody = req.method !== "GET" && req.method !== "HEAD";
+      const upstreamResp = await fetch(upstreamUrl, {
+        method: req.method,
+        headers: fwdHeaders,
+        body: hasBody ? await req.arrayBuffer() : undefined,
+      });
+
+      const respBody = await upstreamResp.arrayBuffer();
+      const respHeaders: Record<string, string> = { ...cors };
+      const upstreamCt = upstreamResp.headers.get("Content-Type");
+      if (upstreamCt) respHeaders["Content-Type"] = upstreamCt;
+      return new Response(respBody, {
+        status: upstreamResp.status,
+        headers: respHeaders,
+      });
+    }
+
     const body = await req.json().catch(() => ({}));
     const action: string = body?.action ?? "";
     const payload = body?.payload ?? {};
