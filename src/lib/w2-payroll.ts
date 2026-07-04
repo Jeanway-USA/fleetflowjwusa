@@ -75,6 +75,8 @@ export interface W2PayrollInput {
   settings: PayrollSettings;
   w4: W4Info;
   ytd: YtdSnapshot;
+  /** Resolved state tax config for this driver. Falls back to FL 2.7%/$7k if omitted. */
+  stateConfig?: StateTaxConfig;
 }
 
 export interface W2PayrollBreakdown {
@@ -83,14 +85,25 @@ export interface W2PayrollBreakdown {
   socialSecurityTax: number;
   medicareTax: number;
   additionalMedicareTax: number;
+  stateIncomeTax: number;
   employeeTotal: number;
   netPay: number;
   employerSsTax: number;
   employerMedicareTax: number;
   employerFicaTotal: number;
+  /** Employer SUTA tax for the driver's state (kept name `flSutaTax` for backwards compat). */
   flSutaTax: number;
   flSutaWageBaseApplied: number;
+  stateCode: string;
 }
+
+export const DEFAULT_STATE_CONFIG: StateTaxConfig = {
+  state_code: 'FL',
+  suta_rate: 0.027,
+  suta_wage_base: 7000,
+  has_state_income_tax: false,
+  sit_rate: 0,
+};
 
 export const PERIODS_PER_YEAR: Record<PayFrequency, number> = {
   weekly: 52,
