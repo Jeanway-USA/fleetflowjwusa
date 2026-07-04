@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Users, Shield, Sun, Moon, Building2, Palette, CreditCard, HardDrive, Settings as SettingsIcon, FileText } from 'lucide-react';
+import { Users, Shield, Sun, Moon, Building2, Palette, CreditCard, HardDrive, Settings as SettingsIcon, FileText, Percent } from 'lucide-react';
 import { CompanyTab } from '@/components/settings/CompanyTab';
 import { BrandingTab } from '@/components/settings/BrandingTab';
 import { BillingTab } from '@/components/settings/BillingTab';
@@ -14,6 +14,7 @@ import { TeamManagementTab } from '@/components/settings/TeamManagementTab';
 import { OnboardingPreferencesCard } from '@/components/settings/OnboardingPreferencesCard';
 import { DocumentTemplatesPanel } from '@/components/settings/DocumentTemplatesPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
+import { PayrollTaxesCard } from '@/components/settings/PayrollTaxesCard';
 
 export default function Settings() {
   const { canSimulateRoles, isDemoMode } = useAuth();
@@ -109,6 +110,10 @@ export default function Settings() {
                 <HardDrive className="h-4 w-4" />
                 Storage
               </TabsTrigger>
+              <TabsTrigger value="payroll" className="flex items-center gap-2">
+                <Percent className="h-4 w-4" />
+                Payroll
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="users" className="space-y-6">
@@ -175,6 +180,10 @@ export default function Settings() {
 
             <TabsContent value="storage">
               <StorageTab />
+            </TabsContent>
+
+            <TabsContent value="payroll">
+              <PayrollTaxesCard />
             </TabsContent>
           </Tabs>
         </TabsContent>
