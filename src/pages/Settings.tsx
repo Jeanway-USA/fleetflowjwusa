@@ -110,6 +110,10 @@ export default function Settings() {
                 <HardDrive className="h-4 w-4" />
                 Storage
               </TabsTrigger>
+              <TabsTrigger value="payroll" className="flex items-center gap-2">
+                <Percent className="h-4 w-4" />
+                Payroll
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="users" className="space-y-6">
