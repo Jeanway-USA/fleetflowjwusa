@@ -231,6 +231,38 @@ export function DriverDetailSheet({
               <CreditCard className="h-3.5 w-3.5" /> CDL #{driver.license_number}
             </p>
           )}
+          <div className="flex items-center gap-2 pt-1">
+            <span className="text-xs text-muted-foreground">Tax State:</span>
+            {canEditTaxState ? (
+              <Select
+                value={driver.tax_state ?? ''}
+                onValueChange={async (value) => {
+                  const { error } = await supabase
+                    .from('drivers')
+                    .update({ tax_state: value })
+                    .eq('id', driver.id);
+                  if (error) {
+                    toast.error(`Failed to update tax state: ${error.message}`);
+                  } else {
+                    toast.success(`Tax state set to ${value}`);
+                    queryClient.invalidateQueries({ queryKey: ['drivers'] });
+                  }
+                }}
+              >
+                <SelectTrigger className="h-7 w-28 text-xs">
+                  <SelectValue placeholder="Not set" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {US_STATES.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Badge variant="outline" className="text-[10px]">{driver.tax_state || 'Org default'}</Badge>
+            )}
+            <span className="text-[10px] text-muted-foreground">Used for SUTA & state income tax withholding.</span>
+          </div>
         </div>
 
         {driver.employment_type === 'lease_purchase' && leaseAgreement && (
