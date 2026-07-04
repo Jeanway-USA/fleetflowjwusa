@@ -181,6 +181,10 @@ export default function Settings() {
             <TabsContent value="storage">
               <StorageTab />
             </TabsContent>
+
+            <TabsContent value="payroll">
+              <PayrollTaxesCard />
+            </TabsContent>
           </Tabs>
         </TabsContent>
 
