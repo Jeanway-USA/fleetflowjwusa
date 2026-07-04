@@ -103,7 +103,7 @@ export function TruckLoanPaymentsSection({ truckId, loanBalance, originalLoanAmo
             </Badge>
           ) : (
             <Badge variant="secondary" className="font-mono">
-              {formatCurrency(loanBalance ?? 0, { maximumFractionDigits: 0 })} Remaining
+              {formatCurrency(effectiveBalance, { maximumFractionDigits: 0 })} Remaining
             </Badge>
           )}
         </CardTitle>
