@@ -14,6 +14,7 @@ import { SuperAdminGuard } from "@/components/shared/SuperAdminGuard";
 import { BrandColorInjector } from "@/components/shared/BrandColorInjector";
 import { RouteTitle } from "@/components/shared/RouteTitle";
 import { Loader2 } from "lucide-react";
+import { GustoAppProvider } from "@/components/providers/GustoAppProvider";
 
 // Lazy-loaded pages
 const Auth = lazy(() => import("./pages/Auth"));
@@ -93,6 +94,7 @@ const App = () => {
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AuthProvider>
               <TimeDisplayProvider>
+                <GustoAppProvider>
                 <BrandColorInjector />
                 <RouteTitle />
                 <ErrorBoundary>
@@ -289,6 +291,7 @@ const App = () => {
                   </Routes>
                 </Suspense>
               </ErrorBoundary>
+                </GustoAppProvider>
               </TimeDisplayProvider>
             </AuthProvider>
           </BrowserRouter>
