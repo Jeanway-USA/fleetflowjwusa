@@ -360,7 +360,7 @@ export function RunW2PayrollDialog({
             <div className="border rounded-md p-3 bg-muted/30">
               <div className="text-xs uppercase text-muted-foreground">Total Employee Withholding</div>
               <div className="text-lg font-semibold">
-                {formatCurrency(totals.fit + totals.ss + totals.med + totals.addlMed)}
+                {formatCurrency(totals.fit + totals.ss + totals.med + totals.addlMed + totals.sit)}
               </div>
             </div>
             <div className="border rounded-md p-3 bg-amber-50 dark:bg-amber-950/20">
@@ -369,7 +369,7 @@ export function RunW2PayrollDialog({
                 {formatCurrency(employerLiability)}
               </div>
               <div className="text-[10px] text-amber-800 dark:text-amber-300">
-                FICA match ({formatCurrency(totals.empFica)}) + FL SUTA ({formatCurrency(totals.suta)})
+                FICA match ({formatCurrency(totals.empFica)}) + State SUTA ({formatCurrency(totals.suta)})
               </div>
             </div>
             <div className="border rounded-md p-3 bg-primary/5">
