@@ -168,13 +168,11 @@ export default function DriverOnboarding() {
       setDeepLinked(true);
       return;
     }
-    const idx = templates.findIndex((t) => docRevisions[t.document_type]?.status === 'revision_requested');
-    if (idx >= 0) {
-      setStepIndex(idx + 2);
-      setDeepLinked(true);
-    } else {
-      setDeepLinked(true);
-    }
+    const hasDocRevision = Object.values(docRevisions).some(
+      (r) => r.status === 'revision_requested',
+    );
+    if (hasDocRevision) setStepIndex(2);
+    setDeepLinked(true);
   }, [revisionMode, driverRow, templates, docRevisions, deepLinked]);
 
 
