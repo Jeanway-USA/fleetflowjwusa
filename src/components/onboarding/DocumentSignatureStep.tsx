@@ -1,12 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, FileText, ShieldCheck, Landmark, ClipboardList } from 'lucide-react';
+import { AlertCircle, FileText, ShieldCheck, ClipboardList } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DocumentTemplateRenderer } from '@/components/onboarding/DocumentTemplateRenderer';
+import {
+  W2Documents,
+  EMPTY_W2_DOCS_STATE,
+  type W2DocsState,
+} from '@/components/onboarding/W2Documents';
+import {
+  ContractorDocuments,
+  EMPTY_CONTRACTOR_DOCS_STATE,
+  type ContractorDocsState,
+} from '@/components/onboarding/ContractorDocuments';
 import type { DriverPayType } from '@/lib/pay-format';
+
 
 // ---------------------------------------------------------------------------
 // Types shared with parent (DriverOnboarding)
