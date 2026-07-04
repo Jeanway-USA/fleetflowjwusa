@@ -40,8 +40,9 @@ function calcW2(input: {
   settings: any;
   w4: { filing_status: string; extra_withholding: number; dependents_amount: number };
   ytd: { ss_wages: number; medicare_wages: number; suta_wages: number };
+  stateConfig: { state_code: string; suta_rate: number; suta_wage_base: number; has_state_income_tax: boolean; sit_rate: number };
 }) {
-  const { settings, w4, ytd } = input;
+  const { settings, w4, ytd, stateConfig } = input;
   const gross = Math.max(0, Number(input.gross) || 0);
   const periods = PERIODS[settings.pay_frequency] ?? 52;
   const annualGross = gross * periods;
@@ -68,11 +69,15 @@ function calcW2(input: {
   const addlBase = Math.max(0, addlOver - addlDone);
   const additionalMedicareTax = round2(addlBase * Number(settings.additional_medicare_rate));
 
-  const sutaHead = Math.max(0, Number(settings.suta_wage_base) - ytd.suta_wages);
-  const flSutaWageBaseApplied = Math.min(gross, sutaHead);
-  const flSutaTax = round2(flSutaWageBaseApplied * Number(settings.suta_rate));
+  const stateIncomeTax = stateConfig.has_state_income_tax
+    ? round2(gross * (Number(stateConfig.sit_rate) || 0))
+    : 0;
 
-  const employeeTotal = round2(federalIncomeTax + socialSecurityTax + medicareTax + additionalMedicareTax);
+  const sutaHead = Math.max(0, Number(stateConfig.suta_wage_base) - ytd.suta_wages);
+  const flSutaWageBaseApplied = Math.min(gross, sutaHead);
+  const flSutaTax = round2(flSutaWageBaseApplied * Number(stateConfig.suta_rate));
+
+  const employeeTotal = round2(federalIncomeTax + socialSecurityTax + medicareTax + additionalMedicareTax + stateIncomeTax);
   const netPay = round2(gross - employeeTotal);
   const employerFicaTotal = round2(employerSsTax + employerMedicareTax);
 
@@ -82,6 +87,7 @@ function calcW2(input: {
     socialSecurityTax,
     medicareTax,
     additionalMedicareTax,
+    stateIncomeTax,
     employeeTotal,
     netPay,
     employerSsTax,
@@ -89,6 +95,7 @@ function calcW2(input: {
     employerFicaTotal,
     flSutaTax,
     flSutaWageBaseApplied: round2(flSutaWageBaseApplied),
+    stateCode: stateConfig.state_code,
   };
 }
 
