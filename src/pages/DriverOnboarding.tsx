@@ -420,28 +420,13 @@ export default function DriverOnboarding() {
             navigate('/driver-dashboard', { replace: true });
             return;
           }
-          // Jump to the first template needing revision
-          const idx = templates.findIndex(
-            (t) => docRevisions[t.document_type]?.status === 'revision_requested',
-          );
-          setStepIndex(idx >= 0 ? idx + 2 : 2);
+          setStepIndex(2);
           window.scrollTo({ top: 0, behavior: 'smooth' });
           return;
         }
 
-        if (totalSteps > 2) {
-          setStepIndex(2);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-          // No documents — credentials alone complete the flow
-          setSignedResults([]);
-          await supabase
-            .from('profiles')
-            .update({ onboarding_completed: true })
-            .eq('user_id', user!.id);
-          await refreshOrgData();
-          toast.success('Profile saved');
-        }
+        setStepIndex(2);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {
         console.error(err);
         toast.error(err instanceof Error ? err.message : 'Failed to save credentials');
