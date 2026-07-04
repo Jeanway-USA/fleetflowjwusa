@@ -108,6 +108,17 @@ export default function DriverOnboarding() {
     },
   });
 
+  // Hydrate employmentType from persisted drivers.employment_type on first load
+  useEffect(() => {
+    if (employmentType !== null) return;
+    const et = (driverRow as { employment_type?: string | null } | null | undefined)?.employment_type;
+    if (!et) return;
+    if (et === 'w2_company') setEmploymentType('W-2');
+    else setEmploymentType('1099'); // '1099_contractor' or 'lease_purchase'
+  }, [driverRow, employmentType]);
+
+
+
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['driver_onboarding_templates', orgId],
     enabled: !!orgId,
