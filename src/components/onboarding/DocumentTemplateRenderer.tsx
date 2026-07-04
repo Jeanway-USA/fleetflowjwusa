@@ -56,6 +56,7 @@ export interface DocumentTemplateRendererProps {
   onAccountNumberChange?: (value: string) => void;
   bankAccountType?: 'checking' | 'savings' | '';
   onBankAccountTypeChange?: (value: 'checking' | 'savings') => void;
+  employmentType?: '1099' | 'W-2' | null;
 }
 
 
