@@ -74,6 +74,7 @@ export default function DriverOnboarding() {
   const { user, orgId, refreshOrgData } = useAuth();
 
   const [stepIndex, setStepIndex] = useState(0);
+  const [employmentType, setEmploymentType] = useState<'1099' | 'W-2' | null>(null);
   const [deepLinked, setDeepLinked] = useState(false);
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [submitting, setSubmitting] = useState(false);
