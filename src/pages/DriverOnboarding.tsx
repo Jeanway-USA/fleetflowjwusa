@@ -870,7 +870,7 @@ export default function DriverOnboarding() {
                 ? `Page ${safeSubPageIndex + 1} of ${chunkCount} · Step ${stepIndex + 1}/${totalSteps}`
                 : `Step ${stepIndex + 1} of ${totalSteps}`}
           </span>
-          {!isCredentialsStep && (
+          {!isCredentialsStep && !isEmploymentStep && (
             fieldsRemaining > 0 ? (
               <span className="text-orange-600 dark:text-orange-400 font-medium mt-0.5">
                 Fields remaining: {fieldsRemaining}
