@@ -216,9 +216,15 @@ const DriverDashboard = React.forwardRef<HTMLDivElement>(function DriverDashboar
         <div id="tour-safety-bonus">
           <MonthlyBonusWidget driverId={driver.id} />
         </div>
+        {/* W-2 Pay Stubs (only renders for W-2 drivers with history) */}
+        <ErrorBoundary compact>
+          <DriverPayStubsCard />
+        </ErrorBoundary>
 
         {/* Driver Leaderboard */}
         <DriverLeaderboard readOnly />
+
+
 
         {/* Unified Driver Requests & Maintenance */}
         <div id="tour-driver-requests" className="space-y-3">
