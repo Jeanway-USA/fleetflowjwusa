@@ -88,6 +88,7 @@ export function DriverDetailSheet({
   const { isOwner, hasRole } = useAuth();
   const canViewSignedDocs = isOwner || hasRole('safety') || hasRole('payroll_admin');
   const canForceReonboard = isOwner || hasRole('payroll_admin');
+  const canEditTaxState = !readOnly && (isOwner || hasRole('payroll_admin'));
   const [chatOpen, setChatOpen] = useState(false);
   const [confirmReonboardOpen, setConfirmReonboardOpen] = useState(false);
   const queryClient = useQueryClient();
