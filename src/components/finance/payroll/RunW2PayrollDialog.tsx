@@ -283,19 +283,24 @@ export function RunW2PayrollDialog({
                 <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="text-left px-3 py-2">Driver</th>
+                    <th className="text-left px-3 py-2 w-16">State</th>
                     <th className="text-right px-3 py-2 w-28">Gross</th>
                     <th className="text-right px-3 py-2 w-24">FIT</th>
                     <th className="text-right px-3 py-2 w-24">SS 6.2%</th>
                     <th className="text-right px-3 py-2 w-24">Medicare</th>
+                    <th className="text-right px-3 py-2 w-24">SIT</th>
                     <th className="text-right px-3 py-2 w-28">Emp FICA</th>
-                    <th className="text-right px-3 py-2 w-24">FL SUTA</th>
+                    <th className="text-right px-3 py-2 w-24">SUTA</th>
                     <th className="text-right px-3 py-2 w-28 bg-primary/5">Net Pay</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {previews.map(({ row, b }) => (
+                  {previews.map(({ row, b, state }) => (
                     <tr key={row.driver_id} className="border-t">
                       <td className="px-3 py-2 font-medium">{nameOf(row.driver_id)}</td>
+                      <td className="px-3 py-2">
+                        <Badge variant="outline" className="text-xs">{state}</Badge>
+                      </td>
                       <td className="px-3 py-1">
                         <Input
                           type="number"
@@ -316,6 +321,9 @@ export function RunW2PayrollDialog({
                       <td className="px-3 py-2 text-right tabular-nums">
                         {formatCurrency(b.medicareTax + b.additionalMedicareTax)}
                       </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {formatCurrency(b.stateIncomeTax)}
+                      </td>
                       <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
                         {formatCurrency(b.employerFicaTotal)}
                       </td>
@@ -328,6 +336,7 @@ export function RunW2PayrollDialog({
                     </tr>
                   ))}
                 </tbody>
+
                 <tfoot className="border-t-2 bg-muted/40 font-medium">
                   <tr>
                     <td className="px-3 py-2">Totals ({previews.length})</td>
