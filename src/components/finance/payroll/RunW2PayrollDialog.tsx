@@ -99,6 +99,26 @@ export function RunW2PayrollDialog({
     },
   });
 
+  const { data: stateConfigs = [] } = useQuery<StateConfigRow[]>({
+    queryKey: ['state_tax_configurations'],
+    enabled: open,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('state_tax_configurations' as any)
+        .select('state_code, suta_rate, suta_wage_base, has_state_income_tax, sit_rate');
+      return ((data ?? []) as unknown as StateConfigRow[]);
+    },
+  });
+
+  const stateMap = useMemo(() => {
+    const m = new Map<string, StateConfigRow>();
+    stateConfigs.forEach((s) => m.set(s.state_code, s));
+    return m;
+  }, [stateConfigs]);
+
+  const defaultState = (settings as any)?.default_tax_state || 'FL';
+
+
   // Initialize rows when dialog opens
   useEffect(() => {
     if (!open) return;
