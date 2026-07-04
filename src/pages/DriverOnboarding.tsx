@@ -79,13 +79,10 @@ export default function DriverOnboarding() {
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
-  const [currentSubPageIndex, setCurrentSubPageIndex] = useState(0);
   const credentialsRef = useRef<DriverCredentialsStepHandle>(null);
   const [credentialsValid, setCredentialsValid] = useState(false);
+  const [documentsValid, setDocumentsValid] = useState(false);
 
-  useEffect(() => {
-    setCurrentSubPageIndex(0);
-  }, [stepIndex]);
 
 
 
