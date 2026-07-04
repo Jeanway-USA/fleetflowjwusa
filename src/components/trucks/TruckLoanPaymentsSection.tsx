@@ -84,11 +84,12 @@ export function TruckLoanPaymentsSection({ truckId, loanBalance, originalLoanAmo
     onError: (e: any) => toast.error(e.message || 'Failed to remove payment'),
   });
 
-  const isPaidOff = (loanBalance ?? 0) <= 0 && (originalLoanAmount ?? 0) > 0;
+  const isPaidOff = loanBalance != null && loanBalance <= 0 && (originalLoanAmount ?? 0) > 0;
   const totalPaid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
   const originalDisplay = originalLoanAmount ?? (loanBalance ?? 0) + totalPaid;
+  const effectiveBalance = loanBalance ?? originalLoanAmount ?? 0;
   const progress = originalDisplay > 0
-    ? Math.min(100, Math.max(0, (1 - (loanBalance ?? 0) / originalDisplay) * 100))
+    ? Math.min(100, Math.max(0, (1 - effectiveBalance / originalDisplay) * 100))
     : 0;
 
   return (
