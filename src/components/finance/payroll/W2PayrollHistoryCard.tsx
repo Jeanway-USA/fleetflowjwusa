@@ -112,13 +112,15 @@ export function W2PayrollHistoryCard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Driver</TableHead>
+                  <TableHead>State</TableHead>
                   <TableHead>Period</TableHead>
                   <TableHead className="text-right">Gross</TableHead>
                   <TableHead className="text-right">FIT</TableHead>
                   <TableHead className="text-right">SS</TableHead>
                   <TableHead className="text-right">Medicare</TableHead>
+                  <TableHead className="text-right">SIT</TableHead>
                   <TableHead className="text-right">Emp FICA</TableHead>
-                  <TableHead className="text-right">FL SUTA</TableHead>
+                  <TableHead className="text-right">SUTA</TableHead>
                   <TableHead className="text-right">Net</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
