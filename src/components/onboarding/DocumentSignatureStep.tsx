@@ -1,12 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, FileText, ShieldCheck, Landmark, ClipboardList } from 'lucide-react';
+import { AlertCircle, FileText, ShieldCheck, ClipboardList } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DocumentTemplateRenderer } from '@/components/onboarding/DocumentTemplateRenderer';
+import {
+  W2Documents,
+  EMPTY_W2_DOCS_STATE,
+  type W2DocsState,
+} from '@/components/onboarding/W2Documents';
+import {
+  ContractorDocuments,
+  EMPTY_CONTRACTOR_DOCS_STATE,
+  type ContractorDocsState,
+} from '@/components/onboarding/ContractorDocuments';
 import type { DriverPayType } from '@/lib/pay-format';
+
 
 // ---------------------------------------------------------------------------
 // Types shared with parent (DriverOnboarding)
@@ -88,29 +99,9 @@ const SHARED_PLACEHOLDERS: PlaceholderDoc[] = [
   },
 ];
 
-const W2_PLACEHOLDERS: PlaceholderDoc[] = [
-  {
-    id: 'placeholder_w4',
-    title: 'Federal W-4 Withholding',
-    description: 'Employee withholding certificate. A full digital form is coming soon.',
-    Icon: FileText,
-  },
-];
+// Employment-specific placeholder lists were replaced by real form components:
+// W2Documents (W-4 / I-9 / Direct Deposit) and ContractorDocuments (W-9 / IOO Agreement).
 
-const CONTRACTOR_PLACEHOLDERS: PlaceholderDoc[] = [
-  {
-    id: 'placeholder_ic_agreement',
-    title: 'Independent Contractor Agreement',
-    description: 'Master contractor terms between you and the carrier. A full signable version is coming soon.',
-    Icon: FileText,
-  },
-  {
-    id: 'placeholder_w9',
-    title: 'W-9 Tax Form',
-    description: 'Taxpayer identification for 1099 reporting. A full digital form is coming soon.',
-    Icon: Landmark,
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Validity helper
@@ -308,6 +299,12 @@ export function DocumentSignatureStep({
   onValidityChange,
 }: DocumentSignatureStepProps) {
   const [placeholderAcks, setPlaceholderAcks] = useState<Record<string, boolean>>({});
+  const [w2Docs, setW2Docs] = useState<W2DocsState>(EMPTY_W2_DOCS_STATE);
+  const [contractorDocs, setContractorDocs] = useState<ContractorDocsState>(
+    EMPTY_CONTRACTOR_DOCS_STATE,
+  );
+  const [w2Valid, setW2Valid] = useState(false);
+  const [contractorValid, setContractorValid] = useState(false);
 
   // Group templates by section
   const sharedTemplates = useMemo(
@@ -323,19 +320,11 @@ export function DocumentSignatureStep({
     [templates],
   );
 
-  // Compute active placeholder set based on employmentType
-  const activePlaceholders = useMemo<PlaceholderDoc[]>(() => {
-    const list = [...SHARED_PLACEHOLDERS];
-    if (employmentType === 'W-2') list.push(...W2_PLACEHOLDERS);
-    if (employmentType === '1099') list.push(...CONTRACTOR_PLACEHOLDERS);
-    return list;
-  }, [employmentType]);
-
   // Determine which real templates should count toward validity (skip approved ones in revision mode)
   const shouldValidateTemplate = (t: DocumentTemplateRow) =>
     !(revisionMode && docRevisions[t.document_type]?.status === 'approved');
 
-  // Aggregate validity
+  // Aggregate validity: shared templates + shared placeholders + real form components
   useEffect(() => {
     if (employmentType === null) {
       onValidityChange(false);
@@ -349,9 +338,13 @@ export function DocumentSignatureStep({
       .filter(shouldValidateTemplate)
       .every((t) => computeTemplateValidity(t, state[t.id] ?? EMPTY_TEMPLATE_STATE));
 
-    const placeholdersValid = activePlaceholders.every((p) => placeholderAcks[p.id] === true);
+    const sharedPlaceholdersValid = SHARED_PLACEHOLDERS.every(
+      (p) => placeholderAcks[p.id] === true,
+    );
 
-    onValidityChange(templatesValid && placeholdersValid);
+    const employmentFormsValid = employmentType === 'W-2' ? w2Valid : contractorValid;
+
+    onValidityChange(templatesValid && sharedPlaceholdersValid && employmentFormsValid);
     // We intentionally omit onValidityChange from deps to avoid loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -361,10 +354,12 @@ export function DocumentSignatureStep({
     contractorTemplates,
     state,
     placeholderAcks,
-    activePlaceholders,
+    w2Valid,
+    contractorValid,
     revisionMode,
     docRevisions,
   ]);
+
 
   if (employmentType === null) {
     return (
@@ -431,16 +426,11 @@ export function DocumentSignatureStep({
           />
           <div className="space-y-4">
             {w2Templates.map(renderTemplate)}
-            {W2_PLACEHOLDERS.map((doc) => (
-              <PlaceholderDocumentCard
-                key={doc.id}
-                doc={doc}
-                checked={placeholderAcks[doc.id] === true}
-                onCheckedChange={(v) =>
-                  setPlaceholderAcks((prev) => ({ ...prev, [doc.id]: v }))
-                }
-              />
-            ))}
+            <W2Documents
+              value={w2Docs}
+              onChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
+              onValidityChange={setW2Valid}
+            />
           </div>
         </section>
       ) : (
@@ -452,19 +442,17 @@ export function DocumentSignatureStep({
           />
           <div className="space-y-4">
             {contractorTemplates.map(renderTemplate)}
-            {CONTRACTOR_PLACEHOLDERS.map((doc) => (
-              <PlaceholderDocumentCard
-                key={doc.id}
-                doc={doc}
-                checked={placeholderAcks[doc.id] === true}
-                onCheckedChange={(v) =>
-                  setPlaceholderAcks((prev) => ({ ...prev, [doc.id]: v }))
-                }
-              />
-            ))}
+            <ContractorDocuments
+              value={contractorDocs}
+              onChange={(patch) =>
+                setContractorDocs((prev) => ({ ...prev, ...patch }))
+              }
+              onValidityChange={setContractorValid}
+            />
           </div>
         </section>
       )}
     </div>
   );
+
 }

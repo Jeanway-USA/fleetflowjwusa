@@ -1,62 +1,94 @@
-## Consolidated Document Signature Step
+## Goal
 
-Replace the existing per-template document steps (`driver_agreement`, `direct_deposit`) with a single new `DocumentSignatureStep` that renders sections: **Shared Documents** (all drivers) and a **1099-only** or **W-2-only** conditional block.
+Replace the "Coming soon" placeholder cards for employment-specific docs with real signature UI and form fields. Validity of every field/signature — shared + conditional — must gate the onboarding "Complete" button. No DB persistence yet (follow-up will wire storage).
 
-### New file: `src/components/onboarding/DocumentSignatureStep.tsx`
+## New files
+
+### `src/components/onboarding/W2Documents.tsx`
+Renders three signable forms stacked vertically:
+
+1. **Federal W-4 Withholding**
+   - Fields: Full name, SSN (9 digits), Address, Filing status (single/married/hoh via `RadioGroup`), Multiple jobs checkbox, Dependents amount (number), Other income (number, optional), Deductions (number, optional), Extra withholding (number, optional).
+   - Signature pad + date (auto-today, read-only).
+2. **Form I-9 Employment Eligibility**
+   - Section 1 fields: Full name, Other last names (optional), Address, DOB, SSN (9 digits), Email, Phone, Citizenship status (radio: US citizen / non-citizen national / permanent resident + alien # / authorized alien + expiry & doc #).
+   - Attestation checkbox ("I am aware that federal law provides for imprisonment…").
+   - Signature pad + date.
+3. **Direct Deposit Authorization**
+   - Fields: Bank name, Account type (radio checking/savings), Routing (9 digits), Account (≥4 digits), Confirm account (must match).
+   - Authorization checkbox.
+   - Signature pad + date.
 
 Props:
 ```ts
-interface DocumentSignatureStepProps {
-  employmentType: '1099' | 'W-2' | null;
-  templates: DocumentTemplateRow[];       // active templates loaded by parent
-  state: Record<string, TemplateState>;   // parent-owned per-template state
-  onUpdateTemplateState: (templateId: string, patch: Partial<TemplateState>) => void;
-  driverRow: DriverRow;                   // for driverName, licenseNumber, etc.
-  docRevisions: Record<string, { status: string; notes: string | null }>;
-  revisionMode: boolean;
+interface W2DocumentsProps {
+  driverRow: DriverRowLike;
+  value: W2DocsState;
+  onChange: (patch: Partial<W2DocsState>) => void;
   onValidityChange: (valid: boolean) => void;
 }
 ```
+Exports `W2DocsState` type, `EMPTY_W2_DOCS_STATE`, and `isW2DocsValid(state)` pure helper.
 
-Structure:
-1. **Shared Documents section** — `<h3>Shared Documents</h3>` + description. Renders templates whose `document_type ∈ SHARED_DOCUMENT_TYPES` (currently `['driver_agreement']` — universal safety/policy docs). Uses `DocumentTemplateRenderer` inline per shared template inside an accordion or vertical stack so the driver signs each in one scroll.
-2. **Conditional block** guarded on `employmentType`:
-   - `employmentType === 'W-2'` → renders `<W2DocumentsSection>`: templates in `W2_DOCUMENT_TYPES = ['direct_deposit']` (W-4 placeholder card noting "Coming soon" with a signed-off checkbox for scaffolding).
-   - `employmentType === '1099'` → renders `<Contractor1099DocumentsSection>`: placeholder cards for "Independent Contractor Agreement" and "W-9 Tax Form" with the same disabled/coming-soon treatment; excludes `direct_deposit`.
-   - When `employmentType` is `null` → renders an informational Alert prompting the user to go back and pick employment type.
-3. **Validity aggregation** — the component computes whether every rendered template's required fields (signature/address/CDL/SSN/bank/etc.) are filled, and calls `onValidityChange(true/false)` so the parent's Continue button gate works the same way it did per-template.
-4. **Revision banners** — if `revisionMode` and a rendered template has `docRevisions[type]?.status === 'revision_requested'`, show its `notes` in a destructive `Alert` above that template.
+### `src/components/onboarding/ContractorDocuments.tsx`
+Two signable forms:
 
-Categorization constants live at top of file:
-```ts
-const SHARED_DOCUMENT_TYPES = ['driver_agreement'] as const;
-const W2_DOCUMENT_TYPES = ['direct_deposit'] as const;
-const CONTRACTOR_DOCUMENT_TYPES: readonly string[] = []; // placeholders only for now
-```
+1. **W-9 Taxpayer ID**
+   - Fields: Legal name, Business name (optional), Federal tax classification (radio: individual/sole prop, single-member LLC, C-corp, S-corp, partnership, LLC, other), Address, TIN type (radio SSN/EIN), TIN value (9 digits).
+   - Certification checkboxes (backup withholding + accuracy).
+   - Signature pad + date.
+2. **Independent Owner-Operator Agreement**
+   - Read-only agreement text block (static contractor terms — no {{placeholders}}, plain English scope, indemnity, insurance, termination, IC status).
+   - Fields: Legal name, Business/DBA (optional), MC #, DOT #, Effective date (defaults to today).
+   - Two attestation checkboxes ("I have read and agree…", "I acknowledge independent contractor status, not employee").
+   - Signature pad + date.
 
-### Changes to `src/pages/DriverOnboarding.tsx`
+Same prop shape as W2Documents with `ContractorDocsState`, `EMPTY_CONTRACTOR_DOCS_STATE`, `isContractorDocsValid`.
 
-1. **Collapse steps.** Onboarding becomes exactly 3 steps: `Employment (0) → Credentials (1) → Documents (2)`. Constants become `EMPLOYMENT_STEP=0, CREDENTIALS_STEP=1, DOCUMENTS_STEP=2, totalSteps=3` (no longer `templates.length + 2`).
-2. **Replace the template rendering block** inside `<CardContent>` — the entire `currentTemplate ? <DocumentTemplateRenderer …> : null` branch is swapped for `<DocumentSignatureStep employmentType={employmentType} templates={templates} state={state} onUpdateTemplateState={(id,patch)=>setState(s=>({…s,[id]:{…(s[id]??EMPTY_TEMPLATE_STATE),…patch}}))} driverRow={driverRow} docRevisions={docRevisions} revisionMode={revisionMode} onValidityChange={setDocumentsValid} />`.
-3. **New state** `const [documentsValid, setDocumentsValid] = useState(false)`; `canContinue` on the docs step uses this instead of the current per-template `needsX` computation.
-4. **Remove sub-page pagination** (`currentSubPageIndex`, `chunks`, `Next Page`/`Previous Page` buttons) — no longer applicable since only one docs step exists. Continue button on docs step calls `finalizeSubmission` (renamed intent unchanged) and iterates over the same `templates` collection to upload/insert as today.
-5. **Preserve finalizeSubmission's existing loop** — it already walks all templates and uploads each; unchanged. In revision mode, keep the skip-approved-templates guard.
-6. **Deep-link revision effect** simplifies: `credentials_review_status === 'revision_requested'` → `setStepIndex(1)`; any doc revision → `setStepIndex(2)`.
-7. **Progress bar** now shows `Step X of 3`.
-8. **Title/description on docs step**: "Sign Your Onboarding Documents" / "Review and sign the shared documents, plus the ones specific to your employment type."
+### Signature reuse
+Both files reuse the existing signature pad component (`SignaturePad`/equivalent already used by `DocumentTemplateRenderer`). I'll locate it during the build and import — no new signature primitive.
 
-### Placeholder subcomponent styling
+## Changes to `src/components/onboarding/DocumentSignatureStep.tsx`
 
-Placeholder cards use a shadcn `Card` with a muted background, an `AlertCircle` icon, a "Coming soon" `Badge`, and a checkbox labeled "I acknowledge I'll sign this later" that must be checked to count toward validity — so 1099 flow can still complete during scaffolding.
+- Remove `W2_PLACEHOLDERS` and `CONTRACTOR_PLACEHOLDERS` (keep `SHARED_PLACEHOLDERS` — Safety Policy and Equipment Use Agreement stay as ack-checkbox cards for now).
+- Add local state:
+  ```ts
+  const [w2Docs, setW2Docs] = useState<W2DocsState>(EMPTY_W2_DOCS_STATE);
+  const [contractorDocs, setContractorDocs] = useState<ContractorDocsState>(EMPTY_CONTRACTOR_DOCS_STATE);
+  const [w2Valid, setW2Valid] = useState(false);
+  const [contractorValid, setContractorValid] = useState(false);
+  ```
+- In the W-2 branch: render `<W2Documents value={w2Docs} onChange={p => setW2Docs(s => ({...s, ...p}))} onValidityChange={setW2Valid} driverRow={driverRow} />` after any `w2Templates` (Direct Deposit template becomes redundant but stays rendered so nothing regresses).
+- In the 1099 branch: render `<ContractorDocuments ... onValidityChange={setContractorValid} />`.
+- Extend the aggregate validity effect:
+  ```
+  onValidityChange(
+    templatesValid &&
+    sharedPlaceholdersValid &&
+    (employmentType === 'W-2' ? w2Valid : contractorValid)
+  )
+  ```
+  where `sharedPlaceholdersValid` only checks `SHARED_PLACEHOLDERS` acks. Add `w2Valid`, `contractorValid`, `employmentType` to the effect deps.
 
-### Out of scope
+- No changes to `DriverOnboarding.tsx` — it already reads a single boolean via `onValidityChange`, which gates the Complete button.
 
-- Creating real 1099-only or W-2-only DB templates (`w9_tax_form`, `contractor_agreement`, `w4_form`, `safety_policy`, `equipment_use`). Placeholders occupy those slots for now.
-- Rewriting `DocumentTemplateRenderer` — it's reused as-is.
-- Changing how signed PDFs are uploaded/stored.
+## Validation rules (used by both new files and mirrored in `isXValid` helpers)
 
-### Technical notes
+Signature: must be a `data:image/...` URL.
+Text field: `.trim().length > 0`.
+SSN/TIN/EIN/Routing: exactly 9 digits after `\D` strip.
+Account #: ≥4 digits, `accountNumber === confirmAccountNumber`.
+Radios/select: non-empty string.
+Numbers (W-4 amounts): allowed empty for optional fields, must parse as number ≥0 when filled.
+Attestation checkboxes: all true.
 
-- Shared templates are recognized by `document_type` string membership, not template `name`, so seed data can rename freely.
-- `chunks` / `page_break` support in a template still works because `DocumentTemplateRenderer` receives the full `content`; if a template uses `{{page_break}}` it renders as one continuous scroll inside its Card (page break becomes an `<hr>` visually inside the docs step). Sub-page pagination is dropped.
-- Validity function is exported from `DocumentSignatureStep.tsx` as `computeTemplateValidity(template, state)` for reuse in aggregation.
+## Out of scope (explicit)
+
+- No new tables, edge functions, or storage uploads. `finalizeSubmission` unchanged.
+- No changes to shared placeholder cards (Safety Policy, Equipment Use) — they remain ack-only.
+- No edits to `DocumentTemplateRenderer` or existing DB templates.
+- No routing/step-index changes in `DriverOnboarding.tsx`.
+
+## Follow-up (not in this task)
+
+Persist `w2Docs` / `contractorDocs` + signature images to storage and an `onboarding_documents` table so onboarding review can see them.
