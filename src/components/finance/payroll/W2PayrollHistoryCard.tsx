@@ -17,6 +17,7 @@ interface Driver {
   last_name: string;
   status: string | null;
   employment_type: string | null;
+  tax_state: string | null;
 }
 
 export function W2PayrollHistoryCard() {
@@ -29,7 +30,7 @@ export function W2PayrollHistoryCard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, first_name, last_name, status, employment_type');
+        .select('id, first_name, last_name, status, employment_type, tax_state');
       if (error) throw error;
       return (data ?? []) as Driver[];
     },
@@ -87,7 +88,7 @@ export function W2PayrollHistoryCard() {
               <Wallet className="h-5 w-5" /> W-2 Payroll
             </CardTitle>
             <CardDescription>
-              Automated FIT + FICA withholding and Florida SUTA accrual for W-2 employees.
+              Automated FIT + FICA withholding and state SUTA / State Income Tax per driver's Tax State.
             </CardDescription>
           </div>
           <Button onClick={() => setDialogOpen(true)}>Run W-2 Payroll</Button>
@@ -103,7 +104,7 @@ export function W2PayrollHistoryCard() {
               value={formatCurrency(totals.fica)}
               tone="amber"
             />
-            <SummaryTile label="FL Reemployment Tax (SUTA)" value={formatCurrency(totals.suta)} tone="amber" />
+            <SummaryTile label="State Reemployment Tax (SUTA)" value={formatCurrency(totals.suta)} tone="amber" />
           </div>
 
           <div className="overflow-x-auto">
@@ -111,13 +112,15 @@ export function W2PayrollHistoryCard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Driver</TableHead>
+                  <TableHead>State</TableHead>
                   <TableHead>Period</TableHead>
                   <TableHead className="text-right">Gross</TableHead>
                   <TableHead className="text-right">FIT</TableHead>
                   <TableHead className="text-right">SS</TableHead>
                   <TableHead className="text-right">Medicare</TableHead>
+                  <TableHead className="text-right">SIT</TableHead>
                   <TableHead className="text-right">Emp FICA</TableHead>
-                  <TableHead className="text-right">FL SUTA</TableHead>
+                  <TableHead className="text-right">SUTA</TableHead>
                   <TableHead className="text-right">Net</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -125,13 +128,13 @@ export function W2PayrollHistoryCard() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-6 text-muted-foreground">
                       Loading…
                     </TableCell>
                   </TableRow>
                 ) : payrolls.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-6 text-muted-foreground">
                       No W-2 payroll runs yet. Click "Run W-2 Payroll" to create one.
                     </TableCell>
                   </TableRow>
@@ -139,6 +142,9 @@ export function W2PayrollHistoryCard() {
                   payrolls.map((p: any) => (
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{getDriverName(p.driver_id, drivers)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">{p.tax_state ?? '—'}</Badge>
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {formatDate(p.period_start)} – {formatDate(p.period_end)}
                       </TableCell>
@@ -155,6 +161,9 @@ export function W2PayrollHistoryCard() {
                         {formatCurrency(
                           Number(p.medicare_tax ?? 0) + Number(p.additional_medicare_tax ?? 0),
                         )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(Number(p.state_income_tax ?? 0))}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
                         {formatCurrency(Number(p.employer_fica_total ?? 0))}
@@ -184,6 +193,7 @@ export function W2PayrollHistoryCard() {
                   ))
                 )}
               </TableBody>
+
             </Table>
           </div>
         </CardContent>

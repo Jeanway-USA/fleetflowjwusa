@@ -1144,9 +1144,11 @@ export type Database = {
           period_start: string
           repair_deductions: number | null
           social_security_tax: number | null
+          state_income_tax: number
           status: string
           stub_generated_at: string | null
           stub_pdf_path: string | null
+          tax_state: string | null
           updated_at: string
           w4_dependents_amount: number | null
           w4_extra_withholding: number | null
@@ -1176,9 +1178,11 @@ export type Database = {
           period_start: string
           repair_deductions?: number | null
           social_security_tax?: number | null
+          state_income_tax?: number
           status?: string
           stub_generated_at?: string | null
           stub_pdf_path?: string | null
+          tax_state?: string | null
           updated_at?: string
           w4_dependents_amount?: number | null
           w4_extra_withholding?: number | null
@@ -1208,9 +1212,11 @@ export type Database = {
           period_start?: string
           repair_deductions?: number | null
           social_security_tax?: number | null
+          state_income_tax?: number
           status?: string
           stub_generated_at?: string | null
           stub_pdf_path?: string | null
+          tax_state?: string | null
           updated_at?: string
           w4_dependents_amount?: number | null
           w4_extra_withholding?: number | null
@@ -1852,6 +1858,7 @@ export type Database = {
           remaining_cycle_hours: number | null
           remaining_drive_hours: number | null
           status: string
+          tax_state: string | null
           twic_expiry: string | null
           updated_at: string
           user_id: string | null
@@ -1892,6 +1899,7 @@ export type Database = {
           remaining_cycle_hours?: number | null
           remaining_drive_hours?: number | null
           status?: string
+          tax_state?: string | null
           twic_expiry?: string | null
           updated_at?: string
           user_id?: string | null
@@ -1932,6 +1940,7 @@ export type Database = {
           remaining_cycle_hours?: number | null
           remaining_drive_hours?: number | null
           status?: string
+          tax_state?: string | null
           twic_expiry?: string | null
           updated_at?: string
           user_id?: string | null
@@ -3916,6 +3925,7 @@ export type Database = {
           additional_medicare_rate: number
           additional_medicare_threshold: number
           created_at: string
+          default_tax_state: string
           fit_brackets: Json
           id: string
           medicare_rate: number
@@ -3932,6 +3942,7 @@ export type Database = {
           additional_medicare_rate?: number
           additional_medicare_threshold?: number
           created_at?: string
+          default_tax_state?: string
           fit_brackets?: Json
           id?: string
           medicare_rate?: number
@@ -3948,6 +3959,7 @@ export type Database = {
           additional_medicare_rate?: number
           additional_medicare_threshold?: number
           created_at?: string
+          default_tax_state?: string
           fit_brackets?: Json
           id?: string
           medicare_rate?: number
@@ -4555,6 +4567,64 @@ export type Database = {
           },
           {
             foreignKeyName: "settlements_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      state_tax_configurations: {
+        Row: {
+          created_at: string
+          has_state_income_tax: boolean
+          id: string
+          org_id: string
+          sit_rate: number
+          state_code: string
+          suta_rate: number
+          suta_wage_base: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          has_state_income_tax?: boolean
+          id?: string
+          org_id: string
+          sit_rate?: number
+          state_code: string
+          suta_rate?: number
+          suta_wage_base?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          has_state_income_tax?: boolean
+          id?: string
+          org_id?: string
+          sit_rate?: number
+          state_code?: string
+          suta_rate?: number
+          suta_wage_base?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "state_tax_configurations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "state_tax_configurations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "state_tax_configurations_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "super_admin_organizations"
@@ -5638,6 +5708,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      seed_state_tax_configurations: {
+        Args: { _org_id: string }
+        Returns: undefined
       }
       state_to_iana: { Args: { _location: string }; Returns: string }
       storage_user_same_org: {

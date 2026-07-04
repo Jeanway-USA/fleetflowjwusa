@@ -39,9 +39,20 @@ export interface PayrollSettings {
   medicare_rate: number;
   additional_medicare_rate: number;
   additional_medicare_threshold: number;
+  /** @deprecated Use per-state stateConfig instead. Retained for backfill. */
   suta_rate: number;
+  /** @deprecated Use per-state stateConfig instead. Retained for backfill. */
   suta_wage_base: number;
   pay_frequency: PayFrequency;
+  default_tax_state?: string;
+}
+
+export interface StateTaxConfig {
+  state_code: string;
+  suta_rate: number;
+  suta_wage_base: number;
+  has_state_income_tax: boolean;
+  sit_rate: number;
 }
 
 export interface W4Info {
@@ -64,6 +75,8 @@ export interface W2PayrollInput {
   settings: PayrollSettings;
   w4: W4Info;
   ytd: YtdSnapshot;
+  /** Resolved state tax config for this driver. Falls back to FL 2.7%/$7k if omitted. */
+  stateConfig?: StateTaxConfig;
 }
 
 export interface W2PayrollBreakdown {
@@ -72,14 +85,25 @@ export interface W2PayrollBreakdown {
   socialSecurityTax: number;
   medicareTax: number;
   additionalMedicareTax: number;
+  stateIncomeTax: number;
   employeeTotal: number;
   netPay: number;
   employerSsTax: number;
   employerMedicareTax: number;
   employerFicaTotal: number;
+  /** Employer SUTA tax for the driver's state (kept name `flSutaTax` for backwards compat). */
   flSutaTax: number;
   flSutaWageBaseApplied: number;
+  stateCode: string;
 }
+
+export const DEFAULT_STATE_CONFIG: StateTaxConfig = {
+  state_code: 'FL',
+  suta_rate: 0.027,
+  suta_wage_base: 7000,
+  has_state_income_tax: false,
+  sit_rate: 0,
+};
 
 export const PERIODS_PER_YEAR: Record<PayFrequency, number> = {
   weekly: 52,
@@ -106,6 +130,7 @@ export function computeAnnualFit(
 
 export function calculateW2Payroll(input: W2PayrollInput): W2PayrollBreakdown {
   const { settings, w4, ytd } = input;
+  const stateConfig = input.stateConfig ?? DEFAULT_STATE_CONFIG;
   const gross = Math.max(0, Number(input.grossPay) || 0);
   const periods = PERIODS_PER_YEAR[settings.pay_frequency] ?? 52;
 
@@ -115,7 +140,6 @@ export function calculateW2Payroll(input: W2PayrollInput): W2PayrollBreakdown {
   const annualTaxable = Math.max(0, annualGross - stdDed);
   const brackets = settings.fit_brackets[w4.filing_status] ?? [];
   const annualFit = computeAnnualFit(annualTaxable, brackets);
-  // Step 2 (dependents credit) reduces annual tax dollar-for-dollar.
   const annualFitAfterCredits = Math.max(0, annualFit - (w4.dependents_amount || 0));
   const periodFit = annualFitAfterCredits / periods + (w4.extra_withholding || 0);
   const federalIncomeTax = round2(Math.max(0, periodFit));
@@ -137,13 +161,18 @@ export function calculateW2Payroll(input: W2PayrollInput): W2PayrollBreakdown {
   const addlPeriodBase = Math.max(0, addlOver - addlAlreadyTaxed);
   const additionalMedicareTax = round2(addlPeriodBase * settings.additional_medicare_rate);
 
-  // ---- FL SUTA (employer only)
-  const sutaHeadroom = Math.max(0, settings.suta_wage_base - ytd.suta_wages);
+  // ---- State Income Tax (flat rate; only when the state levies SIT)
+  const stateIncomeTax = stateConfig.has_state_income_tax
+    ? round2(gross * (Number(stateConfig.sit_rate) || 0))
+    : 0;
+
+  // ---- State SUTA (employer only) — driven by per-state config
+  const sutaHeadroom = Math.max(0, stateConfig.suta_wage_base - ytd.suta_wages);
   const flSutaWageBaseApplied = Math.min(gross, sutaHeadroom);
-  const flSutaTax = round2(flSutaWageBaseApplied * settings.suta_rate);
+  const flSutaTax = round2(flSutaWageBaseApplied * stateConfig.suta_rate);
 
   const employeeTotal = round2(
-    federalIncomeTax + socialSecurityTax + medicareTax + additionalMedicareTax,
+    federalIncomeTax + socialSecurityTax + medicareTax + additionalMedicareTax + stateIncomeTax,
   );
   const netPay = round2(gross - employeeTotal);
   const employerFicaTotal = round2(employerSsTax + employerMedicareTax);
@@ -154,6 +183,7 @@ export function calculateW2Payroll(input: W2PayrollInput): W2PayrollBreakdown {
     socialSecurityTax,
     medicareTax,
     additionalMedicareTax,
+    stateIncomeTax,
     employeeTotal,
     netPay,
     employerSsTax,
@@ -161,6 +191,7 @@ export function calculateW2Payroll(input: W2PayrollInput): W2PayrollBreakdown {
     employerFicaTotal,
     flSutaTax,
     flSutaWageBaseApplied: round2(flSutaWageBaseApplied),
+    stateCode: stateConfig.state_code,
   };
 }
 
@@ -173,3 +204,4 @@ export const DEFAULT_W4: W4Info = {
 };
 
 export const DEFAULT_W2_GROSS = 1700;
+

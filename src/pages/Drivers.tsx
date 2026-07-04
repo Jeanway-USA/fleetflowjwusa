@@ -729,8 +729,25 @@ export default function Drivers() {
                   <Label htmlFor="hire_date">Hire Date</Label>
                   <Input id="hire_date" type="date" value={formData.hire_date || ''} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tax_state">Tax State (W-2 SUTA / SIT)</Label>
+                  <Select
+                    value={(formData as any).tax_state || ''}
+                    onValueChange={(v) => setFormData({ ...formData, tax_state: v })}
+                  >
+                    <SelectTrigger id="tax_state">
+                      <SelectValue placeholder="Use company default" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'].map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
+
 
             <div className="border-t pt-4">
               <h4 className="font-medium mb-3">Endorsements & HAZMAT</h4>

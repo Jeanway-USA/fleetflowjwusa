@@ -32,6 +32,15 @@ interface W2Driver {
   first_name: string | null;
   last_name: string | null;
   employment_type: string | null;
+  tax_state?: string | null;
+}
+
+interface StateConfigRow {
+  state_code: string;
+  suta_rate: number;
+  suta_wage_base: number;
+  has_state_income_tax: boolean;
+  sit_rate: number;
 }
 
 interface RunW2PayrollDialogProps {
@@ -90,6 +99,26 @@ export function RunW2PayrollDialog({
     },
   });
 
+  const { data: stateConfigs = [] } = useQuery<StateConfigRow[]>({
+    queryKey: ['state_tax_configurations'],
+    enabled: open,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('state_tax_configurations' as any)
+        .select('state_code, suta_rate, suta_wage_base, has_state_income_tax, sit_rate');
+      return ((data ?? []) as unknown as StateConfigRow[]);
+    },
+  });
+
+  const stateMap = useMemo(() => {
+    const m = new Map<string, StateConfigRow>();
+    stateConfigs.forEach((s) => m.set(s.state_code, s));
+    return m;
+  }, [stateConfigs]);
+
+  const defaultState = (settings as any)?.default_tax_state || 'FL';
+
+
   // Initialize rows when dialog opens
   useEffect(() => {
     if (!open) return;
@@ -118,12 +147,31 @@ export function RunW2PayrollDialog({
         extra_withholding: r.extra_withholding,
         dependents_amount: r.dependents_amount,
       };
+      const driver = w2Drivers.find((d) => d.id === r.driver_id);
+      const resolvedState = (driver?.tax_state || defaultState || 'FL').toUpperCase();
+      const sc = stateMap.get(resolvedState);
+      const stateConfig = sc
+        ? {
+            state_code: sc.state_code,
+            suta_rate: Number(sc.suta_rate),
+            suta_wage_base: Number(sc.suta_wage_base),
+            has_state_income_tax: !!sc.has_state_income_tax,
+            sit_rate: Number(sc.sit_rate),
+          }
+        : {
+            state_code: resolvedState,
+            suta_rate: 0,
+            suta_wage_base: 0,
+            has_state_income_tax: false,
+            sit_rate: 0,
+          };
       return {
         row: r,
-        b: calculateW2Payroll({ grossPay: r.gross_pay, settings, w4, ytd: EMPTY_YTD }),
+        state: resolvedState,
+        b: calculateW2Payroll({ grossPay: r.gross_pay, settings, w4, ytd: EMPTY_YTD, stateConfig }),
       };
     });
-  }, [rowList, settings]);
+  }, [rowList, settings, w2Drivers, defaultState, stateMap]);
 
   const totals = useMemo(() => {
     const acc = {
@@ -132,6 +180,7 @@ export function RunW2PayrollDialog({
       ss: 0,
       med: 0,
       addlMed: 0,
+      sit: 0,
       net: 0,
       empFica: 0,
       suta: 0,
@@ -142,12 +191,14 @@ export function RunW2PayrollDialog({
       acc.ss += b.socialSecurityTax;
       acc.med += b.medicareTax;
       acc.addlMed += b.additionalMedicareTax;
+      acc.sit += b.stateIncomeTax;
       acc.net += b.netPay;
       acc.empFica += b.employerFicaTotal;
       acc.suta += b.flSutaTax;
     });
     return acc;
   }, [previews]);
+
 
   const employerLiability = totals.empFica + totals.suta;
 
@@ -200,8 +251,9 @@ export function RunW2PayrollDialog({
         <DialogHeader>
           <DialogTitle>Run W-2 Payroll</DialogTitle>
           <DialogDescription>
-            2026 IRS Percentage Method (Pub 15-T) + 6.2% Social Security, 1.45% Medicare, and Florida
-            Reemployment Tax (SUTA). Employer FICA match is accrued but does not reduce net pay.
+            2026 IRS Percentage Method (Pub 15-T) + 6.2% Social Security, 1.45% Medicare. SUTA and
+            State Income Tax are driven per-driver by their assigned Tax State. Employer FICA match
+            is accrued but does not reduce net pay.
           </DialogDescription>
         </DialogHeader>
 
@@ -231,19 +283,24 @@ export function RunW2PayrollDialog({
                 <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="text-left px-3 py-2">Driver</th>
+                    <th className="text-left px-3 py-2 w-16">State</th>
                     <th className="text-right px-3 py-2 w-28">Gross</th>
                     <th className="text-right px-3 py-2 w-24">FIT</th>
                     <th className="text-right px-3 py-2 w-24">SS 6.2%</th>
                     <th className="text-right px-3 py-2 w-24">Medicare</th>
+                    <th className="text-right px-3 py-2 w-24">SIT</th>
                     <th className="text-right px-3 py-2 w-28">Emp FICA</th>
-                    <th className="text-right px-3 py-2 w-24">FL SUTA</th>
+                    <th className="text-right px-3 py-2 w-24">SUTA</th>
                     <th className="text-right px-3 py-2 w-28 bg-primary/5">Net Pay</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {previews.map(({ row, b }) => (
+                  {previews.map(({ row, b, state }) => (
                     <tr key={row.driver_id} className="border-t">
                       <td className="px-3 py-2 font-medium">{nameOf(row.driver_id)}</td>
+                      <td className="px-3 py-2">
+                        <Badge variant="outline" className="text-xs">{state}</Badge>
+                      </td>
                       <td className="px-3 py-1">
                         <Input
                           type="number"
@@ -264,6 +321,9 @@ export function RunW2PayrollDialog({
                       <td className="px-3 py-2 text-right tabular-nums">
                         {formatCurrency(b.medicareTax + b.additionalMedicareTax)}
                       </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {formatCurrency(b.stateIncomeTax)}
+                      </td>
                       <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
                         {formatCurrency(b.employerFicaTotal)}
                       </td>
@@ -276,15 +336,17 @@ export function RunW2PayrollDialog({
                     </tr>
                   ))}
                 </tbody>
+
                 <tfoot className="border-t-2 bg-muted/40 font-medium">
                   <tr>
-                    <td className="px-3 py-2">Totals ({previews.length})</td>
+                    <td className="px-3 py-2" colSpan={2}>Totals ({previews.length})</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.gross)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.fit)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.ss)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {formatCurrency(totals.med + totals.addlMed)}
                     </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.sit)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.empFica)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.suta)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-primary">{formatCurrency(totals.net)}</td>
@@ -298,7 +360,7 @@ export function RunW2PayrollDialog({
             <div className="border rounded-md p-3 bg-muted/30">
               <div className="text-xs uppercase text-muted-foreground">Total Employee Withholding</div>
               <div className="text-lg font-semibold">
-                {formatCurrency(totals.fit + totals.ss + totals.med + totals.addlMed)}
+                {formatCurrency(totals.fit + totals.ss + totals.med + totals.addlMed + totals.sit)}
               </div>
             </div>
             <div className="border rounded-md p-3 bg-amber-50 dark:bg-amber-950/20">
@@ -307,7 +369,7 @@ export function RunW2PayrollDialog({
                 {formatCurrency(employerLiability)}
               </div>
               <div className="text-[10px] text-amber-800 dark:text-amber-300">
-                FICA match ({formatCurrency(totals.empFica)}) + FL SUTA ({formatCurrency(totals.suta)})
+                FICA match ({formatCurrency(totals.empFica)}) + State SUTA ({formatCurrency(totals.suta)})
               </div>
             </div>
             <div className="border rounded-md p-3 bg-primary/5">

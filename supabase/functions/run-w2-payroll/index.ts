@@ -40,8 +40,9 @@ function calcW2(input: {
   settings: any;
   w4: { filing_status: string; extra_withholding: number; dependents_amount: number };
   ytd: { ss_wages: number; medicare_wages: number; suta_wages: number };
+  stateConfig: { state_code: string; suta_rate: number; suta_wage_base: number; has_state_income_tax: boolean; sit_rate: number };
 }) {
-  const { settings, w4, ytd } = input;
+  const { settings, w4, ytd, stateConfig } = input;
   const gross = Math.max(0, Number(input.gross) || 0);
   const periods = PERIODS[settings.pay_frequency] ?? 52;
   const annualGross = gross * periods;
@@ -68,11 +69,15 @@ function calcW2(input: {
   const addlBase = Math.max(0, addlOver - addlDone);
   const additionalMedicareTax = round2(addlBase * Number(settings.additional_medicare_rate));
 
-  const sutaHead = Math.max(0, Number(settings.suta_wage_base) - ytd.suta_wages);
-  const flSutaWageBaseApplied = Math.min(gross, sutaHead);
-  const flSutaTax = round2(flSutaWageBaseApplied * Number(settings.suta_rate));
+  const stateIncomeTax = stateConfig.has_state_income_tax
+    ? round2(gross * (Number(stateConfig.sit_rate) || 0))
+    : 0;
 
-  const employeeTotal = round2(federalIncomeTax + socialSecurityTax + medicareTax + additionalMedicareTax);
+  const sutaHead = Math.max(0, Number(stateConfig.suta_wage_base) - ytd.suta_wages);
+  const flSutaWageBaseApplied = Math.min(gross, sutaHead);
+  const flSutaTax = round2(flSutaWageBaseApplied * Number(stateConfig.suta_rate));
+
+  const employeeTotal = round2(federalIncomeTax + socialSecurityTax + medicareTax + additionalMedicareTax + stateIncomeTax);
   const netPay = round2(gross - employeeTotal);
   const employerFicaTotal = round2(employerSsTax + employerMedicareTax);
 
@@ -82,6 +87,7 @@ function calcW2(input: {
     socialSecurityTax,
     medicareTax,
     additionalMedicareTax,
+    stateIncomeTax,
     employeeTotal,
     netPay,
     employerSsTax,
@@ -89,6 +95,7 @@ function calcW2(input: {
     employerFicaTotal,
     flSutaTax,
     flSutaWageBaseApplied: round2(flSutaWageBaseApplied),
+    stateCode: stateConfig.state_code,
   };
 }
 
@@ -182,7 +189,7 @@ Deno.serve(async (req) => {
       // Validate driver belongs to org & is W-2
       const { data: driver } = await admin
         .from('drivers')
-        .select('id, org_id, employment_type')
+        .select('id, org_id, employment_type, tax_state')
         .eq('id', driverId)
         .maybeSingle();
       if (!driver || driver.org_id !== orgId) {
@@ -193,6 +200,27 @@ Deno.serve(async (req) => {
         results.push({ driver_id: driverId, error: 'Driver is not W-2' });
         continue;
       }
+
+      // Resolve tax state: driver -> org default -> FL
+      const resolvedState = (driver.tax_state || (settings as any).default_tax_state || 'FL').toUpperCase();
+
+      // Ensure state configs exist for this org, then load the row
+      await admin.rpc('seed_state_tax_configurations', { _org_id: orgId });
+      let { data: stateRow } = await admin
+        .from('state_tax_configurations')
+        .select('state_code, suta_rate, suta_wage_base, has_state_income_tax, sit_rate')
+        .eq('org_id', orgId)
+        .eq('state_code', resolvedState)
+        .maybeSingle();
+      const stateConfig = stateRow
+        ? {
+            state_code: stateRow.state_code,
+            suta_rate: Number(stateRow.suta_rate),
+            suta_wage_base: Number(stateRow.suta_wage_base),
+            has_state_income_tax: !!stateRow.has_state_income_tax,
+            sit_rate: Number(stateRow.sit_rate),
+          }
+        : { state_code: resolvedState, suta_rate: 0, suta_wage_base: 0, has_state_income_tax: false, sit_rate: 0 };
 
       // W-4 (fallback to defaults)
       const { data: w4Row } = await admin
@@ -206,12 +234,12 @@ Deno.serve(async (req) => {
         dependents_amount: Number(w4Row?.dependents_amount ?? 0),
       };
 
-      // YTD (sum of prior payroll rows in same calendar year)
+      // YTD (sum of prior payroll rows in same calendar year, same state for SUTA)
       const year = new Date(period_end).getUTCFullYear();
       const yearStart = `${year}-01-01`;
       const { data: prior } = await admin
         .from('driver_payroll')
-        .select('gross_pay, fl_suta_wage_base_applied')
+        .select('gross_pay, fl_suta_wage_base_applied, tax_state')
         .eq('driver_id', driverId)
         .eq('employment_type', 'w2_company')
         .gte('period_end', yearStart)
@@ -219,10 +247,12 @@ Deno.serve(async (req) => {
       const ytd = {
         ss_wages: (prior ?? []).reduce((s, r) => s + Number(r.gross_pay || 0), 0),
         medicare_wages: (prior ?? []).reduce((s, r) => s + Number(r.gross_pay || 0), 0),
-        suta_wages: (prior ?? []).reduce((s, r) => s + Number(r.fl_suta_wage_base_applied || 0), 0),
+        suta_wages: (prior ?? [])
+          .filter((r) => !r.tax_state || r.tax_state === resolvedState)
+          .reduce((s, r) => s + Number(r.fl_suta_wage_base_applied || 0), 0),
       };
 
-      const b = calcW2({ gross, settings, w4, ytd });
+      const b = calcW2({ gross, settings, w4, ytd, stateConfig });
 
       // Insert immutable payroll row
       const { data: inserted, error: insErr } = await admin
@@ -241,6 +271,8 @@ Deno.serve(async (req) => {
           social_security_tax: b.socialSecurityTax,
           medicare_tax: b.medicareTax,
           additional_medicare_tax: b.additionalMedicareTax,
+          state_income_tax: b.stateIncomeTax,
+          tax_state: b.stateCode,
           employer_ss_tax: b.employerSsTax,
           employer_medicare_tax: b.employerMedicareTax,
           employer_fica_total: b.employerFicaTotal,
@@ -257,6 +289,7 @@ Deno.serve(async (req) => {
         results.push({ driver_id: driverId, error: insErr.message });
         continue;
       }
+
 
       results.push({ driver_id: driverId, payroll_id: inserted!.id, breakdown: b });
     }
