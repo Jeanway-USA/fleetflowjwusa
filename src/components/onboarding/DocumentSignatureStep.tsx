@@ -299,6 +299,12 @@ export function DocumentSignatureStep({
   onValidityChange,
 }: DocumentSignatureStepProps) {
   const [placeholderAcks, setPlaceholderAcks] = useState<Record<string, boolean>>({});
+  const [w2Docs, setW2Docs] = useState<W2DocsState>(EMPTY_W2_DOCS_STATE);
+  const [contractorDocs, setContractorDocs] = useState<ContractorDocsState>(
+    EMPTY_CONTRACTOR_DOCS_STATE,
+  );
+  const [w2Valid, setW2Valid] = useState(false);
+  const [contractorValid, setContractorValid] = useState(false);
 
   // Group templates by section
   const sharedTemplates = useMemo(
@@ -314,19 +320,11 @@ export function DocumentSignatureStep({
     [templates],
   );
 
-  // Compute active placeholder set based on employmentType
-  const activePlaceholders = useMemo<PlaceholderDoc[]>(() => {
-    const list = [...SHARED_PLACEHOLDERS];
-    if (employmentType === 'W-2') list.push(...W2_PLACEHOLDERS);
-    if (employmentType === '1099') list.push(...CONTRACTOR_PLACEHOLDERS);
-    return list;
-  }, [employmentType]);
-
   // Determine which real templates should count toward validity (skip approved ones in revision mode)
   const shouldValidateTemplate = (t: DocumentTemplateRow) =>
     !(revisionMode && docRevisions[t.document_type]?.status === 'approved');
 
-  // Aggregate validity
+  // Aggregate validity: shared templates + shared placeholders + real form components
   useEffect(() => {
     if (employmentType === null) {
       onValidityChange(false);
@@ -340,9 +338,13 @@ export function DocumentSignatureStep({
       .filter(shouldValidateTemplate)
       .every((t) => computeTemplateValidity(t, state[t.id] ?? EMPTY_TEMPLATE_STATE));
 
-    const placeholdersValid = activePlaceholders.every((p) => placeholderAcks[p.id] === true);
+    const sharedPlaceholdersValid = SHARED_PLACEHOLDERS.every(
+      (p) => placeholderAcks[p.id] === true,
+    );
 
-    onValidityChange(templatesValid && placeholdersValid);
+    const employmentFormsValid = employmentType === 'W-2' ? w2Valid : contractorValid;
+
+    onValidityChange(templatesValid && sharedPlaceholdersValid && employmentFormsValid);
     // We intentionally omit onValidityChange from deps to avoid loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -352,10 +354,12 @@ export function DocumentSignatureStep({
     contractorTemplates,
     state,
     placeholderAcks,
-    activePlaceholders,
+    w2Valid,
+    contractorValid,
     revisionMode,
     docRevisions,
   ]);
+
 
   if (employmentType === null) {
     return (
