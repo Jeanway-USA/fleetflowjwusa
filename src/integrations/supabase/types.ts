@@ -1120,52 +1120,100 @@ export type Database = {
       }
       driver_payroll: {
         Row: {
+          additional_medicare_tax: number | null
           created_at: string
           driver_id: string
+          employer_fica_total: number | null
+          employer_medicare_tax: number | null
+          employer_ss_tax: number | null
+          employment_type: string | null
+          federal_income_tax: number | null
+          filing_status: string | null
+          fl_suta_tax: number | null
+          fl_suta_wage_base_applied: number | null
           fuel_deductions: number | null
           gross_pay: number
           id: string
+          medicare_tax: number | null
           net_pay: number | null
           notes: string | null
           org_id: string
           other_deductions: number | null
+          payment_date: string | null
           period_end: string
           period_start: string
           repair_deductions: number | null
+          social_security_tax: number | null
           status: string
+          stub_generated_at: string | null
+          stub_pdf_path: string | null
           updated_at: string
+          w4_dependents_amount: number | null
+          w4_extra_withholding: number | null
         }
         Insert: {
+          additional_medicare_tax?: number | null
           created_at?: string
           driver_id: string
+          employer_fica_total?: number | null
+          employer_medicare_tax?: number | null
+          employer_ss_tax?: number | null
+          employment_type?: string | null
+          federal_income_tax?: number | null
+          filing_status?: string | null
+          fl_suta_tax?: number | null
+          fl_suta_wage_base_applied?: number | null
           fuel_deductions?: number | null
           gross_pay?: number
           id?: string
+          medicare_tax?: number | null
           net_pay?: number | null
           notes?: string | null
           org_id: string
           other_deductions?: number | null
+          payment_date?: string | null
           period_end: string
           period_start: string
           repair_deductions?: number | null
+          social_security_tax?: number | null
           status?: string
+          stub_generated_at?: string | null
+          stub_pdf_path?: string | null
           updated_at?: string
+          w4_dependents_amount?: number | null
+          w4_extra_withholding?: number | null
         }
         Update: {
+          additional_medicare_tax?: number | null
           created_at?: string
           driver_id?: string
+          employer_fica_total?: number | null
+          employer_medicare_tax?: number | null
+          employer_ss_tax?: number | null
+          employment_type?: string | null
+          federal_income_tax?: number | null
+          filing_status?: string | null
+          fl_suta_tax?: number | null
+          fl_suta_wage_base_applied?: number | null
           fuel_deductions?: number | null
           gross_pay?: number
           id?: string
+          medicare_tax?: number | null
           net_pay?: number | null
           notes?: string | null
           org_id?: string
           other_deductions?: number | null
+          payment_date?: string | null
           period_end?: string
           period_start?: string
           repair_deductions?: number | null
+          social_security_tax?: number | null
           status?: string
+          stub_generated_at?: string | null
+          stub_pdf_path?: string | null
           updated_at?: string
+          w4_dependents_amount?: number | null
+          w4_extra_withholding?: number | null
         }
         Relationships: [
           {
@@ -1685,6 +1733,87 @@ export type Database = {
           template_id?: string | null
         }
         Relationships: []
+      }
+      driver_w4_info: {
+        Row: {
+          created_at: string
+          deductions: number
+          dependents_amount: number
+          driver_id: string
+          extra_withholding: number
+          filing_status: string
+          id: string
+          multiple_jobs: boolean
+          org_id: string
+          other_income: number
+          step_2c_checkbox: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deductions?: number
+          dependents_amount?: number
+          driver_id: string
+          extra_withholding?: number
+          filing_status?: string
+          id?: string
+          multiple_jobs?: boolean
+          org_id: string
+          other_income?: number
+          step_2c_checkbox?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deductions?: number
+          dependents_amount?: number
+          driver_id?: string
+          extra_withholding?: number
+          filing_status?: string
+          id?: string
+          multiple_jobs?: boolean
+          org_id?: string
+          other_income?: number
+          step_2c_checkbox?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_w4_info_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_w4_info_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_w4_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_w4_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "driver_w4_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       drivers: {
         Row: {
@@ -3781,6 +3910,79 @@ export type Database = {
           vendor_name?: string | null
         }
         Relationships: []
+      }
+      payroll_settings: {
+        Row: {
+          additional_medicare_rate: number
+          additional_medicare_threshold: number
+          created_at: string
+          fit_brackets: Json
+          id: string
+          medicare_rate: number
+          org_id: string
+          pay_frequency: string
+          social_security_rate: number
+          social_security_wage_base: number
+          standard_deduction: Json
+          suta_rate: number
+          suta_wage_base: number
+          updated_at: string
+        }
+        Insert: {
+          additional_medicare_rate?: number
+          additional_medicare_threshold?: number
+          created_at?: string
+          fit_brackets?: Json
+          id?: string
+          medicare_rate?: number
+          org_id: string
+          pay_frequency?: string
+          social_security_rate?: number
+          social_security_wage_base?: number
+          standard_deduction?: Json
+          suta_rate?: number
+          suta_wage_base?: number
+          updated_at?: string
+        }
+        Update: {
+          additional_medicare_rate?: number
+          additional_medicare_threshold?: number
+          created_at?: string
+          fit_brackets?: Json
+          id?: string
+          medicare_rate?: number
+          org_id?: string
+          pay_frequency?: string
+          social_security_rate?: number
+          social_security_wage_base?: number
+          standard_deduction?: Json
+          suta_rate?: number
+          suta_wage_base?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "payroll_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pm_notifications: {
         Row: {
