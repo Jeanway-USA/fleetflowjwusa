@@ -99,29 +99,9 @@ const SHARED_PLACEHOLDERS: PlaceholderDoc[] = [
   },
 ];
 
-const W2_PLACEHOLDERS: PlaceholderDoc[] = [
-  {
-    id: 'placeholder_w4',
-    title: 'Federal W-4 Withholding',
-    description: 'Employee withholding certificate. A full digital form is coming soon.',
-    Icon: FileText,
-  },
-];
+// Employment-specific placeholder lists were replaced by real form components:
+// W2Documents (W-4 / I-9 / Direct Deposit) and ContractorDocuments (W-9 / IOO Agreement).
 
-const CONTRACTOR_PLACEHOLDERS: PlaceholderDoc[] = [
-  {
-    id: 'placeholder_ic_agreement',
-    title: 'Independent Contractor Agreement',
-    description: 'Master contractor terms between you and the carrier. A full signable version is coming soon.',
-    Icon: FileText,
-  },
-  {
-    id: 'placeholder_w9',
-    title: 'W-9 Tax Form',
-    description: 'Taxpayer identification for 1099 reporting. A full digital form is coming soon.',
-    Icon: Landmark,
-  },
-];
 
 // ---------------------------------------------------------------------------
 // Validity helper
