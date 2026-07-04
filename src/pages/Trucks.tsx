@@ -271,12 +271,21 @@ export default function Trucks() {
       header: 'Loan Balance',
       hiddenOnMobile: true,
       render: (truck: TruckWithDriver) => {
-        const balance = Number(truck.loan_balance ?? 0);
+        const rawBalance = truck.loan_balance;
         const original = Number((truck as any).original_loan_amount ?? 0);
-        if (balance <= 0 && original > 0) {
+        const balance = Number(rawBalance ?? 0);
+        // Only "Paid Off" when balance was explicitly recorded and reached zero.
+        if (rawBalance != null && balance <= 0 && original > 0) {
           return (
             <Badge className="bg-green-600/10 text-green-700 border border-green-600/20 hover:bg-green-600/10 text-xs">
               Paid Off
+            </Badge>
+          );
+        }
+        if (rawBalance == null && original > 0) {
+          return (
+            <Badge variant="secondary" className="text-xs font-mono">
+              {formatCurrency(original, { maximumFractionDigits: 0 })} Remaining
             </Badge>
           );
         }
