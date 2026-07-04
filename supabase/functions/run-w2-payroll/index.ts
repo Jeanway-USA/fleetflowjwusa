@@ -1,120 +1,323 @@
 // Edge function: run-w2-payroll
-// Mirrors src/lib/w2-payroll.ts exactly. Do not diverge without updating both.
+// Action router for the Gusto Embedded Payroll integration.
+// Every action is authenticated + org-scoped. All Gusto API calls stay
+// server-side; the browser never sees Gusto tokens.
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const ALLOWED_ORIGINS = [
-  'https://tms.jeanwayusa.com',
-  'https://fleetflowjwusa.lovable.app',
-  'https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app',
-  'http://localhost:5173',
-  'http://localhost:8080',
+  "https://tms.jeanwayusa.com",
+  "https://fleetflowjwusa.lovable.app",
+  "https://id-preview--a815e5bc-e7f9-4eda-be65-87a78fb56f21.lovable.app",
+  "http://localhost:5173",
+  "http://localhost:8080",
 ];
 
 function corsFor(req: Request): Record<string, string> {
-  const origin = req.headers.get('Origin') || '';
+  const origin = req.headers.get("Origin") || "";
   const isAllowed = ALLOWED_ORIGINS.some(
-    (a) => origin === a || origin.endsWith('.lovable.app') || origin.endsWith('.lovableproject.com'),
+    (a) =>
+      origin === a ||
+      origin.endsWith(".lovable.app") ||
+      origin.endsWith(".lovableproject.com"),
   );
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : ALLOWED_ORIGINS[0],
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    "Access-Control-Allow-Origin": isAllowed ? origin : ALLOWED_ORIGINS[0],
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
 
-const PERIODS: Record<string, number> = { weekly: 52, biweekly: 26, semimonthly: 24, monthly: 12 };
-const round2 = (n: number) => Math.round(n * 100) / 100;
+const GUSTO_BASE = Deno.env.get("GUSTO_API_BASE_URL") ??
+  "https://api.gusto-demo.com";
+const GUSTO_CLIENT_ID = Deno.env.get("GUSTO_CLIENT_ID") ?? "";
+const GUSTO_CLIENT_SECRET = Deno.env.get("GUSTO_CLIENT_SECRET") ?? "";
+const GUSTO_PARTNER_ACCESS_TOKEN =
+  Deno.env.get("GUSTO_PARTNER_ACCESS_TOKEN") ?? "";
 
-function computeAnnualFit(annualTaxable: number, brackets: Array<{ over: number; base: number; rate: number }>): number {
-  if (annualTaxable <= 0 || !brackets?.length) return 0;
-  let match = brackets[0];
-  for (const b of brackets) {
-    if (annualTaxable > b.over) match = b;
-    else break;
+type Admin = ReturnType<typeof createClient>;
+
+// -----------------------------------------------------------------------------
+// Gusto helpers
+// -----------------------------------------------------------------------------
+
+async function refreshTokens(admin: Admin, orgId: string, refreshToken: string) {
+  const resp = await fetch(`${GUSTO_BASE}/oauth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: GUSTO_CLIENT_ID,
+      client_secret: GUSTO_CLIENT_SECRET,
+    }),
+  });
+  if (!resp.ok) {
+    throw new Error(`Gusto token refresh failed (${resp.status})`);
   }
-  return match.base + (annualTaxable - match.over) * match.rate;
+  const data = await resp.json();
+  const expiresAt = new Date(Date.now() + (data.expires_in ?? 3600) * 1000)
+    .toISOString();
+  await admin.rpc("gusto_set_tokens", {
+    _org_id: orgId,
+    _company_uuid: null,
+    _access_token: data.access_token,
+    _refresh_token: data.refresh_token ?? refreshToken,
+    _token_expires_at: expiresAt,
+    _onboarding_status: null,
+  });
+  return data.access_token as string;
 }
 
-function calcW2(input: {
-  gross: number;
-  settings: any;
-  w4: { filing_status: string; extra_withholding: number; dependents_amount: number };
-  ytd: { ss_wages: number; medicare_wages: number; suta_wages: number };
-  stateConfig: { state_code: string; suta_rate: number; suta_wage_base: number; has_state_income_tax: boolean; sit_rate: number };
-}) {
-  const { settings, w4, ytd, stateConfig } = input;
-  const gross = Math.max(0, Number(input.gross) || 0);
-  const periods = PERIODS[settings.pay_frequency] ?? 52;
-  const annualGross = gross * periods;
-  const stdDed = Number(settings.standard_deduction?.[w4.filing_status] ?? 0);
-  const annualTaxable = Math.max(0, annualGross - stdDed);
-  const brackets = settings.fit_brackets?.[w4.filing_status] ?? [];
-  const annualFit = computeAnnualFit(annualTaxable, brackets);
-  const annualFitAfterCredits = Math.max(0, annualFit - (Number(w4.dependents_amount) || 0));
-  const periodFit = annualFitAfterCredits / periods + (Number(w4.extra_withholding) || 0);
-  const federalIncomeTax = round2(Math.max(0, periodFit));
-
-  const ssHead = Math.max(0, Number(settings.social_security_wage_base) - ytd.ss_wages);
-  const ssTaxable = Math.min(gross, ssHead);
-  const socialSecurityTax = round2(ssTaxable * Number(settings.social_security_rate));
-  const employerSsTax = socialSecurityTax;
-
-  const medicareTax = round2(gross * Number(settings.medicare_rate));
-  const employerMedicareTax = medicareTax;
-
-  const newMedYtd = ytd.medicare_wages + gross;
-  const threshold = Number(settings.additional_medicare_threshold);
-  const addlOver = Math.max(0, newMedYtd - threshold);
-  const addlDone = Math.max(0, ytd.medicare_wages - threshold);
-  const addlBase = Math.max(0, addlOver - addlDone);
-  const additionalMedicareTax = round2(addlBase * Number(settings.additional_medicare_rate));
-
-  const stateIncomeTax = stateConfig.has_state_income_tax
-    ? round2(gross * (Number(stateConfig.sit_rate) || 0))
+async function getAccessToken(admin: Admin, orgId: string): Promise<{
+  token: string;
+  companyUuid: string | null;
+  status: string;
+}> {
+  const { data, error } = await admin.rpc("gusto_get_tokens", {
+    _org_id: orgId,
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    return {
+      token: GUSTO_PARTNER_ACCESS_TOKEN,
+      companyUuid: null,
+      status: "pending",
+    };
+  }
+  const expiresAt = row.token_expires_at
+    ? new Date(row.token_expires_at).getTime()
     : 0;
-
-  const sutaHead = Math.max(0, Number(stateConfig.suta_wage_base) - ytd.suta_wages);
-  const flSutaWageBaseApplied = Math.min(gross, sutaHead);
-  const flSutaTax = round2(flSutaWageBaseApplied * Number(stateConfig.suta_rate));
-
-  const employeeTotal = round2(federalIncomeTax + socialSecurityTax + medicareTax + additionalMedicareTax + stateIncomeTax);
-  const netPay = round2(gross - employeeTotal);
-  const employerFicaTotal = round2(employerSsTax + employerMedicareTax);
-
+  const needsRefresh = !row.access_token ||
+    expiresAt - Date.now() < 60_000;
+  let token = row.access_token as string | null;
+  if (needsRefresh && row.refresh_token) {
+    token = await refreshTokens(admin, orgId, row.refresh_token);
+  }
+  if (!token) token = GUSTO_PARTNER_ACCESS_TOKEN;
   return {
-    grossPay: round2(gross),
-    federalIncomeTax,
-    socialSecurityTax,
-    medicareTax,
-    additionalMedicareTax,
-    stateIncomeTax,
-    employeeTotal,
-    netPay,
-    employerSsTax,
-    employerMedicareTax,
-    employerFicaTotal,
-    flSutaTax,
-    flSutaWageBaseApplied: round2(flSutaWageBaseApplied),
-    stateCode: stateConfig.state_code,
+    token,
+    companyUuid: row.gusto_company_uuid ?? null,
+    status: row.onboarding_status ?? "pending",
   };
 }
+
+async function gustoFetch(
+  admin: Admin,
+  orgId: string,
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const { token } = await getAccessToken(admin, orgId);
+  const headers = new Headers(init.headers ?? {});
+  headers.set("Authorization", `Bearer ${token}`);
+  headers.set("Content-Type", "application/json");
+  headers.set("Accept", "application/json");
+  const resp = await fetch(`${GUSTO_BASE}${path}`, { ...init, headers });
+  if (resp.status === 401) {
+    // Force refresh and retry once
+    const { data } = await admin.rpc("gusto_get_tokens", { _org_id: orgId });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row?.refresh_token) {
+      const fresh = await refreshTokens(admin, orgId, row.refresh_token);
+      headers.set("Authorization", `Bearer ${fresh}`);
+      return fetch(`${GUSTO_BASE}${path}`, { ...init, headers });
+    }
+  }
+  return resp;
+}
+
+// -----------------------------------------------------------------------------
+// Actions
+// -----------------------------------------------------------------------------
+
+async function actionProvisionCompany(
+  admin: Admin,
+  orgId: string,
+): Promise<Record<string, unknown>> {
+  if (!GUSTO_PARTNER_ACCESS_TOKEN) {
+    throw new Error("GUSTO_PARTNER_ACCESS_TOKEN not configured");
+  }
+  const { data: org } = await admin
+    .from("organizations")
+    .select("name")
+    .eq("id", orgId)
+    .maybeSingle();
+  const resp = await fetch(`${GUSTO_BASE}/v1/partner_managed_companies`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${GUSTO_PARTNER_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      user: { first_name: "Owner", last_name: "Owner", email: `owner+${orgId}@example.com` },
+      company: { name: org?.name ?? `Org ${orgId.slice(0, 8)}`, trade_name: org?.name ?? undefined, ein: null },
+    }),
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(
+      `Gusto provisioning failed (${resp.status}): ${JSON.stringify(body)}`,
+    );
+  }
+  const companyUuid = body.company_uuid ?? body.company?.uuid ?? null;
+  const accessToken = body.access_token ?? null;
+  const refreshToken = body.refresh_token ?? null;
+  const expiresIn = body.expires_in ?? 3600;
+  await admin.rpc("gusto_set_tokens", {
+    _org_id: orgId,
+    _company_uuid: companyUuid,
+    _access_token: accessToken,
+    _refresh_token: refreshToken,
+    _token_expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
+    _onboarding_status: "provisioned",
+  });
+  return { company_uuid: companyUuid };
+}
+
+async function actionSyncEmployee(
+  admin: Admin,
+  orgId: string,
+  payload: { driver_id: string },
+): Promise<Record<string, unknown>> {
+  if (!payload?.driver_id) throw new Error("driver_id required");
+  const { data: driver } = await admin
+    .from("drivers")
+    .select(
+      "id, org_id, first_name, last_name, email, gusto_employee_id",
+    )
+    .eq("id", payload.driver_id)
+    .maybeSingle();
+  if (!driver || driver.org_id !== orgId) {
+    throw new Error("Driver not in organization");
+  }
+  const { companyUuid } = await getAccessToken(admin, orgId);
+  if (!companyUuid) {
+    throw new Error("Gusto company not provisioned for this organization");
+  }
+  if (driver.gusto_employee_id) {
+    return { gusto_employee_id: driver.gusto_employee_id, existed: true };
+  }
+  const resp = await gustoFetch(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/employees`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        first_name: driver.first_name ?? "Driver",
+        last_name: driver.last_name ?? "Unknown",
+        email: driver.email ?? undefined,
+      }),
+    },
+  );
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(
+      `Gusto employee create failed (${resp.status}): ${JSON.stringify(body)}`,
+    );
+  }
+  const employeeUuid = body.uuid ?? body.employee?.uuid ?? null;
+  if (employeeUuid) {
+    await admin
+      .from("drivers")
+      .update({ gusto_employee_id: employeeUuid })
+      .eq("id", driver.id);
+  }
+  return { gusto_employee_id: employeeUuid };
+}
+
+async function actionCreateFlowToken(
+  admin: Admin,
+  orgId: string,
+  payload: { flow_type: string; entity_uuid?: string; entity_type?: string },
+): Promise<Record<string, unknown>> {
+  if (!payload?.flow_type) throw new Error("flow_type required");
+  const { companyUuid } = await getAccessToken(admin, orgId);
+  if (!companyUuid) {
+    throw new Error("Gusto company not provisioned for this organization");
+  }
+  const resp = await gustoFetch(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/flows`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        flow_type: payload.flow_type,
+        entity_uuid: payload.entity_uuid ?? companyUuid,
+        entity_type: payload.entity_type ?? "Company",
+      }),
+    },
+  );
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(
+      `Gusto flow token failed (${resp.status}): ${JSON.stringify(body)}`,
+    );
+  }
+  return {
+    flow_url: body.url ?? null,
+    flow_token: body.token ?? body.flow_token ?? null,
+    expires_at: body.expires_at ?? null,
+  };
+}
+
+async function actionPushPayrollInputs(
+  admin: Admin,
+  orgId: string,
+  payload: {
+    payroll_uuid: string;
+    inputs: Array<{ employee_uuid: string; fixed_compensations?: unknown[]; hourly_compensations?: unknown[] }>;
+  },
+): Promise<Record<string, unknown>> {
+  if (!payload?.payroll_uuid || !Array.isArray(payload.inputs)) {
+    throw new Error("payroll_uuid and inputs[] required");
+  }
+  const { companyUuid } = await getAccessToken(admin, orgId);
+  if (!companyUuid) {
+    throw new Error("Gusto company not provisioned for this organization");
+  }
+  const resp = await gustoFetch(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/payrolls/${payload.payroll_uuid}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ employee_compensations: payload.inputs }),
+    },
+  );
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(
+      `Gusto push inputs failed (${resp.status}): ${JSON.stringify(body)}`,
+    );
+  }
+  return { payroll: body };
+}
+
+// -----------------------------------------------------------------------------
+// Entry
+// -----------------------------------------------------------------------------
 
 Deno.serve(async (req) => {
   const cors = corsFor(req);
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
-    const authHeader = req.headers.get('Authorization') || '';
-    if (!authHeader.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Missing bearer token' }), {
+    const authHeader = req.headers.get("Authorization") || "";
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Missing bearer token" }), {
         status: 401,
-        headers: { ...cors, 'Content-Type': 'application/json' },
+        headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
@@ -123,184 +326,97 @@ Deno.serve(async (req) => {
 
     const { data: userData, error: userErr } = await userClient.auth.getUser();
     if (userErr || !userData.user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...cors, 'Content-Type': 'application/json' },
+        headers: { ...cors, "Content-Type": "application/json" },
       });
     }
     const userId = userData.user.id;
 
-    // Permission gate
-    const { data: allowed } = await admin.rpc('has_payroll_access', { _user_id: userId });
-    if (!allowed) {
-      return new Response(JSON.stringify({ error: 'Access denied' }), {
-        status: 403,
-        headers: { ...cors, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { data: orgIdData } = await admin.rpc('get_user_org_id', { _user_id: userId });
+    const { data: orgIdData } = await admin.rpc("get_user_org_id", {
+      _user_id: userId,
+    });
     const orgId = orgIdData as string | null;
     if (!orgId) {
-      return new Response(JSON.stringify({ error: 'No organization' }), {
+      return new Response(JSON.stringify({ error: "No organization" }), {
         status: 400,
-        headers: { ...cors, 'Content-Type': 'application/json' },
+        headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
-    const body = await req.json();
-    const {
-      period_start,
-      period_end,
-      payment_date,
-      drivers, // [{ driver_id, gross_pay }]
-    } = body ?? {};
+    const body = await req.json().catch(() => ({}));
+    const action: string = body?.action ?? "";
+    const payload = body?.payload ?? {};
 
-    if (!period_start || !period_end || !payment_date || !Array.isArray(drivers) || drivers.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'period_start, period_end, payment_date and drivers[] are required' }),
-        { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } },
-      );
+    // Driver-owned actions (create paystubs flow token for the caller)
+    if (action === "create_paystubs_flow_token") {
+      const { data: driverRow } = await admin
+        .from("drivers")
+        .select("id, gusto_employee_id, org_id")
+        .eq("user_id", userId)
+        .eq("org_id", orgId)
+        .maybeSingle();
+      if (!driverRow?.gusto_employee_id) {
+        return new Response(
+          JSON.stringify({ error: "Payroll not yet activated for your account" }),
+          { status: 404, headers: { ...cors, "Content-Type": "application/json" } },
+        );
+      }
+      const result = await actionCreateFlowToken(admin, orgId, {
+        flow_type: "paystubs",
+        entity_uuid: driverRow.gusto_employee_id,
+        entity_type: "Employee",
+      });
+      return new Response(JSON.stringify(result), {
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
     }
 
-    // Load org payroll settings (auto-seed if missing)
-    let { data: settings } = await admin
-      .from('payroll_settings')
-      .select('*')
-      .eq('org_id', orgId)
-      .maybeSingle();
-    if (!settings) {
-      const { data: seeded } = await admin
-        .from('payroll_settings')
-        .insert({ org_id: orgId })
-        .select('*')
-        .single();
-      settings = seeded;
-    }
-    if (!settings) throw new Error('Failed to load payroll settings');
-
-    const results: any[] = [];
-
-    for (const row of drivers) {
-      const driverId = row.driver_id as string;
-      const gross = Number(row.gross_pay) || 0;
-      if (!driverId || gross <= 0) continue;
-
-      // Validate driver belongs to org & is W-2
-      const { data: driver } = await admin
-        .from('drivers')
-        .select('id, org_id, employment_type, tax_state')
-        .eq('id', driverId)
-        .maybeSingle();
-      if (!driver || driver.org_id !== orgId) {
-        results.push({ driver_id: driverId, error: 'Driver not in organization' });
-        continue;
-      }
-      if (driver.employment_type !== 'w2_company') {
-        results.push({ driver_id: driverId, error: 'Driver is not W-2' });
-        continue;
-      }
-
-      // Resolve tax state: driver -> org default -> FL
-      const resolvedState = (driver.tax_state || (settings as any).default_tax_state || 'FL').toUpperCase();
-
-      // Ensure state configs exist for this org, then load the row
-      await admin.rpc('seed_state_tax_configurations', { _org_id: orgId });
-      let { data: stateRow } = await admin
-        .from('state_tax_configurations')
-        .select('state_code, suta_rate, suta_wage_base, has_state_income_tax, sit_rate')
-        .eq('org_id', orgId)
-        .eq('state_code', resolvedState)
-        .maybeSingle();
-      const stateConfig = stateRow
-        ? {
-            state_code: stateRow.state_code,
-            suta_rate: Number(stateRow.suta_rate),
-            suta_wage_base: Number(stateRow.suta_wage_base),
-            has_state_income_tax: !!stateRow.has_state_income_tax,
-            sit_rate: Number(stateRow.sit_rate),
-          }
-        : { state_code: resolvedState, suta_rate: 0, suta_wage_base: 0, has_state_income_tax: false, sit_rate: 0 };
-
-      // W-4 (fallback to defaults)
-      const { data: w4Row } = await admin
-        .from('driver_w4_info')
-        .select('filing_status, extra_withholding, dependents_amount')
-        .eq('driver_id', driverId)
-        .maybeSingle();
-      const w4 = {
-        filing_status: w4Row?.filing_status ?? 'single',
-        extra_withholding: Number(w4Row?.extra_withholding ?? 0),
-        dependents_amount: Number(w4Row?.dependents_amount ?? 0),
-      };
-
-      // YTD (sum of prior payroll rows in same calendar year, same state for SUTA)
-      const year = new Date(period_end).getUTCFullYear();
-      const yearStart = `${year}-01-01`;
-      const { data: prior } = await admin
-        .from('driver_payroll')
-        .select('gross_pay, fl_suta_wage_base_applied, tax_state')
-        .eq('driver_id', driverId)
-        .eq('employment_type', 'w2_company')
-        .gte('period_end', yearStart)
-        .lte('period_end', period_end);
-      const ytd = {
-        ss_wages: (prior ?? []).reduce((s, r) => s + Number(r.gross_pay || 0), 0),
-        medicare_wages: (prior ?? []).reduce((s, r) => s + Number(r.gross_pay || 0), 0),
-        suta_wages: (prior ?? [])
-          .filter((r) => !r.tax_state || r.tax_state === resolvedState)
-          .reduce((s, r) => s + Number(r.fl_suta_wage_base_applied || 0), 0),
-      };
-
-      const b = calcW2({ gross, settings, w4, ytd, stateConfig });
-
-      // Insert immutable payroll row
-      const { data: inserted, error: insErr } = await admin
-        .from('driver_payroll')
-        .insert({
-          org_id: orgId,
-          driver_id: driverId,
-          period_start,
-          period_end,
-          payment_date,
-          gross_pay: b.grossPay,
-          net_pay: b.netPay,
-          status: 'approved',
-          employment_type: 'w2_company',
-          federal_income_tax: b.federalIncomeTax,
-          social_security_tax: b.socialSecurityTax,
-          medicare_tax: b.medicareTax,
-          additional_medicare_tax: b.additionalMedicareTax,
-          state_income_tax: b.stateIncomeTax,
-          tax_state: b.stateCode,
-          employer_ss_tax: b.employerSsTax,
-          employer_medicare_tax: b.employerMedicareTax,
-          employer_fica_total: b.employerFicaTotal,
-          fl_suta_tax: b.flSutaTax,
-          fl_suta_wage_base_applied: b.flSutaWageBaseApplied,
-          filing_status: w4.filing_status,
-          w4_extra_withholding: w4.extra_withholding,
-          w4_dependents_amount: w4.dependents_amount,
-        })
-        .select('id')
-        .single();
-
-      if (insErr) {
-        results.push({ driver_id: driverId, error: insErr.message });
-        continue;
-      }
-
-
-      results.push({ driver_id: driverId, payroll_id: inserted!.id, breakdown: b });
-    }
-
-    return new Response(JSON.stringify({ results }), {
-      headers: { ...cors, 'Content-Type': 'application/json' },
+    // All remaining actions require owner or payroll_admin
+    const { data: allowed } = await admin.rpc("has_payroll_access", {
+      _user_id: userId,
     });
-  } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message ?? String(e) }), {
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Access denied" }), {
+        status: 403,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    let result: Record<string, unknown>;
+    switch (action) {
+      case "provision_company":
+        result = await actionProvisionCompany(admin, orgId);
+        break;
+      case "sync_employee":
+        result = await actionSyncEmployee(admin, orgId, payload);
+        break;
+      case "create_flow_token":
+        result = await actionCreateFlowToken(admin, orgId, payload);
+        break;
+      case "push_payroll_inputs":
+        result = await actionPushPayrollInputs(admin, orgId, payload);
+        break;
+      case "status": {
+        const { companyUuid, status } = await getAccessToken(admin, orgId);
+        result = { company_uuid: companyUuid, onboarding_status: status };
+        break;
+      }
+      default:
+        return new Response(
+          JSON.stringify({ error: `Unknown action: ${action}` }),
+          { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
+        );
+    }
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return new Response(JSON.stringify({ error: msg }), {
       status: 500,
-      headers: { ...cors, 'Content-Type': 'application/json' },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 });

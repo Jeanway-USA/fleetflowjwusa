@@ -205,3 +205,200 @@ export const DEFAULT_W4: W4Info = {
 
 export const DEFAULT_W2_GROSS = 1700;
 
+// ---------------------------------------------------------------------------
+// Gusto Embedded Payroll — data mapping
+// ---------------------------------------------------------------------------
+// These helpers translate our internal Landstar settlement objects into the
+// payload shapes that Gusto's Embedded Payroll API expects. They are pure —
+// no fetch calls — so they can be reused by both the edge function proxy and
+// the RunW2PayrollDialog preview panel.
+
+export interface GustoAddressInput {
+  street_1: string;
+  street_2?: string;
+  city: string;
+  state: string;
+  zip: string;
+  country?: string;
+}
+
+export interface GustoEmployeeInput {
+  first_name: string;
+  last_name: string;
+  middle_initial?: string;
+  email?: string;
+  date_of_birth?: string; // YYYY-MM-DD
+  ssn?: string;           // 9 digits, no dashes
+  home_address?: GustoAddressInput;
+}
+
+export type GustoFixedCompensationName =
+  | 'Regular Hours'
+  | 'Overtime Hours'
+  | 'Double overtime'
+  | 'Bonus'
+  | 'Commission'
+  | 'Reimbursement'
+  | 'Paycheck Tips'
+  | 'Cash Tips'
+  | 'Correction Payment'
+  | 'Severance'
+  | 'Minimum Wage Adjustment';
+
+export interface GustoFixedCompensation {
+  name: GustoFixedCompensationName;
+  amount: string; // Gusto expects strings for money
+  job_uuid?: string;
+}
+
+export interface GustoHourlyCompensation {
+  name: 'Regular Hours' | 'Overtime Hours' | 'Double overtime';
+  hours: string;
+  job_uuid?: string;
+}
+
+export interface GustoPaycheckDeduction {
+  name: string;
+  amount: string;
+}
+
+export interface GustoEmployeeCompensation {
+  employee_uuid: string;
+  gross_pay?: string;
+  fixed_compensations?: GustoFixedCompensation[];
+  hourly_compensations?: GustoHourlyCompensation[];
+  paycheck_tips?: string;
+  memo?: string;
+}
+
+export interface GustoPayrollInputRecord {
+  payroll_uuid: string;
+  inputs: GustoEmployeeCompensation[];
+}
+
+/** Minimal driver shape needed to map to a Gusto employee. */
+export interface DriverForGusto {
+  first_name: string | null;
+  last_name: string | null;
+  email?: string | null;
+}
+
+export interface W4ForGusto {
+  filing_status?: string | null;
+  ssn?: string | null;
+  date_of_birth?: string | null;
+  home_address?: GustoAddressInput | null;
+}
+
+export function mapDriverToGustoEmployee(
+  driver: DriverForGusto,
+  w4?: W4ForGusto | null,
+): GustoEmployeeInput {
+  const ssn = (w4?.ssn ?? '').replace(/\D/g, '');
+  return {
+    first_name: (driver.first_name ?? '').trim() || 'Driver',
+    last_name: (driver.last_name ?? '').trim() || 'Unknown',
+    email: driver.email ?? undefined,
+    date_of_birth: w4?.date_of_birth ?? undefined,
+    ssn: ssn.length === 9 ? ssn : undefined,
+    home_address: w4?.home_address ?? undefined,
+  };
+}
+
+/** Line-item shape produced by our Landstar settlement parser. */
+export interface SettlementLineForGusto {
+  item_type:
+    | 'load_pay'
+    | 'bonus'
+    | 'reimbursement'
+    | 'deduction'
+    | 'commission'
+    | string;
+  amount: number;
+  description?: string | null;
+}
+
+export interface SettlementForGusto {
+  gross_pay: number;
+  reimbursements?: number | null;
+  deductions?: number | null;
+  memo?: string | null;
+  items?: SettlementLineForGusto[];
+}
+
+const money = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
+
+export function mapSettlementToGustoPayrollInputs(
+  settlement: SettlementForGusto,
+  employeeUuid: string,
+): GustoEmployeeCompensation {
+  const fixed: GustoFixedCompensation[] = [];
+  const items = settlement.items ?? [];
+
+  const loadPayTotal = items
+    .filter((i) => i.item_type === 'load_pay')
+    .reduce((s, i) => s + Number(i.amount || 0), 0);
+  const base = loadPayTotal > 0 ? loadPayTotal : Number(settlement.gross_pay || 0);
+  if (base > 0) {
+    fixed.push({ name: 'Regular Hours', amount: money(base) });
+  }
+
+  for (const item of items) {
+    const amount = Number(item.amount || 0);
+    if (!amount) continue;
+    switch (item.item_type) {
+      case 'bonus':
+        fixed.push({ name: 'Bonus', amount: money(amount) });
+        break;
+      case 'commission':
+        fixed.push({ name: 'Commission', amount: money(amount) });
+        break;
+      case 'reimbursement':
+        fixed.push({ name: 'Reimbursement', amount: money(amount) });
+        break;
+      case 'deduction':
+        // Gusto handles deductions on the employee record, not here; skip.
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Fallback reimbursements column when no line items were supplied
+  if (!items.some((i) => i.item_type === 'reimbursement') &&
+      Number(settlement.reimbursements || 0) > 0) {
+    fixed.push({
+      name: 'Reimbursement',
+      amount: money(Number(settlement.reimbursements)),
+    });
+  }
+
+  return {
+    employee_uuid: employeeUuid,
+    fixed_compensations: fixed,
+    memo: settlement.memo ?? undefined,
+  };
+}
+
+export function summarizeGustoPayrollBatch(
+  inputs: GustoEmployeeCompensation[],
+): { totalGross: number; totalReimbursements: number; totalBonus: number } {
+  let totalGross = 0;
+  let totalReimbursements = 0;
+  let totalBonus = 0;
+  for (const emp of inputs) {
+    for (const fc of emp.fixed_compensations ?? []) {
+      const amt = Number(fc.amount) || 0;
+      if (fc.name === 'Reimbursement') totalReimbursements += amt;
+      else if (fc.name === 'Bonus') totalBonus += amt;
+      else totalGross += amt;
+    }
+  }
+  return {
+    totalGross: round2(totalGross),
+    totalReimbursements: round2(totalReimbursements),
+    totalBonus: round2(totalBonus),
+  };
+}
+
+
