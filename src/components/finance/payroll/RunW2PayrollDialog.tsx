@@ -339,13 +339,14 @@ export function RunW2PayrollDialog({
 
                 <tfoot className="border-t-2 bg-muted/40 font-medium">
                   <tr>
-                    <td className="px-3 py-2">Totals ({previews.length})</td>
+                    <td className="px-3 py-2" colSpan={2}>Totals ({previews.length})</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.gross)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.fit)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.ss)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {formatCurrency(totals.med + totals.addlMed)}
                     </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.sit)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.empFica)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.suta)}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-primary">{formatCurrency(totals.net)}</td>
