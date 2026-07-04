@@ -200,8 +200,7 @@ export default function DriverOnboarding() {
     }));
   };
 
-    }));
-  };
+
 
   const finalizeSubmission = async () => {
     if (!user || !orgId) {
