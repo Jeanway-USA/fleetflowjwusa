@@ -900,11 +900,13 @@ export default function DriverOnboarding() {
               ? isCredentialsStep
                 ? 'Saving…'
                 : 'Submitting…'
-              : isCredentialsStep
-                ? 'Continue'
-                : isLastTemplateStep
-                  ? 'Submit Document'
-                  : 'Continue'}
+              : isEmploymentStep
+                ? 'Next'
+                : isCredentialsStep
+                  ? 'Continue'
+                  : isLastTemplateStep
+                    ? 'Submit Document'
+                    : 'Continue'}
           </Button>
         )}
       </div>
