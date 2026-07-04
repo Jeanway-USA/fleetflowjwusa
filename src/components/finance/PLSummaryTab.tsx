@@ -96,126 +96,111 @@ export function PLSummaryTab({
 
   const npmValue = selected.miles > 0 ? (selected.revenue - selected.costs) / selected.miles : 0;
 
-  const now = new Date();
-  const stamp = now.toLocaleTimeString('en-US', { hour12: false });
-  const tfLabel = timeframe === 'week' ? '7-DAY' : timeframe === 'month' ? '30-DAY' : '90-DAY';
+  const tfLabel = timeframe === 'week' ? '7-day' : timeframe === 'month' ? '30-day' : '90-day';
 
   return (
     <>
-      {/* ============ BLOOMBERG-STYLE P&L COMMAND CENTER ============ */}
-      <div className="mb-6 rounded-sm border border-[#1E2530] bg-[#0A0E14] text-zinc-100 overflow-hidden">
-        {/* Ticker strip */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-[#1E2530] bg-[#11151C]">
-          <span className="font-mono text-[10px] tracking-[0.22em] text-zinc-500">
-            FLEET&nbsp;P&amp;L · LIVE · UPDATED&nbsp;{stamp}
-          </span>
-          <span className="font-mono text-[10px] tracking-[0.22em] text-zinc-500">
-            WINDOW · {tfLabel}
-          </span>
-        </div>
-
-        <div className="p-4 space-y-4">
-          {/* ---------- Triple KPI row ---------- */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {/* Card 1 — Gross Revenue (green rail) */}
-            <div className="relative bg-[#11151C] border border-[#1E2530] rounded-sm p-5 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-emerald-500">
-              <div className="flex items-center justify-between mb-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-                  Fleet Gross Revenue
-                </p>
-                <DollarSign className="h-4 w-4 text-emerald-500" />
-              </div>
-              <p className="font-mono text-4xl tabular-nums text-zinc-50">
+      {/* ============ Fleet P&L Overview ============ */}
+      <div className="mb-6 space-y-4">
+        {/* ---------- Triple KPI row ---------- */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Card 1 — Gross Revenue */}
+          <Card className="rounded-xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Fleet Gross Revenue
+              </CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-semibold text-foreground tabular-nums">
                 {formatCurrency(grossRevenue)}
               </p>
-              <p className="font-mono text-[11px] text-zinc-500 mt-2 tracking-wider">
-                {revenueTotals.loadCount} LOADS · {revenueTotals.bookedMiles.toLocaleString()} MI
+              <p className="text-xs text-muted-foreground mt-2">
+                {revenueTotals.loadCount} loads · {revenueTotals.bookedMiles.toLocaleString()} mi
               </p>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Card 2 — Dispatched Expenses (plain) */}
-            <div className="bg-[#11151C] border border-[#1E2530] rounded-sm p-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-                  Total Dispatched Expenses
-                </p>
-                <TrendingDown className="h-4 w-4 text-rose-500" />
-              </div>
-              <p className="font-mono text-4xl tabular-nums text-zinc-200">
+          {/* Card 2 — Dispatched Expenses */}
+          <Card className="rounded-xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Dispatched Expenses
+              </CardTitle>
+              <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-semibold text-foreground tabular-nums">
                 {formatCurrency(combinedCosts)}
               </p>
-              <p className="font-mono text-[11px] text-zinc-500 mt-2 tracking-wider">
-                PAYROLL · COMMISSIONS · OPEX
+              <p className="text-xs text-muted-foreground mt-2">
+                Payroll · Commissions · Opex
               </p>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Card 3 — Net Operating Margin (highlight) */}
-            <div
-              className={`relative bg-gradient-to-br from-[#11151C] to-[#1E2530] border border-[#1E2530] rounded-sm p-5 ring-1 ${
-                noi >= 0 ? 'ring-emerald-500/40' : 'ring-rose-500/40'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-400">
-                  Net Operating Margin
-                </p>
-                <PiggyBank
-                  className={`h-4 w-4 ${noi >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}
-                />
-              </div>
-              <p
-                className={`font-mono text-5xl tabular-nums tracking-tight ${
-                  noi >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                }`}
-              >
+          {/* Card 3 — Net Operating Margin */}
+          <Card className="rounded-xl">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Net Operating Margin
+              </CardTitle>
+              <PiggyBank className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-semibold text-foreground tabular-nums">
                 {formatCurrency(noi)}
               </p>
-              <p className="font-mono text-[11px] mt-2 tracking-wider">
-                <span className="text-zinc-500">MARGIN&nbsp;</span>
-                <span className={noi >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+              <p className="text-xs mt-2 flex items-center gap-1">
+                <span className="text-muted-foreground">Margin</span>
+                <span
+                  className={`inline-flex items-center gap-0.5 font-medium ${
+                    noi >= 0 ? 'text-green-600' : 'text-destructive'
+                  }`}
+                >
+                  {noi >= 0 ? (
+                    <TrendingUp className="h-3 w-3" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3" />
+                  )}
                   {noiMargin.toFixed(2)}%
                 </span>
               </p>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* ---------- CPM Ratios Tape ---------- */}
-          <div className="bg-[#11151C] border border-[#1E2530] rounded-sm">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[#1E2530]">
-              <div className="flex items-center gap-2">
-                <Gauge className="h-3.5 w-3.5 text-amber-500" />
-                <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-400">
-                  Operational Ratios · Per Mile
-                </h3>
-              </div>
-              <ToggleGroup
-                type="single"
-                value={timeframe}
-                onValueChange={(v) => v && setTimeframe(v as Timeframe)}
-                className="bg-[#0A0E14] border border-[#1E2530] rounded-sm p-0.5"
-              >
-                {(['week', 'month', 'quarter'] as Timeframe[]).map((t) => (
-                  <ToggleGroupItem
-                    key={t}
-                    value={t}
-                    className="font-mono text-[10px] uppercase tracking-wider px-3 py-1 h-auto border-0 text-zinc-500 data-[state=on]:bg-[#1E2530] data-[state=on]:text-emerald-400"
-                  >
-                    {t}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#1E2530]">
+        {/* ---------- Operational Ratios ---------- */}
+        <Card className="rounded-xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 gap-4 flex-wrap">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Gauge className="h-4 w-4 text-muted-foreground" />
+              Operational Ratios · Per Mile
+            </CardTitle>
+            <Tabs
+              value={timeframe}
+              onValueChange={(v) => setTimeframe(v as Timeframe)}
+            >
+              <TabsList>
+                <TabsTrigger value="week">Week</TabsTrigger>
+                <TabsTrigger value="month">Month</TabsTrigger>
+                <TabsTrigger value="quarter">Quarter</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
               <RatioCell
                 code="RPM"
-                label="Rev / Mile"
+                label="Revenue / Mile"
                 value={trendLoading ? '—' : perMile(selected.revenue, selected.miles)}
                 tone="up"
                 sub={`${abbrevCurrency(selected.revenue)} over ${selected.miles.toLocaleString()} mi`}
               />
               <RatioCell
                 code="EPM"
-                label="Exp / Mile"
+                label="Expense / Mile"
                 value={trendLoading ? '—' : perMile(selected.costs, selected.miles)}
                 tone="down"
                 sub={`${abbrevCurrency(selected.costs)} over ${selected.miles.toLocaleString()} mi`}
@@ -228,31 +213,34 @@ export function PLSummaryTab({
                 sub={`${abbrevCurrency(selected.revenue - selected.costs)} net · ${tfLabel}`}
               />
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* ---------- 12-Week Trend Band ---------- */}
-          <div className="bg-[#11151C] border border-[#1E2530] rounded-sm p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-400">
-                  Trend · Gross vs Overhead · 12-Week Rolling
-                </h3>
-              </div>
-              <div className="flex items-center gap-4 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-2 w-2 bg-emerald-500" /> Revenue
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-2 w-2 bg-rose-500" /> Overhead
-                </span>
-              </div>
+        {/* ---------- 12-Week Trend ---------- */}
+        <Card className="rounded-xl">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 gap-4 flex-wrap">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              Gross vs Overhead · 12-Week Rolling
+            </CardTitle>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-sm bg-primary" /> Revenue
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-2 w-2 rounded-sm bg-destructive" /> Overhead
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-0.5 w-3 bg-muted-foreground" /> Net
+              </span>
             </div>
+          </CardHeader>
+          <CardContent>
             {trendLoading || !trend ? (
-              <Skeleton className="h-[320px] w-full bg-[#1E2530]" />
+              <Skeleton className="h-[320px] w-full" />
             ) : trend.weekly.length === 0 ? (
-              <div className="h-[320px] w-full flex items-center justify-center font-mono text-xs tracking-[0.3em] text-zinc-600">
-                NO DATA
+              <div className="h-[320px] w-full flex items-center justify-center text-sm text-muted-foreground">
+                No data available
               </div>
             ) : (
               <div className="h-[320px] w-full">
@@ -263,48 +251,47 @@ export function PLSummaryTab({
                   >
                     <defs>
                       <linearGradient id="plRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#22C55E" stopOpacity={0.32} />
-                        <stop offset="100%" stopColor="#22C55E" stopOpacity={0.02} />
+                        <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
+                        <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0.02} />
                       </linearGradient>
                       <linearGradient id="plCost" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#EF4444" stopOpacity={0.28} />
-                        <stop offset="100%" stopColor="#EF4444" stopOpacity={0.02} />
+                        <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.25} />
+                        <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid stroke="#1E2530" vertical={false} />
+                    <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
                     <XAxis
                       dataKey="label"
-                      stroke="#6B7280"
-                      tick={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 10, fill: '#6B7280' }}
+                      stroke="hsl(var(--muted-foreground))"
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                       tickLine={false}
-                      axisLine={{ stroke: '#1E2530' }}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
                     />
                     <YAxis
-                      stroke="#6B7280"
-                      tick={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 10, fill: '#6B7280' }}
+                      stroke="hsl(var(--muted-foreground))"
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                       tickFormatter={abbrevCurrency}
                       tickLine={false}
-                      axisLine={{ stroke: '#1E2530' }}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
                       width={56}
                     />
                     <Tooltip
                       formatter={(v: any) => formatCurrency(Number(v))}
                       contentStyle={{
-                        background: '#0A0E14',
-                        border: '1px solid #1E2530',
-                        borderRadius: 2,
-                        fontFamily: '"JetBrains Mono", monospace',
-                        fontSize: 11,
-                        color: '#E5E7EB',
+                        background: 'hsl(var(--popover))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: 6,
+                        fontSize: 12,
+                        color: 'hsl(var(--popover-foreground))',
                       }}
-                      labelStyle={{ color: '#E5E7EB', fontWeight: 600 }}
-                      cursor={{ stroke: '#F59E0B', strokeWidth: 1 }}
+                      labelStyle={{ color: 'hsl(var(--popover-foreground))', fontWeight: 600 }}
+                      cursor={{ stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1 }}
                     />
                     <Area
                       type="monotone"
                       dataKey="costs"
                       name="Overhead"
-                      stroke="#EF4444"
+                      stroke="hsl(var(--destructive))"
                       strokeWidth={1.5}
                       fill="url(#plCost)"
                     />
@@ -312,7 +299,7 @@ export function PLSummaryTab({
                       type="monotone"
                       dataKey="revenue"
                       name="Revenue"
-                      stroke="#22C55E"
+                      stroke="hsl(var(--primary))"
                       strokeWidth={1.5}
                       fill="url(#plRev)"
                     />
@@ -320,7 +307,7 @@ export function PLSummaryTab({
                       type="monotone"
                       dataKey="net"
                       name="Net"
-                      stroke="#F59E0B"
+                      stroke="hsl(var(--muted-foreground))"
                       strokeWidth={1}
                       strokeDasharray="4 4"
                       dot={false}
@@ -329,9 +316,10 @@ export function PLSummaryTab({
                 </ResponsiveContainer>
               </div>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
+
 
 
       {/* Revenue Flow */}
