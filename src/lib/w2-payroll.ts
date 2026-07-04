@@ -39,9 +39,20 @@ export interface PayrollSettings {
   medicare_rate: number;
   additional_medicare_rate: number;
   additional_medicare_threshold: number;
+  /** @deprecated Use per-state stateConfig instead. Retained for backfill. */
   suta_rate: number;
+  /** @deprecated Use per-state stateConfig instead. Retained for backfill. */
   suta_wage_base: number;
   pay_frequency: PayFrequency;
+  default_tax_state?: string;
+}
+
+export interface StateTaxConfig {
+  state_code: string;
+  suta_rate: number;
+  suta_wage_base: number;
+  has_state_income_tax: boolean;
+  sit_rate: number;
 }
 
 export interface W4Info {
