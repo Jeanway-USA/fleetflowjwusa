@@ -32,6 +32,15 @@ interface W2Driver {
   first_name: string | null;
   last_name: string | null;
   employment_type: string | null;
+  tax_state?: string | null;
+}
+
+interface StateConfigRow {
+  state_code: string;
+  suta_rate: number;
+  suta_wage_base: number;
+  has_state_income_tax: boolean;
+  sit_rate: number;
 }
 
 interface RunW2PayrollDialogProps {
