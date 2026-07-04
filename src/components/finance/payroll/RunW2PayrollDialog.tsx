@@ -251,8 +251,9 @@ export function RunW2PayrollDialog({
         <DialogHeader>
           <DialogTitle>Run W-2 Payroll</DialogTitle>
           <DialogDescription>
-            2026 IRS Percentage Method (Pub 15-T) + 6.2% Social Security, 1.45% Medicare, and Florida
-            Reemployment Tax (SUTA). Employer FICA match is accrued but does not reduce net pay.
+            2026 IRS Percentage Method (Pub 15-T) + 6.2% Social Security, 1.45% Medicare. SUTA and
+            State Income Tax are driven per-driver by their assigned Tax State. Employer FICA match
+            is accrued but does not reduce net pay.
           </DialogDescription>
         </DialogHeader>
 
