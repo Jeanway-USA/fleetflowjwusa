@@ -21,11 +21,14 @@ function corsFor(req: Request): Record<string, string> {
       origin.endsWith(".lovable.app") ||
       origin.endsWith(".lovableproject.com"),
   );
+  const reqHeaders = req.headers.get("Access-Control-Request-Headers");
   return {
     "Access-Control-Allow-Origin": isAllowed ? origin : ALLOWED_ORIGINS[0],
-    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": reqHeaders ??
+      "authorization, x-client-info, apikey, content-type, accept, x-gusto-api-version",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "Access-Control-Expose-Headers": "content-type, x-request-id",
+    "Vary": "Origin, Access-Control-Request-Headers",
   };
 }
 
