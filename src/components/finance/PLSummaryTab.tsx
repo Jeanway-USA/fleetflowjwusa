@@ -586,19 +586,20 @@ function RatioCell({
   sub: string;
   tone: 'up' | 'down';
 }) {
-  const toneClass = tone === 'up' ? 'text-emerald-400' : 'text-rose-400';
+  const toneClass = tone === 'up' ? 'text-green-600' : 'text-destructive';
+  const ToneIcon = tone === 'up' ? TrendingUp : TrendingDown;
   return (
     <div className="px-5 py-4">
       <div className="flex items-baseline justify-between mb-1">
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-          {label}
-        </p>
-        <span className={`font-mono text-[10px] tracking-widest ${toneClass}`}>{code}</span>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${toneClass}`}>
+          <ToneIcon className="h-3 w-3" />
+          {code}
+        </span>
       </div>
-      <p className={`font-mono text-2xl tabular-nums ${toneClass}`}>{value}</p>
-      <p className="font-mono text-[10px] text-zinc-600 mt-1 tracking-wider uppercase truncate">
-        {sub}
-      </p>
+      <p className="text-2xl font-semibold text-foreground tabular-nums">{value}</p>
+      <p className="text-xs text-muted-foreground mt-1 truncate">{sub}</p>
     </div>
   );
 }
+
