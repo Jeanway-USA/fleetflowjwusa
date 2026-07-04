@@ -95,7 +95,7 @@ export default function DriverOnboarding() {
       const { data, error } = await supabase
         .from('drivers')
         .select(
-          'id, first_name, last_name, phone, license_number, license_expiry, medical_card_expiry, endorsements, hazmat_expiry, has_twic, twic_expiry, pay_type, pay_rate, credentials_review_status, credentials_revision_notes, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, fast_card_passport_expiry, dod_clearance_level, landstar_operator_id'
+          'id, first_name, last_name, phone, license_number, license_expiry, medical_card_expiry, endorsements, hazmat_expiry, has_twic, twic_expiry, pay_type, pay_rate, credentials_review_status, credentials_revision_notes, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, fast_card_passport_expiry, dod_clearance_level, landstar_operator_id, employment_type'
         )
 
         .eq('user_id', user!.id)
