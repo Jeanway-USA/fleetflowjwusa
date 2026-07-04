@@ -238,7 +238,9 @@ export default function DriverOnboarding() {
   const ssnDigits = currentState.ssn.replace(/\D/g, '');
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(currentState.email.trim());
 
-  const canContinue = isCredentialsStep
+  const canContinue = isEmploymentStep
+    ? employmentType !== null
+    : isCredentialsStep
     ? credentialsValid
     : (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
       (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
