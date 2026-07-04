@@ -88,7 +88,7 @@ export function W2PayrollHistoryCard() {
               <Wallet className="h-5 w-5" /> W-2 Payroll
             </CardTitle>
             <CardDescription>
-              Automated FIT + FICA withholding and Florida SUTA accrual for W-2 employees.
+              Automated FIT + FICA withholding and state SUTA / State Income Tax per driver's Tax State.
             </CardDescription>
           </div>
           <Button onClick={() => setDialogOpen(true)}>Run W-2 Payroll</Button>
@@ -104,7 +104,7 @@ export function W2PayrollHistoryCard() {
               value={formatCurrency(totals.fica)}
               tone="amber"
             />
-            <SummaryTile label="FL Reemployment Tax (SUTA)" value={formatCurrency(totals.suta)} tone="amber" />
+            <SummaryTile label="State Reemployment Tax (SUTA)" value={formatCurrency(totals.suta)} tone="amber" />
           </div>
 
           <div className="overflow-x-auto">
