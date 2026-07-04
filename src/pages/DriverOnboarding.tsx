@@ -849,6 +849,7 @@ export default function DriverOnboarding() {
                           routingNumber={currentState.routingNumber}
                           accountNumber={currentState.accountNumber}
                           bankAccountType={currentState.bankAccountType}
+                          employmentType={employmentType}
                         />
                       </div>
                     ),
