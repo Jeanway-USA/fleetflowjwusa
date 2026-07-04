@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/compress-image';
-import { AlertCircle, CheckCircle2, Download } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, Briefcase, Building2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
