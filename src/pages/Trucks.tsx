@@ -378,7 +378,11 @@ export default function Trucks() {
     },
   ];
 
-  const [viewingTruck, setViewingTruck] = useState<TruckWithDriver | null>(null);
+  const [viewingTruckState, setViewingTruck] = useState<TruckWithDriver | null>(null);
+  // Keep the viewed truck fresh from the ['trucks'] query so mutations (e.g. loan payments) reflect immediately.
+  const viewingTruck = viewingTruckState
+    ? ((trucks as TruckWithDriver[]).find((t) => t.id === viewingTruckState.id) ?? viewingTruckState)
+    : null;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
   const [massEditOpen, setMassEditOpen] = useState(false);
