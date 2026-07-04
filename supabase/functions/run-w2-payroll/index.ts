@@ -31,16 +31,60 @@ function corsFor(req: Request): Record<string, string> {
 
 const GUSTO_BASE = Deno.env.get("GUSTO_API_BASE_URL") ??
   "https://api.gusto-demo.com";
+const GUSTO_API_VERSION = Deno.env.get("GUSTO_API_VERSION") ?? "2026-06-15";
 const GUSTO_CLIENT_ID = Deno.env.get("GUSTO_CLIENT_ID") ?? "";
 const GUSTO_CLIENT_SECRET = Deno.env.get("GUSTO_CLIENT_SECRET") ?? "";
-const GUSTO_PARTNER_ACCESS_TOKEN =
-  Deno.env.get("GUSTO_PARTNER_ACCESS_TOKEN") ?? "";
 
 type Admin = ReturnType<typeof createClient>;
 
 // -----------------------------------------------------------------------------
 // Gusto helpers
 // -----------------------------------------------------------------------------
+
+async function readGustoBody(resp: Response): Promise<unknown> {
+  const text = await resp.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+}
+
+async function getGustoSystemToken(): Promise<string> {
+  if (!GUSTO_CLIENT_ID || !GUSTO_CLIENT_SECRET) {
+    throw new Error("GUSTO_CLIENT_ID and GUSTO_CLIENT_SECRET are required");
+  }
+
+  const resp = await fetch(`${GUSTO_BASE}/oauth/token`, {
+    method: "POST",
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      client_id: GUSTO_CLIENT_ID,
+      client_secret: GUSTO_CLIENT_SECRET,
+      grant_type: "system_access",
+    }),
+  });
+
+  const body = await readGustoBody(resp) as Record<string, unknown>;
+  if (!resp.ok) {
+    throw new Error(
+      `Gusto system token failed (${resp.status}): ${JSON.stringify(body)}`,
+    );
+  }
+
+  const accessToken = typeof body.access_token === "string"
+    ? body.access_token
+    : "";
+  if (!accessToken) {
+    throw new Error("Gusto system token response did not include access_token");
+  }
+
+  return accessToken;
+}
 
 async function refreshTokens(admin: Admin, orgId: string, refreshToken: string) {
   const resp = await fetch(`${GUSTO_BASE}/oauth/token`, {
@@ -71,7 +115,7 @@ async function refreshTokens(admin: Admin, orgId: string, refreshToken: string) 
 }
 
 async function getAccessToken(admin: Admin, orgId: string): Promise<{
-  token: string;
+  token: string | null;
   companyUuid: string | null;
   status: string;
 }> {
@@ -82,7 +126,7 @@ async function getAccessToken(admin: Admin, orgId: string): Promise<{
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) {
     return {
-      token: GUSTO_PARTNER_ACCESS_TOKEN,
+      token: null,
       companyUuid: null,
       status: "pending",
     };
@@ -96,7 +140,6 @@ async function getAccessToken(admin: Admin, orgId: string): Promise<{
   if (needsRefresh && row.refresh_token) {
     token = await refreshTokens(admin, orgId, row.refresh_token);
   }
-  if (!token) token = GUSTO_PARTNER_ACCESS_TOKEN;
   return {
     token,
     companyUuid: row.gusto_company_uuid ?? null,
@@ -111,6 +154,11 @@ async function gustoFetch(
   init: RequestInit = {},
 ): Promise<Response> {
   const { token } = await getAccessToken(admin, orgId);
+  if (!token) {
+    throw new Error(
+      "Gusto company access token unavailable; provision or reconnect this organization",
+    );
+  }
   const headers = new Headers(init.headers ?? {});
   headers.set("Authorization", `Bearer ${token}`);
   headers.set("Content-Type", "application/json");
@@ -137,26 +185,26 @@ async function actionProvisionCompany(
   admin: Admin,
   orgId: string,
 ): Promise<Record<string, unknown>> {
-  if (!GUSTO_PARTNER_ACCESS_TOKEN) {
-    throw new Error("GUSTO_PARTNER_ACCESS_TOKEN not configured");
-  }
   const { data: org } = await admin
     .from("organizations")
     .select("name")
     .eq("id", orgId)
     .maybeSingle();
+  const systemToken = await getGustoSystemToken();
   const resp = await fetch(`${GUSTO_BASE}/v1/partner_managed_companies`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${GUSTO_PARTNER_ACCESS_TOKEN}`,
+      "Accept": "application/json",
+      Authorization: `Bearer ${systemToken}`,
       "Content-Type": "application/json",
+      "X-Gusto-API-Version": GUSTO_API_VERSION,
     },
     body: JSON.stringify({
       user: { first_name: "Owner", last_name: "Owner", email: `owner+${orgId}@example.com` },
       company: { name: org?.name ?? `Org ${orgId.slice(0, 8)}`, trade_name: org?.name ?? undefined, ein: null },
     }),
   });
-  const body = await resp.json().catch(() => ({}));
+  const body = await readGustoBody(resp) as Record<string, unknown>;
   if (!resp.ok) {
     throw new Error(
       `Gusto provisioning failed (${resp.status}): ${JSON.stringify(body)}`,
