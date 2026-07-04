@@ -1,41 +1,28 @@
-## Add Employment Type Selection Step to Driver Onboarding
+## Wire `employmentType` through the onboarding flow
 
-Add a new introductory step to `src/pages/DriverOnboarding.tsx` where the driver picks their employment type (1099 Independent Contractor vs W-2 Company Driver) before continuing to the existing credentials step.
+The credentials step already sits at index 1 (immediately after employment type) and doesn't branch on employment type, so no reordering or field changes are needed there. This plan just threads the selected value through the rest of the flow so downstream document signing steps can react to it.
 
 ### Changes to `src/pages/DriverOnboarding.tsx`
 
-1. **New state:**
-   ```ts
-   const [employmentType, setEmploymentType] = useState<'1099' | 'W-2' | null>(null);
-   ```
+1. **Persist alongside credentials save.** When the user clicks Continue on the credentials step (`handleContinue`, `isCredentialsStep` branch), include the mapped `employment_type` in the `drivers` update payload:
+   - `'1099'` → `'1099_contractor'`
+   - `'W-2'` → `'w2_company'`
+   - Merge into the existing `payload` from `credentialsRef.current?.submit()` before `.update(payload)`.
+   - This uses the existing `drivers.employment_type` enum column and keeps every downstream consumer (payroll, settlements, DriverDetailSheet) in sync.
 
-2. **Reindex steps:**
-   - Step 0 → Employment Type (new)
-   - Step 1 → Credentials (was 0)
-   - Steps 2..N → Templates
-   - Update constants: `EMPLOYMENT_STEP = 0`, `CREDENTIALS_STEP = 1`, `totalSteps = templates.length + 2`, `templateIndex = stepIndex - 2`.
-   - Update the deep-link revision `useEffect` to jump to `setStepIndex(1)` for credentials revisions and `idx + 2` for template revisions.
+2. **Hydrate on load.** When `driverRow` loads with an existing `employment_type`, initialize the local `employmentType` state from it (map back to `'1099' | 'W-2'`; treat `lease_purchase` as `'1099'` for onboarding purposes since only two options are offered). Wrapped in a `useEffect` guarded so it only runs when `employmentType === null`.
 
-3. **Gate `canContinue`** on the new step: `employmentType !== null`.
+3. **Pass down to document signing steps.** Add `employmentType` as a prop on both `<DocumentTemplateRenderer>` render sites (interactive + hidden print copies). The renderer will accept it and can be consumed by later work (e.g., conditional 1099 vs W-2 clauses/tokens). No rendering changes in this plan beyond making the value available.
 
-4. **Render the new step** when `stepIndex === 0`:
-   - A `Card` header explaining "How will you be working with us?"
-   - Two large selectable cards side-by-side (grid on desktop, stacked on mobile), each a `<button>` wrapping a shadcn `Card`:
-     - **Independent Contractor (1099)** — icon + short description ("You operate your own authority / receive a 1099 at year-end.")
-     - **Company Driver (W-2)** — icon + short description ("You are an employee; taxes are withheld and you receive a W-2.")
-   - Selected card gets a distinctive `ring-2 ring-primary border-primary bg-primary/5` treatment; unselected uses default border with hover.
-   - Clicking a card sets `employmentType`. Next button remains disabled until one is chosen.
+4. **Extend `driverRow` select** to include `employment_type` so step 2's hydration effect has the value.
 
-5. **Progress bar** and step counter updated to use the new `totalSteps`.
+### Changes to `src/components/onboarding/DocumentTemplateRenderer.tsx`
+
+- Extend `DocumentTemplateRendererProps` with `employmentType?: '1099' | 'W-2' | null`.
+- Destructure it in the component signature. No visual/logic change yet; this exposes the value for upcoming document-signing work.
 
 ### Out of scope
 
-- Persisting `employmentType` to the database (no schema/mutation change requested).
-- Branching downstream template flow by employment type.
-- Backend/edge function changes.
-
-### Technical notes
-
-- Uses existing shadcn `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, and `Button` — no new dependencies.
-- Icons from `lucide-react` already imported in the file (`Briefcase`, `Building2` will be added to the import).
-- No changes outside `src/pages/DriverOnboarding.tsx`.
+- No new UI on the credentials step (it stays universal: CDL, medical card, TWIC).
+- No conditional template rendering by employment type yet — just plumbing.
+- No schema changes (existing `employment_type` enum column is reused).

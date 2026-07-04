@@ -56,6 +56,7 @@ export interface DocumentTemplateRendererProps {
   onAccountNumberChange?: (value: string) => void;
   bankAccountType?: 'checking' | 'savings' | '';
   onBankAccountTypeChange?: (value: 'checking' | 'savings') => void;
+  employmentType?: '1099' | 'W-2' | null;
 }
 
 
@@ -168,6 +169,7 @@ export function DocumentTemplateRenderer({
   onAccountNumberChange,
   bankAccountType = '',
   onBankAccountTypeChange,
+  employmentType: _employmentType = null,
 }: DocumentTemplateRendererProps) {
 
   const [attachmentError, setAttachmentError] = useState<string | null>(null);

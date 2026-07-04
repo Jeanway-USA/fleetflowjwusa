@@ -88,6 +88,8 @@ export default function DriverOnboarding() {
   }, [stepIndex]);
 
 
+
+
   const { data: driverRow, isLoading: driverLoading, refetch: refetchDriver } = useQuery({
     queryKey: ['driver-self', user?.id, orgId],
     enabled: !!user && !!orgId,
@@ -95,7 +97,7 @@ export default function DriverOnboarding() {
       const { data, error } = await supabase
         .from('drivers')
         .select(
-          'id, first_name, last_name, phone, license_number, license_expiry, medical_card_expiry, endorsements, hazmat_expiry, has_twic, twic_expiry, pay_type, pay_rate, credentials_review_status, credentials_revision_notes, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, fast_card_passport_expiry, dod_clearance_level, landstar_operator_id'
+          'id, first_name, last_name, phone, license_number, license_expiry, medical_card_expiry, endorsements, hazmat_expiry, has_twic, twic_expiry, pay_type, pay_rate, credentials_review_status, credentials_revision_notes, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, fast_card_passport_expiry, dod_clearance_level, landstar_operator_id, employment_type'
         )
 
         .eq('user_id', user!.id)
@@ -105,6 +107,17 @@ export default function DriverOnboarding() {
       return data;
     },
   });
+
+  // Hydrate employmentType from persisted drivers.employment_type on first load
+  useEffect(() => {
+    if (employmentType !== null) return;
+    const et = (driverRow as { employment_type?: string | null } | null | undefined)?.employment_type;
+    if (!et) return;
+    if (et === 'w2_company') setEmploymentType('W-2');
+    else setEmploymentType('1099'); // '1099_contractor' or 'lease_purchase'
+  }, [driverRow, employmentType]);
+
+
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['driver_onboarding_templates', orgId],
@@ -456,11 +469,20 @@ export default function DriverOnboarding() {
       }
       const payload = await credentialsRef.current?.submit();
       if (!payload) return;
+      // Merge employment_type from the initial step so downstream systems
+      // (payroll, settlements, DriverDetailSheet) stay in sync.
+      const mappedEmploymentType =
+        employmentType === 'W-2' ? 'w2_company'
+        : employmentType === '1099' ? '1099_contractor'
+        : null;
+      const fullPayload = mappedEmploymentType
+        ? { ...payload, employment_type: mappedEmploymentType }
+        : payload;
       setSubmitting(true);
       try {
         const { data: updated, error } = await supabase
           .from('drivers')
-          .update(payload)
+          .update(fullPayload as never)
           .eq('id', driverRow.id)
           .eq('org_id', orgId)
           .select('id');
@@ -791,6 +813,7 @@ export default function DriverOnboarding() {
                 onAccountNumberChange={(v) => updateCurrent({ accountNumber: v })}
                 bankAccountType={currentState.bankAccountType}
                 onBankAccountTypeChange={(v) => updateCurrent({ bankAccountType: v })}
+                employmentType={employmentType}
               />
 
               {chunkCount > 1 && (
@@ -826,6 +849,7 @@ export default function DriverOnboarding() {
                           routingNumber={currentState.routingNumber}
                           accountNumber={currentState.accountNumber}
                           bankAccountType={currentState.bankAccountType}
+                          employmentType={employmentType}
                         />
                       </div>
                     ),
