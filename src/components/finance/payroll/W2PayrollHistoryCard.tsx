@@ -17,6 +17,7 @@ interface Driver {
   last_name: string;
   status: string | null;
   employment_type: string | null;
+  tax_state: string | null;
 }
 
 export function W2PayrollHistoryCard() {
@@ -29,7 +30,7 @@ export function W2PayrollHistoryCard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, first_name, last_name, status, employment_type');
+        .select('id, first_name, last_name, status, employment_type, tax_state');
       if (error) throw error;
       return (data ?? []) as Driver[];
     },
