@@ -55,7 +55,31 @@ export function useAuditLogs(filters: AuditFilters) {
 
       const { data, error } = await q;
       if (error) throw error;
-      return (data ?? []) as AuditLogRow[];
+      const rows = (data ?? []) as AuditLogRow[];
+
+      // Backfill user_name for rows missing the denormalized value (legacy entries).
+      const missingIds = Array.from(
+        new Set(rows.filter(r => !r.user_name && r.user_id).map(r => r.user_id as string))
+      );
+      if (missingIds.length > 0) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name, email')
+          .in('user_id', missingIds);
+        const byId = new Map(
+          (profs ?? []).map(p => [
+            p.user_id,
+            [p.first_name, p.last_name].filter(Boolean).join(' ').trim() || p.email || null,
+          ])
+        );
+        for (const r of rows) {
+          if (!r.user_name && r.user_id && byId.has(r.user_id)) {
+            r.user_name = byId.get(r.user_id) ?? null;
+          }
+        }
+      }
+
+      return rows;
     },
     enabled: !!orgId,
     refetchOnWindowFocus: false,
