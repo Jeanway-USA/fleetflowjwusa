@@ -469,11 +469,20 @@ export default function DriverOnboarding() {
       }
       const payload = await credentialsRef.current?.submit();
       if (!payload) return;
+      // Merge employment_type from the initial step so downstream systems
+      // (payroll, settlements, DriverDetailSheet) stay in sync.
+      const mappedEmploymentType =
+        employmentType === 'W-2' ? 'w2_company'
+        : employmentType === '1099' ? '1099_contractor'
+        : null;
+      const fullPayload = mappedEmploymentType
+        ? { ...payload, employment_type: mappedEmploymentType }
+        : payload;
       setSubmitting(true);
       try {
         const { data: updated, error } = await supabase
           .from('drivers')
-          .update(payload)
+          .update(fullPayload as never)
           .eq('id', driverRow.id)
           .eq('org_id', orgId)
           .select('id');
