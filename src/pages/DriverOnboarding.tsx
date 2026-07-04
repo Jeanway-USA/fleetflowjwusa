@@ -178,116 +178,28 @@ export default function DriverOnboarding() {
   }, [revisionMode, driverRow, templates, docRevisions, deepLinked]);
 
 
-  // Step 0 = employment type, Step 1 = credentials, Steps 2..N = templates
+  // 3-step flow: Employment (0) → Credentials (1) → Documents (2)
   const EMPLOYMENT_STEP = 0;
   const CREDENTIALS_STEP = 1;
+  const DOCUMENTS_STEP = 2;
   const isEmploymentStep = stepIndex === EMPLOYMENT_STEP;
   const isCredentialsStep = stepIndex === CREDENTIALS_STEP;
-  const totalSteps = templates.length + 2;
-  const templateIndex = stepIndex - 2;
-  const currentTemplate = templateIndex >= 0 ? templates[templateIndex] : undefined;
-  const currentState: TemplateState = currentTemplate
-    ? state[currentTemplate.id] ?? EMPTY_TEMPLATE_STATE
-    : EMPTY_TEMPLATE_STATE;
-
-  const chunks = useMemo(() => {
-    if (!currentTemplate) return [] as string[];
-    return currentTemplate.content.split(/\{\{\s*page_break\s*\}\}/);
-  }, [currentTemplate]);
-  const chunkCount = Math.max(chunks.length, 1);
-  const safeSubPageIndex = Math.min(currentSubPageIndex, chunkCount - 1);
-  const currentChunk = chunks[safeSubPageIndex] ?? '';
-  const isLastSubPage = safeSubPageIndex >= chunkCount - 1;
-  const isLastTemplateStep = stepIndex === totalSteps - 1;
-
-
-  const needsDriverAddress = useMemo(
-    () => !!currentTemplate && /\{\{\s*driver_address\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsCdlNumber = useMemo(
-    () => !!currentTemplate && /\{\{\s*cdl_number\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsDriverSignature = useMemo(
-    () => !!currentTemplate && /\{\{\s*driver_signature\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsFileUpload = useMemo(
-    () => !!currentTemplate && /\{\{\s*file_upload\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsSsn = useMemo(
-    () => !!currentTemplate && /\{\{\s*ssn\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsEmail = useMemo(
-    () => !!currentTemplate && /\{\{\s*email\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsBankName = useMemo(
-    () => !!currentTemplate && /\{\{\s*bank_name\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsBankAccountType = useMemo(
-    () => !!currentTemplate && /\{\{\s*bank_account_type\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsRoutingNumber = useMemo(
-    () => !!currentTemplate && /\{\{\s*routing_number\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsAccountNumber = useMemo(
-    () => !!currentTemplate && /\{\{\s*account_number\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-
-  const isValidSignatureDataUrl = (s: string | null): s is string =>
-    !!s && s.startsWith('data:image/');
-
-  const ssnDigits = currentState.ssn.replace(/\D/g, '');
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(currentState.email.trim());
+  const isDocumentsStep = stepIndex === DOCUMENTS_STEP;
+  const totalSteps = 3;
 
   const canContinue = isEmploymentStep
     ? employmentType !== null
     : isCredentialsStep
     ? credentialsValid
-    : (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
-      (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
-      (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
-      (!needsFileUpload || currentState.attachment != null) &&
-      (!needsSsn || ssnDigits.length === 9) &&
-      (!needsEmail || emailValid) &&
-      (!needsBankName || currentState.bankName.trim().length > 0) &&
-      (!needsBankAccountType || currentState.bankAccountType !== '') &&
-      (!needsRoutingNumber || currentState.routingNumber.length === 9) &&
-      (!needsAccountNumber || currentState.accountNumber.length >= 4);
+    : documentsValid;
 
-  const fieldsRemaining = useMemo(() => {
-    if (isCredentialsStep || !currentTemplate) return 0;
-    const c = currentChunk;
-    let n = 0;
-    if (/\{\{\s*driver_address\s*\}\}/.test(c) && !currentState.driverAddress.trim()) n++;
-    if (/\{\{\s*cdl_number\s*\}\}/.test(c) && !currentState.cdlNumber.trim()) n++;
-    if (/\{\{\s*ssn\s*\}\}/.test(c) && ssnDigits.length !== 9) n++;
-    if (/\{\{\s*email\s*\}\}/.test(c) && !emailValid) n++;
-    if (/\{\{\s*bank_name\s*\}\}/.test(c) && !currentState.bankName.trim()) n++;
-    if (/\{\{\s*bank_account_type\s*\}\}/.test(c) && currentState.bankAccountType === '') n++;
-    if (/\{\{\s*routing_number\s*\}\}/.test(c) && currentState.routingNumber.length !== 9) n++;
-    if (/\{\{\s*account_number\s*\}\}/.test(c) && currentState.accountNumber.length < 4) n++;
-    if (/\{\{\s*file_upload\s*\}\}/.test(c) && !currentState.attachment) n++;
-    if (/\{\{\s*driver_signature\s*\}\}/.test(c) && !isValidSignatureDataUrl(currentState.signature)) n++;
-    return n;
-  }, [isCredentialsStep, currentTemplate, currentChunk, currentState, ssnDigits, emailValid]);
-
-
-
-
-  const updateCurrent = (patch: Partial<TemplateState>) => {
-    if (!currentTemplate) return;
+  const updateTemplateState = (templateId: string, patch: Partial<TemplateState>) => {
     setState((prev) => ({
       ...prev,
-      [currentTemplate.id]: { ...currentState, ...patch },
+      [templateId]: { ...(prev[templateId] ?? EMPTY_TEMPLATE_STATE), ...patch },
+    }));
+  };
+
     }));
   };
 
