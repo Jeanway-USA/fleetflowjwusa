@@ -41,6 +41,8 @@ import { DriverBankingDetails } from './DriverBankingDetails';
 import { DriverChatSheet } from './DriverChatSheet';
 import { CredentialsReviewCard } from './CredentialsReviewCard';
 import { DriverTaxDocuments } from './DriverTaxDocuments';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { US_STATES } from '@/lib/us-states';
 
 
 
