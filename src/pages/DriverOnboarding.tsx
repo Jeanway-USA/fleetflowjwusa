@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DocumentTemplateRenderer } from '@/components/onboarding/DocumentTemplateRenderer';
+import { DocumentSignatureStep } from '@/components/onboarding/DocumentSignatureStep';
 import {
   DriverCredentialsStep,
   buildDefaultValues,
