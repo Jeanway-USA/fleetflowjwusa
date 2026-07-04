@@ -116,7 +116,7 @@ export function TruckLoanPaymentsSection({ truckId, loanBalance, originalLoanAmo
           </div>
           <div>
             <p className="text-muted-foreground">Remaining Balance</p>
-            <p className="font-medium">{isPaidOff ? '$0.00' : formatCurrency(loanBalance ?? 0)}</p>
+            <p className="font-medium">{isPaidOff ? '$0.00' : formatCurrency(effectiveBalance)}</p>
           </div>
         </div>
         {originalDisplay > 0 && (
