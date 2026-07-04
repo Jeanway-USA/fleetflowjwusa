@@ -1839,6 +1839,7 @@ export type Database = {
           endorsements: string[] | null
           fast_card_passport_expiry: string | null
           first_name: string
+          gusto_employee_id: string | null
           has_twic: boolean | null
           hazmat_expiry: string | null
           hire_date: string | null
@@ -1880,6 +1881,7 @@ export type Database = {
           endorsements?: string[] | null
           fast_card_passport_expiry?: string | null
           first_name: string
+          gusto_employee_id?: string | null
           has_twic?: boolean | null
           hazmat_expiry?: string | null
           hire_date?: string | null
@@ -1921,6 +1923,7 @@ export type Database = {
           endorsements?: string[] | null
           fast_card_passport_expiry?: string | null
           first_name?: string
+          gusto_employee_id?: string | null
           has_twic?: boolean | null
           hazmat_expiry?: string | null
           hire_date?: string | null
@@ -2563,6 +2566,64 @@ export type Database = {
             foreignKeyName: "general_ledger_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gusto_integration: {
+        Row: {
+          access_token_encrypted: string | null
+          created_at: string
+          gusto_company_uuid: string | null
+          last_synced_at: string | null
+          onboarding_status: string
+          org_id: string
+          refresh_token_encrypted: string | null
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          created_at?: string
+          gusto_company_uuid?: string | null
+          last_synced_at?: string | null
+          onboarding_status?: string
+          org_id: string
+          refresh_token_encrypted?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          created_at?: string
+          gusto_company_uuid?: string | null
+          last_synced_at?: string | null
+          onboarding_status?: string
+          org_id?: string
+          refresh_token_encrypted?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gusto_integration_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gusto_integration_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "gusto_integration_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
             referencedRelation: "super_admin_organizations"
             referencedColumns: ["id"]
           },
@@ -5659,6 +5720,27 @@ export type Database = {
       }
       get_driver_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
+      gusto_get_tokens: {
+        Args: { _org_id: string }
+        Returns: {
+          access_token: string
+          gusto_company_uuid: string
+          onboarding_status: string
+          refresh_token: string
+          token_expires_at: string
+        }[]
+      }
+      gusto_set_tokens: {
+        Args: {
+          _access_token: string
+          _company_uuid: string
+          _onboarding_status?: string
+          _org_id: string
+          _refresh_token: string
+          _token_expires_at: string
+        }
+        Returns: undefined
+      }
       has_admin_access: { Args: { _user_id: string }; Returns: boolean }
       has_operations_access: { Args: { _user_id: string }; Returns: boolean }
       has_payroll_access: { Args: { _user_id: string }; Returns: boolean }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { invokeWithAuth } from '@/lib/invoke-with-auth';
@@ -13,34 +13,24 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
+import { Payroll } from '@gusto/embedded-react-sdk';
 import {
-  calculateW2Payroll,
-  DEFAULT_W2_GROSS,
-  EMPTY_YTD,
-  type PayrollSettings,
-  type W4Info,
+  mapSettlementToGustoPayrollInputs,
+  summarizeGustoPayrollBatch,
+  type GustoEmployeeCompensation,
 } from '@/lib/w2-payroll';
-import { downloadW2PayStub } from '@/lib/pdf/generateW2PayStubPdf';
+import { useGustoStatus } from '@/lib/gusto/useGustoStatus';
 
 interface W2Driver {
   id: string;
   first_name: string | null;
   last_name: string | null;
   employment_type: string | null;
-  tax_state?: string | null;
-}
-
-interface StateConfigRow {
-  state_code: string;
-  suta_rate: number;
-  suta_wage_base: number;
-  has_state_income_tax: boolean;
-  sit_rate: number;
+  gusto_employee_id?: string | null;
 }
 
 interface RunW2PayrollDialogProps {
@@ -48,14 +38,6 @@ interface RunW2PayrollDialogProps {
   onOpenChange: (open: boolean) => void;
   drivers: W2Driver[];
   onCompleted?: () => void;
-}
-
-interface Row {
-  driver_id: string;
-  gross_pay: number;
-  filing_status: string;
-  extra_withholding: number;
-  dependents_amount: number;
 }
 
 export function RunW2PayrollDialog({
@@ -70,327 +52,226 @@ export function RunW2PayrollDialog({
     [drivers],
   );
 
-  const today = new Date();
-  const [periodEnd, setPeriodEnd] = useState(format(today, 'yyyy-MM-dd'));
-  const [periodStart, setPeriodStart] = useState(
-    format(new Date(today.getTime() - 6 * 86400000), 'yyyy-MM-dd'),
+  const [provisioning, setProvisioning] = useState(false);
+  const { data: status, isLoading: statusLoading, refetch: refetchStatus } = useGustoStatus(open);
+
+  // Pull latest driver rows so we know which are already synced to Gusto
+  const { data: syncedDrivers = [] } = useQuery({
+    queryKey: ['drivers_gusto_ids', w2Drivers.map((d) => d.id).join(',')],
+    enabled: open && w2Drivers.length > 0,
+    queryFn: async () => {
+      const ids = w2Drivers.map((d) => d.id);
+      const { data } = await supabase
+        .from('drivers')
+        .select('id, first_name, last_name, gusto_employee_id')
+        .in('id', ids);
+      return (data ?? []) as Array<W2Driver & { gusto_employee_id: string | null }>;
+    },
+  });
+
+  // Client-side preview of what we WOULD push to Gusto (uses a nominal $0
+  // gross since real amounts get entered by the payroll admin inside Gusto's
+  // PayrollFlow). This preview is purely informational.
+  const previewInputs: GustoEmployeeCompensation[] = useMemo(() => {
+    return syncedDrivers
+      .filter((d) => !!d.gusto_employee_id)
+      .map((d) =>
+        mapSettlementToGustoPayrollInputs(
+          {
+            gross_pay: 0,
+            memo: `Preview for ${d.first_name ?? ''} ${d.last_name ?? ''}`.trim(),
+            items: [],
+          },
+          d.gusto_employee_id as string,
+        ),
+      );
+  }, [syncedDrivers]);
+
+  const previewTotals = useMemo(
+    () => summarizeGustoPayrollBatch(previewInputs),
+    [previewInputs],
   );
-  const [paymentDate, setPaymentDate] = useState(format(today, 'yyyy-MM-dd'));
-  const [rows, setRows] = useState<Record<string, Row>>({});
-  const [running, setRunning] = useState(false);
 
-  const { data: settings } = useQuery<PayrollSettings | null>({
-    queryKey: ['payroll_settings'],
-    enabled: open,
-    queryFn: async () => {
-      const { data } = await supabase.from('payroll_settings').select('*').maybeSingle();
-      return data as unknown as PayrollSettings | null;
-    },
-  });
+  const missingSyncCount = syncedDrivers.filter((d) => !d.gusto_employee_id).length;
+  const provisioned = !!status?.company_uuid;
 
-  const { data: w4s = [] } = useQuery({
-    queryKey: ['driver_w4_info_all'],
-    enabled: open,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('driver_w4_info')
-        .select('driver_id, filing_status, extra_withholding, dependents_amount');
-      return data ?? [];
-    },
-  });
-
-  const { data: stateConfigs = [] } = useQuery<StateConfigRow[]>({
-    queryKey: ['state_tax_configurations'],
-    enabled: open,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('state_tax_configurations' as any)
-        .select('state_code, suta_rate, suta_wage_base, has_state_income_tax, sit_rate');
-      return ((data ?? []) as unknown as StateConfigRow[]);
-    },
-  });
-
-  const stateMap = useMemo(() => {
-    const m = new Map<string, StateConfigRow>();
-    stateConfigs.forEach((s) => m.set(s.state_code, s));
-    return m;
-  }, [stateConfigs]);
-
-  const defaultState = (settings as any)?.default_tax_state || 'FL';
-
-
-  // Initialize rows when dialog opens
-  useEffect(() => {
-    if (!open) return;
-    const w4Map = new Map<string, any>();
-    (w4s ?? []).forEach((w) => w4Map.set(w.driver_id, w));
-    const next: Record<string, Row> = {};
-    w2Drivers.forEach((d) => {
-      const w4 = w4Map.get(d.id);
-      next[d.id] = {
-        driver_id: d.id,
-        gross_pay: DEFAULT_W2_GROSS,
-        filing_status: w4?.filing_status ?? 'single',
-        extra_withholding: Number(w4?.extra_withholding ?? 0),
-        dependents_amount: Number(w4?.dependents_amount ?? 0),
-      };
-    });
-    setRows(next);
-  }, [open, w2Drivers, w4s]);
-
-  const rowList = Object.values(rows);
-  const previews = useMemo(() => {
-    if (!settings) return [];
-    return rowList.map((r) => {
-      const w4: W4Info = {
-        filing_status: r.filing_status as any,
-        extra_withholding: r.extra_withholding,
-        dependents_amount: r.dependents_amount,
-      };
-      const driver = w2Drivers.find((d) => d.id === r.driver_id);
-      const resolvedState = (driver?.tax_state || defaultState || 'FL').toUpperCase();
-      const sc = stateMap.get(resolvedState);
-      const stateConfig = sc
-        ? {
-            state_code: sc.state_code,
-            suta_rate: Number(sc.suta_rate),
-            suta_wage_base: Number(sc.suta_wage_base),
-            has_state_income_tax: !!sc.has_state_income_tax,
-            sit_rate: Number(sc.sit_rate),
-          }
-        : {
-            state_code: resolvedState,
-            suta_rate: 0,
-            suta_wage_base: 0,
-            has_state_income_tax: false,
-            sit_rate: 0,
-          };
-      return {
-        row: r,
-        state: resolvedState,
-        b: calculateW2Payroll({ grossPay: r.gross_pay, settings, w4, ytd: EMPTY_YTD, stateConfig }),
-      };
-    });
-  }, [rowList, settings, w2Drivers, defaultState, stateMap]);
-
-  const totals = useMemo(() => {
-    const acc = {
-      gross: 0,
-      fit: 0,
-      ss: 0,
-      med: 0,
-      addlMed: 0,
-      sit: 0,
-      net: 0,
-      empFica: 0,
-      suta: 0,
-    };
-    previews.forEach(({ b }) => {
-      acc.gross += b.grossPay;
-      acc.fit += b.federalIncomeTax;
-      acc.ss += b.socialSecurityTax;
-      acc.med += b.medicareTax;
-      acc.addlMed += b.additionalMedicareTax;
-      acc.sit += b.stateIncomeTax;
-      acc.net += b.netPay;
-      acc.empFica += b.employerFicaTotal;
-      acc.suta += b.flSutaTax;
-    });
-    return acc;
-  }, [previews]);
-
-
-  const employerLiability = totals.empFica + totals.suta;
-
-  const run = async () => {
-    if (rowList.length === 0) return;
-    setRunning(true);
+  const handleProvision = async () => {
+    setProvisioning(true);
     try {
-      const { data, error } = await invokeWithAuth<{
-        results: Array<{ driver_id: string; payroll_id?: string; error?: string }>;
-      }>('run-w2-payroll', {
-        body: {
-          period_start: periodStart,
-          period_end: periodEnd,
-          payment_date: paymentDate,
-          drivers: rowList.map((r) => ({ driver_id: r.driver_id, gross_pay: r.gross_pay })),
-        },
+      const { error } = await invokeWithAuth('run-w2-payroll', {
+        body: { action: 'provision_company', payload: {} },
       });
       if (error) throw error;
-      const results = data?.results ?? [];
-      const errs = results.filter((r) => r.error);
-      const okIds = results.filter((r) => r.payroll_id).map((r) => r.payroll_id!);
-
-      // Generate + upload stub PDFs in the background
-      await Promise.all(okIds.map((id) => downloadW2PayStub(id).catch(() => null)));
-
-      qc.invalidateQueries({ queryKey: ['driver_payroll'] });
-      qc.invalidateQueries({ queryKey: ['driver_payroll_w2'] });
-      if (errs.length) {
-        toast.error(`${okIds.length} run · ${errs.length} failed: ${errs[0].error}`);
-      } else {
-        toast.success(`W-2 payroll run for ${okIds.length} driver${okIds.length === 1 ? '' : 's'}`);
-      }
-      onOpenChange(false);
-      onCompleted?.();
-    } catch (e: any) {
-      toast.error(e?.message ?? 'Failed to run W-2 payroll');
+      toast.success('Gusto company provisioned');
+      await refetchStatus();
+      qc.invalidateQueries({ queryKey: ['gusto', 'status'] });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to provision Gusto company';
+      toast.error(msg);
     } finally {
-      setRunning(false);
+      setProvisioning(false);
     }
   };
 
-  const nameOf = (id: string) => {
-    const d = w2Drivers.find((x) => x.id === id);
-    return d ? `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() : id;
+  const handleSyncDrivers = async () => {
+    const toSync = syncedDrivers.filter((d) => !d.gusto_employee_id);
+    if (toSync.length === 0) return;
+    toast.info(`Syncing ${toSync.length} driver${toSync.length === 1 ? '' : 's'} to Gusto…`);
+    const results = await Promise.allSettled(
+      toSync.map((d) =>
+        invokeWithAuth('run-w2-payroll', {
+          body: { action: 'sync_employee', payload: { driver_id: d.id } },
+        }),
+      ),
+    );
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    qc.invalidateQueries({ queryKey: ['drivers_gusto_ids'] });
+    if (failed) toast.error(`${failed} driver(s) failed to sync`);
+    else toast.success('Drivers synced to Gusto');
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Run W-2 Payroll</DialogTitle>
+      <DialogContent className="max-w-6xl max-h-[95vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+          <div className="flex items-center gap-3">
+            <DialogTitle>Run W-2 Payroll</DialogTitle>
+            <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+              Gusto Embedded · Sandbox
+            </Badge>
+          </div>
           <DialogDescription>
-            2026 IRS Percentage Method (Pub 15-T) + 6.2% Social Security, 1.45% Medicare. SUTA and
-            State Income Tax are driven per-driver by their assigned Tax State. Employer FICA match
-            is accrued but does not reduce net pay.
+            Payroll is executed inside Gusto&apos;s white-labeled workspace. The
+            preview on the left shows how FleetFlow will map today&apos;s
+            settlement data to Gusto&apos;s compensation records.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-          <div className="grid grid-cols-3 gap-3">
+        <div className="flex-1 overflow-hidden grid grid-cols-[280px_1fr]">
+          {/* Left: FleetFlow preview + connection state */}
+          <aside className="border-r p-4 space-y-4 overflow-y-auto bg-muted/30">
             <div>
-              <Label htmlFor="w2-ps">Period Start</Label>
-              <Input id="w2-ps" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                Gusto Connection
+              </p>
+              {statusLoading ? (
+                <div className="flex items-center gap-2 text-sm mt-2">
+                  <Loader2 className="h-3 w-3 animate-spin" /> Checking…
+                </div>
+              ) : provisioned ? (
+                <div className="text-sm mt-1">
+                  <Badge variant="secondary" className="capitalize">
+                    {status?.onboarding_status}
+                  </Badge>
+                  <p className="text-[11px] text-muted-foreground mt-1 font-mono truncate">
+                    {status?.company_uuid}
+                  </p>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  className="mt-2 w-full"
+                  onClick={handleProvision}
+                  disabled={provisioning}
+                >
+                  {provisioning ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                      Provisioning…
+                    </>
+                  ) : (
+                    'Provision Gusto company'
+                  )}
+                </Button>
+              )}
             </div>
-            <div>
-              <Label htmlFor="w2-pe">Period End</Label>
-              <Input id="w2-pe" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="w2-pd">Payment Date</Label>
-              <Input id="w2-pd" type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
-            </div>
-          </div>
 
-          {w2Drivers.length === 0 ? (
-            <div className="text-sm text-muted-foreground bg-muted/40 rounded-md p-6 text-center">
-              No W-2 drivers found. Set a driver's Employment Type to "W-2 Company Driver" to run payroll here.
-            </div>
-          ) : (
-            <div className="border rounded-md overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
-                  <tr>
-                    <th className="text-left px-3 py-2">Driver</th>
-                    <th className="text-left px-3 py-2 w-16">State</th>
-                    <th className="text-right px-3 py-2 w-28">Gross</th>
-                    <th className="text-right px-3 py-2 w-24">FIT</th>
-                    <th className="text-right px-3 py-2 w-24">SS 6.2%</th>
-                    <th className="text-right px-3 py-2 w-24">Medicare</th>
-                    <th className="text-right px-3 py-2 w-24">SIT</th>
-                    <th className="text-right px-3 py-2 w-28">Emp FICA</th>
-                    <th className="text-right px-3 py-2 w-24">SUTA</th>
-                    <th className="text-right px-3 py-2 w-28 bg-primary/5">Net Pay</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previews.map(({ row, b, state }) => (
-                    <tr key={row.driver_id} className="border-t">
-                      <td className="px-3 py-2 font-medium">{nameOf(row.driver_id)}</td>
-                      <td className="px-3 py-2">
-                        <Badge variant="outline" className="text-xs">{state}</Badge>
-                      </td>
-                      <td className="px-3 py-1">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={row.gross_pay}
-                          onChange={(e) =>
-                            setRows((prev) => ({
-                              ...prev,
-                              [row.driver_id]: { ...prev[row.driver_id], gross_pay: Number(e.target.value) },
-                            }))
-                          }
-                          className="h-8 text-right"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(b.federalIncomeTax)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(b.socialSecurityTax)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatCurrency(b.medicareTax + b.additionalMedicareTax)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatCurrency(b.stateIncomeTax)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                        {formatCurrency(b.employerFicaTotal)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                        {formatCurrency(b.flSutaTax)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold bg-primary/5">
-                        {formatCurrency(b.netPay)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+            {provisioned && (
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Drivers ({syncedDrivers.length})
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {previewInputs.length} synced · {missingSyncCount} pending
+                </p>
+                {missingSyncCount > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2 w-full"
+                    onClick={handleSyncDrivers}
+                  >
+                    Sync {missingSyncCount} to Gusto
+                  </Button>
+                )}
+              </div>
+            )}
 
-                <tfoot className="border-t-2 bg-muted/40 font-medium">
-                  <tr>
-                    <td className="px-3 py-2" colSpan={2}>Totals ({previews.length})</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.gross)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.fit)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.ss)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {formatCurrency(totals.med + totals.addlMed)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.sit)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.empFica)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.suta)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-primary">{formatCurrency(totals.net)}</td>
-                  </tr>
-                </tfoot>
-              </table>
+            <div className="border rounded-md p-3 bg-background">
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                FleetFlow preview
+              </p>
+              <div className="mt-2 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Regular</span>
+                  <span className="tabular-nums">{formatCurrency(previewTotals.totalGross)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Bonus</span>
+                  <span className="tabular-nums">{formatCurrency(previewTotals.totalBonus)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Reimb.</span>
+                  <span className="tabular-nums">
+                    {formatCurrency(previewTotals.totalReimbursements)}
+                  </span>
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-3">
+                Actual amounts are entered inside Gusto&apos;s workspace.
+              </p>
             </div>
-          )}
+          </aside>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="border rounded-md p-3 bg-muted/30">
-              <div className="text-xs uppercase text-muted-foreground">Total Employee Withholding</div>
-              <div className="text-lg font-semibold">
-                {formatCurrency(totals.fit + totals.ss + totals.med + totals.addlMed + totals.sit)}
-              </div>
-            </div>
-            <div className="border rounded-md p-3 bg-amber-50 dark:bg-amber-950/20">
-              <div className="text-xs uppercase text-amber-900 dark:text-amber-200">Employer Tax Liability</div>
-              <div className="text-lg font-semibold text-amber-900 dark:text-amber-200">
-                {formatCurrency(employerLiability)}
-              </div>
-              <div className="text-[10px] text-amber-800 dark:text-amber-300">
-                FICA match ({formatCurrency(totals.empFica)}) + State SUTA ({formatCurrency(totals.suta)})
-              </div>
-            </div>
-            <div className="border rounded-md p-3 bg-primary/5">
-              <div className="text-xs uppercase text-muted-foreground">Total Net Pay</div>
-              <div className="text-lg font-semibold text-primary">{formatCurrency(totals.net)}</div>
-            </div>
-          </div>
+          {/* Right: Gusto's embedded PayrollFlow */}
+          <section className="overflow-y-auto p-4">
+            {!provisioned ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Not connected to Gusto yet</AlertTitle>
+                <AlertDescription>
+                  Provision this organization&apos;s Gusto company from the panel
+                  on the left. Once provisioned, the white-labeled Run Payroll
+                  workspace will render here.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Payroll.PayrollFlow
+                companyId={status!.company_uuid as string}
+                onEvent={(event, data) => {
+                  if (event === 'runPayroll/submitted' || event === 'runPayroll/processed') {
+                    toast.success('Payroll submitted to Gusto');
+                    qc.invalidateQueries({ queryKey: ['driver_payroll'] });
+                    onCompleted?.();
+                  }
+                  if (event === 'runPayroll/processingFailed') {
+                    toast.error('Gusto payroll processing failed');
+                  }
+                  // For debugging in the sandbox:
+                  // eslint-disable-next-line no-console
+                  console.debug('[Gusto PayrollFlow]', event, data);
+                }}
+              />
+            )}
+          </section>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={running}>
-            Cancel
-          </Button>
-          <Button onClick={run} disabled={running || previews.length === 0}>
-            {running ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Running…
-              </>
-            ) : (
-              <>Run Payroll ({previews.length})</>
-            )}
+        <DialogFooter className="px-6 py-4 border-t">
+          <p className="text-xs text-muted-foreground mr-auto">
+            {format(new Date(), 'PP')} · {w2Drivers.length} W-2 driver{w2Drivers.length === 1 ? '' : 's'}
+          </p>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
           </Button>
         </DialogFooter>
       </DialogContent>
