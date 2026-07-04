@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useQuery } from '@tanstack/react-query';
@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DocumentTemplateRenderer } from '@/components/onboarding/DocumentTemplateRenderer';
+import { DocumentSignatureStep } from '@/components/onboarding/DocumentSignatureStep';
 import {
   DriverCredentialsStep,
   buildDefaultValues,
@@ -79,13 +79,10 @@ export default function DriverOnboarding() {
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
-  const [currentSubPageIndex, setCurrentSubPageIndex] = useState(0);
   const credentialsRef = useRef<DriverCredentialsStepHandle>(null);
   const [credentialsValid, setCredentialsValid] = useState(false);
+  const [documentsValid, setDocumentsValid] = useState(false);
 
-  useEffect(() => {
-    setCurrentSubPageIndex(0);
-  }, [stepIndex]);
 
 
 
@@ -171,128 +168,37 @@ export default function DriverOnboarding() {
       setDeepLinked(true);
       return;
     }
-    const idx = templates.findIndex((t) => docRevisions[t.document_type]?.status === 'revision_requested');
-    if (idx >= 0) {
-      setStepIndex(idx + 2);
-      setDeepLinked(true);
-    } else {
-      setDeepLinked(true);
-    }
+    const hasDocRevision = Object.values(docRevisions).some(
+      (r) => r.status === 'revision_requested',
+    );
+    if (hasDocRevision) setStepIndex(2);
+    setDeepLinked(true);
   }, [revisionMode, driverRow, templates, docRevisions, deepLinked]);
 
 
-  // Step 0 = employment type, Step 1 = credentials, Steps 2..N = templates
+  // 3-step flow: Employment (0) → Credentials (1) → Documents (2)
   const EMPLOYMENT_STEP = 0;
   const CREDENTIALS_STEP = 1;
+  const DOCUMENTS_STEP = 2;
   const isEmploymentStep = stepIndex === EMPLOYMENT_STEP;
   const isCredentialsStep = stepIndex === CREDENTIALS_STEP;
-  const totalSteps = templates.length + 2;
-  const templateIndex = stepIndex - 2;
-  const currentTemplate = templateIndex >= 0 ? templates[templateIndex] : undefined;
-  const currentState: TemplateState = currentTemplate
-    ? state[currentTemplate.id] ?? EMPTY_TEMPLATE_STATE
-    : EMPTY_TEMPLATE_STATE;
-
-  const chunks = useMemo(() => {
-    if (!currentTemplate) return [] as string[];
-    return currentTemplate.content.split(/\{\{\s*page_break\s*\}\}/);
-  }, [currentTemplate]);
-  const chunkCount = Math.max(chunks.length, 1);
-  const safeSubPageIndex = Math.min(currentSubPageIndex, chunkCount - 1);
-  const currentChunk = chunks[safeSubPageIndex] ?? '';
-  const isLastSubPage = safeSubPageIndex >= chunkCount - 1;
-  const isLastTemplateStep = stepIndex === totalSteps - 1;
-
-
-  const needsDriverAddress = useMemo(
-    () => !!currentTemplate && /\{\{\s*driver_address\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsCdlNumber = useMemo(
-    () => !!currentTemplate && /\{\{\s*cdl_number\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsDriverSignature = useMemo(
-    () => !!currentTemplate && /\{\{\s*driver_signature\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsFileUpload = useMemo(
-    () => !!currentTemplate && /\{\{\s*file_upload\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsSsn = useMemo(
-    () => !!currentTemplate && /\{\{\s*ssn\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsEmail = useMemo(
-    () => !!currentTemplate && /\{\{\s*email\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsBankName = useMemo(
-    () => !!currentTemplate && /\{\{\s*bank_name\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsBankAccountType = useMemo(
-    () => !!currentTemplate && /\{\{\s*bank_account_type\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsRoutingNumber = useMemo(
-    () => !!currentTemplate && /\{\{\s*routing_number\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-  const needsAccountNumber = useMemo(
-    () => !!currentTemplate && /\{\{\s*account_number\s*\}\}/.test(currentTemplate.content),
-    [currentTemplate],
-  );
-
-  const isValidSignatureDataUrl = (s: string | null): s is string =>
-    !!s && s.startsWith('data:image/');
-
-  const ssnDigits = currentState.ssn.replace(/\D/g, '');
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(currentState.email.trim());
+  const isDocumentsStep = stepIndex === DOCUMENTS_STEP;
+  const totalSteps = 3;
 
   const canContinue = isEmploymentStep
     ? employmentType !== null
     : isCredentialsStep
     ? credentialsValid
-    : (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
-      (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
-      (!needsCdlNumber || currentState.cdlNumber.trim().length > 0) &&
-      (!needsFileUpload || currentState.attachment != null) &&
-      (!needsSsn || ssnDigits.length === 9) &&
-      (!needsEmail || emailValid) &&
-      (!needsBankName || currentState.bankName.trim().length > 0) &&
-      (!needsBankAccountType || currentState.bankAccountType !== '') &&
-      (!needsRoutingNumber || currentState.routingNumber.length === 9) &&
-      (!needsAccountNumber || currentState.accountNumber.length >= 4);
+    : documentsValid;
 
-  const fieldsRemaining = useMemo(() => {
-    if (isCredentialsStep || !currentTemplate) return 0;
-    const c = currentChunk;
-    let n = 0;
-    if (/\{\{\s*driver_address\s*\}\}/.test(c) && !currentState.driverAddress.trim()) n++;
-    if (/\{\{\s*cdl_number\s*\}\}/.test(c) && !currentState.cdlNumber.trim()) n++;
-    if (/\{\{\s*ssn\s*\}\}/.test(c) && ssnDigits.length !== 9) n++;
-    if (/\{\{\s*email\s*\}\}/.test(c) && !emailValid) n++;
-    if (/\{\{\s*bank_name\s*\}\}/.test(c) && !currentState.bankName.trim()) n++;
-    if (/\{\{\s*bank_account_type\s*\}\}/.test(c) && currentState.bankAccountType === '') n++;
-    if (/\{\{\s*routing_number\s*\}\}/.test(c) && currentState.routingNumber.length !== 9) n++;
-    if (/\{\{\s*account_number\s*\}\}/.test(c) && currentState.accountNumber.length < 4) n++;
-    if (/\{\{\s*file_upload\s*\}\}/.test(c) && !currentState.attachment) n++;
-    if (/\{\{\s*driver_signature\s*\}\}/.test(c) && !isValidSignatureDataUrl(currentState.signature)) n++;
-    return n;
-  }, [isCredentialsStep, currentTemplate, currentChunk, currentState, ssnDigits, emailValid]);
-
-
-
-
-  const updateCurrent = (patch: Partial<TemplateState>) => {
-    if (!currentTemplate) return;
+  const updateTemplateState = (templateId: string, patch: Partial<TemplateState>) => {
     setState((prev) => ({
       ...prev,
-      [currentTemplate.id]: { ...currentState, ...patch },
+      [templateId]: { ...(prev[templateId] ?? EMPTY_TEMPLATE_STATE), ...patch },
     }));
   };
+
+
 
   const finalizeSubmission = async () => {
     if (!user || !orgId) {
@@ -514,28 +420,13 @@ export default function DriverOnboarding() {
             navigate('/driver-dashboard', { replace: true });
             return;
           }
-          // Jump to the first template needing revision
-          const idx = templates.findIndex(
-            (t) => docRevisions[t.document_type]?.status === 'revision_requested',
-          );
-          setStepIndex(idx >= 0 ? idx + 2 : 2);
+          setStepIndex(2);
           window.scrollTo({ top: 0, behavior: 'smooth' });
           return;
         }
 
-        if (totalSteps > 2) {
-          setStepIndex(2);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-          // No documents — credentials alone complete the flow
-          setSignedResults([]);
-          await supabase
-            .from('profiles')
-            .update({ onboarding_completed: true })
-            .eq('user_id', user!.id);
-          await refreshOrgData();
-          toast.success('Profile saved');
-        }
+        setStepIndex(2);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (err) {
         console.error(err);
         toast.error(err instanceof Error ? err.message : 'Failed to save credentials');
@@ -644,24 +535,13 @@ export default function DriverOnboarding() {
   }
 
   const progress = ((stepIndex + 1) / totalSteps) * 100;
-  const docType = currentTemplate?.document_type as DocumentTypeKey | undefined;
   const title = isEmploymentStep
     ? 'Choose Your Employment Type'
     : isCredentialsStep
     ? 'Driver Profile & Credentials'
-    : currentTemplate?.name ??
-      (docType ? DOCUMENT_LABELS[docType] : undefined) ??
-      currentTemplate?.document_type ??
-      '';
+    : 'Sign Your Onboarding Documents';
 
-  const currentDocRevision = currentTemplate
-    ? docRevisions[currentTemplate.document_type]
-    : undefined;
-  const stepRevisionNotes = isCredentialsStep
-    ? credentialsRevisionNotes
-    : currentDocRevision?.status === 'revision_requested'
-      ? currentDocRevision.notes
-      : null;
+  const stepRevisionNotes = isCredentialsStep ? credentialsRevisionNotes : null;
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-background">
@@ -704,7 +584,7 @@ export default function DriverOnboarding() {
               ? 'How will you be working with us? This determines how your pay and taxes are handled.'
               : isCredentialsStep
               ? 'Confirm your CDL, medical card, and TWIC details before reviewing onboarding documents.'
-              : 'Please review the document below, fill in the required fields, and sign at the bottom.'}
+              : 'Review and sign the shared documents, plus the ones specific to your employment type.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -777,87 +657,18 @@ export default function DriverOnboarding() {
               defaultValues={buildDefaultValues(driverRow)}
               onValidityChange={setCredentialsValid}
             />
-          ) : currentTemplate ? (
-            <div className="rounded-sm bg-white text-slate-900 shadow-2xl p-8 md:p-12 lg:px-16 lg:py-14 max-w-4xl mx-auto font-serif leading-relaxed print:shadow-none print:p-0 print:break-after-page">
-              <DocumentTemplateRenderer
-                content={currentChunk}
-                driverAddress={currentState.driverAddress}
-                onDriverAddressChange={(v) => updateCurrent({ driverAddress: v })}
-                signature={currentState.signature}
-                onSignatureCapture={(dataUrl) =>
-                  updateCurrent({ signature: dataUrl ? dataUrl : null })
-                }
-                driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
-                cdlNumber={currentState.cdlNumber}
-                onCdlNumberChange={(v) => updateCurrent({ cdlNumber: v })}
-                attachment={currentState.attachment}
-                onAttachmentChange={(file) => updateCurrent({ attachment: file })}
-                licenseNumber={driverRow?.license_number}
-                licenseExpiry={driverRow?.license_expiry}
-                medicalCardExpiry={driverRow?.medical_card_expiry}
-                endorsements={driverRow?.endorsements}
-                hasTwic={driverRow?.has_twic}
-                twicExpiry={driverRow?.twic_expiry}
-                phoneNumber={driverRow?.phone}
-                payType={driverRow?.pay_type}
-                payRate={driverRow?.pay_rate}
-                ssn={currentState.ssn}
-                onSsnChange={(v) => updateCurrent({ ssn: v })}
-                email={currentState.email}
-                onEmailChange={(v) => updateCurrent({ email: v })}
-                bankName={currentState.bankName}
-                onBankNameChange={(v) => updateCurrent({ bankName: v })}
-                routingNumber={currentState.routingNumber}
-                onRoutingNumberChange={(v) => updateCurrent({ routingNumber: v })}
-                accountNumber={currentState.accountNumber}
-                onAccountNumberChange={(v) => updateCurrent({ accountNumber: v })}
-                bankAccountType={currentState.bankAccountType}
-                onBankAccountTypeChange={(v) => updateCurrent({ bankAccountType: v })}
-                employmentType={employmentType}
-              />
-
-              {chunkCount > 1 && (
-                <div className="hidden print:block">
-                  {chunks.map((chunk, idx) =>
-                    idx === safeSubPageIndex ? null : (
-                      <div
-                        key={`print-chunk-${idx}`}
-                        className="print:break-before-page print:break-after-page"
-                      >
-                        <DocumentTemplateRenderer
-                          content={chunk}
-                          driverAddress={currentState.driverAddress}
-                          onDriverAddressChange={() => {}}
-                          signature={currentState.signature}
-                          onSignatureCapture={() => {}}
-                          driverName={`${driverRow?.first_name ?? ''} ${driverRow?.last_name ?? ''}`.trim()}
-                          cdlNumber={currentState.cdlNumber}
-                          onCdlNumberChange={() => {}}
-                          attachment={currentState.attachment}
-                          licenseNumber={driverRow?.license_number}
-                          licenseExpiry={driverRow?.license_expiry}
-                          medicalCardExpiry={driverRow?.medical_card_expiry}
-                          endorsements={driverRow?.endorsements}
-                          hasTwic={driverRow?.has_twic}
-                          twicExpiry={driverRow?.twic_expiry}
-                          phoneNumber={driverRow?.phone}
-                          payType={driverRow?.pay_type}
-                          payRate={driverRow?.pay_rate}
-                          ssn={currentState.ssn}
-                          email={currentState.email}
-                          bankName={currentState.bankName}
-                          routingNumber={currentState.routingNumber}
-                          accountNumber={currentState.accountNumber}
-                          bankAccountType={currentState.bankAccountType}
-                          employmentType={employmentType}
-                        />
-                      </div>
-                    ),
-                  )}
-                </div>
-              )}
-            </div>
-          ) : null}
+          ) : (
+            <DocumentSignatureStep
+              employmentType={employmentType}
+              templates={templates}
+              state={state}
+              onUpdateTemplateState={updateTemplateState}
+              driverRow={driverRow}
+              docRevisions={docRevisions}
+              revisionMode={revisionMode}
+              onValidityChange={setDocumentsValid}
+            />
+          )}
 
         </CardContent>
       </Card>
@@ -865,74 +676,42 @@ export default function DriverOnboarding() {
 
     <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-white dark:bg-background shadow-[0_-2px_8px_-4px_rgba(0,0,0,0.08)]">
       <div className="container max-w-4xl flex items-center justify-between gap-3 py-3 px-4">
-        {!isCredentialsStep && safeSubPageIndex > 0 ? (
-          <Button
-            variant="outline"
-            onClick={() => {
-              setCurrentSubPageIndex((i) => Math.max(0, i - 1));
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            disabled={submitting}
-          >
-            Previous Page
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
-            disabled={stepIndex === 0 || submitting}
-          >
-            Back
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          onClick={() => setStepIndex((i) => Math.max(0, i - 1))}
+          disabled={stepIndex === 0 || submitting}
+        >
+          Back
+        </Button>
 
         <div className="hidden sm:flex flex-col items-center text-xs leading-tight">
           <span className="text-muted-foreground">
-            {isCredentialsStep
-              ? `Step ${stepIndex + 1} of ${totalSteps}`
-              : chunkCount > 1
-                ? `Page ${safeSubPageIndex + 1} of ${chunkCount} · Step ${stepIndex + 1}/${totalSteps}`
-                : `Step ${stepIndex + 1} of ${totalSteps}`}
+            Step {stepIndex + 1} of {totalSteps}
           </span>
-          {!isCredentialsStep && !isEmploymentStep && (
-            fieldsRemaining > 0 ? (
-              <span className="text-orange-600 dark:text-orange-400 font-medium mt-0.5">
-                Fields remaining: {fieldsRemaining}
+          {isDocumentsStep && (
+            documentsValid ? (
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+                Ready to submit!
               </span>
             ) : (
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
-                Document ready to sign!
+              <span className="text-orange-600 dark:text-orange-400 font-medium mt-0.5">
+                Complete all documents to continue
               </span>
             )
           )}
         </div>
 
-
-        {!isCredentialsStep && !isLastSubPage ? (
-          <Button
-            onClick={() => {
-              setCurrentSubPageIndex((i) => i + 1);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            disabled={submitting}
-          >
-            Next Page
-          </Button>
-        ) : (
-          <Button onClick={handleContinue} disabled={!canContinue || submitting}>
-            {submitting
-              ? isCredentialsStep
-                ? 'Saving…'
-                : 'Submitting…'
-              : isEmploymentStep
-                ? 'Next'
-                : isCredentialsStep
-                  ? 'Continue'
-                  : isLastTemplateStep
-                    ? 'Submit Document'
-                    : 'Continue'}
-          </Button>
-        )}
+        <Button onClick={handleContinue} disabled={!canContinue || submitting}>
+          {submitting
+            ? isCredentialsStep
+              ? 'Saving…'
+              : 'Submitting…'
+            : isEmploymentStep
+              ? 'Next'
+              : isCredentialsStep
+                ? 'Continue'
+                : 'Submit Documents'}
+        </Button>
       </div>
     </div>
 
