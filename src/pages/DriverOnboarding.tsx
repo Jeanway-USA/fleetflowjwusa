@@ -154,13 +154,13 @@ export default function DriverOnboarding() {
   useEffect(() => {
     if (deepLinked || !revisionMode || !driverRow || templates.length === 0) return;
     if (driverRow.credentials_review_status === 'revision_requested') {
-      setStepIndex(0);
+      setStepIndex(1);
       setDeepLinked(true);
       return;
     }
     const idx = templates.findIndex((t) => docRevisions[t.document_type]?.status === 'revision_requested');
     if (idx >= 0) {
-      setStepIndex(idx + 1);
+      setStepIndex(idx + 2);
       setDeepLinked(true);
     } else {
       setDeepLinked(true);
@@ -168,11 +168,13 @@ export default function DriverOnboarding() {
   }, [revisionMode, driverRow, templates, docRevisions, deepLinked]);
 
 
-  // Step 0 = credentials, Steps 1..N = templates
-  const CREDENTIALS_STEP = 0;
+  // Step 0 = employment type, Step 1 = credentials, Steps 2..N = templates
+  const EMPLOYMENT_STEP = 0;
+  const CREDENTIALS_STEP = 1;
+  const isEmploymentStep = stepIndex === EMPLOYMENT_STEP;
   const isCredentialsStep = stepIndex === CREDENTIALS_STEP;
-  const totalSteps = templates.length + 1;
-  const templateIndex = stepIndex - 1;
+  const totalSteps = templates.length + 2;
+  const templateIndex = stepIndex - 2;
   const currentTemplate = templateIndex >= 0 ? templates[templateIndex] : undefined;
   const currentState: TemplateState = currentTemplate
     ? state[currentTemplate.id] ?? EMPTY_TEMPLATE_STATE
