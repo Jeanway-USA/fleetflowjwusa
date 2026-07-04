@@ -271,12 +271,21 @@ export default function Trucks() {
       header: 'Loan Balance',
       hiddenOnMobile: true,
       render: (truck: TruckWithDriver) => {
-        const balance = Number(truck.loan_balance ?? 0);
+        const rawBalance = truck.loan_balance;
         const original = Number((truck as any).original_loan_amount ?? 0);
-        if (balance <= 0 && original > 0) {
+        const balance = Number(rawBalance ?? 0);
+        // Only "Paid Off" when balance was explicitly recorded and reached zero.
+        if (rawBalance != null && balance <= 0 && original > 0) {
           return (
             <Badge className="bg-green-600/10 text-green-700 border border-green-600/20 hover:bg-green-600/10 text-xs">
               Paid Off
+            </Badge>
+          );
+        }
+        if (rawBalance == null && original > 0) {
+          return (
+            <Badge variant="secondary" className="text-xs font-mono">
+              {formatCurrency(original, { maximumFractionDigits: 0 })} Remaining
             </Badge>
           );
         }
@@ -369,7 +378,11 @@ export default function Trucks() {
     },
   ];
 
-  const [viewingTruck, setViewingTruck] = useState<TruckWithDriver | null>(null);
+  const [viewingTruckState, setViewingTruck] = useState<TruckWithDriver | null>(null);
+  // Keep the viewed truck fresh from the ['trucks'] query so mutations (e.g. loan payments) reflect immediately.
+  const viewingTruck = viewingTruckState
+    ? ((trucks as TruckWithDriver[]).find((t) => t.id === viewingTruckState.id) ?? viewingTruckState)
+    : null;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
   const [massEditOpen, setMassEditOpen] = useState(false);
