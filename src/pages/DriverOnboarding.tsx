@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/compress-image';
-import { AlertCircle, CheckCircle2, Download } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, Briefcase, Building2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
@@ -74,6 +74,7 @@ export default function DriverOnboarding() {
   const { user, orgId, refreshOrgData } = useAuth();
 
   const [stepIndex, setStepIndex] = useState(0);
+  const [employmentType, setEmploymentType] = useState<'1099' | 'W-2' | null>(null);
   const [deepLinked, setDeepLinked] = useState(false);
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -153,13 +154,13 @@ export default function DriverOnboarding() {
   useEffect(() => {
     if (deepLinked || !revisionMode || !driverRow || templates.length === 0) return;
     if (driverRow.credentials_review_status === 'revision_requested') {
-      setStepIndex(0);
+      setStepIndex(1);
       setDeepLinked(true);
       return;
     }
     const idx = templates.findIndex((t) => docRevisions[t.document_type]?.status === 'revision_requested');
     if (idx >= 0) {
-      setStepIndex(idx + 1);
+      setStepIndex(idx + 2);
       setDeepLinked(true);
     } else {
       setDeepLinked(true);
@@ -167,11 +168,13 @@ export default function DriverOnboarding() {
   }, [revisionMode, driverRow, templates, docRevisions, deepLinked]);
 
 
-  // Step 0 = credentials, Steps 1..N = templates
-  const CREDENTIALS_STEP = 0;
+  // Step 0 = employment type, Step 1 = credentials, Steps 2..N = templates
+  const EMPLOYMENT_STEP = 0;
+  const CREDENTIALS_STEP = 1;
+  const isEmploymentStep = stepIndex === EMPLOYMENT_STEP;
   const isCredentialsStep = stepIndex === CREDENTIALS_STEP;
-  const totalSteps = templates.length + 1;
-  const templateIndex = stepIndex - 1;
+  const totalSteps = templates.length + 2;
+  const templateIndex = stepIndex - 2;
   const currentTemplate = templateIndex >= 0 ? templates[templateIndex] : undefined;
   const currentState: TemplateState = currentTemplate
     ? state[currentTemplate.id] ?? EMPTY_TEMPLATE_STATE
@@ -235,7 +238,9 @@ export default function DriverOnboarding() {
   const ssnDigits = currentState.ssn.replace(/\D/g, '');
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(currentState.email.trim());
 
-  const canContinue = isCredentialsStep
+  const canContinue = isEmploymentStep
+    ? employmentType !== null
+    : isCredentialsStep
     ? credentialsValid
     : (!needsDriverSignature || isValidSignatureDataUrl(currentState.signature)) &&
       (!needsDriverAddress || currentState.driverAddress.trim().length > 0) &&
@@ -491,13 +496,13 @@ export default function DriverOnboarding() {
           const idx = templates.findIndex(
             (t) => docRevisions[t.document_type]?.status === 'revision_requested',
           );
-          setStepIndex(idx >= 0 ? idx + 1 : 1);
+          setStepIndex(idx >= 0 ? idx + 2 : 2);
           window.scrollTo({ top: 0, behavior: 'smooth' });
           return;
         }
 
-        if (totalSteps > 1) {
-          setStepIndex(1);
+        if (totalSteps > 2) {
+          setStepIndex(2);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
           // No documents — credentials alone complete the flow
@@ -618,7 +623,9 @@ export default function DriverOnboarding() {
 
   const progress = ((stepIndex + 1) / totalSteps) * 100;
   const docType = currentTemplate?.document_type as DocumentTypeKey | undefined;
-  const title = isCredentialsStep
+  const title = isEmploymentStep
+    ? 'Choose Your Employment Type'
+    : isCredentialsStep
     ? 'Driver Profile & Credentials'
     : currentTemplate?.name ??
       (docType ? DOCUMENT_LABELS[docType] : undefined) ??
@@ -655,7 +662,7 @@ export default function DriverOnboarding() {
       )}
 
 
-      {driverRow?.pay_type && (
+      {driverRow?.pay_type && !isEmploymentStep && (
         <div className="mb-4 rounded-md border bg-muted/30 p-3 flex items-center justify-between text-sm">
           <div>
             <span className="text-muted-foreground">Contract Terms: </span>
@@ -671,13 +678,78 @@ export default function DriverOnboarding() {
         <CardHeader>
           <CardTitle>{title}</CardTitle>
           <CardDescription>
-            {isCredentialsStep
+            {isEmploymentStep
+              ? 'How will you be working with us? This determines how your pay and taxes are handled.'
+              : isCredentialsStep
               ? 'Confirm your CDL, medical card, and TWIC details before reviewing onboarding documents.'
               : 'Please review the document below, fill in the required fields, and sign at the bottom.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isCredentialsStep ? (
+          {isEmploymentStep ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {([
+                {
+                  value: '1099' as const,
+                  label: 'Independent Contractor',
+                  tag: '1099',
+                  description: 'You operate under your own authority or as an owner-operator. You receive a 1099 at year-end and handle your own taxes.',
+                  Icon: Briefcase,
+                },
+                {
+                  value: 'W-2' as const,
+                  label: 'Company Driver',
+                  tag: 'W-2',
+                  description: 'You are an employee of the company. Taxes are withheld from each paycheck and you receive a W-2 at year-end.',
+                  Icon: Building2,
+                },
+              ]).map(({ value, label, tag, description, Icon }) => {
+                const selected = employmentType === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setEmploymentType(value)}
+                    aria-pressed={selected}
+                    className={
+                      'group relative flex flex-col items-start gap-3 rounded-lg border-2 p-6 text-left transition-all ' +
+                      (selected
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary shadow-md'
+                        : 'border-border bg-card hover:border-primary/50 hover:bg-accent/40')
+                    }
+                  >
+                    <div
+                      className={
+                        'flex h-12 w-12 items-center justify-center rounded-full ' +
+                        (selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')
+                      }
+                    >
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-semibold">{label}</span>
+                      <span
+                        className={
+                          'rounded-full px-2 py-0.5 text-xs font-semibold ' +
+                          (selected
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground')
+                        }
+                      >
+                        {tag}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{description}</p>
+                    {selected && (
+                      <div className="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : isCredentialsStep ? (
             <DriverCredentialsStep
               ref={credentialsRef}
               defaultValues={buildDefaultValues(driverRow)}
@@ -798,7 +870,7 @@ export default function DriverOnboarding() {
                 ? `Page ${safeSubPageIndex + 1} of ${chunkCount} · Step ${stepIndex + 1}/${totalSteps}`
                 : `Step ${stepIndex + 1} of ${totalSteps}`}
           </span>
-          {!isCredentialsStep && (
+          {!isCredentialsStep && !isEmploymentStep && (
             fieldsRemaining > 0 ? (
               <span className="text-orange-600 dark:text-orange-400 font-medium mt-0.5">
                 Fields remaining: {fieldsRemaining}
@@ -828,11 +900,13 @@ export default function DriverOnboarding() {
               ? isCredentialsStep
                 ? 'Saving…'
                 : 'Submitting…'
-              : isCredentialsStep
-                ? 'Continue'
-                : isLastTemplateStep
-                  ? 'Submit Document'
-                  : 'Continue'}
+              : isEmploymentStep
+                ? 'Next'
+                : isCredentialsStep
+                  ? 'Continue'
+                  : isLastTemplateStep
+                    ? 'Submit Document'
+                    : 'Continue'}
           </Button>
         )}
       </div>

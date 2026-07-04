@@ -1,26 +1,41 @@
-## Add Tax State to the Driver Profile Card
+## Add Employment Type Selection Step to Driver Onboarding
 
-### Goal
-Expose and edit each driver's tax state directly on the Driver Profile Card (`DriverDetailSheet`) so W-2 payroll picks up the correct per-state SUTA/SIT rates.
+Add a new introductory step to `src/pages/DriverOnboarding.tsx` where the driver picks their employment type (1099 Independent Contractor vs W-2 Company Driver) before continuing to the existing credentials step.
 
-### Changes
+### Changes to `src/pages/DriverOnboarding.tsx`
 
-1. **`src/components/drivers/DriverDetailSheet.tsx`**
-   - Show a **Tax State** row near the employment badges (visible for all employment types, since 1099 state reporting matters too, but styled subtly).
-   - Render an inline **Select** (all 50 states + DC from `src/lib/us-states.ts`) so owner/payroll_admin can change it without opening the full edit dialog. Fall back to org `default_tax_state` label when unset.
-   - On change, `UPDATE drivers SET tax_state = ... WHERE id = driver.id`, invalidate the `drivers` query, toast success/failure.
-   - Disable the selector when `readOnly` is true or the current user lacks payroll access (reuse existing `useAuth`/role check pattern already imported).
-   - Add a tiny helper caption: "Used for SUTA and state income tax withholding."
+1. **New state:**
+   ```ts
+   const [employmentType, setEmploymentType] = useState<'1099' | 'W-2' | null>(null);
+   ```
 
-2. **W-2 payroll integration** — no code change required. Verified during exploration:
-   - `supabase/functions/run-w2-payroll/index.ts` already resolves `driver.tax_state → org default → 'FL'` and looks up `state_tax_configurations` for SUTA rate/base, wage base, and SIT.
-   - `RunW2PayrollDialog` and `W2PayrollHistoryCard` already display the resolved state badge and SIT column.
+2. **Reindex steps:**
+   - Step 0 → Employment Type (new)
+   - Step 1 → Credentials (was 0)
+   - Steps 2..N → Templates
+   - Update constants: `EMPLOYMENT_STEP = 0`, `CREDENTIALS_STEP = 1`, `totalSteps = templates.length + 2`, `templateIndex = stepIndex - 2`.
+   - Update the deep-link revision `useEffect` to jump to `setStepIndex(1)` for credentials revisions and `idx + 2` for template revisions.
+
+3. **Gate `canContinue`** on the new step: `employmentType !== null`.
+
+4. **Render the new step** when `stepIndex === 0`:
+   - A `Card` header explaining "How will you be working with us?"
+   - Two large selectable cards side-by-side (grid on desktop, stacked on mobile), each a `<button>` wrapping a shadcn `Card`:
+     - **Independent Contractor (1099)** — icon + short description ("You operate your own authority / receive a 1099 at year-end.")
+     - **Company Driver (W-2)** — icon + short description ("You are an employee; taxes are withheld and you receive a W-2.")
+   - Selected card gets a distinctive `ring-2 ring-primary border-primary bg-primary/5` treatment; unselected uses default border with hover.
+   - Clicking a card sets `employmentType`. Next button remains disabled until one is chosen.
+
+5. **Progress bar** and step counter updated to use the new `totalSteps`.
 
 ### Out of scope
-- Schema changes (`tax_state` column already exists on `drivers`).
-- Bulk-assign tax state across drivers.
-- Per-driver SIT override (still uses the state config row).
+
+- Persisting `employmentType` to the database (no schema/mutation change requested).
+- Branching downstream template flow by employment type.
+- Backend/edge function changes.
 
 ### Technical notes
-- Use existing `supabase` client and `useQueryClient().invalidateQueries({ queryKey: ['drivers'] })` pattern already used elsewhere in the sheet.
-- Reuse the `US_STATES` list from `src/lib/us-states.ts` (same source as `PayrollTaxesCard` and the Drivers edit form) to keep state codes consistent.
+
+- Uses existing shadcn `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent`, and `Button` — no new dependencies.
+- Icons from `lucide-react` already imported in the file (`Briefcase`, `Building2` will be added to the import).
+- No changes outside `src/pages/DriverOnboarding.tsx`.
