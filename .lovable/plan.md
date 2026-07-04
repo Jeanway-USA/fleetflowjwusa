@@ -1,62 +1,57 @@
-## Goal
-Replace the globally hardcoded Florida SUTA/state-tax settings with a per-state table, driven by each driver's tax state.
+# Backfill Real State Tax Rates into `state_tax_configurations`
 
-## 1. Database
+Populate the seeder + existing org rows with accurate 2026 SUTA (new-employer) rates, wage bases, and state income tax flags/rates for all 50 states + DC, replacing the current 0.00 defaults.
 
-**New table `state_tax_configurations`** (org-scoped so each tenant can tune their own rates):
-- `state_code` (text, 2-char)
-- `suta_rate` (numeric)
-- `suta_wage_base` (numeric)
-- `has_state_income_tax` (boolean)
-- `sit_rate` (numeric, flat-rate fallback for states with SIT — used by the engine only when `has_state_income_tax = true`; advanced bracket support is out of scope)
-- `org_id`, standard timestamps, unique `(org_id, state_code)`
-- GRANTs + RLS: owner/payroll_admin manage; authenticated in same org can read
-- Seed on first read per org: FL (0.027 / $7,000 / false) and TX (0.00 / $9,000 / false). All 50 states inserted with 0.00 defaults so the settings table renders a full list; owners edit as needed.
+## Data source strategy
 
-**`drivers` table**:
-- Add `tax_state` (text, 2-char, nullable). Backfill nothing — nulls fall back to the org's default (see engine below).
+Use published 2026 (or latest available 2025 carryover where 2026 not yet released) statutory values:
+- **SUTA new-employer rate** and **taxable wage base** per state UI agency / APA payroll guides.
+- **State Income Tax**: `has_state_income_tax` = true for states with any wage withholding; `sit_rate` = a reasonable flat effective rate for withholding estimation (flat-tax states use their statutory rate; graduated states use an approximate middle-bracket effective rate as a placeholder until bracketed SIT is implemented).
 
-**`payroll_settings`**:
-- Add `default_tax_state` (text, default `'FL'`) so orgs with drivers missing a `tax_state` still get a deterministic answer.
-- Leave the existing `suta_rate` / `suta_wage_base` columns in place for now but stop reading them in the engine (documented as deprecated in the migration comment; removed in a future cleanup).
+No-income-tax states (sit_rate = 0, has_state_income_tax = false):
+AK, FL, NV, NH (wages), SD, TN, TX, WA, WY.
 
-## 2. Backend engine (`src/lib/w2-payroll.ts` + `supabase/functions/run-w2-payroll`)
+Flat-rate SIT states (use exact statutory rate):
+AZ 2.5%, CO 4.40%, GA 5.39%, ID 5.695%, IL 4.95%, IN 3.00%, KY 4.0%, MI 4.25%, MS 4.7%, NC 4.25%, PA 3.07%, UT 4.55%.
 
-- Extend `PayrollSettings` input with a resolved `stateConfig: { state_code, suta_rate, suta_wage_base, has_state_income_tax, sit_rate }`.
-- SUTA calc uses `stateConfig.suta_rate` / `stateConfig.suta_wage_base` instead of `settings.suta_*`.
-- Add `stateIncomeTax` to the breakdown: `has_state_income_tax ? gross * sit_rate : 0`. Add matching column `state_income_tax` to `driver_payroll` and include it in the employee total / net pay.
-- Edge function resolution order per driver:
-  1. `drivers.tax_state`
-  2. `payroll_settings.default_tax_state`
-  3. `'FL'`
-  Then load the matching row from `state_tax_configurations` for the org (auto-seed the full 50-state set on first hit).
-- Return `state_code` and `state_income_tax` in each result so the UI can show them.
+Graduated SIT states (placeholder effective rate ~ mid bracket):
+AL 4.0%, AR 3.9%, CA 6.0%, CT 5.0%, DE 5.2%, DC 6.5%, HI 7.0%, IA 3.8%, KS 5.25%, LA 3.0%, ME 6.75%, MD 4.75%, MA 5.0%, MN 6.8%, MO 4.7%, MT 5.0%, NE 5.2%, NJ 5.525%, NM 4.9%, NY 6.0%, ND 2.04%, OH 3.5%, OK 4.75%, OR 8.75%, RI 4.75%, SC 6.2%, VT 6.6%, VA 5.75%, WV 5.12%, WI 5.3%.
 
-## 3. UI
+## Representative SUTA values (new-employer rate / wage base)
 
-**Settings → Payroll (`PayrollTaxesCard`)**:
-- Keep FICA / pay-frequency sections.
-- Remove the "Florida Reemployment Tax (SUTA)" section.
-- Add a `default_tax_state` selector.
-- Add a new **State Tax Configurations** table below with rows for every state:
-  - Columns: State, SUTA Rate, SUTA Wage Base, Has State Income Tax (switch), SIT Rate (disabled unless the switch is on).
-  - Inline edit + single "Save state changes" button (bulk upsert).
-  - "Reset to statutory defaults" per row (FL/TX seeded values, others 0).
+Examples (full list built into the migration):
+- AL 2.7% / $8,000
+- AK 1.0% / $49,700
+- AZ 2.0% / $8,000
+- CA 3.4% / $7,000
+- CO 1.7% / $27,200
+- FL 2.7% / $7,000
+- GA 2.64% / $9,500
+- IL 3.95% / $13,916
+- MA 1.87% / $15,000
+- MI 2.7% / $9,500
+- NJ 2.8% / $43,300
+- NY 4.025% / $12,800
+- NC 1.0% / $32,600
+- OH 2.7% / $9,000
+- PA 3.822% / $10,000
+- TX 2.7% / $9,000 (avg new employer)
+- WA 90th-percentile / $72,800
+- All 50 + DC included.
 
-**Driver form (`DriverDetailSheet` / driver create):**
-- Add a "Tax State" select (US states) alongside existing driver fields.
+## Implementation
 
-**`RunW2PayrollDialog` + `W2PayrollHistoryCard`:**
-- Show a per-driver `Tax State` badge in the preview and history rows.
-- Add `State Income Tax` line to the tax preview when > 0.
+1. **New migration** `..._state_tax_rates_backfill.sql`:
+   - Replace body of `public.seed_state_tax_configurations(_org_id UUID)` with a single `INSERT ... ON CONFLICT (org_id, state_code) DO UPDATE` containing the full 51-row VALUES list (state_code, suta_rate, suta_wage_base, has_state_income_tax, sit_rate).
+   - `ON CONFLICT` updates only rows still at the default (`suta_rate = 0 AND sit_rate = 0 AND has_state_income_tax = false`) so admin-edited rows are preserved.
+   - Immediately run one UPDATE against existing `state_tax_configurations` rows using the same VALUES list, again guarded by the "still default" predicate, so already-seeded orgs get the real numbers without wiping customizations.
 
-## 4. Out of scope
-- Multi-state per driver / reciprocity.
-- Bracketed state income tax (only flat `sit_rate`).
-- Year-end multi-state W-2 form generation.
+2. **No UI/code changes** — `PayrollTaxesCard`, `run-w2-payroll`, and `w2-payroll.ts` already read from this table.
 
-## Technical details
-- Migration order: create `state_tax_configurations` (+ GRANTs + RLS + policies + updated_at trigger), add `drivers.tax_state`, add `payroll_settings.default_tax_state`, add `driver_payroll.state_income_tax` numeric default 0.
-- Seed function `public.seed_state_tax_configurations(_org_id uuid)` invoked from the edge function and from `PayrollTaxesCard` on first load if the table is empty for the org.
-- Regenerate `src/integrations/supabase/types.ts` after migration approval.
-- Keep `w2-payroll.ts` the single source of truth; edge function mirrors it exactly.
+3. **Verification**: after migration, spot-check via `supabase--read_query` that FL/TX/CA/NY rows show the new rates for an existing org.
+
+## Notes / caveats (surfaced in migration comment)
+
+- New-employer SUTA rates are used because per-employer experience rates are private and vary yearly — admins can override in Settings → Payroll.
+- Graduated-SIT `sit_rate` values are effective-rate placeholders; a future bracketed SIT engine can replace them without schema changes.
+- Wage bases reflect the most recent published values (2025/2026); admins can adjust per state.
