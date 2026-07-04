@@ -169,6 +169,7 @@ export function DocumentTemplateRenderer({
   onAccountNumberChange,
   bankAccountType = '',
   onBankAccountTypeChange,
+  employmentType: _employmentType = null,
 }: DocumentTemplateRendererProps) {
 
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
