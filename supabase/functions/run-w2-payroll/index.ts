@@ -35,7 +35,7 @@ const GUSTO_API_VERSION = Deno.env.get("GUSTO_API_VERSION") ?? "2026-06-15";
 const GUSTO_CLIENT_ID = Deno.env.get("GUSTO_CLIENT_ID") ?? "";
 const GUSTO_CLIENT_SECRET = Deno.env.get("GUSTO_CLIENT_SECRET") ?? "";
 
-type Admin = ReturnType<typeof createClient>;
+type Admin = any;
 
 // -----------------------------------------------------------------------------
 // Gusto helpers
@@ -210,10 +210,21 @@ async function actionProvisionCompany(
       `Gusto provisioning failed (${resp.status}): ${JSON.stringify(body)}`,
     );
   }
-  const companyUuid = body.company_uuid ?? body.company?.uuid ?? null;
-  const accessToken = body.access_token ?? null;
-  const refreshToken = body.refresh_token ?? null;
-  const expiresIn = body.expires_in ?? 3600;
+  const company = body.company && typeof body.company === "object"
+    ? body.company as Record<string, unknown>
+    : null;
+  const companyUuid = typeof body.company_uuid === "string"
+    ? body.company_uuid
+    : typeof company?.uuid === "string"
+    ? company.uuid
+    : null;
+  const accessToken = typeof body.access_token === "string"
+    ? body.access_token
+    : null;
+  const refreshToken = typeof body.refresh_token === "string"
+    ? body.refresh_token
+    : null;
+  const expiresIn = typeof body.expires_in === "number" ? body.expires_in : 3600;
   await admin.rpc("gusto_set_tokens", {
     _org_id: orgId,
     _company_uuid: companyUuid,
