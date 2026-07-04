@@ -426,16 +426,11 @@ export function DocumentSignatureStep({
           />
           <div className="space-y-4">
             {w2Templates.map(renderTemplate)}
-            {W2_PLACEHOLDERS.map((doc) => (
-              <PlaceholderDocumentCard
-                key={doc.id}
-                doc={doc}
-                checked={placeholderAcks[doc.id] === true}
-                onCheckedChange={(v) =>
-                  setPlaceholderAcks((prev) => ({ ...prev, [doc.id]: v }))
-                }
-              />
-            ))}
+            <W2Documents
+              value={w2Docs}
+              onChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
+              onValidityChange={setW2Valid}
+            />
           </div>
         </section>
       ) : (
@@ -447,19 +442,17 @@ export function DocumentSignatureStep({
           />
           <div className="space-y-4">
             {contractorTemplates.map(renderTemplate)}
-            {CONTRACTOR_PLACEHOLDERS.map((doc) => (
-              <PlaceholderDocumentCard
-                key={doc.id}
-                doc={doc}
-                checked={placeholderAcks[doc.id] === true}
-                onCheckedChange={(v) =>
-                  setPlaceholderAcks((prev) => ({ ...prev, [doc.id]: v }))
-                }
-              />
-            ))}
+            <ContractorDocuments
+              value={contractorDocs}
+              onChange={(patch) =>
+                setContractorDocs((prev) => ({ ...prev, ...patch }))
+              }
+              onValidityChange={setContractorValid}
+            />
           </div>
         </section>
       )}
     </div>
   );
+
 }
