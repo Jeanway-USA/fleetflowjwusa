@@ -12,6 +12,7 @@ import { NextLoadPreview } from '@/components/driver/NextLoadPreview';
 import { DriverPayWidget } from '@/components/driver/DriverPayWidget';
 import { WeeklyPerformanceWidget } from '@/components/driver/WeeklyPerformanceWidget';
 import { MonthlyBonusWidget } from '@/components/driver/MonthlyBonusWidget';
+import { DriverPayStubsCard } from '@/components/driver/DriverPayStubsCard';
 import { DocumentScanButton } from '@/components/driver/DocumentScanButton';
 import { LocationSharing } from '@/components/driver/LocationSharing';
 import { DriverNotifications } from '@/components/driver/DriverNotifications';
