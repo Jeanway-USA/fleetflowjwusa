@@ -623,7 +623,9 @@ export default function DriverOnboarding() {
 
   const progress = ((stepIndex + 1) / totalSteps) * 100;
   const docType = currentTemplate?.document_type as DocumentTypeKey | undefined;
-  const title = isCredentialsStep
+  const title = isEmploymentStep
+    ? 'Choose Your Employment Type'
+    : isCredentialsStep
     ? 'Driver Profile & Credentials'
     : currentTemplate?.name ??
       (docType ? DOCUMENT_LABELS[docType] : undefined) ??
@@ -660,7 +662,7 @@ export default function DriverOnboarding() {
       )}
 
 
-      {driverRow?.pay_type && (
+      {driverRow?.pay_type && !isEmploymentStep && (
         <div className="mb-4 rounded-md border bg-muted/30 p-3 flex items-center justify-between text-sm">
           <div>
             <span className="text-muted-foreground">Contract Terms: </span>
@@ -676,13 +678,78 @@ export default function DriverOnboarding() {
         <CardHeader>
           <CardTitle>{title}</CardTitle>
           <CardDescription>
-            {isCredentialsStep
+            {isEmploymentStep
+              ? 'How will you be working with us? This determines how your pay and taxes are handled.'
+              : isCredentialsStep
               ? 'Confirm your CDL, medical card, and TWIC details before reviewing onboarding documents.'
               : 'Please review the document below, fill in the required fields, and sign at the bottom.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isCredentialsStep ? (
+          {isEmploymentStep ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {([
+                {
+                  value: '1099' as const,
+                  label: 'Independent Contractor',
+                  tag: '1099',
+                  description: 'You operate under your own authority or as an owner-operator. You receive a 1099 at year-end and handle your own taxes.',
+                  Icon: Briefcase,
+                },
+                {
+                  value: 'W-2' as const,
+                  label: 'Company Driver',
+                  tag: 'W-2',
+                  description: 'You are an employee of the company. Taxes are withheld from each paycheck and you receive a W-2 at year-end.',
+                  Icon: Building2,
+                },
+              ]).map(({ value, label, tag, description, Icon }) => {
+                const selected = employmentType === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setEmploymentType(value)}
+                    aria-pressed={selected}
+                    className={
+                      'group relative flex flex-col items-start gap-3 rounded-lg border-2 p-6 text-left transition-all ' +
+                      (selected
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary shadow-md'
+                        : 'border-border bg-card hover:border-primary/50 hover:bg-accent/40')
+                    }
+                  >
+                    <div
+                      className={
+                        'flex h-12 w-12 items-center justify-center rounded-full ' +
+                        (selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')
+                      }
+                    >
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg font-semibold">{label}</span>
+                      <span
+                        className={
+                          'rounded-full px-2 py-0.5 text-xs font-semibold ' +
+                          (selected
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground')
+                        }
+                      >
+                        {tag}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{description}</p>
+                    {selected && (
+                      <div className="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <CheckCircle2 className="h-5 w-5" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : isCredentialsStep ? (
             <DriverCredentialsStep
               ref={credentialsRef}
               defaultValues={buildDefaultValues(driverRow)}
