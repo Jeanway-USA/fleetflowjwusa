@@ -1290,16 +1290,50 @@ async function actionSyncOnboardingSteps(
     return false;
   };
 
+  const { data: cached } = await admin
+    .from("gusto_integration")
+    .select("federal_tax_status, signatory_status, state_tax_requirements, bank_verification_status, active_pay_schedule_uuid, pay_schedule_frequency")
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  const federalDone = findCompleted(["federal_tax"]);
+  const signatoryDone = findCompleted(["signatory", "add_signatory"]);
+
   const update: Record<string, unknown> = {
     onboarding_steps: steps,
     onboarding_steps_synced_at: new Date().toISOString(),
   };
   if (status) update.onboarding_status = status;
-  update.federal_tax_status = findCompleted(["federal_tax"]) ? "completed" : "pending";
-  update.signatory_status = findCompleted(["signatory", "add_signatory"]) ? "completed" : "pending";
+  update.federal_tax_status = federalDone || cached?.federal_tax_status === "completed"
+    ? "completed"
+    : "pending";
+  update.signatory_status = signatoryDone || cached?.signatory_status === "completed"
+    ? "completed"
+    : "pending";
 
   await admin.from("gusto_integration").update(update).eq("org_id", orgId);
-  return { onboarding_status: status, onboarding_steps: steps };
+  return {
+    onboarding_status: status,
+    onboarding_steps: steps,
+    setup_status: {
+      ...cached,
+      federal_tax_status: update.federal_tax_status,
+      signatory_status: update.signatory_status,
+    },
+  };
+}
+
+async function actionGetPayrollSetupStatus(
+  admin: Admin,
+  orgId: string,
+): Promise<Record<string, unknown>> {
+  const { data, error } = await admin
+    .from("gusto_integration")
+    .select("federal_tax_status, signatory_status, state_tax_requirements, bank_verification_status, active_pay_schedule_uuid, pay_schedule_frequency")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) throw error;
+  return { setup_status: data ?? null };
 }
 
 async function actionGetStateTaxRequirements(
