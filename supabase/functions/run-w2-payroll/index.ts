@@ -187,6 +187,14 @@ async function gustoFetch(
 async function actionProvisionCompany(
   admin: Admin,
   orgId: string,
+  payload: {
+    owner_first_name?: string;
+    owner_last_name?: string;
+    owner_email?: string;
+    company_name?: string;
+    trade_name?: string;
+    ein?: string;
+  } = {},
 ): Promise<Record<string, unknown>> {
   const { data: org } = await admin
     .from("organizations")
@@ -194,6 +202,10 @@ async function actionProvisionCompany(
     .eq("id", orgId)
     .maybeSingle();
   const systemToken = await getGustoSystemToken();
+  const einDigits = (payload.ein || "").replace(/\D/g, "");
+  const ein = einDigits.length === 9
+    ? `${einDigits.slice(0, 2)}-${einDigits.slice(2)}`
+    : null;
   const resp = await fetch(`${GUSTO_BASE}/v1/partner_managed_companies`, {
     method: "POST",
     headers: {
@@ -203,8 +215,16 @@ async function actionProvisionCompany(
       "X-Gusto-API-Version": GUSTO_API_VERSION,
     },
     body: JSON.stringify({
-      user: { first_name: "Owner", last_name: "Owner", email: `owner+${orgId}@example.com` },
-      company: { name: org?.name ?? `Org ${orgId.slice(0, 8)}`, trade_name: org?.name ?? undefined, ein: null },
+      user: {
+        first_name: payload.owner_first_name || "Owner",
+        last_name: payload.owner_last_name || "Owner",
+        email: payload.owner_email || `owner+${orgId}@example.com`,
+      },
+      company: {
+        name: payload.company_name || org?.name || `Org ${orgId.slice(0, 8)}`,
+        trade_name: payload.trade_name || payload.company_name || org?.name || undefined,
+        ein,
+      },
     }),
   });
   const body = await readGustoBody(resp) as Record<string, unknown>;
