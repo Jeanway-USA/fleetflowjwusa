@@ -5270,6 +5270,8 @@ export type Database = {
           created_at: string
           current_driver_id: string | null
           current_odometer: number | null
+          down_payment: number | null
+          financing_fees: number | null
           id: string
           interest_rate: number | null
           last_120_inspection_date: string | null
@@ -5297,6 +5299,8 @@ export type Database = {
           created_at?: string
           current_driver_id?: string | null
           current_odometer?: number | null
+          down_payment?: number | null
+          financing_fees?: number | null
           id?: string
           interest_rate?: number | null
           last_120_inspection_date?: string | null
@@ -5324,6 +5328,8 @@ export type Database = {
           created_at?: string
           current_driver_id?: string | null
           current_odometer?: number | null
+          down_payment?: number | null
+          financing_fees?: number | null
           id?: string
           interest_rate?: number | null
           last_120_inspection_date?: string | null

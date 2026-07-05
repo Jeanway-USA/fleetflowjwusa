@@ -29,6 +29,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { addDays, addMonths, differenceInDays, format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 import { TruckLoanPaymentsSection } from '@/components/trucks/TruckLoanPaymentsSection';
+import { AmortizationCard } from '@/components/trucks/AmortizationCard';
+import { DriverAssignmentSelect, evaluateDriverCompliance, type DriverComplianceCheck } from '@/components/trucks/DriverAssignmentSelect';
+
+
 
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
@@ -96,7 +100,9 @@ export default function Trucks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTruck, setEditingTruck] = useState<TruckWithDriver | null>(null);
   const [formData, setFormData] = useState<Partial<TruckInsert>>({});
+  const [driverCompliance, setDriverCompliance] = useState<DriverComplianceCheck | null>(null);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
+
 
   const truckFields = [
     { key: 'unit_number', label: 'Unit Number', required: true },
@@ -115,12 +121,15 @@ export default function Trucks() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('trucks')
-        .select('*, drivers!trucks_current_driver_id_fkey(id, first_name, last_name)')
-        .order('unit_number');
+        .select('*, drivers!trucks_current_driver_id_fkey(id, first_name, last_name)');
       if (error) throw error;
-      return (data ?? []) as TruckWithDriver[];
+      const rows = (data ?? []) as TruckWithDriver[];
+      // Natural sort by unit_number so "T-101" and "433780" order sensibly.
+      const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+      return [...rows].sort((a, b) => collator.compare(a.unit_number ?? '', b.unit_number ?? ''));
     },
   });
+
 
   // Fetch service schedules for 120-Day Inspections
   const { data: serviceSchedules = [] } = useQuery({
@@ -230,6 +239,21 @@ export default function Trucks() {
   const openDialog = (truck?: TruckWithDriver) => {
     setEditingTruck(truck || null);
     setFormData(toEditableTruck(truck));
+    // Seed compliance from the existing driver so Save isn't blocked on open.
+    const existingDriver = (truck as any)?.drivers;
+    if (existingDriver) {
+      setDriverCompliance(evaluateDriverCompliance({
+        id: existingDriver.id,
+        first_name: existingDriver.first_name,
+        last_name: existingDriver.last_name,
+        status: existingDriver.status ?? 'active',
+        license_expiry: existingDriver.license_expiry ?? null,
+        medical_card_expiry: existingDriver.medical_card_expiry ?? null,
+        credentials_review_status: existingDriver.credentials_review_status ?? 'approved',
+      }));
+    } else {
+      setDriverCompliance(null);
+    }
     setDialogOpen(true);
   };
 
@@ -237,6 +261,7 @@ export default function Trucks() {
     setDialogOpen(false);
     setEditingTruck(null);
     setFormData({});
+    setDriverCompliance(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -245,12 +270,18 @@ export default function Trucks() {
       toast.error('Unit number is required');
       return;
     }
+    // Compliance gate: only block when a driver was selected and they're non-compliant.
+    if (formData.current_driver_id && driverCompliance && !driverCompliance.compliant) {
+      toast.error(`Cannot assign driver: ${driverCompliance.reasons.join(', ')}`);
+      return;
+    }
     if (editingTruck) {
       updateMutation.mutate({ id: editingTruck.id, ...formData });
     } else {
       createMutation.mutate(formData as TruckInsert);
     }
   };
+
 
   const columns = [
     { key: 'unit_number', header: 'Unit #' },
@@ -266,6 +297,18 @@ export default function Trucks() {
       }
     },
     { key: 'status', header: 'Status', render: (truck: TruckWithDriver) => <StatusBadge status={truck.status} /> },
+    {
+      key: 'lender_name',
+      header: 'Lender',
+      hiddenOnMobile: true,
+      render: (truck: TruckWithDriver) =>
+        truck.lender_name ? (
+          <span className="text-sm">{truck.lender_name}</span>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        ),
+    },
+
     {
       key: 'loan',
       header: 'Loan Balance',
@@ -549,27 +592,17 @@ export default function Trucks() {
                   <User className="h-4 w-4" />
                   Current Driver
                 </Label>
-                <Select 
-                  value={formData.current_driver_id || 'none'} 
-                  onValueChange={(v) => setFormData({ ...formData, current_driver_id: v === 'none' ? null : v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a driver" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No driver assigned</SelectItem>
-                    {drivers.map((driver) => (
-                      <SelectItem key={driver.id} value={driver.id}>
-                        {driver.first_name} {driver.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <DriverAssignmentSelect
+                  value={formData.current_driver_id ?? null}
+                  onChange={(id) => setFormData({ ...formData, current_driver_id: id })}
+                  onComplianceChange={setDriverCompliance}
+                />
                 <p className="text-xs text-muted-foreground">
-                  Assign a driver to this truck to enable their DVIR and maintenance features.
+                  Drivers must have current CDL, medical card, and approved compliance docs to be assigned.
                 </p>
               </div>
             </div>
+
 
             {/* Financing Section */}
             <Collapsible>
@@ -603,11 +636,23 @@ export default function Trucks() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label htmlFor="down_payment">Down Payment ($)</Label>
+                    <Input id="down_payment" type="number" step="0.01" value={(formData as any).down_payment || ''} onChange={(e) => setFormData({ ...formData, down_payment: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="financing_fees">Financing / UCC Fees ($)</Label>
+                    <Input id="financing_fees" type="number" step="0.01" value={(formData as any).financing_fees || ''} onChange={(e) => setFormData({ ...formData, financing_fees: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     <Label htmlFor="interest_rate">Interest Rate (%)</Label>
                     <Input id="interest_rate" type="number" step="0.01" value={(formData as any).interest_rate || ''} onChange={(e) => setFormData({ ...formData, interest_rate: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
                   </div>
                   <div />
                 </div>
+
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -682,11 +727,44 @@ export default function Trucks() {
                 />
               </TabsContent>
               <TabsContent value="financing" className="mt-4 space-y-4">
+                <AmortizationCard truck={viewingTruck as any} />
                 <TruckLoanPaymentsSection
                   truckId={viewingTruck.id}
                   loanBalance={viewingTruck.loan_balance ?? null}
                   originalLoanAmount={(viewingTruck as any).original_loan_amount ?? null}
                 />
+                {viewingTruck.monthly_payment ? (
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <div className="text-sm">
+                      <p className="font-medium">Post this month's payment to Finance</p>
+                      <p className="text-xs text-muted-foreground">
+                        Adds {formatCurrency(Number(viewingTruck.monthly_payment))} to the P&amp;L as a "Truck Loan" expense and to the loan ledger. Skips if already posted for this month.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        const { data, error } = await supabase.functions.invoke('post-truck-loan-payments', {
+                          body: { truck_id: viewingTruck.id },
+                        });
+                        if (error) {
+                          toast.error(error.message);
+                          return;
+                        }
+                        const action = (data as any)?.results?.[0]?.action ?? 'posted';
+                        toast.success(action === 'already_posted' ? 'Already posted this month' : 'Monthly payment posted');
+                        queryClient.invalidateQueries({ queryKey: ['trucks'] });
+                        queryClient.invalidateQueries({ queryKey: ['truck_loan_payments', viewingTruck.id] });
+                        queryClient.invalidateQueries({ queryKey: ['truck_loan_payments_sum', viewingTruck.id] });
+                      }}
+                    >
+                      Post Now
+                    </Button>
+                  </div>
+                ) : null}
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
