@@ -6164,6 +6164,7 @@ export type Database = {
         | "safety"
         | "driver"
         | "maintenance"
+        | "admin"
       employment_type_enum: "w2_company" | "1099_contractor" | "lease_purchase"
       onboarding_review_status: "pending" | "approved" | "revision_requested"
     }
@@ -6300,6 +6301,7 @@ export const Constants = {
         "safety",
         "driver",
         "maintenance",
+        "admin",
       ],
       employment_type_enum: ["w2_company", "1099_contractor", "lease_purchase"],
       onboarding_review_status: ["pending", "approved", "revision_requested"],
