@@ -6,6 +6,7 @@ import { Eye, EyeOff, Landmark } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PayrollSetupSectionCard } from '../PayrollSetupSectionCard';
+import { createBankAccount } from '@/services/gustoCompanyApi';
 import { RequiredLabel, RequiredLegend } from '../RequiredLabel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -78,16 +79,20 @@ export function BankDetailsSection() {
     },
   });
 
-  const onSubmit = (values: BankFormValues) => {
-    // TODO: POST /v1/companies/{company_id}/bank_accounts via Gusto edge function
-    console.log('[bank-details] submit', {
-      ...values,
-      accountNumber: '****',
-      confirmAccountNumber: '****',
+  const onSubmit = async (values: BankFormValues) => {
+    const res = await createBankAccount({
+      accountHolder: values.accountHolder,
+      accountType: values.accountType,
+      routingNumber: values.routingNumber,
+      accountNumber: values.accountNumber,
     });
-    toast.success('Bank details saved', {
-      description: 'Gusto API wiring pending.',
-    });
+    if (res.ok) {
+      toast.success('Bank details saved', { description: 'Synced to Gusto.' });
+    } else {
+      toast.error('Failed to save bank details', {
+        description: res.error ?? 'Please try again.',
+      });
+    }
   };
 
   return (

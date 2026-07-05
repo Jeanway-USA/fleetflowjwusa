@@ -5,6 +5,7 @@ import { Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PayrollSetupSectionCard } from '../PayrollSetupSectionCard';
+import { upsertPrimaryLocation } from '@/services/gustoCompanyApi';
 import { RequiredLabel, RequiredLegend } from '../RequiredLabel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,12 +64,15 @@ export function CompanyIndustrySection() {
     },
   });
 
-  const onSubmit = (values: CompanyFormValues) => {
-    // TODO: PUT /v1/companies/{company_id} with address + industry via Gusto edge function
-    console.log('[company-industry] submit', values);
-    toast.success('Company info saved', {
-      description: 'Gusto API wiring pending.',
-    });
+  const onSubmit = async (values: CompanyFormValues) => {
+    const res = await upsertPrimaryLocation(values);
+    if (res.ok) {
+      toast.success('Company info saved', { description: 'Synced to Gusto.' });
+    } else {
+      toast.error('Failed to save company info', {
+        description: res.error ?? 'Please try again.',
+      });
+    }
   };
 
   return (
