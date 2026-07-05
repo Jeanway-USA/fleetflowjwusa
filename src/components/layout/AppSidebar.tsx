@@ -218,15 +218,19 @@ export function AppSidebar() {
     '/maintenance': 'maintenance',
   };
 
-  // --- 3 collapsible groups ---
+  // --- Collapsible groups ---
   const operationsItems: NavItem[] = [
-    { title: 'Trucks', icon: Truck, path: '/trucks', roles: ['owner', 'safety', 'maintenance'], feature: 'trucks' },
-    { title: 'Trailers', icon: Container, path: '/trailers', roles: ['owner', 'safety', 'maintenance'], feature: 'trailers' },
-
-    { title: 'Drivers', icon: Users, path: '/drivers', roles: ['owner', 'payroll_admin'], feature: 'drivers' },
     { title: 'Fleet Loads', icon: Package, path: '/fleet-loads', roles: ['owner', 'dispatcher', 'safety'], feature: 'loads', tourId: 'nav-fleet-loads' },
     { title: 'Agency Loads', icon: Building2, path: '/agency-loads', roles: ['owner', 'dispatcher'], feature: 'agency_loads' },
+    { title: 'Trailers', icon: Container, path: '/trailers', roles: ['owner', 'safety', 'maintenance'], feature: 'trailers' },
+    { title: 'Trucks', icon: Truck, path: '/trucks', roles: ['owner', 'safety', 'maintenance'], feature: 'trucks' },
     { title: currentTmsMode === 'independent' ? 'Broker CRM' : 'Agent CRM', icon: currentTmsMode === 'independent' ? Building2 : Contact, path: '/crm', roles: ['owner', 'dispatcher'], feature: 'crm' },
+    { title: 'Drivers', icon: Users, path: '/drivers', roles: ['owner', 'payroll_admin'], feature: 'drivers' },
+  ];
+
+  const fleetCareItems: NavItem[] = [
+    { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'maintenance'], feature: 'maintenance_full' },
+    { title: 'PM Schedules', icon: Wrench, path: '/maintenance-home', roles: ['owner', 'maintenance'], feature: 'maintenance_full' },
   ];
 
   const safetyItems: NavItem[] = [
@@ -236,8 +240,7 @@ export function AppSidebar() {
     { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety'], feature: 'documents' },
   ];
 
-
-  const backOfficeItems: NavItem[] = [
+  const administrationItems: NavItem[] = [
     { title: 'Finance & P/L', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'], feature: 'profit_loss', tourId: 'nav-finance' },
     { title: 'Company Insights', icon: BarChart3, path: '/insights', roles: ['owner', 'payroll_admin'], feature: 'insights' },
     { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta', tmsMode: 'independent' as TmsMode },
@@ -245,22 +248,24 @@ export function AppSidebar() {
   ];
 
   const filteredOps = useMemo(() => filterByRoleAndTier(operationsItems), [filterByRoleAndTier]);
+  const filteredFleetCare = useMemo(() => filterByRoleAndTier(fleetCareItems), [filterByRoleAndTier]);
   const filteredSafety = useMemo(() => filterByRoleAndTier(safetyItems), [filterByRoleAndTier]);
-  const filteredBackOffice = useMemo(() => filterByRoleAndTier(backOfficeItems), [filterByRoleAndTier]);
+  const filteredAdministration = useMemo(() => filterByRoleAndTier(administrationItems), [filterByRoleAndTier]);
 
-  // Settings goes in back office only for owners
-  const backOfficeWithSettings = useMemo(() => {
+  // Settings goes in administration only for owners
+  const administrationWithSettings = useMemo(() => {
     if (actuallyIsOwner && !isSimulating) {
-      return [...filteredBackOffice, { title: 'Settings', icon: Settings, path: '/settings', roles: ['owner'] as AppRole[], feature: undefined }];
+      return [...filteredAdministration, { title: 'Settings', icon: Settings, path: '/settings', roles: ['owner'] as AppRole[], feature: undefined }];
     }
-    return filteredBackOffice;
-  }, [filteredBackOffice, actuallyIsOwner, isSimulating]);
+    return filteredAdministration;
+  }, [filteredAdministration, actuallyIsOwner, isSimulating]);
 
   const collapsibleGroups = useMemo(() => [
     { key: 'operations', label: 'Operations', items: filteredOps },
+    { key: 'fleetcare', label: 'Fleet Care', items: filteredFleetCare },
     { key: 'safety', label: 'Safety & Compliance', items: filteredSafety },
-    { key: 'backoffice', label: 'Back Office', items: backOfficeWithSettings },
-  ], [filteredOps, filteredSafety, backOfficeWithSettings]);
+    { key: 'administration', label: 'Administration', items: administrationWithSettings },
+  ], [filteredOps, filteredFleetCare, filteredSafety, administrationWithSettings]);
 
   // --- Collapsible state with localStorage + auto-expand ---
   const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>(() => {
