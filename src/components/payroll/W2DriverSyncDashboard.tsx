@@ -51,6 +51,7 @@ import {
 
 interface W2DriverRow {
   id: string;
+  user_id: string | null;
   first_name: string | null;
   last_name: string | null;
   email: string | null;
@@ -82,24 +83,44 @@ function docStatusBadge(status: DocStatus) {
 
 export function W2DriverSyncDashboard() {
   const qc = useQueryClient();
-  const { orgId } = useAuth();
+  const { orgId, orgLoading } = useAuth();
+  const activeOrgId = orgId;
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [invitingId, setInvitingId] = useState<string | null>(null);
   const [bulkSending, setBulkSending] = useState(false);
 
   const driversQuery = useQuery({
-    queryKey: ['w2_driver_sync_dashboard', orgId],
-    enabled: !!orgId,
+    queryKey: ['w2_driver_sync_dashboard', activeOrgId],
+    enabled: !!activeOrgId && !orgLoading,
     queryFn: async (): Promise<W2DriverRow[]> => {
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, first_name, last_name, email, employment_type, gusto_employee_id')
-        .eq('org_id', orgId!)
+        .select('id, user_id, first_name, last_name, email, employment_type, gusto_employee_id')
+        .eq('org_id', activeOrgId!)
         .eq('employment_type', 'w2_company')
         .order('first_name', { ascending: true });
       if (error) throw error;
-      return (data ?? []).map((d) => ({
+
+      const rows = data ?? [];
+      const linkedUserIds = rows
+        .map((d) => d.user_id)
+        .filter((v): v is string => !!v);
+
+      const driverRoleUserIds = new Set<string>();
+      if (linkedUserIds.length > 0) {
+        const { data: roleRows, error: roleError } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('org_id', activeOrgId!)
+          .eq('role', 'driver')
+          .in('user_id', linkedUserIds);
+        if (roleError) throw roleError;
+        for (const row of roleRows ?? []) driverRoleUserIds.add(row.user_id);
+      }
+
+      return rows.filter((d) => !d.user_id || driverRoleUserIds.has(d.user_id)).map((d) => ({
         id: d.id,
+        user_id: d.user_id,
         first_name: d.first_name,
         last_name: d.last_name,
         email: d.email,
@@ -108,15 +129,15 @@ export function W2DriverSyncDashboard() {
     },
   });
 
-  const drivers = driversQuery.data ?? [];
+  const drivers = activeOrgId && !orgLoading ? driversQuery.data ?? [] : [];
   const syncedUuids = useMemo(
     () => drivers.map((d) => d.gusto_employee_id).filter((v): v is string => !!v),
     [drivers],
   );
 
   const onboardingQuery = useQuery({
-    queryKey: ['w2_onboarding_status', syncedUuids.join(',')],
-    enabled: syncedUuids.length > 0,
+    queryKey: ['w2_onboarding_status', activeOrgId, syncedUuids.join(',')],
+    enabled: !!activeOrgId && !orgLoading && syncedUuids.length > 0,
     queryFn: async () => {
       const res = await getEmployeesOnboardingStatus(syncedUuids);
       if (!res.ok) throw new Error(res.error ?? 'Failed to load onboarding status');
