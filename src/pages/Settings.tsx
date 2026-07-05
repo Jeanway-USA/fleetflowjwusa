@@ -173,9 +173,10 @@ export default function Settings() {
               <BrandingTab />
             </TabsContent>
 
-            <TabsContent value="billing">
-              <BillingTab />
+            <TabsContent value="branding">
+              <BrandingTab />
             </TabsContent>
+
 
             <TabsContent value="storage">
               <StorageTab />
