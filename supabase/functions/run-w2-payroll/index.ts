@@ -192,6 +192,35 @@ async function markPayrollSetupStatus(
   }
 }
 
+async function mergeStateTaxSetupStatus(
+  admin: Admin,
+  orgId: string,
+  states: string[],
+): Promise<void> {
+  try {
+    const { data: row } = await admin
+      .from("gusto_integration")
+      .select("state_tax_requirements")
+      .eq("org_id", orgId)
+      .maybeSingle();
+    const current = (row?.state_tax_requirements ?? {}) as Record<string, unknown>;
+    const submittedAt = new Date().toISOString();
+    for (const state of states) {
+      current[state] = {
+        ...((current[state] ?? {}) as Record<string, unknown>),
+        submitted_at: submittedAt,
+        status: "completed",
+      };
+    }
+    await admin.from("gusto_integration").update({
+      state_tax_requirements: current,
+      onboarding_steps_synced_at: submittedAt,
+    }).eq("org_id", orgId);
+  } catch {
+    // Best-effort UI status cache. The upstream Gusto write is authoritative.
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Actions
 // -----------------------------------------------------------------------------
