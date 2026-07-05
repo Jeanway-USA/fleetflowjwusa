@@ -1553,6 +1553,18 @@ Deno.serve(async (req) => {
       case "create_employee_self_onboarding_flow_token":
         result = await actionCreateEmployeeSelfOnboardingFlowToken(admin, orgId, payload);
         break;
+      case "get_company":
+        result = await actionGetCompany(admin, orgId);
+        break;
+      case "get_signatory":
+        result = await actionGetSignatory(admin, orgId);
+        break;
+      case "get_federal_tax_details":
+        result = await actionGetFederalTaxDetails(admin, orgId);
+        break;
+      case "list_bank_accounts":
+        result = await actionListBankAccounts(admin, orgId);
+        break;
 
 
 
