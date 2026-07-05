@@ -1823,6 +1823,7 @@ export type Database = {
       }
       drivers: {
         Row: {
+          assigned_work_address_id: string | null
           avatar_url: string | null
           created_at: string
           credentials_review_status: Database["public"]["Enums"]["onboarding_review_status"]
@@ -1852,6 +1853,7 @@ export type Database = {
           license_state: string | null
           medical_card_expiry: string | null
           mvr_expiry: string | null
+          onboarding_status: string
           org_id: string
           pay_rate: number | null
           pay_type: string | null
@@ -1865,6 +1867,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          assigned_work_address_id?: string | null
           avatar_url?: string | null
           created_at?: string
           credentials_review_status?: Database["public"]["Enums"]["onboarding_review_status"]
@@ -1894,6 +1897,7 @@ export type Database = {
           license_state?: string | null
           medical_card_expiry?: string | null
           mvr_expiry?: string | null
+          onboarding_status?: string
           org_id: string
           pay_rate?: number | null
           pay_type?: string | null
@@ -1907,6 +1911,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          assigned_work_address_id?: string | null
           avatar_url?: string | null
           created_at?: string
           credentials_review_status?: Database["public"]["Enums"]["onboarding_review_status"]
@@ -1936,6 +1941,7 @@ export type Database = {
           license_state?: string | null
           medical_card_expiry?: string | null
           mvr_expiry?: string | null
+          onboarding_status?: string
           org_id?: string
           pay_rate?: number | null
           pay_type?: string | null
@@ -2574,35 +2580,71 @@ export type Database = {
       gusto_integration: {
         Row: {
           access_token_encrypted: string | null
+          active_pay_schedule_uuid: string | null
+          bank_account_uuid: string | null
+          bank_verification_attempts: number
+          bank_verification_status: string | null
           created_at: string
+          federal_tax_status: string | null
           gusto_company_uuid: string | null
           last_synced_at: string | null
           onboarding_status: string
+          onboarding_steps: Json | null
+          onboarding_steps_synced_at: string | null
           org_id: string
+          pay_schedule_frequency: string | null
           refresh_token_encrypted: string | null
+          signatory_status: string | null
+          state_tax_requirements: Json
           token_expires_at: string | null
+          tos_accepted_at: string | null
+          tos_accepted_ip: string | null
           updated_at: string
         }
         Insert: {
           access_token_encrypted?: string | null
+          active_pay_schedule_uuid?: string | null
+          bank_account_uuid?: string | null
+          bank_verification_attempts?: number
+          bank_verification_status?: string | null
           created_at?: string
+          federal_tax_status?: string | null
           gusto_company_uuid?: string | null
           last_synced_at?: string | null
           onboarding_status?: string
+          onboarding_steps?: Json | null
+          onboarding_steps_synced_at?: string | null
           org_id: string
+          pay_schedule_frequency?: string | null
           refresh_token_encrypted?: string | null
+          signatory_status?: string | null
+          state_tax_requirements?: Json
           token_expires_at?: string | null
+          tos_accepted_at?: string | null
+          tos_accepted_ip?: string | null
           updated_at?: string
         }
         Update: {
           access_token_encrypted?: string | null
+          active_pay_schedule_uuid?: string | null
+          bank_account_uuid?: string | null
+          bank_verification_attempts?: number
+          bank_verification_status?: string | null
           created_at?: string
+          federal_tax_status?: string | null
           gusto_company_uuid?: string | null
           last_synced_at?: string | null
           onboarding_status?: string
+          onboarding_steps?: Json | null
+          onboarding_steps_synced_at?: string | null
           org_id?: string
+          pay_schedule_frequency?: string | null
           refresh_token_encrypted?: string | null
+          signatory_status?: string | null
+          state_tax_requirements?: Json
           token_expires_at?: string | null
+          tos_accepted_at?: string | null
+          tos_accepted_ip?: string | null
           updated_at?: string
         }
         Relationships: [
