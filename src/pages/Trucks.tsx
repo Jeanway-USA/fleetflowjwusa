@@ -239,6 +239,21 @@ export default function Trucks() {
   const openDialog = (truck?: TruckWithDriver) => {
     setEditingTruck(truck || null);
     setFormData(toEditableTruck(truck));
+    // Seed compliance from the existing driver so Save isn't blocked on open.
+    const existingDriver = (truck as any)?.drivers;
+    if (existingDriver) {
+      setDriverCompliance(evaluateDriverCompliance({
+        id: existingDriver.id,
+        first_name: existingDriver.first_name,
+        last_name: existingDriver.last_name,
+        status: existingDriver.status ?? 'active',
+        license_expiry: existingDriver.license_expiry ?? null,
+        medical_card_expiry: existingDriver.medical_card_expiry ?? null,
+        credentials_review_status: existingDriver.credentials_review_status ?? 'approved',
+      }));
+    } else {
+      setDriverCompliance(null);
+    }
     setDialogOpen(true);
   };
 
@@ -246,6 +261,7 @@ export default function Trucks() {
     setDialogOpen(false);
     setEditingTruck(null);
     setFormData({});
+    setDriverCompliance(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -254,12 +270,18 @@ export default function Trucks() {
       toast.error('Unit number is required');
       return;
     }
+    // Compliance gate: only block when a driver was selected and they're non-compliant.
+    if (formData.current_driver_id && driverCompliance && !driverCompliance.compliant) {
+      toast.error(`Cannot assign driver: ${driverCompliance.reasons.join(', ')}`);
+      return;
+    }
     if (editingTruck) {
       updateMutation.mutate({ id: editingTruck.id, ...formData });
     } else {
       createMutation.mutate(formData as TruckInsert);
     }
   };
+
 
   const columns = [
     { key: 'unit_number', header: 'Unit #' },
