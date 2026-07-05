@@ -45,6 +45,12 @@ const companySchema = z.object({
   city: z.string().trim().min(1, 'City is required').max(100),
   state: z.string().min(2, 'State is required'),
   zip: z.string().regex(/^\d{5}(-\d{4})?$/, 'ZIP must be 5 digits or ZIP+4'),
+  phoneNumber: z
+    .string()
+    .trim()
+    .refine((v) => v.replace(/\D/g, '').length >= 10, {
+      message: 'Enter a valid 10-digit phone number',
+    }),
   industryCode: z.string().min(1, 'Industry is required'),
 });
 
@@ -60,6 +66,7 @@ export function CompanyIndustrySection() {
       city: '',
       state: '',
       zip: '',
+      phoneNumber: '',
       industryCode: '',
     },
   });
@@ -72,6 +79,7 @@ export function CompanyIndustrySection() {
       city: values.city,
       state: values.state,
       zip: values.zip,
+      phoneNumber: values.phoneNumber,
       industryCode: values.industryCode,
     });
     if (res.ok) {
@@ -197,6 +205,27 @@ export function CompanyIndustrySection() {
               )}
             />
           </div>
+
+          <FormField
+            control={form.control}
+            name="phoneNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel><RequiredLabel>Business phone</RequiredLabel></FormLabel>
+                <FormControl>
+                  <Input
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    placeholder="(555) 555-5555"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
 
           <FormField
             control={form.control}
