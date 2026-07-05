@@ -5972,6 +5972,7 @@ export type Database = {
       }
       get_driver_id_for_user: { Args: { _user_id: string }; Returns: string }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
+      get_user_role: { Args: { _user_id: string }; Returns: string }
       gusto_get_tokens: {
         Args: { _org_id: string }
         Returns: {
@@ -6164,6 +6165,7 @@ export type Database = {
         | "safety"
         | "driver"
         | "maintenance"
+        | "admin"
       employment_type_enum: "w2_company" | "1099_contractor" | "lease_purchase"
       onboarding_review_status: "pending" | "approved" | "revision_requested"
     }
@@ -6300,6 +6302,7 @@ export const Constants = {
         "safety",
         "driver",
         "maintenance",
+        "admin",
       ],
       employment_type_enum: ["w2_company", "1099_contractor", "lease_purchase"],
       onboarding_review_status: ["pending", "approved", "revision_requested"],
