@@ -75,7 +75,13 @@ export function SignatorySection() {
   });
 
   const onSubmit = async (values: SignatoryFormValues) => {
-    const res = await upsertSignatory(values);
+    const res = await upsertSignatory({
+      firstName: values.firstName,
+      lastName: values.lastName,
+      title: values.title,
+      dateOfBirth: values.dateOfBirth,
+      ssn: values.ssn,
+    });
     if (res.ok) {
       toast.success('Signatory saved', { description: 'Synced to Gusto.' });
     } else {

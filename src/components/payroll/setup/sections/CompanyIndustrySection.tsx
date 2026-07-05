@@ -65,7 +65,15 @@ export function CompanyIndustrySection() {
   });
 
   const onSubmit = async (values: CompanyFormValues) => {
-    const res = await upsertPrimaryLocation(values);
+    const res = await upsertPrimaryLocation({
+      legalName: values.legalName,
+      street1: values.street1,
+      street2: values.street2,
+      city: values.city,
+      state: values.state,
+      zip: values.zip,
+      industryCode: values.industryCode,
+    });
     if (res.ok) {
       toast.success('Company info saved', { description: 'Synced to Gusto.' });
     } else {
