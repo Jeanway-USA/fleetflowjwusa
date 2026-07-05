@@ -1080,6 +1080,10 @@ Deno.serve(async (req) => {
       case "assign_employee_pay_schedule":
         result = await actionAssignEmployeePaySchedule(admin, orgId, payload);
         break;
+      case "get_employees_onboarding_status":
+        result = await actionGetEmployeesOnboardingStatus(admin, orgId, payload);
+        break;
+
       case "status": {
         const { companyUuid, status } = await getAccessToken(admin, orgId);
         result = { company_uuid: companyUuid, onboarding_status: status };
