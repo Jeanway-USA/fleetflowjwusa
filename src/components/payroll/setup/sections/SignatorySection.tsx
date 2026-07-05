@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { format } from 'date-fns';
-import { CalendarIcon, Eye, EyeOff, UserCheck } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { CalendarIcon, Eye, EyeOff, Loader2, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PayrollSetupSectionCard } from '../PayrollSetupSectionCard';
-import { upsertSignatory } from '@/services/gustoCompanyApi';
+import { getSignatory, upsertSignatory } from '@/services/gustoCompanyApi';
+
 import { RequiredLabel, RequiredLegend } from '../RequiredLabel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -82,7 +84,19 @@ function formatSsn(raw: string): string {
 }
 
 export function SignatorySection() {
+  const qc = useQueryClient();
   const [showSsn, setShowSsn] = useState(false);
+
+  const { data: remote, isLoading } = useQuery({
+    queryKey: ['gusto-signatory'],
+    queryFn: async () => {
+      const res = await getSignatory();
+      if (!res.ok) throw new Error(res.error);
+      return res.data!;
+    },
+    retry: false,
+    staleTime: 60_000,
+  });
 
   const form = useForm<SignatoryFormValues>({
     resolver: zodResolver(signatorySchema),
@@ -100,6 +114,32 @@ export function SignatorySection() {
       homeZip: '',
     },
   });
+
+  useEffect(() => {
+    const sig = remote?.signatory;
+    if (!sig) return;
+    const addr = sig.home_address ?? {};
+    let dob: Date | undefined;
+    if (sig.birthday) {
+      try { dob = parseISO(sig.birthday); } catch { /* ignore */ }
+    }
+    form.reset({
+      firstName: sig.first_name ?? '',
+      lastName: sig.last_name ?? '',
+      title: sig.title ?? '',
+      dateOfBirth: dob as Date,
+      ssn: '',
+      phone: sig.phone ?? '',
+      email: sig.email ?? '',
+      homeStreet1: (addr.street_1 as string) ?? '',
+      homeStreet2: (addr.street_2 as string) ?? '',
+      homeCity: (addr.city as string) ?? '',
+      homeState: (addr.state as string) ?? '',
+      homeZip: (addr.zip as string) ?? '',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remote]);
+
 
   const onSubmit = async (values: SignatoryFormValues) => {
     const res = await upsertSignatory({
@@ -120,6 +160,8 @@ export function SignatorySection() {
     });
     if (res.ok) {
       toast.success('Signatory saved', { description: 'Synced to Gusto.' });
+      qc.invalidateQueries({ queryKey: ['gusto-signatory'] });
+      qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
     } else {
       toast.error('Failed to save signatory', {
         description: res.error ?? 'Please try again.',
@@ -133,8 +175,14 @@ export function SignatorySection() {
       title="Signatory"
       description="Designate and verify the authorized signatory who will sign federal and state payroll forms on the company's behalf."
     >
+      {isLoading ? (
+        <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading saved values…
+        </div>
+      ) : null}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField
               control={form.control}

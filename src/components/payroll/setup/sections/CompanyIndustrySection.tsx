@@ -1,11 +1,14 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { Building2 } from 'lucide-react';
+import { Building2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PayrollSetupSectionCard } from '../PayrollSetupSectionCard';
-import { upsertPrimaryLocation } from '@/services/gustoCompanyApi';
+import { getCompany, upsertPrimaryLocation } from '@/services/gustoCompanyApi';
+
 import { RequiredLabel, RequiredLegend } from '../RequiredLabel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,10 +60,22 @@ const companySchema = z.object({
 type CompanyFormValues = z.infer<typeof companySchema>;
 
 export function CompanyIndustrySection() {
+  const qc = useQueryClient();
+  const { data: remote, isLoading } = useQuery({
+    queryKey: ['gusto-company'],
+    queryFn: async () => {
+      const res = await getCompany();
+      if (!res.ok) throw new Error(res.error);
+      return res.data!;
+    },
+    retry: false,
+    staleTime: 60_000,
+  });
+
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
     defaultValues: {
-      legalName: 'JeanWay LLC',
+      legalName: '',
       street1: '',
       street2: '',
       city: '',
@@ -70,6 +85,23 @@ export function CompanyIndustrySection() {
       industryCode: '',
     },
   });
+
+  useEffect(() => {
+    if (!remote) return;
+    const loc = remote.primary_location ?? {};
+    form.reset({
+      legalName: remote.legal_name ?? '',
+      street1: (loc.street_1 as string) ?? '',
+      street2: (loc.street_2 as string) ?? '',
+      city: (loc.city as string) ?? '',
+      state: (loc.state as string) ?? '',
+      zip: (loc.zip as string) ?? '',
+      phoneNumber: (loc.phone_number as string) ?? '',
+      industryCode: remote.naics_code ?? '',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remote]);
+
 
   const onSubmit = async (values: CompanyFormValues) => {
     const res = await upsertPrimaryLocation({
@@ -84,6 +116,8 @@ export function CompanyIndustrySection() {
     });
     if (res.ok) {
       toast.success('Company info saved', { description: 'Synced to Gusto.' });
+      qc.invalidateQueries({ queryKey: ['gusto-company'] });
+      qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
     } else {
       toast.error('Failed to save company info', {
         description: res.error ?? 'Please try again.',
@@ -91,14 +125,21 @@ export function CompanyIndustrySection() {
     }
   };
 
+
   return (
     <PayrollSetupSectionCard
       icon={Building2}
       title="Company & Industry"
       description="Confirm your legal company details, primary business address, and NAICS industry classification. Gusto requires these before running payroll."
     >
+      {isLoading ? (
+        <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading saved values…
+        </div>
+      ) : null}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+
           <FormField
             control={form.control}
             name="legalName"

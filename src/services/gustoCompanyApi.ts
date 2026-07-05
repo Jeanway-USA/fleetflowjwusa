@@ -316,4 +316,79 @@ export function createEmployeeSelfOnboardingFlowToken(input: {
   );
 }
 
+// -------- Read-side hydration ----------------------------------------------
+
+export interface GustoLocation {
+  uuid?: string;
+  street_1?: string;
+  street_2?: string | null;
+  city?: string;
+  state?: string;
+  zip?: string;
+  phone_number?: string;
+  [k: string]: unknown;
+}
+
+export interface GustoCompanyInfo {
+  legal_name: string | null;
+  primary_location: GustoLocation | null;
+  naics_code: string | null;
+}
+
+export function getCompany() {
+  return callAction<GustoCompanyInfo>('get_company', {});
+}
+
+export interface GustoSignatory {
+  uuid?: string;
+  first_name?: string;
+  last_name?: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+  birthday?: string;
+  home_address?: {
+    street_1?: string;
+    street_2?: string | null;
+    city?: string;
+    state?: string;
+    zip?: string;
+  } | null;
+  [k: string]: unknown;
+}
+
+export function getSignatory() {
+  return callAction<{ signatory: GustoSignatory | null }>('get_signatory', {});
+}
+
+export interface GustoFederalTaxDetails {
+  ein?: string;
+  legal_name?: string;
+  filing_form?: string;
+  taxable_as_scorp?: boolean;
+  [k: string]: unknown;
+}
+
+export function getFederalTaxDetails() {
+  return callAction<{ federal_tax_details: GustoFederalTaxDetails | null }>(
+    'get_federal_tax_details',
+    {},
+  );
+}
+
+export interface GustoBankAccount {
+  uuid?: string;
+  hidden_account_number?: string;
+  account_type?: string;
+  name?: string;
+  verification_status?: string;
+  verification_type?: string;
+  [k: string]: unknown;
+}
+
+export function listBankAccounts() {
+  return callAction<{ bank_accounts: GustoBankAccount[] }>('list_bank_accounts', {});
+}
+
+
 

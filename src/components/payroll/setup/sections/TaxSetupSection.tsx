@@ -1,11 +1,14 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { Percent } from 'lucide-react';
+import { Loader2, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PayrollSetupSectionCard } from '../PayrollSetupSectionCard';
-import { upsertFederalTaxDetails } from '@/services/gustoCompanyApi';
+import { getFederalTaxDetails, upsertFederalTaxDetails } from '@/services/gustoCompanyApi';
+
 import { RequiredLabel, RequiredLegend } from '../RequiredLabel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,6 +57,18 @@ function formatEin(raw: string): string {
 }
 
 export function TaxSetupSection() {
+  const qc = useQueryClient();
+  const { data: remote, isLoading } = useQuery({
+    queryKey: ['gusto-federal-tax'],
+    queryFn: async () => {
+      const res = await getFederalTaxDetails();
+      if (!res.ok) throw new Error(res.error);
+      return res.data!;
+    },
+    retry: false,
+    staleTime: 60_000,
+  });
+
   const form = useForm<TaxFormValues>({
     resolver: zodResolver(taxSchema),
     defaultValues: {
@@ -65,12 +80,24 @@ export function TaxSetupSection() {
     },
   });
 
+  useEffect(() => {
+    const ftd = remote?.federal_tax_details;
+    if (!ftd?.ein) return;
+    form.reset({
+      ...form.getValues(),
+      ein: ftd.ein,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remote]);
+
   const onSubmit = async (values: TaxFormValues) => {
     // TODO: separate call to /v1/companies/{id}/state_taxes for
     // filingState / stateAccountId / suiAccountId / suiRate.
     const res = await upsertFederalTaxDetails({ ein: values.ein });
     if (res.ok) {
       toast.success('Tax setup saved', { description: 'Synced to Gusto.' });
+      qc.invalidateQueries({ queryKey: ['gusto-federal-tax'] });
+      qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
     } else {
       toast.error('Failed to save tax setup', {
         description: res.error ?? 'Please try again.',
@@ -84,6 +111,12 @@ export function TaxSetupSection() {
       title="Tax Setup"
       description="Provide federal and state tax IDs, deposit schedules, and unemployment rates so Gusto can file and remit payroll taxes."
     >
+      {isLoading ? (
+        <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading saved values…
+        </div>
+      ) : null}
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
