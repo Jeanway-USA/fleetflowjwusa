@@ -39,7 +39,7 @@ export function StateTaxStep() {
   const { data: driverStates, isLoading } = useQuery({
     queryKey: ['payroll-driver-tax-states'],
     queryFn: async (): Promise<string[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('drivers')
         .select('tax_state, home_state')
         .eq('driver_type', 'W-2 Employee');
