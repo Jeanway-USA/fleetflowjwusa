@@ -1,58 +1,46 @@
-# Scaffold a Payroll Setup page for clearing Gusto blockers
+## Add Signatory & Company/Industry Forms to Payroll Setup
 
-## Goal
+Note: the user references `GustoCompanySetup.tsx`, but the scaffolded files are `SignatorySection.tsx` and `CompanyIndustrySection.tsx` under `src/components/payroll/setup/sections/`. Plan targets those.
 
-A new per-organization Settings page that will host the guided workflows to clear Gusto payroll blockers (bank, signatory, tax setup, etc.). This turn is **scaffold only** — layout, tabs, empty section placeholders, and a placeholder blocker-count badge. No Gusto API wiring yet.
+### 1. `SignatorySection.tsx` — Signatory form
 
-## Where it lives
+Replace the placeholder body with a React Hook Form + zod form inside the existing `PayrollSetupSectionCard`.
 
-- **Route:** `/settings/payroll-setup`
-- **Access:** `owner` and `payroll_admin` (matches existing payroll access rules).
-- **Entry point:** new link in the Finance page's payroll area and in the main Settings page ("Payroll Setup"). Left the existing `/settings` page untouched.
+Fields:
+- **First Name** — text, required, 1–50 chars
+- **Last Name** — text, required, 1–50 chars
+- **Title** — text, required, 1–100 chars (e.g. "Owner", "CEO")
+- **Date of Birth** — Shadcn Datepicker (Popover + Calendar with `pointer-events-auto`), required, must be a past date and age ≥ 18
+- **SSN** — text, required, masked/formatted `XXX-XX-XXXX`, regex `^\d{3}-?\d{2}-?\d{4}$`, input `type="password"` (or toggleable), autoComplete off
 
-## Page structure
+Layout: two-column grid on `sm+`, single column on mobile. Submit button "Save Signatory" (full width on mobile, right-aligned on `sm+`). `onSubmit` currently just `console.log` + toast "Signatory saved (Gusto API wiring pending)".
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ Payroll Setup                     [Badge: — blockers]        │
-│ Clear the items below before running W-2 payroll.            │
-├──────────────────────────────────────────────────────────────┤
-│ [Company & Industry] [Signatory] [Bank Details] [Tax Setup]  │
-│ ── active tab content ────────────────────────────────────── │
-│  Section header + short description                          │
-│  Placeholder card: "Guided setup coming soon"                │
-└──────────────────────────────────────────────────────────────┘
-```
+### 2. `CompanyIndustrySection.tsx` — Company & Address/Industry form
 
-- Uses shadcn `Tabs` on `sm+` and collapses to shadcn `Accordion` on mobile (`< sm`) via a simple `useIsMobile` split so all four sections stay reachable on a phone.
-- Each section renders a `Card` shell with title, description, and a muted placeholder body — ready for follow-up work to drop the real forms/flow-token launchers in.
-- Status indicator: shadcn `Badge` at top-right of the header, currently displays `—` with a neutral variant. Component prop-typed to accept `{ count, isLoading }` so wiring it to the Gusto onboarding endpoint later is a one-line change.
+Same RHF + zod pattern.
 
-## Files to add
+Fields:
+- **Legal Company Name** — text, required, **default `"JeanWay LLC"`**
+- **Street Address (line 1)** — text, required
+- **Address Line 2** — text, optional
+- **City** — text, required
+- **State** — Shadcn `Select` of US state codes (reuse existing state list if one exists in `src/lib` / `src/constants`; otherwise inline a `US_STATES` const in the section file)
+- **ZIP** — text, regex `^\d{5}(-\d{4})?$`
+- **Industry** — Shadcn `Select` with a curated NAICS list relevant to trucking (General Freight Trucking, Long-Distance / Local, Specialized Freight, Courier, Warehousing, Other). Values = NAICS codes, labels = human names. Stored in a local `INDUSTRY_OPTIONS` const.
 
-- `src/pages/PayrollSetup.tsx` — page component, header, badge, tabs/accordion switch, four section stubs.
-- `src/components/payroll/setup/PayrollBlockerBadge.tsx` — reusable `<PayrollBlockerBadge count?: number | null />`.
-- `src/components/payroll/setup/sections/CompanyIndustrySection.tsx`
-- `src/components/payroll/setup/sections/SignatorySection.tsx`
-- `src/components/payroll/setup/sections/BankDetailsSection.tsx`
-- `src/components/payroll/setup/sections/TaxSetupSection.tsx`
+Layout: address block as 2-column responsive grid (line1 full width, city/state/zip on one row `sm+`), industry field full width below. Submit button "Save Company Info", same toast + `console.log` stub.
 
-Each section file exports a small component with a shared shape (`title`, `description`, placeholder `Card` body) so they're easy to fill in later.
+### 3. Shared/misc
 
-## Files to edit
+- Both forms use `Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormMessage` from `@/components/ui/form`.
+- Use `useToast` from `@/hooks/use-toast` for the stub submit feedback.
+- No new deps — `react-hook-form`, `zod`, `@hookform/resolvers`, `date-fns`, shadcn primitives are all already in the project.
+- No API calls, no edge functions, no DB writes this turn — TODO comments mark where the Gusto `/companies/{id}` and `/companies/{id}/signatories` calls will go.
+- Blocker badge on `PayrollSetup.tsx` stays as `—` (unchanged).
 
-- `src/App.tsx` — add `<Route path="/settings/payroll-setup" allowedRoles={['owner','payroll_admin']}>` importing `PayrollSetup`.
-- `src/pages/Settings.tsx` — add a "Payroll Setup" entry linking to the new route (keeps discoverability without changing the existing settings layout).
-- `src/components/finance/payroll/RunW2PayrollDialog.tsx` — small "Setup incomplete? Open Payroll Setup →" link in the left panel that navigates to the new page. Non-blocking, purely a shortcut.
+### Files touched
 
-## Responsiveness
+- `src/components/payroll/setup/sections/SignatorySection.tsx` (rewrite body)
+- `src/components/payroll/setup/sections/CompanyIndustrySection.tsx` (rewrite body)
 
-- `< sm`: single-column, `Accordion` (`type="single"`, `collapsible`) with all four sections; header stacks title above badge.
-- `sm` and up: header row (title left, badge right), `Tabs` with a horizontally scrollable `TabsList` so long labels never clip.
-- Consistent `container mx-auto p-4 sm:p-6 max-w-5xl` wrapper, no `DashboardLayout` wrapper (per project rule — `ProtectedRoute` provides it).
-
-## Out of scope this turn
-
-- No calls to the `run-w2-payroll` edge function.
-- No form fields inside the sections yet.
-- No real blocker count — badge shows `—` until we wire the Gusto onboarding-status endpoint in a follow-up.
+No route, layout, or other section changes.
