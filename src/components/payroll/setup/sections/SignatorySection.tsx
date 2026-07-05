@@ -84,7 +84,19 @@ function formatSsn(raw: string): string {
 }
 
 export function SignatorySection() {
+  const qc = useQueryClient();
   const [showSsn, setShowSsn] = useState(false);
+
+  const { data: remote, isLoading } = useQuery({
+    queryKey: ['gusto-signatory'],
+    queryFn: async () => {
+      const res = await getSignatory();
+      if (!res.ok) throw new Error(res.error);
+      return res.data!;
+    },
+    retry: false,
+    staleTime: 60_000,
+  });
 
   const form = useForm<SignatoryFormValues>({
     resolver: zodResolver(signatorySchema),
@@ -102,6 +114,32 @@ export function SignatorySection() {
       homeZip: '',
     },
   });
+
+  useEffect(() => {
+    const sig = remote?.signatory;
+    if (!sig) return;
+    const addr = sig.home_address ?? {};
+    let dob: Date | undefined;
+    if (sig.birthday) {
+      try { dob = parseISO(sig.birthday); } catch { /* ignore */ }
+    }
+    form.reset({
+      firstName: sig.first_name ?? '',
+      lastName: sig.last_name ?? '',
+      title: sig.title ?? '',
+      dateOfBirth: dob as Date,
+      ssn: '',
+      phone: sig.phone ?? '',
+      email: sig.email ?? '',
+      homeStreet1: (addr.street_1 as string) ?? '',
+      homeStreet2: (addr.street_2 as string) ?? '',
+      homeCity: (addr.city as string) ?? '',
+      homeState: (addr.state as string) ?? '',
+      homeZip: (addr.zip as string) ?? '',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remote]);
+
 
   const onSubmit = async (values: SignatoryFormValues) => {
     const res = await upsertSignatory({
