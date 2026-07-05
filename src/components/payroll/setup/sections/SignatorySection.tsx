@@ -160,6 +160,8 @@ export function SignatorySection() {
     });
     if (res.ok) {
       toast.success('Signatory saved', { description: 'Synced to Gusto.' });
+      qc.invalidateQueries({ queryKey: ['gusto-signatory'] });
+      qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
     } else {
       toast.error('Failed to save signatory', {
         description: res.error ?? 'Please try again.',
@@ -173,8 +175,14 @@ export function SignatorySection() {
       title="Signatory"
       description="Designate and verify the authorized signatory who will sign federal and state payroll forms on the company's behalf."
     >
+      {isLoading ? (
+        <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading saved values…
+        </div>
+      ) : null}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField
               control={form.control}
