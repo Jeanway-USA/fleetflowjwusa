@@ -1186,6 +1186,13 @@ Deno.serve(async (req) => {
       case "get_employees_onboarding_status":
         result = await actionGetEmployeesOnboardingStatus(admin, orgId, payload);
         break;
+      case "send_employee_onboarding_invite":
+        result = await actionSendOnboardingInvite(admin, orgId, payload);
+        break;
+      case "get_employee_onboarding_link":
+        result = await actionGetOnboardingLink(admin, orgId, payload);
+        break;
+
 
       case "status": {
         const { companyUuid, status } = await getAccessToken(admin, orgId);
