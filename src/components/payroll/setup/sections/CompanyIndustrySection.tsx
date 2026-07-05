@@ -116,12 +116,15 @@ export function CompanyIndustrySection() {
     });
     if (res.ok) {
       toast.success('Company info saved', { description: 'Synced to Gusto.' });
+      qc.invalidateQueries({ queryKey: ['gusto-company'] });
+      qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
     } else {
       toast.error('Failed to save company info', {
         description: res.error ?? 'Please try again.',
       });
     }
   };
+
 
   return (
     <PayrollSetupSectionCard
