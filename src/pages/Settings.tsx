@@ -17,6 +17,7 @@ import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
 import { PayrollTaxesCard } from '@/components/settings/PayrollTaxesCard';
 import { PayScheduleManager } from '@/components/payroll/PayScheduleManager';
 import { W2DriverSyncDashboard } from '@/components/payroll/W2DriverSyncDashboard';
+import { EmployerOnboardingPortal } from '@/components/finance/payroll/EmployerOnboardingPortal';
 
 export default function Settings() {
   const { canSimulateRoles, isDemoMode } = useAuth();
@@ -185,29 +186,9 @@ export default function Settings() {
             </TabsContent>
 
             <TabsContent value="payroll" className="space-y-6">
-              <Card className="card-elevated">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Percent className="h-5 w-5 text-primary" />
-                    Payroll Setup
-                  </CardTitle>
-                  <CardDescription>
-                    Clear Gusto onboarding blockers (company & industry, signatory, bank details, tax setup)
-                    before running W-2 payroll.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <a
-                    href="/settings/payroll-setup"
-                    className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                  >
-                    Open Payroll Setup →
-                  </a>
-                </CardContent>
-              </Card>
+              <EmployerOnboardingPortal />
               <W2DriverSyncDashboard />
               <PayrollTaxesCard />
-              <PayScheduleManager />
             </TabsContent>
           </Tabs>
         </TabsContent>
