@@ -1,37 +1,102 @@
-## Add "Send onboarding invite" action to W-2 Driver Sync
+## White-labeled W-2 Payroll Compliance Engine
 
-Right now the dashboard shows `Forms pending` once a driver is synced to Gusto, but there's no in-app trigger to actually get the driver to sign their W-4 / I-9. This plan adds that trigger.
+This is a large scope, so I've split it into 5 phases that each land as an independently reviewable slice. Nothing here breaks the existing dispatcher, IOO, or settlements flows — everything is additive and gated on `employment_type = 'w2_company'` and `gusto_company_integrations.onboarding_status`.
 
-### Approach
-Use Gusto's employee self-onboarding flow: the backend asks Gusto to email the driver a secure link where they complete and e-sign W-4 and I-9 themselves. We surface a **"Send onboarding invite"** button per row (and a bulk action) in `W2DriverSyncDashboard`. When the driver finishes in Gusto, the existing onboarding-status query flips the badge to `Forms complete`.
+I'll implement Phase 1 → 5 in that order in follow-up turns. If you want to reorder or drop a phase, tell me before I start Phase 1.
 
-### Edited files
+---
 
-**`supabase/functions/run-w2-payroll/index.ts`**
-- New action `send_employee_onboarding_invite`:
-  - Input: `{ driver_id }` (server looks up `gusto_employee_id` from `drivers`).
-  - Ensures the employee has `self_onboarding = true` (PUT `/v1/employees/{uuid}` if not already), then calls Gusto's self-onboarding invite endpoint to email the driver.
-  - Returns `{ sent: true, email }` on success; surfaces Gusto's error verbatim on failure (missing email, employee already onboarded, etc.).
-- New action `get_employee_onboarding_link` (fallback): returns a one-time onboarding URL for the admin to copy/share when email isn't viable.
-- Both actions are org-scoped through the same auth guard as the existing `sync_employee` action — no new RLS surface.
+### Phase 1 — Schema & ledger upgrades (single migration)
 
-**`src/services/gustoCompanyApi.ts`**
-- `sendEmployeeOnboardingInvite(driverId)` wrapper.
-- `getEmployeeOnboardingLink(driverId)` wrapper.
+Extend the existing tables (no new tables required; the current schema already has `gusto_company_integrations` and `drivers.gusto_employee_id`).
 
-**`src/components/payroll/W2DriverSyncDashboard.tsx`**
-- Add a per-row **"Send invite"** button, visible only when the driver is synced AND doc status is `pending` or `unknown`. Shows a spinner while sending, toast on result, and disables briefly after success ("Invite sent").
-- Add a small "Copy link" dropdown item beside it that calls `getEmployeeOnboardingLink` and copies the URL to clipboard.
-- Add a table-level **"Send invite to all pending"** button in the card header that iterates all `pending`/`unknown` rows sequentially with a progress toast.
-- Empty-email guard: if `driver.email` is null, disable the button with a tooltip ("Add an email to this driver first").
-- After sending, `onboardingQuery.refetch()` is called after ~2s so the badge updates once Gusto reflects the invite.
+`public.gusto_company_integrations` — add:
+- `onboarding_steps jsonb` — cached copy of Gusto's `GET /v1/companies/{uuid}/onboarding_status` step list.
+- `onboarding_steps_synced_at timestamptz`.
+- `bank_account_uuid text`, `bank_verification_status text` (`unverified` / `awaiting_deposits` / `verified` / `failed`), `bank_verification_attempts int default 0`.
+- `active_pay_schedule_uuid text`, `pay_schedule_frequency text`.
+- `federal_tax_status text`, `signatory_status text`.
+- `state_tax_requirements jsonb` — keyed by 2-char state, holds the raw Gusto tax_requirements payload + `last_synced_at`.
+
+`public.drivers` — add:
+- `tax_state char(2)` (work state; distinct from `home_state`).
+- `assigned_work_address_id text` (Gusto location uuid).
+- `onboarding_status text default 'not_started'` (mirrors Gusto's employee onboarding_status enum).
+- `gusto_employee_id` already exists — no change.
+
+No RLS changes: both tables already have policies. Migration only adds columns + backfills `tax_state` from `home_state` where possible.
+
+---
+
+### Phase 2 — Provisioning + Step 1/2 proxy actions in `run-w2-payroll`
+
+Reuse the existing edge function (all Gusto calls stay server-side; browser never sees the bearer). Add these actions, each org-scoped through the existing `has_payroll_access` guard:
+
+- `provision_partner_managed_company` — already exists as `provision_company`; extend to accept `{ legal_name, trade_name, ein, contact_email, tos_accepted_ip }` and persist onboarding_status = `provisioned`.
+- `accept_terms_of_service` — POST `/v1/companies/{uuid}/accept_terms_of_service` with the acknowledging user's IP + name; stores `tos_accepted_at` on the integration row.
+- `set_industry` — PUT `/v1/companies/{uuid}/industry_selection` with a NAICS/SIC pair.
+- `upsert_federal_tax_details` — already exists; extend payload to accept CP-575 legal name + filing form.
+- `sync_onboarding_steps` — GET `/v1/companies/{uuid}/onboarding_status`, cache into `gusto_company_integrations.onboarding_steps`.
+- `get_state_tax_requirements` — GET `/v1/companies/{uuid}/tax_requirements/{state}`; cache in `state_tax_requirements`.
+- `submit_state_tax_requirements` — PUT the same path with the field values the admin filled in.
+- `create_bank_account_from_plaid` — POST `/v1/companies/{uuid}/bank_accounts` with a Plaid processor token (falls back to routing/account if not provided).
+- `initiate_micro_deposits` and `verify_micro_deposits` — corresponding Gusto endpoints; update `bank_verification_status`.
+- `create_pay_schedule` + `assign_employee_pay_schedule` — already exist; add `list_pay_schedules` (GET) so the UI can show the active one.
+- `create_employee_self_onboarding_flow_token` — thin wrapper around the existing flow-token endpoint scoped to `employee_self_management` for the target employee.
+
+No config.toml changes; function still deploys with the current `verify_jwt` posture and validates JWTs in code.
+
+---
+
+### Phase 3 — Embedded employer tax & bank onboarding portal
+
+New folder `src/components/finance/payroll/` (as requested — mirrors the finance module layout):
+
+- `EmployerOnboardingPortal.tsx` — top-level card with a `Stepper` that reads from `onboarding_steps` (Phase 1 cache) and shows completion state per step.
+- `steps/CompanyDetailsStep.tsx` — legal name, EIN, NAICS picker, ToS checkbox → `set_industry` + `accept_terms_of_service`.
+- `steps/FederalTaxStep.tsx` — CP-575 mapping form → `upsert_federal_tax_details`.
+- `steps/StateTaxStep.tsx` — driven by driver `tax_state` distinct values. For each state it calls `get_state_tax_requirements` and dynamically renders Gusto's declared fields (account IDs, deposit schedules, SUI rates). Submits via `submit_state_tax_requirements`.
+- `steps/BankAccountStep.tsx` — two paths:
+  1. **Plaid** — uses the existing Plaid Link (if a Plaid public key secret is present) → exchanges for a processor token in a new edge action, then `create_bank_account_from_plaid`.
+  2. **Manual + micro-deposits** — routing/account input → `initiate_micro_deposits` → later `verify_micro_deposits` with the two deposit amounts.
+- `steps/PayScheduleStep.tsx` — reuses the existing `PayScheduleManager` (already built).
+- `steps/SignatoryStep.tsx` — reuses the existing `SignatorySection`.
+- Where Gusto provides a hosted React flow (via `@gusto/embedded-react-sdk`), the step uses it inside a `<GustoAppProvider>` (already present) with a short-lived flow token generated by `create_flow_token`. Fallback custom forms cover cases where a flow isn't provided.
+
+Mounts inside `Settings → Payroll` above the existing `W2DriverSyncDashboard` and `PayScheduleManager`.
+
+**Plaid note**: If you want the Plaid path, I'll need a `PLAID_CLIENT_ID` + `PLAID_SECRET`. Until those are added, the Bank step falls back to manual routing/account + micro-deposit verification.
+
+---
+
+### Phase 4 — Driver self-onboarding & e-sign
+
+- `src/pages/DriverOnboarding.tsx` — add a branch for W-2 drivers:
+  - When an admin creates a W-2 driver profile, the existing `sync_employee` action now also sends `self_onboarding: true`, work_address, compensation rate, and tax_state.
+  - New `W2SelfOnboardingCard` inside the driver portal that fetches a `create_employee_self_onboarding_flow_token` and renders Gusto's `employee_self_management` flow via the Embedded React SDK (already installed) so the driver completes PII, W-4, direct deposit, and federal + state e-sign entirely inside FleetFlow.
+- Driver `onboarding_status` (Phase 1) is refreshed via the existing `get_employees_onboarding_status` action after the flow closes.
+- IOO drivers see the existing 1099 contractor path unchanged.
+
+---
+
+### Phase 5 — Run Payroll white-label frame
+
+- `RunW2PayrollDialog.tsx` — replace the current placeholder body with an embedded Gusto Run Payroll flow:
+  - Calls `create_flow_token` with `flow_type: 'payroll'` and `entity_type: 'Company'` at open time (token is short-lived, minted per open).
+  - Renders the Gusto React SDK's Run Payroll component inside the dialog with our theme applied (existing `src/lib/gusto/theme.ts`).
+  - Pre-populates payroll inputs from the current settlement period via the already-implemented `push_payroll_inputs` action, so Landstar statement gross wages, fuel card corrections, and deductions flow into Gusto's calculator before Timothy hits Submit.
+- Post-submit hook: refresh `W2PayrollHistoryCard` and mark associated `driver_settlements` rows with the Gusto payroll uuid for reconciliation. Gusto handles direct deposit funding, 941, and SUTA filing automatically once the payroll is submitted — no additional code required.
+
+---
 
 ### Explicitly NOT doing
-- No in-app W-4 / I-9 rendering or e-sign flow — signing continues to happen inside Gusto, which is the compliant path.
-- No changes to `DriverSettlementsTab`, no new tables, no migrations.
-- No auto-send on sync — invites remain an explicit admin action to avoid surprise emails.
+- No changes to IOO settlements, factoring, or IFTA flows.
+- No custom tax-calculation logic — every dollar of federal / state / local tax and every filing (941, SUTA, W-2, W-3, new-hire reports) is delegated to Gusto.
+- No new `payroll_settings` columns — that table already covers what we need.
+- No hosted Plaid Link UI beyond a thin wrapper unless you confirm Plaid credentials.
 
-### Technical notes
-- Gusto endpoint used: `POST /v1/employees/{employee_uuid}/onboarding_status` transition to `self_onboarding_pending_invite` + `POST /v1/employees/{employee_uuid}/send_offer_letter`-style invite. Exact path is `/v1/employees/{uuid}/onboarding_invitation` in Embedded; the edge function will handle the version differences and normalize the response.
-- If Gusto returns `employee_onboarding_status: 'onboarding_completed'` the client action returns early with an informational toast instead of re-inviting.
-- Rate limiting: bulk send waits 400ms between calls to stay under Gusto's per-second limits.
+### Prerequisites I'll need from you before Phase 3 lands
+1. Confirm whether Bank Account onboarding should support Plaid (needs `PLAID_CLIENT_ID` / `PLAID_SECRET`) or micro-deposits only for now.
+2. Confirm the NAICS default for trucking (`484121` "General Freight, Long-Distance, Truckload") is acceptable, or provide a different default.
+
+Reply "go" (or specify a phase to start with) and I'll begin Phase 1's migration.
