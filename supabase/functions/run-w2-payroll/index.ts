@@ -1825,6 +1825,9 @@ Deno.serve(async (req) => {
       case "sync_onboarding_steps":
         result = await actionSyncOnboardingSteps(admin, orgId);
         break;
+      case "get_payroll_setup_status":
+        result = await actionGetPayrollSetupStatus(admin, orgId);
+        break;
       case "get_state_tax_requirements":
         result = await actionGetStateTaxRequirements(admin, orgId, payload);
         break;
