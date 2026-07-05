@@ -407,6 +407,13 @@ async function gustoJson(
   return body;
 }
 
+function isInvalidResourceVersion(body: unknown): boolean {
+  const errors = (body as { errors?: Array<{ category?: unknown; error_key?: unknown }> })?.errors;
+  return Array.isArray(errors) && errors.some((e) =>
+    e?.category === "invalid_resource_version" || e?.error_key === "base"
+  );
+}
+
 async function actionUpsertSignatory(
   admin: Admin,
   orgId: string,
@@ -632,10 +639,8 @@ async function actionUpsertFederalTaxDetails(
   const companyUuid = await requireCompanyUuid(admin, orgId);
   const digits = payload.ein.replace(/\D/g, "");
   const ein = digits.length === 9 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : payload.ein;
-  // Federal tax details is a singleton resource — Gusto requires the current
-  // `version` on updates for optimistic concurrency. Fetch it first.
-  let version: string | undefined;
-  try {
+
+  const getCurrentVersion = async (): Promise<string | undefined> => {
     const current = await gustoJson(
       admin,
       orgId,
@@ -643,27 +648,55 @@ async function actionUpsertFederalTaxDetails(
       { method: "GET" },
       "Gusto get_federal_tax_details (for version)",
     ) as { version?: string } | null;
-    if (current && typeof current.version === "string") version = current.version;
+    return typeof current?.version === "string" ? current.version : undefined;
+  };
+
+  const makeBody = (version?: string) => {
+    const body: Record<string, unknown> = { ein };
+    if (payload.legal_name?.trim()) body.legal_name = payload.legal_name.trim();
+    if (payload.filing_form?.trim()) body.filing_form = payload.filing_form.trim();
+    if (typeof payload.taxable_as_scorp === "boolean") {
+      body.taxable_as_scorp = payload.taxable_as_scorp;
+    }
+    if (version) body.version = version;
+    return body;
+  };
+
+  // Federal tax details is a singleton resource — Gusto requires the current
+  // `version` on updates for optimistic concurrency. Fetch it first, and retry
+  // once if Gusto reports another update landed between GET and PUT.
+  let version: string | undefined;
+  try {
+    version = await getCurrentVersion();
   } catch {
-    // best-effort — first-time create won't have a version
+    // Best-effort — first-time create may not have a readable version yet.
   }
-  const body = await gustoJson(
+  let resp = await gustoFetch(
     admin,
     orgId,
     `/v1/companies/${companyUuid}/federal_tax_details`,
     {
       method: "PUT",
-      body: JSON.stringify({
-        ein,
-        legal_name: payload.legal_name || undefined,
-        filing_form: payload.filing_form || "941",
-        taxable_as_scorp: payload.taxable_as_scorp ?? false,
-        ...(version ? { version } : {}),
-      }),
+      body: JSON.stringify(makeBody(version)),
     },
-    "Gusto upsert_federal_tax_details",
   );
-  // TODO: separate action for /v1/companies/{uuid}/state_taxes for state IDs + SUI rate
+  let body = await readGustoBody(resp) as Record<string, unknown>;
+  if (!resp.ok && resp.status === 409 && isInvalidResourceVersion(body)) {
+    version = await getCurrentVersion();
+    resp = await gustoFetch(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}/federal_tax_details`,
+      {
+        method: "PUT",
+        body: JSON.stringify(makeBody(version)),
+      },
+    );
+    body = await readGustoBody(resp) as Record<string, unknown>;
+  }
+  if (!resp.ok) {
+    throw new Error(`Gusto upsert_federal_tax_details failed (${resp.status}): ${JSON.stringify(body)}`);
+  }
   return { ok: true, gusto: body };
 }
 
@@ -709,6 +742,7 @@ async function actionUpsertStateTaxes(
 
   for (const s of payload.states) {
     if (!s.state) throw new Error("state required");
+    const hasWithholdingAccountId = Object.prototype.hasOwnProperty.call(s, 'withholding_account_id');
 
     const getResp = await gustoFetch(
       admin,
@@ -759,8 +793,8 @@ async function actionUpsertStateTaxes(
       // Withholding set — account number (only exists for SIT states)
       if (setKey.includes('withholding') || setKey.includes('income_tax')) {
         const acct = findReq((k, l) => k.includes('account') || l.includes('account'));
-        if (acct && s.withholding_account_id) {
-          patches.push({ key: acct.key, value: s.withholding_account_id });
+        if (acct && hasWithholdingAccountId) {
+          patches.push({ key: acct.key, value: (s.withholding_account_id ?? '').trim() });
         }
       }
 
