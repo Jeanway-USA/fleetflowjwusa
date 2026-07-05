@@ -432,7 +432,7 @@ export function DocumentSignatureStep({
             {w2Templates.map(renderTemplate)}
             <W2Documents
               value={w2Docs}
-              onChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
+              onChange={onW2DocsChange}
               onValidityChange={setW2Valid}
             />
           </div>
@@ -448,9 +448,7 @@ export function DocumentSignatureStep({
             {contractorTemplates.map(renderTemplate)}
             <ContractorDocuments
               value={contractorDocs}
-              onChange={(patch) =>
-                setContractorDocs((prev) => ({ ...prev, ...patch }))
-              }
+              onChange={onContractorDocsChange}
               onValidityChange={setContractorValid}
             />
           </div>
