@@ -989,6 +989,10 @@ async function actionSendOnboardingInvite(
       );
     }
   }
+
+  return { sent: true, email: driver.email, last: lastBody };
+}
+
 // -----------------------------------------------------------------------------
 // Phase 2: onboarding step cache, state tax requirements, bank (Plaid + micro
 // deposits), pay schedules, self-onboarding flow token.
