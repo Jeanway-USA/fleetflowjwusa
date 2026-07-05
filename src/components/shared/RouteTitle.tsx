@@ -49,11 +49,6 @@ export function RouteTitle() {
     '/auth',
     '/reset-password',
     '/auth/accept-invite',
-    '/landing',
-    '/pricing',
-    '/track',
-    '/about',
-    '/contact',
     '/privacy',
     '/terms',
   ]);

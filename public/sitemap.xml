@@ -1,41 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://tms.jeanwayusa.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/pricing</loc><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/about</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/contact</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/auth</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/track</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/onboarding</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/pending-access</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/reset-password</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/landing</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/checkout-success</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/account-deactivated</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/executive-dashboard</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/dispatcher-dashboard</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/driver-dashboard</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/driver-performance</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/driver-settings</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/driver-stats</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/super-admin</loc><changefreq>yearly</changefreq><priority>0.1</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/drivers</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/trucks</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/trailers</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/fleet-loads</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/agency-loads</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/finance</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/ledger</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/insights</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/ifta</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/maintenance</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/safety</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/incidents</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/crm</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/documents</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/resources</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/load-optimizer</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
-  <url><loc>https://tms.jeanwayusa.com/settings</loc><changefreq>yearly</changefreq><priority>0.2</priority></url>
+  <url><loc>https://tms.jeanwayusa.com/auth</loc><changefreq>monthly</changefreq><priority>1.0</priority></url>
   <url><loc>https://tms.jeanwayusa.com/privacy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
   <url><loc>https://tms.jeanwayusa.com/terms</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
 </urlset>

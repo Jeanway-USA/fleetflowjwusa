@@ -6,47 +6,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, Sparkles, Truck, MessageSquare, CheckCircle } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 import { Helmet } from 'react-helmet-async';
 import textLogo from '@/assets/Text_Logo.png';
 import logoIcon from '@/assets/Logo.png';
 
 const emailSchema = z.string().email('Please enter a valid email address');
-const passwordSchema = z.string()
-  .min(8, 'Password must be at least 8 characters')
-  .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
-  .regex(/[0-9]/, 'Must contain at least one number');
-
-const BENEFITS = [
-  {
-    icon: Sparkles,
-    title: '100% Free Access During Beta',
-    description: 'Every feature unlocked at no cost. No credit card required — just sign up and start managing your fleet.',
-  },
-  {
-    icon: MessageSquare,
-    title: 'Shape the Future of the Platform',
-    description: 'Your feedback drives our roadmap. Help us build the TMS that owner-operators actually need.',
-  },
-  {
-    icon: Truck,
-    title: 'Built Exclusively for Landstar BCOs',
-    description: 'Purpose-built tools for independent contractors — loads, IFTA, settlements, and more in one place.',
-  },
-];
+const passwordSchema = z.string().min(1, 'Password is required');
 
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [formLoading, setFormLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
-  const { signIn, signUp, user, loading: authLoading } = useAuth();
+  const { signIn, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectParam = searchParams.get('redirect');
@@ -66,20 +42,6 @@ export default function Auth() {
 
   if (user) return null;
 
-  const validateForm = () => {
-    try { emailSchema.parse(email); passwordSchema.parse(password); return true; }
-    catch (error) { if (error instanceof z.ZodError) toast.error(error.errors[0].message); return false; }
-  };
-
-  const validateEmail = () => {
-    try { emailSchema.parse(email); return true; }
-    catch (error) { if (error instanceof z.ZodError) toast.error(error.errors[0].message); return false; }
-  };
-
-  // Read the *actual* DOM value at submit time. Mobile autofill writes to
-  // the input AFTER React state hydrates, so the first submit with React
-  // state alone often posts stale/empty values. Pulling from the form
-  // element guarantees we send what the user (or autofill) actually typed.
   const readField = (form: HTMLFormElement, name: string): string => {
     const el = form.elements.namedItem(name) as HTMLInputElement | null;
     return (el?.value ?? '').trim();
@@ -90,7 +52,6 @@ export default function Auth() {
     const form = e.currentTarget;
     const submittedEmail = readField(form, 'signin-email') || email;
     const submittedPassword = (form.elements.namedItem('signin-password') as HTMLInputElement | null)?.value ?? password;
-    // Re-sync React state so subsequent renders reflect what was submitted.
     if (submittedEmail !== email) setEmail(submittedEmail);
     try {
       emailSchema.parse(submittedEmail);
@@ -110,41 +71,6 @@ export default function Auth() {
       }
     } catch (err) {
       console.error('[Auth] signIn threw:', err);
-      toast.error("Couldn't reach the server. Please check your connection and try again.");
-    } finally {
-      setFormLoading(false);
-    }
-  };
-
-  const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const submittedEmail = readField(form, 'signup-email') || email;
-    const submittedPassword = (form.elements.namedItem('signup-password') as HTMLInputElement | null)?.value ?? password;
-    const submittedFirst = readField(form, 'first-name') || firstName;
-    const submittedLast = readField(form, 'last-name') || lastName;
-    if (submittedEmail !== email) setEmail(submittedEmail);
-    if (submittedFirst !== firstName) setFirstName(submittedFirst);
-    if (submittedLast !== lastName) setLastName(submittedLast);
-    try {
-      emailSchema.parse(submittedEmail);
-      passwordSchema.parse(submittedPassword);
-    } catch (err) {
-      if (err instanceof z.ZodError) toast.error(err.errors[0].message);
-      return;
-    }
-    if (!submittedFirst || !submittedLast) { toast.error('Please enter your first and last name'); return; }
-    setFormLoading(true);
-    try {
-      const { error } = await signUp(submittedEmail, submittedPassword, submittedFirst, submittedLast);
-      if (error) {
-        toast.error(error.message.includes('already registered') ? 'This email is already registered. Please sign in.' : error.message);
-        return;
-      }
-      toast.success('Account created! Welcome aboard.');
-      navigate(safeRedirect, { replace: true });
-    } catch (err) {
-      console.error('[Auth] signUp threw:', err);
       toast.error("Couldn't reach the server. Please check your connection and try again.");
     } finally {
       setFormLoading(false);
@@ -172,14 +98,13 @@ export default function Auth() {
     }
   };
 
-  // Forgot Password — centered card, no split layout
   if (showForgotPassword) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="flex items-center justify-center gap-2 mb-8">
             <img src={logoIcon} alt="" className="h-10 w-auto" />
-            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
+            <img src={textLogo} alt="JeanWay USA" className="h-10 w-auto" />
           </div>
           <Card className="border-border bg-card">
             <CardHeader className="text-center">
@@ -219,130 +144,45 @@ export default function Auth() {
     );
   }
 
-  // Main Auth — split-screen layout
   return (
-    <div className="min-h-screen bg-background grid lg:grid-cols-2">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Helmet>
-        <title>Sign In or Join the Free Beta — FleetFlow TMS</title>
-        <meta name="description" content="Sign in to FleetFlow TMS or create a free beta account. All-in-one TMS for owner-operators and small fleets." />
-        <link rel="canonical" href="https://tms.jeanwayusa.com/auth" />
-        <meta property="og:title" content="Sign In — FleetFlow TMS" />
-        <meta property="og:description" content="Sign in or join the free open beta." />
-        <meta property="og:url" content="https://tms.jeanwayusa.com/auth" />
+        <title>Sign In — JeanWay USA</title>
+        <meta name="description" content="Sign in to your JeanWay USA account." />
       </Helmet>
-      <h1 className="sr-only">Sign In or Create a FleetFlow TMS Account</h1>
-      {/* Left Panel — Beta Benefits */}
-      <div className="relative flex flex-col justify-center px-6 py-10 lg:py-0 lg:px-16 bg-[hsl(240_20%_4%)] text-white overflow-hidden">
-        {/* Decorative gradient orbs */}
-        <div className="absolute -top-32 -left-32 w-80 h-80 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-64 h-64 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 max-w-md mx-auto lg:mx-0 space-y-8">
-          {/* Brand */}
-          <div className="flex items-center gap-2">
-            <img src={logoIcon} alt="" className="h-10 w-auto" />
-            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
-          </div>
-
-          {/* Badge */}
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            <CheckCircle className="h-3.5 w-3.5" /> Open Beta — Free Access
-          </span>
-
-          {/* Benefits */}
-          <div className="space-y-6">
-            {BENEFITS.map((b) => (
-              <div key={b.title} className="flex gap-4">
-                <div className="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-lg bg-primary/15">
-                  <b.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-sm leading-tight">{b.title}</h3>
-                  <p className="text-xs text-white/80 mt-1 leading-relaxed">{b.description}</p>
-                </div>
+      <h1 className="sr-only">Sign In</h1>
+      <div className="w-full max-w-md">
+        <div className="flex items-center justify-center gap-2 mb-8">
+          <img src={logoIcon} alt="" className="h-12 w-auto" />
+          <img src={textLogo} alt="JeanWay USA" className="h-12 w-auto" />
+        </div>
+        <Card className="border-border bg-card shadow-lg">
+          <CardHeader className="text-center">
+            <CardTitle>Sign In</CardTitle>
+            <CardDescription>Enter your credentials to access your account</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="signin-email">Email</Label>
+                <Input id="signin-email" name="signin-email" type="email" autoComplete="username" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
               </div>
-            ))}
-          </div>
-
-          {/* Back link */}
-          <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-sm text-white/80 hover:text-white transition-colors mt-4">
-            <ArrowLeft className="h-4 w-4" /> Back to Home
-          </button>
-        </div>
-      </div>
-
-      {/* Right Panel — Auth Card */}
-      <div className="flex items-center justify-center p-4 sm:p-8 lg:p-16">
-        <div className="w-full max-w-md">
-          <Card className="border-border bg-card shadow-lg">
-            <CardHeader className="text-center">
-              <CardTitle>Join the Beta</CardTitle>
-              <CardDescription>Create your free account or sign in</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="signup" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                  <TabsTrigger value="signin">Sign In</TabsTrigger>
-                </TabsList>
-
-                {/* Sign Up */}
-                <TabsContent value="signup">
-                  <form onSubmit={handleSignUp} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="first-name">First Name</Label>
-                        <Input id="first-name" name="first-name" type="text" autoComplete="given-name" placeholder="John" value={firstName} onChange={(e) => setFirstName(e.target.value)} required className="bg-background" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="last-name">Last Name</Label>
-                        <Input id="last-name" name="last-name" type="text" autoComplete="family-name" placeholder="Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} required className="bg-background" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-email">Email</Label>
-                      <Input id="signup-email" name="signup-email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-password">Password</Label>
-                      <Input id="signup-password" name="signup-password" type="password" autoComplete="new-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="bg-background" />
-                      <p className="text-xs text-muted-foreground">Min 8 chars, 1 uppercase, 1 number</p>
-
-                    </div>
-                    <Button type="submit" className="w-full gradient-gold text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-transform" disabled={formLoading}>
-                      {formLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating account...</> : 'Create Free Beta Account'}
-                    </Button>
-                  </form>
-                </TabsContent>
-
-                {/* Sign In */}
-                <TabsContent value="signin">
-                  <form onSubmit={handleSignIn} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signin-email">Email</Label>
-                      <Input id="signin-email" name="signin-email" type="email" autoComplete="username" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="bg-background" />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="signin-password">Password</Label>
-                        <button type="button" onClick={() => setShowForgotPassword(true)} className="text-sm text-primary hover:underline">Forgot password?</button>
-                      </div>
-                      <Input id="signin-password" name="signin-password" type="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="bg-background" />
-
-                    </div>
-                    <Button type="submit" className="w-full gradient-gold text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-transform" disabled={formLoading}>
-                      {formLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</> : 'Sign In'}
-                    </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            Contact your administrator if you need access.
-          </p>
-        </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="signin-password">Password</Label>
+                  <button type="button" onClick={() => setShowForgotPassword(true)} className="text-sm text-primary hover:underline">Forgot password?</button>
+                </div>
+                <Input id="signin-password" name="signin-password" type="password" autoComplete="current-password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="bg-background" />
+              </div>
+              <Button type="submit" className="w-full gradient-gold text-primary-foreground hover:opacity-90 active:scale-[0.97] transition-transform" disabled={formLoading}>
+                {formLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</> : 'Sign In'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          Contact your administrator if you need access.
+        </p>
       </div>
     </div>
   );

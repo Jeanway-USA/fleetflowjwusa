@@ -35,6 +35,7 @@ interface UserWithRole {
 
 const roleLabels: Record<AppRole, string> = {
   owner: 'Owner',
+  admin: 'Admin',
   payroll_admin: 'Payroll Admin',
   dispatcher: 'Dispatcher',
   safety: 'Safety',
@@ -44,6 +45,7 @@ const roleLabels: Record<AppRole, string> = {
 
 const roleBadgeVariant: Record<AppRole, 'default' | 'secondary' | 'outline'> = {
   owner: 'default',
+  admin: 'default',
   payroll_admin: 'secondary',
   dispatcher: 'secondary',
   safety: 'outline',
