@@ -678,6 +678,10 @@ export default function DriverOnboarding() {
               docRevisions={docRevisions}
               revisionMode={revisionMode}
               onValidityChange={setDocumentsValid}
+              w2Docs={w2Docs}
+              onW2DocsChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
+              contractorDocs={contractorDocs}
+              onContractorDocsChange={(patch) => setContractorDocs((prev) => ({ ...prev, ...patch }))}
             />
           )}
 
