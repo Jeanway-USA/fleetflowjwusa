@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Loader2, Landmark, Send } from 'lucide-react';
 
@@ -14,6 +15,7 @@ import { BankDetailsSection } from '@/components/payroll/setup/sections/BankDeta
  * (Plaid instant path can be added later once PLAID_CLIENT_ID/SECRET are set.)
  */
 export function MicroDepositVerifyStep() {
+  const qc = useQueryClient();
   const [d1, setD1] = useState('');
   const [d2, setD2] = useState('');
   const [sending, setSending] = useState(false);
@@ -25,6 +27,7 @@ export function MicroDepositVerifyStep() {
       const res = await initiateMicroDeposits();
       if (!res.ok) throw new Error(res.error);
       toast.success('Micro-deposits sent to your bank (arrive in 1–2 business days).');
+      qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to send micro-deposits');
     } finally {
@@ -44,6 +47,7 @@ export function MicroDepositVerifyStep() {
       const res = await verifyBankAccount({ deposit1: n1, deposit2: n2 });
       if (!res.ok) throw new Error(res.error);
       toast.success('Bank account verified.');
+      qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
       setD1('');
       setD2('');
     } catch (e) {
