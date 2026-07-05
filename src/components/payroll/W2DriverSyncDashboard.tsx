@@ -51,6 +51,7 @@ import {
 
 interface W2DriverRow {
   id: string;
+  user_id: string | null;
   first_name: string | null;
   last_name: string | null;
   email: string | null;
@@ -94,13 +95,32 @@ export function W2DriverSyncDashboard() {
     queryFn: async (): Promise<W2DriverRow[]> => {
       const { data, error } = await supabase
         .from('drivers')
-        .select('id, first_name, last_name, email, employment_type, gusto_employee_id')
+        .select('id, user_id, first_name, last_name, email, employment_type, gusto_employee_id')
         .eq('org_id', activeOrgId!)
         .eq('employment_type', 'w2_company')
         .order('first_name', { ascending: true });
       if (error) throw error;
-      return (data ?? []).map((d) => ({
+
+      const rows = data ?? [];
+      const linkedUserIds = rows
+        .map((d) => d.user_id)
+        .filter((v): v is string => !!v);
+
+      const driverRoleUserIds = new Set<string>();
+      if (linkedUserIds.length > 0) {
+        const { data: roleRows, error: roleError } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('org_id', activeOrgId!)
+          .eq('role', 'driver')
+          .in('user_id', linkedUserIds);
+        if (roleError) throw roleError;
+        for (const row of roleRows ?? []) driverRoleUserIds.add(row.user_id);
+      }
+
+      return rows.filter((d) => !d.user_id || driverRoleUserIds.has(d.user_id)).map((d) => ({
         id: d.id,
+        user_id: d.user_id,
         first_name: d.first_name,
         last_name: d.last_name,
         email: d.email,
