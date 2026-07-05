@@ -29,6 +29,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { addDays, addMonths, differenceInDays, format } from 'date-fns';
 import type { Database } from '@/integrations/supabase/types';
 import { TruckLoanPaymentsSection } from '@/components/trucks/TruckLoanPaymentsSection';
+import { AmortizationCard } from '@/components/trucks/AmortizationCard';
+import { DriverAssignmentSelect, evaluateDriverCompliance, type DriverComplianceCheck } from '@/components/trucks/DriverAssignmentSelect';
+
+
 
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
