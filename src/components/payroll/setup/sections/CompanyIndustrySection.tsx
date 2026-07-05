@@ -1,11 +1,14 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { Building2 } from 'lucide-react';
+import { Building2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PayrollSetupSectionCard } from '../PayrollSetupSectionCard';
-import { upsertPrimaryLocation } from '@/services/gustoCompanyApi';
+import { getCompany, upsertPrimaryLocation } from '@/services/gustoCompanyApi';
+
 import { RequiredLabel, RequiredLegend } from '../RequiredLabel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
