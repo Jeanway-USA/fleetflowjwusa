@@ -182,7 +182,27 @@ export default function Settings() {
               <StorageTab />
             </TabsContent>
 
-            <TabsContent value="payroll">
+            <TabsContent value="payroll" className="space-y-6">
+              <Card className="card-elevated">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Percent className="h-5 w-5 text-primary" />
+                    Payroll Setup
+                  </CardTitle>
+                  <CardDescription>
+                    Clear Gusto onboarding blockers (company & industry, signatory, bank details, tax setup)
+                    before running W-2 payroll.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <a
+                    href="/settings/payroll-setup"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                  >
+                    Open Payroll Setup →
+                  </a>
+                </CardContent>
+              </Card>
               <PayrollTaxesCard />
             </TabsContent>
           </Tabs>

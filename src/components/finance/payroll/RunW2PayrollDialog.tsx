@@ -15,7 +15,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowUpRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { formatCurrency } from '@/lib/formatters';
 import { Payroll } from '@gusto/embedded-react-sdk';
 import {
@@ -231,6 +232,16 @@ export function RunW2PayrollDialog({
                 Actual amounts are entered inside Gusto&apos;s workspace.
               </p>
             </div>
+
+            {provisioned && (
+              <Link
+                to="/settings/payroll-setup"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                Setup incomplete? Open Payroll Setup
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            )}
           </aside>
 
           {/* Right: Gusto's embedded PayrollFlow */}
