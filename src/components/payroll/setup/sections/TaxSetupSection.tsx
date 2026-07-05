@@ -7,7 +7,11 @@ import { Loader2, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PayrollSetupSectionCard } from '../PayrollSetupSectionCard';
-import { getFederalTaxDetails, upsertFederalTaxDetails } from '@/services/gustoCompanyApi';
+import {
+  getFederalTaxDetails,
+  upsertFederalTaxDetails,
+  upsertStateTaxes,
+} from '@/services/gustoCompanyApi';
 
 import { RequiredLabel, RequiredLegend } from '../RequiredLabel';
 import { Button } from '@/components/ui/button';
@@ -115,22 +119,43 @@ export function TaxSetupSection() {
   }, [filingState, stateRequiresWithholding]);
 
   const onSubmit = async (values: TaxFormValues) => {
-    // TODO: separate call to /v1/companies/{id}/state_taxes for
-    // filingState / stateAccountId / suiAccountId / suiRate.
-    // stateAccountId is only sent when the state levies income tax.
-    const _stateWithholding = stateRequiresWithholding
+    const withholding = stateRequiresWithholding
       ? (values.stateAccountId ?? '').trim()
-      : null;
-    const res = await upsertFederalTaxDetails({ ein: values.ein });
-    if (res.ok) {
-      toast.success('Tax setup saved', { description: 'Synced to Gusto.' });
-      qc.invalidateQueries({ queryKey: ['gusto-federal-tax'] });
-      qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
-    } else {
+      : '';
+
+    const fed = await upsertFederalTaxDetails({ ein: values.ein });
+    if (!fed.ok) {
       toast.error('Failed to save tax setup', {
-        description: res.error ?? 'Please try again.',
+        description: fed.error ?? 'Please try again.',
       });
+      return;
     }
+    qc.invalidateQueries({ queryKey: ['gusto-federal-tax'] });
+
+    const state = await upsertStateTaxes({
+      states: [
+        {
+          state: values.filingState,
+          withholdingAccountId: withholding,
+          suiAccountId: values.suiAccountId.trim(),
+          suiRate: values.suiRate,
+        },
+      ],
+    });
+
+    if (!state.ok) {
+      toast.error('State tax details failed to save', {
+        description:
+          state.error ??
+          'Federal EIN saved, but state details could not be synced. Please try again.',
+      });
+      qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
+      return;
+    }
+
+    toast.success('Tax setup saved', { description: 'Synced to Gusto.' });
+    qc.invalidateQueries({ queryKey: ['gusto-state-taxes'] });
+    qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
   };
 
   return (

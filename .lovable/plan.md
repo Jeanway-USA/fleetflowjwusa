@@ -1,24 +1,35 @@
-## Goal
-Make the "State withholding account ID" field conditional based on the selected filing state, and fix the input rendering.
+## Problem
+The Tax Setup form only submits the EIN via `upsertFederalTaxDetails`. The Primary filing state, SUI account number, SUI rate, and (when applicable) State withholding account ID are validated in the form but never sent to Gusto — so nothing "state-side" saves.
 
-## Background
-Several states (TX, FL, NV, SD, WA, WY, AK, TN, NH) don't levy state income tax, so employers don't have a state withholding account. Currently the Tax Setup form always requires this field, blocking Texas-based orgs.
+## Fix (frontend only — `TaxSetupSection.tsx`)
 
-## Changes (frontend only — `src/components/payroll/setup/sections/TaxSetupSection.tsx`)
+1. **Import `upsertStateTaxes`** from `@/services/gustoCompanyApi` (wrapper already exists).
 
-1. **Add no-SIT state list** — constant `NO_SIT_STATES = ['AK','FL','NH','NV','SD','TN','TX','WA','WY']` (NH/TN tax only investment income — treat as no wage withholding for payroll purposes).
+2. **In `onSubmit`, after the federal call succeeds**, call `upsertStateTaxes` with:
+   ```ts
+   {
+     states: [{
+       state: values.filingState,
+       withholding_account_id: stateRequiresWithholding
+         ? values.stateAccountId.trim()
+         : '',
+       sui_account_id: values.suiAccountId.trim(),
+       sui_rate: values.suiRate,
+     }]
+   }
+   ```
+   (For no-SIT states like TX, send an empty `withholding_account_id`; Gusto's state_taxes endpoint accepts state-specific field sets.)
 
-2. **Make schema conditional** — replace the static `stateAccountId` rule with a `z.object(...).superRefine(...)` that only requires `stateAccountId` (min 4) when `filingState` is NOT in `NO_SIT_STATES`. When it is, allow empty/optional.
+3. **Sequence & error handling**
+   - If federal call fails → toast error, stop.
+   - If federal succeeds but state call fails → toast: "Federal saved, but state details failed: {error}". Still invalidate `gusto-federal-tax`.
+   - Only show the green "Tax setup saved" toast when both calls succeed.
 
-3. **Conditionally render the field** — watch `filingState` via `form.watch`; hide the "State withholding account ID" FormField when the selected state has no SIT. Show a small helper line in its place: "{State} has no state income tax — no withholding account required."
+4. **Query invalidation** — on full success, invalidate `['gusto-federal-tax']`, `['gusto-state-taxes']` (harmless if unused), and `['gusto-onboarding-steps']` so the Pending → Done badge updates.
 
-4. **Fix the input** — the field currently shows only a placeholder because `field.value` can be `undefined` on hydrate. Ensure the Input receives `value={field.value ?? ''}` so it renders as a controlled input consistently (apply same fix to `suiAccountId` for safety).
-
-5. **Clear stale value on state change** — when `filingState` switches to a no-SIT state, reset `stateAccountId` to `''` so a previously typed value isn't silently submitted.
-
-6. **Submit payload** — only include `stateAccountId` in the (future) state-tax call when the state requires it. For now the TODO comment stays; just guard the value.
+5. **Disable submit** while either mutation is in-flight (track via local `isSaving` state around the async submit).
 
 ## Out of scope
-- No backend/edge function changes.
-- SUI (unemployment) remains required for all states — every state has SUTA.
-- No schema/migration changes.
+- No changes to the edge function; `upsert_state_taxes` action already exists at line 1527 and hits `/v1/companies/{uuid}/state_taxes/{state}`.
+- No schema changes.
+- Rehydration of saved state-tax values back into the form is a separate follow-up (would need a new `list_state_taxes` action).
