@@ -948,6 +948,147 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_i9_info: {
+        Row: {
+          address: string
+          alien_number: string | null
+          attested_at: string
+          citizenship: string
+          created_at: string
+          dob: string
+          driver_id: string
+          email: string
+          full_name: string
+          id: string
+          org_id: string
+          other_last_names: string | null
+          phone: string
+          ssn_encrypted: string | null
+          ssn_last4: string | null
+          updated_at: string
+          work_auth_doc_number: string | null
+          work_auth_expiry: string | null
+        }
+        Insert: {
+          address: string
+          alien_number?: string | null
+          attested_at?: string
+          citizenship: string
+          created_at?: string
+          dob: string
+          driver_id: string
+          email: string
+          full_name: string
+          id?: string
+          org_id: string
+          other_last_names?: string | null
+          phone: string
+          ssn_encrypted?: string | null
+          ssn_last4?: string | null
+          updated_at?: string
+          work_auth_doc_number?: string | null
+          work_auth_expiry?: string | null
+        }
+        Update: {
+          address?: string
+          alien_number?: string | null
+          attested_at?: string
+          citizenship?: string
+          created_at?: string
+          dob?: string
+          driver_id?: string
+          email?: string
+          full_name?: string
+          id?: string
+          org_id?: string
+          other_last_names?: string | null
+          phone?: string
+          ssn_encrypted?: string | null
+          ssn_last4?: string | null
+          updated_at?: string
+          work_auth_doc_number?: string | null
+          work_auth_expiry?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_i9_info_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_i9_info_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_ioo_agreement: {
+        Row: {
+          ack_ic_status: boolean
+          agree_terms: boolean
+          business_name: string | null
+          created_at: string
+          dot_number: string
+          driver_id: string
+          effective_date: string
+          id: string
+          legal_name: string
+          mc_number: string
+          org_id: string
+          signed_at: string
+          updated_at: string
+        }
+        Insert: {
+          ack_ic_status?: boolean
+          agree_terms?: boolean
+          business_name?: string | null
+          created_at?: string
+          dot_number: string
+          driver_id: string
+          effective_date: string
+          id?: string
+          legal_name: string
+          mc_number: string
+          org_id: string
+          signed_at?: string
+          updated_at?: string
+        }
+        Update: {
+          ack_ic_status?: boolean
+          agree_terms?: boolean
+          business_name?: string | null
+          created_at?: string
+          dot_number?: string
+          driver_id?: string
+          effective_date?: string
+          id?: string
+          legal_name?: string
+          mc_number?: string
+          org_id?: string
+          signed_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_ioo_agreement_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_ioo_agreement_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_locations: {
         Row: {
           accuracy: number | null
@@ -1817,6 +1958,75 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_w9_info: {
+        Row: {
+          address: string
+          business_name: string | null
+          certify_accurate: boolean
+          certify_backup_withholding: boolean
+          created_at: string
+          driver_id: string
+          id: string
+          legal_name: string
+          org_id: string
+          signed_at: string
+          tax_class: string
+          tin_encrypted: string | null
+          tin_last4: string | null
+          tin_type: string
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          business_name?: string | null
+          certify_accurate?: boolean
+          certify_backup_withholding?: boolean
+          created_at?: string
+          driver_id: string
+          id?: string
+          legal_name: string
+          org_id: string
+          signed_at?: string
+          tax_class: string
+          tin_encrypted?: string | null
+          tin_last4?: string | null
+          tin_type: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          business_name?: string | null
+          certify_accurate?: boolean
+          certify_backup_withholding?: boolean
+          created_at?: string
+          driver_id?: string
+          id?: string
+          legal_name?: string
+          org_id?: string
+          signed_at?: string
+          tax_class?: string
+          tin_encrypted?: string | null
+          tin_last4?: string | null
+          tin_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_w9_info_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_w9_info_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
             referencedColumns: ["id"]
           },
         ]
@@ -5885,6 +6095,63 @@ export type Database = {
           _bank_name: string
           _driver_id: string
           _routing_number: string
+        }
+        Returns: string
+      }
+      upsert_driver_i9: {
+        Args: {
+          _address: string
+          _alien_number: string
+          _citizenship: string
+          _dob: string
+          _driver_id: string
+          _email: string
+          _full_name: string
+          _other_last_names: string
+          _phone: string
+          _ssn: string
+          _work_auth_doc_number: string
+          _work_auth_expiry: string
+        }
+        Returns: string
+      }
+      upsert_driver_ioo: {
+        Args: {
+          _ack_ic_status: boolean
+          _agree_terms: boolean
+          _business_name: string
+          _dot_number: string
+          _driver_id: string
+          _effective_date: string
+          _legal_name: string
+          _mc_number: string
+        }
+        Returns: string
+      }
+      upsert_driver_w4: {
+        Args: {
+          _deductions: number
+          _dependents_amount: number
+          _driver_id: string
+          _extra_withholding: number
+          _filing_status: string
+          _multiple_jobs: boolean
+          _other_income: number
+          _step_2c_checkbox: boolean
+        }
+        Returns: string
+      }
+      upsert_driver_w9: {
+        Args: {
+          _address: string
+          _business_name: string
+          _certify_accurate: boolean
+          _certify_backup_withholding: boolean
+          _driver_id: string
+          _legal_name: string
+          _tax_class: string
+          _tin: string
+          _tin_type: string
         }
         Returns: string
       }
