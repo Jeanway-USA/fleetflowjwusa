@@ -10,6 +10,7 @@ import {
   upsertFederalTaxDetails,
   upsertStateTaxes,
   verifyBankAccount,
+  type StateTaxInput,
 } from '@/services/gustoCompanyApi';
 import { RequiredLabel, RequiredLegend } from './setup/RequiredLabel';
 import { Button } from '@/components/ui/button';
