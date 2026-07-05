@@ -15,6 +15,7 @@ import { OnboardingPreferencesCard } from '@/components/settings/OnboardingPrefe
 import { DocumentTemplatesPanel } from '@/components/settings/DocumentTemplatesPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
 import { PayrollTaxesCard } from '@/components/settings/PayrollTaxesCard';
+import { PayScheduleManager } from '@/components/payroll/PayScheduleManager';
 
 export default function Settings() {
   const { canSimulateRoles, isDemoMode } = useAuth();
