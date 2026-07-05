@@ -105,10 +105,6 @@ export default function Settings() {
                 <Sun className="h-4 w-4" />
                 Appearance
               </TabsTrigger>
-              <TabsTrigger value="billing" className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4" />
-                Billing
-              </TabsTrigger>
               <TabsTrigger value="storage" className="flex items-center gap-2">
                 <HardDrive className="h-4 w-4" />
                 Storage
