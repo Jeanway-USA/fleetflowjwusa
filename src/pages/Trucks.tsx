@@ -636,11 +636,23 @@ export default function Trucks() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label htmlFor="down_payment">Down Payment ($)</Label>
+                    <Input id="down_payment" type="number" step="0.01" value={(formData as any).down_payment || ''} onChange={(e) => setFormData({ ...formData, down_payment: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="financing_fees">Financing / UCC Fees ($)</Label>
+                    <Input id="financing_fees" type="number" step="0.01" value={(formData as any).financing_fees || ''} onChange={(e) => setFormData({ ...formData, financing_fees: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     <Label htmlFor="interest_rate">Interest Rate (%)</Label>
                     <Input id="interest_rate" type="number" step="0.01" value={(formData as any).interest_rate || ''} onChange={(e) => setFormData({ ...formData, interest_rate: e.target.value ? parseFloat(e.target.value) : null } as any)} placeholder="0.00" />
                   </div>
                   <div />
                 </div>
+
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
