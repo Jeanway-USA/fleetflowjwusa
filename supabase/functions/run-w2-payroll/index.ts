@@ -632,6 +632,21 @@ async function actionUpsertFederalTaxDetails(
   const companyUuid = await requireCompanyUuid(admin, orgId);
   const digits = payload.ein.replace(/\D/g, "");
   const ein = digits.length === 9 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : payload.ein;
+  // Federal tax details is a singleton resource — Gusto requires the current
+  // `version` on updates for optimistic concurrency. Fetch it first.
+  let version: string | undefined;
+  try {
+    const current = await gustoJson(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}/federal_tax_details`,
+      { method: "GET" },
+      "Gusto get_federal_tax_details (for version)",
+    ) as { version?: string } | null;
+    if (current && typeof current.version === "string") version = current.version;
+  } catch {
+    // best-effort — first-time create won't have a version
+  }
   const body = await gustoJson(
     admin,
     orgId,
@@ -643,6 +658,7 @@ async function actionUpsertFederalTaxDetails(
         legal_name: payload.legal_name || undefined,
         filing_form: payload.filing_form || "941",
         taxable_as_scorp: payload.taxable_as_scorp ?? false,
+        ...(version ? { version } : {}),
       }),
     },
     "Gusto upsert_federal_tax_details",
