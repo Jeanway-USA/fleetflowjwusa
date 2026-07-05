@@ -47,16 +47,8 @@ const IFTA = lazy(() => import("./pages/IFTA"));
 const CRM = lazy(() => import("./pages/CRM"));
 
 const NotFound = lazy(() => import("./pages/NotFound"));
-const PendingAccess = lazy(() => import("./pages/PendingAccess"));
-const Landing = lazy(() => import("./pages/Landing"));
-const Pricing = lazy(() => import("./pages/Pricing"));
-const Onboarding = lazy(() => import("./pages/Onboarding"));
 const SuperAdminDashboard = lazy(() => import("./pages/SuperAdminDashboard"));
-const PublicLoadTracker = lazy(() => import("./pages/PublicLoadTracker"));
 const AccountDeactivated = lazy(() => import("./pages/AccountDeactivated"));
-const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
-const About = lazy(() => import("./pages/About"));
-const Contact = lazy(() => import("./pages/Contact"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const DocumentTemplates = lazy(() => import("./pages/admin/DocumentTemplates"));
@@ -64,6 +56,7 @@ const DriverOnboarding = lazy(() => import("./pages/DriverOnboarding"));
 const SettlementPrint = lazy(() => import("./pages/SettlementPrint"));
 const AuditTrail = lazy(() => import("./pages/AuditTrail"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -101,22 +94,31 @@ const App = () => {
                 <ErrorBoundary>
                   <Suspense fallback={<LoadingFallback />}>
                   <Routes>
-                    {/* Public routes */}
+                    {/* Public + auth routes */}
                     <Route path="/" element={<RoleBasedRedirect />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/auth/accept-invite" element={<AcceptInvite />} />
-                    <Route path="/pending-access" element={<PendingAccess />} />
-                    <Route path="/landing" element={<Navigate to="/" replace />} />
-                    <Route path="/pricing" element={<Pricing />} />
-                    <Route path="/track" element={<PublicLoadTracker />} />
-                    <Route path="/onboarding" element={<Onboarding />} />
                     <Route path="/account-deactivated" element={<AccountDeactivated />} />
-                    <Route path="/checkout-success" element={<CheckoutSuccess />} />
-                    <Route path="/about" element={<About />} />
-                    <Route path="/contact" element={<Contact />} />
                     <Route path="/privacy" element={<PrivacyPolicy />} />
                     <Route path="/terms" element={<TermsOfService />} />
+
+                    {/* Legacy public/marketing routes — retired. Redirect to root. */}
+                    <Route path="/landing" element={<Navigate to="/" replace />} />
+                    <Route path="/pricing" element={<Navigate to="/" replace />} />
+                    <Route path="/about" element={<Navigate to="/" replace />} />
+                    <Route path="/contact" element={<Navigate to="/" replace />} />
+                    <Route path="/track" element={<Navigate to="/" replace />} />
+                    <Route path="/track/:id" element={<Navigate to="/" replace />} />
+                    <Route path="/onboarding" element={<Navigate to="/" replace />} />
+                    <Route path="/pending-access" element={<Navigate to="/" replace />} />
+                    <Route path="/checkout-success" element={<Navigate to="/" replace />} />
+                    <Route path="/subscription-upgrade" element={<Navigate to="/" replace />} />
+                    <Route path="/billing" element={<Navigate to="/" replace />} />
+                    <Route path="/manage-plan" element={<Navigate to="/" replace />} />
+                    <Route path="/live-demo" element={<Navigate to="/" replace />} />
+                    <Route path="/beta-onboarding" element={<Navigate to="/" replace />} />
+
 
                     {/* Dashboard routes */}
                     <Route path="/executive-dashboard" element={

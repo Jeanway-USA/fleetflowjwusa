@@ -1,106 +1,82 @@
 
-# Private TMS Pivot — JeanWay LLC
+# Phase 2a — Extensible role helper + public surface removal
 
-Convert the app from a public multi-tenant SaaS to a single-tenant, internal-only TMS. Root URL becomes a branded login. Only Admins and Drivers can access anything. All billing, marketing, tier gating, workspace-switching, and cross-org logic is removed.
+Slice goal: get the app working with a single generic role helper and no public SaaS surface, without dropping any columns or RLS yet.
 
-## 1. Access model & routing
+## 1. Database (single migration)
 
-- **Root (`/`)** renders a minimalist JeanWay-branded login screen — email + password, no signup link, no marketing, no footer nav.
-- Remove routes: Landing, Pricing, About, Contact, Public Load Tracker, all `/onboarding-wizard` org-creation flows, `/pending-access`, tier upgrade pages, promo-code pages, live-demo pages, beta-onboarding pages.
-- Keep: driver onboarding (paperwork flow for new hires invited by admin), `/reset-password`.
-- `ProtectedRoute` becomes a hard gate: authenticated + role in (`admin`, `driver`). Anyone else is signed out and returned to `/`.
-- Signup is disabled at the client; admins create driver accounts via invitation only.
+- **New helper**: `public.get_user_role(_user_id uuid) RETURNS text` — SECURITY DEFINER, `search_path = public`, STABLE. Returns the highest-privilege role for the user from `user_roles` scoped to JeanWay (`'admin' > 'driver' > NULL`). Returns `'admin'` for anyone with any admin-tier legacy role (`owner`, `payroll_admin`, `dispatcher`, `safety`, `maintenance`) during transition; `'driver'` for drivers; `NULL` otherwise. `GRANT EXECUTE ... TO authenticated`.
+- **Migrate JeanWay's roles**: `UPDATE user_roles SET role = 'admin' WHERE role = 'owner'` (3 rows). Legacy role rows for other tiers already purged; if any linger, also collapse to `admin`.
+- No column drops, no policy rewrites, no table drops in this slice. Existing `has_role`/`is_owner`/etc. keep working so RLS stays intact.
 
-## 2. Roles (extensible, not booleans)
+## 2. Frontend role hook
 
-- Keep `app_role` enum but collapse the *active* set to `admin` and `driver`. Migrate every existing internal role (`owner`, `payroll_admin`, `dispatcher`, `safety`, `executive`, `maintenance`, `accountant`, `fleet_manager`) into `admin`. `super_admin` and impersonation are dropped.
-- All helper functions (`has_role`, `is_owner`, `has_admin_access`, `has_payroll_access`, `has_operations_access`, `has_safety_access`) are consolidated into two: `public.is_admin(uuid)` and `public.is_driver(uuid)`, both reading from `user_roles` — no booleans on `profiles` or `drivers`.
-- Future roles can be added by inserting new enum values + a matching helper, without code changes elsewhere.
+- Replace `useUserRole`/`useRole` internals with a single query that calls `get_user_role` and exposes:
+  ```ts
+  { role: 'admin' | 'driver' | null, isAdmin: boolean, isDriver: boolean, isLoading }
+  ```
+- Keep the existing hook names as thin wrappers so nothing else has to change this slice.
+- `ProtectedRoute`: authenticated + `role in ('admin','driver')`. Anyone else is signed out and returned to `/`.
 
-## 3. Database teardown
+## 3. Route surface
 
-**Data purge first** (single migration, wrapped in a transaction):
-1. Identify JeanWay's `org_id` (I'll surface the candidates and ask you to confirm the exact UUID before I run the migration).
-2. Hard-delete every row where `org_id <> :jeanway`. Order respects FKs; audit triggers are suppressed via `session_replication_role = replica`.
-
-**Then strip multi-tenancy** (second migration):
-- Drop tables: `organizations`, `invitations`, `org_storage_config`, `subscription_plans`, `promo_codes`, `super_admins`, `internal_config` (moved to edge-function env), `changelog`, `user_feedback`, `state_tax_configurations` (kept only if used by IFTA — I'll verify).
-- Drop columns: `org_id` from every remaining table; `subscription_tier`, `stripe_*`, `trial_*`, `is_complimentary`, `tms_mode`, `is_active` from profile-adjacent tables.
-- Drop functions: `get_user_org_id`, `is_super_admin`, all `super_admin_*`, `auto_cleanup_empty_orgs`, `super_admin_reset_demo`, org-setting triggers (`set_*_org_id`), `prevent_org_billing_self_update`, `storage_user_same_org`.
-- Rewrite every RLS policy: replace `org_id = get_user_org_id(auth.uid())` with either `public.is_admin(auth.uid())` for admin-scoped tables or `driver_id = get_driver_id_for_user(auth.uid())` for driver-owned rows. Re-issue `GRANT`s.
-- Rewrite storage bucket paths: `{org_id}/…` → `jeanway/…`; RLS on `storage.objects` checks `is_admin` / driver ownership only.
-
-**Core tables kept and refocused**:
-- `trucks`, `trailers`, `drivers`, `fleet_loads`, `expenses`, `fuel_purchases`, `maintenance_requests`, `work_orders`, `service_schedules`, `driver_payroll`, `driver_settlements`, `driver_banking_info`, `driver_w4_info`, `driver_i9_info`, `driver_w9_info`, `driver_ioo_agreement`, `driver_signed_documents`, `driver_locations`, `documents`, `crm_contacts` (renamed to `partners` — brokers/shippers/vendors), `audit_logs`, `profiles`, `user_roles`.
+- `/` now renders the new **JeanWay login screen** (minimal, dark, branded, no signup link, no marketing).
+- Remove routes and their imports from `src/App.tsx`:
+  - `/landing`, `/pricing`, `/about`, `/contact`
+  - `/public-load-tracker` (and any `/track/:id` public alias)
+  - `/onboarding-wizard` (org creation)
+  - `/pending-access`
+  - `/live-demo`, `/beta-onboarding`
+  - `/subscription-upgrade`, `/billing`, `/manage-plan`
+- Keep: `/reset-password`, `/driver-onboarding` (new-hire paperwork), all authenticated app routes.
+- Files removed this slice: the page files above only. Their supporting component folders (`src/components/marketing/`, `subscription/`, `billing/`, `demo/`, `tour/`, `feedback/`, `admin/impersonation/`, `onboarding/wizard/`) stay on disk for now — we'll delete them in a later cleanup slice once we're sure nothing else imports them.
 
 ## 4. Sidebar restructure
 
-New `AppSidebar` groups, collapsible-to-icon, active-route highlighted:
+Rewrite `src/components/app-sidebar.tsx` (and the driver equivalent) with the operational groups:
 
 ```text
-Dispatch & Loads
-  ├─ Load Board (active + upcoming)
-  ├─ Load History
-  └─ Create Load
+Admin sidebar
+  Dispatch & Loads
+    Load Board / Load History / Create Load
+  Fleet & Maintenance
+    Trucks / Trailers / Maintenance Requests / Work Orders / Telematics
+  Drivers & Payroll
+    Driver Roster / Payroll Runs / Settlements / Onboarding Invitations
+  Financials
+    Fuel Card / Expenses / P&L per Truck / IFTA
+  Admin
+    Partners / Documents / Audit Log / Company Settings
 
-Fleet & Maintenance
-  ├─ Trucks & Equipment
-  ├─ Trailers
-  ├─ Maintenance Requests
-  ├─ Work Orders
-  └─ Telematics (ELD placeholder)
-
-Drivers & Payroll
-  ├─ Driver Roster
-  ├─ Payroll Runs
-  ├─ Settlements
-  └─ Onboarding Invitations
-
-Financials
-  ├─ Fuel Card Transactions
-  ├─ Expenses
-  ├─ P&L per Truck
-  └─ IFTA
-
-Admin
-  ├─ Partners (brokers / shippers / vendors)
-  ├─ Documents
-  ├─ Audit Log
-  └─ Company Settings
+Driver sidebar
+  My Loads / My Pay / My Documents / Profile
 ```
 
-Driver role sees only their own portal: My Loads, My Pay, My Documents, Profile.
+- `collapsible="icon"`, active-route highlight via `NavLink`, groups stay expanded when their route is active.
+- Route targets reuse existing pages; no new pages built this slice.
 
-## 5. UI/UX cleanup
+## 5. Header cleanup
 
-- Remove from every menu, header, and settings page: Subscribe, Upgrade, Billing, Manage Plan, Trial banner, Beta banner, Impersonation banner, Workspace switcher, Org name in header (replaced with static "JeanWay LLC" wordmark), TMS-mode toggle, Feedback widget, Product Tour, Live-Demo pill.
-- Header: JeanWay logo left, sidebar trigger, quick-search, notifications, avatar menu (Profile, Sign out).
-- Theme: high-contrast dark corporate — deep slate background (`#0B1220`), steel surfaces (`#111827` / `#1F2937`), amber accent (`#F59E0B`) for JeanWay identity, white/near-white text. Uses existing HSL tokens in `index.css`; no hardcoded colors in components.
-- Optimize for desktop/tablet (≥768px). Mobile still functional but not the target.
+- Remove: workspace switcher, org name, TMS-mode toggle, tier/trial/beta/impersonation banners, feedback widget, product tour launcher, live-demo pill, "Upgrade" and "Manage billing" links in the avatar menu.
+- Keep: sidebar trigger, JeanWay wordmark left, notifications bell, avatar menu with just **Profile** and **Sign out**.
+- Do NOT delete those component files yet — just stop rendering them.
 
-## 6. Files touched (high-level)
+## 6. Theme
 
-- Routes/layout: `src/App.tsx`, `src/pages/Auth.tsx` (new login), delete `src/pages/{Landing,Pricing,About,Contact,PublicLoadTracker,OnboardingWizard,PendingAccess,LiveDemo,BetaOnboarding,SubscriptionUpgrade}.tsx` + their components.
-- Sidebar: `src/components/app-sidebar.tsx` rewritten; header stripped of tier/impersonation/switcher.
-- Role helpers: `src/hooks/useRole.ts`, `src/hooks/useUserRole.ts` collapsed to `useIsAdmin()` / `useIsDriver()`.
-- Delete folders: `src/components/subscription/`, `src/components/billing/`, `src/components/marketing/`, `src/components/admin/impersonation/`, `src/components/onboarding/wizard/` (org wizard only — keep driver onboarding), `src/components/tour/`, `src/components/feedback/`, `src/components/demo/`.
-- Delete edge functions: `stripe-webhook`, `create-checkout-session`, `manage-subscription`, `promo-code-*`, `super-admin-*`, `impersonation-*`, `beta-onboarding-*`, `live-demo-*`.
-- Theme tokens: `src/index.css` updated with JeanWay palette; `tailwind.config.ts` unchanged (all via CSS vars).
-- Two migrations (data purge → schema teardown) + one migration for RLS rewrite.
+- Update `src/index.css` HSL tokens to the JeanWay dark palette (deep slate bg, steel surfaces, amber accent, near-white text). All via tokens; no hardcoded utility colors touched in components.
 
-## 7. Order of execution (I'll pause for approval before destructive steps)
+## 7. Verification (must pass before we move on)
 
-1. Confirm JeanWay `org_id` from `organizations` table.
-2. Snapshot existing admin/driver users we want to keep.
-3. Migration A — data purge (irreversible).
-4. Migration B — drop columns, tables, functions; add `is_admin`/`is_driver`; rewrite RLS + GRANTs.
-5. Frontend refactor (routes, sidebar, header, theme, dead-code removal).
-6. Delete unused edge functions.
-7. Verify: log in as admin (full sidebar), log in as driver (portal only), confirm no billing/marketing surfaces, all core tables read/write under new RLS.
+- Sign in as JeanWay owner → land on the dashboard, new sidebar renders, no billing/marketing UI, no console errors.
+- Sign in as JeanWay driver → driver portal renders, no admin routes reachable.
+- Hit `/` while signed out → login screen only.
+- Hit `/landing`, `/pricing`, `/subscription-upgrade` etc. → 404 or redirect to `/`.
+- No TS build errors.
 
-## 8. Out of scope
+## 8. Explicitly deferred to Phase 2b
 
-- Custom domain DNS setup for `tms.jeanwayusa.com` — already connected per project URLs; nothing to change here.
-- Real ELD/telematics ingestion — only the UI placeholder + schema hook.
-- New payroll features — existing W-2 flow stays intact, just minus billing plumbing.
-- Data export of purged orgs (per your instruction, hard-delete).
+- Dropping `org_id` columns across tables.
+- Rewriting every RLS policy to drop the `get_user_org_id` join.
+- Dropping `organizations`, `invitations`, `subscription_plans`, `promo_codes`, `super_admins`, `changelog`, `user_feedback`, `org_storage_config`, `internal_config`.
+- Deleting billing/impersonation/demo edge functions.
+- Deleting the dead component folders left behind in step 3.
