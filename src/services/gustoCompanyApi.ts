@@ -28,12 +28,23 @@ async function callAction<T = unknown>(
 
 // -------- Signatory ---------------------------------------------------------
 
+export interface SignatoryHomeAddress {
+  street1: string;
+  street2?: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
 export interface SignatoryInput {
   firstName: string;
   lastName: string;
   title: string;
   dateOfBirth: Date;
   ssn: string;
+  phone: string;
+  email: string;
+  homeAddress: SignatoryHomeAddress;
 }
 
 export function upsertSignatory(input: SignatoryInput) {
@@ -43,6 +54,15 @@ export function upsertSignatory(input: SignatoryInput) {
     title: input.title,
     birthday: format(input.dateOfBirth, 'yyyy-MM-dd'),
     ssn: input.ssn,
+    phone: input.phone,
+    email: input.email,
+    home_address: {
+      street_1: input.homeAddress.street1,
+      street_2: input.homeAddress.street2 || undefined,
+      city: input.homeAddress.city,
+      state: input.homeAddress.state,
+      zip: input.homeAddress.zip,
+    },
   });
 }
 

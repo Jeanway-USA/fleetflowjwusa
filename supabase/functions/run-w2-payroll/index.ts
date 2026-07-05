@@ -396,13 +396,28 @@ async function actionUpsertSignatory(
     title: string;
     birthday: string; // YYYY-MM-DD
     ssn: string; // may include dashes
+    phone: string;
+    email: string;
+    home_address: {
+      street_1: string;
+      street_2?: string;
+      city: string;
+      state: string;
+      zip: string;
+    };
   },
 ): Promise<Record<string, unknown>> {
   if (
     !payload?.first_name || !payload?.last_name || !payload?.title ||
-    !payload?.birthday || !payload?.ssn
+    !payload?.birthday || !payload?.ssn || !payload?.phone || !payload?.email
   ) {
-    throw new Error("first_name, last_name, title, birthday, ssn required");
+    throw new Error(
+      "first_name, last_name, title, birthday, ssn, phone, email required",
+    );
+  }
+  const addr = payload.home_address;
+  if (!addr?.street_1 || !addr?.city || !addr?.state || !addr?.zip) {
+    throw new Error("home_address street_1, city, state, zip required");
   }
   const companyUuid = await requireCompanyUuid(admin, orgId);
   const body = await gustoJson(
@@ -417,6 +432,16 @@ async function actionUpsertSignatory(
         title: payload.title,
         birthday: payload.birthday,
         ssn: payload.ssn.replace(/\D/g, ""),
+        phone: payload.phone.replace(/\D/g, ""),
+        email: payload.email,
+        home_address: {
+          street_1: addr.street_1,
+          street_2: addr.street_2 || undefined,
+          city: addr.city,
+          state: addr.state,
+          zip: addr.zip,
+          country: "USA",
+        },
       }),
     },
     "Gusto upsert_signatory",
