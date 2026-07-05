@@ -82,16 +82,19 @@ function docStatusBadge(status: DocStatus) {
 
 export function W2DriverSyncDashboard() {
   const qc = useQueryClient();
+  const { orgId } = useAuth();
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [invitingId, setInvitingId] = useState<string | null>(null);
   const [bulkSending, setBulkSending] = useState(false);
 
   const driversQuery = useQuery({
-    queryKey: ['w2_driver_sync_dashboard'],
+    queryKey: ['w2_driver_sync_dashboard', orgId],
+    enabled: !!orgId,
     queryFn: async (): Promise<W2DriverRow[]> => {
       const { data, error } = await supabase
         .from('drivers')
         .select('id, first_name, last_name, email, employment_type, gusto_employee_id')
+        .eq('org_id', orgId!)
         .eq('employment_type', 'w2_company')
         .order('first_name', { ascending: true });
       if (error) throw error;
