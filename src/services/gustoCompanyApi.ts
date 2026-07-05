@@ -259,11 +259,28 @@ export interface GustoOnboardingStep {
   [k: string]: unknown;
 }
 
+export interface PayrollSetupStatus {
+  federal_tax_status?: string | null;
+  signatory_status?: string | null;
+  state_tax_requirements?: Record<string, unknown> | null;
+  bank_verification_status?: string | null;
+  active_pay_schedule_uuid?: string | null;
+  pay_schedule_frequency?: string | null;
+}
+
 export function syncOnboardingSteps() {
   return callAction<{
     onboarding_status: string | null;
     onboarding_steps: GustoOnboardingStep[];
+    setup_status?: PayrollSetupStatus | null;
   }>('sync_onboarding_steps', {});
+}
+
+export function getPayrollSetupStatus() {
+  return callAction<{ setup_status: PayrollSetupStatus | null }>(
+    'get_payroll_setup_status',
+    {},
+  );
 }
 
 export function getStateTaxRequirements(state: string) {
