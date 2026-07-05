@@ -298,6 +298,18 @@ export default function Trucks() {
     },
     { key: 'status', header: 'Status', render: (truck: TruckWithDriver) => <StatusBadge status={truck.status} /> },
     {
+      key: 'lender_name',
+      header: 'Lender',
+      hiddenOnMobile: true,
+      render: (truck: TruckWithDriver) =>
+        truck.lender_name ? (
+          <span className="text-sm">{truck.lender_name}</span>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        ),
+    },
+
+    {
       key: 'loan',
       header: 'Loan Balance',
       hiddenOnMobile: true,
