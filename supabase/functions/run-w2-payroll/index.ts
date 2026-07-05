@@ -683,24 +683,122 @@ async function actionUpsertStateTaxes(
     throw new Error("states[] required");
   }
   const companyUuid = await requireCompanyUuid(admin, orgId);
+
+  // Gusto's per-state endpoint is deprecated. Use company_state_taxes which
+  // returns a `questions[]` schema per state (keys vary by state).
+  const listResp = await gustoFetch(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/company_state_taxes`,
+    { method: "GET" },
+  );
+  const listBody = await readGustoBody(listResp);
+  if (!listResp.ok) {
+    throw new Error(
+      `Gusto list_company_state_taxes failed (${listResp.status}): ${JSON.stringify(listBody)}`,
+    );
+  }
+  const allStates = Array.isArray(listBody)
+    ? (listBody as any[])
+    : ((listBody as any)?.states ?? []);
+
+  const validFrom = `${new Date().getFullYear()}-01-01`;
+
+  type Question = {
+    key: string;
+    label?: string;
+    input_question_format?: { type?: string };
+    answers?: Array<{ valid_from?: string; valid_up_to?: string | null; value: unknown }>;
+  };
+
+  const matchQuestion = (
+    questions: Question[],
+    predicate: (key: string, label: string) => boolean,
+  ): Question | undefined =>
+    questions.find((q) => predicate((q.key ?? '').toLowerCase(), (q.label ?? '').toLowerCase()));
+
+  const isRateFormat = (q: Question) =>
+    (q.input_question_format?.type ?? '').toLowerCase().includes('percent') ||
+    /rate/.test((q.key ?? '').toLowerCase());
+
   const results: Array<{ state: string; gusto: unknown }> = [];
+
   for (const s of payload.states) {
     if (!s.state) throw new Error("state required");
+    const entry = allStates.find(
+      (x: any) => (x?.state ?? '').toUpperCase() === s.state.toUpperCase(),
+    );
+    if (!entry) {
+      throw new Error(`Gusto has no state_tax record for ${s.state}`);
+    }
+    const stateTaxUuid = entry.uuid as string;
+    const version = entry.version as string | undefined;
+    const questions: Question[] = Array.isArray(entry.questions) ? entry.questions : [];
+
+    const updates: Array<{ key: string; value: string | number }> = [];
+
+    // SUI / employer account number
+    const suiAcctQ = matchQuestion(
+      questions,
+      (k) =>
+        (k.includes('sui') || k.includes('suta') || k.includes('unemployment') || k.includes('employer')) &&
+        (k.includes('account_number') || k.includes('account')),
+    );
+    if (suiAcctQ && s.sui_account_id) {
+      updates.push({ key: suiAcctQ.key, value: s.sui_account_id });
+    }
+
+    // SUI / SUTA rate
+    const suiRateQ = matchQuestion(
+      questions,
+      (k) =>
+        (k.includes('sui') || k.includes('suta') || k.includes('unemployment')) &&
+        k.includes('rate'),
+    );
+    if (suiRateQ && typeof s.sui_rate === 'number' && !Number.isNaN(s.sui_rate)) {
+      // Gusto expects rates as strings, typically as a percentage.
+      updates.push({
+        key: suiRateQ.key,
+        value: isRateFormat(suiRateQ) ? String(s.sui_rate) : String(s.sui_rate),
+      });
+    }
+
+    // Withholding account (only exists for SIT states)
+    const whQ = matchQuestion(
+      questions,
+      (k) => k.includes('withholding') && (k.includes('account') || k.includes('id')),
+    );
+    if (whQ && s.withholding_account_id) {
+      updates.push({ key: whQ.key, value: s.withholding_account_id });
+    }
+
+    if (updates.length === 0) {
+      results.push({ state: s.state, gusto: { skipped: true, reason: 'no matching questions' } });
+      continue;
+    }
+
+    const putBody = {
+      ...(version ? { version } : {}),
+      states: [
+        {
+          state: s.state,
+          questions: updates.map((u) => ({
+            key: u.key,
+            answers: [{ valid_from: validFrom, valid_up_to: null, value: u.value }],
+          })),
+        },
+      ],
+    };
+
     const body = await gustoJson(
       admin,
       orgId,
-      `/v1/companies/${companyUuid}/state_taxes/${s.state}`,
+      `/v1/company_state_taxes/${stateTaxUuid}`,
       {
-        method: "PUT",
-        body: JSON.stringify({
-          state_tax: {
-            withholding_account_id: s.withholding_account_id,
-            sui_account_id: s.sui_account_id,
-            sui_rate: s.sui_rate,
-          },
-        }),
+        method: 'PUT',
+        body: JSON.stringify(putBody),
       },
-      `Gusto upsert_state_taxes[${s.state}]`,
+      `Gusto upsert_company_state_taxes[${s.state}]`,
     );
     results.push({ state: s.state, gusto: body });
   }
