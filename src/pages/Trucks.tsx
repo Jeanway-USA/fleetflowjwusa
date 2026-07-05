@@ -121,12 +121,15 @@ export default function Trucks() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('trucks')
-        .select('*, drivers!trucks_current_driver_id_fkey(id, first_name, last_name)')
-        .order('unit_number');
+        .select('*, drivers!trucks_current_driver_id_fkey(id, first_name, last_name)');
       if (error) throw error;
-      return (data ?? []) as TruckWithDriver[];
+      const rows = (data ?? []) as TruckWithDriver[];
+      // Natural sort by unit_number so "T-101" and "433780" order sensibly.
+      const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+      return [...rows].sort((a, b) => collator.compare(a.unit_number ?? '', b.unit_number ?? ''));
     },
   });
+
 
   // Fetch service schedules for 120-Day Inspections
   const { data: serviceSchedules = [] } = useQuery({
