@@ -137,7 +137,7 @@ function TaxConfigurationForm() {
       });
       return;
     }
-    const st = await upsertStateTaxes({ states: values.states });
+    const st = await upsertStateTaxes({ states: values.states as StateTaxInput[] });
     if (!st.ok) {
       toast.error('Failed to save state taxes', {
         description: st.error ?? 'Please try again.',
