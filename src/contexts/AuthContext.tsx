@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
@@ -55,6 +56,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
   const isMountedRef = useRef(true);
@@ -203,6 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearOrgSimulation = useCallback(async () => {
     try {
+      setOrgLoading(true);
       await supabase.rpc('super_admin_stop_impersonation' as any);
     } catch (err) {
       console.warn('[Auth] stop impersonation failed:', err);
@@ -216,7 +219,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (currentUserIdRef.current) {
       await fetchOrgData(currentUserIdRef.current);
     }
-  }, []);
+    queryClient.removeQueries({ queryKey: ['w2_driver_sync_dashboard'] });
+    queryClient.removeQueries({ queryKey: ['w2_onboarding_status'] });
+    queryClient.invalidateQueries();
+    if (isMountedRef.current) setOrgLoading(false);
+  }, [queryClient]);
 
   // Super admin check via server-side RPC (no hardcoded emails)
   useEffect(() => {
@@ -261,7 +268,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    const handler = () => {
+    const handler = async () => {
       if (!isSuperAdmin) {
         localStorage.removeItem('simulatedOrgId');
         localStorage.removeItem('simulatedOrgName');
@@ -271,13 +278,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSimulatedOrgTier(null);
         return;
       }
+      setOrgLoading(true);
       setSimulatedOrgId(localStorage.getItem('simulatedOrgId'));
       setSimulatedOrgName(localStorage.getItem('simulatedOrgName'));
       setSimulatedOrgTier(localStorage.getItem('simulatedOrgTier'));
+      queryClient.removeQueries({ queryKey: ['w2_driver_sync_dashboard'] });
+      queryClient.removeQueries({ queryKey: ['w2_onboarding_status'] });
+      if (currentUserIdRef.current) {
+        await fetchOrgData(currentUserIdRef.current);
+      }
+      await queryClient.invalidateQueries();
+      if (isMountedRef.current) setOrgLoading(false);
     };
     window.addEventListener('simulatedOrgChanged', handler);
     return () => window.removeEventListener('simulatedOrgChanged', handler);
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, queryClient]);
 
   useEffect(() => {
     isMountedRef.current = true;
