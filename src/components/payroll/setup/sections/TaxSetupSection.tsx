@@ -136,9 +136,9 @@ export function TaxSetupSection() {
       states: [
         {
           state: values.filingState,
-          withholding_account_id: withholding,
-          sui_account_id: values.suiAccountId.trim(),
-          sui_rate: values.suiRate,
+          withholdingAccountId: withholding,
+          suiAccountId: values.suiAccountId.trim(),
+          suiRate: values.suiRate,
         },
       ],
     });
