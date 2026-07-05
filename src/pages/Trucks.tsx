@@ -592,27 +592,17 @@ export default function Trucks() {
                   <User className="h-4 w-4" />
                   Current Driver
                 </Label>
-                <Select 
-                  value={formData.current_driver_id || 'none'} 
-                  onValueChange={(v) => setFormData({ ...formData, current_driver_id: v === 'none' ? null : v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a driver" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No driver assigned</SelectItem>
-                    {drivers.map((driver) => (
-                      <SelectItem key={driver.id} value={driver.id}>
-                        {driver.first_name} {driver.last_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <DriverAssignmentSelect
+                  value={formData.current_driver_id ?? null}
+                  onChange={(id) => setFormData({ ...formData, current_driver_id: id })}
+                  onComplianceChange={setDriverCompliance}
+                />
                 <p className="text-xs text-muted-foreground">
-                  Assign a driver to this truck to enable their DVIR and maintenance features.
+                  Drivers must have current CDL, medical card, and approved compliance docs to be assigned.
                 </p>
               </div>
             </div>
+
 
             {/* Financing Section */}
             <Collapsible>
