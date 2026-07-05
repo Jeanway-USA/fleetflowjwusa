@@ -66,6 +66,10 @@ export interface DocumentSignatureStepProps {
   docRevisions: Record<string, { status: string; notes: string | null }>;
   revisionMode: boolean;
   onValidityChange: (valid: boolean) => void;
+  w2Docs: W2DocsState;
+  onW2DocsChange: (patch: Partial<W2DocsState>) => void;
+  contractorDocs: ContractorDocsState;
+  onContractorDocsChange: (patch: Partial<ContractorDocsState>) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -297,12 +301,12 @@ export function DocumentSignatureStep({
   docRevisions,
   revisionMode,
   onValidityChange,
+  w2Docs,
+  onW2DocsChange,
+  contractorDocs,
+  onContractorDocsChange,
 }: DocumentSignatureStepProps) {
   const [placeholderAcks, setPlaceholderAcks] = useState<Record<string, boolean>>({});
-  const [w2Docs, setW2Docs] = useState<W2DocsState>(EMPTY_W2_DOCS_STATE);
-  const [contractorDocs, setContractorDocs] = useState<ContractorDocsState>(
-    EMPTY_CONTRACTOR_DOCS_STATE,
-  );
   const [w2Valid, setW2Valid] = useState(false);
   const [contractorValid, setContractorValid] = useState(false);
 
@@ -428,7 +432,7 @@ export function DocumentSignatureStep({
             {w2Templates.map(renderTemplate)}
             <W2Documents
               value={w2Docs}
-              onChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
+              onChange={onW2DocsChange}
               onValidityChange={setW2Valid}
             />
           </div>
@@ -444,9 +448,7 @@ export function DocumentSignatureStep({
             {contractorTemplates.map(renderTemplate)}
             <ContractorDocuments
               value={contractorDocs}
-              onChange={(patch) =>
-                setContractorDocs((prev) => ({ ...prev, ...patch }))
-              }
+              onChange={onContractorDocsChange}
               onValidityChange={setContractorValid}
             />
           </div>

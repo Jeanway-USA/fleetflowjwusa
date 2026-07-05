@@ -21,6 +21,15 @@ import {
   type DriverCredentialsStepHandle,
 } from '@/components/onboarding/DriverCredentialsStep';
 import { generateSignedPdf } from '@/lib/onboarding/generateSignedPdf';
+import { generateFormPdf, type FormPdfSection } from '@/lib/onboarding/generateFormPdf';
+import {
+  EMPTY_W2_DOCS_STATE,
+  type W2DocsState,
+} from '@/components/onboarding/W2Documents';
+import {
+  EMPTY_CONTRACTOR_DOCS_STATE,
+  type ContractorDocsState,
+} from '@/components/onboarding/ContractorDocuments';
 import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
 
 
@@ -77,6 +86,8 @@ export default function DriverOnboarding() {
   const [employmentType, setEmploymentType] = useState<'1099' | 'W-2' | null>(null);
   const [deepLinked, setDeepLinked] = useState(false);
   const [state, setState] = useState<Record<string, TemplateState>>({});
+  const [w2Docs, setW2Docs] = useState<W2DocsState>(EMPTY_W2_DOCS_STATE);
+  const [contractorDocs, setContractorDocs] = useState<ContractorDocsState>(EMPTY_CONTRACTOR_DOCS_STATE);
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
   const credentialsRef = useRef<DriverCredentialsStepHandle>(null);
@@ -346,6 +357,275 @@ export default function DriverOnboarding() {
       });
     }
 
+    // --------------------------------------------------------------------
+    // Persist W-2 / 1099 onboarding forms (W-4, I-9, Direct Deposit form,
+    // W-9, IOO) — data collected in DocumentSignatureStep that was
+    // previously discarded on submit.
+    // --------------------------------------------------------------------
+    // (driverName already defined above)
+    const uploadFormPdf = async (
+      docType: string,
+      label: string,
+      blob: Blob,
+    ) => {
+      const ts = Date.now();
+      const safe = docType.replace(/[^a-z0-9_-]/gi, '_');
+      const filePath = `${orgId}/${driverRow.id}/${safe}-${ts}.pdf`;
+      const { error: upErr } = await supabase.storage
+        .from('signed-documents')
+        .upload(filePath, blob, { contentType: 'application/pdf', upsert: false });
+      if (upErr) throw new Error(`Couldn't upload ${label}: ${upErr.message}`);
+      const { error: insErr } = await supabase.from('driver_signed_documents').insert({
+        org_id: orgId,
+        driver_id: driverRow.id,
+        template_id: null,
+        document_type: docType,
+        file_path: filePath,
+        attachment_file_path: null,
+        driver_address: null,
+        signature_data_url: null,
+      });
+      if (insErr) throw new Error(`Couldn't record ${label}: ${insErr.message}`);
+      results.push({
+        title: label,
+        documentType: docType,
+        filePath,
+        blobUrl: URL.createObjectURL(blob),
+      });
+    };
+
+    const maskTail = (v: string) => {
+      const digits = v.replace(/\D/g, '');
+      return digits.length >= 4 ? `***-**-${digits.slice(-4)}` : '—';
+    };
+
+    if (employmentType === 'W-2') {
+      // W-4 → driver_w4_info via SECURITY DEFINER RPC
+      const { error: w4Err } = await supabase.rpc('upsert_driver_w4' as never, {
+        _driver_id: driverRow.id,
+        _filing_status: w2Docs.w4_filingStatus,
+        _multiple_jobs: !!w2Docs.w4_multipleJobs,
+        _dependents_amount: Number(w2Docs.w4_dependentsAmount || 0),
+        _other_income: Number(w2Docs.w4_otherIncome || 0),
+        _deductions: Number(w2Docs.w4_deductions || 0),
+        _extra_withholding: Number(w2Docs.w4_extraWithholding || 0),
+        _step_2c_checkbox: !!w2Docs.w4_multipleJobs,
+      } as never);
+      if (w4Err) throw new Error(`Couldn't save your W-4: ${w4Err.message}`);
+
+      // I-9 → driver_i9_info
+      const { error: i9Err } = await supabase.rpc('upsert_driver_i9' as never, {
+        _driver_id: driverRow.id,
+        _full_name: w2Docs.i9_fullName,
+        _other_last_names: w2Docs.i9_otherLastNames,
+        _address: w2Docs.i9_address,
+        _dob: w2Docs.i9_dob,
+        _ssn: w2Docs.i9_ssn,
+        _email: w2Docs.i9_email,
+        _phone: w2Docs.i9_phone,
+        _citizenship: w2Docs.i9_citizenship,
+        _alien_number: w2Docs.i9_alienNumber,
+        _work_auth_expiry: w2Docs.i9_workAuthExpiry || null,
+        _work_auth_doc_number: w2Docs.i9_workAuthDocNumber,
+      } as never);
+      if (i9Err) throw new Error(`Couldn't save your I-9: ${i9Err.message}`);
+
+      // Direct deposit → banking (reuse existing RPC)
+      const { error: ddErr } = await supabase.rpc('upsert_driver_banking', {
+        _driver_id: driverRow.id,
+        _bank_name: w2Docs.dd_bankName,
+        _account_type: w2Docs.dd_accountType || '',
+        _routing_number: w2Docs.dd_routingNumber,
+        _account_number: w2Docs.dd_accountNumber,
+      });
+      if (ddErr) throw new Error(`Couldn't save your direct deposit info: ${ddErr.message}`);
+
+      // W-4 PDF
+      const w4Sections: FormPdfSection[] = [
+        {
+          heading: 'Employee Information',
+          fields: [
+            { label: 'Full legal name', value: w2Docs.w4_fullName },
+            { label: 'Social Security Number', value: maskTail(w2Docs.w4_ssn) },
+            { label: 'Home address', value: w2Docs.w4_address },
+            { label: 'Filing status', value: w2Docs.w4_filingStatus },
+          ],
+        },
+        {
+          heading: 'Adjustments',
+          fields: [
+            { label: 'Step 2(c) multiple jobs', value: w2Docs.w4_multipleJobs ? 'Yes' : 'No' },
+            { label: 'Dependents amount', value: `$${w2Docs.w4_dependentsAmount || '0'}` },
+            { label: 'Other income', value: `$${w2Docs.w4_otherIncome || '0'}` },
+            { label: 'Deductions', value: `$${w2Docs.w4_deductions || '0'}` },
+            { label: 'Extra withholding', value: `$${w2Docs.w4_extraWithholding || '0'}` },
+          ],
+        },
+      ];
+      await uploadFormPdf(
+        'w4',
+        'Federal W-4 Withholding Certificate',
+        generateFormPdf({
+          title: 'Form W-4 — Employee Withholding Certificate',
+          subtitle: 'Signed electronically as part of driver onboarding.',
+          driverName,
+          sections: w4Sections,
+          signatureLabel: 'Employee signature',
+          signature: w2Docs.w4_signature,
+        }),
+      );
+
+      // I-9 PDF
+      const i9Sections: FormPdfSection[] = [
+        {
+          heading: 'Section 1 — Employee Information',
+          fields: [
+            { label: 'Full legal name', value: w2Docs.i9_fullName },
+            { label: 'Other last names used', value: w2Docs.i9_otherLastNames || '—' },
+            { label: 'Address', value: w2Docs.i9_address },
+            { label: 'Date of birth', value: w2Docs.i9_dob },
+            { label: 'SSN', value: maskTail(w2Docs.i9_ssn) },
+            { label: 'Email', value: w2Docs.i9_email },
+            { label: 'Phone', value: w2Docs.i9_phone },
+            { label: 'Citizenship / status', value: w2Docs.i9_citizenship },
+            { label: 'Alien / USCIS number', value: w2Docs.i9_alienNumber || '—' },
+            { label: 'Work authorization expiry', value: w2Docs.i9_workAuthExpiry || '—' },
+            { label: 'Work authorization doc #', value: w2Docs.i9_workAuthDocNumber || '—' },
+          ],
+          notes: [
+            'The employee attests, under penalty of perjury, that the information provided is true and correct.',
+          ],
+        },
+      ];
+      await uploadFormPdf(
+        'i9',
+        'Form I-9 — Employment Eligibility',
+        generateFormPdf({
+          title: 'Form I-9 — Employment Eligibility Verification',
+          subtitle: 'Section 1 attestation completed by the employee.',
+          driverName,
+          sections: i9Sections,
+          signatureLabel: 'Employee signature',
+          signature: w2Docs.i9_signature,
+        }),
+      );
+
+      // Direct Deposit form PDF (structured artifact separate from the DB template)
+      const ddSections: FormPdfSection[] = [
+        {
+          heading: 'Banking Details',
+          fields: [
+            { label: 'Bank name', value: w2Docs.dd_bankName },
+            { label: 'Account type', value: w2Docs.dd_accountType },
+            { label: 'Routing number', value: w2Docs.dd_routingNumber },
+            {
+              label: 'Account number',
+              value: (() => {
+                const d = w2Docs.dd_accountNumber.replace(/\D/g, '');
+                return d.length >= 4 ? `****${d.slice(-4)}` : '—';
+              })(),
+            },
+          ],
+          notes: [
+            'Employee authorizes the employer to initiate direct deposits into the account listed above.',
+          ],
+        },
+      ];
+      await uploadFormPdf(
+        'direct_deposit_form',
+        'Direct Deposit Authorization',
+        generateFormPdf({
+          title: 'Direct Deposit Authorization',
+          driverName,
+          sections: ddSections,
+          signatureLabel: 'Employee signature',
+          signature: w2Docs.dd_signature,
+        }),
+      );
+    }
+
+    if (employmentType === '1099') {
+      const { error: w9Err } = await supabase.rpc('upsert_driver_w9' as never, {
+        _driver_id: driverRow.id,
+        _legal_name: contractorDocs.w9_legalName,
+        _business_name: contractorDocs.w9_businessName,
+        _tax_class: contractorDocs.w9_taxClass,
+        _address: contractorDocs.w9_address,
+        _tin_type: contractorDocs.w9_tinType,
+        _tin: contractorDocs.w9_tin,
+        _certify_accurate: contractorDocs.w9_certifyAccurate,
+        _certify_backup_withholding: contractorDocs.w9_certifyBackupWithholding,
+      } as never);
+      if (w9Err) throw new Error(`Couldn't save your W-9: ${w9Err.message}`);
+
+      const { error: iooErr } = await supabase.rpc('upsert_driver_ioo' as never, {
+        _driver_id: driverRow.id,
+        _legal_name: contractorDocs.ioo_legalName,
+        _business_name: contractorDocs.ioo_businessName,
+        _mc_number: contractorDocs.ioo_mcNumber,
+        _dot_number: contractorDocs.ioo_dotNumber,
+        _effective_date: contractorDocs.ioo_effectiveDate,
+        _agree_terms: contractorDocs.ioo_agreeTerms,
+        _ack_ic_status: contractorDocs.ioo_ackIcStatus,
+      } as never);
+      if (iooErr) throw new Error(`Couldn't save your Owner-Operator agreement: ${iooErr.message}`);
+
+      // W-9 PDF
+      await uploadFormPdf(
+        'w9',
+        'Form W-9 — Taxpayer Identification',
+        generateFormPdf({
+          title: 'Form W-9 — Request for Taxpayer Identification',
+          subtitle: 'Signed electronically as part of contractor onboarding.',
+          driverName,
+          sections: [
+            {
+              heading: 'Contractor Information',
+              fields: [
+                { label: 'Legal name', value: contractorDocs.w9_legalName },
+                { label: 'Business name', value: contractorDocs.w9_businessName || '—' },
+                { label: 'Tax classification', value: contractorDocs.w9_taxClass },
+                { label: 'Address', value: contractorDocs.w9_address },
+                { label: 'TIN type', value: contractorDocs.w9_tinType.toUpperCase() },
+                { label: 'TIN', value: maskTail(contractorDocs.w9_tin) },
+              ],
+              notes: [
+                'The contractor certifies, under penalty of perjury, that the TIN provided is correct and that they are not subject to backup withholding.',
+              ],
+            },
+          ],
+          signatureLabel: 'Contractor signature',
+          signature: contractorDocs.w9_signature,
+        }),
+      );
+
+      // IOO PDF
+      await uploadFormPdf(
+        'ioo_agreement',
+        'Independent Owner-Operator Agreement',
+        generateFormPdf({
+          title: 'Independent Owner-Operator Agreement',
+          driverName,
+          sections: [
+            {
+              heading: 'Contractor & Authority',
+              fields: [
+                { label: 'Legal name', value: contractorDocs.ioo_legalName },
+                { label: 'Business name', value: contractorDocs.ioo_businessName || '—' },
+                { label: 'MC number', value: contractorDocs.ioo_mcNumber },
+                { label: 'DOT number', value: contractorDocs.ioo_dotNumber },
+                { label: 'Effective date', value: contractorDocs.ioo_effectiveDate },
+              ],
+              notes: [
+                'Contractor agrees to the terms of the Independent Owner-Operator Agreement and acknowledges independent contractor status.',
+              ],
+            },
+          ],
+          signatureLabel: 'Contractor signature',
+          signature: contractorDocs.ioo_signature,
+        }),
+      );
+    }
 
     setSignedResults(results);
 
@@ -667,6 +947,10 @@ export default function DriverOnboarding() {
               docRevisions={docRevisions}
               revisionMode={revisionMode}
               onValidityChange={setDocumentsValid}
+              w2Docs={w2Docs}
+              onW2DocsChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
+              contractorDocs={contractorDocs}
+              onContractorDocsChange={(patch) => setContractorDocs((prev) => ({ ...prev, ...patch }))}
             />
           )}
 
