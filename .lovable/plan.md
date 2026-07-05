@@ -1,38 +1,37 @@
-## W-2 Driver Sync Dashboard
+## Add "Send onboarding invite" action to W-2 Driver Sync
 
-Add a new dashboard on **Settings → Payroll** that lists all W-2 company drivers, syncs them to Gusto, and shows the status of their onboarding forms (W-4 / I-9).
+Right now the dashboard shows `Forms pending` once a driver is synced to Gusto, but there's no in-app trigger to actually get the driver to sign their W-4 / I-9. This plan adds that trigger.
 
-Per your answer, the gross-pay-only / drop-deductions helper will **not** be built — drivers need to see itemized deductions on their settlements.
-
-### New file
-- `src/components/payroll/W2DriverSyncDashboard.tsx`
-  - shadcn `Card` + `Table` layout, TanStack Query fetches drivers filtered to `employment_type = 'w2_company'` (Independent Owner-Operator rows are excluded at the query level and never rendered).
-  - Columns: Name, Email, Gusto ID (or "Not synced"), **Document Status** badge, Action.
-  - **Sync to Gusto** button per row → calls existing `sync_employee` action (already POSTs `/v1/companies/{uuid}/employees` and persists `gusto_employee_id`). Button hides once the driver has a `gusto_employee_id`.
-  - **Document Status** badge states:
-    - `Not synced` (gray) — no `gusto_employee_id` yet
-    - `Forms pending` (amber) — synced but W-4 or I-9 not signed
-    - `Forms complete` (green) — both W-4 and I-9 signed
-    - `Unknown` (gray outline) — Gusto returned no onboarding data
-  - Refresh button re-queries both drivers table and Gusto onboarding status.
-  - Empty state: "No W-2 company drivers. Switch a driver's employment type to W-2 to see them here."
+### Approach
+Use Gusto's employee self-onboarding flow: the backend asks Gusto to email the driver a secure link where they complete and e-sign W-4 and I-9 themselves. We surface a **"Send onboarding invite"** button per row (and a bulk action) in `W2DriverSyncDashboard`. When the driver finishes in Gusto, the existing onboarding-status query flips the badge to `Forms complete`.
 
 ### Edited files
-- `supabase/functions/run-w2-payroll/index.ts`
-  - Add `get_employee_onboarding_status` action: `GET /v1/employees/{employee_uuid}/onboarding_status`, returns a compact `{ employee_uuid, w4_signed, i9_signed, onboarding_completed }` shape derived from Gusto's `onboarding_steps` (matches `federal_tax_setup` and `state_tax_setup` / `employee_form_signing` step keys).
-  - Batch variant `get_employees_onboarding_status` that accepts `employee_uuids: string[]` and returns an array — used by the dashboard so we make one function call instead of N.
-- `src/services/gustoCompanyApi.ts`
-  - Add `syncEmployeeToGusto(driverId)` and `getEmployeesOnboardingStatus(uuids)` service wrappers around the two edge-function actions.
-- `src/pages/Settings.tsx`
-  - Mount `<W2DriverSyncDashboard />` inside `TabsContent value="payroll"`, placed above `<PayrollTaxesCard />` and `<PayScheduleManager />` (sync is the prerequisite step, so it goes first).
+
+**`supabase/functions/run-w2-payroll/index.ts`**
+- New action `send_employee_onboarding_invite`:
+  - Input: `{ driver_id }` (server looks up `gusto_employee_id` from `drivers`).
+  - Ensures the employee has `self_onboarding = true` (PUT `/v1/employees/{uuid}` if not already), then calls Gusto's self-onboarding invite endpoint to email the driver.
+  - Returns `{ sent: true, email }` on success; surfaces Gusto's error verbatim on failure (missing email, employee already onboarded, etc.).
+- New action `get_employee_onboarding_link` (fallback): returns a one-time onboarding URL for the admin to copy/share when email isn't viable.
+- Both actions are org-scoped through the same auth guard as the existing `sync_employee` action — no new RLS surface.
+
+**`src/services/gustoCompanyApi.ts`**
+- `sendEmployeeOnboardingInvite(driverId)` wrapper.
+- `getEmployeeOnboardingLink(driverId)` wrapper.
+
+**`src/components/payroll/W2DriverSyncDashboard.tsx`**
+- Add a per-row **"Send invite"** button, visible only when the driver is synced AND doc status is `pending` or `unknown`. Shows a spinner while sending, toast on result, and disables briefly after success ("Invite sent").
+- Add a small "Copy link" dropdown item beside it that calls `getEmployeeOnboardingLink` and copies the URL to clipboard.
+- Add a table-level **"Send invite to all pending"** button in the card header that iterates all `pending`/`unknown` rows sequentially with a progress toast.
+- Empty-email guard: if `driver.email` is null, disable the button with a tooltip ("Add an email to this driver first").
+- After sending, `onboardingQuery.refetch()` is called after ~2s so the badge updates once Gusto reflects the invite.
 
 ### Explicitly NOT doing
-- **No gross-only settlements helper.** Per your decision, drivers keep full deduction visibility; we won't add a function that strips deduction line items.
-- No changes to the existing `DriverSettlementsTab` — settlements continue to show full detail.
-- No new DB migrations (uses existing `drivers.gusto_employee_id`).
+- No in-app W-4 / I-9 rendering or e-sign flow — signing continues to happen inside Gusto, which is the compliant path.
+- No changes to `DriverSettlementsTab`, no new tables, no migrations.
+- No auto-send on sync — invites remain an explicit admin action to avoid surprise emails.
 
 ### Technical notes
-- W-2 filter is applied server-side in the Supabase query (`.eq('employment_type', 'w2_company')`) so Independent OO drivers never enter the client.
-- Sync button uses optimistic UI with a spinner and toast; on success invalidates the drivers query so the row reflects the new Gusto ID and re-fetches onboarding status.
-- Onboarding-status query is `enabled` only when at least one driver has a `gusto_employee_id`.
-- All Gusto network calls stay inside the edge function; the client never touches Gusto directly.
+- Gusto endpoint used: `POST /v1/employees/{employee_uuid}/onboarding_status` transition to `self_onboarding_pending_invite` + `POST /v1/employees/{employee_uuid}/send_offer_letter`-style invite. Exact path is `/v1/employees/{uuid}/onboarding_invitation` in Embedded; the edge function will handle the version differences and normalize the response.
+- If Gusto returns `employee_onboarding_status: 'onboarding_completed'` the client action returns early with an informational toast instead of re-inviting.
+- Rate limiting: bulk send waits 400ms between calls to stay under Gusto's per-second limits.
