@@ -525,6 +525,18 @@ Deno.serve(async (req) => {
       case "push_payroll_inputs":
         result = await actionPushPayrollInputs(admin, orgId, payload);
         break;
+      case "upsert_signatory":
+        result = await actionUpsertSignatory(admin, orgId, payload);
+        break;
+      case "upsert_primary_location":
+        result = await actionUpsertPrimaryLocation(admin, orgId, payload);
+        break;
+      case "create_bank_account":
+        result = await actionCreateBankAccount(admin, orgId, payload);
+        break;
+      case "upsert_federal_tax_details":
+        result = await actionUpsertFederalTaxDetails(admin, orgId, payload);
+        break;
       case "status": {
         const { companyUuid, status } = await getAccessToken(admin, orgId);
         result = { company_uuid: companyUuid, onboarding_status: status };
