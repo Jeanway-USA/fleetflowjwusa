@@ -180,6 +180,18 @@ async function gustoFetch(
   return resp;
 }
 
+async function markPayrollSetupStatus(
+  admin: Admin,
+  orgId: string,
+  updates: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await admin.from("gusto_integration").update(updates).eq("org_id", orgId);
+  } catch {
+    // Best-effort UI status cache. The upstream Gusto write is authoritative.
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Actions
 // -----------------------------------------------------------------------------
