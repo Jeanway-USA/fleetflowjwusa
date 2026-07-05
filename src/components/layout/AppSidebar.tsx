@@ -176,19 +176,15 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         ) : (
-          ADMIN_GROUPS.map((group) => {
-            const groupActive = group.items.some(
-              (i) => currentPath === i.path || currentPath.startsWith(i.path + '/'),
-            );
-            return (
-              <SidebarGroup key={group.label} defaultOpen={groupActive}>
-                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>{group.items.map(renderItem)}</SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            );
-          })
+          ADMIN_GROUPS.map((group) => (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>{group.items.map(renderItem)}</SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))
+
         )}
 
         {isSuperAdmin && (
