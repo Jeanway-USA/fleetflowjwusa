@@ -803,6 +803,95 @@ async function actionAssignEmployeePaySchedule(
 
 
 // -----------------------------------------------------------------------------
+// Employee onboarding status (W-4 / I-9 form signing)
+// -----------------------------------------------------------------------------
+
+interface EmployeeOnboardingSummary {
+  employee_uuid: string;
+  onboarding_completed: boolean;
+  w4_signed: boolean;
+  i9_signed: boolean;
+  error?: string;
+}
+
+function summarizeOnboardingSteps(body: Record<string, unknown>): {
+  onboarding_completed: boolean;
+  w4_signed: boolean;
+  i9_signed: boolean;
+} {
+  const steps = Array.isArray((body as { onboarding_steps?: unknown }).onboarding_steps)
+    ? ((body as { onboarding_steps: Array<Record<string, unknown>> }).onboarding_steps)
+    : [];
+  const overallCompleted =
+    (body as { onboarding_status?: string }).onboarding_status === "onboarding_completed";
+
+  const findCompleted = (needles: string[]): boolean => {
+    for (const step of steps) {
+      const id = String(step.id ?? step.step ?? "").toLowerCase();
+      const title = String(step.title ?? "").toLowerCase();
+      if (needles.some((n) => id.includes(n) || title.includes(n))) {
+        return Boolean(step.completed);
+      }
+    }
+    return false;
+  };
+
+  return {
+    onboarding_completed: overallCompleted,
+    w4_signed: findCompleted(["federal_tax", "w-4", "w4", "form_signing"]),
+    i9_signed: findCompleted(["i-9", "i9"]),
+  };
+}
+
+async function actionGetEmployeesOnboardingStatus(
+  admin: Admin,
+  orgId: string,
+  payload: { employee_uuids: string[] },
+): Promise<Record<string, unknown>> {
+  const uuids = Array.isArray(payload?.employee_uuids) ? payload.employee_uuids : [];
+  if (uuids.length === 0) return { statuses: [] };
+  // Ensure org has a Gusto company before making calls
+  await requireCompanyUuid(admin, orgId);
+
+  const results: EmployeeOnboardingSummary[] = await Promise.all(
+    uuids.map(async (uuid): Promise<EmployeeOnboardingSummary> => {
+      try {
+        const resp = await gustoFetch(
+          admin,
+          orgId,
+          `/v1/employees/${uuid}/onboarding_status`,
+          { method: "GET" },
+        );
+        const body = (await readGustoBody(resp)) as Record<string, unknown>;
+        if (!resp.ok) {
+          return {
+            employee_uuid: uuid,
+            onboarding_completed: false,
+            w4_signed: false,
+            i9_signed: false,
+            error: `Gusto ${resp.status}`,
+          };
+        }
+        return { employee_uuid: uuid, ...summarizeOnboardingSteps(body) };
+      } catch (e) {
+        return {
+          employee_uuid: uuid,
+          onboarding_completed: false,
+          w4_signed: false,
+          i9_signed: false,
+          error: e instanceof Error ? e.message : String(e),
+        };
+      }
+    }),
+  );
+  return { statuses: results };
+}
+
+
+
+
+
+// -----------------------------------------------------------------------------
 // Entry
 // -----------------------------------------------------------------------------
 
@@ -991,6 +1080,10 @@ Deno.serve(async (req) => {
       case "assign_employee_pay_schedule":
         result = await actionAssignEmployeePaySchedule(admin, orgId, payload);
         break;
+      case "get_employees_onboarding_status":
+        result = await actionGetEmployeesOnboardingStatus(admin, orgId, payload);
+        break;
+
       case "status": {
         const { companyUuid, status } = await getAccessToken(admin, orgId);
         result = { company_uuid: companyUuid, onboarding_status: status };
