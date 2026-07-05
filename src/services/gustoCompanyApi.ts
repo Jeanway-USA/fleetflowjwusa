@@ -165,3 +165,47 @@ export function verifyBankAccount(input: VerifyBankAccountInput) {
     bank_account_uuid: input.bankAccountUuid,
   });
 }
+
+// -------- Pay schedules -----------------------------------------------------
+
+export type PayScheduleFrequency =
+  | 'Every week'
+  | 'Every other week'
+  | 'Twice per month'
+  | 'Monthly';
+
+export interface CreatePayScheduleInput {
+  frequency: PayScheduleFrequency;
+  anchorPayDate: Date;
+  anchorEndOfPayPeriod: Date;
+  customName?: string;
+}
+
+export interface GustoPaySchedule {
+  uuid: string;
+  frequency: string;
+  anchor_pay_date?: string;
+  anchor_end_of_pay_period?: string;
+  custom_name?: string | null;
+}
+
+export function createPaySchedule(input: CreatePayScheduleInput) {
+  return callAction<{ ok: true; gusto: GustoPaySchedule }>('create_pay_schedule', {
+    frequency: input.frequency,
+    anchor_pay_date: format(input.anchorPayDate, 'yyyy-MM-dd'),
+    anchor_end_of_pay_period: format(input.anchorEndOfPayPeriod, 'yyyy-MM-dd'),
+    custom_name: input.customName || undefined,
+  });
+}
+
+export interface AssignEmployeePayScheduleInput {
+  employeeUuid: string;
+  payScheduleUuid: string;
+}
+
+export function assignEmployeePaySchedule(input: AssignEmployeePayScheduleInput) {
+  return callAction('assign_employee_pay_schedule', {
+    employee_uuid: input.employeeUuid,
+    pay_schedule_uuid: input.payScheduleUuid,
+  });
+}
