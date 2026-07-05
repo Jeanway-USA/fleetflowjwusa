@@ -304,6 +304,7 @@ export function BankDetailsSection() {
           </div>
         </form>
       </Form>
+      ) : null}
     </PayrollSetupSectionCard>
   );
 }
