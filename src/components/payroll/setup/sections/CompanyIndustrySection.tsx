@@ -5,6 +5,7 @@ import { Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PayrollSetupSectionCard } from '../PayrollSetupSectionCard';
+import { RequiredLabel, RequiredLegend } from '../RequiredLabel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -83,7 +84,7 @@ export function CompanyIndustrySection() {
             name="legalName"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Legal company name</FormLabel>
+                <FormLabel><RequiredLabel>Legal company name</RequiredLabel></FormLabel>
                 <FormControl>
                   <Input autoComplete="organization" {...field} />
                 </FormControl>
@@ -97,7 +98,7 @@ export function CompanyIndustrySection() {
             name="street1"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Street address</FormLabel>
+                <FormLabel><RequiredLabel>Street address</RequiredLabel></FormLabel>
                 <FormControl>
                   <Input autoComplete="address-line1" {...field} />
                 </FormControl>
@@ -133,7 +134,7 @@ export function CompanyIndustrySection() {
               name="city"
               render={({ field }) => (
                 <FormItem className="sm:col-span-3">
-                  <FormLabel>City</FormLabel>
+                  <FormLabel><RequiredLabel>City</RequiredLabel></FormLabel>
                   <FormControl>
                     <Input autoComplete="address-level2" {...field} />
                   </FormControl>
@@ -146,7 +147,7 @@ export function CompanyIndustrySection() {
               name="state"
               render={({ field }) => (
                 <FormItem className="sm:col-span-1">
-                  <FormLabel>State</FormLabel>
+                  <FormLabel><RequiredLabel>State</RequiredLabel></FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl>
                       <SelectTrigger>
@@ -170,7 +171,7 @@ export function CompanyIndustrySection() {
               name="zip"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel>ZIP</FormLabel>
+                  <FormLabel><RequiredLabel>ZIP</RequiredLabel></FormLabel>
                   <FormControl>
                     <Input
                       autoComplete="postal-code"
@@ -190,7 +191,7 @@ export function CompanyIndustrySection() {
             name="industryCode"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Industry (NAICS)</FormLabel>
+                <FormLabel><RequiredLabel>Industry (NAICS)</RequiredLabel></FormLabel>
                 <Select value={field.value} onValueChange={field.onChange}>
                   <FormControl>
                     <SelectTrigger>
@@ -213,7 +214,8 @@ export function CompanyIndustrySection() {
             )}
           />
 
-          <div className="flex justify-stretch pt-2 sm:justify-end">
+          <div className="flex flex-col-reverse items-stretch gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+            <RequiredLegend />
             <Button
               type="submit"
               className="w-full sm:w-auto"
