@@ -1,82 +1,38 @@
+## W-2 Driver Sync Dashboard
 
-## Goal
+Add a new dashboard on **Settings → Payroll** that lists all W-2 company drivers, syncs them to Gusto, and shows the status of their onboarding forms (W-4 / I-9).
 
-Add `src/components/payroll/PayScheduleManager.tsx` — a card that lets a payroll admin create a Gusto company pay schedule and assign it (individually or in bulk) to synced W-2 drivers. Mount it as a new section on the Payroll tab in `/settings`.
+Per your answer, the gross-pay-only / drop-deductions helper will **not** be built — drivers need to see itemized deductions on their settlements.
 
-## Files
+### New file
+- `src/components/payroll/W2DriverSyncDashboard.tsx`
+  - shadcn `Card` + `Table` layout, TanStack Query fetches drivers filtered to `employment_type = 'w2_company'` (Independent Owner-Operator rows are excluded at the query level and never rendered).
+  - Columns: Name, Email, Gusto ID (or "Not synced"), **Document Status** badge, Action.
+  - **Sync to Gusto** button per row → calls existing `sync_employee` action (already POSTs `/v1/companies/{uuid}/employees` and persists `gusto_employee_id`). Button hides once the driver has a `gusto_employee_id`.
+  - **Document Status** badge states:
+    - `Not synced` (gray) — no `gusto_employee_id` yet
+    - `Forms pending` (amber) — synced but W-4 or I-9 not signed
+    - `Forms complete` (green) — both W-4 and I-9 signed
+    - `Unknown` (gray outline) — Gusto returned no onboarding data
+  - Refresh button re-queries both drivers table and Gusto onboarding status.
+  - Empty state: "No W-2 company drivers. Switch a driver's employment type to W-2 to see them here."
 
-**New**
-- `src/components/payroll/PayScheduleManager.tsx` — the full UI (form + driver list).
+### Edited files
+- `supabase/functions/run-w2-payroll/index.ts`
+  - Add `get_employee_onboarding_status` action: `GET /v1/employees/{employee_uuid}/onboarding_status`, returns a compact `{ employee_uuid, w4_signed, i9_signed, onboarding_completed }` shape derived from Gusto's `onboarding_steps` (matches `federal_tax_setup` and `state_tax_setup` / `employee_form_signing` step keys).
+  - Batch variant `get_employees_onboarding_status` that accepts `employee_uuids: string[]` and returns an array — used by the dashboard so we make one function call instead of N.
+- `src/services/gustoCompanyApi.ts`
+  - Add `syncEmployeeToGusto(driverId)` and `getEmployeesOnboardingStatus(uuids)` service wrappers around the two edge-function actions.
+- `src/pages/Settings.tsx`
+  - Mount `<W2DriverSyncDashboard />` inside `TabsContent value="payroll"`, placed above `<PayrollTaxesCard />` and `<PayScheduleManager />` (sync is the prerequisite step, so it goes first).
 
-**Edited**
-- `src/services/gustoCompanyApi.ts` — add two service calls:
-  - `createPaySchedule({ frequency, anchorPayDate, anchorEndOfPayPeriod, customName? })`
-  - `assignEmployeePaySchedule({ employeeUuid, payScheduleUuid })`
-- `supabase/functions/run-w2-payroll/index.ts` — add matching handlers:
-  - `create_pay_schedule` → `POST /v1/companies/{uuid}/pay_schedules` with `{ frequency, anchor_pay_date, anchor_end_of_pay_period, custom_name? }`. Response includes the new `uuid`, which is returned to the client.
-  - `assign_employee_pay_schedule` → `PUT /v1/companies/{uuid}/employees/{employee_uuid}/pay_schedule` with `{ pay_schedule_uuid }` (version fetched via prior GET on the employee if Gusto requires it).
-- `src/pages/Settings.tsx` — render `<PayScheduleManager />` inside the existing `TabsContent value="payroll"`, below `PayrollTaxesCard`.
+### Explicitly NOT doing
+- **No gross-only settlements helper.** Per your decision, drivers keep full deduction visibility; we won't add a function that strips deduction line items.
+- No changes to the existing `DriverSettlementsTab` — settlements continue to show full detail.
+- No new DB migrations (uses existing `drivers.gusto_employee_id`).
 
-## Component UI
-
-Uses shadcn `Card`, `Form`, `Select`, `Popover` + `Calendar` (per project datepicker guidance with `pointer-events-auto`), `Button`, `Table`, `Badge`, and `sonner` toasts.
-
-### Form: Create pay schedule
-
-- **Frequency** — `Select`, required:
-  - `Every week` → `Every week`
-  - `Every other week` → `Every other week`
-  - `Twice per month` → `Twice per month`
-  - `Monthly` → `Monthly`
-- **Anchor pay date** — shadcn date picker, required.
-- **Anchor end of pay period** — shadcn date picker, required. Zod check: must be ≤ anchor pay date.
-- **Custom name** (optional text).
-- Submit `Create pay schedule` → calls `createPaySchedule`. On success:
-  - Toast "Pay schedule created".
-  - Store the returned schedule uuid + a short summary in local state so the driver list can use it.
-  - Append the schedule to an in-memory "Recent schedules" chip row (helps user see the active target).
-
-### Driver list
-
-- Fetches synced W-2 drivers via TanStack Query:
-  ```ts
-  supabase.from('drivers')
-    .select('id, first_name, last_name, gusto_employee_id, employment_type')
-    .eq('employment_type', 'w2_company')
-    .not('gusto_employee_id', 'is', null)
-    .order('last_name');
-  ```
-  (Same shape used in `RunW2PayrollDialog.tsx` — RLS already restricts by org.)
-- Renders a `Table` with columns: checkbox, Name, Gusto ID (muted), Action.
-- Header shows:
-  - Bulk-select checkbox.
-  - "Assign selected to schedule" button — disabled until at least one driver is selected AND a pay schedule has been created this session.
-  - "Assign all synced" button (per user's answer) — same disabled logic as bulk but ignores individual selection and targets all rows.
-- Each row's Action button "Assign" calls `assignEmployeePaySchedule` for that driver.
-- Per-driver loading state; success toast per row; row shows a "Assigned" `Badge` after success so it's obvious what's done. Bulk actions run sequentially and show one aggregate toast (`X assigned, Y failed`).
-- Empty state: card-styled message "No synced W-2 drivers yet — sync employees on the Payroll dashboard first." with a link to `/settings/payroll-setup`.
-
-### Empty schedule state
-If no schedule has been created yet, the driver-list assign buttons are visible but disabled with tooltip "Create a pay schedule first."
-
-## Endpoint mapping
-
-| UI action | Edge action | Gusto endpoint |
-|---|---|---|
-| Create pay schedule | `create_pay_schedule` | `POST /v1/companies/{uuid}/pay_schedules` |
-| Assign employee to schedule | `assign_employee_pay_schedule` | `PUT /v1/companies/{uuid}/employees/{employee_uuid}/pay_schedule` |
-
-## Technical details
-
-- All Gusto calls stay in the edge function; the browser never sees a bearer token.
-- Frequency values are sent to Gusto verbatim (`Every week`, `Every other week`, `Twice per month`, `Monthly`) — matches Gusto's documented enum, so no mapping layer needed.
-- Dates are serialized as `format(date, 'yyyy-MM-dd')` (project standard) before hitting the edge action.
-- Assign flow tolerates Gusto's optimistic-locking `version` field: edge handler does a GET on the employee's current pay-schedule assignment first and includes `version` in the PUT body if present.
-- No database migration needed — schedule uuids live only in Gusto; the Settings page holds the "last created schedule" in local component state for the session. (Follow-up work could persist it, but that's out of scope.)
-- No changes to `PayrollSetup.tsx` — user asked for Settings placement.
-
-## Out of scope
-
-- Listing/editing existing Gusto pay schedules.
-- Persisting the created schedule uuid in our own DB.
-- Removing an assignment or supporting effective-date-based reassignment.
+### Technical notes
+- W-2 filter is applied server-side in the Supabase query (`.eq('employment_type', 'w2_company')`) so Independent OO drivers never enter the client.
+- Sync button uses optimistic UI with a spinner and toast; on success invalidates the drivers query so the row reflects the new Gusto ID and re-fetches onboarding status.
+- Onboarding-status query is `enabled` only when at least one driver has a `gusto_employee_id`.
+- All Gusto network calls stay inside the edge function; the client never touches Gusto directly.
