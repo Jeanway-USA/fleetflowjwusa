@@ -106,6 +106,10 @@ export function BankDetailsSection() {
     });
     if (res.ok) {
       toast.success('Bank details saved', { description: 'Synced to Gusto.' });
+      qc.invalidateQueries({ queryKey: ['gusto-bank-accounts'] });
+      qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
+      setReplace(false);
+      form.reset();
     } else {
       toast.error('Failed to save bank details', {
         description: res.error ?? 'Please try again.',
@@ -113,14 +117,48 @@ export function BankDetailsSection() {
     }
   };
 
+  const showForm = !existing || replace;
+
   return (
     <PayrollSetupSectionCard
       icon={Landmark}
       title="Bank Details"
       description="Connect and verify the company bank account Gusto will debit for payroll and taxes."
     >
+      {isLoading ? (
+        <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading saved values…
+        </div>
+      ) : null}
+      {existing ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              {existing.name ?? 'Bank account on file'}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {(existing.account_type ?? 'Checking')} • ****{(existing.hidden_account_number ?? '').slice(-4)}
+              {existing.verification_status ? (
+                <Badge variant="outline" className="ml-2">{String(existing.verification_status)}</Badge>
+              ) : null}
+            </div>
+          </div>
+          {!replace ? (
+            <Button variant="outline" size="sm" type="button" onClick={() => setReplace(true)}>
+              Replace account
+            </Button>
+          ) : (
+            <Button variant="ghost" size="sm" type="button" onClick={() => setReplace(false)}>
+              Cancel
+            </Button>
+          )}
+        </div>
+      ) : null}
+      {showForm ? (
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField
               control={form.control}
