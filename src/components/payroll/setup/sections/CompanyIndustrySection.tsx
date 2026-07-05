@@ -208,6 +208,27 @@ export function CompanyIndustrySection() {
 
           <FormField
             control={form.control}
+            name="phoneNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel><RequiredLabel>Business phone</RequiredLabel></FormLabel>
+                <FormControl>
+                  <Input
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    placeholder="(555) 555-5555"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+
+          <FormField
+            control={form.control}
             name="industryCode"
             render={({ field }) => (
               <FormItem>
