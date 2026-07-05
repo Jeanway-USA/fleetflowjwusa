@@ -129,3 +129,39 @@ export function upsertFederalTaxDetails(input: FederalTaxInput) {
     taxable_as_scorp: input.taxableAsScorp ?? false,
   });
 }
+
+// -------- State tax details -------------------------------------------------
+
+export interface StateTaxInput {
+  state: string;
+  withholdingAccountId: string;
+  suiAccountId: string;
+  suiRate: number;
+}
+
+export function upsertStateTaxes(input: { states: StateTaxInput[] }) {
+  return callAction('upsert_state_taxes', {
+    states: input.states.map((s) => ({
+      state: s.state,
+      withholding_account_id: s.withholdingAccountId,
+      sui_account_id: s.suiAccountId,
+      sui_rate: s.suiRate,
+    })),
+  });
+}
+
+// -------- Bank account verification ----------------------------------------
+
+export interface VerifyBankAccountInput {
+  deposit1: number;
+  deposit2: number;
+  bankAccountUuid?: string;
+}
+
+export function verifyBankAccount(input: VerifyBankAccountInput) {
+  return callAction('verify_bank_account', {
+    deposit_1: input.deposit1,
+    deposit_2: input.deposit2,
+    bank_account_uuid: input.bankAccountUuid,
+  });
+}
