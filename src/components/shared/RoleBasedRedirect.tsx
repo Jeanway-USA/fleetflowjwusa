@@ -27,7 +27,7 @@ export function RoleBasedRedirect() {
     );
   }
 
-  if (!user) return <Landing />;
+  if (!user) return <Navigate to="/auth" replace />;
 
   if (!orgId) return <Navigate to="/onboarding" replace />;
   if (!orgIsActive) return <Navigate to="/account-deactivated" replace />;
