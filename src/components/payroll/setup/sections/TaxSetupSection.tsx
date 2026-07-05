@@ -7,7 +7,11 @@ import { Loader2, Percent } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PayrollSetupSectionCard } from '../PayrollSetupSectionCard';
-import { getFederalTaxDetails, upsertFederalTaxDetails } from '@/services/gustoCompanyApi';
+import {
+  getFederalTaxDetails,
+  upsertFederalTaxDetails,
+  upsertStateTaxes,
+} from '@/services/gustoCompanyApi';
 
 import { RequiredLabel, RequiredLegend } from '../RequiredLabel';
 import { Button } from '@/components/ui/button';
