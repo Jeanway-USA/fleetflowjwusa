@@ -7,6 +7,7 @@ import { CalendarIcon, Eye, EyeOff, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PayrollSetupSectionCard } from '../PayrollSetupSectionCard';
+import { upsertSignatory } from '@/services/gustoCompanyApi';
 import { RequiredLabel, RequiredLegend } from '../RequiredLabel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,16 +74,21 @@ export function SignatorySection() {
     },
   });
 
-  const onSubmit = (values: SignatoryFormValues) => {
-    // TODO: POST /v1/companies/{company_id}/signatories via Gusto edge function
-    console.log('[signatory] submit', {
-      ...values,
-      dateOfBirth: format(values.dateOfBirth, 'yyyy-MM-dd'),
-      ssn: '***-**-****',
+  const onSubmit = async (values: SignatoryFormValues) => {
+    const res = await upsertSignatory({
+      firstName: values.firstName,
+      lastName: values.lastName,
+      title: values.title,
+      dateOfBirth: values.dateOfBirth,
+      ssn: values.ssn,
     });
-    toast.success('Signatory saved', {
-      description: 'Gusto API wiring pending.',
-    });
+    if (res.ok) {
+      toast.success('Signatory saved', { description: 'Synced to Gusto.' });
+    } else {
+      toast.error('Failed to save signatory', {
+        description: res.error ?? 'Please try again.',
+      });
+    }
   };
 
   return (

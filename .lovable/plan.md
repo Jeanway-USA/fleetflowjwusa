@@ -1,54 +1,78 @@
-## Bank Details & Tax Setup Forms + Unified "Required" Styling
+## Wire Payroll Setup Forms to Gusto via Edge Function
 
-### 1. `BankDetailsSection.tsx` — Bank form (RHF + zod)
+Reference: the four sections are in `src/components/payroll/setup/sections/`. `GustoCompanySetup.tsx` isn't a real file — the plan targets the actual section components. Also: browser code cannot call `api.gusto.com` directly without leaking the bearer, so the client service will call the existing `run-w2-payroll` edge function which already mints/refreshes Gusto tokens server-side using `GUSTO_CLIENT_ID` / `GUSTO_CLIENT_SECRET` env vars.
 
-Fields (all required for payroll compliance):
-- **Account holder name** — text, 1–100 chars
-- **Account type** — Shadcn `Select`: Checking / Savings
-- **Routing number** — text, exactly 9 digits, `inputMode="numeric"`, ABA checksum validation (mod-10 with weights 3,7,1) in the zod refine
-- **Account number** — text, 4–17 digits, masked (`type="password"` with show/hide eye toggle, same pattern as SSN field)
-- **Confirm account number** — text, must equal `accountNumber` (zod `.refine` at the object level)
+### 1. New edge-function actions in `supabase/functions/run-w2-payroll/index.ts`
 
-Layout: `PayrollSetupSectionCard` with `Landmark` icon. Two-column grid on `sm+`. Submit button "Save bank details" (full-width on mobile, right-aligned on `sm+`). `onSubmit` logs (masked) + `toast.success('Bank details saved', { description: 'Gusto API wiring pending.' })`. TODO comment for `POST /v1/companies/{id}/bank_accounts`.
+Add four action handlers that use the existing `gustoFetch(admin, orgId, path, init)` helper (already injects `Authorization: Bearer <token>` + `X-Gusto-API-Version` server-side). Each pulls `companyUuid` from `getAccessToken(admin, orgId)` and 409s if the company hasn't been provisioned yet.
 
-### 2. `TaxSetupSection.tsx` — Tax IDs form (RHF + zod)
+- `upsert_signatory` → `POST /v1/companies/{company_uuid}/signatories`
+  Payload: `{ first_name, last_name, title, birthday: 'YYYY-MM-DD', ssn: '#########' }` (strip dashes server-side).
+- `upsert_primary_location` → `PUT /v1/companies/{company_uuid}/locations`
+  Payload: `{ street_1, street_2?, city, state, zip, country: 'USA', phone_number?, mailing_address: true, filing_address: true }`. Also send `{ industry: { naics_code } }` in the same action via a second `PUT /v1/companies/{company_uuid}` call so Company & Industry is one round trip.
+- `create_bank_account` → `POST /v1/companies/{company_uuid}/bank_accounts`
+  Payload: `{ routing_number, account_number, account_type: 'Checking' | 'Savings', account_holder_name }`.
+- `upsert_federal_tax_details` → `PUT /v1/companies/{company_uuid}/federal_tax_details`
+  Payload: `{ ein, filing_form: '941', taxable_as_scorp: false, legal_name }` (uses the values from the Tax Setup form; extra state-tax IDs are stored in a `TODO` note — Gusto exposes those via a separate `state_taxes` endpoint we'll add in a follow-up).
 
-Fields:
-- **Federal EIN** *(required)* — text, formatted `XX-XXXXXXX`, regex `^\d{2}-\d{7}$`, auto-format on input (same helper pattern as SSN)
-- **Filing state** — Shadcn `Select` of `US_STATES` (required, primary state where the company will file)
-- **State employer account / withholding ID** — text, 4–20 chars (required; label notes format varies by state)
-- **State unemployment (SUI) account number** — text, 4–20 chars (required)
-- **SUI rate (%)** — number input, 0–20, step 0.001 (required)
+Each handler returns `{ ok: true, gusto: <parsed body> }` on 2xx; on non-2xx it throws with the Gusto error body so the top-level catch returns 500 with `{ error }`.
 
-Layout: same shell (`Percent` icon), 2-col grid on `sm+`, EIN + Filing state in the top row, then the two state-ID fields, then SUI rate. Submit "Save tax setup" with the same log + toast stub. TODO comment for Gusto `federal_tax_details` + `state_taxes` PUT endpoints.
+Add the four cases to the `switch (action)` block right after `push_payroll_inputs`.
 
-### 3. Unified "required" styling across all four section forms
+### 2. New client service `src/services/gustoCompanyApi.ts`
 
-Add a tiny shared helper `src/components/payroll/setup/RequiredLabel.tsx`:
-```tsx
-export function RequiredLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      {children}
-      <span aria-label="required" className="text-destructive">*</span>
-    </span>
-  );
-}
+Thin, typed wrapper around `invokeWithAuth('run-w2-payroll', { body: { action, payload } })`. Exports:
+
+```ts
+export interface SignatoryInput { firstName; lastName; title; dateOfBirth: Date; ssn }
+export interface CompanyLocationInput { legalName; street1; street2?; city; state; zip; industryCode }
+export interface BankAccountInput { accountHolder; accountType: 'checking'|'savings'; routingNumber; accountNumber }
+export interface FederalTaxInput { ein; legalName }
+
+export async function upsertSignatory(input: SignatoryInput): Promise<GustoApiResult>
+export async function upsertPrimaryLocation(input: CompanyLocationInput): Promise<GustoApiResult>
+export async function createBankAccount(input: BankAccountInput): Promise<GustoApiResult>
+export async function upsertFederalTaxDetails(input: FederalTaxInput): Promise<GustoApiResult>
 ```
 
-Apply it inside every `<FormLabel>` for required fields in all four sections (Signatory, Company & Industry, Bank Details, Tax Setup). Optional fields (Address line 2) keep their existing "(optional)" hint and no asterisk.
+Each function:
+- Formats the payload to Gusto's snake_case shape (`birthday` from `format(date, 'yyyy-MM-dd')`, SSN/EIN stripped of dashes, account type Title-cased, etc.).
+- Calls `invokeWithAuth`; treats any successful non-error response as 200/201 success (the edge function only returns 2xx on Gusto 2xx).
+- Returns `{ ok: boolean; data?: unknown; error?: string }` so components stay UI-focused.
 
-Also add a small legend line under each form's submit row:
-`<p className="text-xs text-muted-foreground"><span className="text-destructive">*</span> Required for payroll compliance</p>`
+No bearer tokens in the file — the edge function reads `GUSTO_CLIENT_ID` / `GUSTO_CLIENT_SECRET` from Supabase secrets and mints/refreshes access tokens server-side. Confirm both secrets already exist via `fetch_secrets` before shipping; if either is missing, ask the user before wiring further.
 
-All forms already use shadcn `Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormMessage`, `Input`, `Select`, `Button` — no primitive swaps needed beyond adding the asterisk helper and legend.
+### 3. Wire the four form submits
+
+In each section, replace the stub `console.log + toast` in `onSubmit` with:
+
+```ts
+setSubmitting(true);
+const res = await upsertX(values);
+setSubmitting(false);
+if (res.ok) toast.success('<Section> saved', { description: 'Synced to Gusto.' });
+else toast.error('Failed to save', { description: res.error ?? 'Please try again.' });
+```
+
+Use `form.formState.isSubmitting` (already wired) via `await form.handleSubmit(async …)` — no extra state needed. Submit buttons already exist and remain disabled while submitting.
+
+Sections touched:
+- `SignatorySection.tsx` → `upsertSignatory`
+- `CompanyIndustrySection.tsx` → `upsertPrimaryLocation` (combined address + industry)
+- `BankDetailsSection.tsx` → `createBankAccount`
+- `TaxSetupSection.tsx` → `upsertFederalTaxDetails` (state-tax fields kept in the form but not sent this turn — TODO comment references the follow-up `state_taxes` endpoint)
 
 ### Files touched
 
-- `src/components/payroll/setup/sections/BankDetailsSection.tsx` (rewrite body)
-- `src/components/payroll/setup/sections/TaxSetupSection.tsx` (rewrite body)
-- `src/components/payroll/setup/sections/SignatorySection.tsx` (add `RequiredLabel` + legend)
-- `src/components/payroll/setup/sections/CompanyIndustrySection.tsx` (add `RequiredLabel` + legend)
-- `src/components/payroll/setup/RequiredLabel.tsx` (new, tiny)
+- `supabase/functions/run-w2-payroll/index.ts` (add 4 actions + 4 switch cases)
+- `src/services/gustoCompanyApi.ts` (new)
+- `src/components/payroll/setup/sections/SignatorySection.tsx` (submit handler)
+- `src/components/payroll/setup/sections/CompanyIndustrySection.tsx` (submit handler)
+- `src/components/payroll/setup/sections/BankDetailsSection.tsx` (submit handler)
+- `src/components/payroll/setup/sections/TaxSetupSection.tsx` (submit handler)
 
-No routes, no API calls, no DB writes this turn.
+### Out of scope this turn
+
+- No new secrets requested (reusing existing `GUSTO_CLIENT_ID` / `GUSTO_CLIENT_SECRET`).
+- No state-tax `state_taxes` endpoint wiring (follow-up).
+- Payroll Setup blocker-count badge still shows `—` (recomputing it needs a separate Gusto onboarding-status parse).
