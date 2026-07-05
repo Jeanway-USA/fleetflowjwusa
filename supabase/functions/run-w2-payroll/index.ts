@@ -901,6 +901,12 @@ Deno.serve(async (req) => {
       case "upsert_federal_tax_details":
         result = await actionUpsertFederalTaxDetails(admin, orgId, payload);
         break;
+      case "upsert_state_taxes":
+        result = await actionUpsertStateTaxes(admin, orgId, payload);
+        break;
+      case "verify_bank_account":
+        result = await actionVerifyBankAccount(admin, orgId, payload);
+        break;
       case "status": {
         const { companyUuid, status } = await getAccessToken(admin, orgId);
         result = { company_uuid: companyUuid, onboarding_status: status };
