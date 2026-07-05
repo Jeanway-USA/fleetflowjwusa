@@ -198,25 +198,37 @@ export function TaxSetupSection() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="stateAccountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    <RequiredLabel>State withholding account ID</RequiredLabel>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      autoComplete="off"
-                      placeholder="Format varies by state"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {stateRequiresWithholding ? (
+              <FormField
+                control={form.control}
+                name="stateAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      <RequiredLabel>State withholding account ID</RequiredLabel>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        autoComplete="off"
+                        placeholder="Format varies by state"
+                        {...field}
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : filingState ? (
+              <FormItem>
+                <FormLabel className="text-muted-foreground">
+                  State withholding account ID
+                </FormLabel>
+                <div className="flex h-10 items-center rounded-md border border-dashed border-border/60 bg-muted/30 px-3 text-xs text-muted-foreground">
+                  {filingState} has no state income tax — no withholding account required.
+                </div>
+              </FormItem>
+            ) : null}
 
             <FormField
               control={form.control}
@@ -227,7 +239,7 @@ export function TaxSetupSection() {
                     <RequiredLabel>State unemployment (SUI) account number</RequiredLabel>
                   </FormLabel>
                   <FormControl>
-                    <Input autoComplete="off" {...field} />
+                    <Input autoComplete="off" {...field} value={field.value ?? ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
