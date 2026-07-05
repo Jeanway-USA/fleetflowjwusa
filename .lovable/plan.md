@@ -1,51 +1,24 @@
-## Problem
+## Goal
+Make the "State withholding account ID" field conditional based on the selected filing state, and fix the input rendering.
 
-Each onboarding section (Company & Industry, Signatory, Federal Tax, Bank, State Tax, Pay Schedule) submits data to Gusto via `run-w2-payroll`, but the forms never read the saved values back. When a step is marked "Done" by `sync_onboarding_steps` and the user re-opens the accordion, the form shows its hardcoded `defaultValues` (mostly empty), so it looks like nothing was saved.
+## Background
+Several states (TX, FL, NV, SD, WA, WY, AK, TN, NH) don't levy state income tax, so employers don't have a state withholding account. Currently the Tax Setup form always requires this field, blocking Texas-based orgs.
 
-The data is actually stored in Gusto — it's just never rehydrated into the form.
+## Changes (frontend only — `src/components/payroll/setup/sections/TaxSetupSection.tsx`)
 
-## Fix
+1. **Add no-SIT state list** — constant `NO_SIT_STATES = ['AK','FL','NH','NV','SD','TN','TX','WA','WY']` (NH/TN tax only investment income — treat as no wage withholding for payroll purposes).
 
-Add read-side endpoints to the edge function and use them to prefill each section's form.
+2. **Make schema conditional** — replace the static `stateAccountId` rule with a `z.object(...).superRefine(...)` that only requires `stateAccountId` (min 4) when `filingState` is NOT in `NO_SIT_STATES`. When it is, allow empty/optional.
 
-### 1. `supabase/functions/run-w2-payroll/index.ts`
+3. **Conditionally render the field** — watch `filingState` via `form.watch`; hide the "State withholding account ID" FormField when the selected state has no SIT. Show a small helper line in its place: "{State} has no state income tax — no withholding account required."
 
-Add new actions that GET data from Gusto and return it to the client:
+4. **Fix the input** — the field currently shows only a placeholder because `field.value` can be `undefined` on hydrate. Ensure the Input receives `value={field.value ?? ''}` so it renders as a controlled input consistently (apply same fix to `suiAccountId` for safety).
 
-- `get_company` — returns legal name, primary work address, phone, NAICS industry code
-- `get_signatory` — returns signatory first/last name, title, email, phone, home address (SSN/DOB not returned by Gusto once saved; leave blank)
-- `get_federal_tax_details` — returns EIN, filing_form, taxable_as_scorp
-- `list_bank_accounts` — returns existing bank account uuid + last4 + verification status
-- `list_state_tax_setups` — returns per-state withholding/SUI account ids + rate
+5. **Clear stale value on state change** — when `filingState` switches to a no-SIT state, reset `stateAccountId` to `''` so a previously typed value isn't silently submitted.
 
-Wire each into the `switch (action)` block.
-
-### 2. `src/services/gustoCompanyApi.ts`
-
-Add typed client wrappers (`getCompany`, `getSignatory`, `getFederalTaxDetails`, `listBankAccounts`, `listStateTaxSetups`) that call the new actions via `callAction`.
-
-### 3. Section components
-
-For each section under `src/components/payroll/setup/sections/` and `src/components/finance/payroll/steps/`:
-
-- Fetch current values with `useQuery` on mount, keyed by `orgId`.
-- Pass fetched values into `useForm`'s `defaultValues`, plus `form.reset(values)` in a `useEffect` when the query resolves (so switching orgs or refetching also rehydrates).
-- Show a small "Loading…" state while fetching.
-- Keep the existing submit flow unchanged; after a successful save, invalidate the section's query so the newly saved values re-load.
-
-Affected files:
-- `sections/CompanyIndustrySection.tsx`
-- `sections/SignatorySection.tsx` (SSN/DOB stay input-only; other fields prefill)
-- `sections/TaxSetupSection.tsx`
-- `steps/MicroDepositVerifyStep.tsx` (prefill bank account uuid + show masked last4)
-- `steps/StateTaxStep.tsx`
-- `PayScheduleManager.tsx` (already lists pay schedules; verify it reflects saved schedule and skip if it already does)
-
-### 4. Portal refresh
-
-In `EmployerOnboardingPortal.tsx`, on successful save inside any section, also `refetch()` the `gusto-onboarding-steps` query so the "Done" badge updates in the same interaction.
+6. **Submit payload** — only include `stateAccountId` in the (future) state-tax call when the state requires it. For now the TODO comment stays; just guard the value.
 
 ## Out of scope
-
-- No schema changes. All state lives in Gusto; we only read/write through the edge function.
-- Sensitive fields Gusto never returns (SSN, DOB, full bank account number) stay blank on rehydrate by design.
+- No backend/edge function changes.
+- SUI (unemployment) remains required for all states — every state has SUTA.
+- No schema/migration changes.

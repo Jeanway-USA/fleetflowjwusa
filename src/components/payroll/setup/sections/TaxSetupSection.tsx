@@ -29,24 +29,37 @@ import {
 } from '@/components/ui/select';
 import { US_STATES } from '@/lib/us-states';
 
-const taxSchema = z.object({
-  ein: z.string().regex(/^\d{2}-\d{7}$/, 'EIN must be formatted XX-XXXXXXX'),
-  filingState: z.string().min(2, 'Filing state is required'),
-  stateAccountId: z
-    .string()
-    .trim()
-    .min(4, 'State account ID is required')
-    .max(20),
-  suiAccountId: z
-    .string()
-    .trim()
-    .min(4, 'SUI account number is required')
-    .max(20),
-  suiRate: z
-    .number({ invalid_type_error: 'SUI rate is required' })
-    .min(0, 'SUI rate cannot be negative')
-    .max(20, 'SUI rate seems too high'),
-});
+// States that do not levy a wage-based state income tax. NH & TN only tax
+// investment income, so no employer withholding account is issued for wages.
+const NO_SIT_STATES = ['AK', 'FL', 'NH', 'NV', 'SD', 'TN', 'TX', 'WA', 'WY'];
+
+const taxSchema = z
+  .object({
+    ein: z.string().regex(/^\d{2}-\d{7}$/, 'EIN must be formatted XX-XXXXXXX'),
+    filingState: z.string().min(2, 'Filing state is required'),
+    stateAccountId: z.string().trim().max(20).optional().or(z.literal('')),
+    suiAccountId: z
+      .string()
+      .trim()
+      .min(4, 'SUI account number is required')
+      .max(20),
+    suiRate: z
+      .number({ invalid_type_error: 'SUI rate is required' })
+      .min(0, 'SUI rate cannot be negative')
+      .max(20, 'SUI rate seems too high'),
+  })
+  .superRefine((val, ctx) => {
+    if (!NO_SIT_STATES.includes(val.filingState)) {
+      const v = (val.stateAccountId ?? '').trim();
+      if (v.length < 4) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['stateAccountId'],
+          message: 'State account ID is required',
+        });
+      }
+    }
+  });
 
 type TaxFormValues = z.infer<typeof taxSchema>;
 
@@ -90,9 +103,24 @@ export function TaxSetupSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remote]);
 
+  const filingState = form.watch('filingState');
+  const stateRequiresWithholding = !!filingState && !NO_SIT_STATES.includes(filingState);
+
+  useEffect(() => {
+    if (filingState && !stateRequiresWithholding) {
+      const current = form.getValues('stateAccountId');
+      if (current) form.setValue('stateAccountId', '', { shouldValidate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filingState, stateRequiresWithholding]);
+
   const onSubmit = async (values: TaxFormValues) => {
     // TODO: separate call to /v1/companies/{id}/state_taxes for
     // filingState / stateAccountId / suiAccountId / suiRate.
+    // stateAccountId is only sent when the state levies income tax.
+    const _stateWithholding = stateRequiresWithholding
+      ? (values.stateAccountId ?? '').trim()
+      : null;
     const res = await upsertFederalTaxDetails({ ein: values.ein });
     if (res.ok) {
       toast.success('Tax setup saved', { description: 'Synced to Gusto.' });
@@ -170,25 +198,37 @@ export function TaxSetupSection() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="stateAccountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    <RequiredLabel>State withholding account ID</RequiredLabel>
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      autoComplete="off"
-                      placeholder="Format varies by state"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {stateRequiresWithholding ? (
+              <FormField
+                control={form.control}
+                name="stateAccountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      <RequiredLabel>State withholding account ID</RequiredLabel>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        autoComplete="off"
+                        placeholder="Format varies by state"
+                        {...field}
+                        value={field.value ?? ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : filingState ? (
+              <FormItem>
+                <FormLabel className="text-muted-foreground">
+                  State withholding account ID
+                </FormLabel>
+                <div className="flex h-10 items-center rounded-md border border-dashed border-border/60 bg-muted/30 px-3 text-xs text-muted-foreground">
+                  {filingState} has no state income tax — no withholding account required.
+                </div>
+              </FormItem>
+            ) : null}
 
             <FormField
               control={form.control}
@@ -199,7 +239,7 @@ export function TaxSetupSection() {
                     <RequiredLabel>State unemployment (SUI) account number</RequiredLabel>
                   </FormLabel>
                   <FormControl>
-                    <Input autoComplete="off" {...field} />
+                    <Input autoComplete="off" {...field} value={field.value ?? ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
