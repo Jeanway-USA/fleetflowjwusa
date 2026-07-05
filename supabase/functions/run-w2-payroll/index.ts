@@ -451,6 +451,7 @@ async function actionUpsertSignatory(
   // Check for existing signatory - Gusto only allows one per company
   let existingUuid: string | undefined;
   let existingVersion: string | undefined;
+  let existingEmail: string | undefined;
   try {
     const listResp = await gustoFetch(
       admin,
@@ -463,10 +464,32 @@ async function actionUpsertSignatory(
       if (Array.isArray(list) && list.length > 0) {
         existingUuid = list[0].uuid as string | undefined;
         existingVersion = list[0].version as string | undefined;
+        existingEmail = list[0].email as string | undefined;
       }
     }
   } catch {
     // ignore, will attempt POST
+  }
+
+  // Gusto forbids updating email on an existing signatory.
+  // If the email changed, delete the existing one and recreate.
+  const emailChanged = existingUuid && existingEmail &&
+    existingEmail.trim().toLowerCase() !== payload.email.trim().toLowerCase();
+  if (emailChanged) {
+    const delResp = await gustoFetch(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}/signatories/${existingUuid}`,
+      { method: "DELETE" },
+    );
+    if (!delResp.ok && delResp.status !== 404) {
+      const errBody = await readGustoBody(delResp);
+      throw new Error(
+        `Gusto delete_signatory failed (${delResp.status}): ${JSON.stringify(errBody)}`,
+      );
+    }
+    existingUuid = undefined;
+    existingVersion = undefined;
   }
 
   const signatoryBody: Record<string, unknown> = {
@@ -476,7 +499,6 @@ async function actionUpsertSignatory(
     birthday: payload.birthday,
     ssn: payload.ssn.replace(/\D/g, ""),
     phone: payload.phone.replace(/\D/g, ""),
-    email: payload.email,
     home_address: {
       street_1: addr.street_1,
       street_2: addr.street_2 || undefined,
@@ -489,6 +511,7 @@ async function actionUpsertSignatory(
 
   let body: unknown;
   if (existingUuid) {
+    // Do NOT include email on PUT - Gusto rejects email updates
     if (existingVersion) signatoryBody.version = existingVersion;
     body = await gustoJson(
       admin,
@@ -498,6 +521,7 @@ async function actionUpsertSignatory(
       "Gusto update_signatory",
     );
   } else {
+    signatoryBody.email = payload.email;
     body = await gustoJson(
       admin,
       orgId,
@@ -508,6 +532,7 @@ async function actionUpsertSignatory(
   }
   return { ok: true, gusto: body };
 }
+
 
 
 async function actionUpsertPrimaryLocation(
