@@ -187,6 +187,14 @@ async function gustoFetch(
 async function actionProvisionCompany(
   admin: Admin,
   orgId: string,
+  payload: {
+    owner_first_name?: string;
+    owner_last_name?: string;
+    owner_email?: string;
+    company_name?: string;
+    trade_name?: string;
+    ein?: string;
+  } = {},
 ): Promise<Record<string, unknown>> {
   const { data: org } = await admin
     .from("organizations")
@@ -194,6 +202,10 @@ async function actionProvisionCompany(
     .eq("id", orgId)
     .maybeSingle();
   const systemToken = await getGustoSystemToken();
+  const einDigits = (payload.ein || "").replace(/\D/g, "");
+  const ein = einDigits.length === 9
+    ? `${einDigits.slice(0, 2)}-${einDigits.slice(2)}`
+    : null;
   const resp = await fetch(`${GUSTO_BASE}/v1/partner_managed_companies`, {
     method: "POST",
     headers: {
@@ -203,8 +215,16 @@ async function actionProvisionCompany(
       "X-Gusto-API-Version": GUSTO_API_VERSION,
     },
     body: JSON.stringify({
-      user: { first_name: "Owner", last_name: "Owner", email: `owner+${orgId}@example.com` },
-      company: { name: org?.name ?? `Org ${orgId.slice(0, 8)}`, trade_name: org?.name ?? undefined, ein: null },
+      user: {
+        first_name: payload.owner_first_name || "Owner",
+        last_name: payload.owner_last_name || "Owner",
+        email: payload.owner_email || `owner+${orgId}@example.com`,
+      },
+      company: {
+        name: payload.company_name || org?.name || `Org ${orgId.slice(0, 8)}`,
+        trade_name: payload.trade_name || payload.company_name || org?.name || undefined,
+        ein,
+      },
     }),
   });
   const body = await readGustoBody(resp) as Record<string, unknown>;
@@ -969,9 +989,230 @@ async function actionSendOnboardingInvite(
       );
     }
   }
+// -----------------------------------------------------------------------------
+// Phase 2: onboarding step cache, state tax requirements, bank (Plaid + micro
+// deposits), pay schedules, self-onboarding flow token.
+// -----------------------------------------------------------------------------
 
-  return { sent: true, email: driver.email, gusto: lastBody };
+async function actionSyncOnboardingSteps(
+  admin: Admin,
+  orgId: string,
+): Promise<Record<string, unknown>> {
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const resp = await gustoFetch(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/onboarding_status`,
+    { method: "GET" },
+  );
+  const body = (await readGustoBody(resp)) as Record<string, unknown>;
+  if (!resp.ok) {
+    throw new Error(
+      `Gusto company onboarding_status failed (${resp.status}): ${JSON.stringify(body)}`,
+    );
+  }
+  const steps = Array.isArray(body?.onboarding_steps) ? body.onboarding_steps : [];
+  const status = typeof body?.onboarding_status === "string"
+    ? body.onboarding_status
+    : null;
+
+  const findCompleted = (needles: string[]): boolean => {
+    for (const step of steps as Array<Record<string, unknown>>) {
+      const id = String(step.id ?? step.step ?? "").toLowerCase();
+      const title = String(step.title ?? "").toLowerCase();
+      if (needles.some((n) => id.includes(n) || title.includes(n))) {
+        return Boolean(step.completed);
+      }
+    }
+    return false;
+  };
+
+  const update: Record<string, unknown> = {
+    onboarding_steps: steps,
+    onboarding_steps_synced_at: new Date().toISOString(),
+  };
+  if (status) update.onboarding_status = status;
+  update.federal_tax_status = findCompleted(["federal_tax"]) ? "completed" : "pending";
+  update.signatory_status = findCompleted(["signatory", "add_signatory"]) ? "completed" : "pending";
+
+  await admin.from("gusto_integration").update(update).eq("org_id", orgId);
+  return { onboarding_status: status, onboarding_steps: steps };
 }
+
+async function actionGetStateTaxRequirements(
+  admin: Admin,
+  orgId: string,
+  payload: { state: string },
+): Promise<Record<string, unknown>> {
+  const state = String(payload?.state || "").toUpperCase();
+  if (state.length !== 2) throw new Error("state (2-char) required");
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const body = await gustoJson(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/tax_requirements/${state}`,
+    { method: "GET" },
+    `Gusto get_state_tax_requirements[${state}]`,
+  );
+  return { state, requirements: body };
+}
+
+async function actionSubmitStateTaxRequirements(
+  admin: Admin,
+  orgId: string,
+  payload: { state: string; requirement_sets: unknown[] },
+): Promise<Record<string, unknown>> {
+  const state = String(payload?.state || "").toUpperCase();
+  if (state.length !== 2) throw new Error("state (2-char) required");
+  if (!Array.isArray(payload?.requirement_sets)) {
+    throw new Error("requirement_sets[] required");
+  }
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const body = await gustoJson(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/tax_requirements/${state}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ requirement_sets: payload.requirement_sets }),
+    },
+    `Gusto submit_state_tax_requirements[${state}]`,
+  );
+
+  // Cache per-state status in gusto_integration.state_tax_requirements
+  try {
+    const { data: row } = await admin
+      .from("gusto_integration")
+      .select("state_tax_requirements")
+      .eq("org_id", orgId)
+      .maybeSingle();
+    const current = (row?.state_tax_requirements ?? {}) as Record<string, unknown>;
+    current[state] = { submitted_at: new Date().toISOString(), gusto: body };
+    await admin
+      .from("gusto_integration")
+      .update({ state_tax_requirements: current })
+      .eq("org_id", orgId);
+  } catch { /* best-effort cache */ }
+
+  return { state, gusto: body };
+}
+
+async function actionCreateBankAccountFromPlaid(
+  admin: Admin,
+  orgId: string,
+  payload: { plaid_processor_token: string; account_holder_name?: string },
+): Promise<Record<string, unknown>> {
+  if (!payload?.plaid_processor_token) {
+    throw new Error("plaid_processor_token required");
+  }
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const body = await gustoJson(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/bank_accounts/plaid`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        plaid_processor_token: payload.plaid_processor_token,
+        account_holder_name: payload.account_holder_name || undefined,
+      }),
+    },
+    "Gusto create_bank_account_from_plaid",
+  );
+
+  const uuid = typeof (body as { uuid?: string }).uuid === "string"
+    ? (body as { uuid: string }).uuid
+    : null;
+  const verifStatus = typeof (body as { verification_status?: string }).verification_status === "string"
+    ? (body as { verification_status: string }).verification_status
+    : "verified";
+  await admin.from("gusto_integration").update({
+    bank_account_uuid: uuid,
+    bank_verification_status: verifStatus,
+  }).eq("org_id", orgId);
+
+  return { ok: true, gusto: body };
+}
+
+async function actionInitiateMicroDeposits(
+  admin: Admin,
+  orgId: string,
+  payload: { bank_account_uuid?: string },
+): Promise<Record<string, unknown>> {
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+
+  let bankUuid = payload?.bank_account_uuid;
+  if (!bankUuid) {
+    const listResp = await gustoFetch(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}/bank_accounts`,
+      { method: "GET" },
+    );
+    const list = (await readGustoBody(listResp)) as unknown;
+    const arr = Array.isArray(list) ? list : [];
+    const unverified = arr.find((b: any) => b?.verification_status !== "verified") ?? arr[0];
+    bankUuid = unverified?.uuid;
+    if (!bankUuid) {
+      throw new Error("No bank account found. Create a bank account first.");
+    }
+  }
+
+  const body = await gustoJson(
+    admin,
+    orgId,
+    `/v1/company_bank_accounts/${bankUuid}/send_test_deposits`,
+    { method: "POST", body: JSON.stringify({}) },
+    "Gusto initiate_micro_deposits",
+  );
+
+  await admin.from("gusto_integration").update({
+    bank_account_uuid: bankUuid,
+    bank_verification_status: "awaiting_deposits",
+  }).eq("org_id", orgId);
+
+  return { ok: true, bank_account_uuid: bankUuid, gusto: body };
+}
+
+async function actionListPaySchedules(
+  admin: Admin,
+  orgId: string,
+): Promise<Record<string, unknown>> {
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const resp = await gustoFetch(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/pay_schedules`,
+    { method: "GET" },
+  );
+  const body = await readGustoBody(resp);
+  if (!resp.ok) {
+    throw new Error(
+      `Gusto list_pay_schedules failed (${resp.status}): ${JSON.stringify(body)}`,
+    );
+  }
+  const list = Array.isArray(body) ? body : [];
+  return { pay_schedules: list };
+}
+
+async function actionCreateEmployeeSelfOnboardingFlowToken(
+  admin: Admin,
+  orgId: string,
+  payload: { driver_id?: string; employee_uuid?: string },
+): Promise<Record<string, unknown>> {
+  let employeeUuid = payload?.employee_uuid;
+  if (!employeeUuid && payload?.driver_id) {
+    const driver = await loadDriverForInvite(admin, orgId, payload.driver_id);
+    employeeUuid = driver.gusto_employee_id;
+  }
+  if (!employeeUuid) throw new Error("driver_id or employee_uuid required");
+  return await actionCreateFlowToken(admin, orgId, {
+    flow_type: "employee_self_management",
+    entity_uuid: employeeUuid,
+    entity_type: "Employee",
+  });
+}
+
 
 async function actionGetOnboardingLink(
   admin: Admin,
@@ -1148,7 +1389,7 @@ Deno.serve(async (req) => {
     let result: Record<string, unknown>;
     switch (action) {
       case "provision_company":
-        result = await actionProvisionCompany(admin, orgId);
+        result = await actionProvisionCompany(admin, orgId, payload);
         break;
       case "sync_employee":
         result = await actionSyncEmployee(admin, orgId, payload);
@@ -1192,6 +1433,32 @@ Deno.serve(async (req) => {
       case "get_employee_onboarding_link":
         result = await actionGetOnboardingLink(admin, orgId, payload);
         break;
+      case "sync_onboarding_steps":
+        result = await actionSyncOnboardingSteps(admin, orgId);
+        break;
+      case "get_state_tax_requirements":
+        result = await actionGetStateTaxRequirements(admin, orgId, payload);
+        break;
+      case "submit_state_tax_requirements":
+        result = await actionSubmitStateTaxRequirements(admin, orgId, payload);
+        break;
+      case "create_bank_account_from_plaid":
+        result = await actionCreateBankAccountFromPlaid(admin, orgId, payload);
+        break;
+      case "initiate_micro_deposits":
+        result = await actionInitiateMicroDeposits(admin, orgId, payload);
+        break;
+      case "verify_micro_deposits":
+        result = await actionVerifyBankAccount(admin, orgId, payload);
+        break;
+      case "list_pay_schedules":
+        result = await actionListPaySchedules(admin, orgId);
+        break;
+      case "create_employee_self_onboarding_flow_token":
+        result = await actionCreateEmployeeSelfOnboardingFlowToken(admin, orgId, payload);
+        break;
+
+
 
 
       case "status": {
