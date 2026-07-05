@@ -232,6 +232,16 @@ export function RunW2PayrollDialog({
                 Actual amounts are entered inside Gusto&apos;s workspace.
               </p>
             </div>
+
+            {provisioned && (
+              <Link
+                to="/settings/payroll-setup"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                Setup incomplete? Open Payroll Setup
+                <ArrowUpRight className="h-3 w-3" />
+              </Link>
+            )}
           </aside>
 
           {/* Right: Gusto's embedded PayrollFlow */}
