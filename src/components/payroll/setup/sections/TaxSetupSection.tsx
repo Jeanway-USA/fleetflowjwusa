@@ -29,24 +29,37 @@ import {
 } from '@/components/ui/select';
 import { US_STATES } from '@/lib/us-states';
 
-const taxSchema = z.object({
-  ein: z.string().regex(/^\d{2}-\d{7}$/, 'EIN must be formatted XX-XXXXXXX'),
-  filingState: z.string().min(2, 'Filing state is required'),
-  stateAccountId: z
-    .string()
-    .trim()
-    .min(4, 'State account ID is required')
-    .max(20),
-  suiAccountId: z
-    .string()
-    .trim()
-    .min(4, 'SUI account number is required')
-    .max(20),
-  suiRate: z
-    .number({ invalid_type_error: 'SUI rate is required' })
-    .min(0, 'SUI rate cannot be negative')
-    .max(20, 'SUI rate seems too high'),
-});
+// States that do not levy a wage-based state income tax. NH & TN only tax
+// investment income, so no employer withholding account is issued for wages.
+const NO_SIT_STATES = ['AK', 'FL', 'NH', 'NV', 'SD', 'TN', 'TX', 'WA', 'WY'];
+
+const taxSchema = z
+  .object({
+    ein: z.string().regex(/^\d{2}-\d{7}$/, 'EIN must be formatted XX-XXXXXXX'),
+    filingState: z.string().min(2, 'Filing state is required'),
+    stateAccountId: z.string().trim().max(20).optional().or(z.literal('')),
+    suiAccountId: z
+      .string()
+      .trim()
+      .min(4, 'SUI account number is required')
+      .max(20),
+    suiRate: z
+      .number({ invalid_type_error: 'SUI rate is required' })
+      .min(0, 'SUI rate cannot be negative')
+      .max(20, 'SUI rate seems too high'),
+  })
+  .superRefine((val, ctx) => {
+    if (!NO_SIT_STATES.includes(val.filingState)) {
+      const v = (val.stateAccountId ?? '').trim();
+      if (v.length < 4) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['stateAccountId'],
+          message: 'State account ID is required',
+        });
+      }
+    }
+  });
 
 type TaxFormValues = z.infer<typeof taxSchema>;
 
