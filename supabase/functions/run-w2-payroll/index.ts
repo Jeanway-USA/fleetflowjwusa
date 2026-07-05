@@ -493,7 +493,7 @@ async function actionUpsertSignatory(
     body = await gustoJson(
       admin,
       orgId,
-      `/v1/signatories/${existingUuid}`,
+      `/v1/companies/${companyUuid}/signatories/${existingUuid}`,
       { method: "PUT", body: JSON.stringify(signatoryBody) },
       "Gusto update_signatory",
     );
