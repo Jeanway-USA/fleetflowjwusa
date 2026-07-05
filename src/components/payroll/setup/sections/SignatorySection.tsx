@@ -7,6 +7,7 @@ import { CalendarIcon, Eye, EyeOff, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { PayrollSetupSectionCard } from '../PayrollSetupSectionCard';
+import { RequiredLabel, RequiredLegend } from '../RequiredLabel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
@@ -98,7 +99,7 @@ export function SignatorySection() {
               name="firstName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>First name</FormLabel>
+                  <FormLabel><RequiredLabel>First name</RequiredLabel></FormLabel>
                   <FormControl>
                     <Input autoComplete="given-name" {...field} />
                   </FormControl>
@@ -111,7 +112,7 @@ export function SignatorySection() {
               name="lastName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Last name</FormLabel>
+                  <FormLabel><RequiredLabel>Last name</RequiredLabel></FormLabel>
                   <FormControl>
                     <Input autoComplete="family-name" {...field} />
                   </FormControl>
@@ -124,7 +125,7 @@ export function SignatorySection() {
               name="title"
               render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel>Title</FormLabel>
+                  <FormLabel><RequiredLabel>Title</RequiredLabel></FormLabel>
                   <FormControl>
                     <Input placeholder="e.g. Owner, CEO, President" {...field} />
                   </FormControl>
@@ -137,7 +138,7 @@ export function SignatorySection() {
               name="dateOfBirth"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Date of birth</FormLabel>
+                  <FormLabel><RequiredLabel>Date of birth</RequiredLabel></FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -177,7 +178,7 @@ export function SignatorySection() {
               name="ssn"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>SSN</FormLabel>
+                  <FormLabel><RequiredLabel>SSN</RequiredLabel></FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Input
@@ -205,7 +206,8 @@ export function SignatorySection() {
             />
           </div>
 
-          <div className="flex justify-stretch pt-2 sm:justify-end">
+          <div className="flex flex-col-reverse items-stretch gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+            <RequiredLegend />
             <Button
               type="submit"
               className="w-full sm:w-auto"

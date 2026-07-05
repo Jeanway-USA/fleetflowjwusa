@@ -1,46 +1,54 @@
-## Add Signatory & Company/Industry Forms to Payroll Setup
+## Bank Details & Tax Setup Forms + Unified "Required" Styling
 
-Note: the user references `GustoCompanySetup.tsx`, but the scaffolded files are `SignatorySection.tsx` and `CompanyIndustrySection.tsx` under `src/components/payroll/setup/sections/`. Plan targets those.
+### 1. `BankDetailsSection.tsx` — Bank form (RHF + zod)
 
-### 1. `SignatorySection.tsx` — Signatory form
+Fields (all required for payroll compliance):
+- **Account holder name** — text, 1–100 chars
+- **Account type** — Shadcn `Select`: Checking / Savings
+- **Routing number** — text, exactly 9 digits, `inputMode="numeric"`, ABA checksum validation (mod-10 with weights 3,7,1) in the zod refine
+- **Account number** — text, 4–17 digits, masked (`type="password"` with show/hide eye toggle, same pattern as SSN field)
+- **Confirm account number** — text, must equal `accountNumber` (zod `.refine` at the object level)
 
-Replace the placeholder body with a React Hook Form + zod form inside the existing `PayrollSetupSectionCard`.
+Layout: `PayrollSetupSectionCard` with `Landmark` icon. Two-column grid on `sm+`. Submit button "Save bank details" (full-width on mobile, right-aligned on `sm+`). `onSubmit` logs (masked) + `toast.success('Bank details saved', { description: 'Gusto API wiring pending.' })`. TODO comment for `POST /v1/companies/{id}/bank_accounts`.
 
-Fields:
-- **First Name** — text, required, 1–50 chars
-- **Last Name** — text, required, 1–50 chars
-- **Title** — text, required, 1–100 chars (e.g. "Owner", "CEO")
-- **Date of Birth** — Shadcn Datepicker (Popover + Calendar with `pointer-events-auto`), required, must be a past date and age ≥ 18
-- **SSN** — text, required, masked/formatted `XXX-XX-XXXX`, regex `^\d{3}-?\d{2}-?\d{4}$`, input `type="password"` (or toggleable), autoComplete off
-
-Layout: two-column grid on `sm+`, single column on mobile. Submit button "Save Signatory" (full width on mobile, right-aligned on `sm+`). `onSubmit` currently just `console.log` + toast "Signatory saved (Gusto API wiring pending)".
-
-### 2. `CompanyIndustrySection.tsx` — Company & Address/Industry form
-
-Same RHF + zod pattern.
+### 2. `TaxSetupSection.tsx` — Tax IDs form (RHF + zod)
 
 Fields:
-- **Legal Company Name** — text, required, **default `"JeanWay LLC"`**
-- **Street Address (line 1)** — text, required
-- **Address Line 2** — text, optional
-- **City** — text, required
-- **State** — Shadcn `Select` of US state codes (reuse existing state list if one exists in `src/lib` / `src/constants`; otherwise inline a `US_STATES` const in the section file)
-- **ZIP** — text, regex `^\d{5}(-\d{4})?$`
-- **Industry** — Shadcn `Select` with a curated NAICS list relevant to trucking (General Freight Trucking, Long-Distance / Local, Specialized Freight, Courier, Warehousing, Other). Values = NAICS codes, labels = human names. Stored in a local `INDUSTRY_OPTIONS` const.
+- **Federal EIN** *(required)* — text, formatted `XX-XXXXXXX`, regex `^\d{2}-\d{7}$`, auto-format on input (same helper pattern as SSN)
+- **Filing state** — Shadcn `Select` of `US_STATES` (required, primary state where the company will file)
+- **State employer account / withholding ID** — text, 4–20 chars (required; label notes format varies by state)
+- **State unemployment (SUI) account number** — text, 4–20 chars (required)
+- **SUI rate (%)** — number input, 0–20, step 0.001 (required)
 
-Layout: address block as 2-column responsive grid (line1 full width, city/state/zip on one row `sm+`), industry field full width below. Submit button "Save Company Info", same toast + `console.log` stub.
+Layout: same shell (`Percent` icon), 2-col grid on `sm+`, EIN + Filing state in the top row, then the two state-ID fields, then SUI rate. Submit "Save tax setup" with the same log + toast stub. TODO comment for Gusto `federal_tax_details` + `state_taxes` PUT endpoints.
 
-### 3. Shared/misc
+### 3. Unified "required" styling across all four section forms
 
-- Both forms use `Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormMessage` from `@/components/ui/form`.
-- Use `useToast` from `@/hooks/use-toast` for the stub submit feedback.
-- No new deps — `react-hook-form`, `zod`, `@hookform/resolvers`, `date-fns`, shadcn primitives are all already in the project.
-- No API calls, no edge functions, no DB writes this turn — TODO comments mark where the Gusto `/companies/{id}` and `/companies/{id}/signatories` calls will go.
-- Blocker badge on `PayrollSetup.tsx` stays as `—` (unchanged).
+Add a tiny shared helper `src/components/payroll/setup/RequiredLabel.tsx`:
+```tsx
+export function RequiredLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {children}
+      <span aria-label="required" className="text-destructive">*</span>
+    </span>
+  );
+}
+```
+
+Apply it inside every `<FormLabel>` for required fields in all four sections (Signatory, Company & Industry, Bank Details, Tax Setup). Optional fields (Address line 2) keep their existing "(optional)" hint and no asterisk.
+
+Also add a small legend line under each form's submit row:
+`<p className="text-xs text-muted-foreground"><span className="text-destructive">*</span> Required for payroll compliance</p>`
+
+All forms already use shadcn `Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormMessage`, `Input`, `Select`, `Button` — no primitive swaps needed beyond adding the asterisk helper and legend.
 
 ### Files touched
 
-- `src/components/payroll/setup/sections/SignatorySection.tsx` (rewrite body)
-- `src/components/payroll/setup/sections/CompanyIndustrySection.tsx` (rewrite body)
+- `src/components/payroll/setup/sections/BankDetailsSection.tsx` (rewrite body)
+- `src/components/payroll/setup/sections/TaxSetupSection.tsx` (rewrite body)
+- `src/components/payroll/setup/sections/SignatorySection.tsx` (add `RequiredLabel` + legend)
+- `src/components/payroll/setup/sections/CompanyIndustrySection.tsx` (add `RequiredLabel` + legend)
+- `src/components/payroll/setup/RequiredLabel.tsx` (new, tiny)
 
-No route, layout, or other section changes.
+No routes, no API calls, no DB writes this turn.
