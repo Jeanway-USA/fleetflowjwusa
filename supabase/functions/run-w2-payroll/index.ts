@@ -542,6 +542,10 @@ async function actionUpsertSignatory(
       "Gusto upsert_signatory",
     );
   }
+  await markPayrollSetupStatus(admin, orgId, {
+    signatory_status: "completed",
+    onboarding_steps_synced_at: new Date().toISOString(),
+  });
   return { ok: true, gusto: body };
 }
 
@@ -768,6 +772,10 @@ async function actionUpsertFederalTaxDetails(
   if (!resp.ok) {
     throw new Error(`Gusto upsert_federal_tax_details failed (${resp.status}): ${JSON.stringify(body)}`);
   }
+  await markPayrollSetupStatus(admin, orgId, {
+    federal_tax_status: "completed",
+    onboarding_steps_synced_at: new Date().toISOString(),
+  });
   return { ok: true, gusto: body };
 }
 
@@ -895,6 +903,16 @@ async function actionUpsertStateTaxes(
     );
     results.push({ state: s.state, gusto: body });
   }
+  await markPayrollSetupStatus(admin, orgId, {
+    state_tax_requirements: payload.states.reduce((acc, state) => {
+      acc[state.state] = {
+        submitted_at: new Date().toISOString(),
+        status: "completed",
+      };
+      return acc;
+    }, {} as Record<string, unknown>),
+    onboarding_steps_synced_at: new Date().toISOString(),
+  });
   return { ok: true, results };
 }
 
@@ -979,6 +997,11 @@ async function actionCreatePaySchedule(
     },
     "Gusto create_pay_schedule",
   );
+  await markPayrollSetupStatus(admin, orgId, {
+    active_pay_schedule_uuid: (body as { uuid?: string })?.uuid ?? null,
+    pay_schedule_frequency: payload.frequency,
+    onboarding_steps_synced_at: new Date().toISOString(),
+  });
   return { ok: true, gusto: body };
 }
 
