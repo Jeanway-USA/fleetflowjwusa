@@ -1235,8 +1235,100 @@ async function actionGetOnboardingLink(
 
 
 
+// --- Read-side GETs for form hydration --------------------------------------
 
+async function actionGetCompany(
+  admin: Admin,
+  orgId: string,
+): Promise<Record<string, unknown>> {
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const [companyResp, locResp, indResp] = await Promise.all([
+    gustoFetch(admin, orgId, `/v1/companies/${companyUuid}`, { method: "GET" }),
+    gustoFetch(admin, orgId, `/v1/companies/${companyUuid}/locations`, { method: "GET" }),
+    gustoFetch(admin, orgId, `/v1/companies/${companyUuid}/industry_selection`, { method: "GET" }),
+  ]);
+  const company = (await readGustoBody(companyResp)) as Record<string, unknown> | null;
+  const locsBody = await readGustoBody(locResp);
+  const industry = indResp.ok
+    ? ((await readGustoBody(indResp)) as Record<string, unknown> | null)
+    : null;
+  const list = Array.isArray(locsBody) ? locsBody : [];
+  const primary =
+    list.find((l: any) => l?.mailing_address) ??
+    list.find((l: any) => l?.filing_address) ??
+    list[0] ??
+    null;
+  return {
+    legal_name:
+      (company?.trade_name as string | undefined) ??
+      (company?.name as string | undefined) ??
+      null,
+    primary_location: primary,
+    naics_code: (industry?.naics_code as string | undefined) ?? null,
+  };
+}
 
+async function actionGetSignatory(
+  admin: Admin,
+  orgId: string,
+): Promise<Record<string, unknown>> {
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const resp = await gustoFetch(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/signatories`,
+    { method: "GET" },
+  );
+  const body = await readGustoBody(resp);
+  if (!resp.ok) {
+    throw new Error(`Gusto get_signatory failed (${resp.status}): ${JSON.stringify(body)}`);
+  }
+  const list = Array.isArray(body) ? body : [];
+  return { signatory: list[0] ?? null };
+}
+
+async function actionGetFederalTaxDetails(
+  admin: Admin,
+  orgId: string,
+): Promise<Record<string, unknown>> {
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const resp = await gustoFetch(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/federal_tax_details`,
+    { method: "GET" },
+  );
+  const body = await readGustoBody(resp);
+  if (!resp.ok) {
+    // Not-yet-set returns 404 in some Gusto envs; return empty rather than throw.
+    if (resp.status === 404) return { federal_tax_details: null };
+    throw new Error(
+      `Gusto get_federal_tax_details failed (${resp.status}): ${JSON.stringify(body)}`,
+    );
+  }
+  return { federal_tax_details: body ?? null };
+}
+
+async function actionListBankAccounts(
+  admin: Admin,
+  orgId: string,
+): Promise<Record<string, unknown>> {
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const resp = await gustoFetch(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/bank_accounts`,
+    { method: "GET" },
+  );
+  const body = await readGustoBody(resp);
+  if (!resp.ok) {
+    throw new Error(
+      `Gusto list_bank_accounts failed (${resp.status}): ${JSON.stringify(body)}`,
+    );
+  }
+  const list = Array.isArray(body) ? body : [];
+  return { bank_accounts: list };
+}
 
 
 // -----------------------------------------------------------------------------
