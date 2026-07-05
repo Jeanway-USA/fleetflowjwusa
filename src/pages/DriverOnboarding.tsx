@@ -362,7 +362,7 @@ export default function DriverOnboarding() {
     // W-9, IOO) — data collected in DocumentSignatureStep that was
     // previously discarded on submit.
     // --------------------------------------------------------------------
-    const driverName = `${driverRow.first_name ?? ''} ${driverRow.last_name ?? ''}`.trim() || 'Driver';
+    // (driverName already defined above)
     const uploadFormPdf = async (
       docType: string,
       label: string,
