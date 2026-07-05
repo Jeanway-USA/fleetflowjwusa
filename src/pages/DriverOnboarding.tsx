@@ -86,6 +86,8 @@ export default function DriverOnboarding() {
   const [employmentType, setEmploymentType] = useState<'1099' | 'W-2' | null>(null);
   const [deepLinked, setDeepLinked] = useState(false);
   const [state, setState] = useState<Record<string, TemplateState>>({});
+  const [w2Docs, setW2Docs] = useState<W2DocsState>(EMPTY_W2_DOCS_STATE);
+  const [contractorDocs, setContractorDocs] = useState<ContractorDocsState>(EMPTY_CONTRACTOR_DOCS_STATE);
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
   const credentialsRef = useRef<DriverCredentialsStepHandle>(null);
