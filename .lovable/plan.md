@@ -1,41 +1,64 @@
 ## Goal
-Hide public-facing marketing UI. Root URL sends visitors straight to Sign-In. No DB, RLS, roles, or org data touched.
+Frontend-only QoL update: regroup the sidebar into clearer sections and tighten role-scoping guarantees so drivers stay locked to their pages while all other privileged roles keep current access. No database, RLS, role enum, or org data changes.
 
-## Changes (frontend only)
+## 1. Sidebar regrouping — `src/components/layout/AppSidebar.tsx`
 
-### 1. `src/App.tsx` — routing
-- Root `/`: when unauthenticated, redirect to `/auth` instead of rendering `Landing`. When authenticated, keep current role-based redirect behavior.
-  - Simplest: replace `<Route path="/" element={<RoleBasedRedirect />} />` with a small wrapper that returns `<Navigate to="/auth" replace />` for signed-out users, otherwise delegates to `RoleBasedRedirect`. Alternatively, edit `RoleBasedRedirect.tsx` to `return <Navigate to="/auth" replace />` in place of `return <Landing />`.
-- Remove these public routes entirely (they will 404 via existing `*` NotFound):
-  - `/landing`, `/pricing`, `/track`, `/about`, `/contact`
-- Remove the corresponding `lazy(() => import(...))` lines for `Landing`, `Pricing`, `PublicLoadTracker`, `About`, `Contact`.
-- Keep `/privacy` and `/terms` (legal pages required for auth/compliance) — confirm if you want these removed too.
-- Keep `/auth`, `/reset-password`, `/auth/accept-invite`, `/onboarding`, `/pending-access`, `/account-deactivated`, `/checkout-success` untouched.
+Reorganize the collapsible groups (dashboards section stays as-is). New structure:
 
-### 2. `src/pages/Auth.tsx` — scrub marketing links
-- Remove any links / buttons pointing to `/landing`, `/pricing`, `/about`, `/contact`, `/track`, or public signup CTAs.
-- Keep sign-in, password reset, and invite-acceptance flows. Ensure JeanWay logo + branding remain.
-- (Will read the file in build mode to enumerate exact links to strip.)
+```text
+Dashboards (unchanged)
+  Executive View / Dispatcher View / Driver View / Maintenance View
 
-### 3. Delete marketing page files
-- `src/pages/Landing.tsx`
-- `src/pages/Pricing.tsx`
-- `src/pages/PublicLoadTracker.tsx`
-- `src/pages/About.tsx`
-- `src/pages/Contact.tsx`
-- Remove any now-orphaned imports these pages pulled in (only if not used elsewhere — verified via `rg` before deletion).
+Operations
+  Fleet Loads
+  Agency Loads
+  Dispatcher Map (Dispatcher View already covers map; keep Fleet Loads/Agency Loads here)
+  Trailers
+  Trucks
+  CRM (Broker / Agent)
+  Drivers
 
-### 4. `src/components/shared/RouteTitle.tsx`
-- Drop `/landing`, `/pricing`, `/track`, `/about`, `/contact` entries from `SELF_TITLED` set since the pages no longer exist.
+Fleet Care
+  Maintenance (Management)
+  Maintenance Home (PM schedules live here)
 
-### 5. `index.html` / `public/sitemap.xml` / `public/robots.txt`
-- Remove marketing URLs from `sitemap.xml` if listed. Leave meta tags alone unless they reference removed pages.
+Safety & Compliance   (kept separate per your choice)
+  Safety
+  Incidents
+  Driver Performance
+  Documents (Compliance Document Hub)
 
-## Explicitly NOT touched
-- Any database table, column, row, RLS policy, migration, edge function.
-- `user_roles`, `organizations`, `profiles`, or any auth data.
-- Dashboards, sidebar, ProtectedRoute logic, role-home routing for signed-in users.
+Administration
+  Finance & P/L
+  Company Insights
+  IFTA Reporting  (independent mode only, unchanged gating)
+  Audit Trail
+  Settings (owners only, unchanged)
+```
 
-## Open questions
-1. Keep `/privacy` and `/terms` reachable (legal requirement, usually linked from Auth footer)? Default: keep.
-2. Keep `/track` (public load tracker used by brokers/customers via shared link)? You listed it for removal — will delete unless you say otherwise.
+- Reuse existing `NavItem` entries — only move them between the `operationsItems`, new `fleetCareItems`, `safetyItems`, and renamed `administrationItems` arrays.
+- Update `collapsibleGroups` to render four groups in this order; keep localStorage key `sidebar-groups` but seed defaults for the new `fleetcare` and renamed `administration` keys so nothing starts collapsed on first load.
+- Keep all existing role/tier/tmsMode filters on each item — no widening of visibility.
+
+## 2. Role routing hardening (frontend-only)
+
+Interpretation confirmed: `admin` = any privileged role (owner, payroll_admin, dispatcher, safety, maintenance). No enum, RLS, or `user_roles` changes.
+
+- Audit `src/App.tsx` route table and confirm every non-driver route already lists at least one privileged role in `allowedRoles` and never lists `driver` alongside privileged pages (spot-check: `/executive-dashboard`, `/finance`, `/insights`, `/ifta`, `/audit-trail`, `/settings`, `/maintenance`, `/documents`, `/safety`, `/incidents`, `/driver-performance`, `/trucks`, `/trailers`, `/drivers`, `/fleet-loads`, `/agency-loads`, `/crm`).
+- Confirm driver-only routes (`/driver-dashboard`, `/driver/loads`, `/driver/settlements`, `/driver/onboarding`, `/driver-settings`, `/driver-stats`) only allow `driver` (and `owner` for view-as, which is intentional per existing simulation feature).
+- If any route currently lists `driver` in a privileged page's `allowedRoles`, remove `driver` from that list. Based on the current `App.tsx` shown in context, none do — this step will likely be a no-op verification, and the plan section will simply document the audit result.
+- No changes to `ProtectedRoute.tsx`, `RoleBasedRedirect.tsx`, `role-home.ts`, `AuthContext.tsx`, or `useSubscriptionTier.ts` — existing owner-can-see-everything + `hasRole` logic already implements the "admin toggles across all views" behavior via the dashboard switcher.
+
+## 3. Data protection
+
+- No SQL migrations. No edits to `supabase/`. No edits to `src/integrations/supabase/*`. No edits to `user_roles`, `organizations`, `profiles`, or any RLS policy.
+- No page files created or deleted. No changes to data-fetching hooks.
+
+## Files touched
+- `src/components/layout/AppSidebar.tsx` — regroup nav arrays + add Fleet Care group + rename Back Office → Administration.
+- `src/App.tsx` — only if the audit in step 2 finds a driver listed on a privileged route (expected: no change).
+
+## Out of scope
+- Any change to the `app_role` enum, `user_roles` table, or RLS.
+- Any consolidation of real roles into a two-role model.
+- Any new pages, dashboards, or backend endpoints.
