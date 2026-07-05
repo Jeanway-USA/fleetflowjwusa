@@ -132,8 +132,14 @@ export function CompanyIndustrySection() {
       title="Company & Industry"
       description="Confirm your legal company details, primary business address, and NAICS industry classification. Gusto requires these before running payroll."
     >
+      {isLoading ? (
+        <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading saved values…
+        </div>
+      ) : null}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+
           <FormField
             control={form.control}
             name="legalName"
