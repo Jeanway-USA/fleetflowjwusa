@@ -684,121 +684,109 @@ async function actionUpsertStateTaxes(
   }
   const companyUuid = await requireCompanyUuid(admin, orgId);
 
-  // Gusto's per-state endpoint is deprecated. Use company_state_taxes which
-  // returns a `questions[]` schema per state (keys vary by state).
-  const listResp = await gustoFetch(
-    admin,
-    orgId,
-    `/v1/companies/${companyUuid}/company_state_taxes`,
-    { method: "GET" },
-  );
-  const listBody = await readGustoBody(listResp);
-  if (!listResp.ok) {
-    throw new Error(
-      `Gusto list_company_state_taxes failed (${listResp.status}): ${JSON.stringify(listBody)}`,
-    );
-  }
-  const allStates = Array.isArray(listBody)
-    ? (listBody as any[])
-    : ((listBody as any)?.states ?? []);
-
+  // Gusto's current API exposes state tax setup via the tax_requirements
+  // endpoint: GET returns requirement_sets (e.g. "unemployment_insurance",
+  // "withholding") each with `requirements` (key/value/metadata). PUT accepts
+  // the same shape with updated `value`s.
   const validFrom = `${new Date().getFullYear()}-01-01`;
 
-  type Question = {
+  type Requirement = {
     key: string;
     label?: string;
-    input_question_format?: { type?: string };
-    answers?: Array<{ valid_from?: string; valid_up_to?: string | null; value: unknown }>;
+    value?: unknown;
+    metadata?: { type?: string; [k: string]: unknown };
+    effective_from?: string;
   };
-
-  const matchQuestion = (
-    questions: Question[],
-    predicate: (key: string, label: string) => boolean,
-  ): Question | undefined =>
-    questions.find((q) => predicate((q.key ?? '').toLowerCase(), (q.label ?? '').toLowerCase()));
-
-  const isRateFormat = (q: Question) =>
-    (q.input_question_format?.type ?? '').toLowerCase().includes('percent') ||
-    /rate/.test((q.key ?? '').toLowerCase());
+  type RequirementSet = {
+    key: string;
+    label?: string;
+    state?: string;
+    effective_from?: string;
+    requirements: Requirement[];
+  };
 
   const results: Array<{ state: string; gusto: unknown }> = [];
 
   for (const s of payload.states) {
     if (!s.state) throw new Error("state required");
-    const entry = allStates.find(
-      (x: any) => (x?.state ?? '').toUpperCase() === s.state.toUpperCase(),
+
+    const getResp = await gustoFetch(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}/tax_requirements/${s.state}`,
+      { method: "GET" },
     );
-    if (!entry) {
-      throw new Error(`Gusto has no state_tax record for ${s.state}`);
+    const getBody = await readGustoBody(getResp);
+    if (!getResp.ok) {
+      throw new Error(
+        `Gusto get_tax_requirements[${s.state}] failed (${getResp.status}): ${JSON.stringify(getBody)}`,
+      );
     }
-    const stateTaxUuid = entry.uuid as string;
-    const version = entry.version as string | undefined;
-    const questions: Question[] = Array.isArray(entry.questions) ? entry.questions : [];
+    const sets: RequirementSet[] = Array.isArray((getBody as any)?.requirement_sets)
+      ? (getBody as any).requirement_sets
+      : [];
 
-    const updates: Array<{ key: string; value: string | number }> = [];
+    const outSets: Array<{
+      key: string;
+      effective_from: string;
+      requirements: Array<{ key: string; value: string }>;
+    }> = [];
 
-    // SUI / employer account number
-    const suiAcctQ = matchQuestion(
-      questions,
-      (k) =>
-        (k.includes('sui') || k.includes('suta') || k.includes('unemployment') || k.includes('employer')) &&
-        (k.includes('account_number') || k.includes('account')),
-    );
-    if (suiAcctQ && s.sui_account_id) {
-      updates.push({ key: suiAcctQ.key, value: s.sui_account_id });
+    for (const set of sets) {
+      const setKey = (set.key ?? '').toLowerCase();
+      const reqs = Array.isArray(set.requirements) ? set.requirements : [];
+      const patches: Array<{ key: string; value: string }> = [];
+
+      const findReq = (pred: (k: string, label: string) => boolean) =>
+        reqs.find((r) => pred((r.key ?? '').toLowerCase(), (r.label ?? '').toLowerCase()));
+
+      // Unemployment insurance set — account number + rate
+      if (
+        setKey.includes('unemployment') ||
+        setKey.includes('sui') ||
+        setKey.includes('suta')
+      ) {
+        const acct = findReq((k, l) => k.includes('account') || l.includes('account'));
+        if (acct && s.sui_account_id) {
+          patches.push({ key: acct.key, value: s.sui_account_id });
+        }
+        const rate = findReq((k, l) => k.includes('rate') || l.includes('rate'));
+        if (rate && typeof s.sui_rate === 'number' && !Number.isNaN(s.sui_rate)) {
+          patches.push({ key: rate.key, value: String(s.sui_rate) });
+        }
+      }
+
+      // Withholding set — account number (only exists for SIT states)
+      if (setKey.includes('withholding') || setKey.includes('income_tax')) {
+        const acct = findReq((k, l) => k.includes('account') || l.includes('account'));
+        if (acct && s.withholding_account_id) {
+          patches.push({ key: acct.key, value: s.withholding_account_id });
+        }
+      }
+
+      if (patches.length > 0) {
+        outSets.push({
+          key: set.key,
+          effective_from: set.effective_from ?? validFrom,
+          requirements: patches,
+        });
+      }
     }
 
-    // SUI / SUTA rate
-    const suiRateQ = matchQuestion(
-      questions,
-      (k) =>
-        (k.includes('sui') || k.includes('suta') || k.includes('unemployment')) &&
-        k.includes('rate'),
-    );
-    if (suiRateQ && typeof s.sui_rate === 'number' && !Number.isNaN(s.sui_rate)) {
-      // Gusto expects rates as strings, typically as a percentage.
-      updates.push({
-        key: suiRateQ.key,
-        value: isRateFormat(suiRateQ) ? String(s.sui_rate) : String(s.sui_rate),
-      });
-    }
-
-    // Withholding account (only exists for SIT states)
-    const whQ = matchQuestion(
-      questions,
-      (k) => k.includes('withholding') && (k.includes('account') || k.includes('id')),
-    );
-    if (whQ && s.withholding_account_id) {
-      updates.push({ key: whQ.key, value: s.withholding_account_id });
-    }
-
-    if (updates.length === 0) {
-      results.push({ state: s.state, gusto: { skipped: true, reason: 'no matching questions' } });
+    if (outSets.length === 0) {
+      results.push({ state: s.state, gusto: { skipped: true, reason: 'no matching requirement_sets' } });
       continue;
     }
-
-    const putBody = {
-      ...(version ? { version } : {}),
-      states: [
-        {
-          state: s.state,
-          questions: updates.map((u) => ({
-            key: u.key,
-            answers: [{ valid_from: validFrom, valid_up_to: null, value: u.value }],
-          })),
-        },
-      ],
-    };
 
     const body = await gustoJson(
       admin,
       orgId,
-      `/v1/company_state_taxes/${stateTaxUuid}`,
+      `/v1/companies/${companyUuid}/tax_requirements/${s.state}`,
       {
         method: 'PUT',
-        body: JSON.stringify(putBody),
+        body: JSON.stringify({ requirement_sets: outSets }),
       },
-      `Gusto upsert_company_state_taxes[${s.state}]`,
+      `Gusto upsert_tax_requirements[${s.state}]`,
     );
     results.push({ state: s.state, gusto: body });
   }
