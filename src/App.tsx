@@ -32,6 +32,7 @@ const MaintenanceDashboardHome = lazy(() => import("./pages/MaintenanceDashboard
 const Documents = lazy(() => import("./pages/Documents"));
 const Safety = lazy(() => import("./pages/Safety"));
 const Settings = lazy(() => import("./pages/Settings"));
+const PayrollSetup = lazy(() => import("./pages/PayrollSetup"));
 const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
 const DriverLoads = lazy(() => import("./pages/DriverLoads"));
 const DriverSettlements = lazy(() => import("./pages/DriverSettlements"));
