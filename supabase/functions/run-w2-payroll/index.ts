@@ -985,6 +985,12 @@ Deno.serve(async (req) => {
       case "verify_bank_account":
         result = await actionVerifyBankAccount(admin, orgId, payload);
         break;
+      case "create_pay_schedule":
+        result = await actionCreatePaySchedule(admin, orgId, payload);
+        break;
+      case "assign_employee_pay_schedule":
+        result = await actionAssignEmployeePaySchedule(admin, orgId, payload);
+        break;
       case "status": {
         const { companyUuid, status } = await getAccessToken(admin, orgId);
         result = { company_uuid: companyUuid, onboarding_status: status };
