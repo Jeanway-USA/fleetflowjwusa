@@ -1433,6 +1433,32 @@ Deno.serve(async (req) => {
       case "get_employee_onboarding_link":
         result = await actionGetOnboardingLink(admin, orgId, payload);
         break;
+      case "sync_onboarding_steps":
+        result = await actionSyncOnboardingSteps(admin, orgId);
+        break;
+      case "get_state_tax_requirements":
+        result = await actionGetStateTaxRequirements(admin, orgId, payload);
+        break;
+      case "submit_state_tax_requirements":
+        result = await actionSubmitStateTaxRequirements(admin, orgId, payload);
+        break;
+      case "create_bank_account_from_plaid":
+        result = await actionCreateBankAccountFromPlaid(admin, orgId, payload);
+        break;
+      case "initiate_micro_deposits":
+        result = await actionInitiateMicroDeposits(admin, orgId, payload);
+        break;
+      case "verify_micro_deposits":
+        result = await actionVerifyBankAccount(admin, orgId, payload);
+        break;
+      case "list_pay_schedules":
+        result = await actionListPaySchedules(admin, orgId);
+        break;
+      case "create_employee_self_onboarding_flow_token":
+        result = await actionCreateEmployeeSelfOnboardingFlowToken(admin, orgId, payload);
+        break;
+
+
 
 
       case "status": {
