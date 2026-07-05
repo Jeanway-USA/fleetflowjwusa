@@ -723,6 +723,84 @@ async function actionVerifyBankAccount(
   return { ok: true, gusto: body };
 }
 
+async function actionCreatePaySchedule(
+  admin: Admin,
+  orgId: string,
+  payload: {
+    frequency: string;
+    anchor_pay_date: string;
+    anchor_end_of_pay_period: string;
+    custom_name?: string;
+  },
+): Promise<Record<string, unknown>> {
+  if (!payload?.frequency || !payload?.anchor_pay_date || !payload?.anchor_end_of_pay_period) {
+    throw new Error("frequency, anchor_pay_date, anchor_end_of_pay_period required");
+  }
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const body = await gustoJson(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/pay_schedules`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        frequency: payload.frequency,
+        anchor_pay_date: payload.anchor_pay_date,
+        anchor_end_of_pay_period: payload.anchor_end_of_pay_period,
+        custom_name: payload.custom_name || undefined,
+      }),
+    },
+    "Gusto create_pay_schedule",
+  );
+  return { ok: true, gusto: body };
+}
+
+async function actionAssignEmployeePaySchedule(
+  admin: Admin,
+  orgId: string,
+  payload: {
+    employee_uuid: string;
+    pay_schedule_uuid: string;
+  },
+): Promise<Record<string, unknown>> {
+  if (!payload?.employee_uuid || !payload?.pay_schedule_uuid) {
+    throw new Error("employee_uuid and pay_schedule_uuid required");
+  }
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+
+  // Fetch current assignment for optimistic-lock version if Gusto returns one.
+  let version: string | undefined;
+  try {
+    const currentResp = await gustoFetch(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}/employees/${payload.employee_uuid}/pay_schedule`,
+      { method: "GET" },
+    );
+    if (currentResp.ok) {
+      const current = (await readGustoBody(currentResp)) as Record<string, unknown>;
+      if (typeof current?.version === "string") version = current.version;
+    }
+  } catch {
+    // best-effort; proceed without version
+  }
+
+  const body = await gustoJson(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/employees/${payload.employee_uuid}/pay_schedule`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        pay_schedule_uuid: payload.pay_schedule_uuid,
+        version,
+      }),
+    },
+    "Gusto assign_employee_pay_schedule",
+  );
+  return { ok: true, gusto: body };
+}
+
 
 // -----------------------------------------------------------------------------
 // Entry
@@ -906,6 +984,12 @@ Deno.serve(async (req) => {
         break;
       case "verify_bank_account":
         result = await actionVerifyBankAccount(admin, orgId, payload);
+        break;
+      case "create_pay_schedule":
+        result = await actionCreatePaySchedule(admin, orgId, payload);
+        break;
+      case "assign_employee_pay_schedule":
+        result = await actionAssignEmployeePaySchedule(admin, orgId, payload);
         break;
       case "status": {
         const { companyUuid, status } = await getAccessToken(admin, orgId);
