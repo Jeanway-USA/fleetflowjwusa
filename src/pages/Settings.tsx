@@ -205,6 +205,7 @@ export default function Settings() {
                 </CardContent>
               </Card>
               <PayrollTaxesCard />
+              <PayScheduleManager />
             </TabsContent>
           </Tabs>
         </TabsContent>
