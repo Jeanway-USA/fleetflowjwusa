@@ -1,78 +1,68 @@
-## Wire Payroll Setup Forms to Gusto via Edge Function
 
-Reference: the four sections are in `src/components/payroll/setup/sections/`. `GustoCompanySetup.tsx` isn't a real file — the plan targets the actual section components. Also: browser code cannot call `api.gusto.com` directly without leaking the bearer, so the client service will call the existing `run-w2-payroll` edge function which already mints/refreshes Gusto tokens server-side using `GUSTO_CLIENT_ID` / `GUSTO_CLIENT_SECRET` env vars.
+## Goal
 
-### 1. New edge-function actions in `supabase/functions/run-w2-payroll/index.ts`
+Replace the separate "Bank Details" and "Tax Setup" steps on `/settings/payroll-setup` with a single unified component `CompanyFinancialSetup.tsx` that uses shadcn `Card` + `Tabs`, supports multiple state tax registrations, and includes bank micro-deposit verification.
 
-Add four action handlers that use the existing `gustoFetch(admin, orgId, path, init)` helper (already injects `Authorization: Bearer <token>` + `X-Gusto-API-Version` server-side). Each pulls `companyUuid` from `getAccessToken(admin, orgId)` and 409s if the company hasn't been provisioned yet.
+## Files
 
-- `upsert_signatory` → `POST /v1/companies/{company_uuid}/signatories`
-  Payload: `{ first_name, last_name, title, birthday: 'YYYY-MM-DD', ssn: '#########' }` (strip dashes server-side).
-- `upsert_primary_location` → `PUT /v1/companies/{company_uuid}/locations`
-  Payload: `{ street_1, street_2?, city, state, zip, country: 'USA', phone_number?, mailing_address: true, filing_address: true }`. Also send `{ industry: { naics_code } }` in the same action via a second `PUT /v1/companies/{company_uuid}` call so Company & Industry is one round trip.
-- `create_bank_account` → `POST /v1/companies/{company_uuid}/bank_accounts`
-  Payload: `{ routing_number, account_number, account_type: 'Checking' | 'Savings', account_holder_name }`.
-- `upsert_federal_tax_details` → `PUT /v1/companies/{company_uuid}/federal_tax_details`
-  Payload: `{ ein, filing_form: '941', taxable_as_scorp: false, legal_name }` (uses the values from the Tax Setup form; extra state-tax IDs are stored in a `TODO` note — Gusto exposes those via a separate `state_taxes` endpoint we'll add in a follow-up).
+**New**
+- `src/components/payroll/CompanyFinancialSetup.tsx` — Card wrapper + two-tab layout ("Tax Configuration", "Bank Accounts"). Composes the two forms below.
+- `src/components/payroll/setup/sections/StateTaxRow.tsx` — small helper for a single state row (state dropdown, withholding ID, SUI account #, SUI rate, remove button). Keeps the tax form readable.
 
-Each handler returns `{ ok: true, gusto: <parsed body> }` on 2xx; on non-2xx it throws with the Gusto error body so the top-level catch returns 500 with `{ error }`.
+**Edited**
+- `src/services/gustoCompanyApi.ts` — extend `FederalTaxInput` with `legalName` (already present) + add:
+  - `upsertStateTaxes({ states: StateTaxInput[] })` → calls new action `upsert_state_taxes`
+  - `verifyBankAccount({ deposit1, deposit2 })` → calls new action `verify_bank_account`
+- `supabase/functions/run-w2-payroll/index.ts` — add two handlers:
+  - `upsert_state_taxes`: for each state, `PUT /v1/companies/{uuid}/state_taxes/{state}` with `{ state_tax: { ... } }` following Gusto's state-tax questions schema. Loops so it stays a single client call.
+  - `verify_bank_account`: `PUT /v1/company_bank_accounts/{bank_account_uuid}/verify` with `{ deposit_1, deposit_2 }`. Resolves `bank_account_uuid` by first calling `GET /v1/companies/{uuid}/bank_accounts` and picking the most-recent unverified account.
+- `src/pages/PayrollSetup.tsx` — replace the two step entries (`bank`, `tax`) with one step `financial` → `CompanyFinancialSetup`. Other steps (company, signatory, etc.) untouched.
 
-Add the four cases to the `switch (action)` block right after `push_payroll_inputs`.
+## Tax Configuration tab
 
-### 2. New client service `src/services/gustoCompanyApi.ts`
+Single form managed with `react-hook-form` + zod.
 
-Thin, typed wrapper around `invokeWithAuth('run-w2-payroll', { body: { action, payload } })`. Exports:
+- Federal section
+  - Legal company name — text, default `"JeanWay LLC"`.
+  - Federal EIN — masked `XX-XXXXXXX`, reused formatter from `TaxSetupSection`.
+  - Filing form — select (`941` default, `944`).
+  - Taxable as S-corp — switch.
+- State Tax IDs section (repeatable rows via `useFieldArray`)
+  - Row fields: State (select, US_STATES), Withholding account ID, SUI account #, SUI rate (%).
+  - First row prefilled with `state: "TX"`.
+  - "Add state" button appends a blank row; each row has a remove button (disabled when only one row remains).
+  - Duplicate-state validation in zod (`superRefine`).
+- Submit button `Save tax configuration`:
+  1. `upsertFederalTaxDetails({ ein, legalName, filingForm, taxableAsScorp })`.
+  2. On success, `upsertStateTaxes({ states })`.
+  3. Success toast only when both return `ok: true`; otherwise show the specific error.
 
-```ts
-export interface SignatoryInput { firstName; lastName; title; dateOfBirth: Date; ssn }
-export interface CompanyLocationInput { legalName; street1; street2?; city; state; zip; industryCode }
-export interface BankAccountInput { accountHolder; accountType: 'checking'|'savings'; routingNumber; accountNumber }
-export interface FederalTaxInput { ein; legalName }
+## Bank Accounts tab
 
-export async function upsertSignatory(input: SignatoryInput): Promise<GustoApiResult>
-export async function upsertPrimaryLocation(input: CompanyLocationInput): Promise<GustoApiResult>
-export async function createBankAccount(input: BankAccountInput): Promise<GustoApiResult>
-export async function upsertFederalTaxDetails(input: FederalTaxInput): Promise<GustoApiResult>
-```
+- Bank details section — same shape as existing `BankDetailsSection` (accountHolder, accountType, routing, account, confirm). Wired to `createBankAccount`. Success toast on save; also stashes returned `bank_account_uuid` in local state (edge function already returns Gusto response — we'll pass it through) so the verification section can enable.
+- Micro-deposit verification section (rendered below, in a bordered sub-card)
+  - Two numeric inputs: "Deposit 1 ($)", "Deposit 2 ($)", each `0.01`–`0.99`, step `0.01`.
+  - Disabled until a bank account has been saved this session OR the backend reports an existing unverified account.
+  - Submit `Verify deposits` → `verifyBankAccount({ deposit1, deposit2 })`, success toast "Bank account verified" on 200/201.
 
-Each function:
-- Formats the payload to Gusto's snake_case shape (`birthday` from `format(date, 'yyyy-MM-dd')`, SSN/EIN stripped of dashes, account type Title-cased, etc.).
-- Calls `invokeWithAuth`; treats any successful non-error response as 200/201 success (the edge function only returns 2xx on Gusto 2xx).
-- Returns `{ ok: boolean; data?: unknown; error?: string }` so components stay UI-focused.
+## Endpoint mapping
 
-No bearer tokens in the file — the edge function reads `GUSTO_CLIENT_ID` / `GUSTO_CLIENT_SECRET` from Supabase secrets and mints/refreshes access tokens server-side. Confirm both secrets already exist via `fetch_secrets` before shipping; if either is missing, ask the user before wiring further.
+| UI action | Edge action | Gusto endpoint |
+|---|---|---|
+| Save federal tax | `upsert_federal_tax_details` (existing) | `PUT /v1/companies/{uuid}/federal_tax_details` |
+| Save state taxes | `upsert_state_taxes` (new) | `PUT /v1/companies/{uuid}/state_taxes/{state}` per row |
+| Save bank | `create_bank_account` (existing) | `POST /v1/companies/{uuid}/bank_accounts` |
+| Verify bank | `verify_bank_account` (new) | `PUT /v1/company_bank_accounts/{uuid}/verify` |
 
-### 3. Wire the four form submits
+## Technical details
 
-In each section, replace the stub `console.log + toast` in `onSubmit` with:
+- Component styled with existing tokens (no hardcoded colors). Uses `Card`, `CardHeader`, `CardContent`, `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent` from `@/components/ui/*`.
+- All Gusto tokens continue to live server-side in the edge function; client only calls `invokeWithAuth('run-w2-payroll', …)`.
+- Success detection uses the existing `GustoApiResult.ok` pattern; toasts via `sonner`.
+- Multi-state loop in the edge function short-circuits on first failure and returns `{ error, state }` so the UI can highlight the offending row.
+- Page component (`PayrollSetup.tsx`) is the only mount point per the answer; the two old section files stay on disk (still imported by nothing) but I'll remove their imports from `PayrollSetup.tsx`.
 
-```ts
-setSubmitting(true);
-const res = await upsertX(values);
-setSubmitting(false);
-if (res.ok) toast.success('<Section> saved', { description: 'Synced to Gusto.' });
-else toast.error('Failed to save', { description: res.error ?? 'Please try again.' });
-```
+## Out of scope
 
-Use `form.formState.isSubmitting` (already wired) via `await form.handleSubmit(async …)` — no extra state needed. Submit buttons already exist and remain disabled while submitting.
-
-Sections touched:
-- `SignatorySection.tsx` → `upsertSignatory`
-- `CompanyIndustrySection.tsx` → `upsertPrimaryLocation` (combined address + industry)
-- `BankDetailsSection.tsx` → `createBankAccount`
-- `TaxSetupSection.tsx` → `upsertFederalTaxDetails` (state-tax fields kept in the form but not sent this turn — TODO comment references the follow-up `state_taxes` endpoint)
-
-### Files touched
-
-- `supabase/functions/run-w2-payroll/index.ts` (add 4 actions + 4 switch cases)
-- `src/services/gustoCompanyApi.ts` (new)
-- `src/components/payroll/setup/sections/SignatorySection.tsx` (submit handler)
-- `src/components/payroll/setup/sections/CompanyIndustrySection.tsx` (submit handler)
-- `src/components/payroll/setup/sections/BankDetailsSection.tsx` (submit handler)
-- `src/components/payroll/setup/sections/TaxSetupSection.tsx` (submit handler)
-
-### Out of scope this turn
-
-- No new secrets requested (reusing existing `GUSTO_CLIENT_ID` / `GUSTO_CLIENT_SECRET`).
-- No state-tax `state_taxes` endpoint wiring (follow-up).
-- Payroll Setup blocker-count badge still shows `—` (recomputing it needs a separate Gusto onboarding-status parse).
+- Deleting the old `BankDetailsSection.tsx` / `TaxSetupSection.tsx` files (kept to avoid touching unrelated code; can be removed in a follow-up).
+- Persisting bank/tax data to our own DB — remains Gusto-only, matching current behavior.
