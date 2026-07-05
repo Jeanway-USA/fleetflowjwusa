@@ -248,3 +248,72 @@ export function getEmployeeOnboardingLink(driverId: string) {
   );
 }
 
+// -------- Phase 2: onboarding steps, state tax reqs, bank, pay schedules ----
+
+export interface GustoOnboardingStep {
+  id?: string;
+  step?: string;
+  title?: string;
+  completed?: boolean;
+  required?: boolean;
+  [k: string]: unknown;
+}
+
+export function syncOnboardingSteps() {
+  return callAction<{
+    onboarding_status: string | null;
+    onboarding_steps: GustoOnboardingStep[];
+  }>('sync_onboarding_steps', {});
+}
+
+export function getStateTaxRequirements(state: string) {
+  return callAction<{ state: string; requirements: Record<string, unknown> }>(
+    'get_state_tax_requirements',
+    { state },
+  );
+}
+
+export function submitStateTaxRequirements(input: {
+  state: string;
+  requirementSets: unknown[];
+}) {
+  return callAction('submit_state_tax_requirements', {
+    state: input.state,
+    requirement_sets: input.requirementSets,
+  });
+}
+
+export function createBankAccountFromPlaid(input: {
+  plaidProcessorToken: string;
+  accountHolderName?: string;
+}) {
+  return callAction('create_bank_account_from_plaid', {
+    plaid_processor_token: input.plaidProcessorToken,
+    account_holder_name: input.accountHolderName || undefined,
+  });
+}
+
+export function initiateMicroDeposits(bankAccountUuid?: string) {
+  return callAction<{ bank_account_uuid: string }>('initiate_micro_deposits', {
+    bank_account_uuid: bankAccountUuid,
+  });
+}
+
+export function listPaySchedules() {
+  return callAction<{ pay_schedules: GustoPaySchedule[] }>('list_pay_schedules', {});
+}
+
+export function createEmployeeSelfOnboardingFlowToken(input: {
+  driverId?: string;
+  employeeUuid?: string;
+}) {
+  return callAction<{ flow_url: string | null; expires_at: string | null }>(
+    'create_employee_self_onboarding_flow_token',
+    {
+      driver_id: input.driverId,
+      employee_uuid: input.employeeUuid,
+    },
+  );
+}
+
+
