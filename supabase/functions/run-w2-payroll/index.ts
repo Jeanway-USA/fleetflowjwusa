@@ -360,6 +360,203 @@ async function actionPushPayrollInputs(
   return { payroll: body };
 }
 
+// --- Payroll setup: signatory / location / bank / federal tax ---------------
+
+async function requireCompanyUuid(admin: Admin, orgId: string): Promise<string> {
+  const { companyUuid } = await getAccessToken(admin, orgId);
+  if (!companyUuid) {
+    throw new Error(
+      "Gusto company not provisioned for this organization. Provision the company first.",
+    );
+  }
+  return companyUuid;
+}
+
+async function gustoJson(
+  admin: Admin,
+  orgId: string,
+  path: string,
+  init: RequestInit,
+  label: string,
+): Promise<Record<string, unknown>> {
+  const resp = await gustoFetch(admin, orgId, path, init);
+  const body = await readGustoBody(resp) as Record<string, unknown>;
+  if (!resp.ok) {
+    throw new Error(`${label} failed (${resp.status}): ${JSON.stringify(body)}`);
+  }
+  return body;
+}
+
+async function actionUpsertSignatory(
+  admin: Admin,
+  orgId: string,
+  payload: {
+    first_name: string;
+    last_name: string;
+    title: string;
+    birthday: string; // YYYY-MM-DD
+    ssn: string; // may include dashes
+  },
+): Promise<Record<string, unknown>> {
+  if (
+    !payload?.first_name || !payload?.last_name || !payload?.title ||
+    !payload?.birthday || !payload?.ssn
+  ) {
+    throw new Error("first_name, last_name, title, birthday, ssn required");
+  }
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const body = await gustoJson(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/signatories`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        first_name: payload.first_name,
+        last_name: payload.last_name,
+        title: payload.title,
+        birthday: payload.birthday,
+        ssn: payload.ssn.replace(/\D/g, ""),
+      }),
+    },
+    "Gusto upsert_signatory",
+  );
+  return { ok: true, gusto: body };
+}
+
+async function actionUpsertPrimaryLocation(
+  admin: Admin,
+  orgId: string,
+  payload: {
+    legal_name?: string;
+    street_1: string;
+    street_2?: string;
+    city: string;
+    state: string;
+    zip: string;
+    phone_number?: string;
+    naics_code?: string;
+  },
+): Promise<Record<string, unknown>> {
+  if (
+    !payload?.street_1 || !payload?.city || !payload?.state || !payload?.zip
+  ) {
+    throw new Error("street_1, city, state, zip required");
+  }
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+
+  const locationBody = await gustoJson(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/locations`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        street_1: payload.street_1,
+        street_2: payload.street_2 || undefined,
+        city: payload.city,
+        state: payload.state,
+        zip: payload.zip,
+        country: "USA",
+        phone_number: payload.phone_number || undefined,
+        mailing_address: true,
+        filing_address: true,
+      }),
+    },
+    "Gusto upsert_primary_location",
+  );
+
+  let companyBody: Record<string, unknown> | null = null;
+  if (payload.naics_code || payload.legal_name) {
+    companyBody = await gustoJson(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          trade_name: payload.legal_name || undefined,
+          industry: payload.naics_code
+            ? { naics_code: payload.naics_code }
+            : undefined,
+        }),
+      },
+      "Gusto update_company",
+    );
+  }
+
+  return { ok: true, location: locationBody, company: companyBody };
+}
+
+async function actionCreateBankAccount(
+  admin: Admin,
+  orgId: string,
+  payload: {
+    routing_number: string;
+    account_number: string;
+    account_type: "checking" | "savings" | "Checking" | "Savings";
+    account_holder_name?: string;
+  },
+): Promise<Record<string, unknown>> {
+  if (!payload?.routing_number || !payload?.account_number || !payload?.account_type) {
+    throw new Error("routing_number, account_number, account_type required");
+  }
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const type = payload.account_type.toString().toLowerCase() === "savings"
+    ? "Savings"
+    : "Checking";
+  const body = await gustoJson(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/bank_accounts`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        routing_number: payload.routing_number.replace(/\D/g, ""),
+        account_number: payload.account_number.replace(/\D/g, ""),
+        account_type: type,
+        account_holder_name: payload.account_holder_name || undefined,
+      }),
+    },
+    "Gusto create_bank_account",
+  );
+  return { ok: true, gusto: body };
+}
+
+async function actionUpsertFederalTaxDetails(
+  admin: Admin,
+  orgId: string,
+  payload: {
+    ein: string; // may include dash
+    legal_name?: string;
+    filing_form?: string;
+    taxable_as_scorp?: boolean;
+  },
+): Promise<Record<string, unknown>> {
+  if (!payload?.ein) throw new Error("ein required");
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const digits = payload.ein.replace(/\D/g, "");
+  const ein = digits.length === 9 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : payload.ein;
+  const body = await gustoJson(
+    admin,
+    orgId,
+    `/v1/companies/${companyUuid}/federal_tax_details`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        ein,
+        legal_name: payload.legal_name || undefined,
+        filing_form: payload.filing_form || "941",
+        taxable_as_scorp: payload.taxable_as_scorp ?? false,
+      }),
+    },
+    "Gusto upsert_federal_tax_details",
+  );
+  // TODO: separate action for /v1/companies/{uuid}/state_taxes for state IDs + SUI rate
+  return { ok: true, gusto: body };
+}
+
+
 // -----------------------------------------------------------------------------
 // Entry
 // -----------------------------------------------------------------------------
