@@ -102,14 +102,14 @@ const App = () => {
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/auth/accept-invite" element={<AcceptInvite />} />
                     <Route path="/pending-access" element={<PendingAccess />} />
-                    <Route path="/landing" element={<Navigate to="/" replace />} />
-                    <Route path="/pricing" element={<Pricing />} />
-                    <Route path="/track" element={<PublicLoadTracker />} />
+                    <Route path="/landing" element={<Navigate to="/auth" replace />} />
+                    <Route path="/pricing" element={<Navigate to="/auth" replace />} />
+                    <Route path="/track" element={<Navigate to="/auth" replace />} />
+                    <Route path="/about" element={<Navigate to="/auth" replace />} />
+                    <Route path="/contact" element={<Navigate to="/auth" replace />} />
                     <Route path="/onboarding" element={<Onboarding />} />
                     <Route path="/account-deactivated" element={<AccountDeactivated />} />
                     <Route path="/checkout-success" element={<CheckoutSuccess />} />
-                    <Route path="/about" element={<About />} />
-                    <Route path="/contact" element={<Contact />} />
                     <Route path="/privacy" element={<PrivacyPolicy />} />
                     <Route path="/terms" element={<TermsOfService />} />
 
