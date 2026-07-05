@@ -16,6 +16,7 @@ import { DocumentTemplatesPanel } from '@/components/settings/DocumentTemplatesP
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
 import { PayrollTaxesCard } from '@/components/settings/PayrollTaxesCard';
 import { PayScheduleManager } from '@/components/payroll/PayScheduleManager';
+import { W2DriverSyncDashboard } from '@/components/payroll/W2DriverSyncDashboard';
 
 export default function Settings() {
   const { canSimulateRoles, isDemoMode } = useAuth();
