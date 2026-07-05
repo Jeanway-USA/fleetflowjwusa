@@ -246,7 +246,115 @@ export function SignatorySection() {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel><RequiredLabel>Phone</RequiredLabel></FormLabel>
+                  <FormControl>
+                    <Input type="tel" autoComplete="tel" placeholder="(555) 555-5555" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel><RequiredLabel>Email</RequiredLabel></FormLabel>
+                  <FormControl>
+                    <Input type="email" autoComplete="email" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
+
+          <div className="rounded-md border border-border/60 p-4 space-y-4">
+            <p className="text-sm font-medium">Home address</p>
+            <FormField
+              control={form.control}
+              name="homeStreet1"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel><RequiredLabel>Street address</RequiredLabel></FormLabel>
+                  <FormControl>
+                    <Input autoComplete="address-line1" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="homeStreet2"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Address line 2{' '}
+                    <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input autoComplete="address-line2" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+              <FormField
+                control={form.control}
+                name="homeCity"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-3">
+                    <FormLabel><RequiredLabel>City</RequiredLabel></FormLabel>
+                    <FormControl>
+                      <Input autoComplete="address-level2" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="homeState"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-1">
+                    <FormLabel><RequiredLabel>State</RequiredLabel></FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-72">
+                        {US_STATES.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="homeZip"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel><RequiredLabel>ZIP</RequiredLabel></FormLabel>
+                    <FormControl>
+                      <Input autoComplete="postal-code" inputMode="numeric" placeholder="00000" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+
 
           <div className="flex flex-col-reverse items-stretch gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
             <RequiredLegend />
