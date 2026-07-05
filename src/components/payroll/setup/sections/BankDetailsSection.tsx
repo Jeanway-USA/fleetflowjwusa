@@ -67,8 +67,23 @@ type BankFormValues = z.infer<typeof bankSchema>;
 const digitsOnly = (v: string, max: number) => v.replace(/\D/g, '').slice(0, max);
 
 export function BankDetailsSection() {
+  const qc = useQueryClient();
   const [showAcct, setShowAcct] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [replace, setReplace] = useState(false);
+
+  const { data: remote, isLoading } = useQuery({
+    queryKey: ['gusto-bank-accounts'],
+    queryFn: async () => {
+      const res = await listBankAccounts();
+      if (!res.ok) throw new Error(res.error);
+      return res.data!;
+    },
+    retry: false,
+    staleTime: 60_000,
+  });
+
+  const existing = remote?.bank_accounts?.[0];
 
   const form = useForm<BankFormValues>({
     resolver: zodResolver(bankSchema),
@@ -80,6 +95,7 @@ export function BankDetailsSection() {
       confirmAccountNumber: '',
     },
   });
+
 
   const onSubmit = async (values: BankFormValues) => {
     const res = await createBankAccount({
