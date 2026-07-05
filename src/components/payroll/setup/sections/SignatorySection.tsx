@@ -14,6 +14,14 @@ import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { US_STATES } from '@/lib/us-states';
+import {
   Form,
   FormControl,
   FormField,
@@ -50,6 +58,18 @@ const signatorySchema = z.object({
     .string()
     .trim()
     .regex(SSN_REGEX, 'SSN must be 9 digits (XXX-XX-XXXX)'),
+  phone: z
+    .string()
+    .trim()
+    .refine((v) => v.replace(/\D/g, '').length >= 10, {
+      message: 'Enter a valid 10-digit phone number',
+    }),
+  email: z.string().trim().email('Enter a valid email address').max(255),
+  homeStreet1: z.string().trim().min(1, 'Street address is required').max(200),
+  homeStreet2: z.string().trim().max(200).optional().or(z.literal('')),
+  homeCity: z.string().trim().min(1, 'City is required').max(100),
+  homeState: z.string().min(2, 'State is required'),
+  homeZip: z.string().regex(/^\d{5}(-\d{4})?$/, 'ZIP must be 5 digits or ZIP+4'),
 });
 
 type SignatoryFormValues = z.infer<typeof signatorySchema>;
@@ -71,6 +91,13 @@ export function SignatorySection() {
       lastName: '',
       title: '',
       ssn: '',
+      phone: '',
+      email: '',
+      homeStreet1: '',
+      homeStreet2: '',
+      homeCity: '',
+      homeState: '',
+      homeZip: '',
     },
   });
 
@@ -81,6 +108,15 @@ export function SignatorySection() {
       title: values.title,
       dateOfBirth: values.dateOfBirth,
       ssn: values.ssn,
+      phone: values.phone,
+      email: values.email,
+      homeAddress: {
+        street1: values.homeStreet1,
+        street2: values.homeStreet2,
+        city: values.homeCity,
+        state: values.homeState,
+        zip: values.homeZip,
+      },
     });
     if (res.ok) {
       toast.success('Signatory saved', { description: 'Synced to Gusto.' });
