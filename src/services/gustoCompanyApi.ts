@@ -209,3 +209,27 @@ export function assignEmployeePaySchedule(input: AssignEmployeePayScheduleInput)
     pay_schedule_uuid: input.payScheduleUuid,
   });
 }
+
+// -------- Employee sync + onboarding status --------------------------------
+
+export function syncEmployeeToGusto(driverId: string) {
+  return callAction<{ gusto_employee_id: string | null; existed?: boolean }>(
+    'sync_employee',
+    { driver_id: driverId },
+  );
+}
+
+export interface EmployeeOnboardingStatus {
+  employee_uuid: string;
+  onboarding_completed: boolean;
+  w4_signed: boolean;
+  i9_signed: boolean;
+  error?: string;
+}
+
+export function getEmployeesOnboardingStatus(employeeUuids: string[]) {
+  return callAction<{ statuses: EmployeeOnboardingStatus[] }>(
+    'get_employees_onboarding_status',
+    { employee_uuids: employeeUuids },
+  );
+}
