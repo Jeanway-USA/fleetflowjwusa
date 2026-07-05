@@ -270,7 +270,7 @@ export function AppSidebar() {
   // --- Collapsible state with localStorage + auto-expand ---
   const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>(() => {
     const saved = loadGroupState();
-    const defaults: Record<string, boolean> = { operations: true, safety: true, backoffice: true };
+    const defaults: Record<string, boolean> = { operations: true, fleetcare: true, safety: true, administration: true };
     return { ...defaults, ...saved };
   });
 
