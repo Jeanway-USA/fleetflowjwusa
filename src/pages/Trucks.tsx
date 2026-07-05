@@ -727,11 +727,44 @@ export default function Trucks() {
                 />
               </TabsContent>
               <TabsContent value="financing" className="mt-4 space-y-4">
+                <AmortizationCard truck={viewingTruck as any} />
                 <TruckLoanPaymentsSection
                   truckId={viewingTruck.id}
                   loanBalance={viewingTruck.loan_balance ?? null}
                   originalLoanAmount={(viewingTruck as any).original_loan_amount ?? null}
                 />
+                {viewingTruck.monthly_payment ? (
+                  <div className="flex items-center justify-between rounded-md border p-3">
+                    <div className="text-sm">
+                      <p className="font-medium">Post this month's payment to Finance</p>
+                      <p className="text-xs text-muted-foreground">
+                        Adds {formatCurrency(Number(viewingTruck.monthly_payment))} to the P&amp;L as a "Truck Loan" expense and to the loan ledger. Skips if already posted for this month.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        const { data, error } = await supabase.functions.invoke('post-truck-loan-payments', {
+                          body: { truck_id: viewingTruck.id },
+                        });
+                        if (error) {
+                          toast.error(error.message);
+                          return;
+                        }
+                        const action = (data as any)?.results?.[0]?.action ?? 'posted';
+                        toast.success(action === 'already_posted' ? 'Already posted this month' : 'Monthly payment posted');
+                        queryClient.invalidateQueries({ queryKey: ['trucks'] });
+                        queryClient.invalidateQueries({ queryKey: ['truck_loan_payments', viewingTruck.id] });
+                        queryClient.invalidateQueries({ queryKey: ['truck_loan_payments_sum', viewingTruck.id] });
+                      }}
+                    >
+                      Post Now
+                    </Button>
+                  </div>
+                ) : null}
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
