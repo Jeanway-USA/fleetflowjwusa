@@ -233,3 +233,18 @@ export function getEmployeesOnboardingStatus(employeeUuids: string[]) {
     { employee_uuids: employeeUuids },
   );
 }
+
+export function sendEmployeeOnboardingInvite(driverId: string) {
+  return callAction<{ sent: boolean; email: string | null }>(
+    'send_employee_onboarding_invite',
+    { driver_id: driverId },
+  );
+}
+
+export function getEmployeeOnboardingLink(driverId: string) {
+  return callAction<{ flow_url: string | null; expires_at: string | null }>(
+    'get_employee_onboarding_link',
+    { driver_id: driverId },
+  );
+}
+

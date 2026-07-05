@@ -887,6 +887,109 @@ async function actionGetEmployeesOnboardingStatus(
   return { statuses: results };
 }
 
+// -----------------------------------------------------------------------------
+// Employee onboarding invite (W-4 / I-9 self-onboarding via Gusto)
+// -----------------------------------------------------------------------------
+
+async function loadDriverForInvite(
+  admin: Admin,
+  orgId: string,
+  driverId: string,
+): Promise<{ id: string; email: string | null; gusto_employee_id: string }> {
+  const { data: driver } = await admin
+    .from("drivers")
+    .select("id, org_id, email, gusto_employee_id")
+    .eq("id", driverId)
+    .maybeSingle();
+  if (!driver || driver.org_id !== orgId) {
+    throw new Error("Driver not in organization");
+  }
+  if (!driver.gusto_employee_id) {
+    throw new Error("Driver has not been synced to Gusto yet");
+  }
+  return {
+    id: driver.id,
+    email: driver.email ?? null,
+    gusto_employee_id: driver.gusto_employee_id,
+  };
+}
+
+async function actionSendOnboardingInvite(
+  admin: Admin,
+  orgId: string,
+  payload: { driver_id: string },
+): Promise<Record<string, unknown>> {
+  if (!payload?.driver_id) throw new Error("driver_id required");
+  const driver = await loadDriverForInvite(admin, orgId, payload.driver_id);
+  if (!driver.email) {
+    throw new Error(
+      "Driver has no email address; add one before sending an onboarding invite",
+    );
+  }
+  const uuid = driver.gusto_employee_id;
+
+  // 1. Ensure employee is flagged for self-onboarding.
+  const putResp = await gustoFetch(
+    admin,
+    orgId,
+    `/v1/employees/${uuid}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ self_onboarding: true }),
+    },
+  );
+  if (!putResp.ok && putResp.status !== 422) {
+    const b = await readGustoBody(putResp);
+    throw new Error(
+      `Failed to enable self-onboarding (${putResp.status}): ${JSON.stringify(b)}`,
+    );
+  }
+
+  // 2. Transition onboarding_status to trigger the invitation email.
+  //    Gusto accepts "self_onboarding_pending_invite" → "self_onboarding_invited".
+  const transitions = [
+    "self_onboarding_pending_invite",
+    "self_onboarding_invited",
+  ];
+  let lastBody: unknown = null;
+  for (const on_status of transitions) {
+    const resp = await gustoFetch(
+      admin,
+      orgId,
+      `/v1/employees/${uuid}/onboarding_status`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ onboarding_status: on_status }),
+      },
+    );
+    lastBody = await readGustoBody(resp);
+    if (!resp.ok && resp.status !== 422) {
+      throw new Error(
+        `Gusto onboarding_status → ${on_status} failed (${resp.status}): ${JSON.stringify(lastBody)}`,
+      );
+    }
+  }
+
+  return { sent: true, email: driver.email, gusto: lastBody };
+}
+
+async function actionGetOnboardingLink(
+  admin: Admin,
+  orgId: string,
+  payload: { driver_id: string },
+): Promise<Record<string, unknown>> {
+  if (!payload?.driver_id) throw new Error("driver_id required");
+  const driver = await loadDriverForInvite(admin, orgId, payload.driver_id);
+  const result = await actionCreateFlowToken(admin, orgId, {
+    flow_type: "employee_onboarding",
+    entity_uuid: driver.gusto_employee_id,
+    entity_type: "Employee",
+  });
+  return result;
+}
+
+
+
 
 
 
@@ -1083,6 +1186,13 @@ Deno.serve(async (req) => {
       case "get_employees_onboarding_status":
         result = await actionGetEmployeesOnboardingStatus(admin, orgId, payload);
         break;
+      case "send_employee_onboarding_invite":
+        result = await actionSendOnboardingInvite(admin, orgId, payload);
+        break;
+      case "get_employee_onboarding_link":
+        result = await actionGetOnboardingLink(admin, orgId, payload);
+        break;
+
 
       case "status": {
         const { companyUuid, status } = await getAccessToken(admin, orgId);
