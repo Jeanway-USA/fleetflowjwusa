@@ -254,6 +254,11 @@ const App = () => {
                         <Settings />
                       </ProtectedRoute>
                     } />
+                    <Route path="/settings/payroll-setup" element={
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin']}>
+                        <PayrollSetup />
+                      </ProtectedRoute>
+                    } />
                     <Route path="/admin/document-templates" element={
                       <ProtectedRoute allowedRoles={['owner']}>
                         <DocumentTemplates />
