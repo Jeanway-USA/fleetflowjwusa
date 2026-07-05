@@ -205,6 +205,7 @@ export default function Settings() {
                   </a>
                 </CardContent>
               </Card>
+              <W2DriverSyncDashboard />
               <PayrollTaxesCard />
               <PayScheduleManager />
             </TabsContent>
