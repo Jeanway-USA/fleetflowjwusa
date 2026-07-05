@@ -1,69 +1,106 @@
-## Problem (confirmed)
 
-`src/components/onboarding/DocumentSignatureStep.tsx` owns `w2Docs` (`W2DocsState`) and `contractorDocs` (`ContractorDocsState`) locally and only exposes an `onValidityChange` boolean to its parent. `src/pages/DriverOnboarding.tsx` → `finalizeSubmission` iterates only the DB `templates` list (`driver_agreement`, `direct_deposit`) and never receives the W-4 / I-9 / W-9 / IOO field values or signatures. When the driver clicks Submit:
+# Private TMS Pivot — JeanWay LLC
 
-- Onboarding is marked complete (`profiles.onboarding_completed = true`).
-- Success toast fires.
-- W-4 SSN/filing status/dependents/signature, I-9 citizenship/DOB/SSN/work-auth/signature, direct-deposit bank/routing/account/signature, W-9 legal name/tax class/TIN/signature, and IOO MC/DOT/effective date/signature are all thrown away.
+Convert the app from a public multi-tenant SaaS to a single-tenant, internal-only TMS. Root URL becomes a branded login. Only Admins and Drivers can access anything. All billing, marketing, tier gating, workspace-switching, and cross-org logic is removed.
 
-Result: admins can't run payroll for the driver and there's no record of what was signed.
+## 1. Access model & routing
 
-## Fix (scope)
+- **Root (`/`)** renders a minimalist JeanWay-branded login screen — email + password, no signup link, no marketing, no footer nav.
+- Remove routes: Landing, Pricing, About, Contact, Public Load Tracker, all `/onboarding-wizard` org-creation flows, `/pending-access`, tier upgrade pages, promo-code pages, live-demo pages, beta-onboarding pages.
+- Keep: driver onboarding (paperwork flow for new hires invited by admin), `/reset-password`.
+- `ProtectedRoute` becomes a hard gate: authenticated + role in (`admin`, `driver`). Anyone else is signed out and returned to `/`.
+- Signup is disabled at the client; admins create driver accounts via invitation only.
 
-Wire the two doc-form states up to the parent, persist their data to existing tables/storage, and generate signed PDFs so admins have artifacts identical to the current `driver_agreement` / `direct_deposit` flow.
+## 2. Roles (extensible, not booleans)
 
-### 1. Expose form state to parent
+- Keep `app_role` enum but collapse the *active* set to `admin` and `driver`. Migrate every existing internal role (`owner`, `payroll_admin`, `dispatcher`, `safety`, `executive`, `maintenance`, `accountant`, `fleet_manager`) into `admin`. `super_admin` and impersonation are dropped.
+- All helper functions (`has_role`, `is_owner`, `has_admin_access`, `has_payroll_access`, `has_operations_access`, `has_safety_access`) are consolidated into two: `public.is_admin(uuid)` and `public.is_driver(uuid)`, both reading from `user_roles` — no booleans on `profiles` or `drivers`.
+- Future roles can be added by inserting new enum values + a matching helper, without code changes elsewhere.
 
-`src/components/onboarding/DocumentSignatureStep.tsx`:
-- Lift `w2Docs` / `contractorDocs` out of local state OR add `onW2DocsChange` / `onContractorDocsChange` callbacks to `DocumentSignatureStepProps`.
-- Emit the current value on every change so the parent can persist on Submit.
+## 3. Database teardown
 
-`src/pages/DriverOnboarding.tsx`:
-- Hold `w2Docs` / `contractorDocs` in page state (start from `EMPTY_W2_DOCS_STATE` / `EMPTY_CONTRACTOR_DOCS_STATE`).
-- Pass them down and read them in `finalizeSubmission`.
+**Data purge first** (single migration, wrapped in a transaction):
+1. Identify JeanWay's `org_id` (I'll surface the candidates and ask you to confirm the exact UUID before I run the migration).
+2. Hard-delete every row where `org_id <> :jeanway`. Order respects FKs; audit triggers are suppressed via `session_replication_role = replica`.
 
-### 2. Persist structured data (reuse existing tables where possible)
+**Then strip multi-tenancy** (second migration):
+- Drop tables: `organizations`, `invitations`, `org_storage_config`, `subscription_plans`, `promo_codes`, `super_admins`, `internal_config` (moved to edge-function env), `changelog`, `user_feedback`, `state_tax_configurations` (kept only if used by IFTA — I'll verify).
+- Drop columns: `org_id` from every remaining table; `subscription_tier`, `stripe_*`, `trial_*`, `is_complimentary`, `tms_mode`, `is_active` from profile-adjacent tables.
+- Drop functions: `get_user_org_id`, `is_super_admin`, all `super_admin_*`, `auto_cleanup_empty_orgs`, `super_admin_reset_demo`, org-setting triggers (`set_*_org_id`), `prevent_org_billing_self_update`, `storage_user_same_org`.
+- Rewrite every RLS policy: replace `org_id = get_user_org_id(auth.uid())` with either `public.is_admin(auth.uid())` for admin-scoped tables or `driver_id = get_driver_id_for_user(auth.uid())` for driver-owned rows. Re-issue `GRANT`s.
+- Rewrite storage bucket paths: `{org_id}/…` → `jeanway/…`; RLS on `storage.objects` checks `is_admin` / driver ownership only.
 
-- **W-4**: upsert into existing `driver_w4_info` (already in schema) via a new `upsert_driver_w4` RPC or a direct insert scoped by `org_id` + `driver_id`. Fields: filing status, dependents amount, other income, deductions, extra withholding, multiple-jobs flag, SSN (stored encrypted like other PII if a column pattern exists; otherwise mirror how `drivers.ssn` is handled today).
-- **Direct deposit**: reuse existing `upsert_driver_banking` RPC (already used for the `direct_deposit` template) with `dd_*` fields.
-- **I-9**: no existing table. Add a small `driver_i9_info` table via migration (org_id, driver_id, full_name, other_last_names, address, dob, ssn, email, phone, citizenship enum, alien_number, work_auth_expiry, work_auth_doc_number, attested_at) + RLS mirroring `driver_w4_info`, plus GRANTs.
-- **W-9** (1099): add `driver_w9_info` table (org_id, driver_id, legal_name, business_name, tax_class, tin_type, tin, address, certifications_ack, signed_at) + RLS + GRANTs.
-- **IOO Agreement** (1099): store the structured fields (mc/dot/effective_date) as columns on a new `driver_ioo_agreement` row (or as JSON on `driver_signed_documents.metadata` if that column already exists — verify first). The signature/PDF is stored as a signed document (below).
+**Core tables kept and refocused**:
+- `trucks`, `trailers`, `drivers`, `fleet_loads`, `expenses`, `fuel_purchases`, `maintenance_requests`, `work_orders`, `service_schedules`, `driver_payroll`, `driver_settlements`, `driver_banking_info`, `driver_w4_info`, `driver_i9_info`, `driver_w9_info`, `driver_ioo_agreement`, `driver_signed_documents`, `driver_locations`, `documents`, `crm_contacts` (renamed to `partners` — brokers/shippers/vendors), `audit_logs`, `profiles`, `user_roles`.
 
-### 3. Generate + upload signed PDFs
+## 4. Sidebar restructure
 
-For each of `w4`, `i9`, `direct_deposit_form`, `w9`, `ioo_agreement`:
-- Build a PDF (extend `src/lib/onboarding/generateSignedPdf.ts` or add sibling generators) using the collected fields + signature data URL.
-- Upload to `signed-documents` under `${orgId}/${driverId}/${docType}-${ts}.pdf` (same pattern as today).
-- Insert a `driver_signed_documents` row per form so admins see them in `SignedOnboardingDocuments.tsx` alongside existing docs.
+New `AppSidebar` groups, collapsible-to-icon, active-route highlighted:
 
-### 4. Ordering & error handling
+```text
+Dispatch & Loads
+  ├─ Load Board (active + upcoming)
+  ├─ Load History
+  └─ Create Load
 
-In `finalizeSubmission`:
-1. Run existing template loop unchanged.
-2. If `employmentType === 'W-2'`: persist W-4 → I-9 → banking → upload three signed PDFs → insert three `driver_signed_documents` rows.
-3. If `employmentType === '1099'`: persist W-9 + IOO → upload two signed PDFs → insert two rows.
-4. Only flip `profiles.onboarding_completed = true` after every step above succeeds. On failure, throw so the outer `try/catch` shows the real error instead of the success toast.
+Fleet & Maintenance
+  ├─ Trucks & Equipment
+  ├─ Trailers
+  ├─ Maintenance Requests
+  ├─ Work Orders
+  └─ Telematics (ELD placeholder)
 
-### 5. Admin visibility
+Drivers & Payroll
+  ├─ Driver Roster
+  ├─ Payroll Runs
+  ├─ Settlements
+  └─ Onboarding Invitations
 
-`SignedOnboardingDocuments.tsx` already lists `driver_signed_documents` by `document_type`. Add labels for `w4`, `i9`, `w9`, `ioo_agreement`, `direct_deposit_form` to `DOCUMENT_LABELS` there and in `src/pages/DriverOnboarding.tsx`'s `DOCUMENT_LABELS`.
+Financials
+  ├─ Fuel Card Transactions
+  ├─ Expenses
+  ├─ P&L per Truck
+  └─ IFTA
 
-## Files to change
+Admin
+  ├─ Partners (brokers / shippers / vendors)
+  ├─ Documents
+  ├─ Audit Log
+  └─ Company Settings
+```
 
-- `src/components/onboarding/DocumentSignatureStep.tsx` — lift state / add change callbacks.
-- `src/pages/DriverOnboarding.tsx` — hold and persist W-2 / 1099 payloads in `finalizeSubmission`.
-- `src/lib/onboarding/generateSignedPdf.ts` (+ possibly new sibling files) — PDF templates for W-4/I-9/W-9/IOO/direct-deposit-form.
-- `src/components/drivers/SignedOnboardingDocuments.tsx` — new document-type labels.
-- New migration: `driver_i9_info`, `driver_w9_info`, `driver_ioo_agreement` tables with RLS + GRANTs matching the existing `driver_w4_info` pattern; optionally an `upsert_driver_w4` RPC.
+Driver role sees only their own portal: My Loads, My Pay, My Documents, Profile.
 
-## Out of scope
+## 5. UI/UX cleanup
 
-- Rehydrating saved values into the form on revision rounds (separate follow-up).
-- Pushing W-4 to Gusto — the existing payroll sync path can pick up `driver_w4_info` on its next run.
+- Remove from every menu, header, and settings page: Subscribe, Upgrade, Billing, Manage Plan, Trial banner, Beta banner, Impersonation banner, Workspace switcher, Org name in header (replaced with static "JeanWay LLC" wordmark), TMS-mode toggle, Feedback widget, Product Tour, Live-Demo pill.
+- Header: JeanWay logo left, sidebar trigger, quick-search, notifications, avatar menu (Profile, Sign out).
+- Theme: high-contrast dark corporate — deep slate background (`#0B1220`), steel surfaces (`#111827` / `#1F2937`), amber accent (`#F59E0B`) for JeanWay identity, white/near-white text. Uses existing HSL tokens in `index.css`; no hardcoded colors in components.
+- Optimize for desktop/tablet (≥768px). Mobile still functional but not the target.
 
-## Verification
+## 6. Files touched (high-level)
 
-1. Complete onboarding as a W-2 driver in the preview → confirm five signed docs appear in the admin driver sheet (agreement, direct deposit template, W-4, I-9, direct deposit form) and rows exist in `driver_w4_info` / `driver_i9_info` / `driver_banking_info`.
-2. Complete as a 1099 driver → confirm agreement + W-9 + IOO signed docs and `driver_w9_info` / `driver_ioo_agreement` rows.
-3. Force a persistence error (e.g. bad routing number) → confirm the failure toast fires and `profiles.onboarding_completed` stays `false`.
+- Routes/layout: `src/App.tsx`, `src/pages/Auth.tsx` (new login), delete `src/pages/{Landing,Pricing,About,Contact,PublicLoadTracker,OnboardingWizard,PendingAccess,LiveDemo,BetaOnboarding,SubscriptionUpgrade}.tsx` + their components.
+- Sidebar: `src/components/app-sidebar.tsx` rewritten; header stripped of tier/impersonation/switcher.
+- Role helpers: `src/hooks/useRole.ts`, `src/hooks/useUserRole.ts` collapsed to `useIsAdmin()` / `useIsDriver()`.
+- Delete folders: `src/components/subscription/`, `src/components/billing/`, `src/components/marketing/`, `src/components/admin/impersonation/`, `src/components/onboarding/wizard/` (org wizard only — keep driver onboarding), `src/components/tour/`, `src/components/feedback/`, `src/components/demo/`.
+- Delete edge functions: `stripe-webhook`, `create-checkout-session`, `manage-subscription`, `promo-code-*`, `super-admin-*`, `impersonation-*`, `beta-onboarding-*`, `live-demo-*`.
+- Theme tokens: `src/index.css` updated with JeanWay palette; `tailwind.config.ts` unchanged (all via CSS vars).
+- Two migrations (data purge → schema teardown) + one migration for RLS rewrite.
+
+## 7. Order of execution (I'll pause for approval before destructive steps)
+
+1. Confirm JeanWay `org_id` from `organizations` table.
+2. Snapshot existing admin/driver users we want to keep.
+3. Migration A — data purge (irreversible).
+4. Migration B — drop columns, tables, functions; add `is_admin`/`is_driver`; rewrite RLS + GRANTs.
+5. Frontend refactor (routes, sidebar, header, theme, dead-code removal).
+6. Delete unused edge functions.
+7. Verify: log in as admin (full sidebar), log in as driver (portal only), confirm no billing/marketing surfaces, all core tables read/write under new RLS.
+
+## 8. Out of scope
+
+- Custom domain DNS setup for `tms.jeanwayusa.com` — already connected per project URLs; nothing to change here.
+- Real ELD/telematics ingestion — only the UI placeholder + schema hook.
+- New payroll features — existing W-2 flow stays intact, just minus billing plumbing.
+- Data export of purged orgs (per your instruction, hard-delete).
