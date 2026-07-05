@@ -445,48 +445,98 @@ async function actionUpsertPrimaryLocation(
   }
   const companyUuid = await requireCompanyUuid(admin, orgId);
 
-  const locationBody = await gustoJson(
+  // Locations is a collection: look up existing primary location, PUT it if
+  // present (with version), otherwise POST a new one.
+  const existingResp = await gustoFetch(
     admin,
     orgId,
     `/v1/companies/${companyUuid}/locations`,
-    {
-      method: "PUT",
-      body: JSON.stringify({
-        street_1: payload.street_1,
-        street_2: payload.street_2 || undefined,
-        city: payload.city,
-        state: payload.state,
-        zip: payload.zip,
-        country: "USA",
-        phone_number: payload.phone_number || undefined,
-        mailing_address: true,
-        filing_address: true,
-      }),
-    },
-    "Gusto upsert_primary_location",
+    { method: "GET" },
   );
+  const existing = await readGustoBody(existingResp);
+  if (!existingResp.ok) {
+    throw new Error(
+      `Gusto list_locations failed (${existingResp.status}): ${JSON.stringify(existing)}`,
+    );
+  }
+  const list = Array.isArray(existing) ? existing : [];
+  const primary = (list.find((l: any) => l?.mailing_address) ??
+    list.find((l: any) => l?.filing_address) ??
+    list[0]) as { uuid?: string; version?: string } | undefined;
 
-  let companyBody: Record<string, unknown> | null = null;
-  if (payload.naics_code || payload.legal_name) {
-    companyBody = await gustoJson(
+  const locationPayload: Record<string, unknown> = {
+    street_1: payload.street_1,
+    street_2: payload.street_2 || undefined,
+    city: payload.city,
+    state: payload.state,
+    zip: payload.zip,
+    country: "USA",
+    phone_number: payload.phone_number || undefined,
+    mailing_address: true,
+    filing_address: true,
+  };
+
+  const locationBody = primary?.uuid
+    ? await gustoJson(
+        admin,
+        orgId,
+        `/v1/locations/${primary.uuid}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ ...locationPayload, version: primary.version }),
+        },
+        "Gusto update_location",
+      )
+    : await gustoJson(
+        admin,
+        orgId,
+        `/v1/companies/${companyUuid}/locations`,
+        { method: "POST", body: JSON.stringify(locationPayload) },
+        "Gusto create_location",
+      );
+
+  let industryBody: Record<string, unknown> | null = null;
+  if (payload.naics_code) {
+    industryBody = await gustoJson(
       admin,
       orgId,
-      `/v1/companies/${companyUuid}`,
+      `/v1/companies/${companyUuid}/industry_selection`,
       {
         method: "PUT",
-        body: JSON.stringify({
-          trade_name: payload.legal_name || undefined,
-          industry: payload.naics_code
-            ? { naics_code: payload.naics_code }
-            : undefined,
-        }),
+        body: JSON.stringify({ naics_code: payload.naics_code }),
       },
-      "Gusto update_company",
+      "Gusto update_industry",
     );
   }
 
-  return { ok: true, location: locationBody, company: companyBody };
+  let companyBody: Record<string, unknown> | null = null;
+  if (payload.legal_name) {
+    // Company update requires a version; fetch first.
+    const cResp = await gustoFetch(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}`,
+      { method: "GET" },
+    );
+    const cData = await readGustoBody(cResp) as Record<string, unknown>;
+    const version = typeof cData?.version === "string" ? cData.version : undefined;
+    if (cResp.ok && version) {
+      companyBody = await gustoJson(
+        admin,
+        orgId,
+        `/v1/companies/${companyUuid}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({ trade_name: payload.legal_name, version }),
+        },
+        "Gusto update_company",
+      );
+    }
+  }
+
+  return { ok: true, location: locationBody, industry: industryBody, company: companyBody };
 }
+
 
 async function actionCreateBankAccount(
   admin: Admin,
