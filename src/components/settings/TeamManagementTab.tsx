@@ -34,7 +34,6 @@ interface UserWithRole {
 }
 
 const roleLabels: Record<AppRole, string> = {
-  admin: 'Admin',
   owner: 'Owner',
   payroll_admin: 'Payroll Admin',
   dispatcher: 'Dispatcher',
@@ -44,7 +43,6 @@ const roleLabels: Record<AppRole, string> = {
 };
 
 const roleBadgeVariant: Record<AppRole, 'default' | 'secondary' | 'outline'> = {
-  admin: 'default',
   owner: 'default',
   payroll_admin: 'secondary',
   dispatcher: 'secondary',
@@ -52,7 +50,6 @@ const roleBadgeVariant: Record<AppRole, 'default' | 'secondary' | 'outline'> = {
   driver: 'outline',
   maintenance: 'outline',
 };
-
 
 export function TeamManagementTab() {
   const queryClient = useQueryClient();

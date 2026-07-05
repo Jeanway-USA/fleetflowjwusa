@@ -5,9 +5,10 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { Users, Shield, Sun, Moon, Building2, Palette, HardDrive, Settings as SettingsIcon, FileText, Percent } from 'lucide-react';
+import { Users, Shield, Sun, Moon, Building2, Palette, CreditCard, HardDrive, Settings as SettingsIcon, FileText, Percent } from 'lucide-react';
 import { CompanyTab } from '@/components/settings/CompanyTab';
 import { BrandingTab } from '@/components/settings/BrandingTab';
+import { BillingTab } from '@/components/settings/BillingTab';
 import { StorageTab } from '@/components/settings/StorageTab';
 import { TeamManagementTab } from '@/components/settings/TeamManagementTab';
 import { OnboardingPreferencesCard } from '@/components/settings/OnboardingPreferencesCard';
@@ -104,6 +105,10 @@ export default function Settings() {
                 <Sun className="h-4 w-4" />
                 Appearance
               </TabsTrigger>
+              <TabsTrigger value="billing" className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Billing
+              </TabsTrigger>
               <TabsTrigger value="storage" className="flex items-center gap-2">
                 <HardDrive className="h-4 w-4" />
                 Storage
@@ -172,9 +177,9 @@ export default function Settings() {
               <BrandingTab />
             </TabsContent>
 
-
-
-
+            <TabsContent value="billing">
+              <BillingTab />
+            </TabsContent>
 
             <TabsContent value="storage">
               <StorageTab />

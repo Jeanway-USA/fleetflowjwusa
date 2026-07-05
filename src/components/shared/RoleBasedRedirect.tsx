@@ -1,6 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import Landing from '@/pages/Landing';
 import { getRoleHomePath } from '@/lib/role-home';
 
 export function RoleBasedRedirect() {
@@ -12,6 +13,8 @@ export function RoleBasedRedirect() {
     roles,
     hasRole,
     subscriptionTier,
+    orgId,
+    orgIsActive,
     requiresOnboarding,
     onboardingCompleted,
   } = useAuth();
@@ -24,10 +27,11 @@ export function RoleBasedRedirect() {
     );
   }
 
-  // Not signed in → send to the internal login screen.
-  if (!user) return <Navigate to="/auth" replace />;
+  if (!user) return <Landing />;
 
-  // Drivers still owe onboarding paperwork must complete it first.
+  if (!orgId) return <Navigate to="/onboarding" replace />;
+  if (!orgIsActive) return <Navigate to="/account-deactivated" replace />;
+
   if (hasRole('driver') && requiresOnboarding && !onboardingCompleted) {
     return <Navigate to="/driver/onboarding" replace />;
   }

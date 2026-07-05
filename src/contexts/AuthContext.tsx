@@ -522,63 +522,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Legacy admin-tier roles that are now all collapsed into 'admin'.
-  // Anyone with 'admin' role satisfies checks for these historic roles too,
-  // so existing hasRole('owner') / hasRole('payroll_admin') / etc. call sites
-  // keep working without a codebase-wide sweep.
-  const LEGACY_ADMIN_ROLES: AppRole[] = ['owner', 'payroll_admin', 'dispatcher', 'safety', 'maintenance'];
-  const userHasAdminRow = roles.includes('admin' as AppRole) || roles.some(r => LEGACY_ADMIN_ROLES.includes(r));
-
   // Check if user has a role - respects simulation mode
   const hasRole = (role: AppRole) => {
     // If simulating, only return true for the simulated role
     if (simulatedRole) {
       return role === simulatedRole;
     }
-    if (roles.includes(role)) return true;
-    // Backward-compat: 'admin' covers every legacy admin-tier role.
-    if (userHasAdminRow && LEGACY_ADMIN_ROLES.includes(role)) return true;
-    return false;
+    return roles.includes(role);
   };
 
-  // Real owner status (ignores simulation) - preserved for the small
-  // number of places that use it for "only real top-level user" gating.
-  const actuallyIsOwner = userHasAdminRow;
-
-  // Only actual admins/owners can simulate other roles (security requirement)
+  // Real owner status (ignores simulation) - this is the ONLY check for role simulation permission
+  const actuallyIsOwner = roles.includes('owner');
+  
+  // Only actual owners can simulate other roles (security requirement)
   const canSimulateRoles = actuallyIsOwner;
-
-  // Secure setSimulatedRole that only works for actual admins/owners
+  
+  // Secure setSimulatedRole that only works for actual owners
   const handleSetSimulatedRole = (role: AppRole | null) => {
     if (!actuallyIsOwner && role !== null) {
-      console.warn('Security: Only admins can simulate roles. Ignoring request.');
+      console.warn('Security: Only owners can simulate roles. Ignoring request.');
       return;
     }
     setSimulatedRole(role);
   };
-
+  
   // Simulated owner status
   const isOwner = simulatedRole ? simulatedRole === 'owner' : actuallyIsOwner;
-
-  const isAdmin = simulatedRole
-    ? [...LEGACY_ADMIN_ROLES, 'admin' as AppRole].includes(simulatedRole)
-    : userHasAdminRow;
+  
+  const isAdmin = simulatedRole 
+    ? ['owner', 'payroll_admin', 'dispatcher', 'safety'].includes(simulatedRole)
+    : roles.some(r => ['owner', 'payroll_admin', 'dispatcher', 'safety'].includes(r));
 
   const isSimulating = simulatedRole !== null;
 
-  // Granular access control — admin covers all of these post-collapse.
-  const hasPayrollAccess = simulatedRole
-    ? ['owner', 'payroll_admin', 'admin'].includes(simulatedRole)
-    : userHasAdminRow;
+  // Granular access control - matches database functions
+  const hasPayrollAccess = simulatedRole 
+    ? ['owner', 'payroll_admin'].includes(simulatedRole)
+    : roles.some(r => ['owner', 'payroll_admin'].includes(r));
 
-  const hasOperationsAccess = simulatedRole
-    ? ['owner', 'dispatcher', 'admin'].includes(simulatedRole)
-    : userHasAdminRow;
+  const hasOperationsAccess = simulatedRole 
+    ? ['owner', 'dispatcher'].includes(simulatedRole)
+    : roles.some(r => ['owner', 'dispatcher'].includes(r));
 
-  const hasSafetyAccess = simulatedRole
-    ? ['owner', 'safety', 'admin'].includes(simulatedRole)
-    : userHasAdminRow;
-
+  const hasSafetyAccess = simulatedRole 
+    ? ['owner', 'safety'].includes(simulatedRole)
+    : roles.some(r => ['owner', 'safety'].includes(r));
 
   return (
     <AuthContext.Provider value={{

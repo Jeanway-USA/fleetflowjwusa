@@ -13,13 +13,22 @@ export function getRoleHomePath(
 ): string {
   const has = (r: AppRole) => roles.includes(r);
 
-  // Post-teardown: 'admin' is the consolidated internal staff role.
-  if (has('admin') || has('owner') || has('payroll_admin') || has('safety')) {
-    return '/executive-dashboard';
+  if (has('owner')) {
+    switch (subscriptionTier) {
+      case 'solo_bco':
+      case 'open_beta':
+        return '/fleet-loads';
+      case 'agency':
+        return '/agency-loads';
+      case 'fleet_owner':
+      case 'all_in_one':
+      default:
+        return '/executive-dashboard';
+    }
   }
   if (has('dispatcher')) return '/dispatcher-dashboard';
   if (has('driver')) return '/driver-dashboard';
   if (has('maintenance')) return '/maintenance-home';
-  // No role yet — send to auth rather than a dead pending-access page.
-  return '/auth';
+  if (has('safety') || has('payroll_admin')) return '/executive-dashboard';
+  return '/pending-access';
 }
