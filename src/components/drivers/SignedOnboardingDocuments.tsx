@@ -14,6 +14,11 @@ import { RequestRevisionDialog } from './RequestRevisionDialog';
 const DOCUMENT_LABELS: Record<string, string> = {
   driver_agreement: 'Driver Agreement',
   direct_deposit: 'Direct Deposit Authorization',
+  direct_deposit_form: 'Direct Deposit Authorization (Form)',
+  w4: 'Federal W-4 Withholding',
+  i9: 'Form I-9 — Employment Eligibility',
+  w9: 'Form W-9 — Taxpayer Identification',
+  ioo_agreement: 'Independent Owner-Operator Agreement',
 };
 
 type ReviewStatus = 'pending' | 'approved' | 'revision_requested';
