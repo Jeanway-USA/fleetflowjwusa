@@ -180,6 +180,47 @@ async function gustoFetch(
   return resp;
 }
 
+async function markPayrollSetupStatus(
+  admin: Admin,
+  orgId: string,
+  updates: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await admin.from("gusto_integration").update(updates).eq("org_id", orgId);
+  } catch {
+    // Best-effort UI status cache. The upstream Gusto write is authoritative.
+  }
+}
+
+async function mergeStateTaxSetupStatus(
+  admin: Admin,
+  orgId: string,
+  states: string[],
+): Promise<void> {
+  try {
+    const { data: row } = await admin
+      .from("gusto_integration")
+      .select("state_tax_requirements")
+      .eq("org_id", orgId)
+      .maybeSingle();
+    const current = (row?.state_tax_requirements ?? {}) as Record<string, unknown>;
+    const submittedAt = new Date().toISOString();
+    for (const state of states) {
+      current[state] = {
+        ...((current[state] ?? {}) as Record<string, unknown>),
+        submitted_at: submittedAt,
+        status: "completed",
+      };
+    }
+    await admin.from("gusto_integration").update({
+      state_tax_requirements: current,
+      onboarding_steps_synced_at: submittedAt,
+    }).eq("org_id", orgId);
+  } catch {
+    // Best-effort UI status cache. The upstream Gusto write is authoritative.
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Actions
 // -----------------------------------------------------------------------------
@@ -530,6 +571,10 @@ async function actionUpsertSignatory(
       "Gusto upsert_signatory",
     );
   }
+  await markPayrollSetupStatus(admin, orgId, {
+    signatory_status: "completed",
+    onboarding_steps_synced_at: new Date().toISOString(),
+  });
   return { ok: true, gusto: body };
 }
 
@@ -756,6 +801,10 @@ async function actionUpsertFederalTaxDetails(
   if (!resp.ok) {
     throw new Error(`Gusto upsert_federal_tax_details failed (${resp.status}): ${JSON.stringify(body)}`);
   }
+  await markPayrollSetupStatus(admin, orgId, {
+    federal_tax_status: "completed",
+    onboarding_steps_synced_at: new Date().toISOString(),
+  });
   return { ok: true, gusto: body };
 }
 
@@ -883,6 +932,11 @@ async function actionUpsertStateTaxes(
     );
     results.push({ state: s.state, gusto: body });
   }
+  await mergeStateTaxSetupStatus(
+    admin,
+    orgId,
+    payload.states.map((state) => state.state),
+  );
   return { ok: true, results };
 }
 
@@ -967,6 +1021,11 @@ async function actionCreatePaySchedule(
     },
     "Gusto create_pay_schedule",
   );
+  await markPayrollSetupStatus(admin, orgId, {
+    active_pay_schedule_uuid: (body as { uuid?: string })?.uuid ?? null,
+    pay_schedule_frequency: payload.frequency,
+    onboarding_steps_synced_at: new Date().toISOString(),
+  });
   return { ok: true, gusto: body };
 }
 
@@ -1226,16 +1285,50 @@ async function actionSyncOnboardingSteps(
     return false;
   };
 
+  const { data: cached } = await admin
+    .from("gusto_integration")
+    .select("federal_tax_status, signatory_status, state_tax_requirements, bank_verification_status, active_pay_schedule_uuid, pay_schedule_frequency")
+    .eq("org_id", orgId)
+    .maybeSingle();
+
+  const federalDone = findCompleted(["federal_tax"]);
+  const signatoryDone = findCompleted(["signatory", "add_signatory"]);
+
   const update: Record<string, unknown> = {
     onboarding_steps: steps,
     onboarding_steps_synced_at: new Date().toISOString(),
   };
   if (status) update.onboarding_status = status;
-  update.federal_tax_status = findCompleted(["federal_tax"]) ? "completed" : "pending";
-  update.signatory_status = findCompleted(["signatory", "add_signatory"]) ? "completed" : "pending";
+  update.federal_tax_status = federalDone || cached?.federal_tax_status === "completed"
+    ? "completed"
+    : "pending";
+  update.signatory_status = signatoryDone || cached?.signatory_status === "completed"
+    ? "completed"
+    : "pending";
 
   await admin.from("gusto_integration").update(update).eq("org_id", orgId);
-  return { onboarding_status: status, onboarding_steps: steps };
+  return {
+    onboarding_status: status,
+    onboarding_steps: steps,
+    setup_status: {
+      ...cached,
+      federal_tax_status: update.federal_tax_status,
+      signatory_status: update.signatory_status,
+    },
+  };
+}
+
+async function actionGetPayrollSetupStatus(
+  admin: Admin,
+  orgId: string,
+): Promise<Record<string, unknown>> {
+  const { data, error } = await admin
+    .from("gusto_integration")
+    .select("federal_tax_status, signatory_status, state_tax_requirements, bank_verification_status, active_pay_schedule_uuid, pay_schedule_frequency")
+    .eq("org_id", orgId)
+    .maybeSingle();
+  if (error) throw error;
+  return { setup_status: data ?? null };
 }
 
 async function actionGetStateTaxRequirements(
@@ -1279,19 +1372,7 @@ async function actionSubmitStateTaxRequirements(
   );
 
   // Cache per-state status in gusto_integration.state_tax_requirements
-  try {
-    const { data: row } = await admin
-      .from("gusto_integration")
-      .select("state_tax_requirements")
-      .eq("org_id", orgId)
-      .maybeSingle();
-    const current = (row?.state_tax_requirements ?? {}) as Record<string, unknown>;
-    current[state] = { submitted_at: new Date().toISOString(), gusto: body };
-    await admin
-      .from("gusto_integration")
-      .update({ state_tax_requirements: current })
-      .eq("org_id", orgId);
-  } catch { /* best-effort cache */ }
+  await mergeStateTaxSetupStatus(admin, orgId, [state]);
 
   return { state, gusto: body };
 }
@@ -1726,6 +1807,9 @@ Deno.serve(async (req) => {
         break;
       case "sync_onboarding_steps":
         result = await actionSyncOnboardingSteps(admin, orgId);
+        break;
+      case "get_payroll_setup_status":
+        result = await actionGetPayrollSetupStatus(admin, orgId);
         break;
       case "get_state_tax_requirements":
         result = await actionGetStateTaxRequirements(admin, orgId, payload);

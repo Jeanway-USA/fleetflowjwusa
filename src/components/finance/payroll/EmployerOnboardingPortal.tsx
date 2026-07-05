@@ -25,7 +25,11 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 
-import { syncOnboardingSteps, type GustoOnboardingStep } from '@/services/gustoCompanyApi';
+import {
+  syncOnboardingSteps,
+  type GustoOnboardingStep,
+  type PayrollSetupStatus,
+} from '@/services/gustoCompanyApi';
 import { CompanyIndustrySection } from '@/components/payroll/setup/sections/CompanyIndustrySection';
 import { SignatorySection } from '@/components/payroll/setup/sections/SignatorySection';
 import { TaxSetupSection } from '@/components/payroll/setup/sections/TaxSetupSection';
@@ -93,15 +97,42 @@ const STEPS: StepDef[] = [
   },
 ];
 
-function isStepCompleted(step: StepDef, remote: GustoOnboardingStep[]): boolean {
+function hasCompletedStateTax(status?: PayrollSetupStatus | null): boolean {
+  const reqs = status?.state_tax_requirements;
+  if (!reqs || typeof reqs !== 'object') return false;
+  return Object.values(reqs).some((entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    const value = entry as Record<string, unknown>;
+    return value.status === 'completed' || typeof value.submitted_at === 'string';
+  });
+}
+
+function isStepCompleted(
+  step: StepDef,
+  remote: GustoOnboardingStep[],
+  setupStatus?: PayrollSetupStatus | null,
+): boolean {
   for (const r of remote) {
     const id = String(r.id ?? r.step ?? '').toLowerCase();
     const title = String(r.title ?? '').toLowerCase();
     if (step.match.some((m) => id.includes(m) || title.includes(m))) {
-      return Boolean(r.completed);
+      if (r.completed) return true;
     }
   }
-  return false;
+  switch (step.id) {
+    case 'federal_tax':
+      return setupStatus?.federal_tax_status === 'completed';
+    case 'signatory':
+      return setupStatus?.signatory_status === 'completed';
+    case 'bank':
+      return setupStatus?.bank_verification_status === 'verified';
+    case 'state_tax':
+      return hasCompletedStateTax(setupStatus);
+    case 'pay_schedule':
+      return Boolean(setupStatus?.active_pay_schedule_uuid || setupStatus?.pay_schedule_frequency);
+    default:
+      return false;
+  }
 }
 
 /**
@@ -125,8 +156,9 @@ export function EmployerOnboardingPortal() {
     () => (Array.isArray(data?.onboarding_steps) ? data!.onboarding_steps : []),
     [data],
   );
+  const setupStatus = data?.setup_status ?? null;
 
-  const completedCount = STEPS.filter((s) => isStepCompleted(s, remote)).length;
+  const completedCount = STEPS.filter((s) => isStepCompleted(s, remote, setupStatus)).length;
   const pct = Math.round((completedCount / STEPS.length) * 100);
   const notProvisioned = error instanceof Error && /not provisioned/i.test(error.message);
 
@@ -178,7 +210,7 @@ export function EmployerOnboardingPortal() {
         ) : null}
         <Accordion type="multiple" className="space-y-2">
           {STEPS.map((step, idx) => {
-            const done = isStepCompleted(step, remote);
+            const done = isStepCompleted(step, remote, setupStatus);
             const Icon = step.icon;
             return (
               <AccordionItem

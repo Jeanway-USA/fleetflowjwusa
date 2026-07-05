@@ -1,22 +1,23 @@
-## Plan
+## Goal
+Make payroll onboarding steps immediately show as completed after their information saves successfully, instead of remaining Pending while the backend provider has accepted the data.
 
-1. **Keep no-income-tax states explicit**
-   - Preserve the existing UI behavior that hides the state withholding account input for states like TX, FL, WA, etc.
-   - Ensure the submit payload still includes `withholding_account_id: ""` for those states instead of omitting it or skipping related handling.
+## What I’ll change
+1. **Backend completion signals**
+   - In `run-w2-payroll`, after successful signatory save, update the organization’s cached payroll setup status (`signatory_status = completed`) and trigger/sync onboarding steps when possible.
+   - Apply the same pattern to federal tax details/state tax saves where the data has been accepted but the remote onboarding step may lag.
 
-2. **Fix federal tax details update shape**
-   - Update the backend `upsert_federal_tax_details` payload so it only sends fields Gusto expects and does not accidentally overwrite optional federal values with defaults when the form only supplies EIN.
-   - Keep the version fetch/retry pattern so stale resource-version errors do not block saves.
+2. **Frontend status calculation**
+   - Update the employer onboarding portal to treat a step as complete if either:
+     - the live onboarding step says `completed`, or
+     - the backend’s cached status for that setup area is `completed` after a successful save.
+   - Keep the Refresh button behavior so live provider status can still override/update cached status.
 
-3. **Fix state tax requirement patching for blank withholding**
-   - In the state-tax save action, treat a blank withholding ID as an intentional value for states that expose a withholding requirement but do not collect wage income tax.
-   - Continue to skip withholding only when the Gusto tax requirement schema has no matching withholding/account field.
-   - Keep SUI account number and SUI rate saving unchanged.
+3. **Query invalidation after saves**
+   - Ensure successful saves invalidate/refetch the onboarding status query so the badge changes from Pending/Done without a page reload.
 
-4. **Add diagnostics-safe error handling**
-   - Make the edge function return clearer action-specific errors without exposing secrets.
-   - Avoid turning a valid blank withholding field into a skipped/failed save.
+4. **Safety checks**
+   - Keep failures surfaced as errors; only mark complete after the save endpoint returns success.
+   - Preserve tenant-scoped updates by `org_id` and do not expose sensitive tax/signatory fields to the client beyond existing form data.
 
-5. **Verify**
-   - Test the Tax Setup form with a no-income-tax state, confirming the client sends a blank withholding field and the backend attempts the correct tax-requirements update.
-   - Test a normal withholding state to ensure required validation and SUI/withholding saves still work.
+## Expected result
+When Signatory or Federal Tax Details save successfully, the toast and the accordion badge should agree: the step should move from **Pending** to **Done** promptly instead of appearing unsaved.

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { CalendarIcon, CalendarClock, CheckCircle2, Loader2, Users } from 'lucide-react';
@@ -104,6 +104,7 @@ interface SyncedDriverRow {
 // ---------------------------------------------------------------------------
 
 export function PayScheduleManager() {
+  const qc = useQueryClient();
   const [schedules, setSchedules] = useState<GustoPaySchedule[]>([]);
   const [activeScheduleUuid, setActiveScheduleUuid] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
@@ -155,6 +156,7 @@ export function PayScheduleManager() {
     setSchedules((prev) => [created, ...prev.filter((s) => s.uuid !== created.uuid)]);
     setActiveScheduleUuid(created.uuid);
     toast.success('Pay schedule created', { description: 'Synced to Gusto.' });
+    qc.invalidateQueries({ queryKey: ['gusto-onboarding-steps'] });
     form.reset({
       frequency: values.frequency,
       customName: '',
