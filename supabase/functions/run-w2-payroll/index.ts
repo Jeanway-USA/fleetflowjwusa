@@ -932,16 +932,11 @@ async function actionUpsertStateTaxes(
     );
     results.push({ state: s.state, gusto: body });
   }
-  await markPayrollSetupStatus(admin, orgId, {
-    state_tax_requirements: payload.states.reduce((acc, state) => {
-      acc[state.state] = {
-        submitted_at: new Date().toISOString(),
-        status: "completed",
-      };
-      return acc;
-    }, {} as Record<string, unknown>),
-    onboarding_steps_synced_at: new Date().toISOString(),
-  });
+  await mergeStateTaxSetupStatus(
+    admin,
+    orgId,
+    payload.states.map((state) => state.state),
+  );
   return { ok: true, results };
 }
 
@@ -1377,19 +1372,7 @@ async function actionSubmitStateTaxRequirements(
   );
 
   // Cache per-state status in gusto_integration.state_tax_requirements
-  try {
-    const { data: row } = await admin
-      .from("gusto_integration")
-      .select("state_tax_requirements")
-      .eq("org_id", orgId)
-      .maybeSingle();
-    const current = (row?.state_tax_requirements ?? {}) as Record<string, unknown>;
-    current[state] = { submitted_at: new Date().toISOString(), gusto: body };
-    await admin
-      .from("gusto_integration")
-      .update({ state_tax_requirements: current })
-      .eq("org_id", orgId);
-  } catch { /* best-effort cache */ }
+  await mergeStateTaxSetupStatus(admin, orgId, [state]);
 
   return { state, gusto: body };
 }
