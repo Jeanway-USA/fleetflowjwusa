@@ -116,7 +116,7 @@ function isStepCompleted(
     const id = String(r.id ?? r.step ?? '').toLowerCase();
     const title = String(r.title ?? '').toLowerCase();
     if (step.match.some((m) => id.includes(m) || title.includes(m))) {
-      return Boolean(r.completed);
+      if (r.completed) return true;
     }
   }
   switch (step.id) {
