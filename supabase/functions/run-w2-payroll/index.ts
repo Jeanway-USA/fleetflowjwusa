@@ -447,34 +447,68 @@ async function actionUpsertSignatory(
     throw new Error("home_address street_1, city, state, zip required");
   }
   const companyUuid = await requireCompanyUuid(admin, orgId);
-  const body = await gustoJson(
-    admin,
-    orgId,
-    `/v1/companies/${companyUuid}/signatories`,
-    {
-      method: "POST",
-      body: JSON.stringify({
-        first_name: payload.first_name,
-        last_name: payload.last_name,
-        title: payload.title,
-        birthday: payload.birthday,
-        ssn: payload.ssn.replace(/\D/g, ""),
-        phone: payload.phone.replace(/\D/g, ""),
-        email: payload.email,
-        home_address: {
-          street_1: addr.street_1,
-          street_2: addr.street_2 || undefined,
-          city: addr.city,
-          state: addr.state,
-          zip: addr.zip,
-          country: "USA",
-        },
-      }),
+
+  // Check for existing signatory - Gusto only allows one per company
+  let existingUuid: string | undefined;
+  let existingVersion: string | undefined;
+  try {
+    const listResp = await gustoFetch(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}/signatories`,
+      { method: "GET" },
+    );
+    if (listResp.ok) {
+      const list = await readGustoBody(listResp) as Array<Record<string, unknown>>;
+      if (Array.isArray(list) && list.length > 0) {
+        existingUuid = list[0].uuid as string | undefined;
+        existingVersion = list[0].version as string | undefined;
+      }
+    }
+  } catch {
+    // ignore, will attempt POST
+  }
+
+  const signatoryBody: Record<string, unknown> = {
+    first_name: payload.first_name,
+    last_name: payload.last_name,
+    title: payload.title,
+    birthday: payload.birthday,
+    ssn: payload.ssn.replace(/\D/g, ""),
+    phone: payload.phone.replace(/\D/g, ""),
+    email: payload.email,
+    home_address: {
+      street_1: addr.street_1,
+      street_2: addr.street_2 || undefined,
+      city: addr.city,
+      state: addr.state,
+      zip: addr.zip,
+      country: "USA",
     },
-    "Gusto upsert_signatory",
-  );
+  };
+
+  let body: unknown;
+  if (existingUuid) {
+    if (existingVersion) signatoryBody.version = existingVersion;
+    body = await gustoJson(
+      admin,
+      orgId,
+      `/v1/signatories/${existingUuid}`,
+      { method: "PUT", body: JSON.stringify(signatoryBody) },
+      "Gusto update_signatory",
+    );
+  } else {
+    body = await gustoJson(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}/signatories`,
+      { method: "POST", body: JSON.stringify(signatoryBody) },
+      "Gusto upsert_signatory",
+    );
+  }
   return { ok: true, gusto: body };
 }
+
 
 async function actionUpsertPrimaryLocation(
   admin: Admin,
