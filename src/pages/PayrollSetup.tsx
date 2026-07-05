@@ -10,15 +10,13 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { PayrollBlockerBadge } from '@/components/payroll/setup/PayrollBlockerBadge';
 import { CompanyIndustrySection } from '@/components/payroll/setup/sections/CompanyIndustrySection';
 import { SignatorySection } from '@/components/payroll/setup/sections/SignatorySection';
-import { BankDetailsSection } from '@/components/payroll/setup/sections/BankDetailsSection';
-import { TaxSetupSection } from '@/components/payroll/setup/sections/TaxSetupSection';
-import { Building2, Landmark, Percent, UserCheck } from 'lucide-react';
+import { CompanyFinancialSetup } from '@/components/payroll/CompanyFinancialSetup';
+import { Building2, Landmark, UserCheck } from 'lucide-react';
 
 const SECTIONS = [
   { id: 'company', label: 'Company & Industry', icon: Building2, Component: CompanyIndustrySection },
   { id: 'signatory', label: 'Signatory', icon: UserCheck, Component: SignatorySection },
-  { id: 'bank', label: 'Bank Details', icon: Landmark, Component: BankDetailsSection },
-  { id: 'tax', label: 'Tax Setup', icon: Percent, Component: TaxSetupSection },
+  { id: 'financial', label: 'Financial Setup', icon: Landmark, Component: CompanyFinancialSetup },
 ] as const;
 
 export default function PayrollSetup() {
