@@ -631,6 +631,98 @@ async function actionUpsertFederalTaxDetails(
   return { ok: true, gusto: body };
 }
 
+async function actionUpsertStateTaxes(
+  admin: Admin,
+  orgId: string,
+  payload: {
+    states: Array<{
+      state: string;
+      withholding_account_id: string;
+      sui_account_id: string;
+      sui_rate: number;
+    }>;
+  },
+): Promise<Record<string, unknown>> {
+  if (!Array.isArray(payload?.states) || payload.states.length === 0) {
+    throw new Error("states[] required");
+  }
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+  const results: Array<{ state: string; gusto: unknown }> = [];
+  for (const s of payload.states) {
+    if (!s.state) throw new Error("state required");
+    const body = await gustoJson(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}/state_taxes/${s.state}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          state_tax: {
+            withholding_account_id: s.withholding_account_id,
+            sui_account_id: s.sui_account_id,
+            sui_rate: s.sui_rate,
+          },
+        }),
+      },
+      `Gusto upsert_state_taxes[${s.state}]`,
+    );
+    results.push({ state: s.state, gusto: body });
+  }
+  return { ok: true, results };
+}
+
+async function actionVerifyBankAccount(
+  admin: Admin,
+  orgId: string,
+  payload: {
+    deposit_1: number;
+    deposit_2: number;
+    bank_account_uuid?: string;
+  },
+): Promise<Record<string, unknown>> {
+  if (typeof payload?.deposit_1 !== "number" || typeof payload?.deposit_2 !== "number") {
+    throw new Error("deposit_1 and deposit_2 required (numbers)");
+  }
+  const companyUuid = await requireCompanyUuid(admin, orgId);
+
+  let bankUuid = payload.bank_account_uuid;
+  if (!bankUuid) {
+    const listResp = await gustoFetch(
+      admin,
+      orgId,
+      `/v1/companies/${companyUuid}/bank_accounts`,
+      { method: "GET" },
+    );
+    const listBody = await readGustoBody(listResp);
+    if (!listResp.ok) {
+      throw new Error(
+        `Gusto list_bank_accounts failed (${listResp.status}): ${JSON.stringify(listBody)}`,
+      );
+    }
+    const list = Array.isArray(listBody) ? listBody : [];
+    const unverified = list.find((b: any) => b?.verification_status !== "verified") ?? list[0];
+    bankUuid = unverified?.uuid;
+    if (!bankUuid) {
+      throw new Error("No bank account found to verify. Create a bank account first.");
+    }
+  }
+
+  const body = await gustoJson(
+    admin,
+    orgId,
+    `/v1/company_bank_accounts/${bankUuid}/verify`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        deposit_1: payload.deposit_1,
+        deposit_2: payload.deposit_2,
+      }),
+    },
+    "Gusto verify_bank_account",
+  );
+  return { ok: true, gusto: body };
+}
+
 
 // -----------------------------------------------------------------------------
 // Entry
