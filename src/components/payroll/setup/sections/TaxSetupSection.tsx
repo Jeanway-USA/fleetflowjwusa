@@ -103,9 +103,24 @@ export function TaxSetupSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remote]);
 
+  const filingState = form.watch('filingState');
+  const stateRequiresWithholding = !!filingState && !NO_SIT_STATES.includes(filingState);
+
+  useEffect(() => {
+    if (filingState && !stateRequiresWithholding) {
+      const current = form.getValues('stateAccountId');
+      if (current) form.setValue('stateAccountId', '', { shouldValidate: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filingState, stateRequiresWithholding]);
+
   const onSubmit = async (values: TaxFormValues) => {
     // TODO: separate call to /v1/companies/{id}/state_taxes for
     // filingState / stateAccountId / suiAccountId / suiRate.
+    // stateAccountId is only sent when the state levies income tax.
+    const _stateWithholding = stateRequiresWithholding
+      ? (values.stateAccountId ?? '').trim()
+      : null;
     const res = await upsertFederalTaxDetails({ ein: values.ein });
     if (res.ok) {
       toast.success('Tax setup saved', { description: 'Synced to Gusto.' });
