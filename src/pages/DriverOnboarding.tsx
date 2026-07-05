@@ -21,6 +21,15 @@ import {
   type DriverCredentialsStepHandle,
 } from '@/components/onboarding/DriverCredentialsStep';
 import { generateSignedPdf } from '@/lib/onboarding/generateSignedPdf';
+import { generateFormPdf, type FormPdfSection } from '@/lib/onboarding/generateFormPdf';
+import {
+  EMPTY_W2_DOCS_STATE,
+  type W2DocsState,
+} from '@/components/onboarding/W2Documents';
+import {
+  EMPTY_CONTRACTOR_DOCS_STATE,
+  type ContractorDocsState,
+} from '@/components/onboarding/ContractorDocuments';
 import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
 
 
