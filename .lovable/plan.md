@@ -1,12 +1,19 @@
-## Issue
-`W2DriverSyncDashboard` queries `drivers` without an explicit `org_id` filter, so a driver from another organization (Andrew Baker) is showing alongside the correct one (Timothy Ames).
+Plan:
 
-## Fix
-Scope the drivers query to the current user's organization.
+1. **Fix the active organization source**
+   - Update the auth/tenant context so when a super-admin starts or stops viewing another organization, the in-memory `orgId` and organization metadata refresh immediately instead of relying on the previous organization until a full reload.
 
-1. In `src/components/payroll/W2DriverSyncDashboard.tsx`:
-   - Resolve the caller's `org_id` (via `useAuth()` / existing profile hook already used elsewhere in the app, e.g. `AuthContext`).
-   - Add `.eq('org_id', orgId)` to the `drivers` select.
-   - Gate the query with `enabled: !!orgId` and include `orgId` in the `queryKey` so it refetches on org change / impersonation.
+2. **Harden the W-2 driver sync query**
+   - In the W-2 Driver Sync dashboard, use the effective active organization for the query key and `.eq('org_id', activeOrgId)` filter.
+   - Keep the query disabled until the active organization is known, so stale data cannot render between tenant changes.
 
-No backend/RLS changes — just tightening the client query to match the tenant scope pattern used across the rest of the app.
+3. **Invalidate stale driver cache on org changes**
+   - Ensure W-2 driver sync/onboarding queries are invalidated when switching organizations so cached JeanWay rows cannot appear while viewing another organization.
+
+4. **Verify the backend guard**
+   - Confirm the driver table access rules still require `drivers.org_id` to match the authenticated user’s active organization.
+   - If the UI fix is not enough, add a restrictive organization-match policy so every driver read must match the current active organization, regardless of other permissive role policies.
+
+Technical notes:
+- The prior component filter was added, but the app can still hold a stale `orgId` after organization simulation because the context only updates `simulatedOrgId` from local storage and does not refresh tenant data.
+- Andrew currently exists in the JeanWay organization in the database, so if you are viewing a different organization, this is most likely a stale active-org/client-cache issue rather than the W-2 filter itself.
