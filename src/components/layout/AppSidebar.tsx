@@ -230,7 +230,6 @@ export function AppSidebar() {
 
   const fleetCareItems: NavItem[] = [
     { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'maintenance'], feature: 'maintenance_full' },
-    { title: 'PM Schedules', icon: Wrench, path: '/maintenance-home', roles: ['owner', 'maintenance'], feature: 'maintenance_full' },
   ];
 
   const safetyItems: NavItem[] = [
