@@ -66,6 +66,10 @@ export interface DocumentSignatureStepProps {
   docRevisions: Record<string, { status: string; notes: string | null }>;
   revisionMode: boolean;
   onValidityChange: (valid: boolean) => void;
+  w2Docs: W2DocsState;
+  onW2DocsChange: (patch: Partial<W2DocsState>) => void;
+  contractorDocs: ContractorDocsState;
+  onContractorDocsChange: (patch: Partial<ContractorDocsState>) => void;
 }
 
 // ---------------------------------------------------------------------------
