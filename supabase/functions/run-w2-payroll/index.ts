@@ -1389,7 +1389,7 @@ Deno.serve(async (req) => {
     let result: Record<string, unknown>;
     switch (action) {
       case "provision_company":
-        result = await actionProvisionCompany(admin, orgId);
+        result = await actionProvisionCompany(admin, orgId, payload);
         break;
       case "sync_employee":
         result = await actionSyncEmployee(admin, orgId, payload);
