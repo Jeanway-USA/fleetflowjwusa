@@ -239,21 +239,6 @@ export default function Trucks() {
   const openDialog = (truck?: TruckWithDriver) => {
     setEditingTruck(truck || null);
     setFormData(toEditableTruck(truck));
-    // Seed compliance from the existing driver so Save isn't blocked on open.
-    const existingDriver = (truck as any)?.drivers;
-    if (existingDriver) {
-      setDriverCompliance(evaluateDriverCompliance({
-        id: existingDriver.id,
-        first_name: existingDriver.first_name,
-        last_name: existingDriver.last_name,
-        status: existingDriver.status ?? 'active',
-        license_expiry: existingDriver.license_expiry ?? null,
-        medical_card_expiry: existingDriver.medical_card_expiry ?? null,
-        credentials_review_status: existingDriver.credentials_review_status ?? 'approved',
-      }));
-    } else {
-      setDriverCompliance(null);
-    }
     setDialogOpen(true);
   };
 
