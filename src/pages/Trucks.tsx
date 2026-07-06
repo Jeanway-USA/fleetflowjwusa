@@ -246,7 +246,6 @@ export default function Trucks() {
     setDialogOpen(false);
     setEditingTruck(null);
     setFormData({});
-    setDriverCompliance(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -255,11 +254,7 @@ export default function Trucks() {
       toast.error('Unit number is required');
       return;
     }
-    // Compliance gate: only block when a driver was selected and they're non-compliant.
-    if (formData.current_driver_id && driverCompliance && !driverCompliance.compliant) {
-      toast.error(`Cannot assign driver: ${driverCompliance.reasons.join(', ')}`);
-      return;
-    }
+
     if (editingTruck) {
       updateMutation.mutate({ id: editingTruck.id, ...formData });
     } else {
