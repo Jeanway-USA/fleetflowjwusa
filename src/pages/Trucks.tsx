@@ -100,7 +100,7 @@ export default function Trucks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTruck, setEditingTruck] = useState<TruckWithDriver | null>(null);
   const [formData, setFormData] = useState<Partial<TruckInsert>>({});
-  const [driverCompliance, setDriverCompliance] = useState<DriverComplianceCheck | null>(null);
+  
   const [csvImportOpen, setCsvImportOpen] = useState(false);
 
 
