@@ -575,11 +575,8 @@ export default function Trucks() {
                 <DriverAssignmentSelect
                   value={formData.current_driver_id ?? null}
                   onChange={(id) => setFormData({ ...formData, current_driver_id: id })}
-                  onComplianceChange={setDriverCompliance}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Drivers must have current CDL, medical card, and approved compliance docs to be assigned.
-                </p>
+
               </div>
             </div>
 
