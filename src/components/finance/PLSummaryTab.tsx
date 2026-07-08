@@ -174,6 +174,10 @@ export function PLSummaryTab({
           </Card>
         </div>
 
+        {/* ---------- Fleet Runway (Cost Per Day + Break-Even Gauge) ---------- */}
+        <FleetRunwaySection loading={trendLoading} runway={trend?.runway} />
+
+
 
 
 
