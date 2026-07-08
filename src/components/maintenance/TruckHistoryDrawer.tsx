@@ -9,10 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTruckHistory, useTruckProfitability } from '@/hooks/useMaintenanceData';
 import { calculateWearPartHealth } from '@/lib/truck-maintenance-profiles';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Truck, DollarSign, Wrench, Calendar, FileText, Activity, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { Truck, DollarSign, Wrench, Calendar, FileText, Activity, TrendingUp, TrendingDown, AlertTriangle, ShieldAlert, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatCurrency } from '@/lib/formatters';
 
 interface TruckHistoryDrawerProps {
   truckId: string | null;
@@ -50,12 +52,42 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
       <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 gap-0 overflow-hidden">
         <SheetHeader className="shrink-0 mx-0 mt-0 px-6 pt-6 pb-4 pr-12 border-b static">
 
-          <SheetTitle className="flex items-center gap-2">
+          <SheetTitle className="flex items-center gap-2 flex-wrap">
             <Truck className="h-5 w-5" />
             {isLoading ? (
               <Skeleton className="h-6 w-24" />
             ) : (
               <>Unit {data?.truck?.unit_number || 'Unknown'}</>
+            )}
+            {data?.chronic?.hasChronicIssue && (
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-300 gap-1 cursor-help">
+                      <ShieldAlert className="h-3 w-3" />
+                      High Vulnerability Index
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-medium mb-1">
+                      {data.chronic.count} uncorrected minor issues in last 30 days.
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Consider before assigning long OTR lanes.
+                    </p>
+                    <ul className="text-xs space-y-1">
+                      {data.chronic.entries.map(e => (
+                        <li key={`${e.source}-${e.id}`} className="border-l-2 border-amber-500 pl-2">
+                          <span className="font-mono opacity-70">
+                            {format(new Date(e.date + 'T00:00:00'), 'MMM d')}
+                          </span>{' '}
+                          · {e.category} — {e.description}
+                        </li>
+                      ))}
+                    </ul>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
             )}
           </SheetTitle>
           <SheetDescription>
@@ -93,7 +125,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
               <ScrollArea className="h-[calc(100vh-200px)] pr-4">
                 <div className="space-y-6 py-6">
               {/* Stats Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -116,7 +148,38 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                     </p>
                   </CardContent>
                 </Card>
+                <Card
+                  className={cn(
+                    data.stats.opportunityRevenueLost > 0 &&
+                      'border-rose-200 bg-rose-50/40 dark:border-rose-900 dark:bg-rose-950/20'
+                  )}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <Clock className="h-4 w-4" />
+                      <span className="text-xs">Opportunity Revenue Lost</span>
+                    </div>
+                    <p
+                      className={cn(
+                        'text-xl font-bold',
+                        data.stats.opportunityRevenueLost > 0
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-muted-foreground'
+                      )}
+                    >
+                      {formatCurrency(data.stats.opportunityRevenueLost)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {data.stats.totalDaysDown}d down
+                      {data.stats.liveDaysDown > 0 && (
+                        <> · <span className="text-amber-600 dark:text-amber-400">{data.stats.liveDaysDown}d live</span></>
+                      )}
+                      {' · '}${data.stats.avgDailyRevenue.toLocaleString()}/day target
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
+
 
               {data.stats.lastServiceDate && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">

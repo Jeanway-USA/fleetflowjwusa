@@ -1,6 +1,8 @@
-import { AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { HealthStatus } from './PMScheduleFilters';
+import { useChronicIssueTrucks } from '@/hooks/useMaintenanceData';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PMFleetHealthSummaryProps {
   overdueCount: number;
@@ -18,9 +20,11 @@ export function PMFleetHealthSummary({
   activeFilter,
 }: PMFleetHealthSummaryProps) {
   const total = overdueCount + dueSoonCount + onTrackCount;
+  const { data: chronic } = useChronicIssueTrucks();
+  const chronicCount = chronic?.count ?? 0;
 
   return (
-    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border mb-4">
+    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border mb-4 flex-wrap">
       <span className="text-sm font-medium text-muted-foreground mr-2">
         Fleet PM Health
       </span>
@@ -71,9 +75,34 @@ export function PMFleetHealthSummary({
         <span>{onTrackCount} On Track</span>
       </button>
 
+      {chronicCount > 0 && (
+        <>
+          <div className="h-4 w-px bg-border" />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium cursor-help',
+                    'bg-amber-100/70 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                  )}
+                >
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                  <span>{chronicCount} High Vulnerability</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                ≥ 3 uncorrected minor issues in the last 30 days. Avoid long OTR assignments for these trucks.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </>
+      )}
+
       <div className="ml-auto text-xs text-muted-foreground">
         {total} trucks total
       </div>
+
     </div>
   );
 }
