@@ -205,6 +205,21 @@ export default function DriverOnboarding() {
   const isDocumentsStep = stepIndex === DOCUMENTS_STEP;
   const totalSteps = 3;
 
+  // Templates the driver still has to sign: excludes anything already submitted
+  // (pending review or approved). Revision-requested items stay in the list so
+  // they can be re-signed.
+  const pendingTemplates = useMemo(() => {
+    return templates.filter((t) => {
+      const status = docRevisions[t.document_type]?.status;
+      return status !== 'approved' && status !== 'pending';
+    });
+  }, [templates, docRevisions]);
+
+  // Templates already submitted and awaiting admin review.
+  const awaitingReviewTemplates = useMemo(() => {
+    return templates.filter((t) => docRevisions[t.document_type]?.status === 'pending');
+  }, [templates, docRevisions]);
+
   const canContinue = isEmploymentStep
     ? employmentType !== null
     : isCredentialsStep
