@@ -638,4 +638,63 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
   );
 }
 
+function SignerSequenceEditor({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const move = (idx: number, dir: -1 | 1) => {
+    const j = idx + dir;
+    if (j < 0 || j >= value.length) return;
+    const next = [...value];
+    [next[idx], next[j]] = [next[j], next[idx]];
+    onChange(next);
+  };
+  const remove = (idx: number) => {
+    const next = value.filter((_, i) => i !== idx);
+    onChange(next.length ? next : ['driver']);
+  };
+  const add = (role: string) => {
+    onChange([...value, role]);
+  };
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <Label className="text-sm font-medium">Signers (sequential order)</Label>
+      <p className="text-xs text-muted-foreground">
+        The document routes through these roles in order. Each step must be signed before it moves to the next.
+      </p>
+      <div className="space-y-2 pt-1">
+        {value.map((role, idx) => {
+          const cfg = SIGNER_ROLE_OPTIONS.find((o) => o.value === role);
+          return (
+            <div key={`${role}-${idx}`} className="flex items-center gap-2 rounded border bg-muted/30 p-2">
+              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-xs font-semibold">
+                {idx + 1}
+              </span>
+              <span className="flex-1 text-sm">{cfg?.label ?? role}</span>
+              <Button type="button" size="sm" variant="ghost" onClick={() => move(idx, -1)} disabled={idx === 0}>↑</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => move(idx, 1)} disabled={idx === value.length - 1}>↓</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => remove(idx)}>✕</Button>
+            </div>
+          );
+        })}
+      </div>
+      <div className="pt-2">
+        <Select onValueChange={add}>
+          <SelectTrigger className="h-10">
+            <SelectValue placeholder="+ Add signer" />
+          </SelectTrigger>
+          <SelectContent>
+            {SIGNER_ROLE_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
 export default DocumentTemplatesPanel;
