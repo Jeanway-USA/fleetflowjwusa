@@ -396,7 +396,11 @@ export const DEFAULT_PAYROLL_TAX_CONFIG: PayrollTaxConfig = {
   txSuiRate: 0.027,
 };
 
-/** Percentage drivers: line-haul base excludes 100% pass-through fuel surcharge. */
+/**
+ * @deprecated Legacy load-revenue-based path. New payroll ledger uses
+ * `calculateGrossTaxablePay` off base salary + bonus + holiday.
+ * Kept for backwards compatibility with any historical rows.
+ */
 export function calculateLineHaulBase(params: {
   grossTotal: number;
   fscAmount: number;
@@ -408,6 +412,22 @@ export function calculateLineHaulBase(params: {
     return Math.max(0, gross - fsc);
   }
   return gross;
+}
+
+/**
+ * Salary-track taxable wages for W-2 drivers:
+ *   Gross Taxable Pay = Base Salary + Bonus + Holiday.
+ * This is the sole input to FICA in the in-house payroll ledger.
+ */
+export function calculateGrossTaxablePay(params: {
+  baseSalary: number;
+  bonusPay: number;
+  holidayPay: number;
+}): number {
+  const b = Math.max(0, Number(params.baseSalary) || 0);
+  const bo = Math.max(0, Number(params.bonusPay) || 0);
+  const h = Math.max(0, Number(params.holidayPay) || 0);
+  return b + bo + h;
 }
 
 export interface PayrollTaxInput {
