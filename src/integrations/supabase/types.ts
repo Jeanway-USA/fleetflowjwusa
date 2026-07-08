@@ -4519,6 +4519,7 @@ export type Database = {
         Row: {
           address: string | null
           created_at: string
+          default_signing_title: string | null
           email: string | null
           first_name: string | null
           has_completed_onboarding_tour: boolean
@@ -4535,6 +4536,7 @@ export type Database = {
         Insert: {
           address?: string | null
           created_at?: string
+          default_signing_title?: string | null
           email?: string | null
           first_name?: string | null
           has_completed_onboarding_tour?: boolean
@@ -4551,6 +4553,7 @@ export type Database = {
         Update: {
           address?: string | null
           created_at?: string
+          default_signing_title?: string | null
           email?: string | null
           first_name?: string | null
           has_completed_onboarding_tour?: boolean
