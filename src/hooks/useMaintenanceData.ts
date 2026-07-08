@@ -1,6 +1,31 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfMonth, endOfMonth, differenceInDays, addDays } from 'date-fns';
+import { startOfMonth, endOfMonth, differenceInDays, addDays, subDays } from 'date-fns';
+
+/**
+ * Fallback avg daily gross revenue per truck when the org hasn't set
+ * `company_settings.avg_daily_truck_revenue`. Used for opportunity-cost math.
+ */
+const DEFAULT_DAILY_REVENUE_TARGET = 800;
+
+// Chronic-issue detection: minor service types + description keywords.
+const MINOR_SERVICE_TYPES = new Set(['fluid', 'tire', 'pressure', 'minor', 'inspection']);
+const MINOR_KEYWORD_RE = /\b(leak|drip|slow\s+(?:tire|fluid)|pressure|weep)\b/i;
+
+const isMinorEntry = (serviceType?: string | null, description?: string | null) => {
+  if (serviceType && MINOR_SERVICE_TYPES.has(serviceType.toLowerCase())) return true;
+  if (description && MINOR_KEYWORD_RE.test(description)) return true;
+  return false;
+};
+
+export interface ChronicEntry {
+  id: string;
+  source: 'log' | 'work_order';
+  description: string;
+  date: string;
+  category: string;
+}
+
 
 // Types for our maintenance data
 export interface WorkOrder {
