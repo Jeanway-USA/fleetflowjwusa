@@ -1,46 +1,30 @@
-## Feature: `{{consent:key}}` — required Yes/No consent
+# Restore public shipment tracking
 
-Interactive Yes/No selector inline in document templates. Values bind to `document_instances.metadata` using the explicit key from the token (e.g. `{{consent:tcpa_text_agree}}` → `metadata.consent_tcpa_text_agree`). Existing token hydration (`{{driver_name}}`, `{{today_date}}`, etc.) continues to work untouched.
+## Problem
+`src/App.tsx` redirects `/track` → `/auth`, and `src/pages/PublicLoadTracker.tsx` was deleted. But the app still hands out `/track?tracking_id=…` links to external recipients (no accounts):
 
-## Token format
+- `src/components/driver/ActiveLoadCard.tsx` (Copy tracking link)
+- `src/pages/FleetLoads.tsx` (Tracking ID column copy)
+- `supabase/functions/email-load-status/index.ts` ("View Load Details" button)
+- `supabase/functions/send-invoice-email/index.ts` ("View Load Details" button)
 
-- `{{consent:<snake_case_key>}}` where key matches `^[a-z][a-z0-9_]*$`.
-- Metadata key: `consent_<key>` (prefix keeps it distinct from other metadata fields).
-- Stored value: string `'yes'` or `'no'`.
+Recipients hit the sign-in wall → tracking flow is broken end-to-end.
 
-## Hydration (`src/lib/documents/hydrateTokens.ts`)
+## Decision needed
+Pick one:
+1. **Restore public tracker** (recommended). Re-create a minimal `PublicLoadTracker.tsx` that reads `tracking_id` from the URL and shows read-only load status (stops, ETA, current status, last GPS ping timestamp) via a public RPC / RLS policy limited to `tracking_id` lookups. Restore the route `<Route path="/track" element={<PublicLoadTracker />} />` in `App.tsx`.
+2. **Kill the public tracking flow**. Remove all outgoing `/track?tracking_id=…` link generation from the four call sites above and drop the "View Load Details" button from the two edge functions.
 
-- Extend the token regex to allow the `:` separator so consent tokens aren't broken by the plain `{{token}}` matcher. Change the regex from `\{\{\s*([a-zA-Z0-9_]+)\s*\}\}` to `\{\{\s*([a-zA-Z0-9_:]+)\s*\}\}`.
-- In `hydrateTokens`, recognize the `consent:` prefix and resolve to a checkbox glyph line for read-only rendering:
-  - `[X] Yes [ ] No` when metadata is `'yes'`, `[ ] Yes [X] No` when `'no'`, `[ ] Yes [ ] No` when unset.
-- In `extractUnresolvedTokens`, filter out consent tokens (they're handled by dedicated inputs, not the generic missing-token loop).
-- Add a new helper `extractConsentKeys(source: string): string[]` that returns the list of `consent:<key>` occurrences (deduped, in source order). The signing panel uses this to know which Yes/No pairs to render.
+## Proposed implementation (option 1)
+1. Add `src/pages/PublicLoadTracker.tsx`:
+   - Read `tracking_id` from `useSearchParams`.
+   - Call a security-definer RPC `public.get_public_load_by_tracking(tracking_id uuid)` returning only non-sensitive fields (load number, status, origin/destination city+state, pickup/delivery windows, last driver location timestamp, ETA). No rates, no broker PII, no driver name.
+   - Render read-only card with a status timeline. Handle "not found" and "delivered/expired" states.
+2. Migration: create the RPC (SECURITY DEFINER, `SET search_path = public`), granting `EXECUTE` to `anon, authenticated`. Do not add broad RLS SELECT to `anon`.
+3. `src/App.tsx`: replace the `Navigate` with `<Route path="/track" element={<PublicLoadTracker />} />` outside `ProtectedRoute`.
+4. Verify the four link-generation sites still produce the expected URL; no changes needed.
+5. Add a lightweight CSP/robots note if desired (noindex meta on the page).
 
-## Signing panel (`src/pages/DocumentSigningWorkspace.tsx`)
-
-- Add `consentValues: Record<string, 'yes' | 'no' | undefined>` state.
-- Pre-fill from existing `instance.metadata` on load (same effect that seeds `fieldValues`).
-- Render a new "Consents" section above the signature pad when the template contains any consent tokens. Each key gets:
-  - The humanized label (`key.replace(/_/g, ' ')`) and two radio-style buttons: **Yes** / **No** (shadcn `RadioGroup`).
-  - Required — validation blocks the sign submit until every consent has a value.
-- On submit, merge `consent_<key>: value` for each answered consent into the metadata payload alongside printed name / title / date signed.
-
-## Template rendering surfaces
-
-- **`src/pages/DocumentSigningWorkspace.tsx`** already routes through `hydrateTokens`, so consent tokens render as `[X] Yes [ ] No` inline in the markdown preview automatically once hydration knows about them.
-- **`src/components/onboarding/DocumentTemplateRenderer.tsx`** — only touched by legacy driver onboarding flow. No changes; consent tokens aren't used there.
-- **`composeCompletedPdf.ts`** — the native (non-legacy) certificate page reads the hydrated text, so nothing to add there. Legacy backfilled PDFs are untouched, per requirement.
-
-## Reference guide
-
-Add one entry to `VARIABLES` in `src/components/settings/DocumentTemplatesPanel.tsx`:
-
-- `{{consent:key}}` — "Renders a required Yes/No consent checkbox. Replace `key` with a snake_case name (e.g. `{{consent:tcpa_text_agree}}`). The answer is saved to the document as `consent_<key>`."
-
-## Files touched
-
-- `src/lib/documents/hydrateTokens.ts` — regex, consent resolution, `extractConsentKeys` helper.
-- `src/pages/DocumentSigningWorkspace.tsx` — consent state, prefill, RadioGroup UI, validation, metadata write.
-- `src/components/settings/DocumentTemplatesPanel.tsx` — one new reference entry.
-
-No migrations. No changes to `document_signatures` schema.
+## Verification
+- Copy a tracking link while signed out in an incognito window → page loads with status.
+- Trigger `email-load-status` in staging → button opens the public page for a non-authed recipient.
