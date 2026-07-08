@@ -2,10 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Trophy, Info, Fuel } from 'lucide-react';
+import { Trophy, Info, Fuel, ShieldCheck, Target } from 'lucide-react';
 import { DriverMetric } from '@/hooks/useDriverPerformanceData';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { Target } from 'lucide-react';
+
 
 interface PerformanceScorecardsProps {
   metrics: DriverMetric[];
