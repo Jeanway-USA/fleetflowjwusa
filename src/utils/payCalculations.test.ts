@@ -161,38 +161,53 @@ describe('weekly aggregation for percentage', () => {
 });
 
 describe('employment_type routing', () => {
-  it('W-2 hourly: net = gross * (1 - 0.22)', () => {
+  it('W-2 hourly: gross includes accessorials, 22% withheld', () => {
     const r = calculateWeeklyPay({
       loads: [load()],
       driver: { pay_type: 'hourly', pay_rate: 25, employment_type: 'w2_company' },
       hoursWorked: 40,
     });
     expect(r.employmentClass).toBe('w2');
-    expect(r.grossPay).toBe(1000);
-    expect(r.taxWithholding).toBeCloseTo(220);
-    expect(r.netPay).toBeCloseTo(780);
-    // Accessorials are NOT tracked for W-2
-    expect(r.accessorialsTotal).toBe(0);
+    // base = 40*25 = 1000 ; accessorials = 75 ; gross = 1075
+    expect(r.base).toBe(1000);
+    expect(r.accessorialsTotal).toBe(75);
+    expect(r.grossPay).toBe(1075);
+    expect(r.taxWithholding).toBeCloseTo(236.5);
+    expect(r.netPay).toBeCloseTo(1075 - 236.5);
   });
 
-  it('W-2 per_mile: net = miles*rate * 0.78', () => {
+  it('W-2 per_mile: gross = miles*rate + accessorials, 22% withheld', () => {
     const r = calculateWeeklyPay({
       loads: [load()],
       driver: { pay_type: 'per_mile', pay_rate: 0.5, employment_type: 'w2_company' },
     });
-    expect(r.grossPay).toBe(500);
-    expect(r.taxWithholding).toBeCloseTo(110);
-    expect(r.netPay).toBeCloseTo(390);
+    // base = 1000*0.5 = 500 ; accessorials = 75 ; gross = 575
+    expect(r.grossPay).toBe(575);
+    expect(r.taxWithholding).toBeCloseTo(126.5);
+    expect(r.netPay).toBeCloseTo(575 - 126.5);
   });
 
-  it('W-2 percentage is illegal — returns zero', () => {
+  it('W-2 percentage: now legal, taxed like any other W-2 gross', () => {
     const r = calculateWeeklyPay({
       loads: [load()],
       driver: { pay_type: 'percentage', pay_rate: 70, employment_type: 'w2_company' },
+      settings: { tmsMode: 'landstar' },
     });
-    expect(r.grossPay).toBe(0);
-    expect(r.netPay).toBe(0);
-    expect(r.payType).toBe('unknown');
+    // base = 2000*0.65*0.7 = 910 ; accessorials = 75 ; gross = 985
+    expect(r.payType).toBe('percentage');
+    expect(r.grossPay).toBeCloseTo(985);
+    expect(r.taxWithholding).toBeCloseTo(216.7);
+    expect(r.netPay).toBeCloseTo(985 - 216.7);
+  });
+
+  it('W-2 flat: weekly_flat_rate + accessorials, 22% withheld', () => {
+    const r = calculateWeeklyPay({
+      loads: [load()],
+      driver: { pay_type: 'flat', pay_rate: 1500, employment_type: 'w2_company' },
+    });
+    // base = 1500 ; accessorials = 75 ; gross = 1575
+    expect(r.grossPay).toBe(1575);
+    expect(r.taxWithholding).toBeCloseTo(346.5);
   });
 
   it('W-2 honors configurable withholding rate', () => {
