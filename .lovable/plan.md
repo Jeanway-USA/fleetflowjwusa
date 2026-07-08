@@ -1,55 +1,41 @@
 
-## Root cause
+## Diagnosis
 
-The PDF stored for each signed document is generated once — at the moment the **driver** signs. In `src/lib/onboarding/generateSignedPdf.ts` line 418, the `{{owner_signature}}` token is unconditionally replaced with the literal string `"[Owner Signature Pending]"`. Nothing regenerates or amends that PDF when the owner countersigns through the new signing engine, so the "completed" file you're viewing is still the frozen driver-only version.
+The composed PDF is being built in the browser, then the browser tries to write it to storage and update `document_instances` directly. The RLS policies I added should allow the owner, but the toast the user saw shows the write is still being rejected — most likely because the compose ran once before the RLS migration was approved, cached the failure, and now some later condition (impersonation, refreshed session, or unusual auth state) is keeping it broken. Fighting RLS from the client for a write that must always succeed for whoever finishes the last signature is fragile.
 
-Additionally, for **backfilled** instances we only stored a `legacy:` marker for the driver's signature (the actual signature image lives inside the original PDF), so we cannot re-render the document from scratch — we have to stamp onto the existing PDF.
+The clean fix is to stop writing to storage/DB from the browser and instead post the composed PDF bytes to a small edge function that uses the service role.
 
 ## Fix
 
-Compose a final, fully-signed PDF at the moment the instance transitions to `completed`, save it to storage, and surface it in the UI.
+**1. New edge function `finalize-document-instance`**
 
-**1. Add `pdf-lib`** — needed to open/modify existing PDFs (jsPDF only writes new ones).
+- Reads the user's JWT with the anon client to establish `auth.uid()`.
+- Validates the caller: they must be a signer of that instance (row in `document_signatures` for `signer_id = auth.uid()`), and the instance's `status` must be `completed`. This is stricter than "is owner" — it also lets whoever is the final signer complete the artifact regardless of role.
+- Accepts `{ instance_id, pdf_base64 }`. Decodes the bytes.
+- Uses the **service-role** client to:
+  - Upload to `signed-documents/{org_id}/completed/{instance_id}.pdf` with `upsert: true`.
+  - Update `document_instances.pdf_storage_path` for that row.
+- Returns `{ path }`.
+- CORS-enabled, `verify_jwt = false` in code (validates the JWT itself).
 
-**2. New helper `src/lib/documents/composeCompletedPdf.ts`**
+**2. `composeCompletedPdf` client refactor**
 
-Given a completed `document_instance`, return a `Uint8Array` PDF that includes every signer's signature image.
+Keep the PDF assembly (pdf-lib merge + jsPDF signature page — already working) but replace the final `storage.upload` + `document_instances.update` block with a single `supabase.functions.invoke('finalize-document-instance', { body: { instance_id, pdf_base64 } })` call.
 
-- **Backfilled instances** (`metadata.legacy_file_path` present):
-  1. Download the original driver-signed PDF from the `signed-documents` bucket via `pdf-lib`.
-  2. Append a new "Countersignatures" page listing each non-driver signer: role label, signer name, date, and the signature PNG decoded from their `document_signatures.signature_data_url`.
-  3. Return the merged bytes.
-- **Native instances** (no legacy path):
-  1. Build the whole PDF fresh using the same `generateSignedPdf` renderer, but pass an additional `ownerSignature` (and any other role signatures) argument so the `owner_signature` token embeds the image instead of the "Pending" placeholder.
-  2. Add a small signatures block at the bottom (role, name, date, signature) for any signers whose role isn't referenced by a token in the template.
+**3. Remove now-unused storage policies**
 
-**3. `generateSignedPdf` update**
+Drop the two `Owner payroll can upload/update completed signed documents` policies from the previous migration — the service-role edge function bypasses RLS, and keeping unnecessary INSERT/UPDATE policies on `storage.objects` widens the attack surface (would let owners write any path under their org, including overwriting driver-signed originals).
 
-Extend the args with an optional `additionalSignatures: Array<{ role: string; name: string; dataUrl: string; signedAt: string }>` and change the `owner_signature` case: if a matching signature is provided, render it as a PNG (same as `driver_signature`); otherwise keep today's "Pending" behavior so mid-flow PDFs still work.
+**4. UI**
 
-**4. Storage + persistence**
-
-- Save the composed PDF to `signed-documents/{org_id}/completed/{instance_id}.pdf`.
-- Write that path back to `document_instances.pdf_storage_path` (column already exists).
-
-**5. When to compose**
-
-- Client-side in `DocumentSigningWorkspace` right after the owner's `document_signatures` insert resolves and the instance query refetches with `status === 'completed'` — run once, guarded by `pdf_storage_path` being null.
-- Same helper called from a **one-time backfill script** for the 3 already-completed instances if the owner signs before this ships (safe: the guard makes it a no-op once populated).
-
-**6. UI**
-
-- In `DocumentSigningWorkspace`, when `instance.status === 'completed'` and `pdf_storage_path` is set, show a primary "Download completed PDF" button next to the existing "Fully signed on…" banner. Keep the legacy "View driver's signed PDF" link when the instance is backfilled so both artifacts remain accessible.
-- In `DocumentsSigning` dashboard, the "Completed" tab row already shows an "Open" link; no change needed — the workspace surfaces the download.
+No changes — the existing "Assembling the final PDF with all signatures…" spinner already flips to the download button once `pdf_storage_path` is populated.
 
 ## Verification
 
-1. Countersign one of the three backfilled instances as owner.
-2. Confirm `pdf_storage_path` is populated and the "Download completed PDF" button appears.
-3. Open the downloaded PDF: page 1 is the original driver-signed doc, appended page shows the owner's signature image with name + date.
-4. For a fresh non-backfilled flow: create a template with `{{driver_signature}}` and `{{owner_signature}}`, run it end-to-end, verify the final PDF renders **both** signature images inline where the tokens are placed (no "Pending" text).
+1. Reload the completed instance screen. The `useEffect` re-fires, invokes the edge function, and the spinner should switch to the "Download completed PDF" button within a second.
+2. Download the PDF — page 1 = original driver-signed doc, appended page = owner's signature image, name, and date.
+3. Repeat for the other two backfilled instances — all three should populate `pdf_storage_path`.
 
 ## Out of scope
 
-- Re-issuing the original driver-signed PDF filename (kept intact — the completed PDF is a new file so audit trails aren't rewritten).
-- Multi-signer templates with 3+ roles — the composed PDF handles them structurally, but visual placement for uncommon tokens like `{{supervisor_signature}}` falls back to the appended block.
+- Rendering the final PDF entirely server-side (would need a Deno-compatible PDF renderer; the current client generation already works and just needs the storage write moved).
