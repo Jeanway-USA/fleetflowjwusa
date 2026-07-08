@@ -197,6 +197,11 @@ const VARIABLES: Array<{ token: string; description: string }> = [
       "Auto-fills with the compensation terms set by the Administrator on the Drivers page. This is strictly read-only for the driver.",
   },
   {
+    token: "{{consent:key}}",
+    description:
+      "Renders a required Yes/No consent choice at signing. Replace `key` with a snake_case name (e.g. `{{consent:tcpa_text_agree}}`). The signer must pick Yes or No; the answer saves to the document as `consent_<key>` for audit.",
+  },
+  {
     token: "{{page_break}}",
     description:
       "Splits this document into multiple readable pages for the driver, and enforces a hard page break when the final PDF is generated.",
