@@ -821,18 +821,59 @@ export default function Drivers() {
             <div className="border-t pt-4">
               <h4 className="font-medium mb-3">Classification</h4>
               <div className="space-y-2">
-                <Label htmlFor="employment_type">Employment Type</Label>
-                <Select
-                  value={formData.employment_type || 'w2_company'}
-                  onValueChange={(v) => setFormData({ ...formData, employment_type: v })}
-                >
-                  <SelectTrigger id="employment_type"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="w2_company">W-2 Company Driver</SelectItem>
-                    <SelectItem value="1099_contractor">1099 Contractor</SelectItem>
-                    <SelectItem value="lease_purchase">Lease-Purchase</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Worker Type</Label>
+                {formData.employment_type === 'lease_purchase' ? (
+                  <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm space-y-2">
+                    <div className="font-medium">Lease-Purchase Operator</div>
+                    <p className="text-xs text-muted-foreground">
+                      This driver is on an active Lease-Purchase agreement. Switching worker
+                      type will end that agreement and clear the lease terms below.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setFormData({ ...formData, employment_type: '1099_contractor' })}
+                      >
+                        Convert to 1099
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setFormData({ ...formData, employment_type: 'w2_company' })}
+                      >
+                        Convert to W-2
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="inline-flex rounded-md border p-0.5 bg-muted">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, employment_type: 'w2_company' })}
+                      className={`px-3 py-1.5 text-sm rounded ${
+                        (formData.employment_type || 'w2_company') === 'w2_company'
+                          ? 'bg-background shadow-sm font-medium'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      W-2 Employee
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, employment_type: '1099_contractor' })}
+                      className={`px-3 py-1.5 text-sm rounded ${
+                        formData.employment_type === '1099_contractor'
+                          ? 'bg-background shadow-sm font-medium'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      1099 Contractor
+                    </button>
+                  </div>
+                )}
               </div>
 
               {formData.employment_type === 'lease_purchase' && (
@@ -885,20 +926,66 @@ export default function Drivers() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="pay_type">Pay Type</Label>
-                  <Select value={formData.pay_type || 'percentage'} onValueChange={(v) => setFormData({ ...formData, pay_type: v })}>
+                  <Label htmlFor="pay_type">Pay Model</Label>
+                  <Select value={formData.pay_type || 'per_mile'} onValueChange={(v) => setFormData({ ...formData, pay_type: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="per_mile">CPM (Cents per Mile)</SelectItem>
-                      <SelectItem value="flat">Flat Rate</SelectItem>
-                      <SelectItem value="percentage">Percentage</SelectItem>
+                      <SelectItem value="per_mile">CPM (Cents Per Mile)</SelectItem>
+                      <SelectItem value="percentage">Percentage of Line-Haul</SelectItem>
+                      <SelectItem value="flat">Flat Salary</SelectItem>
+                      {(formData.pay_type === 'hourly' || formData.pay_type === 'cpm') && (
+                        <SelectItem value={formData.pay_type}>
+                          {formData.pay_type === 'hourly' ? 'Hourly (legacy)' : 'CPM (legacy alias)'}
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
-
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pay_rate">Pay Rate</Label>
-                  <Input id="pay_rate" type="number" step="0.01" value={formData.pay_rate || ''} onChange={(e) => setFormData({ ...formData, pay_rate: parseFloat(e.target.value) || 0 })} />
+                  {(() => {
+                    const pt = formData.pay_type || 'per_mile';
+                    const cfg =
+                      pt === 'percentage'
+                        ? { label: 'Driver Split', suffix: '%', step: '0.5', min: '0', max: '100', placeholder: '25' }
+                        : pt === 'flat'
+                          ? { label: 'Weekly Flat Rate', suffix: '$/week', step: '1', min: '0', max: undefined, placeholder: '1500' }
+                          : pt === 'hourly'
+                            ? { label: 'Hourly Rate', suffix: '$/hr', step: '0.25', min: '0', max: undefined, placeholder: '25.00' }
+                            : { label: 'Rate per Mile', suffix: '$/mi', step: '0.01', min: '0', max: undefined, placeholder: '0.55' };
+                    const rate = Number(formData.pay_rate) || 0;
+                    const helper =
+                      pt === 'per_mile' || pt === 'cpm'
+                        ? `= $${rate.toFixed(2)} × booked miles per load`
+                        : pt === 'percentage'
+                          ? `= ${rate}% of line-haul (FSC excluded)`
+                          : pt === 'flat'
+                            ? `= $${rate.toLocaleString()} paid weekly`
+                            : pt === 'hourly'
+                              ? `= $${rate.toFixed(2)} × hours worked`
+                              : '';
+                    return (
+                      <>
+                        <Label htmlFor="pay_rate">{cfg.label}</Label>
+                        <div className="relative">
+                          <Input
+                            id="pay_rate"
+                            type="number"
+                            step={cfg.step}
+                            min={cfg.min}
+                            max={cfg.max}
+                            placeholder={cfg.placeholder}
+                            value={formData.pay_rate ?? ''}
+                            onChange={(e) => setFormData({ ...formData, pay_rate: parseFloat(e.target.value) || 0 })}
+                            className="pr-16"
+                          />
+                          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                            {cfg.suffix}
+                          </span>
+                        </div>
+                        {helper && <p className="text-[11px] text-muted-foreground">{helper}</p>}
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="status">Status</Label>
