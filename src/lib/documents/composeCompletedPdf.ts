@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -235,6 +235,7 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
       const sigBytes = dataUrlToPngBytes(ownerSig.signature_data_url);
       if (sigBytes) {
         const pngImage = await pdfDoc.embedPng(sigBytes);
+        const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const hits = await findOwnerPlaceholders(legacyBytes);
 
         const targets = hits.length > 0
@@ -248,13 +249,19 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
               return [{
                 pageIndex: pdfDoc.getPageCount() - 1,
                 x: 54,
-                y: 60,
+                y: 120,
                 width: 220,
                 height: 12,
                 pageWidth: width,
                 pageHeight: height,
               }];
             })();
+
+        const ownerName = meta.owner_printed_name?.trim() || ownerSig.name;
+        const ownerTitle = meta.owner_title?.trim() || '';
+        const ownerDate =
+          meta.owner_date_signed?.trim() ||
+          format(new Date(ownerSig.signed_at), 'MMMM d, yyyy');
 
         for (const hit of targets) {
           const page = pdfDoc.getPage(hit.pageIndex);
@@ -263,13 +270,14 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
           const maxWidth = page.getWidth() - hit.x - 36;
           const targetWidth = Math.min(aspect * targetHeight, maxWidth);
 
-          // Cover the placeholder text with a white rectangle (add a little
-          // padding above/below so descenders/ascenders don't peek out).
+          // Cover the placeholder text with a white rectangle (add padding so
+          // descenders/ascenders don't peek out, and extend downward to leave
+          // room for the three metadata lines).
           page.drawRectangle({
             x: hit.x - 1,
-            y: hit.y - 3,
-            width: hit.width + 2,
-            height: hit.height + 6,
+            y: hit.y - 60,
+            width: Math.max(hit.width + 2, targetWidth + 4, 240),
+            height: hit.height + 66,
             color: rgb(1, 1, 1),
           });
 
@@ -280,6 +288,24 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
             width: targetWidth,
             height: targetHeight,
           });
+
+          // Printed Name / Title / Date Signed underneath the signature image.
+          const lineSize = 9;
+          const lineHeight = 12;
+          let ty = hit.y - 16;
+          const draw = (text: string) => {
+            page.drawText(text, {
+              x: hit.x,
+              y: ty,
+              size: lineSize,
+              font: helvetica,
+              color: rgb(0, 0, 0),
+            });
+            ty -= lineHeight;
+          };
+          draw(`Printed Name: ${ownerName}`);
+          draw(`Title: ${ownerTitle}`);
+          draw(`Date Signed: ${ownerDate}`);
         }
       }
     }

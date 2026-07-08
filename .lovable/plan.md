@@ -1,42 +1,59 @@
-## Problem
+## New tokens
 
-The completed-PDF card is stuck on "Assembling the final PDF…" forever. Two issues combine:
+Add six new template tokens to `src/lib/documents/hydrateTokens.ts`:
 
-1. **pdfjs worker not configured.** Setting `GlobalWorkerOptions.workerSrc = ''` does NOT disable the worker in modern pdfjs-dist — `getDocument()` still tries to spin one up and throws "No 'GlobalWorkerOptions.workerSrc' specified" (visible in the session replay). `composeCompletedPdf` rejects before uploading, so `pdf_storage_path` is never set.
-2. **UI has no failure state.** `DocumentSigningWorkspace` shows the spinner whenever `status === 'completed'` and `pdf_storage_path` is null. When the compose promise rejects, the toast fires once but the effect's dependency array (`instance.pdf_storage_path`) doesn't change, so nothing re-triggers and the spinner stays forever. Refreshing re-runs the same broken call.
+- `{{driver_printed_name}}`, `{{driver_title}}`, `{{driver_date_signed}}`
+- `{{owner_printed_name}}`, `{{owner_title}}`, `{{owner_date_signed}}`
 
-## Fix
+Resolution rules in `buildTokenMap`:
 
-### 1. Give pdfjs a real worker (Vite-native)
+- `*_printed_name` / `*_title` / `*_date_signed` pull from `instance.metadata` when present (populated at signing time — see below). Falls back to blank so `extractUnresolvedTokens` reports them.
+- `driver_printed_name` also falls back to the current `driver_name` value.
+- Add these to the "handled by inputs" delete list in `extractUnresolvedTokens` — they'll be prompted by the signing panel, not the generic missing-token loop.
 
-In `src/lib/documents/composeCompletedPdf.ts`, replace the `workerSrc = ''` hack with a Vite `?url` import of the bundled worker:
+## Signing panel prompts
 
-```ts
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-import pdfjsWorker from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-```
+In `src/pages/DocumentSigningWorkspace.tsx`, when `canSignNow`:
 
-This is the standard pattern for pdfjs in Vite and eliminates the "workerSrc not specified" error. No other logic in `composeCompletedPdf` needs to change.
+- Show three new required inputs above the signature pad: **Printed Name**, **Title**, **Date Signed**.
+- Pre-fill:
+  - Printed Name = signer's profile full name (already fetched).
+  - Title = user's last-used title, read from a new `profiles.default_signing_title` column (see below). Blank if none.
+  - Date Signed = today's date, read-only display, editable if the signer needs to override.
+- On submit, block signing until all three are filled.
+- Persist all three onto `document_instances.metadata` under role-scoped keys derived from the current step's `stepRole`:
+  - `${role}_printed_name`, `${role}_title`, `${role}_date_signed` (e.g. `owner_printed_name`).
+- Also write the entered title back to `profiles.default_signing_title` so it pre-fills next time.
 
-### 2. Recover from failures in the signing workspace
+## Profile column
 
-In `src/pages/DocumentSigningWorkspace.tsx`:
+Migration to add nullable `default_signing_title text` to `public.profiles`. No policy changes needed — existing profile policies already gate reads/writes.
 
-- Track a local `composeError: string | null` alongside `composing`.
-- On compose failure, set `composeError` (in addition to the existing toast).
-- Change the "completed but no pdf_storage_path" branch of the card so it renders:
-  - the spinner + "Assembling…" while `composing === true` and no error
-  - an error message + "Retry" button when `composeError` is set; clicking clears the error and re-invokes `composeCompletedPdf(instance.id)`
-- Keep the automatic first attempt as-is so the happy path is unchanged.
+## Template renderer support
 
-### 3. Reset the stale row so the retry has a clean slate
+Update `src/components/onboarding/DocumentTemplateRenderer.tsx` and `src/lib/onboarding/generateSignedPdf.ts` so their token regexes recognize the six new names and render them as inline text (they behave like normal string tokens, not block signatures).
 
-The current instance already went through the broken compose path. Its `pdf_storage_path` is still null, which is fine — the fixed worker will let the next attempt (auto on reload, or via the new Retry button) upload successfully.
+## Legacy PDF overlay (`composeCompletedPdf`)
 
-No database migration required for this fix.
+Extend the owner-signature overlay branch in `src/lib/documents/composeCompletedPdf.ts`:
+
+- After drawing the owner signature PNG at each `[Owner Signature Pending]` hit, draw three text lines directly beneath the image using `pdf-lib`'s standard Helvetica font, matching the reference screenshot style:
+  - `Printed Name: <owner_printed_name>`
+  - `Title: <owner_title>`
+  - `Date Signed: <owner_date_signed>`
+- Pull values from `document_instances.metadata` (already loaded in the compose flow).
+- Extend the white-rectangle mask height so it covers any residual layout the placeholder occupied; text lines render below the signature, ~10pt with 12pt line height, clamped to page bounds.
+- No driver-side legacy overlay — driver signature has no `Pending` marker to anchor to and the driver's printed name/title are baked into their original signed PDF (or absent).
 
 ## Files touched
 
-- `src/lib/documents/composeCompletedPdf.ts` — swap workerSrc line for the `?url` import pattern.
-- `src/pages/DocumentSigningWorkspace.tsx` — add `composeError` state, render retry UI, wire up retry handler.
+- `supabase/migrations/*.sql` — add `profiles.default_signing_title`.
+- `src/lib/documents/hydrateTokens.ts` — six new tokens + unresolved-token filtering.
+- `src/pages/DocumentSigningWorkspace.tsx` — new inputs, validation, metadata write, profile update.
+- `src/components/onboarding/DocumentTemplateRenderer.tsx` — token regex.
+- `src/lib/onboarding/generateSignedPdf.ts` — token regex + rendering case.
+- `src/lib/documents/composeCompletedPdf.ts` — printed name/title/date text under overlaid owner signature.
+
+## Out of scope
+
+Existing already-completed instances won't retroactively gain printed name/title (metadata wasn't captured). New signings from this point forward will render them everywhere.

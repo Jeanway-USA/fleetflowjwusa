@@ -117,8 +117,18 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
     }
   }
 
+  // Role-scoped signer blocks. Fall back to blank so extractUnresolvedTokens
+  // knows to prompt for them if not already captured.
+  for (const role of ['driver', 'owner']) {
+    if (!(`${role}_printed_name` in map)) map[`${role}_printed_name`] =
+      role === 'driver' ? driverName : '';
+    if (!(`${role}_title` in map)) map[`${role}_title`] = '';
+    if (!(`${role}_date_signed` in map)) map[`${role}_date_signed`] = '';
+  }
+
   return map;
 }
+
 
 /**
  * Replace {{token}} occurrences in the source with values from the map.
@@ -146,11 +156,17 @@ export function extractUnresolvedTokens(source: string, ctx: HydrationContext): 
     const t = m[1];
     if (!Object.prototype.hasOwnProperty.call(map, t) || !map[t]) seen.add(t);
   }
-  // Signature tokens are handled by the signature pad, not by inputs.
+  // Signature tokens are handled by the signature pad; printed name / title /
+  // date are prompted by the signing panel, not the generic missing-token loop.
   seen.delete('driver_signature');
   seen.delete('owner_signature');
   seen.delete('signer_signature');
   seen.delete('page_break');
   seen.delete('file_upload');
+  for (const role of ['driver', 'owner']) {
+    seen.delete(`${role}_printed_name`);
+    seen.delete(`${role}_title`);
+    seen.delete(`${role}_date_signed`);
+  }
   return Array.from(seen);
 }

@@ -24,6 +24,9 @@ export default function DocumentSigningWorkspace() {
 
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [printedName, setPrintedName] = useState('');
+  const [signerTitle, setSignerTitle] = useState('');
+  const [dateSigned, setDateSigned] = useState(() => new Date().toISOString().slice(0, 10));
 
   const { data, isLoading } = useQuery({
     queryKey: ['document-instance', instanceId],
@@ -62,11 +65,11 @@ export default function DocumentSigningWorkspace() {
         driver = d ?? null;
       }
 
-      let signerProfile: { first_name: string | null; last_name: string | null; email: string | null } | null = null;
+      let signerProfile: { first_name: string | null; last_name: string | null; email: string | null; default_signing_title: string | null } | null = null;
       if (user?.id) {
         const { data: p } = await supabase
           .from('profiles')
-          .select('first_name, last_name, email')
+          .select('first_name, last_name, email, default_signing_title')
           .eq('user_id', user.id)
           .maybeSingle();
         signerProfile = p ?? null;
@@ -143,6 +146,21 @@ export default function DocumentSigningWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instance?.id]);
 
+  // Pre-fill Printed Name / Title / Date once profile + step role are known.
+  useEffect(() => {
+    if (!data) return;
+    const meta = (instance?.metadata ?? {}) as Record<string, string>;
+    const roleKey = stepRole || '';
+    const existingName = meta[`${roleKey}_printed_name`];
+    const existingTitle = meta[`${roleKey}_title`];
+    const existingDate = meta[`${roleKey}_date_signed`];
+    if (!printedName) setPrintedName(existingName || signerName || '');
+    if (!signerTitle) setSignerTitle(existingTitle || data.signerProfile?.default_signing_title || '');
+    if (existingDate) setDateSigned(existingDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.signerProfile?.email ?? null, signerName, stepRole]);
+
+
   // When an instance becomes completed but has no final PDF yet, build it once.
   const [composing, setComposing] = useState(false);
   const [composeError, setComposeError] = useState<string | null>(null);
@@ -176,20 +194,34 @@ export default function DocumentSigningWorkspace() {
     mutationFn: async () => {
       if (!instance || !user || !orgId) throw new Error('Not ready');
       if (!signatureDataUrl) throw new Error('Capture a signature first');
+      if (!printedName.trim()) throw new Error('Please enter your printed name');
+      if (!signerTitle.trim()) throw new Error('Please enter your title');
+      if (!dateSigned) throw new Error('Please choose a signing date');
       // Ensure all required tokens are filled.
       const unfilled = missingTokens.filter((t) => !fieldValues[t] || !fieldValues[t].trim());
       if (unfilled.length > 0) throw new Error(`Please fill: ${unfilled.join(', ')}`);
 
-      // Merge new metadata onto the instance.
+      // Merge new metadata onto the instance, including role-scoped signer info.
+      const roleKey = stepRole || 'signer';
+      const dateSignedFormatted = new Date(`${dateSigned}T00:00:00`).toLocaleDateString();
       const nextMeta = {
         ...(instance.metadata as Record<string, string> | null ?? {}),
         ...fieldValues,
+        [`${roleKey}_printed_name`]: printedName.trim(),
+        [`${roleKey}_title`]: signerTitle.trim(),
+        [`${roleKey}_date_signed`]: dateSignedFormatted,
       };
       const { error: metaErr } = await supabase
         .from('document_instances')
         .update({ metadata: nextMeta })
         .eq('id', instance.id);
       if (metaErr) throw metaErr;
+
+      // Remember the entered title on the profile for next time.
+      await supabase
+        .from('profiles')
+        .update({ default_signing_title: signerTitle.trim() })
+        .eq('user_id', user.id);
 
       const { error: sigErr } = await supabase.from('document_signatures').insert({
         org_id: orgId,
@@ -346,6 +378,42 @@ export default function DocumentSigningWorkspace() {
                     ))}
                   </div>
                 )}
+
+                <div className="space-y-3">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Signer details
+                  </Label>
+                  <div className="space-y-1">
+                    <Label htmlFor="signer-printed-name" className="text-xs">Printed name</Label>
+                    <Input
+                      id="signer-printed-name"
+                      className="h-11 pl-4 sm:pl-3"
+                      value={printedName}
+                      onChange={(e) => setPrintedName(e.target.value)}
+                      placeholder="Full legal name"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="signer-title" className="text-xs">Title</Label>
+                    <Input
+                      id="signer-title"
+                      className="h-11 pl-4 sm:pl-3"
+                      value={signerTitle}
+                      onChange={(e) => setSignerTitle(e.target.value)}
+                      placeholder="e.g. Founder & Managing Member"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="signer-date" className="text-xs">Date signed</Label>
+                    <Input
+                      id="signer-date"
+                      type="date"
+                      className="h-11 pl-4 sm:pl-3"
+                      value={dateSigned}
+                      onChange={(e) => setDateSigned(e.target.value)}
+                    />
+                  </div>
+                </div>
 
                 <SignaturePad onSignatureCapture={setSignatureDataUrl} />
 
