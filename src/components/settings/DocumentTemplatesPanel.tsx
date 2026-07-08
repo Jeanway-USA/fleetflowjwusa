@@ -393,6 +393,30 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                         />
                       </div>
 
+                      <div className="space-y-2 rounded-md border p-3">
+                        <Label htmlFor="doc-audience" className="text-sm font-medium">
+                          Audience
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Choose which drivers see this template during onboarding.
+                        </p>
+                        <Select
+                          value={(draft.applies_to ?? 'shared') as string}
+                          onValueChange={(v) =>
+                            setDraft((d) => ({ ...d, applies_to: v as TemplateAudience }))
+                          }
+                        >
+                          <SelectTrigger id="doc-audience" className="h-12">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="shared">All drivers</SelectItem>
+                            <SelectItem value="w2">W-2 employees only</SelectItem>
+                            <SelectItem value="1099">1099 contractors only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
                       <div className="space-y-2">
                         <Label htmlFor="doc-content">Content</Label>
                         <Textarea
