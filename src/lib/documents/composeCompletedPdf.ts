@@ -3,12 +3,11 @@ import { PDFDocument, rgb } from 'pdf-lib';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
-// pdfjs — use legacy build and disable the worker so it runs inline in the browser
-// without requiring Vite to bundle a worker file.
+// pdfjs — use legacy build with the bundled worker resolved by Vite as a URL.
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import pdfjsWorker from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 
-// Disable worker so pdfjs runs entirely in the main thread (no worker file to host).
-(pdfjsLib as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = '';
+(pdfjsLib as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const OWNER_PLACEHOLDER = '[Owner Signature Pending]';
 

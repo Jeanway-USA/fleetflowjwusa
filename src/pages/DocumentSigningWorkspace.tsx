@@ -145,18 +145,30 @@ export default function DocumentSigningWorkspace() {
 
   // When an instance becomes completed but has no final PDF yet, build it once.
   const [composing, setComposing] = useState(false);
-  useEffect(() => {
+  const [composeError, setComposeError] = useState<string | null>(null);
+
+  const runCompose = () => {
     if (!instance) return;
-    if (instance.status !== 'completed') return;
-    if (instance.pdf_storage_path) return;
-    if (composing) return;
+    setComposeError(null);
     setComposing(true);
     composeCompletedPdf(instance.id)
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ['document-instance', instanceId] });
       })
-      .catch((e: Error) => toast.error(e.message || 'Could not build completed PDF'))
+      .catch((e: Error) => {
+        const msg = e.message || 'Could not build completed PDF';
+        setComposeError(msg);
+        toast.error(msg);
+      })
       .finally(() => setComposing(false));
+  };
+
+  useEffect(() => {
+    if (!instance) return;
+    if (instance.status !== 'completed') return;
+    if (instance.pdf_storage_path) return;
+    if (composing || composeError) return;
+    runCompose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instance?.id, instance?.status, instance?.pdf_storage_path]);
 
@@ -393,6 +405,16 @@ export default function DocumentSigningWorkspace() {
                     <Download className="h-4 w-4 mr-2" />
                     Download completed PDF
                   </Button>
+                ) : composeError ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-destructive">
+                      Could not assemble the final PDF: {composeError}
+                    </p>
+                    <Button size="sm" variant="outline" className="w-full" onClick={runCompose} disabled={composing}>
+                      {composing && <Loader2 className="h-3 w-3 mr-2 animate-spin" />}
+                      Retry
+                    </Button>
+                  </div>
                 ) : (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />
