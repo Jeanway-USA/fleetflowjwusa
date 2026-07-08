@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { CalendarClock, AlertTriangle, CheckCircle2, Lock } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { CalendarClock, AlertTriangle, CheckCircle2, Lock, Ban, ChevronDown } from 'lucide-react';
 import { format, differenceInCalendarDays, parseISO } from 'date-fns';
 import { MarkFiledDialog } from './MarkFiledDialog';
+import { VoidExemptDialog } from './VoidExemptDialog';
 
 interface Deadline {
   form: string;
@@ -80,6 +82,7 @@ export function TaxFilingRegistryTab() {
   const { orgId } = useAuth();
   const deadlines = useMemo(() => buildDeadlines(today), []);
   const [dialog, setDialog] = useState<{ key: string; label: string } | null>(null);
+  const [voidDialog, setVoidDialog] = useState<{ key: string; label: string } | null>(null);
 
   const { data: completions = [] } = useQuery({
     queryKey: ['tax_filing_completions', orgId],
@@ -100,6 +103,15 @@ export function TaxFilingRegistryTab() {
     return m;
   }, [completions]);
 
+  const activeDeadlines = deadlines.filter((d) => {
+    const c = completionMap.get(keyFor(d));
+    return !c?.is_exempt;
+  });
+  const exemptDeadlines = deadlines.filter((d) => {
+    const c = completionMap.get(keyFor(d));
+    return !!c?.is_exempt;
+  });
+
   return (
     <Card className="card-elevated">
       <CardHeader>
@@ -107,12 +119,12 @@ export function TaxFilingRegistryTab() {
           <CalendarClock className="h-5 w-5" /> W-2 / 1099 Audit Registry
         </CardTitle>
         <CardDescription>
-          Quarterly and annual filing deadlines. Once a filing is submitted, click
-          "Mark Filed & Paid" to record the confirmation reference — completed rows
-          lock as a permanent audit record.
+          Quarterly and annual filing deadlines. Record a confirmation with
+          "Mark Filed & Paid", or clear historical non-applicable rows via
+          "Void / Exempt".
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -126,12 +138,12 @@ export function TaxFilingRegistryTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {deadlines.map((d) => {
+              {activeDeadlines.map((d) => {
                 const key = keyFor(d);
                 const completion = completionMap.get(key);
                 const days = differenceInCalendarDays(d.dueDate, today);
                 let badge;
-                if (completion) {
+                if (completion && !completion.is_exempt) {
                   badge = (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -142,7 +154,7 @@ export function TaxFilingRegistryTab() {
                       <TooltipContent>
                         <div className="text-xs">
                           <div>Ref: <span className="font-mono">{completion.confirmation_reference}</span></div>
-                          <div>Filed: {format(parseISO(completion.filed_on), 'MMM d, yyyy')}</div>
+                          <div>Filed: {completion.filed_on ? format(parseISO(completion.filed_on), 'MMM d, yyyy') : '—'}</div>
                         </div>
                       </TooltipContent>
                     </Tooltip>
@@ -167,10 +179,16 @@ export function TaxFilingRegistryTab() {
                           <Lock className="h-3 w-3" /> Locked
                         </span>
                       ) : (
-                        <Button size="sm" variant="outline"
-                          onClick={() => setDialog({ key, label: `${d.form} — ${d.scope}` })}>
-                          Mark Filed & Paid
-                        </Button>
+                        <div className="flex gap-1 justify-end">
+                          <Button size="sm" variant="ghost"
+                            onClick={() => setVoidDialog({ key, label: `${d.form} — ${d.scope}` })}>
+                            <Ban className="h-3.5 w-3.5 mr-1" /> Void / Exempt
+                          </Button>
+                          <Button size="sm" variant="outline"
+                            onClick={() => setDialog({ key, label: `${d.form} — ${d.scope}` })}>
+                            Mark Filed & Paid
+                          </Button>
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -179,6 +197,53 @@ export function TaxFilingRegistryTab() {
             </TableBody>
           </Table>
         </div>
+
+        {exemptDeadlines.length > 0 && (
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="text-muted-foreground">
+                <ChevronDown className="h-4 w-4 mr-1" />
+                {exemptDeadlines.length} exempt / archived filing{exemptDeadlines.length === 1 ? '' : 's'}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="overflow-x-auto opacity-60">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Form</TableHead>
+                      <TableHead>Scope</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {exemptDeadlines.map((d) => {
+                      const key = keyFor(d);
+                      const c = completionMap.get(key);
+                      return (
+                        <TableRow key={key}>
+                          <TableCell className="font-medium">{d.form}</TableCell>
+                          <TableCell className="text-sm">{d.scope}</TableCell>
+                          <TableCell className="text-sm">{format(d.dueDate, 'MMM d, yyyy')}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground italic">
+                            {c?.exempt_reason ?? '—'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="gap-1">
+                              <Ban className="h-3 w-3" /> Not Applicable
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
       </CardContent>
       {dialog && (
         <MarkFiledDialog
@@ -186,6 +251,14 @@ export function TaxFilingRegistryTab() {
           onOpenChange={(v) => !v && setDialog(null)}
           formKey={dialog.key}
           formLabel={dialog.label}
+        />
+      )}
+      {voidDialog && (
+        <VoidExemptDialog
+          open={!!voidDialog}
+          onOpenChange={(v) => !v && setVoidDialog(null)}
+          formKey={voidDialog.key}
+          formLabel={voidDialog.label}
         />
       )}
     </Card>
