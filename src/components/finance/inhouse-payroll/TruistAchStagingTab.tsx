@@ -128,9 +128,9 @@ export function TruistAchStagingTab() {
           <Landmark className="h-5 w-5" /> Truist ACH Staging
         </CardTitle>
         <CardDescription>
-          After executing the direct deposit manually from your Truist business portal,
-          paste the bank's transaction reference code and click Finalize Settlement.
-          Finalizing locks the row for audit integrity.
+          Auto-synced from the Active Batch tab. After executing the direct deposit
+          from your Truist business portal, paste the bank's transaction reference
+          code and click Submit Payout. Submitting locks the row as Settled.
         </CardDescription>
       </CardHeader>
       <CardContent>
