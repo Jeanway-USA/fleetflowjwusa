@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, CheckCircle2, FileText, Download } from 'lucide-react';
 import { SignaturePad } from '@/components/driver/SignaturePad';
-import { hydrateTokens, extractUnresolvedTokens } from '@/lib/documents/hydrateTokens';
+import { hydrateTokens, extractUnresolvedTokens, extractConsentKeys } from '@/lib/documents/hydrateTokens';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { composeCompletedPdf } from '@/lib/documents/composeCompletedPdf';
 
 export default function DocumentSigningWorkspace() {
@@ -27,6 +28,7 @@ export default function DocumentSigningWorkspace() {
   const [printedName, setPrintedName] = useState('');
   const [signerTitle, setSignerTitle] = useState('');
   const [dateSigned, setDateSigned] = useState(() => new Date().toISOString().slice(0, 10));
+  const [consentValues, setConsentValues] = useState<Record<string, 'yes' | 'no'>>({});
 
   const { data, isLoading } = useQuery({
     queryKey: ['document-instance', instanceId],
@@ -116,22 +118,33 @@ export default function DocumentSigningWorkspace() {
 
   const signerName = [data?.signerProfile?.first_name, data?.signerProfile?.last_name].filter(Boolean).join(' ');
   const ctx = useMemo(
-    () => ({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      driver: (data?.driver ?? null) as any,
-      signer: { name: signerName, role: stepRole, email: data?.signerProfile?.email ?? '' },
-      company: { name: data?.company?.name ?? null, address: null },
-      instance: {
-        id: instance?.id,
-        title: instance?.title,
-        metadata: { ...(instance?.metadata as Record<string, string> | null ?? {}), ...fieldValues },
-      },
-    }),
-    [data, signerName, stepRole, instance, fieldValues],
+    () => {
+      const consentMeta: Record<string, string> = {};
+      for (const [k, v] of Object.entries(consentValues)) {
+        if (v) consentMeta[`consent_${k}`] = v;
+      }
+      return {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        driver: (data?.driver ?? null) as any,
+        signer: { name: signerName, role: stepRole, email: data?.signerProfile?.email ?? '' },
+        company: { name: data?.company?.name ?? null, address: null },
+        instance: {
+          id: instance?.id,
+          title: instance?.title,
+          metadata: {
+            ...(instance?.metadata as Record<string, string> | null ?? {}),
+            ...fieldValues,
+            ...consentMeta,
+          },
+        },
+      };
+    },
+    [data, signerName, stepRole, instance, fieldValues, consentValues],
   );
 
   const rendered = useMemo(() => hydrateTokens(templateContent, ctx), [templateContent, ctx]);
   const missingTokens = useMemo(() => extractUnresolvedTokens(templateContent, ctx), [templateContent, ctx]);
+  const consentKeys = useMemo(() => extractConsentKeys(templateContent), [templateContent]);
 
   useEffect(() => {
     // Prime field values from instance metadata so previously entered values persist.
@@ -142,6 +155,14 @@ export default function DocumentSigningWorkspace() {
         if (m[t]) seeded[t] = m[t];
       }
       if (Object.keys(seeded).length > 0) setFieldValues(seeded);
+
+      // Also seed consent selections from previously saved values.
+      const seededConsents: Record<string, 'yes' | 'no'> = {};
+      for (const key of consentKeys) {
+        const v = (m[`consent_${key}`] as string | undefined)?.toLowerCase();
+        if (v === 'yes' || v === 'no') seededConsents[key] = v;
+      }
+      if (Object.keys(seededConsents).length > 0) setConsentValues(seededConsents);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instance?.id]);
@@ -201,12 +222,22 @@ export default function DocumentSigningWorkspace() {
       const unfilled = missingTokens.filter((t) => !fieldValues[t] || !fieldValues[t].trim());
       if (unfilled.length > 0) throw new Error(`Please fill: ${unfilled.join(', ')}`);
 
-      // Merge new metadata onto the instance, including role-scoped signer info.
+      // Ensure every consent has an explicit Yes/No.
+      const missingConsents = consentKeys.filter((k) => consentValues[k] !== 'yes' && consentValues[k] !== 'no');
+      if (missingConsents.length > 0) {
+        throw new Error(`Please answer: ${missingConsents.map((k) => k.replace(/_/g, ' ')).join(', ')}`);
+      }
+
+      // Merge new metadata onto the instance, including role-scoped signer info
+      // and consent selections.
       const roleKey = stepRole || 'signer';
       const dateSignedFormatted = new Date(`${dateSigned}T00:00:00`).toLocaleDateString();
+      const consentMeta: Record<string, string> = {};
+      for (const k of consentKeys) consentMeta[`consent_${k}`] = consentValues[k]!;
       const nextMeta = {
         ...(instance.metadata as Record<string, string> | null ?? {}),
         ...fieldValues,
+        ...consentMeta,
         [`${roleKey}_printed_name`]: printedName.trim(),
         [`${roleKey}_title`]: signerTitle.trim(),
         [`${roleKey}_date_signed`]: dateSignedFormatted,
@@ -378,6 +409,36 @@ export default function DocumentSigningWorkspace() {
                     ))}
                   </div>
                 )}
+
+                {consentKeys.length > 0 && (
+                  <div className="space-y-3">
+                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Consents (required)
+                    </Label>
+                    {consentKeys.map((key) => (
+                      <div key={key} className="rounded-md border p-3 space-y-2">
+                        <p className="text-sm font-medium capitalize">{key.replace(/_/g, ' ')}</p>
+                        <RadioGroup
+                          value={consentValues[key] ?? ''}
+                          onValueChange={(v) =>
+                            setConsentValues((prev) => ({ ...prev, [key]: v as 'yes' | 'no' }))
+                          }
+                          className="flex gap-6"
+                        >
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <RadioGroupItem value="yes" id={`consent-${key}-yes`} />
+                            <span>Yes</span>
+                          </label>
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <RadioGroupItem value="no" id={`consent-${key}-no`} />
+                            <span>No</span>
+                          </label>
+                        </RadioGroup>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
 
                 <div className="space-y-3">
                   <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
