@@ -1,44 +1,32 @@
-## Remove Synthetic/Sample Data from Finance Overview & Maintenance
+## Restore Fleet Runway Card — Real Data Only
 
-The "false data" showing on Finance → Overview & P&L comes from hardcoded fallback constants that were added as demo scaffolding. This plan strips them out so every figure on the Overview reflects real database records, and does the same for the maintenance down-time opportunity cost added recently.
+You're right — I over-corrected and deleted the card itself. Bringing the "Fleet Runway · Cost-Per-Day vs Month-to-Date Revenue" card back on Finance → Overview, but rebuilding every input from live database records instead of the hardcoded matrix and default constants.
 
-### 1. Finance Overview — "Fleet Runway · Cost-Per-Day vs Month-to-Date Revenue" card
+### Data sources (all from real tables)
 
-This entire card is built from hardcoded values:
+| Runway input | New source |
+| --- | --- |
+| `fixedMonthly` | Sum of trailing 90-day `expenses` rows whose `expense_type` is one of the recurring-overhead types (Truck Payment, Trailer Payment, Licensing/Permits, Registration/Plates, Insurance, LCN/Satellite, Cell Phone, Truck Warranty, CPP/Benefits, IFTA), divided by 3 → true monthly run-rate. |
+| `avgFleetMpg` | Trailing 90-day fleet miles ÷ trailing 90-day `fuel_purchases.gallons` (already computed today). |
+| `fuelPricePerGallon` | Trailing 90-day `fuel_purchases.total_cost` ÷ `fuel_purchases.gallons` (weighted average of what the fleet actually paid). |
+| `plannedDispatchDays` | Count of distinct `delivery_date`s in the trailing 30 days across `fleet_loads`. |
+| `plannedMilesPerDay` | Trailing 30-day actual/booked miles ÷ `plannedDispatchDays`. |
+| `projectedFuelMonthly` | `(plannedMilesPerDay × plannedDispatchDays ÷ avgFleetMpg) × fuelPricePerGallon`. |
+| `costPerDay` | `(fixedMonthly + projectedFuelMonthly) ÷ plannedDispatchDays`. |
+| `monthToDateRevenue` | Sum of `fleet_loads.gross_revenue` + `agent_commissions.commission_amount` where date is in the current calendar month (already real). |
+| `monthToDateDays` | Distinct dispatch days observed so far this month. |
+| `breakEvenMTD` | `costPerDay × monthToDateDays`. |
 
-- `src/config/fixedOverhead.ts` — a hand-authored matrix (Unladen Liability $450, Communications $375, Physical Damage $1,200, Vehicle Lease $3,200, Baseline Driver Salary $5,200 → $10,425/mo fixed overhead) that no org actually configured.
-- `src/hooks/usePLTrend.ts` — `DEFAULT_FUEL_PRICE = 4.10`, `DEFAULT_MILES_PER_DAY = 450`, `DEFAULT_DISPATCH_DAYS = 22`, `DEFAULT_MPG = 6.5` used to fabricate a runway when no real settings exist.
-
-Changes:
-- Delete `src/config/fixedOverhead.ts`.
-- Delete the `FleetRunwaySection` component and its render in `src/components/finance/PLSummaryTab.tsx` (remove the `Target`/`FIXED_OVERHEAD_MATRIX` imports too).
-- In `src/hooks/usePLTrend.ts`, drop the `runway` block, the fuel/miles/dispatch defaults, and the `RunwayMetrics` type. Keep the real rollups (`week`/`month`/`quarter`/`weekly`) that drive the KPI cards, Operational Ratios, and the 12-Week Trend chart — those are computed from real `fleet_loads`, `expenses`, `driver_payroll`, and `agent_commissions` rows.
-- Remove the now-unused `fuelPricePerGallon`/`plannedMilesPerDay`/`plannedDispatchDays` reads from `PLSummaryTab.tsx`.
-
-Result: Overview shows Gross Revenue, Dispatched Expenses, NOI, Operational Ratios (RPM/EPM/NPM), and the 12-week trend — all derived from the org's own tables. The synthetic runway/break-even gauge is gone.
-
-### 2. Maintenance — Opportunity Revenue Lost
-
-`src/hooks/useMaintenanceData.ts` uses `DEFAULT_DAILY_REVENUE_TARGET = 800` when no `daily_revenue_target` company setting is configured. That silently multiplies every down-day by an invented $800.
-
-Changes:
-- Remove the `DEFAULT_DAILY_REVENUE_TARGET` constant and both fallback sites (lines ~1204, ~1374).
-- When the setting is missing or unparseable, treat the daily target as `0` so `opportunityRevenueLost` becomes `0` (no fabricated number). Down-day counts still display.
-- Update `TruckHistoryDrawer` / `PMFleetHealthSummary` where the figure is rendered: when the target is `0`, show a small "Set daily revenue target in Settings to calculate lost revenue" hint instead of a dollar amount.
-
-### 3. Sweep for other synthetic data
-
-Verified other recent additions read from real tables:
-- Dispatch timeline (`FleetTimelineScheduler`, `DriverStatusGrid`) — pulls loads, hometime, PM schedules from DB. No changes.
-- Driver performance (`useDriverPerformanceData`, leaderboard, scorecards) — all metrics derived from `fleet_loads`, `incidents`, `driver_payroll`. No changes.
-- `supabase/functions/demo-login` seeds the shared **demo** account only (`demo@fleetflow-tms.com`). That is the public "Try the demo" experience and is intentionally isolated to that user — left as-is unless you want it stripped too.
+If a source has no rows (e.g. no fuel purchases yet), that input is `0` and the card renders a small "Insufficient data — add fuel purchases / expenses to activate" hint in place of the missing figure. Nothing is fabricated.
 
 ### Files touched
-- delete `src/config/fixedOverhead.ts`
-- edit `src/hooks/usePLTrend.ts`
-- edit `src/components/finance/PLSummaryTab.tsx`
-- edit `src/hooks/useMaintenanceData.ts`
-- edit `src/components/maintenance/TruckHistoryDrawer.tsx`
-- edit `src/components/maintenance/PMFleetHealthSummary.tsx`
 
-Confirm whether the demo-login seed data (only visible when signing in as the demo account) should also be removed, or leave that intact.
+- `src/hooks/usePLTrend.ts` — re-add `RunwayMetrics` type and `runway` field; compute all fields from the queries above (adds a trailing-30d loads query and fuel `total_cost` to the existing fuel query). No default constants, no options parameter.
+- `src/components/finance/PLSummaryTab.tsx` — re-add the `FleetRunwaySection` component and render it under the KPI row. The Cost-Per-Day breakdown lists the actual expense categories that contributed to `fixedMonthly` (grouped by `expense_type`, showing each type's monthly avg), plus the projected-fuel line. The Break-Even gauge and MTD/Break-Even/Delta trio stay exactly as before, just fed by real numbers.
+- Add empty-state fallbacks in the card when `fixedMonthly === 0`, `avgFleetMpg === 0`, or `plannedDispatchDays === 0`.
+
+### Out of scope
+
+- No new tables, migrations, or company_settings keys.
+- No changes to the maintenance opportunity-cost fix from the last turn.
+- The demo-seed edge function stays as-is (only the demo user sees it).

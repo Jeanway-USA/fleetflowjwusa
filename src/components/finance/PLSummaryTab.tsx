@@ -22,10 +22,13 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  RadialBarChart,
+  RadialBar,
+  PolarAngleAxis,
 } from 'recharts';
 import { formatCurrency } from '@/lib/formatters';
 import { useOperationalCPM } from '@/hooks/useOperationalCPM';
-import { usePLTrend, type PeriodRollup } from '@/hooks/usePLTrend';
+import { usePLTrend, type PeriodRollup, type RunwayMetrics } from '@/hooks/usePLTrend';
 
 interface PLSummaryTabProps {
   revenueTotals: any;
@@ -170,6 +173,10 @@ export function PLSummaryTab({
             </CardContent>
           </Card>
         </div>
+
+        {/* ---------- Fleet Runway (Cost Per Day + Break-Even Gauge) ---------- */}
+        <FleetRunwaySection loading={trendLoading} runway={trend?.runway} />
+
 
 
 
@@ -605,5 +612,186 @@ function RatioCell({
     </div>
   );
 }
+
+function FleetRunwaySection({
+  loading,
+  runway,
+}: {
+  loading: boolean;
+  runway?: RunwayMetrics;
+}) {
+  if (loading || !runway) {
+    return (
+      <Card className="rounded-xl">
+        <CardContent className="pt-6">
+          <Skeleton className="h-[220px] w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const hasFixed = runway.fixedMonthly > 0;
+  const hasFuelInputs = runway.avgFleetMpg > 0 && runway.fuelPricePerGallon > 0;
+  const hasDispatch = runway.plannedDispatchDays > 0;
+  const hasCostPerDay = runway.costPerDay > 0;
+
+  const pct = runway.breakEvenMTD > 0 ? runway.monthToDateRevenue / runway.breakEvenMTD : 0;
+  const pctDisplay = Math.round(pct * 100);
+  const delta = runway.monthToDateRevenue - runway.breakEvenMTD;
+
+  const gaugeColor =
+    pct >= 1 ? 'hsl(var(--success))' : pct >= 0.9 ? 'hsl(var(--warning))' : 'hsl(var(--destructive))';
+  const statusLabel =
+    !hasCostPerDay ? 'Awaiting data'
+      : pct >= 1 ? 'Net profit MTD'
+      : pct >= 0.9 ? 'Approaching break-even'
+      : 'Below break-even';
+
+  const gaugeValue = Math.max(0, Math.min(pct * 100, 150));
+  const gaugeData = [{ name: 'progress', value: gaugeValue, fill: gaugeColor }];
+
+  return (
+    <Card className="rounded-xl">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Target className="h-4 w-4 text-muted-foreground" />
+          Fleet Runway · Cost-Per-Day vs Month-to-Date Revenue
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Cost Per Day breakdown */}
+          <div className="rounded-lg border bg-card p-5">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Fleet Cost Per Day
+            </p>
+            <p className="text-4xl font-bold tabular-nums mt-1">
+              {hasCostPerDay ? formatCurrency(runway.costPerDay) : '—'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              {hasCostPerDay ? (
+                <>
+                  ({formatCurrency(runway.fixedMonthly)} fixed + {formatCurrency(runway.projectedFuelMonthly)} projected fuel) ÷ {runway.plannedDispatchDays} dispatch days (last 30d)
+                </>
+              ) : (
+                <>Add recurring expenses, fuel purchases, and delivered loads to activate.</>
+              )}
+            </p>
+
+            <div className="mt-4 space-y-1.5">
+              {hasFixed ? (
+                runway.fixedBreakdown.map((entry) => (
+                  <div
+                    key={entry.expenseType}
+                    className="flex items-center justify-between text-xs border-b border-border/40 last:border-0 py-1"
+                  >
+                    <span className="text-muted-foreground truncate pr-2">{entry.expenseType}</span>
+                    <span className="font-mono tabular-nums">{formatCurrency(entry.monthlyAmount)}/mo</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground italic">
+                  No recurring overhead recorded in the last 90 days.
+                </p>
+              )}
+              <div className="flex items-center justify-between text-xs pt-1.5">
+                <span className="text-muted-foreground">
+                  {hasFuelInputs
+                    ? <>Projected fuel · {runway.avgFleetMpg.toFixed(2)} mpg @ {formatCurrency(runway.fuelPricePerGallon)}/gal</>
+                    : <>Projected fuel · log fuel purchases to compute</>}
+                </span>
+                <span className="font-mono tabular-nums">
+                  {hasFuelInputs && hasDispatch ? formatCurrency(runway.projectedFuelMonthly) : '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Break-Even Gauge */}
+          <div className="rounded-lg border bg-card p-5 flex flex-col">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Break-Even Gauge · Month-to-Date
+              </p>
+              <span
+                className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                  !hasCostPerDay
+                    ? 'bg-muted text-muted-foreground'
+                    : pct >= 1
+                    ? 'bg-success/10 text-success'
+                    : pct >= 0.9
+                    ? 'bg-warning/10 text-warning'
+                    : 'bg-destructive/10 text-destructive'
+                }`}
+              >
+                {statusLabel}
+              </span>
+            </div>
+
+            <div className="relative h-[200px] mt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadialBarChart
+                  innerRadius="70%"
+                  outerRadius="100%"
+                  data={gaugeData}
+                  startAngle={180}
+                  endAngle={0}
+                  cy="90%"
+                >
+                  <PolarAngleAxis type="number" domain={[0, 150]} tick={false} />
+                  <RadialBar background dataKey="value" cornerRadius={8} />
+                </RadialBarChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-end pb-2 pointer-events-none">
+                <p
+                  className={`text-3xl font-bold tabular-nums ${
+                    !hasCostPerDay
+                      ? 'text-muted-foreground'
+                      : pct >= 1
+                      ? 'text-success'
+                      : pct >= 0.9
+                      ? 'text-warning'
+                      : 'text-destructive'
+                  }`}
+                >
+                  {hasCostPerDay ? `${pctDisplay}%` : '—'}
+                </p>
+                <p className="text-xs text-muted-foreground">of break-even</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mt-2 text-center">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">MTD Revenue</p>
+                <p className="text-sm font-semibold tabular-nums">{formatCurrency(runway.monthToDateRevenue)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Break-Even</p>
+                <p className="text-sm font-semibold tabular-nums">
+                  {hasCostPerDay ? formatCurrency(runway.breakEvenMTD) : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Delta</p>
+                <p
+                  className={`text-sm font-semibold tabular-nums ${
+                    !hasCostPerDay ? 'text-muted-foreground' : delta >= 0 ? 'text-success' : 'text-destructive'
+                  }`}
+                >
+                  {hasCostPerDay ? `${delta >= 0 ? '+' : ''}${formatCurrency(delta)}` : '—'}
+                </p>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-2 text-center">
+              {runway.monthToDateDays} dispatch days logged this month
+              {hasDispatch && <> · {runway.plannedDispatchDays}/30d cadence</>}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 
 
