@@ -1194,8 +1194,17 @@ export function useTruckHistory(truckId: string | null) {
 
       if (logsError) throw logsError;
 
+      // Fetch the org's avg daily revenue target (fallback to constant).
+      const { data: dailyRevSetting } = await supabase
+        .from('company_settings')
+        .select('setting_value')
+        .eq('setting_key', 'avg_daily_truck_revenue')
+        .maybeSingle();
+      const avgDailyRevenue =
+        parseFloat(dailyRevSetting?.setting_value || '') || DEFAULT_DAILY_REVENUE_TARGET;
+
       // Calculate stats
-      const totalSpend = 
+      const totalSpend =
         (workOrders?.reduce((sum, wo) => sum + (wo.final_cost || 0), 0) || 0) +
         (logs?.reduce((sum, log) => sum + (log.cost || 0), 0) || 0);
 
@@ -1205,6 +1214,61 @@ export function useTruckHistory(truckId: string | null) {
         .sort()
         .pop();
 
+      // === Down-Time Leakage ===
+      const today = new Date();
+      const openWorkOrders = (workOrders || []).filter(wo => wo.status !== 'completed');
+      const liveDaysDown = openWorkOrders.reduce((sum, wo) => {
+        if (!wo.entry_date) return sum;
+        const entry = new Date(`${wo.entry_date.slice(0, 10)}T00:00:00`);
+        const days = Math.max(0, differenceInDays(today, entry));
+        return sum + days;
+      }, 0);
+      const historicalDaysDown = (workOrders || [])
+        .filter(wo => wo.status === 'completed')
+        .reduce((sum, wo) => sum + (wo.days_down || 0), 0);
+      const totalDaysDown = liveDaysDown + historicalDaysDown;
+      const opportunityRevenueLost = totalDaysDown * avgDailyRevenue;
+
+      // === Chronic Issue Detection (trailing 30 days) ===
+      const thirtyAgo = subDays(today, 30);
+      const chronicEntries: ChronicEntry[] = [];
+
+      for (const log of logs || []) {
+        if (!log.service_date) continue;
+        const d = new Date(`${log.service_date.slice(0, 10)}T00:00:00`);
+        if (d < thirtyAgo) continue;
+        if (!isMinorEntry(log.service_type, log.description)) continue;
+        chronicEntries.push({
+          id: log.id,
+          source: 'log',
+          description: log.description || log.service_type || 'Minor maintenance log',
+          date: log.service_date,
+          category: log.service_type || 'general',
+        });
+      }
+      for (const wo of workOrders || []) {
+        if (wo.status === 'completed') continue;
+        const priority = ((wo as any).priority || 'medium').toLowerCase();
+        if (priority !== 'low' && priority !== 'medium') continue;
+        if (!wo.entry_date) continue;
+        const d = new Date(`${wo.entry_date.slice(0, 10)}T00:00:00`);
+        if (d < thirtyAgo) continue;
+        if (!isMinorEntry(wo.service_type, wo.description)) continue;
+        chronicEntries.push({
+          id: wo.id,
+          source: 'work_order',
+          description: wo.description || wo.service_type || 'Open minor work order',
+          date: wo.entry_date,
+          category: wo.service_type || 'general',
+        });
+      }
+
+      const chronic = {
+        hasChronicIssue: chronicEntries.length > 2,
+        count: chronicEntries.length,
+        entries: chronicEntries.slice(0, 10),
+      };
+
       return {
         truck,
         workOrders: workOrders || [],
@@ -1212,12 +1276,62 @@ export function useTruckHistory(truckId: string | null) {
         stats: {
           totalSpend,
           lastServiceDate,
-          openWorkOrders: workOrders?.filter(wo => wo.status !== 'completed').length || 0,
+          openWorkOrders: openWorkOrders.length,
+          liveDaysDown,
+          historicalDaysDown,
+          totalDaysDown,
+          avgDailyRevenue,
+          opportunityRevenueLost,
         },
+        chronic,
       };
     },
   });
 }
+
+/**
+ * Fleet-wide chronic issue scan. Returns truck IDs with > 2 uncorrected minor
+ * maintenance entries in the trailing 30 days. Used by PMFleetHealthSummary.
+ */
+export function useChronicIssueTrucks() {
+  return useQuery({
+    queryKey: ['chronic-issue-trucks'],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const thirtyAgoIso = subDays(new Date(), 30).toISOString().slice(0, 10);
+      const [logsRes, wosRes] = await Promise.all([
+        supabase
+          .from('maintenance_logs')
+          .select('id, truck_id, service_type, description, service_date')
+          .gte('service_date', thirtyAgoIso),
+        supabase
+          .from('work_orders')
+          .select('id, truck_id, service_type, description, priority, status, entry_date')
+          .gte('entry_date', thirtyAgoIso)
+          .neq('status', 'completed'),
+      ]);
+
+      const counts = new Map<string, number>();
+      for (const l of logsRes.data || []) {
+        if (!l.truck_id) continue;
+        if (!isMinorEntry(l.service_type, l.description)) continue;
+        counts.set(l.truck_id, (counts.get(l.truck_id) || 0) + 1);
+      }
+      for (const wo of wosRes.data || []) {
+        if (!wo.truck_id) continue;
+        const priority = (wo.priority || 'medium').toLowerCase();
+        if (priority !== 'low' && priority !== 'medium') continue;
+        if (!isMinorEntry(wo.service_type, wo.description)) continue;
+        counts.set(wo.truck_id, (counts.get(wo.truck_id) || 0) + 1);
+      }
+
+      const truckIds = new Set<string>();
+      for (const [id, count] of counts) if (count > 2) truckIds.add(id);
+      return { truckIds, count: truckIds.size };
+    },
+  });
+}
+
 
 export function useTruckProfitability(truckId: string | null) {
   const { data, isLoading } = useQuery({
