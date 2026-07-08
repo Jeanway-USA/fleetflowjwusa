@@ -91,6 +91,30 @@ const VARIABLES: Array<{ token: string; description: string }> = [
     description: "Renders the SignaturePad component for the driver to sign.",
   },
   {
+    token: "{{driver_printed_name}}",
+    description: "Auto-fills with the driver's printed name captured at signing.",
+  },
+  {
+    token: "{{driver_title}}",
+    description: "Auto-fills with the title the driver enters when signing.",
+  },
+  {
+    token: "{{driver_date_signed}}",
+    description: "Auto-fills with the date the driver signed the document.",
+  },
+  {
+    token: "{{owner_printed_name}}",
+    description: "Auto-fills with the owner's printed name captured at signing.",
+  },
+  {
+    token: "{{owner_title}}",
+    description: "Auto-fills with the title the owner enters when signing.",
+  },
+  {
+    token: "{{owner_date_signed}}",
+    description: "Auto-fills with the date the owner signed the document.",
+  },
+  {
     token: "{{driver_name}}",
     description: "Auto-fills with the printed full name of the driver signing the document.",
   },
