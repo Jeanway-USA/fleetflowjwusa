@@ -167,14 +167,18 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                           : 'text-muted-foreground'
                       )}
                     >
-                      {formatCurrency(data.stats.opportunityRevenueLost)}
+                      {data.stats.avgDailyRevenue > 0
+                        ? formatCurrency(data.stats.opportunityRevenueLost)
+                        : '—'}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-1">
                       {data.stats.totalDaysDown}d down
                       {data.stats.liveDaysDown > 0 && (
                         <> · <span className="text-amber-600 dark:text-amber-400">{data.stats.liveDaysDown}d live</span></>
                       )}
-                      {' · '}${data.stats.avgDailyRevenue.toLocaleString()}/day target
+                      {data.stats.avgDailyRevenue > 0
+                        ? <> · ${data.stats.avgDailyRevenue.toLocaleString()}/day target</>
+                        : <> · Set avg daily truck revenue in Settings to calculate</>}
                     </p>
                   </CardContent>
                 </Card>

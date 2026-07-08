@@ -2,11 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, differenceInDays, addDays, subDays } from 'date-fns';
 
-/**
- * Fallback avg daily gross revenue per truck when the org hasn't set
- * `company_settings.avg_daily_truck_revenue`. Used for opportunity-cost math.
- */
-const DEFAULT_DAILY_REVENUE_TARGET = 800;
+// Opportunity-cost math uses the org's configured
+// `company_settings.avg_daily_truck_revenue`. When unset we treat the
+// target as 0 so we never fabricate a synthetic dollar figure.
 
 // Chronic-issue detection: minor service types + description keywords.
 const MINOR_SERVICE_TYPES = new Set(['fluid', 'tire', 'pressure', 'minor', 'inspection']);
@@ -1201,7 +1199,7 @@ export function useTruckHistory(truckId: string | null) {
         .eq('setting_key', 'avg_daily_truck_revenue')
         .maybeSingle();
       const avgDailyRevenue =
-        parseFloat(dailyRevSetting?.setting_value || '') || DEFAULT_DAILY_REVENUE_TARGET;
+        parseFloat(dailyRevSetting?.setting_value || '') || 0;
 
       // Calculate stats
       const totalSpend =
@@ -1371,7 +1369,7 @@ export function useTruckProfitability(truckId: string | null) {
       if (expensesError) throw expensesError;
 
       const avgDailyRevenue =
-        parseFloat(dailyRevSetting?.setting_value || '') || DEFAULT_DAILY_REVENUE_TARGET;
+        parseFloat(dailyRevSetting?.setting_value || '') || 0;
       const totalRevenue = (loads || []).reduce((sum, load) => sum + (load.gross_revenue || 0), 0);
       const totalMaintenanceCost = (workOrders || []).reduce((sum, wo) => sum + (wo.final_cost || 0), 0);
       const totalDaysDown = (workOrders || []).reduce((sum, wo) => sum + (wo.days_down || 0), 0);
