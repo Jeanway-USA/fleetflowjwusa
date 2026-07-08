@@ -336,12 +336,16 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                         <SelectValue placeholder="Select a template" />
                       </SelectTrigger>
                       <SelectContent>
-                        {templates.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name ? `${t.name} · ${t.document_type}` : t.document_type}
-                            {!t.is_active && " (inactive)"}
-                          </SelectItem>
-                        ))}
+                        {templates.map((t) => {
+                          const audience = (t.applies_to ?? 'shared') as TemplateAudience;
+                          return (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name ? `${t.name} · ${t.document_type}` : t.document_type}
+                              {" — "}{AUDIENCE_LABELS[audience]}
+                              {!t.is_active && " (inactive)"}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
