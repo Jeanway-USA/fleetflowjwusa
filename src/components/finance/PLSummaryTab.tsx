@@ -22,10 +22,13 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  RadialBarChart,
+  RadialBar,
+  PolarAngleAxis,
 } from 'recharts';
 import { formatCurrency } from '@/lib/formatters';
 import { useOperationalCPM } from '@/hooks/useOperationalCPM';
-import { usePLTrend, type PeriodRollup } from '@/hooks/usePLTrend';
+import { usePLTrend, type PeriodRollup, type RunwayMetrics } from '@/hooks/usePLTrend';
 
 interface PLSummaryTabProps {
   revenueTotals: any;
