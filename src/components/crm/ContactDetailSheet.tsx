@@ -285,9 +285,10 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
           {/* === Tabs (only for brokers and CRM-source agents) === */}
           {supportsTabs ? (
             <Tabs defaultValue="activity">
-              <TabsList className="w-full grid grid-cols-3">
+              <TabsList className={`w-full grid ${showLanesTab ? 'grid-cols-4' : 'grid-cols-3'}`}>
                 <TabsTrigger value="activity" className="text-xs">Activity</TabsTrigger>
                 <TabsTrigger value="loads" className="text-xs">Load History</TabsTrigger>
+                {showLanesTab && <TabsTrigger value="lanes" className="text-xs">Lanes</TabsTrigger>}
                 <TabsTrigger value="revenue" className="text-xs">Revenue</TabsTrigger>
               </TabsList>
               <TabsContent value="activity" className="mt-3">
@@ -296,6 +297,42 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
               <TabsContent value="loads" className="mt-3">
                 <ContactLoadHistory contactId={contact.id} />
               </TabsContent>
+              {showLanesTab && (
+                <TabsContent value="lanes" className="mt-3">
+                  {lanesLoading ? (
+                    <div className="text-xs text-muted-foreground text-center py-6">Loading lanes…</div>
+                  ) : lanes.length === 0 ? (
+                    <div className="text-xs text-muted-foreground text-center py-6">
+                      No completed loads recorded for agency code {agencyCode} yet.
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-border rounded-md border">
+                      {lanes.map((lane) => (
+                        <li key={`${lane.origin}||${lane.destination}`} className="px-3 py-2.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-medium flex items-center gap-1.5">
+                                <Route className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                <span className="truncate">{lane.origin} → {lane.destination}</span>
+                              </div>
+                              <div className="text-[11px] text-muted-foreground mt-0.5">
+                                Revenue: {formatCurrency(lane.totalRevenue)}
+                                {lane.lastDeliveredAt && (
+                                  <> · Last: {format(parseISO(`${lane.lastDeliveredAt}T00:00:00`), 'MMM d, yyyy')}</>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-sm font-semibold tabular-nums">{lane.count}</div>
+                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">loads</div>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </TabsContent>
+              )}
               <TabsContent value="revenue" className="mt-3">
                 <Suspense fallback={<ChartSkeleton height={260} />}>
                   <ContactRevenueStats contactId={contact.id} />
