@@ -41,6 +41,14 @@ const FORMATTING_EXAMPLES: Array<{ syntax: string; preview: ReactNode; label: st
 
 type TemplateAudience = 'shared' | 'w2' | '1099';
 
+const SIGNER_ROLE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'driver', label: 'Driver' },
+  { value: 'dispatcher', label: 'Dispatcher / Supervisor' },
+  { value: 'payroll_admin', label: 'Payroll Admin' },
+  { value: 'safety', label: 'Safety Manager' },
+  { value: 'owner', label: 'Owner / Executive' },
+];
+
 interface DocumentTemplate {
   id: string;
   org_id: string;
@@ -49,6 +57,7 @@ interface DocumentTemplate {
   content: string;
   is_active: boolean;
   applies_to: TemplateAudience;
+  signatory_roles: string[] | null;
   version: number;
   created_at: string;
   updated_at: string;
