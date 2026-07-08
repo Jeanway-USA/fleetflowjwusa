@@ -52,12 +52,42 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
       <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 gap-0 overflow-hidden">
         <SheetHeader className="shrink-0 mx-0 mt-0 px-6 pt-6 pb-4 pr-12 border-b static">
 
-          <SheetTitle className="flex items-center gap-2">
+          <SheetTitle className="flex items-center gap-2 flex-wrap">
             <Truck className="h-5 w-5" />
             {isLoading ? (
               <Skeleton className="h-6 w-24" />
             ) : (
               <>Unit {data?.truck?.unit_number || 'Unknown'}</>
+            )}
+            {data?.chronic?.hasChronicIssue && (
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-300 gap-1 cursor-help">
+                      <ShieldAlert className="h-3 w-3" />
+                      High Vulnerability Index
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="font-medium mb-1">
+                      {data.chronic.count} uncorrected minor issues in last 30 days.
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Consider before assigning long OTR lanes.
+                    </p>
+                    <ul className="text-xs space-y-1">
+                      {data.chronic.entries.map(e => (
+                        <li key={`${e.source}-${e.id}`} className="border-l-2 border-amber-500 pl-2">
+                          <span className="font-mono opacity-70">
+                            {format(new Date(e.date + 'T00:00:00'), 'MMM d')}
+                          </span>{' '}
+                          · {e.category} — {e.description}
+                        </li>
+                      ))}
+                    </ul>
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
             )}
           </SheetTitle>
           <SheetDescription>
