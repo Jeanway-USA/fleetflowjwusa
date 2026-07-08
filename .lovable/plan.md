@@ -1,57 +1,49 @@
-# Forward-Looking Cost-Per-Day Runway Dashboard
+# Fleet Maintenance Economic Loss & Down-Time Tracker
 
-Add a predictive planning module to the finance P&L Summary that surfaces our daily break-even number and shows the current month's revenue against it as a live gauge.
+Wire economic loss and chronic-issue signals into maintenance so dispatch can see, in one glance, which trucks are bleeding money and which shouldn't be sent OTR.
 
-## 1. Fixed Overhead Matrix (new config)
+## What's already there (leveraged, not rebuilt)
 
-Create `src/config/fixedOverhead.ts` — a lightweight, editable array of the baseline monthly fixed costs the fleet carries whether trucks roll or not:
+- `work_orders.days_down` column exists.
+- `useTruckProfitability` already computes `totalDaysDown` × `avg_daily_truck_revenue` (`company_settings`, default 1000) and renders "True Cost of Maintenance" in the drawer's Unit P&L tab.
+- What's missing: **live** down-days for in-progress repairs, opportunity-cost surfaced on the History card (not just P&L tab), chronic-issue detection, and a fleet-level warning pill.
 
-- Unladen (bobtail/non-trucking) liability
-- Communications (ELD/phones/dispatch software)
-- Physical damage insurance
-- Vehicle lease payments
-- Baseline driver salary profile (guaranteed W-2 minimums)
+## 1. `src/hooks/useMaintenanceData.ts`
 
-Each entry: `{ id, label, category, monthlyAmount, notes? }`. Exported helpers: `TOTAL_FIXED_OVERHEAD_MONTHLY` and `sumFixedOverhead(entries)`. Kept as a typed constant array now — no DB migration — so it's easy to lift into settings later.
+Extend `useTruckHistory(truckId)` to also compute and return:
 
-## 2. Daily Break-Even Runway (hook update)
+- `liveDaysDown` — for every work order with `status !== 'completed'`, `days_down = floor((today − entry_date) / 1 day)`; sum + list.
+- `historicalDaysDown` — sum of `days_down` on completed work orders (all time).
+- `avgDailyRevenue` — pulled from `company_settings.avg_daily_truck_revenue` (fallback **$800/day** per spec).
+- `opportunityRevenueLost` — `(liveDaysDown + historicalDaysDown) × avgDailyRevenue`.
+- `chronic` — `{ hasChronicIssue: boolean, count: number, entries: Array<{ id, source: 'log'|'work_order', description, date, category }>` }.
+  - **Rule**: > 2 uncorrected minor updates in trailing 30 days. "Minor" = `service_type` in `{'fluid','tire','pressure','minor','inspection'}` OR description matches `/leak|drip|slow (tire|fluid)|pressure|weep/i`. "Uncorrected" = maintenance_logs not linked to a completed work_order for the same category **and** open work_orders with `priority in ('low','medium')`.
 
-Extend `src/hooks/usePLTrend.ts` to also return a `runway` block:
+Add a new fleet-wide hook `useChronicIssueTrucks()` returning `{ truckIds: Set<string>, count: number }` using the same rule across all trucks (single joined query on `maintenance_logs` + `work_orders` scoped to last 30 days, then grouped by `truck_id`). Cached with the same query key family as other maintenance hooks; `staleTime: 5m`.
 
-```
-runway: {
-  fixedMonthly:        number   // from fixedOverhead.ts
-  avgFleetMpg:         number   // trailing 90d miles ÷ fuel gallons (fallback 6.5)
-  projectedFuelMonthly:number   // (planned miles/day × dispatch days) ÷ mpg × $/gal
-  plannedDispatchDays: number   // configurable, default 22
-  costPerDay:          number   // (fixedMonthly + projectedFuelMonthly) ÷ dispatchDays
-  monthToDateRevenue:  number   // sum of gross_revenue + commissions this calendar month
-  monthToDateDays:     number   // dispatch days elapsed MTD
-  breakEvenMTD:        number   // costPerDay × monthToDateDays
-}
-```
+## 2. `src/components/maintenance/TruckHistoryDrawer.tsx`
 
-Fuel $/gal and planned miles/day pulled from existing `fleet_settings` via `getSetting` (fallbacks `4.10` and `450`). No new tables, no new queries beyond what the hook already fetches (loads + expenses already include the range we need; add a small `fuel_purchases` select for MPG).
+On the **History** tab:
 
-## 3. Target Revenue Gauge (UI)
+- Replace the 2-card stats grid with a 3-card grid, adding an **Opportunity Revenue Lost** card:
+  - Big number: `formatCurrency(opportunityRevenueLost)`
+  - Sub-line: `{liveDaysDown + historicalDaysDown}d down · ${avgDailyRevenue}/day target`
+  - Tinted rose when > 0; muted when 0.
+- Add an amber **High Vulnerability Index** badge in the `SheetHeader` next to the unit number when `chronic.hasChronicIssue` is true. Tooltip lists the offending entries (date + description + category). Uses the shared amber palette already used on the "Due Soon" pill.
+- No changes to the Unit P&L tab (already displays 90-day lost revenue).
 
-In `src/components/finance/PLSummaryTab.tsx`, add a new section **"Fleet Runway"** directly under the existing triple-KPI row:
+## 3. `src/components/maintenance/PMFleetHealthSummary.tsx`
 
-- Left card: **Cost Per Day** — big number, sub-line lists the matrix contributors (fixed $X + fuel $Y ÷ Z dispatch days).
-- Right card: **Break-Even Gauge** — a semi-circular Recharts `RadialBarChart` where:
-  - 0% → 150% of the MTD break-even line
-  - Fill = `monthToDateRevenue / breakEvenMTD`
-  - Color: red < 90%, amber 90–100%, green > 100% (semantic tokens `destructive` / `warning` / `success`)
-  - Center label: current $ vs break-even $, delta chip showing "Net profit" / "Net loss" for the month so far.
+- Call `useChronicIssueTrucks()` internally (keeps the change contained to these three files — no prop-drilling changes in `PreventiveMaintenanceTab`).
+- Add a fourth pill after "On Track": **High Vulnerability** — amber, `ShieldAlert` icon, shows `{chronicCount} High Vulnerability`. Purely informational (no filter binding), with a tooltip: "≥ 3 uncorrected minor issues in last 30 days — avoid long OTR assignments."
+- Hidden when `chronicCount === 0` so it doesn't add noise on healthy fleets.
 
-All formatting via existing `formatCurrency` / `abbrevCurrency`. No changes to props coming into `PLSummaryTab`.
+## Constants
 
-## Files touched
-
-- `src/config/fixedOverhead.ts` (new)
-- `src/hooks/usePLTrend.ts` (add `runway` to return type + computation)
-- `src/components/finance/PLSummaryTab.tsx` (new Runway section + gauge)
+New file-local constant `DEFAULT_DAILY_REVENUE_TARGET = 800` in `useMaintenanceData.ts` used as fallback everywhere `avg_daily_truck_revenue` isn't set (also updates the existing `useTruckProfitability` fallback from 1000 → 800 for consistency with the spec).
 
 ## Out of scope
 
-No schema changes, no settings UI for the overhead matrix (edit the config file for now), no changes to other P&L tabs.
+- No new tables, migrations, or columns.
+- No changes to `PMScheduleFilters` / `HealthStatus` type (chronic pill is display-only).
+- No changes to work-order creation UI or the `days_down` write path.
