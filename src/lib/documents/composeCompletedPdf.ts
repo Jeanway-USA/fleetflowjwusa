@@ -124,11 +124,7 @@ interface PlaceholderHit {
  * return their positions in PDF user-space coordinates.
  */
 async function findOwnerPlaceholders(pdfBytes: Uint8Array): Promise<PlaceholderHit[]> {
-  const loadingTask = pdfjsLib.getDocument({
-    data: pdfBytes,
-    isEvalSupported: false,
-    useSystemFonts: true,
-  });
+  const loadingTask = pdfjsLib.getDocument({ data: pdfBytes } as never);
   const pdf = await loadingTask.promise;
   const hits: PlaceholderHit[] = [];
 
