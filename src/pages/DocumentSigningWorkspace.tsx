@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,13 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, CheckCircle2, FileText } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, FileText, Download } from 'lucide-react';
 import { SignaturePad } from '@/components/driver/SignaturePad';
 import { hydrateTokens, extractUnresolvedTokens } from '@/lib/documents/hydrateTokens';
+import { composeCompletedPdf } from '@/lib/documents/composeCompletedPdf';
 
 export default function DocumentSigningWorkspace() {
   const { instanceId } = useParams<{ instanceId: string }>();
-  const navigate = useNavigate();
+  // Auto-navigation after signing removed so the completed PDF can render.
   const { user, orgId, roles } = useAuth();
   const queryClient = useQueryClient();
 
@@ -142,6 +143,23 @@ export default function DocumentSigningWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instance?.id]);
 
+  // When an instance becomes completed but has no final PDF yet, build it once.
+  const [composing, setComposing] = useState(false);
+  useEffect(() => {
+    if (!instance) return;
+    if (instance.status !== 'completed') return;
+    if (instance.pdf_storage_path) return;
+    if (composing) return;
+    setComposing(true);
+    composeCompletedPdf(instance.id)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['document-instance', instanceId] });
+      })
+      .catch((e: Error) => toast.error(e.message || 'Could not build completed PDF'))
+      .finally(() => setComposing(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instance?.id, instance?.status, instance?.pdf_storage_path]);
+
   const signMutation = useMutation({
     mutationFn: async () => {
       if (!instance || !user || !orgId) throw new Error('Not ready');
@@ -176,7 +194,6 @@ export default function DocumentSigningWorkspace() {
       queryClient.invalidateQueries({ queryKey: ['document-instance', instanceId] });
       queryClient.invalidateQueries({ queryKey: ['document_instances', orgId] });
       queryClient.invalidateQueries({ queryKey: ['document_signatures_mine', user?.id] });
-      setTimeout(() => navigate('/documents/signing'), 600);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -351,9 +368,37 @@ export default function DocumentSigningWorkspace() {
 
           {instance.status === 'completed' && (
             <Card className="card-elevated border-green-500/40">
-              <CardContent className="p-4 text-sm flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Fully signed on {instance.completed_at ? new Date(instance.completed_at).toLocaleString() : '—'}.
+              <CardContent className="p-4 text-sm space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  Fully signed on {instance.completed_at ? new Date(instance.completed_at).toLocaleString() : '—'}.
+                </div>
+                {instance.pdf_storage_path ? (
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={async () => {
+                      const { data: signed, error } = await supabase.storage
+                        .from('signed-documents')
+                        .createSignedUrl(instance.pdf_storage_path!, 300, {
+                          download: `${instance.title}.pdf`,
+                        });
+                      if (error || !signed?.signedUrl) {
+                        toast.error(error?.message ?? 'Could not open completed PDF');
+                        return;
+                      }
+                      window.open(signed.signedUrl, '_blank', 'noopener,noreferrer');
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download completed PDF
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Assembling the final PDF with all signatures…
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

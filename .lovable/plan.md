@@ -1,54 +1,55 @@
 
-## Goal
+## Root cause
 
-Legacy driver-signed documents in `driver_signed_documents` never went through the new sequential signing engine, so nothing shows up in the owner's "Action Required" queue on `/documents/signing`. This plan backfills a `document_instances` row (at the owner step) for every eligible legacy signature, plus a `document_signatures` row recording the driver's original signature — so owners can now countersign historical documents in one place.
+The PDF stored for each signed document is generated once — at the moment the **driver** signs. In `src/lib/onboarding/generateSignedPdf.ts` line 418, the `{{owner_signature}}` token is unconditionally replaced with the literal string `"[Owner Signature Pending]"`. Nothing regenerates or amends that PDF when the owner countersigns through the new signing engine, so the "completed" file you're viewing is still the frozen driver-only version.
 
-## Eligibility
+Additionally, for **backfilled** instances we only stored a `legacy:` marker for the driver's signature (the actual signature image lives inside the original PDF), so we cannot re-render the document from scratch — we have to stamp onto the existing PDF.
 
-A legacy `driver_signed_documents` row is backfilled only when **all** of these are true:
+## Fix
 
-1. There is an **active** `document_templates` row in the same `org_id` matching `document_type`.
-2. That template's `signatory_roles` contains `owner` **after** `driver` (i.e., an owner countersignature step exists).
-3. No `document_instances` row already exists linking to this legacy signature (idempotent — safe to re-run).
+Compose a final, fully-signed PDF at the moment the instance transitions to `completed`, save it to storage, and surface it in the UI.
 
-Currently that matches these types: `w2_driver_agreement`, `company_safety_policy`, `equipment_use_agreement`, `1099_driver_agreement`. Types like `driver_agreement`, `direct_deposit`, `w4`, `i9` have no active owner-required template, so they are skipped.
+**1. Add `pdf-lib`** — needed to open/modify existing PDFs (jsPDF only writes new ones).
 
-Existing `review_status` (`approved` / `pending`) on the legacy row is preserved and does not block backfill — admin approval is separate from the owner's signature step.
+**2. New helper `src/lib/documents/composeCompletedPdf.ts`**
 
-## Implementation
+Given a completed `document_instance`, return a `Uint8Array` PDF that includes every signer's signature image.
 
-**1. One-time SQL backfill migration** (`supabase/migrations/…_backfill_owner_signing.sql`)
+- **Backfilled instances** (`metadata.legacy_file_path` present):
+  1. Download the original driver-signed PDF from the `signed-documents` bucket via `pdf-lib`.
+  2. Append a new "Countersignatures" page listing each non-driver signer: role label, signer name, date, and the signature PNG decoded from their `document_signatures.signature_data_url`.
+  3. Return the merged bytes.
+- **Native instances** (no legacy path):
+  1. Build the whole PDF fresh using the same `generateSignedPdf` renderer, but pass an additional `ownerSignature` (and any other role signatures) argument so the `owner_signature` token embeds the image instead of the "Pending" placeholder.
+  2. Add a small signatures block at the bottom (role, name, date, signature) for any signers whose role isn't referenced by a token in the template.
 
-- Add a nullable `legacy_signed_document_id uuid` column + unique index on `document_instances` for idempotency and traceability.
-- Insert into `document_instances` for each eligible legacy row:
-  - `template_id` = matching active template
-  - `title` = template name
-  - `signatory_roles` = template's roles
-  - `current_step` = 1 (driver step already done, owner is next)
-  - `status` = `'pending_signatures'`
-  - `driver_id`, `org_id`, `created_by` = driver's `user_id` (fallback to legacy row's driver)
-  - `created_at` / `updated_at` = legacy `signed_at`
-  - `legacy_signed_document_id` = legacy row id
-- Insert into `document_signatures` a step-0 row for the driver's original signature:
-  - `instance_id` = new instance id
-  - `step_index` = 0
-  - `role_label` = `'driver'`
-  - `signer_id` = driver's `user_id`
-  - `signed_at` = legacy `signed_at`
-  - `signature_data_url` = `NULL` (legacy PDF holds the actual signature; store a marker like `'legacy:<file_path>'` in `metadata` or a note field so the workspace can link to the original PDF)
-- Skip inserting `driver_notifications` for the trigger (this is a manual backfill; the `advance_document_instance` trigger only fires on new signature inserts going forward, and we're not advancing — we're seeding at step 1).
+**3. `generateSignedPdf` update**
 
-**2. UI touch-up on the workspace page**
+Extend the args with an optional `additionalSignatures: Array<{ role: string; name: string; dataUrl: string; signedAt: string }>` and change the `owner_signature` case: if a matching signature is provided, render it as a PNG (same as `driver_signature`); otherwise keep today's "Pending" behavior so mid-flow PDFs still work.
 
-- `DocumentSigningWorkspace` should, when an instance has a `legacy_signed_document_id`, show a "View driver's original signed PDF" button that opens the signed-documents storage file. No other logic changes; the owner then signs step 1 and the existing trigger completes the instance.
+**4. Storage + persistence**
+
+- Save the composed PDF to `signed-documents/{org_id}/completed/{instance_id}.pdf`.
+- Write that path back to `document_instances.pdf_storage_path` (column already exists).
+
+**5. When to compose**
+
+- Client-side in `DocumentSigningWorkspace` right after the owner's `document_signatures` insert resolves and the instance query refetches with `status === 'completed'` — run once, guarded by `pdf_storage_path` being null.
+- Same helper called from a **one-time backfill script** for the 3 already-completed instances if the owner signs before this ships (safe: the guard makes it a no-op once populated).
+
+**6. UI**
+
+- In `DocumentSigningWorkspace`, when `instance.status === 'completed'` and `pdf_storage_path` is set, show a primary "Download completed PDF" button next to the existing "Fully signed on…" banner. Keep the legacy "View driver's signed PDF" link when the instance is backfilled so both artifacts remain accessible.
+- In `DocumentsSigning` dashboard, the "Completed" tab row already shows an "Open" link; no change needed — the workspace surfaces the download.
 
 ## Verification
 
-- Run a `SELECT count(*)` before/after to confirm the expected number of new instances (4 eligible legacy rows in current data: the three from driver `8b1b2d7e…` on 2026-07-08 plus the `w2_driver_agreement`).
-- Sign in as owner, open `/documents/signing`, confirm the four historical documents appear under **Action Required**.
-- Countersign one; confirm status flips to `completed`.
+1. Countersign one of the three backfilled instances as owner.
+2. Confirm `pdf_storage_path` is populated and the "Download completed PDF" button appears.
+3. Open the downloaded PDF: page 1 is the original driver-signed doc, appended page shows the owner's signature image with name + date.
+4. For a fresh non-backfilled flow: create a template with `{{driver_signature}}` and `{{owner_signature}}`, run it end-to-end, verify the final PDF renders **both** signature images inline where the tokens are placed (no "Pending" text).
 
 ## Out of scope
 
-- Backfilling `driver_agreement` / `direct_deposit` / `w4` / `i9` — no active owner-signing template exists for those. If you want those routed for owner signature too, we'd first need to activate/create templates with `signatory_roles = {driver, owner}`.
-- Regenerating a combined PDF for legacy documents — the original driver-signed PDF stays as the source of truth; the owner's countersignature is captured in the new engine.
+- Re-issuing the original driver-signed PDF filename (kept intact — the completed PDF is a new file so audit trails aren't rewritten).
+- Multi-signer templates with 3+ roles — the composed PDF handles them structurally, but visual placement for uncommon tokens like `{{supervisor_signature}}` falls back to the appended block.
