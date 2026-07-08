@@ -216,6 +216,7 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
         content: current.content,
         is_active: current.is_active,
         applies_to: current.applies_to ?? 'shared',
+        signatory_roles: current.signatory_roles && current.signatory_roles.length > 0 ? current.signatory_roles : ['driver'],
       });
     }
   }, [selectedId, templates]);
