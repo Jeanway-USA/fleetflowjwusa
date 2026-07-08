@@ -5239,6 +5239,36 @@ export type Database = {
         }
         Relationships: []
       }
+      tax_filing_completions: {
+        Row: {
+          confirmation_reference: string
+          created_at: string
+          filed_by: string | null
+          filed_on: string
+          form_key: string
+          id: string
+          org_id: string
+        }
+        Insert: {
+          confirmation_reference: string
+          created_at?: string
+          filed_by?: string | null
+          filed_on: string
+          form_key: string
+          id?: string
+          org_id: string
+        }
+        Update: {
+          confirmation_reference?: string
+          created_at?: string
+          filed_by?: string | null
+          filed_on?: string
+          form_key?: string
+          id?: string
+          org_id?: string
+        }
+        Relationships: []
+      }
       tax_withholding_ledger: {
         Row: {
           created_at: string
