@@ -2,11 +2,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, differenceInDays, addDays, subDays } from 'date-fns';
 
-/**
- * Fallback avg daily gross revenue per truck when the org hasn't set
- * `company_settings.avg_daily_truck_revenue`. Used for opportunity-cost math.
- */
-const DEFAULT_DAILY_REVENUE_TARGET = 800;
+// Opportunity-cost math uses the org's configured
+// `company_settings.avg_daily_truck_revenue`. When unset we treat the
+// target as 0 so we never fabricate a synthetic dollar figure.
 
 // Chronic-issue detection: minor service types + description keywords.
 const MINOR_SERVICE_TYPES = new Set(['fluid', 'tire', 'pressure', 'minor', 'inspection']);
