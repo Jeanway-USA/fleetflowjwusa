@@ -158,7 +158,7 @@ export default function DocumentSigningWorkspace() {
     if (!signerTitle) setSignerTitle(existingTitle || data.signerProfile?.default_signing_title || '');
     if (existingDate) setDateSigned(existingDate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.signerProfile?.user_id ?? null, signerName, stepRole]);
+  }, [data?.signerProfile?.email ?? null, signerName, stepRole]);
 
 
   // When an instance becomes completed but has no final PDF yet, build it once.
