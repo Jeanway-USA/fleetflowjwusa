@@ -15,11 +15,12 @@
  *   hourly      : (hoursWorked * hourly_rate). No per-load component.
  *
  * Employment-type routing (net):
- *   w2_company        : Net = Gross - (Gross * w2WithholdingRate). Only hourly /
- *                       per_mile pay types are legal for W-2. Percentage / flat
- *                       fall back to 0 with a warning formulaLabel.
- *                       Statutory deductions are modeled as a single effective
- *                       withholding rate (default 22%, configurable).
+ *   w2_company        : Net = Gross - (Gross * w2WithholdingRate). Any pay type
+ *                       is legal (per_mile, percentage, flat, hourly). Gross is
+ *                       computed the same way as contractor; only tax withholding
+ *                       differentiates the tracks. Statutory deductions are
+ *                       modeled as a single effective withholding rate (default
+ *                       22%, configurable via settings.w2WithholdingRate).
  *   1099_contractor /
  *   lease_purchase    : Net = Gross + Reimbursements - Deductions. No tax
  *                       withholding (contractor handles their own taxes).
@@ -184,7 +185,6 @@ export function calculateLoadPay(
   const accessorialsTotal = sumAccessorials(load);
   const type = normalizePayType(driver?.pay_type);
   const rate = n(driver?.pay_rate);
-  const employmentClass = classifyEmployment(driver);
 
   if (!load || !driver) {
     return buildBreakdown({
@@ -194,19 +194,6 @@ export function calculateLoadPay(
       driver,
       settings,
       formulaLabel: '—',
-    });
-  }
-
-  // W-2 drivers may only be paid hourly or per-mile. Reject the other
-  // pay types loudly so the UI can surface the misconfiguration.
-  if (employmentClass === 'w2' && (type === 'percentage' || type === 'flat')) {
-    return buildBreakdown({
-      base: 0,
-      accessorialsTotal: 0,
-      payType: 'unknown',
-      driver,
-      settings,
-      formulaLabel: 'W-2 drivers must be hourly or per-mile',
     });
   }
 
