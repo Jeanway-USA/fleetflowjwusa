@@ -455,7 +455,7 @@ export default function DriverOnboarding() {
       return digits.length >= 4 ? `***-**-${digits.slice(-4)}` : '—';
     };
 
-    if (employmentType === 'W-2') {
+    if (employmentType === 'W-2' && !skipW2Structured) {
       // W-4 → driver_w4_info via SECURITY DEFINER RPC
       const { error: w4Err } = await supabase.rpc('upsert_driver_w4' as never, {
         _driver_id: driverRow.id,
