@@ -279,41 +279,14 @@ export interface WeeklyPayResult {
   employmentClass: EmploymentClass;
 }
 
-function w2WeeklyResult(args: {
-  base: number;
-  accessorialsTotal: number;
-  loadCount: number;
-  totalMiles: number;
-  payType: CanonicalPayType | 'unknown';
-  settings?: PaySettings;
-}): WeeklyPayResult {
-  // Per spec: W-2 ignores accessorials/percentage-split tracking.
-  // Hourly = hours * rate, per_mile = miles * rate.
-  const grossPay = args.base;
-  const taxWithholding =
-    Math.round(grossPay * effectiveW2Withholding(args.settings) * 100) / 100;
-  return {
-    base: args.base,
-    accessorialsTotal: 0,
-    total: grossPay,
-    grossPay,
-    taxWithholding,
-    reimbursements: 0,
-    deductions: 0,
-    netPay: grossPay - taxWithholding,
-    loadCount: args.loadCount,
-    totalMiles: args.totalMiles,
-    payType: args.payType,
-    employmentClass: 'w2',
-  };
-}
-
 /**
  * Pay for a set of loads (typically a pay period).
  * For flat drivers, base = weekly_flat_rate (or pay_rate fallback).
  * For hourly drivers, base = hoursWorked * hourly_rate (or pay_rate).
  * For percentage / per_mile, base is the sum of per-load base pay.
- * Accessorials are always summed across the loads (contractor track only).
+ * Accessorials are always summed across the loads.
+ * W-2 gross = base + accessorials, minus statutory withholding.
+ * Contractor gross = base + accessorials, plus reimbursements, minus deductions.
  */
 export function calculateWeeklyPay({
   loads,
@@ -347,42 +320,41 @@ export function calculateWeeklyPay({
     };
   }
 
-  // W-2 track: only hourly / per_mile legal. Statutory withholding applies.
+  // Compute base uniformly across employment classes.
+  let base = 0;
+  if (type === 'flat') {
+    base = n(driver.weekly_flat_rate ?? driver.pay_rate);
+  } else if (type === 'hourly') {
+    base = n(hoursWorked) * n(driver.hourly_rate ?? driver.pay_rate);
+  } else if (type === 'per_mile' || type === 'percentage') {
+    for (const load of loadArr) {
+      const { base: b } = calculateLoadPay(load, driver, settings);
+      base += b;
+    }
+  }
+  // unknown → base stays 0
+
+  // W-2 track: statutory withholding on gross taxable wages.
   if (employmentClass === 'w2') {
-    if (type === 'hourly') {
-      const rate = n(driver.hourly_rate ?? driver.pay_rate);
-      const base = n(hoursWorked) * rate;
-      return w2WeeklyResult({
-        base,
-        accessorialsTotal,
-        loadCount,
-        totalMiles,
-        payType: 'hourly',
-        settings,
-      });
-    }
-    if (type === 'per_mile') {
-      let base = 0;
-      for (const load of loadArr) base += n(load.booked_miles) * n(driver.pay_rate);
-      return w2WeeklyResult({
-        base,
-        accessorialsTotal,
-        loadCount,
-        totalMiles,
-        payType: 'per_mile',
-        settings,
-      });
-    }
-    // Illegal W-2 configuration (percentage / flat / unknown) → zero out.
-    return w2WeeklyResult({
-      base: 0,
+    const grossPay = base + accessorialsTotal;
+    const taxWithholding =
+      Math.round(grossPay * effectiveW2Withholding(settings) * 100) / 100;
+    return {
+      base,
       accessorialsTotal,
+      total: grossPay,
+      grossPay,
+      taxWithholding,
+      reimbursements: 0,
+      deductions: 0,
+      netPay: grossPay - taxWithholding,
       loadCount,
       totalMiles,
-      payType: 'unknown',
-      settings,
-    });
+      payType: type,
+      employmentClass: 'w2',
+    };
   }
+
 
   // Contractor / lease track: gross + reimbursements - deductions.
   let base = 0;
