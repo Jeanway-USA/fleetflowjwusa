@@ -202,20 +202,20 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
     });
   }
 
-  const targetPath = `${inst.org_id}/completed/${inst.id}.pdf`;
-  const { error: upErr } = await supabase.storage
-    .from('signed-documents')
-    .upload(targetPath, new Blob([finalBytes as BlobPart], { type: 'application/pdf' }), {
-      contentType: 'application/pdf',
-      upsert: true,
-    });
-  if (upErr) throw upErr;
+  // Base64-encode without exceeding call-stack limits for larger PDFs.
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < finalBytes.length; i += chunkSize) {
+    binary += String.fromCharCode(
+      ...finalBytes.subarray(i, Math.min(i + chunkSize, finalBytes.length)),
+    );
+  }
+  const pdf_base64 = btoa(binary);
 
-  const { error: updErr } = await supabase
-    .from('document_instances')
-    .update({ pdf_storage_path: targetPath })
-    .eq('id', instanceId);
-  if (updErr) throw updErr;
-
-  return targetPath;
+  const { data, error } = await supabase.functions.invoke('finalize-document-instance', {
+    body: { instance_id: inst.id, pdf_base64 },
+  });
+  if (error) throw error;
+  return (data as { path?: string })?.path ?? null;
 }
+
