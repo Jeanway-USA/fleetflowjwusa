@@ -87,14 +87,7 @@ export function PLSummaryTab({
   const noiMargin = grossRevenue > 0 ? (noi / grossRevenue) * 100 : 0;
 
   const [timeframe, setTimeframe] = useState<Timeframe>('week');
-  const fuelPricePerGallon = Number(getSetting('fuel_price_per_gallon', '4.10')) || 4.10;
-  const plannedMilesPerDay = Number(getSetting('planned_miles_per_day', '450')) || 450;
-  const plannedDispatchDays = Number(getSetting('planned_dispatch_days', '22')) || 22;
-  const { data: trend, isLoading: trendLoading } = usePLTrend({
-    fuelPricePerGallon,
-    plannedMilesPerDay,
-    plannedDispatchDays,
-  });
+  const { data: trend, isLoading: trendLoading } = usePLTrend();
 
   const selected: PeriodRollup = useMemo(() => {
     if (!trend) return { revenue: 0, costs: 0, miles: 0 };
