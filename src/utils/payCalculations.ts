@@ -357,19 +357,6 @@ export function calculateWeeklyPay({
 
 
   // Contractor / lease track: gross + reimbursements - deductions.
-  let base = 0;
-  if (type === 'flat') {
-    base = n(driver.weekly_flat_rate ?? driver.pay_rate);
-  } else if (type === 'hourly') {
-    base = n(hoursWorked) * n(driver.hourly_rate ?? driver.pay_rate);
-  } else {
-    // percentage / per_mile / unknown: sum per-load base.
-    for (const load of loadArr) {
-      const { base: b } = calculateLoadPay(load, driver, settings);
-      base += b;
-    }
-  }
-
   const grossPay = base + accessorialsTotal;
   const reimb = Math.max(0, n(reimbursements));
   const ded = Math.max(0, n(deductions));
