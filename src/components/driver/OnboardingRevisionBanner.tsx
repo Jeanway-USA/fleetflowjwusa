@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { fetchOutstandingTemplates } from '@/lib/onboarding/outstanding';
 
 interface Props {
   driverId: string;
@@ -34,10 +35,32 @@ export function OnboardingRevisionBanner({ driverId, credentialsStatus }: Props)
     refetchInterval: 60_000,
   });
 
+  const { data: outstandingCount = 0 } = useQuery({
+    queryKey: ['onboarding-outstanding', driverId],
+    enabled: !!driverId,
+    queryFn: async () => {
+      const res = await fetchOutstandingTemplates(driverId);
+      return res.templates.length;
+    },
+    refetchInterval: 60_000,
+  });
 
   const hasCredentialsRevision = credentialsStatus === 'revision_requested';
-  const totalRevisions = (hasCredentialsRevision ? 1 : 0) + docRevisionCount;
-  if (totalRevisions === 0) return null;
+  const revisionTotal = (hasCredentialsRevision ? 1 : 0) + docRevisionCount;
+  const total = revisionTotal + outstandingCount;
+  if (total === 0) return null;
+
+  // If the only work is unsigned templates (no revision requests), deep-link
+  // to the docs-only mode; otherwise use the standard revision flow.
+  const targetHref =
+    revisionTotal === 0 ? '/driver/onboarding?docs=1' : '/driver/onboarding?revision=1';
+
+  const message =
+    revisionTotal > 0
+      ? `Your onboarding requires a revision${total > 1 ? ` on ${total} items` : ''}. Please review and resubmit.`
+      : outstandingCount === 1
+        ? 'You have 1 document that still needs your signature.'
+        : `You have ${outstandingCount} documents that still need your signature.`;
 
   return (
     <div
@@ -48,19 +71,16 @@ export function OnboardingRevisionBanner({ driverId, credentialsStatus }: Props)
         <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
         <div>
           <p className="font-bold leading-tight">Action Required</p>
-          <p className="text-sm leading-snug opacity-95">
-            Your onboarding requires a revision
-            {totalRevisions > 1 ? ` on ${totalRevisions} items` : ''}. Please review and resubmit.
-          </p>
+          <p className="text-sm leading-snug opacity-95">{message}</p>
         </div>
       </div>
       <Button
         size="sm"
         variant="secondary"
         className="bg-white text-destructive hover:bg-white/90 font-semibold shrink-0"
-        onClick={() => navigate('/driver/onboarding?revision=1')}
+        onClick={() => navigate(targetHref)}
       >
-        View Details
+        {revisionTotal > 0 ? 'View Details' : 'Complete Documents'}
       </Button>
     </div>
   );
