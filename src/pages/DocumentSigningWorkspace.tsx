@@ -143,6 +143,23 @@ export default function DocumentSigningWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instance?.id]);
 
+  // When an instance becomes completed but has no final PDF yet, build it once.
+  const [composing, setComposing] = useState(false);
+  useEffect(() => {
+    if (!instance) return;
+    if (instance.status !== 'completed') return;
+    if (instance.pdf_storage_path) return;
+    if (composing) return;
+    setComposing(true);
+    composeCompletedPdf(instance.id)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['document-instance', instanceId] });
+      })
+      .catch((e: Error) => toast.error(e.message || 'Could not build completed PDF'))
+      .finally(() => setComposing(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instance?.id, instance?.status, instance?.pdf_storage_path]);
+
   const signMutation = useMutation({
     mutationFn: async () => {
       if (!instance || !user || !orgId) throw new Error('Not ready');
