@@ -199,7 +199,7 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
       {outstandingSection}
 
 
-      {docs.map((d) => {
+      {(docs ?? []).map((d) => {
         const label = DOCUMENT_LABELS[d.document_type] ?? d.document_type;
         const isLatest = latestByType.get(d.document_type)?.id === d.id;
         const status: ReviewStatus = d.review_status ?? 'pending';
