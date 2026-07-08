@@ -75,9 +75,34 @@ export function PMFleetHealthSummary({
         <span>{onTrackCount} On Track</span>
       </button>
 
+      {chronicCount > 0 && (
+        <>
+          <div className="h-4 w-px bg-border" />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium cursor-help',
+                    'bg-amber-100/70 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                  )}
+                >
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                  <span>{chronicCount} High Vulnerability</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                ≥ 3 uncorrected minor issues in the last 30 days. Avoid long OTR assignments for these trucks.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </>
+      )}
+
       <div className="ml-auto text-xs text-muted-foreground">
         {total} trucks total
       </div>
+
     </div>
   );
 }
