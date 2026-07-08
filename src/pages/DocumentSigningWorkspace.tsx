@@ -368,9 +368,37 @@ export default function DocumentSigningWorkspace() {
 
           {instance.status === 'completed' && (
             <Card className="card-elevated border-green-500/40">
-              <CardContent className="p-4 text-sm flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                Fully signed on {instance.completed_at ? new Date(instance.completed_at).toLocaleString() : '—'}.
+              <CardContent className="p-4 text-sm space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  Fully signed on {instance.completed_at ? new Date(instance.completed_at).toLocaleString() : '—'}.
+                </div>
+                {instance.pdf_storage_path ? (
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={async () => {
+                      const { data: signed, error } = await supabase.storage
+                        .from('signed-documents')
+                        .createSignedUrl(instance.pdf_storage_path!, 300, {
+                          download: `${instance.title}.pdf`,
+                        });
+                      if (error || !signed?.signedUrl) {
+                        toast.error(error?.message ?? 'Could not open completed PDF');
+                        return;
+                      }
+                      window.open(signed.signedUrl, '_blank', 'noopener,noreferrer');
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download completed PDF
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Assembling the final PDF with all signatures…
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
