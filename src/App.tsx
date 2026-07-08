@@ -14,7 +14,7 @@ import { SuperAdminGuard } from "@/components/shared/SuperAdminGuard";
 import { BrandColorInjector } from "@/components/shared/BrandColorInjector";
 import { RouteTitle } from "@/components/shared/RouteTitle";
 import { Loader2 } from "lucide-react";
-import { GustoAppProvider } from "@/components/providers/GustoAppProvider";
+
 
 // Lazy-loaded pages
 const Auth = lazy(() => import("./pages/Auth"));
@@ -32,7 +32,7 @@ const MaintenanceDashboardHome = lazy(() => import("./pages/MaintenanceDashboard
 const Documents = lazy(() => import("./pages/Documents"));
 const Safety = lazy(() => import("./pages/Safety"));
 const Settings = lazy(() => import("./pages/Settings"));
-const PayrollSetup = lazy(() => import("./pages/PayrollSetup"));
+
 const DriverDashboard = lazy(() => import("./pages/DriverDashboard"));
 const DriverLoads = lazy(() => import("./pages/DriverLoads"));
 const DriverSettlements = lazy(() => import("./pages/DriverSettlements"));
@@ -93,7 +93,7 @@ const App = () => {
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AuthProvider>
               <TimeDisplayProvider>
-                <GustoAppProvider>
+                <>
                 <BrandColorInjector />
                 <RouteTitle />
                 <ErrorBoundary>
@@ -262,11 +262,8 @@ const App = () => {
                         <Settings />
                       </ProtectedRoute>
                     } />
-                    <Route path="/settings/payroll-setup" element={
-                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin']}>
-                        <PayrollSetup />
-                      </ProtectedRoute>
-                    } />
+                    <Route path="/settings/payroll-setup" element={<Navigate to="/finance?tab=inhouse-payroll" replace />} />
+                    <Route path="/finance/inhouse-payroll" element={<Navigate to="/finance?tab=inhouse-payroll" replace />} />
                     <Route path="/admin/document-templates" element={
                       <ProtectedRoute allowedRoles={['owner']}>
                         <DocumentTemplates />
@@ -305,7 +302,7 @@ const App = () => {
                   </Routes>
                 </Suspense>
               </ErrorBoundary>
-                </GustoAppProvider>
+                </>
               </TimeDisplayProvider>
             </AuthProvider>
           </BrowserRouter>

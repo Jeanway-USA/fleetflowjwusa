@@ -36,7 +36,7 @@ import type { Database } from '@/integrations/supabase/types';
 import { GenerateSettlementsDialog } from './GenerateSettlementsDialog';
 import { SettlementDetailSheet } from './SettlementDetailSheet';
 import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
-import { W2PayrollHistoryCard } from '@/components/finance/payroll/W2PayrollHistoryCard';
+
 
 type DriverSettlement = Database['public']['Tables']['driver_settlements']['Row'];
 
@@ -175,7 +175,7 @@ export function DriverSettlementsTab() {
 
   return (
     <div className="space-y-6">
-      <W2PayrollHistoryCard />
+
 
       <Card className="card-elevated">
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

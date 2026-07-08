@@ -2525,6 +2525,7 @@ export type Database = {
           end_miles: number | null
           factoring_status: string | null
           factoring_submission_id: string | null
+          fsc_amount: number
           fuel_advance: number | null
           fuel_surcharge: number | null
           gross_revenue: number | null
@@ -2594,6 +2595,7 @@ export type Database = {
           end_miles?: number | null
           factoring_status?: string | null
           factoring_submission_id?: string | null
+          fsc_amount?: number
           fuel_advance?: number | null
           fuel_surcharge?: number | null
           gross_revenue?: number | null
@@ -2663,6 +2665,7 @@ export type Database = {
           end_miles?: number | null
           factoring_status?: string | null
           factoring_submission_id?: string | null
+          fsc_amount?: number
           fuel_advance?: number | null
           fuel_surcharge?: number | null
           gross_revenue?: number | null
@@ -3350,6 +3353,81 @@ export type Database = {
           value?: string
         }
         Relationships: []
+      }
+      internal_payroll_ledger: {
+        Row: {
+          created_at: string
+          driver_id: string
+          employment_type: string
+          federal_withholding_override: number | null
+          finalized_at: string | null
+          finalized_by: string | null
+          gross_line_haul: number
+          gross_taxable_pay: number
+          id: string
+          org_id: string
+          pass_through_fsc: number
+          pay_model: string
+          period_end: string
+          period_start: string
+          status: string
+          total_miles: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          driver_id: string
+          employment_type?: string
+          federal_withholding_override?: number | null
+          finalized_at?: string | null
+          finalized_by?: string | null
+          gross_line_haul?: number
+          gross_taxable_pay?: number
+          id?: string
+          org_id: string
+          pass_through_fsc?: number
+          pay_model: string
+          period_end: string
+          period_start: string
+          status?: string
+          total_miles?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string
+          employment_type?: string
+          federal_withholding_override?: number | null
+          finalized_at?: string | null
+          finalized_by?: string | null
+          gross_line_haul?: number
+          gross_taxable_pay?: number
+          id?: string
+          org_id?: string
+          pass_through_fsc?: number
+          pay_model?: string
+          period_end?: string
+          period_start?: string
+          status?: string
+          total_miles?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_payroll_ledger_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internal_payroll_ledger_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invitations: {
         Row: {
@@ -5161,6 +5239,59 @@ export type Database = {
         }
         Relationships: []
       }
+      tax_withholding_ledger: {
+        Row: {
+          created_at: string
+          ee_medicare: number
+          ee_social_security: number
+          employer_medicare: number
+          er_social_security: number
+          federal_income_withholding: number
+          fl_reemployment: number
+          id: string
+          ledger_id: string
+          org_id: string
+          tx_twc_unemployment: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          ee_medicare?: number
+          ee_social_security?: number
+          employer_medicare?: number
+          er_social_security?: number
+          federal_income_withholding?: number
+          fl_reemployment?: number
+          id?: string
+          ledger_id: string
+          org_id: string
+          tx_twc_unemployment?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          ee_medicare?: number
+          ee_social_security?: number
+          employer_medicare?: number
+          er_social_security?: number
+          federal_income_withholding?: number
+          fl_reemployment?: number
+          id?: string
+          ledger_id?: string
+          org_id?: string
+          tx_twc_unemployment?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tax_withholding_ledger_ledger_id_fkey"
+            columns: ["ledger_id"]
+            isOneToOne: true
+            referencedRelation: "internal_payroll_ledger"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trailer_assignments: {
         Row: {
           assigned_at: string
@@ -5522,6 +5653,47 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      truist_payout_logs: {
+        Row: {
+          created_at: string
+          id: string
+          ledger_id: string
+          marked_paid_at: string
+          net_payout_amount: number
+          org_id: string
+          processed_by: string | null
+          truist_ach_ref_code: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ledger_id: string
+          marked_paid_at?: string
+          net_payout_amount?: number
+          org_id: string
+          processed_by?: string | null
+          truist_ach_ref_code: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ledger_id?: string
+          marked_paid_at?: string
+          net_payout_amount?: number
+          org_id?: string
+          processed_by?: string | null
+          truist_ach_ref_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "truist_payout_logs_ledger_id_fkey"
+            columns: ["ledger_id"]
+            isOneToOne: false
+            referencedRelation: "internal_payroll_ledger"
             referencedColumns: ["id"]
           },
         ]

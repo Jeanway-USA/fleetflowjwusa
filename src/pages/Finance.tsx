@@ -32,6 +32,7 @@ const RevenueTab = lazy(() =>
 );
 import { CommissionsTab } from '@/components/finance/CommissionsTab';
 import { DriverSettlementsTab } from '@/components/finance/driver-settlements/DriverSettlementsTab';
+import { InHousePayrollWorkspace } from '@/components/finance/inhouse-payroll/InHousePayrollWorkspace';
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
 import { SafetyBonusSettings } from '@/components/finance/SafetyBonusSettings';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
@@ -54,7 +55,8 @@ type AgentCommission = Database['public']['Tables']['agent_commissions']['Row'];
 
 export default function Finance() {
   const queryClient = useQueryClient();
-  const { orgId } = useAuth();
+  const { orgId, hasRole } = useAuth();
+  const canManagePayroll = hasRole('owner') || hasRole('payroll_admin');
   const { isIndependent } = useOrganizationMode();
   // Default to current month
   const now = new Date();
@@ -657,6 +659,9 @@ export default function Finance() {
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="overview">Overview & P&L</TabsTrigger>
           <TabsTrigger value="driver-settlements">Driver Settlements</TabsTrigger>
+          {canManagePayroll && (
+            <TabsTrigger value="inhouse-payroll">In-House Payroll</TabsTrigger>
+          )}
           <TabsTrigger value="commissions">Agent Commissions</TabsTrigger>
           <TabsTrigger value="invoicing">Invoicing & Factoring</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
@@ -972,6 +977,14 @@ export default function Finance() {
             <DriverSettlementsTab />
           </div>
         </TabsContent>
+
+        {canManagePayroll && (
+          <TabsContent value="inhouse-payroll">
+            <div className="space-y-6 animate-in fade-in-50">
+              <InHousePayrollWorkspace />
+            </div>
+          </TabsContent>
+        )}
 
         <TabsContent value="commissions">
           <div className="space-y-6 animate-in fade-in-50">

@@ -377,3 +377,118 @@ export function calculateWeeklyPay({
     employmentClass: 'contractor',
   };
 }
+
+// ============================================================================
+// In-House Payroll Tax Engine (internal_payroll_ledger + tax_withholding_ledger)
+// ============================================================================
+
+export interface PayrollTaxConfig {
+  ssWageBase: number;   // e.g. 184500
+  ssRate: number;       // e.g. 0.062
+  medicareRate: number; // e.g. 0.0145
+  txSuiRate: number;    // e.g. 0.027
+}
+
+export const DEFAULT_PAYROLL_TAX_CONFIG: PayrollTaxConfig = {
+  ssWageBase: 184500,
+  ssRate: 0.062,
+  medicareRate: 0.0145,
+  txSuiRate: 0.027,
+};
+
+/** Percentage drivers: line-haul base excludes 100% pass-through fuel surcharge. */
+export function calculateLineHaulBase(params: {
+  grossTotal: number;
+  fscAmount: number;
+  payModel: string;
+}): number {
+  const gross = Number(params.grossTotal) || 0;
+  const fsc = Number(params.fscAmount) || 0;
+  if (params.payModel === 'percentage') {
+    return Math.max(0, gross - fsc);
+  }
+  return gross;
+}
+
+export interface PayrollTaxInput {
+  grossTaxablePay: number;
+  ytdEarnings: number;
+  employmentType: 'w2' | '1099';
+  config: PayrollTaxConfig;
+  federalOverride?: number | null;
+  state?: string | null;
+}
+
+export interface PayrollTaxResult {
+  eeSocialSecurity: number;
+  erSocialSecurity: number;
+  eeMedicare: number;
+  employerMedicare: number;
+  federalIncomeWithholding: number;
+  txTwcUnemployment: number;
+  flReemployment: number;
+  totalEmployeeWithholding: number;
+  totalEmployerLiability: number;
+  netPay: number;
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+export function calculatePayrollTaxes(input: PayrollTaxInput): PayrollTaxResult {
+  const gross = Math.max(0, Number(input.grossTaxablePay) || 0);
+  const ytd = Math.max(0, Number(input.ytdEarnings) || 0);
+  const cfg = input.config;
+
+  // 1099 contractors: zero out all withholdings.
+  if (input.employmentType !== 'w2') {
+    return {
+      eeSocialSecurity: 0,
+      erSocialSecurity: 0,
+      eeMedicare: 0,
+      employerMedicare: 0,
+      federalIncomeWithholding: 0,
+      txTwcUnemployment: 0,
+      flReemployment: 0,
+      totalEmployeeWithholding: 0,
+      totalEmployerLiability: 0,
+      netPay: round2(gross),
+    };
+  }
+
+  // Social Security — capped at (wageBase - YTD)
+  const ssRemaining = Math.max(0, cfg.ssWageBase - ytd);
+  const ssTaxable = Math.min(gross, ssRemaining);
+  const eeSS = round2(ssTaxable * cfg.ssRate);
+  const erSS = round2(ssTaxable * cfg.ssRate);
+
+  // Medicare — no cap
+  const eeMed = round2(gross * cfg.medicareRate);
+  const erMed = round2(gross * cfg.medicareRate);
+
+  // Texas SUI — employer-only, only for W-2 in TX
+  const txSui = (input.state ?? '').toUpperCase() === 'TX'
+    ? round2(gross * cfg.txSuiRate)
+    : 0;
+
+  // Florida reemployment — placeholder 0 (rate not configured yet)
+  const flReemp = 0;
+
+  const fit = Math.max(0, Number(input.federalOverride) || 0);
+
+  const totalEmp = round2(eeSS + eeMed + fit);
+  const totalEr = round2(erSS + erMed + txSui + flReemp);
+  const net = round2(gross - totalEmp);
+
+  return {
+    eeSocialSecurity: eeSS,
+    erSocialSecurity: erSS,
+    eeMedicare: eeMed,
+    employerMedicare: erMed,
+    federalIncomeWithholding: fit,
+    txTwcUnemployment: txSui,
+    flReemployment: flReemp,
+    totalEmployeeWithholding: totalEmp,
+    totalEmployerLiability: totalEr,
+    netPay: net,
+  };
+}

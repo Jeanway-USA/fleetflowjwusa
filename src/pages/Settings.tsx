@@ -15,9 +15,6 @@ import { OnboardingPreferencesCard } from '@/components/settings/OnboardingPrefe
 import { DocumentTemplatesPanel } from '@/components/settings/DocumentTemplatesPanel';
 import { AuditLogPanel } from '@/components/settings/AuditLogPanel';
 import { PayrollTaxesCard } from '@/components/settings/PayrollTaxesCard';
-import { PayScheduleManager } from '@/components/payroll/PayScheduleManager';
-import { W2DriverSyncDashboard } from '@/components/payroll/W2DriverSyncDashboard';
-import { EmployerOnboardingPortal } from '@/components/finance/payroll/EmployerOnboardingPortal';
 
 export default function Settings() {
   const { canSimulateRoles, isDemoMode } = useAuth();
@@ -186,8 +183,6 @@ export default function Settings() {
             </TabsContent>
 
             <TabsContent value="payroll" className="space-y-6">
-              <EmployerOnboardingPortal />
-              <W2DriverSyncDashboard />
               <PayrollTaxesCard />
             </TabsContent>
           </Tabs>
