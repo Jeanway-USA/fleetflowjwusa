@@ -950,7 +950,7 @@ export default function DriverOnboarding() {
           ) : (
             <DocumentSignatureStep
               employmentType={employmentType}
-              templates={templates}
+              templates={templates as never}
               state={state}
               onUpdateTemplateState={updateTemplateState}
               driverRow={driverRow}
