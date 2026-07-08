@@ -1370,7 +1370,8 @@ export function useTruckProfitability(truckId: string | null) {
       if (woError) throw woError;
       if (expensesError) throw expensesError;
 
-      const avgDailyRevenue = parseFloat(dailyRevSetting?.setting_value || '1000');
+      const avgDailyRevenue =
+        parseFloat(dailyRevSetting?.setting_value || '') || DEFAULT_DAILY_REVENUE_TARGET;
       const totalRevenue = (loads || []).reduce((sum, load) => sum + (load.gross_revenue || 0), 0);
       const totalMaintenanceCost = (workOrders || []).reduce((sum, wo) => sum + (wo.final_cost || 0), 0);
       const totalDaysDown = (workOrders || []).reduce((sum, wo) => sum + (wo.days_down || 0), 0);
