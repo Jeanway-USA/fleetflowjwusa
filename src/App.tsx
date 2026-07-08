@@ -55,6 +55,8 @@ const CheckoutSuccess = lazy(() => import("./pages/CheckoutSuccess"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const DocumentTemplates = lazy(() => import("./pages/admin/DocumentTemplates"));
+const DocumentsSigning = lazy(() => import("./pages/DocumentsSigning"));
+const DocumentSigningWorkspace = lazy(() => import("./pages/DocumentSigningWorkspace"));
 const DriverOnboarding = lazy(() => import("./pages/DriverOnboarding"));
 const SettlementPrint = lazy(() => import("./pages/SettlementPrint"));
 const AuditTrail = lazy(() => import("./pages/AuditTrail"));
