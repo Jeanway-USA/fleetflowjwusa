@@ -1,49 +1,64 @@
-# Fleet Maintenance Economic Loss & Down-Time Tracker
+# Multi-Asset Dispatch Availability & Hometime Timeline
 
-Wire economic loss and chronic-issue signals into maintenance so dispatch can see, in one glance, which trucks are bleeding money and which shouldn't be sent OTR.
+Turn the existing `FleetTimelineScheduler` into a true 14-day multi-asset Gantt with distinct status strips, an outbound planning overlay, and hard hometime locks — and mirror the hometime signal into `DriverStatusGrid`.
 
-## What's already there (leveraged, not rebuilt)
+## Data source (no new tables)
 
-- `work_orders.days_down` column exists.
-- `useTruckProfitability` already computes `totalDaysDown` × `avg_daily_truck_revenue` (`company_settings`, default 1000) and renders "True Cost of Maintenance" in the drawer's Unit P&L tab.
-- What's missing: **live** down-days for in-progress repairs, opportunity-cost surfaced on the History card (not just P&L tab), chronic-issue detection, and a fleet-level warning pill.
+Approved hometime already lives in `driver_requests` with `request_type='home_time'`, `status='approved'`, `start_date`, `end_date`. That's the source of truth; no schema changes.
 
-## 1. `src/hooks/useMaintenanceData.ts`
+## 1. `FleetTimelineScheduler.tsx`
 
-Extend `useTruckHistory(truckId)` to also compute and return:
+**Grid**
+- Extend the rolling window from 7 → **14 days**. `gridTemplateColumns: '140px repeat(14, minmax(56px, 1fr))'`, horizontal scroll preserved.
+- Prev/Next buttons step by 7 days (half-window nudge) instead of full 7 days × 1 offset multiplier; "Today" still snaps `weekOffset` to 0.
+- Widen `min-w-[600px]` → `min-w-[1080px]` so 14 columns don't crush.
 
-- `liveDaysDown` — for every work order with `status !== 'completed'`, `days_down = floor((today − entry_date) / 1 day)`; sum + list.
-- `historicalDaysDown` — sum of `days_down` on completed work orders (all time).
-- `avgDailyRevenue` — pulled from `company_settings.avg_daily_truck_revenue` (fallback **$800/day** per spec).
-- `opportunityRevenueLost` — `(liveDaysDown + historicalDaysDown) × avgDailyRevenue`.
-- `chronic` — `{ hasChronicIssue: boolean, count: number, entries: Array<{ id, source: 'log'|'work_order', description, date, category }>` }.
-  - **Rule**: > 2 uncorrected minor updates in trailing 30 days. "Minor" = `service_type` in `{'fluid','tire','pressure','minor','inspection'}` OR description matches `/leak|drip|slow (tire|fluid)|pressure|weep/i`. "Uncorrected" = maintenance_logs not linked to a completed work_order for the same category **and** open work_orders with `priority in ('low','medium')`.
+**Color-blocked status strips per row-day cell**
 
-Add a new fleet-wide hook `useChronicIssueTrucks()` returning `{ truckIds: Set<string>, count: number }` using the same rule across all trucks (single joined query on `maintenance_logs` + `work_orders` scoped to last 30 days, then grouped by `truck_id`). Cached with the same query key family as other maintenance hooks; `staleTime: 5m`.
+Each cell's background is picked from a shared `getCellStatus(driverId, day)` helper. Priority order (highest wins):
 
-## 2. `src/components/maintenance/TruckHistoryDrawer.tsx`
+1. `hometime` → muted-purple + a diagonal striped SVG pattern (`background-image: repeating-linear-gradient(45deg, hsl(var(--muted-foreground)/.15) 0 6px, transparent 6px 12px)`). Cell is `pointer-events-none` for drops.
+2. `active-transit` → primary/15 tint; the existing load bar renders on top.
+3. `outbound-planning` → amber/10 tint on the 1–3 days immediately after `delivery_date` of the last active load in the window, with a small `MapPin` chip labeled "Reload @ {destination_state}". Skipped if the driver has another load or hometime already scheduled in that gap.
+4. `idle` → default muted background (current look).
 
-On the **History** tab:
+Add a compact **legend row** above the grid (four swatches: Active Transit, Pre-Approved Hometime, Outbound Planning, Unassigned/Idle).
 
-- Replace the 2-card stats grid with a 3-card grid, adding an **Opportunity Revenue Lost** card:
-  - Big number: `formatCurrency(opportunityRevenueLost)`
-  - Sub-line: `{liveDaysDown + historicalDaysDown}d down · ${avgDailyRevenue}/day target`
-  - Tinted rose when > 0; muted when 0.
-- Add an amber **High Vulnerability Index** badge in the `SheetHeader` next to the unit number when `chronic.hasChronicIssue` is true. Tooltip lists the offending entries (date + description + category). Uses the shared amber palette already used on the "Due Soon" pill.
-- No changes to the Unit P&L tab (already displays 90-day lost revenue).
+**New query**
+```ts
+useQuery(['timeline-hometime', windowStart, windowEnd], () =>
+  supabase.from('driver_requests')
+    .select('driver_id, start_date, end_date, request_type, status')
+    .eq('request_type', 'home_time')
+    .eq('status', 'approved')
+    .gte('end_date', windowStart)
+    .lte('start_date', windowEnd)
+)
+```
 
-## 3. `src/components/maintenance/PMFleetHealthSummary.tsx`
+**Hometime buffer locks**
+- Extend `checkConflicts` with a hometime branch: if the load's pickup/delivery interval overlaps any approved hometime for the driver → `hasConflict: true, message: "Driver has approved hometime {start}–{end}. Move or reschedule the hometime first."`
+- Drop handler already respects the toast + early-return; the striped cells also block `onDrop` via `pointer-events-none` for immediate visual feedback.
 
-- Call `useChronicIssueTrucks()` internally (keeps the change contained to these three files — no prop-drilling changes in `PreventiveMaintenanceTab`).
-- Add a fourth pill after "On Track": **High Vulnerability** — amber, `ShieldAlert` icon, shows `{chronicCount} High Vulnerability`. Purely informational (no filter binding), with a tooltip: "≥ 3 uncorrected minor issues in last 30 days — avoid long OTR assignments."
-- Hidden when `chronicCount === 0` so it doesn't add noise on healthy fleets.
+**Outbound Planning Window overlay**
+- After rendering active-load bars, compute for each driver the last-delivering load whose `delivery_date` falls inside the window. If the 3 days after delivery are free of loads/hometime, render an absolutely-positioned dashed amber strip across those cells with a `MapPin` chip: `"Reload near {stateFromDestination}"` (parse the last comma-separated token from `destination`). Clicking the chip is a no-op for v1 (dispatcher visual cue only).
 
-## Constants
+## 2. `DriverStatusGrid.tsx`
 
-New file-local constant `DEFAULT_DAILY_REVENUE_TARGET = 800` in `useMaintenanceData.ts` used as fallback everywhere `avg_daily_truck_revenue` isn't set (also updates the existing `useTruckProfitability` fallback from 1000 → 800 for consistency with the spec).
+- Add the same `driver_requests` fetch (scoped to today → +14d, approved home_time only) alongside the existing loads query.
+- Replace the binary Available / On Load pill with a 3-way status:
+  - `On Hometime` (purple pill, `Home` icon) — when today is within any approved hometime window.
+  - `On Load` (existing blue).
+  - `Available` (existing green) — but if hometime is *upcoming* within 7 days, append a small amber sub-line: `"Hometime {MMM d}–{MMM d}"`.
+- Precedence: Hometime > On Load > Available (matches the timeline lock: if hometime is active, dispatch should treat the driver as locked even if a stale load is still marked assigned).
+
+## Files touched
+
+- `src/components/dispatcher/FleetTimelineScheduler.tsx`
+- `src/components/dispatcher/DriverStatusGrid.tsx`
 
 ## Out of scope
 
-- No new tables, migrations, or columns.
-- No changes to `PMScheduleFilters` / `HealthStatus` type (chronic pill is display-only).
-- No changes to work-order creation UI or the `days_down` write path.
+- No new tables, no changes to `driver_requests` write paths, no changes to `useDriverRequests` hook.
+- No new global CSS — diagonal pattern is inline via a Tailwind arbitrary `bg-[image:...]` class.
+- The "Outbound Planning" chip is a visual prompt only; auto-booking suggestions come later.

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CalendarRange, ChevronLeft, ChevronRight, GripVertical, Package, MapPin, AlertTriangle } from 'lucide-react';
+import { CalendarRange, ChevronLeft, ChevronRight, GripVertical, Package, MapPin, AlertTriangle, Home } from 'lucide-react';
 import { format, addDays, startOfDay, isSameDay, isWithinInterval, parseISO, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -35,6 +35,14 @@ interface ServiceSchedule {
   interval_days: number | null;
 }
 
+interface HometimeWindow {
+  driver_id: string;
+  start_date: string;
+  end_date: string;
+}
+
+const WINDOW_DAYS = 14;
+
 const LOAD_COLORS = [
   'bg-primary/80 text-primary-foreground',
   'bg-accent/80 text-accent-foreground',
@@ -45,15 +53,38 @@ function getLoadColor(index: number) {
   return LOAD_COLORS[index % LOAD_COLORS.length];
 }
 
+// Diagonal striping used to lock hometime cells.
+const HOMETIME_STRIPE =
+  'bg-[image:repeating-linear-gradient(45deg,hsl(var(--muted-foreground)/0.18)_0_6px,transparent_6px_12px)] bg-purple-500/10 dark:bg-purple-400/10';
+
+function parseDate(d: string | null | undefined) {
+  if (!d) return null;
+  return startOfDay(parseISO(`${d.slice(0, 10)}T00:00:00`));
+}
+
+function destinationRegion(destination: string | null | undefined) {
+  if (!destination) return '';
+  const parts = destination.split(',').map(s => s.trim()).filter(Boolean);
+  return parts[parts.length - 1] || destination;
+}
+
 export function FleetTimelineScheduler() {
   const queryClient = useQueryClient();
   const [weekOffset, setWeekOffset] = useState(0);
   const [draggedLoad, setDraggedLoad] = useState<TimelineLoad | null>(null);
   const [assigningLoad, setAssigningLoad] = useState<string | null>(null);
 
-  const weekStart = useMemo(() => startOfDay(addDays(new Date(), weekOffset * 7)), [weekOffset]);
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const weekEnd = days[6];
+  const windowStart = useMemo(
+    () => startOfDay(addDays(new Date(), weekOffset * 7)),
+    [weekOffset]
+  );
+  const days = useMemo(
+    () => Array.from({ length: WINDOW_DAYS }, (_, i) => addDays(windowStart, i)),
+    [windowStart]
+  );
+  const windowEnd = days[WINDOW_DAYS - 1];
+  const windowStartIso = format(windowStart, 'yyyy-MM-dd');
+  const windowEndIso = format(windowEnd, 'yyyy-MM-dd');
 
   // Active drivers with their truck assignments
   const { data: drivers, isLoading: driversLoading } = useQuery({
@@ -79,21 +110,18 @@ export function FleetTimelineScheduler() {
     },
   });
 
-  // Loads in the 7-day window (assigned)
+  // Loads intersecting the window (assigned)
   const { data: assignedLoads } = useQuery({
-    queryKey: ['timeline-assigned-loads', weekStart.toISOString()],
+    queryKey: ['timeline-assigned-loads', windowStartIso, windowEndIso],
     staleTime: 2 * 60 * 1000,
     placeholderData: keepPreviousData,
     queryFn: async () => {
-      const windowStart = weekStart.toISOString().split('T')[0];
-      const windowEnd = format(addDays(weekEnd, 1), 'yyyy-MM-dd');
-
       const { data } = await supabase
         .from('fleet_loads')
         .select('id, landstar_load_id, origin, destination, status, pickup_date, delivery_date, driver_id')
         .not('driver_id', 'is', null)
         .in('status', ['assigned', 'loading', 'in_transit', 'unloading', 'booked'])
-        .or(`pickup_date.lte.${windowEnd},delivery_date.gte.${windowStart},and(pickup_date.gte.${windowStart},pickup_date.lte.${windowEnd})`);
+        .or(`pickup_date.lte.${windowEndIso},delivery_date.gte.${windowStartIso},and(pickup_date.gte.${windowStartIso},pickup_date.lte.${windowEndIso})`);
 
       return (data || []) as TimelineLoad[];
     },
@@ -116,6 +144,25 @@ export function FleetTimelineScheduler() {
     },
   });
 
+  // Approved hometime windows overlapping the visible range
+  const { data: hometime } = useQuery({
+    queryKey: ['timeline-hometime', windowStartIso, windowEndIso],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('driver_requests')
+        .select('driver_id, start_date, end_date, request_type, status')
+        .eq('request_type', 'home_time')
+        .eq('status', 'approved')
+        .not('start_date', 'is', null)
+        .not('end_date', 'is', null)
+        .gte('end_date', windowStartIso)
+        .lte('start_date', windowEndIso);
+
+      return (data || []) as HometimeWindow[];
+    },
+  });
+
   // Service schedules for conflict detection
   const { data: serviceSchedules } = useQuery({
     queryKey: ['timeline-service-schedules'],
@@ -132,34 +179,89 @@ export function FleetTimelineScheduler() {
   const getLoadsForDriver = (driverId: string) =>
     assignedLoads?.filter(l => l.driver_id === driverId) || [];
 
-  const getLoadBarStyle = (load: TimelineLoad) => {
-    if (!load.pickup_date) return null;
-    const pickup = startOfDay(parseISO(load.pickup_date));
-    const delivery = load.delivery_date ? startOfDay(parseISO(load.delivery_date)) : pickup;
+  const getHometimeForDriver = (driverId: string) =>
+    hometime?.filter(h => h.driver_id === driverId) || [];
 
-    const startCol = Math.max(0, differenceInDays(pickup, weekStart));
-    const endCol = Math.min(6, differenceInDays(delivery, weekStart));
+  const isDayOnHometime = (driverId: string, day: Date) => {
+    return getHometimeForDriver(driverId).some(h => {
+      const s = parseDate(h.start_date);
+      const e = parseDate(h.end_date);
+      if (!s || !e) return false;
+      return day >= s && day <= e;
+    });
+  };
 
-    if (startCol > 6 || endCol < 0) return null;
+  const isDayOnLoad = (driverId: string, day: Date) => {
+    return getLoadsForDriver(driverId).some(l => {
+      const s = parseDate(l.pickup_date);
+      const e = parseDate(l.delivery_date) || s;
+      if (!s || !e) return false;
+      return day >= s && day <= e;
+    });
+  };
 
-    const colStart = Math.max(startCol, 0) + 2; // +2 because col 1 is the driver label
-    const colSpan = Math.max(1, endCol - Math.max(startCol, 0) + 1);
+  /**
+   * Outbound planning window: 1–3 days immediately after the last delivery
+   * inside the visible range, when those days are free of loads and hometime.
+   */
+  const getOutboundPlanning = (driverId: string) => {
+    const loads = getLoadsForDriver(driverId);
+    if (loads.length === 0) return null;
+    // Find last-delivering load whose delivery_date is inside the window
+    const scored = loads
+      .map(l => {
+        const d = parseDate(l.delivery_date);
+        return d ? { load: l, delivery: d } : null;
+      })
+      .filter((x): x is { load: TimelineLoad; delivery: Date } => !!x)
+      .filter(x => x.delivery >= windowStart && x.delivery <= windowEnd)
+      .sort((a, b) => b.delivery.getTime() - a.delivery.getTime());
 
-    return { gridColumn: `${colStart} / span ${colSpan}` };
+    const last = scored[0];
+    if (!last) return null;
+
+    const gapDays: Date[] = [];
+    for (let i = 1; i <= 3; i++) {
+      const day = addDays(last.delivery, i);
+      if (day > windowEnd) break;
+      if (isDayOnHometime(driverId, day)) break;
+      if (isDayOnLoad(driverId, day)) break;
+      gapDays.push(day);
+    }
+    if (gapDays.length === 0) return null;
+    return {
+      startCol: differenceInDays(gapDays[0], windowStart) + 2, // +2 for label col
+      span: gapDays.length,
+      region: destinationRegion(last.load.destination),
+    };
   };
 
   const checkConflicts = (driverId: string, load: TimelineLoad): { hasConflict: boolean; message: string } => {
     if (!load.pickup_date) return { hasConflict: false, message: '' };
 
-    const newStart = startOfDay(parseISO(load.pickup_date));
-    const newEnd = load.delivery_date ? startOfDay(parseISO(load.delivery_date)) : newStart;
+    const newStart = parseDate(load.pickup_date)!;
+    const newEnd = parseDate(load.delivery_date) || newStart;
 
-    // Check load overlaps
+    // Hometime lock
+    const hometimeOverlap = getHometimeForDriver(driverId).find(h => {
+      const s = parseDate(h.start_date);
+      const e = parseDate(h.end_date);
+      if (!s || !e) return false;
+      return newStart <= e && newEnd >= s;
+    });
+    if (hometimeOverlap) {
+      return {
+        hasConflict: true,
+        message: `Driver has approved hometime ${format(parseDate(hometimeOverlap.start_date)!, 'MMM d')}–${format(parseDate(hometimeOverlap.end_date)!, 'MMM d')}. Move or reschedule the hometime first.`,
+      };
+    }
+
+    // Load overlaps
     const driverLoads = getLoadsForDriver(driverId);
     const loadOverlap = driverLoads.some(existing => {
       if (!existing.pickup_date) return false;
-      const existStart = startOfDay(parseISO(existing.pickup_date));
-      const existEnd = existing.delivery_date ? startOfDay(parseISO(existing.delivery_date)) : existStart;
+      const existStart = parseDate(existing.pickup_date)!;
+      const existEnd = parseDate(existing.delivery_date) || existStart;
       return newStart <= existEnd && newEnd >= existStart;
     });
 
@@ -167,7 +269,7 @@ export function FleetTimelineScheduler() {
       return { hasConflict: true, message: 'This load overlaps with an existing assignment for this driver.' };
     }
 
-    // Check PM schedule conflicts
+    // PM schedule conflicts
     const driver = drivers?.find(d => d.id === driverId);
     if (driver?.truckId && serviceSchedules) {
       const truckSchedules = serviceSchedules.filter(
@@ -234,7 +336,7 @@ export function FleetTimelineScheduler() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
             <CalendarRange className="h-4 w-4 text-primary" />
-            Fleet Timeline
+            Fleet Timeline · 14 Days
           </CardTitle>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setWeekOffset(o => o - 1)}>
@@ -248,9 +350,26 @@ export function FleetTimelineScheduler() {
             </Button>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {format(weekStart, 'MMM d')} — {format(weekEnd, 'MMM d, yyyy')}
-        </p>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-xs text-muted-foreground">
+            {format(windowStart, 'MMM d')} — {format(windowEnd, 'MMM d, yyyy')}
+          </p>
+          {/* Legend */}
+          <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-3 rounded-sm bg-primary/70" /> Active Transit
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className={`inline-block h-2.5 w-3 rounded-sm ${HOMETIME_STRIPE}`} /> Pre-Approved Hometime
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-3 rounded-sm bg-amber-400/40 border border-dashed border-amber-500" /> Outbound Planning
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-3 rounded-sm bg-muted" /> Unassigned / Idle
+            </span>
+          </div>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -263,9 +382,9 @@ export function FleetTimelineScheduler() {
             {/* Timeline Grid */}
             <div className="overflow-x-auto">
               <div
-                className="grid min-w-[600px]"
+                className="grid min-w-[1080px]"
                 style={{
-                  gridTemplateColumns: '120px repeat(7, 1fr)',
+                  gridTemplateColumns: `140px repeat(${WINDOW_DAYS}, minmax(56px, 1fr))`,
                 }}
               >
                 {/* Header row */}
@@ -285,60 +404,94 @@ export function FleetTimelineScheduler() {
                 {/* Driver rows */}
                 {drivers?.map(driver => {
                   const driverLoads = getLoadsForDriver(driver.id);
+                  const hometimeWindows = getHometimeForDriver(driver.id);
+                  const outbound = getOutboundPlanning(driver.id);
 
                   return (
-                    <div
-                      key={driver.id}
-                      className="contents"
-                    >
+                    <div key={driver.id} className="contents">
                       {/* Driver label */}
-                      <div className="p-2 text-sm font-medium border-b border-border truncate flex items-center">
-                        {driver.first_name} {driver.last_name?.charAt(0)}.
+                      <div className="p-2 text-sm font-medium border-b border-border truncate flex items-center gap-1.5">
+                        <span className="truncate">
+                          {driver.first_name} {driver.last_name?.charAt(0)}.
+                        </span>
+                        {hometimeWindows.some(h => {
+                          const s = parseDate(h.start_date);
+                          const e = parseDate(h.end_date);
+                          return s && e && new Date() >= s && new Date() <= e;
+                        }) && <Home className="h-3 w-3 text-purple-500 shrink-0" />}
                       </div>
 
-                      {/* Day cells as a single drop zone row */}
-                      {days.map((day, dayIdx) => (
-                        <div
-                          key={day.toISOString()}
-                          onDragOver={handleDragOver}
-                          onDrop={() => handleDrop(driver.id)}
-                          className={`relative border-b border-l border-border min-h-[44px] transition-colors ${
-                            draggedLoad ? 'bg-primary/5 hover:bg-primary/10' : ''
-                          } ${isSameDay(day, new Date()) ? 'bg-primary/5' : ''}`}
-                        >
-                          {/* Render load bars that start on this day */}
-                          {driverLoads.map((load, loadIdx) => {
-                            if (!load.pickup_date) return null;
-                            const pickup = startOfDay(parseISO(load.pickup_date));
-                            if (!isSameDay(pickup, day) && !(dayIdx === 0 && pickup < day)) return null;
-                            if (dayIdx > 0 && pickup < day) return null; // only render from start col
+                      {/* Day cells */}
+                      {days.map((day, dayIdx) => {
+                        const onHometime = isDayOnHometime(driver.id, day);
+                        const onLoad = isDayOnLoad(driver.id, day);
+                        const outboundHit =
+                          outbound && dayIdx + 2 >= outbound.startCol && dayIdx + 2 < outbound.startCol + outbound.span;
 
-                            const delivery = load.delivery_date ? startOfDay(parseISO(load.delivery_date)) : pickup;
-                            const spanDays = Math.min(
-                              differenceInDays(delivery, day) + 1,
-                              7 - dayIdx
-                            );
-                            const widthPercent = spanDays * 100;
-
-                            return (
+                        return (
+                          <div
+                            key={day.toISOString()}
+                            onDragOver={onHometime ? undefined : handleDragOver}
+                            onDrop={onHometime ? undefined : () => handleDrop(driver.id)}
+                            className={[
+                              'relative border-b border-l border-border min-h-[44px] transition-colors',
+                              onHometime
+                                ? `${HOMETIME_STRIPE} pointer-events-none`
+                                : onLoad
+                                ? 'bg-primary/5'
+                                : outboundHit
+                                ? 'bg-amber-100/30 dark:bg-amber-900/10'
+                                : '',
+                              draggedLoad && !onHometime ? 'hover:bg-primary/10' : '',
+                              isSameDay(day, new Date()) && !onHometime ? 'bg-primary/5' : '',
+                            ].join(' ')}
+                          >
+                            {/* Outbound planning chip on first day of the window */}
+                            {outbound && dayIdx + 2 === outbound.startCol && (
                               <div
-                                key={load.id}
-                                className={`absolute inset-y-0.5 left-0.5 right-0.5 rounded text-[10px] px-1.5 py-0.5 truncate flex items-center font-medium z-10 ${getLoadColor(loadIdx)}`}
-                                style={{ width: `calc(${widthPercent}% - 4px)`, minWidth: 'calc(100% - 4px)' }}
-                                title={`${load.landstar_load_id || load.id.slice(0, 8)}: ${load.origin} → ${load.destination}`}
+                                className="absolute inset-y-1 left-0.5 right-0.5 flex items-center rounded border border-dashed border-amber-500/70 bg-amber-100/50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 text-[9px] px-1 font-medium truncate z-[5] pointer-events-none"
+                                style={{ width: `calc(${outbound.span * 100}% - 4px)` }}
+                                title={`Outbound planning window — pre-book reload near ${outbound.region}`}
                               >
-                                {load.landstar_load_id || load.id.slice(0, 6)}
+                                <MapPin className="h-2.5 w-2.5 mr-0.5 shrink-0" />
+                                Reload {outbound.region}
                               </div>
-                            );
-                          })}
-                        </div>
-                      ))}
+                            )}
+
+                            {/* Load bars starting on this day */}
+                            {driverLoads.map((load, loadIdx) => {
+                              const pickup = parseDate(load.pickup_date);
+                              if (!pickup) return null;
+                              if (!isSameDay(pickup, day) && !(dayIdx === 0 && pickup < day)) return null;
+                              if (dayIdx > 0 && pickup < day) return null;
+
+                              const delivery = parseDate(load.delivery_date) || pickup;
+                              const spanDays = Math.min(
+                                differenceInDays(delivery, day) + 1,
+                                WINDOW_DAYS - dayIdx
+                              );
+                              const widthPercent = spanDays * 100;
+
+                              return (
+                                <div
+                                  key={load.id}
+                                  className={`absolute inset-y-0.5 left-0.5 right-0.5 rounded text-[10px] px-1.5 py-0.5 truncate flex items-center font-medium z-10 ${getLoadColor(loadIdx)}`}
+                                  style={{ width: `calc(${widthPercent}% - 4px)`, minWidth: 'calc(100% - 4px)' }}
+                                  title={`${load.landstar_load_id || load.id.slice(0, 8)}: ${load.origin} → ${load.destination}`}
+                                >
+                                  {load.landstar_load_id || load.id.slice(0, 6)}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
 
                 {(!drivers || drivers.length === 0) && (
-                  <div className="col-span-8 text-center py-6 text-sm text-muted-foreground">
+                  <div className="col-span-full text-center py-6 text-sm text-muted-foreground">
                     No active drivers
                   </div>
                 )}
