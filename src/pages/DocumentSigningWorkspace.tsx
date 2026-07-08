@@ -146,6 +146,21 @@ export default function DocumentSigningWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instance?.id]);
 
+  // Pre-fill Printed Name / Title / Date once profile + step role are known.
+  useEffect(() => {
+    if (!data) return;
+    const meta = (instance?.metadata ?? {}) as Record<string, string>;
+    const roleKey = stepRole || '';
+    const existingName = meta[`${roleKey}_printed_name`];
+    const existingTitle = meta[`${roleKey}_title`];
+    const existingDate = meta[`${roleKey}_date_signed`];
+    if (!printedName) setPrintedName(existingName || signerName || '');
+    if (!signerTitle) setSignerTitle(existingTitle || data.signerProfile?.default_signing_title || '');
+    if (existingDate) setDateSigned(existingDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.signerProfile?.user_id ?? null, signerName, stepRole]);
+
+
   // When an instance becomes completed but has no final PDF yet, build it once.
   const [composing, setComposing] = useState(false);
   const [composeError, setComposeError] = useState<string | null>(null);
