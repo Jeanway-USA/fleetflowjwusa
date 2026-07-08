@@ -33,13 +33,12 @@ import {
 import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
 
 
-const DOCUMENT_ORDER = ['driver_agreement', 'direct_deposit'] as const;
-type DocumentTypeKey = (typeof DOCUMENT_ORDER)[number];
-
-const DOCUMENT_LABELS: Record<DocumentTypeKey, string> = {
+const DOCUMENT_LABELS: Record<string, string> = {
   driver_agreement: 'Driver Agreement',
   direct_deposit: 'Direct Deposit Authorization',
 };
+
+type TemplateAudience = 'shared' | 'w2' | '1099';
 
 interface TemplateState {
   driverAddress: string;
