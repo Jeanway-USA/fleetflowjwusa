@@ -123,16 +123,44 @@ export function BrokerDatabase() {
   });
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return brokers;
-    const q = search.toLowerCase();
-    return brokers.filter(
-      (b) =>
-        b.company_name.toLowerCase().includes(q) ||
-        (b.contact_name && b.contact_name.toLowerCase().includes(q)) ||
-        (b.agent_code && b.agent_code.toLowerCase().includes(q)) ||
-        (b.email && b.email.toLowerCase().includes(q))
-    );
-  }, [brokers, search]);
+    const base = !search.trim()
+      ? brokers
+      : brokers.filter((b) => {
+          const q = search.toLowerCase();
+          return (
+            b.company_name.toLowerCase().includes(q) ||
+            (b.contact_name && b.contact_name.toLowerCase().includes(q)) ||
+            (b.agent_code && b.agent_code.toLowerCase().includes(q)) ||
+            (b.email && b.email.toLowerCase().includes(q))
+          );
+        });
+    // Default sort: highest adjusted gross revenue, then load count. No stats → bottom.
+    return [...base].sort((a, b) => {
+      const sa = statsFor(a);
+      const sb = statsFor(b);
+      const ra = sa?.adjustedGrossRevenue ?? -1;
+      const rb = sb?.adjustedGrossRevenue ?? -1;
+      if (rb !== ra) return rb - ra;
+      const la = sa?.loadCount ?? 0;
+      const lb = sb?.loadCount ?? 0;
+      if (lb !== la) return lb - la;
+      return a.company_name.localeCompare(b.company_name);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brokers, search, volumeStats]);
+
+  const totals = useMemo(() => {
+    let loads = 0;
+    let revenue = 0;
+    for (const b of brokers) {
+      const s = statsFor(b);
+      if (!s) continue;
+      loads += s.loadCount;
+      revenue += s.adjustedGrossRevenue;
+    }
+    return { loads, revenue };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brokers, volumeStats]);
 
   const openForm = (broker?: BrokerContact) => {
     if (broker) {
