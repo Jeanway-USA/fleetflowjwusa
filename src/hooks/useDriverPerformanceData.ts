@@ -130,6 +130,15 @@ export function useDriverPerformanceData(selectedPeriod: PerformancePeriod) {
 
   const driverMetrics = useMemo(() => {
     const { start, end } = getPeriodRange(selectedPeriod);
+    const now = new Date();
+    const currentMonthStart = startOfMonth(now);
+    const currentMonthEnd = endOfMonth(now);
+    const dayOfMonth = getDate(now);
+    // Trailing 6 completed months (exclude current)
+    const baselineStart = startOfMonth(subMonths(now, 6));
+    const baselineEnd = endOfMonth(subMonths(now, 1));
+    // 4 completed weeks preceding the current week
+    const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
 
     return drivers.map(driver => {
       const driverLoads = loads.filter(load => {
@@ -172,6 +181,53 @@ export function useDriverPerformanceData(selectedPeriod: PerformancePeriod) {
       const mpg = totalGallons > 0 && totalMiles > 0 ? totalMiles / totalGallons : null;
       const fuelCostPerMile = totalMiles > 0 && totalFuelCost > 0 ? totalFuelCost / totalMiles : null;
 
+      // Bonus milestone: 4 consecutive completed weeks with ≥1 delivered load and 0 incidents.
+      let bonusWeeks = 0;
+      for (let i = 1; i <= 4; i++) {
+        const wkStart = addWeeks(currentWeekStart, -i);
+        const wkEnd = endOfWeek(wkStart, { weekStartsOn: 1 });
+        const hadLoad = loads.some(l => {
+          if (l.driver_id !== driver.id || !l.delivery_date || l.status !== 'delivered') return false;
+          const d = parseISO(l.delivery_date);
+          return isWithinInterval(d, { start: wkStart, end: wkEnd });
+        });
+        const hadIncident = incidents.some(inc => {
+          if (inc.driver_id !== driver.id || !inc.incident_date) return false;
+          const d = parseISO(inc.incident_date);
+          return isWithinInterval(d, { start: wkStart, end: wkEnd });
+        });
+        if (hadLoad && !hadIncident) bonusWeeks++;
+        else break;
+      }
+
+      // Baseline monthly miles (trailing 6 completed months) and current-month miles
+      const monthBuckets = new Map<string, number>();
+      let currentMonthMiles = 0;
+      loads.forEach(l => {
+        if (l.driver_id !== driver.id || !l.delivery_date || l.status !== 'delivered') return;
+        const d = parseISO(l.delivery_date);
+        const miles = l.actual_miles || 0;
+        if (isWithinInterval(d, { start: currentMonthStart, end: currentMonthEnd })) {
+          currentMonthMiles += miles;
+        }
+        if (isWithinInterval(d, { start: baselineStart, end: baselineEnd })) {
+          const key = `${d.getFullYear()}-${d.getMonth()}`;
+          monthBuckets.set(key, (monthBuckets.get(key) || 0) + miles);
+        }
+      });
+      const monthsWithData = monthBuckets.size;
+      const baselineMonthlyMiles = monthsWithData > 0
+        ? Array.from(monthBuckets.values()).reduce((s, v) => s + v, 0) / monthsWithData
+        : 0;
+      const retentionDropPct = baselineMonthlyMiles > 0
+        ? Math.max(0, ((baselineMonthlyMiles - currentMonthMiles) / baselineMonthlyMiles) * 100)
+        : 0;
+      const retentionFlag =
+        monthsWithData >= 2 &&
+        baselineMonthlyMiles > 0 &&
+        dayOfMonth >= 10 &&
+        retentionDropPct > 25;
+
       // Scores (0-100)
       const productivityScore = Math.min(100, (totalLoads / 10) * 100);
       const safetyScore = Math.max(0, 100 - (incidentCount * 10) - (severeIncidents * 20));
@@ -195,9 +251,15 @@ export function useDriverPerformanceData(selectedPeriod: PerformancePeriod) {
         revenuePerMile: totalMiles > 0 ? totalRevenue / totalMiles : 0,
         mpg,
         fuelCostPerMile,
+        bonusWeeks,
+        baselineMonthlyMiles,
+        currentMonthMiles,
+        retentionFlag,
+        retentionDropPct,
       };
     }).sort((a, b) => b.overallScore - a.overallScore);
   }, [drivers, loads, inspections, incidents, fuelPurchases, selectedPeriod]);
+
 
   const fleetAverages = useMemo(() => {
     if (driverMetrics.length === 0) return { loads: 0, miles: 0, revenue: 0, score: 0 };
