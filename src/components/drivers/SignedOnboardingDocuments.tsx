@@ -125,7 +125,7 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || outstandingLoading) {
     return (
       <div className="space-y-2">
         <Skeleton className="h-14 w-full" />
@@ -134,7 +134,53 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     );
   }
 
-  if (!docs || docs.length === 0) {
+  // Dedupe by document_type — only show the latest per type for actions
+  const latestByType = new Map<string, NonNullable<typeof docs>[number]>();
+  for (const d of docs ?? []) {
+    if (!latestByType.has(d.document_type)) latestByType.set(d.document_type, d);
+  }
+
+  const outstandingSection = outstanding.length > 0 ? (
+    <div className="rounded-md border-2 border-amber-500/50 bg-amber-500/5 p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        <p className="font-semibold text-sm">Outstanding documents ({outstanding.length})</p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        These active templates have never been signed by this driver. Notify them to complete the missing paperwork.
+      </p>
+      <div className="space-y-2 pt-1">
+        {outstanding.map((t) => (
+          <div key={t.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-md border bg-background p-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileSignature className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="font-medium truncate">{t.name ?? t.document_type}</span>
+              <Badge variant="outline" className="text-[10px] uppercase">
+                {t.applies_to === 'shared' ? 'All' : t.applies_to === 'w2' ? 'W-2' : '1099'}
+              </Badge>
+            </div>
+            {canReview && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={notifyMutation.isPending}
+                onClick={() => notifyMutation.mutate({ document_type: t.document_type, name: t.name })}
+              >
+                {notifyMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                ) : (
+                  <Bell className="h-4 w-4 mr-1.5" />
+                )}
+                Notify driver
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
+  if ((!docs || docs.length === 0) && outstanding.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
         <FileSignature className="mx-auto mb-2 h-6 w-6 opacity-60" />
@@ -143,18 +189,15 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     );
   }
 
-  // Dedupe by document_type — only show the latest per type for actions
-  const latestByType = new Map<string, typeof docs[number]>();
-  for (const d of docs) {
-    if (!latestByType.has(d.document_type)) latestByType.set(d.document_type, d);
-  }
-
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <ShieldCheck className="h-3.5 w-3.5 text-primary" />
         Admin view
       </div>
+
+      {outstandingSection}
+
 
       {docs.map((d) => {
         const label = DOCUMENT_LABELS[d.document_type] ?? d.document_type;
