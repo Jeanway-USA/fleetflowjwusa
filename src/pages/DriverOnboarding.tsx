@@ -181,9 +181,39 @@ export default function DriverOnboarding() {
     ? (driverRow?.credentials_revision_notes ?? null)
     : null;
 
+  // Existence checks for the employment-specific structured forms so a driver
+  // completing only outstanding templates isn't forced to re-enter W-4/I-9/W-9/IOO.
+  const { data: structuredFormsPresent = { w4: false, i9: false, w9: false, ioo: false } } = useQuery({
+    queryKey: ['driver-structured-forms-present', driverRow?.id],
+    enabled: !!driverRow?.id,
+    queryFn: async () => {
+      const [w4, i9, w9, ioo] = await Promise.all([
+        supabase.from('driver_w4_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
+        supabase.from('driver_i9_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
+        supabase.from('driver_w9_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
+        supabase.from('driver_ioo_agreement').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
+      ]);
+      return {
+        w4: !!w4.data,
+        i9: !!i9.data,
+        w9: !!w9.data,
+        ioo: !!ioo.data,
+      };
+    },
+  });
+
+  const skipW2Structured = docsOnlyMode && structuredFormsPresent.w4 && structuredFormsPresent.i9;
+  const skip1099Structured = docsOnlyMode && structuredFormsPresent.w9 && structuredFormsPresent.ioo;
+
   // Deep-link: when ?revision=1, jump to first step that needs revision.
   useEffect(() => {
-    if (deepLinked || !revisionMode || !driverRow || templates.length === 0) return;
+    if (deepLinked || !driverRow) return;
+    if (docsOnlyMode && employmentType !== null) {
+      setStepIndex(2);
+      setDeepLinked(true);
+      return;
+    }
+    if (!revisionMode || templates.length === 0) return;
     if (driverRow.credentials_review_status === 'revision_requested') {
       setStepIndex(1);
       setDeepLinked(true);
@@ -194,7 +224,7 @@ export default function DriverOnboarding() {
     );
     if (hasDocRevision) setStepIndex(2);
     setDeepLinked(true);
-  }, [revisionMode, driverRow, templates, docRevisions, deepLinked]);
+  }, [revisionMode, docsOnlyMode, employmentType, driverRow, templates, docRevisions, deepLinked]);
 
 
   // 3-step flow: Employment (0) → Credentials (1) → Documents (2)
