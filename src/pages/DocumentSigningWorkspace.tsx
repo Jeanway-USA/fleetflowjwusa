@@ -118,18 +118,28 @@ export default function DocumentSigningWorkspace() {
 
   const signerName = [data?.signerProfile?.first_name, data?.signerProfile?.last_name].filter(Boolean).join(' ');
   const ctx = useMemo(
-    () => ({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      driver: (data?.driver ?? null) as any,
-      signer: { name: signerName, role: stepRole, email: data?.signerProfile?.email ?? '' },
-      company: { name: data?.company?.name ?? null, address: null },
-      instance: {
-        id: instance?.id,
-        title: instance?.title,
-        metadata: { ...(instance?.metadata as Record<string, string> | null ?? {}), ...fieldValues },
-      },
-    }),
-    [data, signerName, stepRole, instance, fieldValues],
+    () => {
+      const consentMeta: Record<string, string> = {};
+      for (const [k, v] of Object.entries(consentValues)) {
+        if (v) consentMeta[`consent_${k}`] = v;
+      }
+      return {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        driver: (data?.driver ?? null) as any,
+        signer: { name: signerName, role: stepRole, email: data?.signerProfile?.email ?? '' },
+        company: { name: data?.company?.name ?? null, address: null },
+        instance: {
+          id: instance?.id,
+          title: instance?.title,
+          metadata: {
+            ...(instance?.metadata as Record<string, string> | null ?? {}),
+            ...fieldValues,
+            ...consentMeta,
+          },
+        },
+      };
+    },
+    [data, signerName, stepRole, instance, fieldValues, consentValues],
   );
 
   const rendered = useMemo(() => hydrateTokens(templateContent, ctx), [templateContent, ctx]);
