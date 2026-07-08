@@ -78,6 +78,31 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     onError: (err: Error) => toast.error(err.message || 'Failed to update review'),
   });
 
+  const { data: outstandingData, isLoading: outstandingLoading } = useQuery({
+    queryKey: ['onboarding-outstanding-admin', driverId],
+    enabled: canView && !!driverId,
+    queryFn: () => fetchOutstandingTemplates(driverId),
+  });
+  const outstanding = outstandingData?.templates ?? [];
+
+  const notifyMutation = useMutation({
+    mutationFn: async (tmpl: { document_type: string; name: string | null }) => {
+      const label = tmpl.name ?? tmpl.document_type;
+      const { error } = await supabase.from('driver_notifications').insert({
+        driver_id: driverId,
+        org_id: outstandingData?.orgId ?? null,
+        notification_type: 'document_request',
+        title: 'Document signature requested',
+        message: `Your administrator asked you to sign: ${label}. Open the onboarding page from your dashboard to complete it.`,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Driver notified. A prompt will show on their dashboard.');
+    },
+    onError: (err: Error) => toast.error(err.message || 'Failed to notify driver'),
+  });
+
   if (!canView) return null;
 
   const openSignedUrl = async (filePath: string, downloadName: string, mode: 'preview' | 'download') => {
