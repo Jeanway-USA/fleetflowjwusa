@@ -657,22 +657,92 @@ export default function Finance() {
         </Card>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="flex flex-wrap">
-          <TabsTrigger value="overview">Overview & P&L</TabsTrigger>
-          <TabsTrigger value="driver-settlements">Driver Settlements</TabsTrigger>
-          {canManagePayroll && (
-            <TabsTrigger value="inhouse-payroll">In-House Payroll</TabsTrigger>
-          )}
-          <TabsTrigger value="commissions">Agent Commissions</TabsTrigger>
-          <TabsTrigger value="invoicing">Invoicing & Factoring</TabsTrigger>
-          <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          <TabsTrigger value="profitability">Profitability</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+      <Tabs
+        value={(searchParams.get('view') as 'payouts' | 'compliance' | 'analytics') || 'payouts'}
+        onValueChange={(v) => {
+          const next = new URLSearchParams(searchParams);
+          next.set('view', v);
+          setSearchParams(next, { replace: true });
+        }}
+        className="w-full"
+      >
+        <TabsList className="grid grid-cols-3 gap-2 p-1 bg-muted rounded-lg h-auto w-full max-w-2xl mx-auto mb-6">
+          <TabsTrigger value="payouts" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
+            1. Run Payouts
+          </TabsTrigger>
+          <TabsTrigger value="compliance" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
+            2. Tax & Compliance
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
+            3. Analytics & Audit Logs
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview">
+        {/* ===== VIEW 1 — RUN PAYOUTS ===== */}
+        <TabsContent value="payouts">
+          <div className="space-y-8 animate-in fade-in-50">
+            {canManagePayroll && (
+              <>
+                <section className="space-y-2">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" /> W-2 Active Payroll Batch
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Salary-based batch: $2,000 base default · edit Bonus / Holiday / FIT with live net calculations.
+                  </p>
+                  <ActiveBatchTab />
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Landmark className="h-5 w-5 text-primary" /> Truist ACH Staging
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Confirm and lock finalized payouts with a Truist clearing reference number.
+                  </p>
+                  <TruistAchStagingTab />
+                </section>
+              </>
+            )}
+
+            <section className="space-y-2">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-primary" /> Contractor Settlements (1099)
+              </h3>
+              <DriverSettlementsTab />
+            </section>
+
+            <section className="space-y-2">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Percent className="h-5 w-5 text-primary" /> Agent Commissions
+              </h3>
+              <CommissionsTab
+                filteredCommissions={filteredCommissions}
+                commissionTotals={commissionTotals}
+                commissionsLoading={commissionsLoading}
+              />
+            </section>
+          </div>
+        </TabsContent>
+
+        {/* ===== VIEW 2 — TAX & COMPLIANCE ===== */}
+        <TabsContent value="compliance">
           <div className="space-y-6 animate-in fade-in-50">
+            {canManagePayroll ? (
+              <TaxFilingRegistryTab />
+            ) : (
+              <Card className="card-elevated">
+                <CardContent className="py-10 text-center text-muted-foreground">
+                  Tax & Compliance registry is available to payroll administrators only.
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ===== VIEW 3 — ANALYTICS & AUDIT LOGS ===== */}
+        <TabsContent value="analytics">
+          <div className="space-y-8 animate-in fade-in-50">
             <PLSummaryTab
               revenueTotals={revenueTotals}
               loadExpenseTotals={loadExpenseTotals}
@@ -692,11 +762,6 @@ export default function Finance() {
             <Suspense fallback={<ChartSkeleton height={320} />}>
               <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
             </Suspense>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="profitability">
-          <div className="space-y-6 animate-in fade-in-50">
             <Suspense fallback={<ChartSkeleton height={320} />}>
               <LoadProfitabilityTab
                 deliveredLoads={deliveredLoads}
@@ -710,315 +775,273 @@ export default function Finance() {
                 isIndependent={isIndependent}
               />
             </Suspense>
-          </div>
-        </TabsContent>
+            <AuditReconciliation loads={loads} />
 
-        <TabsContent value="expenses">
-          <div className="space-y-6 animate-in fade-in-50">
-          <AuditReconciliation loads={loads} />
-
-          <Card className="card-elevated">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" /> Manage Expenses</CardTitle>
-                <CardDescription>Track expenses by type, optionally link to a load or truck</CardDescription>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Select onValueChange={selectExpensesByType}>
-                  <SelectTrigger className="w-44"><SelectValue placeholder="Select by type" /></SelectTrigger>
-                  <SelectContent>
-                    {[...new Set(sortedFilteredExpenses.map(e => e.expense_type))].sort().map(type => {
-                      const count = sortedFilteredExpenses.filter(e => e.expense_type === type).length;
-                      return <SelectItem key={type} value={type}>{type} ({count})</SelectItem>;
-                    })}
-                  </SelectContent>
-                </Select>
-                {selectedExpenseIds.size > 0 && (
-                  <>
-                    <Button variant="outline" onClick={() => { setMassEditFormData({}); setMassEditDialogOpen(true); }}>
-                      <CheckSquare className="h-4 w-4 mr-2" /> Edit {selectedExpenseIds.size} Selected
-                    </Button>
-                    <Button variant="destructive" onClick={() => setMassDeleteDialogOpen(true)}>
-                      <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedExpenseIds.size} Selected
-                    </Button>
-                  </>
-                )}
-                <Button onClick={() => openExpenseDialog()} className="gradient-gold text-primary-foreground">
-                  <Plus className="h-4 w-4 mr-2" /> Add Expense
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border border-border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="w-10">
-                        <Checkbox checked={sortedFilteredExpenses.length > 0 && selectedExpenseIds.size === sortedFilteredExpenses.length} onCheckedChange={toggleSelectAllExpenses} />
-                      </TableHead>
-                      {(['expense_date', 'expense_type', 'description', 'amount', 'gallons', 'truck_id', 'load_id'] as SortField[]).map(field => (
-                        <TableHead key={field} className="cursor-pointer hover:bg-muted/80 select-none" onClick={() => handleSort(field)}>
-                          <div className="flex items-center">
-                            {{ expense_date: 'Date', expense_type: 'Type', description: 'Description', amount: 'Amount', gallons: 'Gallons', truck_id: 'Truck', load_id: 'Load' }[field]}
-                            <SortIcon field={field} />
-                          </div>
+            <Card className="card-elevated">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" /> Historical Expenses</CardTitle>
+                  <CardDescription>Track expenses by type, optionally link to a load or truck</CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Select onValueChange={selectExpensesByType}>
+                    <SelectTrigger className="w-44"><SelectValue placeholder="Select by type" /></SelectTrigger>
+                    <SelectContent>
+                      {[...new Set(sortedFilteredExpenses.map(e => e.expense_type))].sort().map(type => {
+                        const count = sortedFilteredExpenses.filter(e => e.expense_type === type).length;
+                        return <SelectItem key={type} value={type}>{type} ({count})</SelectItem>;
+                      })}
+                    </SelectContent>
+                  </Select>
+                  {selectedExpenseIds.size > 0 && (
+                    <>
+                      <Button variant="outline" onClick={() => { setMassEditFormData({}); setMassEditDialogOpen(true); }}>
+                        <CheckSquare className="h-4 w-4 mr-2" /> Edit {selectedExpenseIds.size} Selected
+                      </Button>
+                      <Button variant="destructive" onClick={() => setMassDeleteDialogOpen(true)}>
+                        <Trash2 className="h-4 w-4 mr-2" /> Delete {selectedExpenseIds.size} Selected
+                      </Button>
+                    </>
+                  )}
+                  <Button onClick={() => openExpenseDialog()} className="gradient-gold text-primary-foreground">
+                    <Plus className="h-4 w-4 mr-2" /> Add Expense
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="w-10">
+                          <Checkbox checked={sortedFilteredExpenses.length > 0 && selectedExpenseIds.size === sortedFilteredExpenses.length} onCheckedChange={toggleSelectAllExpenses} />
                         </TableHead>
-                      ))}
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedFilteredExpenses.length === 0 ? (
-                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No expenses for this period</TableCell></TableRow>
-                    ) : (
-                      sortedFilteredExpenses.slice(expensePage * EXPENSES_PER_PAGE, (expensePage + 1) * EXPENSES_PER_PAGE).map((expense) => {
-                        const isRefund = isCreditExpense(expense);
-                        const isAdvance = isAdvanceExpense(expense);
-                        const absAmount = Math.abs(Number(expense.amount));
-                        return (
-                          <TableRow key={expense.id} className={`${selectedExpenseIds.has(expense.id) ? 'bg-primary/5' : ''} ${isAdvance ? 'opacity-70' : ''}`}>
-                            <TableCell><Checkbox checked={selectedExpenseIds.has(expense.id)} onCheckedChange={() => toggleExpenseSelection(expense.id)} /></TableCell>
-                            <TableCell>{expense.expense_date ? format(parseISO(expense.expense_date), 'MM/dd/yyyy') : '-'}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {isRefund && <TrendingUp className="h-4 w-4 text-success" />}
-                                {isAdvance && <Banknote className="h-4 w-4 text-warning" />}
-                                <span className={isRefund ? 'text-success font-medium' : isAdvance ? 'text-warning font-medium' : ''}>{expense.expense_type}</span>
-                                {isAdvance && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-warning/30 text-warning">Non-P&L</Badge>}
-                              </div>
-                            </TableCell>
-                            <TableCell>{expense.description || '-'}</TableCell>
-                            <TableCell>
-                              <span className={`font-medium ${isRefund ? 'text-success' : isAdvance ? 'text-warning' : 'text-destructive'}`}>
-                                {isRefund ? '+' : '-'}{formatCurrency(absAmount)}
-                              </span>
-                            </TableCell>
-                            <TableCell>{expense.gallons ? `${expense.gallons} gal` : '-'}</TableCell>
-                            <TableCell>{getTruckName(expense.truck_id)}</TableCell>
-                            <TableCell>{getLoadName(expense.load_id)}</TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openExpenseDialog(expense)}>
-                                    <Pencil className="mr-2 h-4 w-4" /> Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem className="text-destructive" onClick={() => setDeleteConfirmId(expense.id)}>
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              {/* Pagination Controls */}
-              {sortedFilteredExpenses.length > EXPENSES_PER_PAGE && (
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Showing {expensePage * EXPENSES_PER_PAGE + 1}–{Math.min((expensePage + 1) * EXPENSES_PER_PAGE, sortedFilteredExpenses.length)} of {sortedFilteredExpenses.length}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" disabled={expensePage === 0} onClick={() => setExpensePage(p => p - 1)}>Previous</Button>
-                    <Button variant="outline" size="sm" disabled={(expensePage + 1) * EXPENSES_PER_PAGE >= sortedFilteredExpenses.length} onClick={() => setExpensePage(p => p + 1)}>Next</Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Expense Breakdown Card */}
-          <Card className="card-elevated mt-6">
-            <CardHeader>
-              <CardTitle>Expense Breakdown</CardTitle>
-              <CardDescription>Summary by category for the selected period</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-semibold mb-3">Standalone Expenses</h4>
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {Object.keys(standaloneExpenseTotals.byType).sort().map(type => {
-                        const amount = standaloneExpenseTotals.byType[type] || 0;
-                        const gallons = standaloneExpenseTotals.gallonsByType[type] || 0;
-                        if (amount === 0) return null;
-                        return (
-                          <TableRow key={type}>
-                            <TableCell className="flex items-center gap-2">
-                              {(type === 'Fuel' || type === 'DEF') && <Fuel className="h-4 w-4" />}
-                              {type}
-                              {gallons > 0 && <span className="text-xs text-muted-foreground">({gallons.toFixed(1)} gal)</span>}
-                            </TableCell>
-                            <TableCell className="text-right">{formatCurrency(amount)}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      <TableRow className="bg-warning/10">
-                        <TableCell className="font-bold">Total Standalone</TableCell>
-                        <TableCell className="text-right font-bold text-warning">{formatCurrency(standaloneExpenseTotals.total)}</TableCell>
+                        {(['expense_date', 'expense_type', 'description', 'amount', 'gallons', 'truck_id', 'load_id'] as SortField[]).map(field => (
+                          <TableHead key={field} className="cursor-pointer hover:bg-muted/80 select-none" onClick={() => handleSort(field)}>
+                            <div className="flex items-center">
+                              {{ expense_date: 'Date', expense_type: 'Type', description: 'Description', amount: 'Amount', gallons: 'Gallons', truck_id: 'Truck', load_id: 'Load' }[field]}
+                              <SortIcon field={field} />
+                            </div>
+                          </TableHead>
+                        ))}
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-                <div>
-                  <h4 className="font-semibold mb-3">Load-Linked Expenses</h4>
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                    </TableHeader>
                     <TableBody>
-                      {Object.keys(loadLinkedExpenseTotals.byType).sort().map(type => {
-                        const amount = loadLinkedExpenseTotals.byType[type] || 0;
-                        if (amount === 0) return null;
-                        return (
-                          <TableRow key={type}>
-                            <TableCell>{type}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(amount)}</TableCell>
-                          </TableRow>
-                        );
-                      })}
-                      {loadExpenseTotals.operatingTotal > 0 && (
-                        <TableRow>
-                          <TableCell>Operating (Legacy)</TableCell>
-                          <TableCell className="text-right">{formatCurrency(loadExpenseTotals.operatingTotal)}</TableCell>
-                        </TableRow>
+                      {sortedFilteredExpenses.length === 0 ? (
+                        <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">No expenses for this period</TableCell></TableRow>
+                      ) : (
+                        sortedFilteredExpenses.slice(expensePage * EXPENSES_PER_PAGE, (expensePage + 1) * EXPENSES_PER_PAGE).map((expense) => {
+                          const isRefund = isCreditExpense(expense);
+                          const isAdvance = isAdvanceExpense(expense);
+                          const absAmount = Math.abs(Number(expense.amount));
+                          return (
+                            <TableRow key={expense.id} className={`${selectedExpenseIds.has(expense.id) ? 'bg-primary/5' : ''} ${isAdvance ? 'opacity-70' : ''}`}>
+                              <TableCell><Checkbox checked={selectedExpenseIds.has(expense.id)} onCheckedChange={() => toggleExpenseSelection(expense.id)} /></TableCell>
+                              <TableCell>{expense.expense_date ? format(parseISO(expense.expense_date), 'MM/dd/yyyy') : '-'}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  {isRefund && <TrendingUp className="h-4 w-4 text-success" />}
+                                  {isAdvance && <Banknote className="h-4 w-4 text-warning" />}
+                                  <span className={isRefund ? 'text-success font-medium' : isAdvance ? 'text-warning font-medium' : ''}>{expense.expense_type}</span>
+                                  {isAdvance && <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-warning/30 text-warning">Non-P&L</Badge>}
+                                </div>
+                              </TableCell>
+                              <TableCell>{expense.description || '-'}</TableCell>
+                              <TableCell>
+                                <span className={`font-medium ${isRefund ? 'text-success' : isAdvance ? 'text-warning' : 'text-destructive'}`}>
+                                  {isRefund ? '+' : '-'}{formatCurrency(absAmount)}
+                                </span>
+                              </TableCell>
+                              <TableCell>{expense.gallons ? `${expense.gallons} gal` : '-'}</TableCell>
+                              <TableCell>{getTruckName(expense.truck_id)}</TableCell>
+                              <TableCell>{getLoadName(expense.load_id)}</TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openExpenseDialog(expense)}>
+                                      <Pencil className="mr-2 h-4 w-4" /> Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-destructive" onClick={() => setDeleteConfirmId(expense.id)}>
+                                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       )}
-                      <TableRow className="bg-destructive/10">
-                        <TableCell className="font-bold">Total Load-Linked</TableCell>
-                        <TableCell className="text-right font-bold text-destructive">{formatCurrency(loadLinkedExpenseTotals.total + loadExpenseTotals.operatingTotal)}</TableCell>
-                      </TableRow>
                     </TableBody>
                   </Table>
                 </div>
-              </div>
-
-              {/* Credits & Advances summary */}
-              {(creditsTotal > 0 || advancesTotal > 0) && (
-                <div className="grid md:grid-cols-2 gap-6 mt-6">
-                  {creditsTotal > 0 && (
-                    <div>
-                      <h4 className="font-semibold mb-3 text-success">Credits & Reimbursements</h4>
-                      <Table>
-                        <TableHeader><TableRow><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                          {creditExpenses.map((e) => (
-                            <TableRow key={e.id}>
-                              <TableCell className="text-success">{e.expense_type}</TableCell>
-                              <TableCell className="text-right text-success">+{formatCurrency(Math.abs(Number(e.amount)))}</TableCell>
-                            </TableRow>
-                          ))}
-                          <TableRow className="bg-success/10">
-                            <TableCell className="font-bold">Total Credits</TableCell>
-                            <TableCell className="text-right font-bold text-success">+{formatCurrency(creditsTotal)}</TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
+                {sortedFilteredExpenses.length > EXPENSES_PER_PAGE && (
+                  <div className="flex items-center justify-between mt-4">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {expensePage * EXPENSES_PER_PAGE + 1}–{Math.min((expensePage + 1) * EXPENSES_PER_PAGE, sortedFilteredExpenses.length)} of {sortedFilteredExpenses.length}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" disabled={expensePage === 0} onClick={() => setExpensePage(p => p - 1)}>Previous</Button>
+                      <Button variant="outline" size="sm" disabled={(expensePage + 1) * EXPENSES_PER_PAGE >= sortedFilteredExpenses.length} onClick={() => setExpensePage(p => p + 1)}>Next</Button>
                     </div>
-                  )}
-                  {advancesTotal > 0 && (
-                    <div>
-                      <h4 className="font-semibold mb-3 text-warning">Advances (Non-P&L)</h4>
-                      <Table>
-                        <TableHeader><TableRow><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                          {advanceExpenses.map((e) => (
-                            <TableRow key={e.id}>
-                              <TableCell className="text-warning">{e.expense_type}</TableCell>
-                              <TableCell className="text-right text-warning">{formatCurrency(Math.abs(Number(e.amount)))}</TableCell>
-                            </TableRow>
-                          ))}
-                          <TableRow className="bg-warning/10">
-                            <TableCell className="font-bold">Total Advances</TableCell>
-                            <TableCell className="text-right font-bold text-warning">{formatCurrency(advancesTotal)}</TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-              <div className="mt-6 p-4 bg-muted rounded-lg space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Actual Expenses</span>
-                  <span className="font-medium text-destructive">{formatCurrency(grossExpenses)}</span>
+            <Card className="card-elevated">
+              <CardHeader>
+                <CardTitle>Expense Breakdown</CardTitle>
+                <CardDescription>Summary by category for the selected period</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-semibold mb-3">Standalone Expenses</h4>
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {Object.keys(standaloneExpenseTotals.byType).sort().map(type => {
+                          const amount = standaloneExpenseTotals.byType[type] || 0;
+                          const gallons = standaloneExpenseTotals.gallonsByType[type] || 0;
+                          if (amount === 0) return null;
+                          return (
+                            <TableRow key={type}>
+                              <TableCell className="flex items-center gap-2">
+                                {(type === 'Fuel' || type === 'DEF') && <Fuel className="h-4 w-4" />}
+                                {type}
+                                {gallons > 0 && <span className="text-xs text-muted-foreground">({gallons.toFixed(1)} gal)</span>}
+                              </TableCell>
+                              <TableCell className="text-right">{formatCurrency(amount)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        <TableRow className="bg-warning/10">
+                          <TableCell className="font-bold">Total Standalone</TableCell>
+                          <TableCell className="text-right font-bold text-warning">{formatCurrency(standaloneExpenseTotals.total)}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-3">Load-Linked Expenses</h4>
+                    <Table>
+                      <TableHeader><TableRow><TableHead>Category</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                      <TableBody>
+                        {Object.keys(loadLinkedExpenseTotals.byType).sort().map(type => {
+                          const amount = loadLinkedExpenseTotals.byType[type] || 0;
+                          if (amount === 0) return null;
+                          return (
+                            <TableRow key={type}>
+                              <TableCell>{type}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(amount)}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {loadExpenseTotals.operatingTotal > 0 && (
+                          <TableRow>
+                            <TableCell>Operating (Legacy)</TableCell>
+                            <TableCell className="text-right">{formatCurrency(loadExpenseTotals.operatingTotal)}</TableCell>
+                          </TableRow>
+                        )}
+                        <TableRow className="bg-destructive/10">
+                          <TableCell className="font-bold">Total Load-Linked</TableCell>
+                          <TableCell className="text-right font-bold text-destructive">{formatCurrency(loadLinkedExpenseTotals.total + loadExpenseTotals.operatingTotal)}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
-                {creditsTotal > 0 && (
+
+                {(creditsTotal > 0 || advancesTotal > 0) && (
+                  <div className="grid md:grid-cols-2 gap-6 mt-6">
+                    {creditsTotal > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-3 text-success">Credits & Reimbursements</h4>
+                        <Table>
+                          <TableHeader><TableRow><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                          <TableBody>
+                            {creditExpenses.map((e) => (
+                              <TableRow key={e.id}>
+                                <TableCell className="text-success">{e.expense_type}</TableCell>
+                                <TableCell className="text-right text-success">+{formatCurrency(Math.abs(Number(e.amount)))}</TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="bg-success/10">
+                              <TableCell className="font-bold">Total Credits</TableCell>
+                              <TableCell className="text-right font-bold text-success">+{formatCurrency(creditsTotal)}</TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                    {advancesTotal > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-3 text-warning">Advances (Non-P&L)</h4>
+                        <Table>
+                          <TableHeader><TableRow><TableHead>Type</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                          <TableBody>
+                            {advanceExpenses.map((e) => (
+                              <TableRow key={e.id}>
+                                <TableCell className="text-warning">{e.expense_type}</TableCell>
+                                <TableCell className="text-right text-warning">{formatCurrency(Math.abs(Number(e.amount)))}</TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="bg-warning/10">
+                              <TableCell className="font-bold">Total Advances</TableCell>
+                              <TableCell className="text-right font-bold text-warning">{formatCurrency(advancesTotal)}</TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-6 p-4 bg-muted rounded-lg space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Credits / Discounts</span>
-                    <span className="font-medium text-success">-{formatCurrency(creditsTotal)}</span>
+                    <span className="text-sm text-muted-foreground">Actual Expenses</span>
+                    <span className="font-medium text-destructive">{formatCurrency(grossExpenses)}</span>
                   </div>
-                )}
-                <div className="flex justify-between items-center border-t border-border pt-2">
-                  <span className="font-bold text-lg">NET EXPENSE IMPACT</span>
-                  <span className="font-bold text-2xl text-destructive">{formatCurrency(totalExpenses)}</span>
+                  {creditsTotal > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">Credits / Discounts</span>
+                      <span className="font-medium text-success">-{formatCurrency(creditsTotal)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center border-t border-border pt-2">
+                    <span className="font-bold text-lg">NET EXPENSE IMPACT</span>
+                    <span className="font-bold text-2xl text-destructive">{formatCurrency(totalExpenses)}</span>
+                  </div>
+                  {advancesTotal > 0 && (
+                    <div className="flex justify-between items-center pt-1">
+                      <span className="text-sm text-warning flex items-center gap-1"><Banknote className="h-3 w-3" /> Advances Taken (neutral)</span>
+                      <span className="text-sm text-warning">{formatCurrency(advancesTotal)}</span>
+                    </div>
+                  )}
                 </div>
-                {advancesTotal > 0 && (
-                  <div className="flex justify-between items-center pt-1">
-                    <span className="text-sm text-warning flex items-center gap-1"><Banknote className="h-3 w-3" /> Advances Taken (neutral)</span>
-                    <span className="text-sm text-warning">{formatCurrency(advancesTotal)}</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          </div>
-        </TabsContent>
+              </CardContent>
+            </Card>
 
-        <TabsContent value="driver-settlements">
-          <div className="space-y-6 animate-in fade-in-50">
-            <DriverSettlementsTab />
-          </div>
-        </TabsContent>
-
-        {canManagePayroll && (
-          <TabsContent value="inhouse-payroll">
-            <div className="space-y-6 animate-in fade-in-50">
-              <InHousePayrollWorkspace />
-            </div>
-          </TabsContent>
-        )}
-
-        <TabsContent value="commissions">
-          <div className="space-y-6 animate-in fade-in-50">
-            <CommissionsTab
-              filteredCommissions={filteredCommissions}
-              commissionTotals={commissionTotals}
-              commissionsLoading={commissionsLoading}
-            />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="invoicing">
-          <div className="space-y-6 animate-in fade-in-50">
-            {isIndependent && <InvoicingTab />}
-            {isIndependent && <FactoringTab />}
-            {!isIndependent && (
-              <Card className="card-elevated">
-                <CardContent className="py-10 text-center text-muted-foreground">
-                  Invoicing & Factoring are available in Independent Owner-Operator mode.
-                </CardContent>
-              </Card>
+            {isIndependent && (
+              <>
+                <InvoicingTab />
+                <FactoringTab />
+              </>
             )}
-          </div>
-        </TabsContent>
 
-        <TabsContent value="settings">
-          <div className="space-y-6 animate-in fade-in-50">
             <CompensationSettingsTab getSetting={getSetting} />
             <SafetyBonusSettings />
           </div>
         </TabsContent>
       </Tabs>
+
 
       {/* Upload Statement Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
