@@ -39,6 +39,8 @@ const FORMATTING_EXAMPLES: Array<{ syntax: string; preview: ReactNode; label: st
   { label: "Block quote", syntax: "> Notice text", preview: <blockquote className="text-sm border-l-2 border-primary pl-3 italic text-muted-foreground">Notice text</blockquote> },
 ];
 
+type TemplateAudience = 'shared' | 'w2' | '1099';
+
 interface DocumentTemplate {
   id: string;
   org_id: string;
@@ -46,10 +48,17 @@ interface DocumentTemplate {
   name: string | null;
   content: string;
   is_active: boolean;
+  applies_to: TemplateAudience;
   version: number;
   created_at: string;
   updated_at: string;
 }
+
+const AUDIENCE_LABELS: Record<TemplateAudience, string> = {
+  shared: 'All drivers',
+  w2: 'W-2 only',
+  '1099': '1099 only',
+};
 
 const VARIABLES: Array<{ token: string; description: string }> = [
   {
@@ -197,6 +206,7 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
         name: current.name,
         content: current.content,
         is_active: current.is_active,
+        applies_to: current.applies_to ?? 'shared',
       });
     }
   }, [selectedId, templates]);
@@ -211,7 +221,8 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
           name: draft.name ?? null,
           content: draft.content ?? "",
           is_active: draft.is_active ?? true,
-        })
+          applies_to: draft.applies_to ?? 'shared',
+        } as never)
         .eq("id", draft.id);
       if (error) throw error;
     },
@@ -325,12 +336,16 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                         <SelectValue placeholder="Select a template" />
                       </SelectTrigger>
                       <SelectContent>
-                        {templates.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            {t.name ? `${t.name} · ${t.document_type}` : t.document_type}
-                            {!t.is_active && " (inactive)"}
-                          </SelectItem>
-                        ))}
+                        {templates.map((t) => {
+                          const audience = (t.applies_to ?? 'shared') as TemplateAudience;
+                          return (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name ? `${t.name} · ${t.document_type}` : t.document_type}
+                              {" — "}{AUDIENCE_LABELS[audience]}
+                              {!t.is_active && " (inactive)"}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -376,6 +391,30 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                           checked={!!draft.is_active}
                           onCheckedChange={(v) => setDraft((d) => ({ ...d, is_active: v }))}
                         />
+                      </div>
+
+                      <div className="space-y-2 rounded-md border p-3">
+                        <Label htmlFor="doc-audience" className="text-sm font-medium">
+                          Audience
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Choose which drivers see this template during onboarding.
+                        </p>
+                        <Select
+                          value={(draft.applies_to ?? 'shared') as string}
+                          onValueChange={(v) =>
+                            setDraft((d) => ({ ...d, applies_to: v as TemplateAudience }))
+                          }
+                        >
+                          <SelectTrigger id="doc-audience" className="h-12">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="shared">All drivers</SelectItem>
+                            <SelectItem value="w2">W-2 employees only</SelectItem>
+                            <SelectItem value="1099">1099 contractors only</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-2">

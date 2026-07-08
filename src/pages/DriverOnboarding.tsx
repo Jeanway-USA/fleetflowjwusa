@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useQuery } from '@tanstack/react-query';
@@ -33,13 +33,12 @@ import {
 import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
 
 
-const DOCUMENT_ORDER = ['driver_agreement', 'direct_deposit'] as const;
-type DocumentTypeKey = (typeof DOCUMENT_ORDER)[number];
-
-const DOCUMENT_LABELS: Record<DocumentTypeKey, string> = {
+const DOCUMENT_LABELS: Record<string, string> = {
   driver_agreement: 'Driver Agreement',
   direct_deposit: 'Direct Deposit Authorization',
 };
+
+type TemplateAudience = 'shared' | 'w2' | '1099';
 
 interface TemplateState {
   driverAddress: string;
@@ -128,7 +127,7 @@ export default function DriverOnboarding() {
 
 
   const { data: templates = [], isLoading } = useQuery({
-    queryKey: ['driver_onboarding_templates', orgId],
+    queryKey: ['driver_onboarding_templates', orgId, employmentType],
     enabled: !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -136,13 +135,23 @@ export default function DriverOnboarding() {
         .select('*')
         .eq('org_id', orgId!)
         .eq('is_active', true)
-        .in('document_type', DOCUMENT_ORDER as unknown as string[]);
+        .order('document_type', { ascending: true });
       if (error) throw error;
-      return [...(data ?? [])].sort(
-        (a, b) =>
-          DOCUMENT_ORDER.indexOf(a.document_type as DocumentTypeKey) -
-          DOCUMENT_ORDER.indexOf(b.document_type as DocumentTypeKey),
-      );
+      const rows = (data ?? []) as Array<{
+        id: string;
+        document_type: string;
+        name: string | null;
+        content: string;
+        applies_to?: string | null;
+      }>;
+      // Filter by audience relative to the driver's employment type.
+      return rows.filter((r) => {
+        const audience = (r.applies_to ?? 'shared') as TemplateAudience;
+        if (audience === 'shared') return true;
+        if (audience === 'w2') return employmentType === 'W-2';
+        if (audience === '1099') return employmentType === '1099';
+        return true;
+      });
     },
   });
 
@@ -196,6 +205,21 @@ export default function DriverOnboarding() {
   const isDocumentsStep = stepIndex === DOCUMENTS_STEP;
   const totalSteps = 3;
 
+  // Templates the driver still has to sign: excludes anything already submitted
+  // (pending review or approved). Revision-requested items stay in the list so
+  // they can be re-signed.
+  const pendingTemplates = useMemo(() => {
+    return templates.filter((t) => {
+      const status = docRevisions[t.document_type]?.status;
+      return status !== 'approved' && status !== 'pending';
+    });
+  }, [templates, docRevisions]);
+
+  // Templates already submitted and awaiting admin review.
+  const awaitingReviewTemplates = useMemo(() => {
+    return templates.filter((t) => docRevisions[t.document_type]?.status === 'pending');
+  }, [templates, docRevisions]);
+
   const canContinue = isEmploymentStep
     ? employmentType !== null
     : isCredentialsStep
@@ -234,8 +258,9 @@ export default function DriverOnboarding() {
     const results: SignedResult[] = [];
 
     for (const tmpl of templates) {
-      // In revision mode, skip templates already approved by the admin.
-      if (revisionMode && docRevisions[tmpl.document_type]?.status === 'approved') {
+      // Skip templates already submitted (revision_requested still needs resubmit).
+      const existingStatus = docRevisions[tmpl.document_type]?.status;
+      if (existingStatus === 'approved' || existingStatus === 'pending') {
         continue;
       }
       const tState: TemplateState =
@@ -244,7 +269,7 @@ export default function DriverOnboarding() {
 
       const title =
         tmpl.name ??
-        DOCUMENT_LABELS[tmpl.document_type as DocumentTypeKey] ??
+        DOCUMENT_LABELS[tmpl.document_type] ??
         tmpl.document_type;
 
       const blob = generateSignedPdf({
@@ -938,20 +963,33 @@ export default function DriverOnboarding() {
               onValidityChange={setCredentialsValid}
             />
           ) : (
-            <DocumentSignatureStep
-              employmentType={employmentType}
-              templates={templates}
-              state={state}
-              onUpdateTemplateState={updateTemplateState}
-              driverRow={driverRow}
-              docRevisions={docRevisions}
-              revisionMode={revisionMode}
-              onValidityChange={setDocumentsValid}
-              w2Docs={w2Docs}
-              onW2DocsChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
-              contractorDocs={contractorDocs}
-              onContractorDocsChange={(patch) => setContractorDocs((prev) => ({ ...prev, ...patch }))}
-            />
+            <div className="space-y-4">
+              {awaitingReviewTemplates.length > 0 && (
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertTitle>Already submitted — waiting on review</AlertTitle>
+                  <AlertDescription>
+                    {awaitingReviewTemplates
+                      .map((t) => t.name ?? DOCUMENT_LABELS[t.document_type] ?? t.document_type)
+                      .join(', ')}
+                  </AlertDescription>
+                </Alert>
+              )}
+              <DocumentSignatureStep
+                employmentType={employmentType}
+                templates={pendingTemplates as never}
+                state={state}
+                onUpdateTemplateState={updateTemplateState}
+                driverRow={driverRow}
+                docRevisions={docRevisions}
+                revisionMode={revisionMode}
+                onValidityChange={setDocumentsValid}
+                w2Docs={w2Docs}
+                onW2DocsChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
+                contractorDocs={contractorDocs}
+                onContractorDocsChange={(patch) => setContractorDocs((prev) => ({ ...prev, ...patch }))}
+              />
+            </div>
           )}
 
         </CardContent>
