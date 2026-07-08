@@ -305,7 +305,7 @@ const App = () => {
                   </Routes>
                 </Suspense>
               </ErrorBoundary>
-                </GustoAppProvider>
+                </>
               </TimeDisplayProvider>
             </AuthProvider>
           </BrowserRouter>
