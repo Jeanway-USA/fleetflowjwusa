@@ -86,15 +86,14 @@ export default function DocumentsSigning() {
       <PageHeader
         title="Document Signing"
         description="Sign, route, and track documents across your organization."
-        actions={
-          canSimulateRoles ? (
-            <Button onClick={() => setSendOpen(true)} className="h-11 gradient-gold text-primary-foreground">
-              <Send className="h-4 w-4 mr-2" />
-              Send document
-            </Button>
-          ) : undefined
-        }
-      />
+      >
+        {canSimulateRoles && (
+          <Button onClick={() => setSendOpen(true)} className="h-11 gradient-gold text-primary-foreground">
+            <Send className="h-4 w-4 mr-2" />
+            Send document
+          </Button>
+        )}
+      </PageHeader>
 
       <Tabs defaultValue="action">
         <TabsList>
