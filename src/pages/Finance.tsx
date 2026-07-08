@@ -659,6 +659,9 @@ export default function Finance() {
         <TabsList className="flex flex-wrap">
           <TabsTrigger value="overview">Overview & P&L</TabsTrigger>
           <TabsTrigger value="driver-settlements">Driver Settlements</TabsTrigger>
+          {canManagePayroll && (
+            <TabsTrigger value="inhouse-payroll">In-House Payroll</TabsTrigger>
+          )}
           <TabsTrigger value="commissions">Agent Commissions</TabsTrigger>
           <TabsTrigger value="invoicing">Invoicing & Factoring</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
