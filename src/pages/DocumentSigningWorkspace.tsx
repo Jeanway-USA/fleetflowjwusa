@@ -24,6 +24,9 @@ export default function DocumentSigningWorkspace() {
 
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [printedName, setPrintedName] = useState('');
+  const [signerTitle, setSignerTitle] = useState('');
+  const [dateSigned, setDateSigned] = useState(() => new Date().toISOString().slice(0, 10));
 
   const { data, isLoading } = useQuery({
     queryKey: ['document-instance', instanceId],
