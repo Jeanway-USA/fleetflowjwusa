@@ -14,7 +14,7 @@ import { SuperAdminGuard } from "@/components/shared/SuperAdminGuard";
 import { BrandColorInjector } from "@/components/shared/BrandColorInjector";
 import { RouteTitle } from "@/components/shared/RouteTitle";
 import { Loader2 } from "lucide-react";
-import { GustoAppProvider } from "@/components/providers/GustoAppProvider";
+
 
 // Lazy-loaded pages
 const Auth = lazy(() => import("./pages/Auth"));
