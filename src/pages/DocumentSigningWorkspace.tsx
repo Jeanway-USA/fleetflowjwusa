@@ -28,6 +28,7 @@ export default function DocumentSigningWorkspace() {
   const [printedName, setPrintedName] = useState('');
   const [signerTitle, setSignerTitle] = useState('');
   const [dateSigned, setDateSigned] = useState(() => new Date().toISOString().slice(0, 10));
+  const [consentValues, setConsentValues] = useState<Record<string, 'yes' | 'no'>>({});
 
   const { data, isLoading } = useQuery({
     queryKey: ['document-instance', instanceId],
