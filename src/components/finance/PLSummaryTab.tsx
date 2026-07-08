@@ -182,6 +182,9 @@ export function PLSummaryTab({
           </Card>
         </div>
 
+        {/* ---------- Fleet Runway (Cost Per Day + Break-Even Gauge) ---------- */}
+        <FleetRunwaySection loading={trendLoading} runway={trend?.runway} />
+
         {/* ---------- Operational Ratios ---------- */}
         <Card className="rounded-xl">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 gap-4 flex-wrap">
