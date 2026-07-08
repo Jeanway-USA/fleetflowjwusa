@@ -544,3 +544,116 @@ export function useContactRevenueStats(contactId: string | null) {
     enabled: !!contactId,
   });
 }
+
+// --- Agent lane-match / volume aggregation ---
+
+export interface AgentVolumeStats {
+  loadCount: number;
+  adjustedGrossRevenue: number;
+  recentLoadCount60d: number;
+  topLane: string | null;
+}
+
+export interface AgentLane {
+  origin: string;
+  destination: string;
+  count: number;
+  lastDeliveredAt: string | null;
+  totalRevenue: number;
+}
+
+const COMPLETED_STATUSES = ['delivered', 'invoiced', 'paid'];
+
+function loadRevenue(l: { net_revenue?: number | null; gross_revenue?: number | null; rate?: number | null }) {
+  return Number(l.net_revenue ?? l.gross_revenue ?? l.rate ?? 0) || 0;
+}
+
+export function useAgentVolumeStats() {
+  return useQuery({
+    queryKey: ['agent-volume-stats'],
+    queryFn: async (): Promise<Record<string, AgentVolumeStats>> => {
+      const { data, error } = await supabase
+        .from('fleet_loads')
+        .select('agency_code, net_revenue, gross_revenue, rate, origin, destination, delivery_date, status')
+        .in('status', COMPLETED_STATUSES)
+        .not('agency_code', 'is', null);
+      if (error) throw error;
+
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 60);
+      const cutoffIso = cutoff.toISOString().slice(0, 10);
+
+      const map: Record<string, AgentVolumeStats & { _lanes: Record<string, number> }> = {};
+      for (const l of (data || []) as any[]) {
+        const code = (l.agency_code || '').trim();
+        if (!code) continue;
+        if (!map[code]) {
+          map[code] = { loadCount: 0, adjustedGrossRevenue: 0, recentLoadCount60d: 0, topLane: null, _lanes: {} };
+        }
+        const bucket = map[code];
+        bucket.loadCount += 1;
+        bucket.adjustedGrossRevenue += loadRevenue(l);
+        if (l.delivery_date && l.delivery_date >= cutoffIso) bucket.recentLoadCount60d += 1;
+        const origin = (l.origin || '').trim();
+        const destination = (l.destination || '').trim();
+        if (origin && destination) {
+          const key = `${origin} → ${destination}`;
+          bucket._lanes[key] = (bucket._lanes[key] || 0) + 1;
+        }
+      }
+
+      const out: Record<string, AgentVolumeStats> = {};
+      for (const [code, v] of Object.entries(map)) {
+        let topLane: string | null = null;
+        let topCount = 0;
+        for (const [lane, count] of Object.entries(v._lanes)) {
+          if (count > topCount) { topLane = lane; topCount = count; }
+        }
+        out[code] = {
+          loadCount: v.loadCount,
+          adjustedGrossRevenue: v.adjustedGrossRevenue,
+          recentLoadCount60d: v.recentLoadCount60d,
+          topLane,
+        };
+      }
+      return out;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useAgentLanes(agencyCode: string | null) {
+  return useQuery({
+    queryKey: ['agent-lanes', agencyCode],
+    queryFn: async (): Promise<AgentLane[]> => {
+      if (!agencyCode) return [];
+      const { data, error } = await supabase
+        .from('fleet_loads')
+        .select('origin, destination, delivery_date, net_revenue, gross_revenue, rate, status')
+        .eq('agency_code', agencyCode)
+        .in('status', COMPLETED_STATUSES);
+      if (error) throw error;
+
+      const map: Record<string, AgentLane> = {};
+      for (const l of (data || []) as any[]) {
+        const origin = (l.origin || '').trim();
+        const destination = (l.destination || '').trim();
+        if (!origin || !destination) continue;
+        const key = `${origin}||${destination}`;
+        if (!map[key]) {
+          map[key] = { origin, destination, count: 0, lastDeliveredAt: null, totalRevenue: 0 };
+        }
+        const bucket = map[key];
+        bucket.count += 1;
+        bucket.totalRevenue += loadRevenue(l);
+        if (l.delivery_date && (!bucket.lastDeliveredAt || l.delivery_date > bucket.lastDeliveredAt)) {
+          bucket.lastDeliveredAt = l.delivery_date;
+        }
+      }
+      return Object.values(map).sort((a, b) => b.count - a.count).slice(0, 25);
+    },
+    enabled: !!agencyCode,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
