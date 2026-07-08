@@ -243,8 +243,9 @@ export default function DriverOnboarding() {
     const results: SignedResult[] = [];
 
     for (const tmpl of templates) {
-      // In revision mode, skip templates already approved by the admin.
-      if (revisionMode && docRevisions[tmpl.document_type]?.status === 'approved') {
+      // Skip templates already submitted (revision_requested still needs resubmit).
+      const existingStatus = docRevisions[tmpl.document_type]?.status;
+      if (existingStatus === 'approved' || existingStatus === 'pending') {
         continue;
       }
       const tState: TemplateState =
@@ -253,7 +254,7 @@ export default function DriverOnboarding() {
 
       const title =
         tmpl.name ??
-        DOCUMENT_LABELS[tmpl.document_type as DocumentTypeKey] ??
+        DOCUMENT_LABELS[tmpl.document_type] ??
         tmpl.document_type;
 
       const blob = generateSignedPdf({
