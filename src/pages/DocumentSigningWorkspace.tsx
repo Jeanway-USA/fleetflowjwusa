@@ -18,7 +18,7 @@ import { composeCompletedPdf } from '@/lib/documents/composeCompletedPdf';
 
 export default function DocumentSigningWorkspace() {
   const { instanceId } = useParams<{ instanceId: string }>();
-  const navigate = useNavigate();
+  // Auto-navigation after signing removed so the completed PDF can render.
   const { user, orgId, roles } = useAuth();
   const queryClient = useQueryClient();
 
