@@ -129,6 +129,15 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
   return map;
 }
 
+const CONSENT_KEY_RE = /^[a-z][a-z0-9_]*$/;
+const TOKEN_RE = /\{\{\s*([a-zA-Z0-9_:]+)\s*\}\}/g;
+
+function renderConsent(value: string | undefined): string {
+  const v = (value ?? '').toLowerCase();
+  if (v === 'yes') return '[X] Yes  [ ] No';
+  if (v === 'no') return '[ ] Yes  [X] No';
+  return '[ ] Yes  [ ] No';
+}
 
 /**
  * Replace {{token}} occurrences in the source with values from the map.
@@ -137,7 +146,13 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
 export function hydrateTokens(source: string, ctx: HydrationContext): string {
   if (!source) return '';
   const map = buildTokenMap(ctx);
-  return source.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (full, token: string) => {
+  const meta = (ctx.instance?.metadata ?? {}) as Record<string, string | undefined>;
+  return source.replace(TOKEN_RE, (full, token: string) => {
+    if (token.startsWith('consent:')) {
+      const key = token.slice('consent:'.length);
+      if (!CONSENT_KEY_RE.test(key)) return full;
+      return renderConsent(meta[`consent_${key}`] as string | undefined);
+    }
     return Object.prototype.hasOwnProperty.call(map, token) ? map[token] : full;
   });
 }
@@ -150,10 +165,11 @@ export function extractUnresolvedTokens(source: string, ctx: HydrationContext): 
   if (!source) return [];
   const map = buildTokenMap(ctx);
   const seen = new Set<string>();
-  const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
   let m: RegExpExecArray | null;
+  const re = new RegExp(TOKEN_RE.source, 'g');
   while ((m = re.exec(source)) !== null) {
     const t = m[1];
+    if (t.includes(':')) continue; // consent tokens handled separately
     if (!Object.prototype.hasOwnProperty.call(map, t) || !map[t]) seen.add(t);
   }
   // Signature tokens are handled by the signature pad; printed name / title /
@@ -170,3 +186,25 @@ export function extractUnresolvedTokens(source: string, ctx: HydrationContext): 
   }
   return Array.from(seen);
 }
+
+/**
+ * List unique consent keys referenced by `{{consent:<key>}}` in source order.
+ */
+export function extractConsentKeys(source: string): string[] {
+  if (!source) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const re = new RegExp(TOKEN_RE.source, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source)) !== null) {
+    const t = m[1];
+    if (!t.startsWith('consent:')) continue;
+    const key = t.slice('consent:'.length);
+    if (!CONSENT_KEY_RE.test(key)) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
