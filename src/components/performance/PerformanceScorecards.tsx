@@ -137,18 +137,46 @@ export function PerformanceScorecards({ metrics, selectedDriver }: PerformanceSc
         return (
           <Card key={metric.driver.id} className="card-elevated">
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between gap-2">
                 <CardTitle className="text-lg">{metric.driver.first_name} {metric.driver.last_name}</CardTitle>
-                {globalIndex < 3 && (
-                  <Trophy className={`h-5 w-5 ${
-                    globalIndex === 0 ? 'text-yellow-500' :
-                    globalIndex === 1 ? 'text-gray-400' :
-                    'text-amber-600'
-                  }`} />
+                <div className="flex items-center gap-2">
+                  <BonusRing weeks={metric.bonusWeeks} />
+                  {globalIndex < 3 && (
+                    <Trophy className={`h-5 w-5 ${
+                      globalIndex === 0 ? 'text-yellow-500' :
+                      globalIndex === 1 ? 'text-gray-400' :
+                      'text-amber-600'
+                    }`} />
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className={badge.color}>{badge.label}</Badge>
+                {metric.bonusWeeks >= 4 && (
+                  <Badge className="bg-success/10 text-success border-success/20 hover:bg-success/10 gap-1">
+                    <ShieldCheck className="h-3 w-3" />
+                    Bonus Earned
+                  </Badge>
+                )}
+                {metric.retentionFlag && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500/10 cursor-help">
+                          Retention Review Required
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[240px]">
+                        <p className="text-xs">
+                          Monthly mileage is {metric.retentionDropPct.toFixed(0)}% below the 6-month baseline. Audit routing and coordinate with agents.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
               </div>
-              <Badge className={badge.color}>{badge.label}</Badge>
             </CardHeader>
+
             <CardContent className="space-y-4">
               <div className="text-center">
                 <div className={`text-4xl font-bold ${getScoreColor(metric.overallScore)}`}>
