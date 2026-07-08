@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
