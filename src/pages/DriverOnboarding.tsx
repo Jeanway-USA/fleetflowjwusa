@@ -127,7 +127,7 @@ export default function DriverOnboarding() {
 
 
   const { data: templates = [], isLoading } = useQuery({
-    queryKey: ['driver_onboarding_templates', orgId],
+    queryKey: ['driver_onboarding_templates', orgId, employmentType],
     enabled: !!orgId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -135,13 +135,23 @@ export default function DriverOnboarding() {
         .select('*')
         .eq('org_id', orgId!)
         .eq('is_active', true)
-        .in('document_type', DOCUMENT_ORDER as unknown as string[]);
+        .order('document_type', { ascending: true });
       if (error) throw error;
-      return [...(data ?? [])].sort(
-        (a, b) =>
-          DOCUMENT_ORDER.indexOf(a.document_type as DocumentTypeKey) -
-          DOCUMENT_ORDER.indexOf(b.document_type as DocumentTypeKey),
-      );
+      const rows = (data ?? []) as Array<{
+        id: string;
+        document_type: string;
+        name: string | null;
+        content: string;
+        applies_to?: string | null;
+      }>;
+      // Filter by audience relative to the driver's employment type.
+      return rows.filter((r) => {
+        const audience = (r.applies_to ?? 'shared') as TemplateAudience;
+        if (audience === 'shared') return true;
+        if (audience === 'w2') return employmentType === 'W-2';
+        if (audience === '1099') return employmentType === '1099';
+        return true;
+      });
     },
   });
 
