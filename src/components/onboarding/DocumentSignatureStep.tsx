@@ -345,11 +345,21 @@ export function DocumentSignatureStep({
           />
           <div className="space-y-4">
             {w2Templates.map(renderTemplate)}
-            <W2Documents
-              value={w2Docs}
-              onChange={onW2DocsChange}
-              onValidityChange={setW2Valid}
-            />
+            {skipW2Structured ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>W-4, I-9 and Direct Deposit already on file</AlertTitle>
+                <AlertDescription>
+                  You've already completed these forms. No need to fill them out again.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <W2Documents
+                value={w2Docs}
+                onChange={onW2DocsChange}
+                onValidityChange={setW2Valid}
+              />
+            )}
           </div>
         </section>
       ) : (
@@ -361,11 +371,21 @@ export function DocumentSignatureStep({
           />
           <div className="space-y-4">
             {contractorTemplates.map(renderTemplate)}
-            <ContractorDocuments
-              value={contractorDocs}
-              onChange={onContractorDocsChange}
-              onValidityChange={setContractorValid}
-            />
+            {skip1099Structured ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>W-9 and Owner-Operator Agreement already on file</AlertTitle>
+                <AlertDescription>
+                  You've already completed these forms. No need to fill them out again.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <ContractorDocuments
+                value={contractorDocs}
+                onChange={onContractorDocsChange}
+                onValidityChange={setContractorValid}
+              />
+            )}
           </div>
         </section>
       )}
