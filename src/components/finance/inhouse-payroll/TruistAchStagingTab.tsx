@@ -186,8 +186,8 @@ export function TruistAchStagingTab() {
                     </TableCell>
                     <TableCell>
                       {locked
-                        ? <Badge className="gap-1"><Lock className="h-3 w-3" /> Finalized</Badge>
-                        : <Badge variant="secondary">Draft</Badge>}
+                        ? <Badge className="gap-1 bg-emerald-600 hover:bg-emerald-700"><Lock className="h-3 w-3" /> Settled</Badge>
+                        : <Badge className="bg-amber-500 hover:bg-amber-600">Pending Bank Release</Badge>}
                     </TableCell>
                     <TableCell className="text-right">
                       {!locked && (
@@ -196,7 +196,7 @@ export function TruistAchStagingTab() {
                           onClick={() => finalize.mutate({ ledgerId: r.id, net })}
                           disabled={finalize.isPending || !(codes[r.id] ?? '').trim()}
                         >
-                          Finalize Settlement
+                          Submit Payout
                         </Button>
                       )}
                     </TableCell>
