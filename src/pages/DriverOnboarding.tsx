@@ -1019,9 +1019,18 @@ export default function DriverOnboarding() {
                 onW2DocsChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
                 contractorDocs={contractorDocs}
                 onContractorDocsChange={(patch) => setContractorDocs((prev) => ({ ...prev, ...patch }))}
+                skipW2Structured={skipW2Structured}
+                skip1099Structured={skip1099Structured}
               />
-            </div>
-          )}
+              {docsOnlyMode && pendingTemplates.length === 0 && (skipW2Structured || skip1099Structured || (structuredFormsPresent.w4 && structuredFormsPresent.i9 && structuredFormsPresent.w9 && structuredFormsPresent.ioo)) && (
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertTitle>You're all caught up</AlertTitle>
+                  <AlertDescription>
+                    Every required document has already been signed. You can return to your dashboard.
+                  </AlertDescription>
+                </Alert>
+              )}
 
         </CardContent>
       </Card>
