@@ -9,6 +9,7 @@ import {
   TrendingDown,
   PiggyBank,
   Route,
+  Target,
   Gauge,
 } from 'lucide-react';
 import {
