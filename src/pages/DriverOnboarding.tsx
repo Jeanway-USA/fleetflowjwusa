@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/compress-image';
 import { AlertCircle, CheckCircle2, Download, Briefcase, Building2 } from 'lucide-react';
@@ -77,6 +77,7 @@ interface SignedResult {
 
 export default function DriverOnboarding() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const revisionMode = searchParams.get('revision') === '1';
   const docsOnlyMode = searchParams.get('docs') === '1';
@@ -90,6 +91,7 @@ export default function DriverOnboarding() {
   const [contractorDocs, setContractorDocs] = useState<ContractorDocsState>(EMPTY_CONTRACTOR_DOCS_STATE);
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
+  const [completionPendingDashboard, setCompletionPendingDashboard] = useState(false);
   const credentialsRef = useRef<DriverCredentialsStepHandle>(null);
   const [credentialsValid, setCredentialsValid] = useState(false);
   const [documentsValid, setDocumentsValid] = useState(false);
@@ -288,7 +290,7 @@ export default function DriverOnboarding() {
     const driverName = `${driverRow.first_name ?? ''} ${driverRow.last_name ?? ''}`.trim() || 'Driver';
     const results: SignedResult[] = [];
 
-    for (const tmpl of templates) {
+    for (const tmpl of pendingTemplates) {
       // Skip templates already submitted (revision_requested still needs resubmit).
       const existingStatus = docRevisions[tmpl.document_type]?.status;
       if (existingStatus === 'approved' || existingStatus === 'pending') {
@@ -683,13 +685,20 @@ export default function DriverOnboarding() {
       );
     }
 
-    setSignedResults(results);
+    const profileCompleted = !revisionMode;
+    const shouldReturnToDashboard = docsOnlyMode || results.length === 0;
 
-    if (!revisionMode) {
+    if (shouldReturnToDashboard) {
+      setCompletionPendingDashboard(true);
+    } else {
+      setSignedResults(results);
+    }
+
+    if (profileCompleted) {
       // Mark onboarding complete on the user's profile so guards unlock the dashboard.
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ onboarding_completed: true })
+        .update({ onboarding_completed: true, requires_onboarding: false })
         .eq('user_id', user.id);
       if (profileError) {
         console.error('Failed to mark onboarding complete:', profileError);
@@ -698,7 +707,19 @@ export default function DriverOnboarding() {
       }
     }
 
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['onboarding-revisions-detail', driverRow.id] }),
+      queryClient.invalidateQueries({ queryKey: ['onboarding-revisions', driverRow.id] }),
+      queryClient.invalidateQueries({ queryKey: ['onboarding-outstanding', driverRow.id] }),
+      queryClient.invalidateQueries({ queryKey: ['driver_signed_documents', driverRow.id] }),
+      queryClient.invalidateQueries({ queryKey: ['driver-signed-doc-counts', orgId] }),
+    ]);
+
     toast.success(revisionMode ? 'Revisions resubmitted. Admin will be notified.' : 'Documents submitted successfully');
+
+    if (shouldReturnToDashboard) {
+      navigate('/driver-dashboard', { replace: true });
+    }
   };
 
 
@@ -1065,11 +1086,13 @@ export default function DriverOnboarding() {
           )}
         </div>
 
-        <Button onClick={handleContinue} disabled={!canContinue || submitting}>
+        <Button type="button" onClick={handleContinue} disabled={!canContinue || submitting || completionPendingDashboard}>
           {submitting
             ? isCredentialsStep
               ? 'Saving…'
               : 'Submitting…'
+            : completionPendingDashboard
+              ? 'Finishing…'
             : isEmploymentStep
               ? 'Next'
               : isCredentialsStep
