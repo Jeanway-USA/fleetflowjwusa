@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ChevronUp, ChevronDown, Minus, Fuel } from 'lucide-react';
-import { DriverMetric } from '@/hooks/useDriverPerformanceData';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ChevronUp, ChevronDown, Minus, Fuel, Trophy, Target } from 'lucide-react';
+import { DriverMetric, useDriverPerformanceData, PerformancePeriod } from '@/hooks/useDriverPerformanceData';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { Target } from 'lucide-react';
+
 
 interface PerformanceLeaderboardProps {
   metrics: DriverMetric[];
