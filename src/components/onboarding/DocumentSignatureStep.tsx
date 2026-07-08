@@ -229,6 +229,8 @@ export function DocumentSignatureStep({
   onW2DocsChange,
   contractorDocs,
   onContractorDocsChange,
+  skipW2Structured = false,
+  skip1099Structured = false,
 }: DocumentSignatureStepProps) {
   const [w2Valid, setW2Valid] = useState(false);
   const [contractorValid, setContractorValid] = useState(false);
