@@ -262,11 +262,8 @@ const App = () => {
                         <Settings />
                       </ProtectedRoute>
                     } />
-                    <Route path="/settings/payroll-setup" element={
-                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin']}>
-                        <PayrollSetup />
-                      </ProtectedRoute>
-                    } />
+                    <Route path="/settings/payroll-setup" element={<Navigate to="/finance?tab=inhouse-payroll" replace />} />
+                    <Route path="/finance/inhouse-payroll" element={<Navigate to="/finance?tab=inhouse-payroll" replace />} />
                     <Route path="/admin/document-templates" element={
                       <ProtectedRoute allowedRoles={['owner']}>
                         <DocumentTemplates />
