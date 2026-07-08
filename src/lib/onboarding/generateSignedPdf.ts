@@ -504,6 +504,24 @@ export function generateSignedPdf({
           }
           break;
         }
+        case 'driver_printed_name':
+          buffer += driverName || '________________________';
+          break;
+        case 'driver_title':
+          buffer += '[Title Pending]';
+          break;
+        case 'driver_date_signed':
+          buffer += todayFormatted;
+          break;
+        case 'owner_printed_name':
+          buffer += '[Owner Printed Name Pending]';
+          break;
+        case 'owner_title':
+          buffer += '[Owner Title Pending]';
+          break;
+        case 'owner_date_signed':
+          buffer += '[Owner Date Pending]';
+          break;
       }
     }
     flush();
