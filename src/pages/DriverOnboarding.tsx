@@ -963,20 +963,33 @@ export default function DriverOnboarding() {
               onValidityChange={setCredentialsValid}
             />
           ) : (
-            <DocumentSignatureStep
-              employmentType={employmentType}
-              templates={templates as never}
-              state={state}
-              onUpdateTemplateState={updateTemplateState}
-              driverRow={driverRow}
-              docRevisions={docRevisions}
-              revisionMode={revisionMode}
-              onValidityChange={setDocumentsValid}
-              w2Docs={w2Docs}
-              onW2DocsChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
-              contractorDocs={contractorDocs}
-              onContractorDocsChange={(patch) => setContractorDocs((prev) => ({ ...prev, ...patch }))}
-            />
+            <div className="space-y-4">
+              {awaitingReviewTemplates.length > 0 && (
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertTitle>Already submitted — waiting on review</AlertTitle>
+                  <AlertDescription>
+                    {awaitingReviewTemplates
+                      .map((t) => t.name ?? DOCUMENT_LABELS[t.document_type] ?? t.document_type)
+                      .join(', ')}
+                  </AlertDescription>
+                </Alert>
+              )}
+              <DocumentSignatureStep
+                employmentType={employmentType}
+                templates={pendingTemplates as never}
+                state={state}
+                onUpdateTemplateState={updateTemplateState}
+                driverRow={driverRow}
+                docRevisions={docRevisions}
+                revisionMode={revisionMode}
+                onValidityChange={setDocumentsValid}
+                w2Docs={w2Docs}
+                onW2DocsChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
+                contractorDocs={contractorDocs}
+                onContractorDocsChange={(patch) => setContractorDocs((prev) => ({ ...prev, ...patch }))}
+              />
+            </div>
           )}
 
         </CardContent>
