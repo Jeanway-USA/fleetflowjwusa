@@ -14,7 +14,7 @@ interface Deadline {
 
 function buildDeadlines(today: Date): Deadline[] {
   const y = today.getFullYear();
-  const raw: Omit<Deadline, 'dueDate'> & { dueDate: Date }[] = [];
+  const _raw: Deadline[] = [];
 
   // Federal 941 quarterly (W-2 payroll taxes)
   const q941 = [
