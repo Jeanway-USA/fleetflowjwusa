@@ -39,6 +39,8 @@ const FORMATTING_EXAMPLES: Array<{ syntax: string; preview: ReactNode; label: st
   { label: "Block quote", syntax: "> Notice text", preview: <blockquote className="text-sm border-l-2 border-primary pl-3 italic text-muted-foreground">Notice text</blockquote> },
 ];
 
+type TemplateAudience = 'shared' | 'w2' | '1099';
+
 interface DocumentTemplate {
   id: string;
   org_id: string;
@@ -46,10 +48,17 @@ interface DocumentTemplate {
   name: string | null;
   content: string;
   is_active: boolean;
+  applies_to: TemplateAudience;
   version: number;
   created_at: string;
   updated_at: string;
 }
+
+const AUDIENCE_LABELS: Record<TemplateAudience, string> = {
+  shared: 'All drivers',
+  w2: 'W-2 only',
+  '1099': '1099 only',
+};
 
 const VARIABLES: Array<{ token: string; description: string }> = [
   {
