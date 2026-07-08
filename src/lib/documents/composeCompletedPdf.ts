@@ -1,7 +1,14 @@
 import { jsPDF } from 'jspdf';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+
+// pdfjs — use legacy build and disable the worker so it runs inline in the browser
+// without requiring Vite to bundle a worker file.
+// @ts-expect-error - no bundled types for the legacy entry
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+
+const OWNER_PLACEHOLDER = '[Owner Signature Pending]';
 
 interface SignatureRow {
   id: string;
@@ -19,15 +26,11 @@ interface SignerInfo {
 }
 
 const roleLabel = (r: string) =>
-  r
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  r.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 /**
- * Renders a single-page PDF summarizing all captured signatures.
- * Used both as a countersignature page appended to a legacy PDF and
- * (when there is no template PDF to append to) as a stand-alone
- * signatures certificate.
+ * Stand-alone signatures certificate for native (non-legacy) instances that
+ * don't have a source PDF to overlay onto.
  */
 function renderSignaturesPage(args: {
   title: string;
@@ -78,7 +81,6 @@ function renderSignaturesPage(args: {
     y += 6;
     doc.setTextColor(0);
 
-    // Embed signature PNG when available.
     if (s.signature_data_url && s.signature_data_url.startsWith('data:image')) {
       try {
         doc.addImage(s.signature_data_url, 'PNG', marginX, y, 220, 70);
@@ -88,17 +90,10 @@ function renderSignaturesPage(args: {
         y += 30;
       }
     } else {
-      // Legacy placeholder — signature lives inside the original PDF.
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(9);
       doc.setTextColor(120);
-      doc.text(
-        s.signature_data_url?.startsWith('legacy:')
-          ? '(Original signature is preserved in the attached document.)'
-          : '(No signature captured.)',
-        marginX,
-        y + 14,
-      );
+      doc.text('(No signature captured.)', marginX, y + 14);
       doc.setTextColor(0);
       y += 24;
     }
@@ -109,14 +104,72 @@ function renderSignaturesPage(args: {
     y += 24;
   }
 
-  // Serialize
-  const blob = doc.output('arraybuffer');
-  return new Uint8Array(blob);
+  return new Uint8Array(doc.output('arraybuffer'));
+}
+
+interface PlaceholderHit {
+  pageIndex: number; // 0-based
+  x: number;
+  y: number; // baseline in PDF user-space (bottom-left origin)
+  width: number;
+  height: number;
+  pageWidth: number;
+  pageHeight: number;
 }
 
 /**
- * Build a "completed" PDF for a signed document instance and upload it
- * to storage. Idempotent-ish: caller should check `pdf_storage_path` first.
+ * Locate every occurrence of `[Owner Signature Pending]` in the PDF and
+ * return their positions in PDF user-space coordinates.
+ */
+async function findOwnerPlaceholders(pdfBytes: Uint8Array): Promise<PlaceholderHit[]> {
+  const loadingTask = pdfjsLib.getDocument({
+    data: pdfBytes,
+    disableWorker: true,
+    isEvalSupported: false,
+    useSystemFonts: true,
+  });
+  const pdf = await loadingTask.promise;
+  const hits: PlaceholderHit[] = [];
+
+  for (let p = 0; p < pdf.numPages; p += 1) {
+    const page = await pdf.getPage(p + 1);
+    const viewport = page.getViewport({ scale: 1 });
+    const content = await page.getTextContent({ includeMarkedContent: false });
+
+    for (const item of content.items as Array<{
+      str: string;
+      transform: number[];
+      width: number;
+      height: number;
+    }>) {
+      if (!item.str || !item.str.includes(OWNER_PLACEHOLDER)) continue;
+      const [a, , , d, e, f] = item.transform;
+      hits.push({
+        pageIndex: p,
+        x: e,
+        y: f,
+        width: item.width || Math.abs(a) * item.str.length * 0.5,
+        height: item.height || Math.abs(d) || 12,
+        pageWidth: viewport.width,
+        pageHeight: viewport.height,
+      });
+    }
+  }
+
+  return hits;
+}
+
+function dataUrlToPngBytes(dataUrl: string): Uint8Array | null {
+  const m = /^data:image\/png;base64,(.+)$/i.exec(dataUrl);
+  if (!m) return null;
+  const bin = atob(m[1]);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+/**
+ * Build a "completed" PDF for a signed document instance and upload it.
  */
 export async function composeCompletedPdf(instanceId: string): Promise<string | null> {
   const { data: inst, error: iErr } = await supabase
@@ -136,7 +189,6 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
     .order('step_index');
   if (sErr) throw sErr;
 
-  // Resolve signer display names via profiles.
   const signerIds = Array.from(new Set((sigs ?? []).map((s) => s.signer_id)));
   let signersById: Record<string, SignerInfo> = {};
   if (signerIds.length > 0) {
@@ -169,32 +221,76 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
   let finalBytes: Uint8Array;
 
   if (legacyPath) {
-    // Backfilled instance: keep the original driver-signed PDF and append
-    // a countersignature page for every non-driver signer.
+    // Backfilled: overlay the owner signature image directly onto the
+    // `[Owner Signature Pending]` text in the original driver-signed PDF.
     const { data: legacyBlob, error: dErr } = await supabase.storage
       .from('signed-documents')
       .download(legacyPath);
     if (dErr) throw dErr;
     const legacyBytes = new Uint8Array(await legacyBlob.arrayBuffer());
 
-    const countersigners = sigsWithName.filter((s) => s.step_index > 0);
-    const overlayBytes = renderSignaturesPage({
-      title: inst.title,
-      headline: 'Countersignatures',
-      signatures: countersigners,
-    });
+    const pdfDoc = await PDFDocument.load(legacyBytes);
 
-    const merged = await PDFDocument.create();
-    const original = await PDFDocument.load(legacyBytes);
-    const overlay = await PDFDocument.load(overlayBytes);
-    const originalPages = await merged.copyPages(original, original.getPageIndices());
-    for (const p of originalPages) merged.addPage(p);
-    const overlayPages = await merged.copyPages(overlay, overlay.getPageIndices());
-    for (const p of overlayPages) merged.addPage(p);
-    finalBytes = await merged.save();
+    const ownerSig = sigsWithName.find(
+      (s) => s.role_label === 'owner' && s.signature_data_url?.startsWith('data:image/png'),
+    );
+
+    if (ownerSig) {
+      const sigBytes = dataUrlToPngBytes(ownerSig.signature_data_url);
+      if (sigBytes) {
+        const pngImage = await pdfDoc.embedPng(sigBytes);
+        const hits = await findOwnerPlaceholders(legacyBytes);
+
+        const targets = hits.length > 0
+          ? hits
+          : (() => {
+              console.warn(
+                '[composeCompletedPdf] No [Owner Signature Pending] found; drawing owner signature at bottom margin.',
+              );
+              const lastPage = pdfDoc.getPage(pdfDoc.getPageCount() - 1);
+              const { width, height } = lastPage.getSize();
+              return [{
+                pageIndex: pdfDoc.getPageCount() - 1,
+                x: 54,
+                y: 60,
+                width: 220,
+                height: 12,
+                pageWidth: width,
+                pageHeight: height,
+              }];
+            })();
+
+        for (const hit of targets) {
+          const page = pdfDoc.getPage(hit.pageIndex);
+          const targetHeight = 28;
+          const aspect = pngImage.width / pngImage.height;
+          const maxWidth = page.getWidth() - hit.x - 36;
+          const targetWidth = Math.min(aspect * targetHeight, maxWidth);
+
+          // Cover the placeholder text with a white rectangle (add a little
+          // padding above/below so descenders/ascenders don't peek out).
+          page.drawRectangle({
+            x: hit.x - 1,
+            y: hit.y - 3,
+            width: hit.width + 2,
+            height: hit.height + 6,
+            color: rgb(1, 1, 1),
+          });
+
+          // Draw signature anchored to the placeholder baseline.
+          page.drawImage(pngImage, {
+            x: hit.x,
+            y: hit.y - 4,
+            width: targetWidth,
+            height: targetHeight,
+          });
+        }
+      }
+    }
+
+    finalBytes = await pdfDoc.save();
   } else {
-    // Native new-flow instance: no source PDF exists. Build a stand-alone
-    // signatures certificate that embeds every signer's captured image.
+    // Native new-flow instance: no source PDF exists.
     finalBytes = renderSignaturesPage({
       title: inst.title,
       headline: 'Signed Document',
@@ -202,7 +298,6 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
     });
   }
 
-  // Base64-encode without exceeding call-stack limits for larger PDFs.
   let binary = '';
   const chunkSize = 0x8000;
   for (let i = 0; i < finalBytes.length; i += chunkSize) {
@@ -218,4 +313,3 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
   if (error) throw error;
   return (data as { path?: string })?.path ?? null;
 }
-
