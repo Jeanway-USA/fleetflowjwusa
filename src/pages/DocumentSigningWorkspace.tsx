@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, FileText } from 'lucide-react';
 import { SignaturePad } from '@/components/driver/SignaturePad';
 import { hydrateTokens, extractUnresolvedTokens } from '@/lib/documents/hydrateTokens';
 
@@ -215,7 +215,39 @@ export default function DocumentSigningWorkspace() {
           <CardHeader>
             <CardTitle className="text-base">Document</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {(() => {
+              const meta = (instance.metadata ?? {}) as Record<string, string>;
+              const legacyPath = meta.legacy_file_path;
+              if (!legacyPath) return null;
+              return (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm">
+                    <p className="font-medium">Backfilled from a previously signed document</p>
+                    <p className="text-xs text-muted-foreground">
+                      The driver already signed this document. Review the original PDF, then countersign below.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      const { data: signed, error } = await supabase.storage
+                        .from('signed-documents')
+                        .createSignedUrl(legacyPath, 300);
+                      if (error || !signed?.signedUrl) {
+                        toast.error(error?.message ?? 'Could not open original document');
+                        return;
+                      }
+                      window.open(signed.signedUrl, '_blank', 'noopener,noreferrer');
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-1.5" />
+                    View driver's signed PDF
+                  </Button>
+                </div>
+              );
+            })()}
             <article className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap break-words">
               <ReactMarkdown>{rendered || '_This template has no content yet._'}</ReactMarkdown>
             </article>

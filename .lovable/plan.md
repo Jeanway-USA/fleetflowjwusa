@@ -1,72 +1,54 @@
-## Approach
 
-Extend the existing signing infrastructure rather than duplicate it. Reuse `document_templates` and `driver_signed_documents`, add signer-routing metadata, add a generic multi-signer store for non-driver signatures, and ship a sitewide `/documents/signing` dashboard that surfaces every user's Action Required / Pending / Completed items.
+## Goal
 
-## Database Migration
+Legacy driver-signed documents in `driver_signed_documents` never went through the new sequential signing engine, so nothing shows up in the owner's "Action Required" queue on `/documents/signing`. This plan backfills a `document_instances` row (at the owner step) for every eligible legacy signature, plus a `document_signatures` row recording the driver's original signature — so owners can now countersign historical documents in one place.
 
-1. Enum + columns on `document_templates`:
-   - Add `signatory_roles text[] not null default '{driver}'` — ordered array of role labels defining the signing sequence (e.g. `{'driver','manager','owner'}`).
-   - Add `required_fields jsonb not null default '[]'` — declared metadata fields templates ask for at signing time.
-   - Keep `applies_to` / `document_type` as-is (drivers still filter by employment type).
+## Eligibility
 
-2. New `public.document_instances`:
-   - `id, org_id, template_id, title, status document_status, metadata jsonb, pdf_storage_path text, assigned_to_user uuid, driver_id uuid null, current_step int, created_by, timestamps`.
-   - `document_status` enum: `draft | pending_signatures | completed | voided`.
-   - RLS: org-scoped select for staff; insert/update by owner + payroll_admin + creator; signer-of-current-step can update to advance.
+A legacy `driver_signed_documents` row is backfilled only when **all** of these are true:
 
-3. New `public.document_signatures`:
-   - `id, org_id, instance_id, signer_id, role_label text, step_index int, signature_data_url text, ip_address text, signed_at, created_at`.
-   - RLS: signer can insert their own row; org staff can select; immutable after insert (no update/delete except owner void).
-   - Unique `(instance_id, step_index)`.
+1. There is an **active** `document_templates` row in the same `org_id` matching `document_type`.
+2. That template's `signatory_roles` contains `owner` **after** `driver` (i.e., an owner countersignature step exists).
+3. No `document_instances` row already exists linking to this legacy signature (idempotent — safe to re-run).
 
-4. Grants: `authenticated` gets CRUD scoped by policy, `service_role` full. No `anon` access.
+Currently that matches these types: `w2_driver_agreement`, `company_safety_policy`, `equipment_use_agreement`, `1099_driver_agreement`. Types like `driver_agreement`, `direct_deposit`, `w4`, `i9` have no active owner-required template, so they are skipped.
 
-5. Backfill: existing `driver_signed_documents` rows stay as-is (single-signer legacy path). Adapter view/helpers unify listing for the dashboard.
+Existing `review_status` (`approved` / `pending`) on the legacy row is preserved and does not block backfill — admin approval is separate from the owner's signature step.
 
-6. Trigger `advance_document_instance()` on `document_signatures` insert: if `step_index + 1 == length(signatory_roles)` → mark instance `completed`; else bump `current_step`, insert `driver_notifications` (or generic `notifications` row) for the next role holder.
+## Implementation
 
-## Backend / Edge
+**1. One-time SQL backfill migration** (`supabase/migrations/…_backfill_owner_signing.sql`)
 
-- `render-document-instance` edge function: hydrates tokens (existing driver tokens + new `{{contractor_state}}`, `{{cdl_number}}`, `{{pay_type}}`, `{{signer_name}}`, `{{signer_role}}`, `{{current_date}}`, `{{company_*}}`), returns HTML for the workspace preview.
-- `finalize-document-instance` edge function: on final signature, composes the signed PDF (reuse `generateSignedPdf`), uploads to storage, writes `pdf_storage_path`.
+- Add a nullable `legacy_signed_document_id uuid` column + unique index on `document_instances` for idempotency and traceability.
+- Insert into `document_instances` for each eligible legacy row:
+  - `template_id` = matching active template
+  - `title` = template name
+  - `signatory_roles` = template's roles
+  - `current_step` = 1 (driver step already done, owner is next)
+  - `status` = `'pending_signatures'`
+  - `driver_id`, `org_id`, `created_by` = driver's `user_id` (fallback to legacy row's driver)
+  - `created_at` / `updated_at` = legacy `signed_at`
+  - `legacy_signed_document_id` = legacy row id
+- Insert into `document_signatures` a step-0 row for the driver's original signature:
+  - `instance_id` = new instance id
+  - `step_index` = 0
+  - `role_label` = `'driver'`
+  - `signer_id` = driver's `user_id`
+  - `signed_at` = legacy `signed_at`
+  - `signature_data_url` = `NULL` (legacy PDF holds the actual signature; store a marker like `'legacy:<file_path>'` in `metadata` or a note field so the workspace can link to the original PDF)
+- Skip inserting `driver_notifications` for the trigger (this is a manual backfill; the `advance_document_instance` trigger only fires on new signature inserts going forward, and we're not advancing — we're seeding at step 1).
 
-## Frontend
+**2. UI touch-up on the workspace page**
 
-1. **Template Builder upgrades** (`src/pages/admin/DocumentTemplates.tsx` + `DocumentTemplatesPanel.tsx`):
-   - Add "Signers" section: ordered list picker (Driver, Supervisor, Manager, Payroll Admin, Owner). Drag to reorder.
-   - Add "Required fields" repeater (label + token + type).
-   - Extend variable palette with the new tokens.
+- `DocumentSigningWorkspace` should, when an instance has a `legacy_signed_document_id`, show a "View driver's original signed PDF" button that opens the signed-documents storage file. No other logic changes; the owner then signs step 1 and the existing trigger completes the instance.
 
-2. **Sitewide Signing Dashboard** — new page `src/pages/DocumentsSigning.tsx` at `/documents/signing`:
-   - Three tabs: **Action Required** (instances where `signatory_roles[current_step]` matches the viewer's role and they haven't signed), **Pending Others** (waiting on someone else), **Completed**.
-   - DataTable with title, template, current signer, last action, status badge, Open button.
-   - Sidebar link visible to every authenticated role.
+## Verification
 
-3. **Signature Workspace** — new route `/documents/signing/:instanceId`:
-   - Split layout. Left: hydrated document body (read-only Markdown → HTML).
-   - Right: dynamic metadata inputs (from `required_fields` not yet filled) + existing `SignaturePad` + Submit.
-   - After submit → insert `document_signatures` row (trigger advances the instance), toast, redirect to dashboard.
+- Run a `SELECT count(*)` before/after to confirm the expected number of new instances (4 eligible legacy rows in current data: the three from driver `8b1b2d7e…` on 2026-07-08 plus the `w2_driver_agreement`).
+- Sign in as owner, open `/documents/signing`, confirm the four historical documents appear under **Action Required**.
+- Countersign one; confirm status flips to `completed`.
 
-4. **Onboarding consolidation** (`src/components/onboarding/DocumentSignatureStep.tsx`, `DriverOnboarding.tsx`):
-   - When a template has `signatory_roles = {'driver'}`, keep today's inline flow (writes to `driver_signed_documents`).
-   - When a template has additional signers, create a `document_instances` row on driver submit instead, so it routes to the next signer via the same engine.
-   - Outstanding-templates logic reads from both stores so drivers still see prompts either way.
+## Out of scope
 
-5. **Notifications**: reuse `driver_notifications` for driver-targeted steps; for non-driver steps use a lightweight org-wide notification row surfaced in the app header (link straight to `/documents/signing`).
-
-## Token Hydration
-
-Central helper `src/lib/documents/hydrateTokens.ts` used by both preview and PDF generation. Inputs: template body, driver row (optional), signer profile, org settings, instance metadata. Adds the new tokens listed above and centralizes the existing driver token set so onboarding + sitewide signing share one implementation.
-
-## Out of scope (call out for later)
-
-- Email delivery of signature requests (in-app notifications only for v1).
-- Bulk template send to multiple assignees at once.
-- Advanced conditional routing / parallel signers.
-
-## Technical notes
-
-- Reuse `SignaturePad`, `generateSignedPdf`, `useAuth`, `PageHeader`, `DataTable`.
-- No changes to `driver_signed_documents` schema — treat it as the legacy single-signer table; new multi-signer flow uses the new tables.
-- All new tables follow the standard CREATE → GRANT → RLS → POLICY order and include `service_role` grants for edge functions.
-- Update `src/App.tsx` routes and `AppSidebar.tsx` to expose `/documents/signing` for all authenticated roles and `/admin/templates` for owners (already exists).
+- Backfilling `driver_agreement` / `direct_deposit` / `w4` / `i9` — no active owner-signing template exists for those. If you want those routed for owner signature too, we'd first need to activate/create templates with `signatory_roles = {driver, owner}`.
+- Regenerating a combined PDF for legacy documents — the original driver-signed PDF stays as the source of truth; the owner's countersignature is captured in the new engine.
