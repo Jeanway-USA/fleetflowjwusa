@@ -206,6 +206,7 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
         name: current.name,
         content: current.content,
         is_active: current.is_active,
+        applies_to: current.applies_to ?? 'shared',
       });
     }
   }, [selectedId, templates]);
@@ -220,7 +221,8 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
           name: draft.name ?? null,
           content: draft.content ?? "",
           is_active: draft.is_active ?? true,
-        })
+          applies_to: draft.applies_to ?? 'shared',
+        } as never)
         .eq("id", draft.id);
       if (error) throw error;
     },
