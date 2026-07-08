@@ -808,6 +808,7 @@ export type Database = {
       }
       document_templates: {
         Row: {
+          applies_to: string
           content: string
           created_at: string
           created_by: string | null
@@ -820,6 +821,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          applies_to?: string
           content: string
           created_at?: string
           created_by?: string | null
@@ -832,6 +834,7 @@ export type Database = {
           version?: number
         }
         Update: {
+          applies_to?: string
           content?: string
           created_at?: string
           created_by?: string | null
