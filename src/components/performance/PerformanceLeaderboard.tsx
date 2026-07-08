@@ -123,20 +123,25 @@ export function PerformanceLeaderboard({ metrics, fleetAverages, selectedDriver 
 
   if (filteredMetrics.length === 0) {
     return (
-      <Card className="card-elevated">
-        <CardContent className="pt-6">
-          <EmptyState
-            icon={Target}
-            title="No performance data available"
-            description="No delivered loads, inspections, or incidents found for the selected period. Data will appear here once drivers complete deliveries."
-          />
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <FleetRevenueLeaderboardCard selectedDriver={selectedDriver} />
+        <Card className="card-elevated">
+          <CardContent className="pt-6">
+            <EmptyState
+              icon={Target}
+              title="No performance data available"
+              description="No delivered loads, inspections, or incidents found for the selected period. Data will appear here once drivers complete deliveries."
+            />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <Card className="card-elevated">
+    <div className="space-y-4">
+      <FleetRevenueLeaderboardCard selectedDriver={selectedDriver} />
+      <Card className="card-elevated">
       <CardHeader>
         <CardTitle>Driver Rankings</CardTitle>
         <CardDescription>Sorted by overall performance score</CardDescription>
