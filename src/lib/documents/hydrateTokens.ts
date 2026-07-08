@@ -117,8 +117,18 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
     }
   }
 
+  // Role-scoped signer blocks. Fall back to blank so extractUnresolvedTokens
+  // knows to prompt for them if not already captured.
+  for (const role of ['driver', 'owner']) {
+    if (!(`${role}_printed_name` in map)) map[`${role}_printed_name`] =
+      role === 'driver' ? driverName : '';
+    if (!(`${role}_title` in map)) map[`${role}_title`] = '';
+    if (!(`${role}_date_signed` in map)) map[`${role}_date_signed`] = '';
+  }
+
   return map;
 }
+
 
 /**
  * Replace {{token}} occurrences in the source with values from the map.
