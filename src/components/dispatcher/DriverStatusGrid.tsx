@@ -173,8 +173,9 @@ export function DriverStatusGrid() {
     );
   }
 
-  const availableDrivers = drivers?.filter(d => !d.activeLoad) || [];
-  const onLoadDrivers = drivers?.filter(d => d.activeLoad) || [];
+  const onHometimeDrivers = drivers?.filter(d => d.activeHometime) || [];
+  const onLoadDrivers = drivers?.filter(d => d.activeLoad && !d.activeHometime) || [];
+  const availableDrivers = drivers?.filter(d => !d.activeLoad && !d.activeHometime) || [];
 
   return (
     <Card className="card-elevated h-full">
@@ -187,6 +188,7 @@ export function DriverStatusGrid() {
             </CardTitle>
             <CardDescription>
               {availableDrivers.length} available • {onLoadDrivers.length} on load
+              {onHometimeDrivers.length > 0 && <> • {onHometimeDrivers.length} on hometime</>}
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={() => navigate('/drivers')}>
@@ -226,20 +228,45 @@ export function DriverStatusGrid() {
                         </div>
                       )}
                     </div>
-                    <Badge 
-                      variant="outline" 
-                      className={driver.activeLoad 
-                        ? 'bg-blue-500/10 text-blue-500 border-blue-500/20 shrink-0' 
-                        : 'bg-green-500/10 text-green-500 border-green-500/20 shrink-0'
-                      }
-                    >
-                      {driver.activeLoad ? (
-                        <><Package className="h-3 w-3 mr-1" /> On Load</>
-                      ) : (
-                        <><CheckCircle className="h-3 w-3 mr-1" /> Available</>
-                      )}
-                    </Badge>
+                    {driver.activeHometime ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge
+                            variant="outline"
+                            className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 shrink-0"
+                          >
+                            <Home className="h-3 w-3 mr-1" /> On Hometime
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Hometime {format(parseISO(`${driver.activeHometime.start_date}T00:00:00`), 'MMM d')}–
+                          {format(parseISO(`${driver.activeHometime.end_date}T00:00:00`), 'MMM d')}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className={driver.activeLoad
+                          ? 'bg-blue-500/10 text-blue-500 border-blue-500/20 shrink-0'
+                          : 'bg-green-500/10 text-green-500 border-green-500/20 shrink-0'
+                        }
+                      >
+                        {driver.activeLoad ? (
+                          <><Package className="h-3 w-3 mr-1" /> On Load</>
+                        ) : (
+                          <><CheckCircle className="h-3 w-3 mr-1" /> Available</>
+                        )}
+                      </Badge>
+                    )}
                   </div>
+
+                  {driver.upcomingHometime && !driver.activeHometime && (
+                    <div className="flex items-center gap-1 mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                      <Home className="h-3 w-3" />
+                      Hometime {format(parseISO(`${driver.upcomingHometime.start_date}T00:00:00`), 'MMM d')}–
+                      {format(parseISO(`${driver.upcomingHometime.end_date}T00:00:00`), 'MMM d')}
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-2 mt-2">
                     {hos.isStale ? (
