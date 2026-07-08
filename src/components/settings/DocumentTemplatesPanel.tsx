@@ -459,6 +459,13 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                         </Select>
                       </div>
 
+                      <SignerSequenceEditor
+                        value={draft.signatory_roles ?? ['driver']}
+                        onChange={(next) => setDraft((d) => ({ ...d, signatory_roles: next }))}
+                      />
+
+
+
                       <div className="space-y-2">
                         <Label htmlFor="doc-content">Content</Label>
                         <Textarea
