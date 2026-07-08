@@ -9,7 +9,6 @@ import {
   TrendingDown,
   PiggyBank,
   Route,
-  Target,
   Gauge,
 } from 'lucide-react';
 import {
@@ -22,11 +21,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  RadialBarChart,
-  RadialBar,
-  PolarAngleAxis,
 } from 'recharts';
-import { FIXED_OVERHEAD_MATRIX } from '@/config/fixedOverhead';
 import { formatCurrency } from '@/lib/formatters';
 import { useOperationalCPM } from '@/hooks/useOperationalCPM';
 import { usePLTrend, type PeriodRollup } from '@/hooks/usePLTrend';
