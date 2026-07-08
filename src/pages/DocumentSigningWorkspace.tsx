@@ -379,6 +379,42 @@ export default function DocumentSigningWorkspace() {
                   </div>
                 )}
 
+                <div className="space-y-3">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Signer details
+                  </Label>
+                  <div className="space-y-1">
+                    <Label htmlFor="signer-printed-name" className="text-xs">Printed name</Label>
+                    <Input
+                      id="signer-printed-name"
+                      className="h-11 pl-4 sm:pl-3"
+                      value={printedName}
+                      onChange={(e) => setPrintedName(e.target.value)}
+                      placeholder="Full legal name"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="signer-title" className="text-xs">Title</Label>
+                    <Input
+                      id="signer-title"
+                      className="h-11 pl-4 sm:pl-3"
+                      value={signerTitle}
+                      onChange={(e) => setSignerTitle(e.target.value)}
+                      placeholder="e.g. Founder & Managing Member"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="signer-date" className="text-xs">Date signed</Label>
+                    <Input
+                      id="signer-date"
+                      type="date"
+                      className="h-11 pl-4 sm:pl-3"
+                      value={dateSigned}
+                      onChange={(e) => setDateSigned(e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 <SignaturePad onSignatureCapture={setSignatureDataUrl} />
 
                 {signatureDataUrl && (
