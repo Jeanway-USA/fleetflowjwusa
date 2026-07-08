@@ -218,6 +218,8 @@ export function PerformanceLeaderboard({ metrics, fleetAverages, selectedDriver 
           </Table>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
+
