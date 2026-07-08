@@ -126,7 +126,6 @@ interface PlaceholderHit {
 async function findOwnerPlaceholders(pdfBytes: Uint8Array): Promise<PlaceholderHit[]> {
   const loadingTask = pdfjsLib.getDocument({
     data: pdfBytes,
-    disableWorker: true,
     isEvalSupported: false,
     useSystemFonts: true,
   });
