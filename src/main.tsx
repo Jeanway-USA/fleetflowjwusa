@@ -14,7 +14,7 @@ import "@fontsource/inter/600.css";
 import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/700.css";
-import "@gusto/embedded-react-sdk/style.css";
+
 
 // --- Pre-init: purge obviously-dead Supabase auth storage ---------------
 // Supabase JS auto-calls _recoverAndRefresh() on init. If a stale/expired
