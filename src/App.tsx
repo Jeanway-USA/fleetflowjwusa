@@ -61,6 +61,7 @@ const DriverOnboarding = lazy(() => import("./pages/DriverOnboarding"));
 const SettlementPrint = lazy(() => import("./pages/SettlementPrint"));
 const AuditTrail = lazy(() => import("./pages/AuditTrail"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
+const PublicLoadTracker = lazy(() => import("./pages/PublicLoadTracker"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -106,7 +107,7 @@ const App = () => {
                     <Route path="/pending-access" element={<PendingAccess />} />
                     <Route path="/landing" element={<Navigate to="/auth" replace />} />
                     <Route path="/pricing" element={<Navigate to="/auth" replace />} />
-                    <Route path="/track" element={<Navigate to="/auth" replace />} />
+                    <Route path="/track" element={<PublicLoadTracker />} />
                     <Route path="/about" element={<Navigate to="/auth" replace />} />
                     <Route path="/contact" element={<Navigate to="/auth" replace />} />
                     <Route path="/onboarding" element={<Onboarding />} />
