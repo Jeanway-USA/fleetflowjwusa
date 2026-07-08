@@ -410,6 +410,36 @@ export default function DocumentSigningWorkspace() {
                   </div>
                 )}
 
+                {consentKeys.length > 0 && (
+                  <div className="space-y-3">
+                    <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Consents (required)
+                    </Label>
+                    {consentKeys.map((key) => (
+                      <div key={key} className="rounded-md border p-3 space-y-2">
+                        <p className="text-sm font-medium capitalize">{key.replace(/_/g, ' ')}</p>
+                        <RadioGroup
+                          value={consentValues[key] ?? ''}
+                          onValueChange={(v) =>
+                            setConsentValues((prev) => ({ ...prev, [key]: v as 'yes' | 'no' }))
+                          }
+                          className="flex gap-6"
+                        >
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <RadioGroupItem value="yes" id={`consent-${key}-yes`} />
+                            <span>Yes</span>
+                          </label>
+                          <label className="flex items-center gap-2 text-sm cursor-pointer">
+                            <RadioGroupItem value="no" id={`consent-${key}-no`} />
+                            <span>No</span>
+                          </label>
+                        </RadioGroup>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+
                 <div className="space-y-3">
                   <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Signer details
