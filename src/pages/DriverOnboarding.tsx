@@ -1031,6 +1031,8 @@ export default function DriverOnboarding() {
                   </AlertDescription>
                 </Alert>
               )}
+            </div>
+          )}
 
         </CardContent>
       </Card>
