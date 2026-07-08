@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowLeft, CheckCircle2, FileText, Download } from 'lucide-react';
 import { SignaturePad } from '@/components/driver/SignaturePad';
-import { hydrateTokens, extractUnresolvedTokens } from '@/lib/documents/hydrateTokens';
+import { hydrateTokens, extractUnresolvedTokens, extractConsentKeys } from '@/lib/documents/hydrateTokens';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { composeCompletedPdf } from '@/lib/documents/composeCompletedPdf';
 
 export default function DocumentSigningWorkspace() {
