@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { CalendarClock, AlertTriangle, CheckCircle2, Lock } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { CalendarClock, AlertTriangle, CheckCircle2, Lock, Ban, ChevronDown } from 'lucide-react';
 import { format, differenceInCalendarDays, parseISO } from 'date-fns';
 import { MarkFiledDialog } from './MarkFiledDialog';
+import { VoidExemptDialog } from './VoidExemptDialog';
 
 interface Deadline {
   form: string;
