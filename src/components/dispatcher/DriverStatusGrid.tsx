@@ -5,9 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Users, Phone, AlertTriangle, Package, CheckCircle, Clock } from 'lucide-react';
+import { Users, Phone, AlertTriangle, Package, CheckCircle, Clock, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { addDays, isBefore, formatDistanceToNow } from 'date-fns';
+import { addDays, isBefore, formatDistanceToNow, format, parseISO, startOfDay } from 'date-fns';
 
 interface Driver {
   id: string;
@@ -22,9 +22,18 @@ interface Driver {
   hos_last_updated: string | null;
 }
 
+interface HometimeWindow {
+  driver_id: string;
+  start_date: string;
+  end_date: string;
+}
+
 interface DriverWithLoad extends Driver {
   activeLoad: boolean;
+  activeHometime: HometimeWindow | null;
+  upcomingHometime: HometimeWindow | null;
 }
+
 
 type HosTone = 'red' | 'yellow' | 'green' | 'muted';
 
@@ -78,14 +87,54 @@ export function DriverStatusGrid() {
       
       if (loadsError) throw loadsError;
 
+      // Approved hometime windows: active or upcoming within 14 days
+      const todayIso = format(new Date(), 'yyyy-MM-dd');
+      const horizonIso = format(addDays(new Date(), 14), 'yyyy-MM-dd');
+      const { data: hometimeRows } = await supabase
+        .from('driver_requests')
+        .select('driver_id, start_date, end_date')
+        .eq('request_type', 'home_time')
+        .eq('status', 'approved')
+        .not('start_date', 'is', null)
+        .not('end_date', 'is', null)
+        .gte('end_date', todayIso)
+        .lte('start_date', horizonIso);
+
+      const today = startOfDay(new Date());
+      const hometimeByDriver = new Map<string, HometimeWindow[]>();
+      for (const h of hometimeRows || []) {
+        if (!h.driver_id || !h.start_date || !h.end_date) continue;
+        const list = hometimeByDriver.get(h.driver_id) || [];
+        list.push(h as HometimeWindow);
+        hometimeByDriver.set(h.driver_id, list);
+      }
+
       const assignedDriverIds = new Set(activeLoads?.map(l => l.driver_id).filter(Boolean));
 
-      return driversData?.map(driver => ({
-        ...driver,
-        activeLoad: assignedDriverIds.has(driver.id),
-      })) as DriverWithLoad[];
+      return driversData?.map(driver => {
+        const windows = hometimeByDriver.get(driver.id) || [];
+        const active =
+          windows.find(w => {
+            const s = startOfDay(parseISO(`${w.start_date}T00:00:00`));
+            const e = startOfDay(parseISO(`${w.end_date}T00:00:00`));
+            return today >= s && today <= e;
+          }) || null;
+        const upcoming = active
+          ? null
+          : windows
+              .filter(w => startOfDay(parseISO(`${w.start_date}T00:00:00`)) > today)
+              .sort((a, b) => a.start_date.localeCompare(b.start_date))[0] || null;
+
+        return {
+          ...driver,
+          activeLoad: assignedDriverIds.has(driver.id),
+          activeHometime: active,
+          upcomingHometime: upcoming,
+        };
+      }) as DriverWithLoad[];
     },
   });
+
 
   const getExpiringCredentials = (driver: Driver) => {
     const warnings: string[] = [];
@@ -124,8 +173,9 @@ export function DriverStatusGrid() {
     );
   }
 
-  const availableDrivers = drivers?.filter(d => !d.activeLoad) || [];
-  const onLoadDrivers = drivers?.filter(d => d.activeLoad) || [];
+  const onHometimeDrivers = drivers?.filter(d => d.activeHometime) || [];
+  const onLoadDrivers = drivers?.filter(d => d.activeLoad && !d.activeHometime) || [];
+  const availableDrivers = drivers?.filter(d => !d.activeLoad && !d.activeHometime) || [];
 
   return (
     <Card className="card-elevated h-full">
@@ -138,6 +188,7 @@ export function DriverStatusGrid() {
             </CardTitle>
             <CardDescription>
               {availableDrivers.length} available • {onLoadDrivers.length} on load
+              {onHometimeDrivers.length > 0 && <> • {onHometimeDrivers.length} on hometime</>}
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={() => navigate('/drivers')}>
@@ -177,20 +228,45 @@ export function DriverStatusGrid() {
                         </div>
                       )}
                     </div>
-                    <Badge 
-                      variant="outline" 
-                      className={driver.activeLoad 
-                        ? 'bg-blue-500/10 text-blue-500 border-blue-500/20 shrink-0' 
-                        : 'bg-green-500/10 text-green-500 border-green-500/20 shrink-0'
-                      }
-                    >
-                      {driver.activeLoad ? (
-                        <><Package className="h-3 w-3 mr-1" /> On Load</>
-                      ) : (
-                        <><CheckCircle className="h-3 w-3 mr-1" /> Available</>
-                      )}
-                    </Badge>
+                    {driver.activeHometime ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge
+                            variant="outline"
+                            className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 shrink-0"
+                          >
+                            <Home className="h-3 w-3 mr-1" /> On Hometime
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Hometime {format(parseISO(`${driver.activeHometime.start_date}T00:00:00`), 'MMM d')}–
+                          {format(parseISO(`${driver.activeHometime.end_date}T00:00:00`), 'MMM d')}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className={driver.activeLoad
+                          ? 'bg-blue-500/10 text-blue-500 border-blue-500/20 shrink-0'
+                          : 'bg-green-500/10 text-green-500 border-green-500/20 shrink-0'
+                        }
+                      >
+                        {driver.activeLoad ? (
+                          <><Package className="h-3 w-3 mr-1" /> On Load</>
+                        ) : (
+                          <><CheckCircle className="h-3 w-3 mr-1" /> Available</>
+                        )}
+                      </Badge>
+                    )}
                   </div>
+
+                  {driver.upcomingHometime && !driver.activeHometime && (
+                    <div className="flex items-center gap-1 mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                      <Home className="h-3 w-3" />
+                      Hometime {format(parseISO(`${driver.upcomingHometime.start_date}T00:00:00`), 'MMM d')}–
+                      {format(parseISO(`${driver.upcomingHometime.end_date}T00:00:00`), 'MMM d')}
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-2 mt-2">
                     {hos.isStale ? (
