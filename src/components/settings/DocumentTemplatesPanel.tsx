@@ -95,6 +95,14 @@ const VARIABLES: Array<{ token: string; description: string }> = [
     description: "Auto-fills with the printed full name of the driver signing the document.",
   },
   {
+    token: "{{signer_name}}",
+    description: "Auto-fills with the name of whoever is signing this step (driver, manager, owner, etc.).",
+  },
+  {
+    token: "{{signer_role}}",
+    description: "Auto-fills with the role label of the current signer (e.g. owner, payroll_admin).",
+  },
+  {
     token: "{{cdl_number}}",
     description: "Renders an input field for the driver to fill in their CDL / license number.",
   },
