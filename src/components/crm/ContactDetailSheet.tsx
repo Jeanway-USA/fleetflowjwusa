@@ -67,11 +67,20 @@ function Field({ icon: Icon, label, value, href }: { icon?: any; label: string; 
 }
 
 export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOnly = false }: ContactDetailSheetProps) {
+  const { data: volumeStats = {} } = useAgentVolumeStats();
+  const agencyCode = contact?.agent_code?.trim() || null;
+  const { data: lanes = [], isLoading: lanesLoading } = useAgentLanes(
+    open && agencyCode ? agencyCode : null,
+  );
+
   if (!contact) return null;
 
   const subType = getSubTypeLabel(contact);
   const kind = classify(contact);
   const supportsTabs = kind === 'broker' || (kind === 'agent' && contact.source === 'crm');
+  const stats = agencyCode ? volumeStats[agencyCode] : null;
+  const showPriority = !!stats && stats.recentLoadCount60d > 5;
+  const showLanesTab = supportsTabs && !!agencyCode;
 
   const handleEditClick = () => {
     onOpenChange(false);
