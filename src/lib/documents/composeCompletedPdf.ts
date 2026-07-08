@@ -5,8 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 
 // pdfjs — use legacy build and disable the worker so it runs inline in the browser
 // without requiring Vite to bundle a worker file.
-// @ts-expect-error - no bundled types for the legacy entry
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+
+// Disable worker so pdfjs runs entirely in the main thread (no worker file to host).
+(pdfjsLib as unknown as { GlobalWorkerOptions: { workerSrc: string } }).GlobalWorkerOptions.workerSrc = '';
 
 const OWNER_PLACEHOLDER = '[Owner Signature Pending]';
 
