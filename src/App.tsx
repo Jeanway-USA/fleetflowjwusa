@@ -221,6 +221,16 @@ const App = () => {
                         <Documents />
                       </ProtectedRoute>
                     } />
+                    <Route path="/documents/signing" element={
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver', 'maintenance']}>
+                        <DocumentsSigning />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/documents/signing/:instanceId" element={
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver', 'maintenance']}>
+                        <DocumentSigningWorkspace />
+                      </ProtectedRoute>
+                    } />
 
                     {/* Safety */}
                     <Route path="/safety" element={
