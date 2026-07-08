@@ -41,6 +41,14 @@ const FORMATTING_EXAMPLES: Array<{ syntax: string; preview: ReactNode; label: st
 
 type TemplateAudience = 'shared' | 'w2' | '1099';
 
+const SIGNER_ROLE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'driver', label: 'Driver' },
+  { value: 'dispatcher', label: 'Dispatcher / Supervisor' },
+  { value: 'payroll_admin', label: 'Payroll Admin' },
+  { value: 'safety', label: 'Safety Manager' },
+  { value: 'owner', label: 'Owner / Executive' },
+];
+
 interface DocumentTemplate {
   id: string;
   org_id: string;
@@ -49,6 +57,7 @@ interface DocumentTemplate {
   content: string;
   is_active: boolean;
   applies_to: TemplateAudience;
+  signatory_roles: string[] | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -84,6 +93,14 @@ const VARIABLES: Array<{ token: string; description: string }> = [
   {
     token: "{{driver_name}}",
     description: "Auto-fills with the printed full name of the driver signing the document.",
+  },
+  {
+    token: "{{signer_name}}",
+    description: "Auto-fills with the name of whoever is signing this step (driver, manager, owner, etc.).",
+  },
+  {
+    token: "{{signer_role}}",
+    description: "Auto-fills with the role label of the current signer (e.g. owner, payroll_admin).",
   },
   {
     token: "{{cdl_number}}",
@@ -207,6 +224,7 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
         content: current.content,
         is_active: current.is_active,
         applies_to: current.applies_to ?? 'shared',
+        signatory_roles: current.signatory_roles && current.signatory_roles.length > 0 ? current.signatory_roles : ['driver'],
       });
     }
   }, [selectedId, templates]);
@@ -214,6 +232,9 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!draft.id) throw new Error("No template selected");
+      const signers = (draft.signatory_roles && draft.signatory_roles.length > 0)
+        ? draft.signatory_roles
+        : ['driver'];
       const { error } = await supabase
         .from("document_templates")
         .update({
@@ -222,6 +243,7 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
           content: draft.content ?? "",
           is_active: draft.is_active ?? true,
           applies_to: draft.applies_to ?? 'shared',
+          signatory_roles: signers,
         } as never)
         .eq("id", draft.id);
       if (error) throw error;
@@ -445,6 +467,13 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
                         </Select>
                       </div>
 
+                      <SignerSequenceEditor
+                        value={draft.signatory_roles ?? ['driver']}
+                        onChange={(next) => setDraft((d) => ({ ...d, signatory_roles: next }))}
+                      />
+
+
+
                       <div className="space-y-2">
                         <Label htmlFor="doc-content">Content</Label>
                         <Textarea
@@ -613,6 +642,65 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function SignerSequenceEditor({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const move = (idx: number, dir: -1 | 1) => {
+    const j = idx + dir;
+    if (j < 0 || j >= value.length) return;
+    const next = [...value];
+    [next[idx], next[j]] = [next[j], next[idx]];
+    onChange(next);
+  };
+  const remove = (idx: number) => {
+    const next = value.filter((_, i) => i !== idx);
+    onChange(next.length ? next : ['driver']);
+  };
+  const add = (role: string) => {
+    onChange([...value, role]);
+  };
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <Label className="text-sm font-medium">Signers (sequential order)</Label>
+      <p className="text-xs text-muted-foreground">
+        The document routes through these roles in order. Each step must be signed before it moves to the next.
+      </p>
+      <div className="space-y-2 pt-1">
+        {value.map((role, idx) => {
+          const cfg = SIGNER_ROLE_OPTIONS.find((o) => o.value === role);
+          return (
+            <div key={`${role}-${idx}`} className="flex items-center gap-2 rounded border bg-muted/30 p-2">
+              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-primary/10 text-xs font-semibold">
+                {idx + 1}
+              </span>
+              <span className="flex-1 text-sm">{cfg?.label ?? role}</span>
+              <Button type="button" size="sm" variant="ghost" onClick={() => move(idx, -1)} disabled={idx === 0}>↑</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => move(idx, 1)} disabled={idx === value.length - 1}>↓</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => remove(idx)}>✕</Button>
+            </div>
+          );
+        })}
+      </div>
+      <div className="pt-2">
+        <Select onValueChange={add}>
+          <SelectTrigger className="h-10">
+            <SelectValue placeholder="+ Add signer" />
+          </SelectTrigger>
+          <SelectContent>
+            {SIGNER_ROLE_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

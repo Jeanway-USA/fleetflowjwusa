@@ -806,6 +806,129 @@ export type Database = {
           },
         ]
       }
+      document_instances: {
+        Row: {
+          assigned_to_user: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          current_step: number
+          driver_id: string | null
+          id: string
+          metadata: Json
+          org_id: string
+          pdf_storage_path: string | null
+          signatory_roles: string[]
+          status: Database["public"]["Enums"]["document_status"]
+          template_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to_user?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_step?: number
+          driver_id?: string | null
+          id?: string
+          metadata?: Json
+          org_id: string
+          pdf_storage_path?: string | null
+          signatory_roles?: string[]
+          status?: Database["public"]["Enums"]["document_status"]
+          template_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to_user?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_step?: number
+          driver_id?: string | null
+          id?: string
+          metadata?: Json
+          org_id?: string
+          pdf_storage_path?: string | null
+          signatory_roles?: string[]
+          status?: Database["public"]["Enums"]["document_status"]
+          template_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_instances_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_instances_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_signatures: {
+        Row: {
+          created_at: string
+          id: string
+          instance_id: string
+          ip_address: string | null
+          org_id: string
+          role_label: string
+          signature_data_url: string
+          signed_at: string
+          signer_id: string
+          step_index: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instance_id: string
+          ip_address?: string | null
+          org_id: string
+          role_label: string
+          signature_data_url: string
+          signed_at?: string
+          signer_id: string
+          step_index: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instance_id?: string
+          ip_address?: string | null
+          org_id?: string
+          role_label?: string
+          signature_data_url?: string
+          signed_at?: string
+          signer_id?: string
+          step_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_signatures_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "document_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_templates: {
         Row: {
           applies_to: string
@@ -817,6 +940,8 @@ export type Database = {
           is_active: boolean
           name: string | null
           org_id: string
+          required_fields: Json
+          signatory_roles: string[]
           updated_at: string
           version: number
         }
@@ -830,6 +955,8 @@ export type Database = {
           is_active?: boolean
           name?: string | null
           org_id: string
+          required_fields?: Json
+          signatory_roles?: string[]
           updated_at?: string
           version?: number
         }
@@ -843,6 +970,8 @@ export type Database = {
           is_active?: boolean
           name?: string | null
           org_id?: string
+          required_fields?: Json
+          signatory_roles?: string[]
           updated_at?: string
           version?: number
         }
@@ -6175,6 +6304,7 @@ export type Database = {
         | "driver"
         | "maintenance"
         | "admin"
+      document_status: "draft" | "pending_signatures" | "completed" | "voided"
       employment_type_enum: "w2_company" | "1099_contractor" | "lease_purchase"
       onboarding_review_status: "pending" | "approved" | "revision_requested"
     }
@@ -6313,6 +6443,7 @@ export const Constants = {
         "maintenance",
         "admin",
       ],
+      document_status: ["draft", "pending_signatures", "completed", "voided"],
       employment_type_enum: ["w2_company", "1099_contractor", "lease_purchase"],
       onboarding_review_status: ["pending", "approved", "revision_requested"],
     },
