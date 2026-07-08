@@ -1,6 +1,8 @@
-import { AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { HealthStatus } from './PMScheduleFilters';
+import { useChronicIssueTrucks } from '@/hooks/useMaintenanceData';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PMFleetHealthSummaryProps {
   overdueCount: number;
@@ -18,9 +20,11 @@ export function PMFleetHealthSummary({
   activeFilter,
 }: PMFleetHealthSummaryProps) {
   const total = overdueCount + dueSoonCount + onTrackCount;
+  const { data: chronic } = useChronicIssueTrucks();
+  const chronicCount = chronic?.count ?? 0;
 
   return (
-    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border mb-4">
+    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg border mb-4 flex-wrap">
       <span className="text-sm font-medium text-muted-foreground mr-2">
         Fleet PM Health
       </span>
