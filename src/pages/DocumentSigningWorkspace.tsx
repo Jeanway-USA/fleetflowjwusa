@@ -194,20 +194,34 @@ export default function DocumentSigningWorkspace() {
     mutationFn: async () => {
       if (!instance || !user || !orgId) throw new Error('Not ready');
       if (!signatureDataUrl) throw new Error('Capture a signature first');
+      if (!printedName.trim()) throw new Error('Please enter your printed name');
+      if (!signerTitle.trim()) throw new Error('Please enter your title');
+      if (!dateSigned) throw new Error('Please choose a signing date');
       // Ensure all required tokens are filled.
       const unfilled = missingTokens.filter((t) => !fieldValues[t] || !fieldValues[t].trim());
       if (unfilled.length > 0) throw new Error(`Please fill: ${unfilled.join(', ')}`);
 
-      // Merge new metadata onto the instance.
+      // Merge new metadata onto the instance, including role-scoped signer info.
+      const roleKey = stepRole || 'signer';
+      const dateSignedFormatted = new Date(`${dateSigned}T00:00:00`).toLocaleDateString();
       const nextMeta = {
         ...(instance.metadata as Record<string, string> | null ?? {}),
         ...fieldValues,
+        [`${roleKey}_printed_name`]: printedName.trim(),
+        [`${roleKey}_title`]: signerTitle.trim(),
+        [`${roleKey}_date_signed`]: dateSignedFormatted,
       };
       const { error: metaErr } = await supabase
         .from('document_instances')
         .update({ metadata: nextMeta })
         .eq('id', instance.id);
       if (metaErr) throw metaErr;
+
+      // Remember the entered title on the profile for next time.
+      await supabase
+        .from('profiles')
+        .update({ default_signing_title: signerTitle.trim() })
+        .eq('user_id', user.id);
 
       const { error: sigErr } = await supabase.from('document_signatures').insert({
         org_id: orgId,
