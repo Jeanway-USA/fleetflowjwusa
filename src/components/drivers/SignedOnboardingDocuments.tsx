@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { CheckCircle2, Download, Eye, FileSignature, Loader2, ShieldAlert, ShieldCheck, Undo2 } from 'lucide-react';
+import { AlertTriangle, Bell, CheckCircle2, Download, Eye, FileSignature, Loader2, ShieldAlert, ShieldCheck, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { RequestRevisionDialog } from './RequestRevisionDialog';
+import { fetchOutstandingTemplates } from '@/lib/onboarding/outstanding';
 
 const DOCUMENT_LABELS: Record<string, string> = {
   driver_agreement: 'Driver Agreement',
@@ -77,6 +78,31 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     onError: (err: Error) => toast.error(err.message || 'Failed to update review'),
   });
 
+  const { data: outstandingData, isLoading: outstandingLoading } = useQuery({
+    queryKey: ['onboarding-outstanding-admin', driverId],
+    enabled: canView && !!driverId,
+    queryFn: () => fetchOutstandingTemplates(driverId),
+  });
+  const outstanding = outstandingData?.templates ?? [];
+
+  const notifyMutation = useMutation({
+    mutationFn: async (tmpl: { document_type: string; name: string | null }) => {
+      const label = tmpl.name ?? tmpl.document_type;
+      const { error } = await supabase.from('driver_notifications').insert({
+        driver_id: driverId,
+        org_id: outstandingData?.orgId ?? null,
+        notification_type: 'document_request',
+        title: 'Document signature requested',
+        message: `Your administrator asked you to sign: ${label}. Open the onboarding page from your dashboard to complete it.`,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Driver notified. A prompt will show on their dashboard.');
+    },
+    onError: (err: Error) => toast.error(err.message || 'Failed to notify driver'),
+  });
+
   if (!canView) return null;
 
   const openSignedUrl = async (filePath: string, downloadName: string, mode: 'preview' | 'download') => {
@@ -99,7 +125,7 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || outstandingLoading) {
     return (
       <div className="space-y-2">
         <Skeleton className="h-14 w-full" />
@@ -108,19 +134,59 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     );
   }
 
-  if (!docs || docs.length === 0) {
+  // Dedupe by document_type — only show the latest per type for actions
+  const latestByType = new Map<string, NonNullable<typeof docs>[number]>();
+  for (const d of docs ?? []) {
+    if (!latestByType.has(d.document_type)) latestByType.set(d.document_type, d);
+  }
+
+  const outstandingSection = outstanding.length > 0 ? (
+    <div className="rounded-md border-2 border-amber-500/50 bg-amber-500/5 p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        <p className="font-semibold text-sm">Outstanding documents ({outstanding.length})</p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        These active templates have never been signed by this driver. Notify them to complete the missing paperwork.
+      </p>
+      <div className="space-y-2 pt-1">
+        {outstanding.map((t) => (
+          <div key={t.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-md border bg-background p-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileSignature className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="font-medium truncate">{t.name ?? t.document_type}</span>
+              <Badge variant="outline" className="text-[10px] uppercase">
+                {t.applies_to === 'shared' ? 'All' : t.applies_to === 'w2' ? 'W-2' : '1099'}
+              </Badge>
+            </div>
+            {canReview && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={notifyMutation.isPending}
+                onClick={() => notifyMutation.mutate({ document_type: t.document_type, name: t.name })}
+              >
+                {notifyMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                ) : (
+                  <Bell className="h-4 w-4 mr-1.5" />
+                )}
+                Notify driver
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
+  if ((!docs || docs.length === 0) && outstanding.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
         <FileSignature className="mx-auto mb-2 h-6 w-6 opacity-60" />
         No signed onboarding documents yet.
       </div>
     );
-  }
-
-  // Dedupe by document_type — only show the latest per type for actions
-  const latestByType = new Map<string, typeof docs[number]>();
-  for (const d of docs) {
-    if (!latestByType.has(d.document_type)) latestByType.set(d.document_type, d);
   }
 
   return (
@@ -130,7 +196,10 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
         Admin view
       </div>
 
-      {docs.map((d) => {
+      {outstandingSection}
+
+
+      {(docs ?? []).map((d) => {
         const label = DOCUMENT_LABELS[d.document_type] ?? d.document_type;
         const isLatest = latestByType.get(d.document_type)?.id === d.id;
         const status: ReviewStatus = d.review_status ?? 'pending';

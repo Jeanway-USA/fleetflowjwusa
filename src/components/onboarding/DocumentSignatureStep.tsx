@@ -71,6 +71,10 @@ export interface DocumentSignatureStepProps {
   onW2DocsChange: (patch: Partial<W2DocsState>) => void;
   contractorDocs: ContractorDocsState;
   onContractorDocsChange: (patch: Partial<ContractorDocsState>) => void;
+  /** When true, W-2 structured forms (W-4/I-9/Direct Deposit) are already on file — hide their block. */
+  skipW2Structured?: boolean;
+  /** When true, 1099 structured forms (W-9/IOO) are already on file — hide their block. */
+  skip1099Structured?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -225,6 +229,8 @@ export function DocumentSignatureStep({
   onW2DocsChange,
   contractorDocs,
   onContractorDocsChange,
+  skipW2Structured = false,
+  skip1099Structured = false,
 }: DocumentSignatureStepProps) {
   const [w2Valid, setW2Valid] = useState(false);
   const [contractorValid, setContractorValid] = useState(false);
@@ -262,7 +268,10 @@ export function DocumentSignatureStep({
       .filter(shouldValidateTemplate)
       .every((t) => computeTemplateValidity(t, state[t.id] ?? EMPTY_TEMPLATE_STATE));
 
-    const employmentFormsValid = employmentType === 'W-2' ? w2Valid : contractorValid;
+    const employmentFormsValid =
+      employmentType === 'W-2'
+        ? (skipW2Structured ? true : w2Valid)
+        : (skip1099Structured ? true : contractorValid);
 
     onValidityChange(templatesValid && employmentFormsValid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -336,11 +345,21 @@ export function DocumentSignatureStep({
           />
           <div className="space-y-4">
             {w2Templates.map(renderTemplate)}
-            <W2Documents
-              value={w2Docs}
-              onChange={onW2DocsChange}
-              onValidityChange={setW2Valid}
-            />
+            {skipW2Structured ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>W-4, I-9 and Direct Deposit already on file</AlertTitle>
+                <AlertDescription>
+                  You've already completed these forms. No need to fill them out again.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <W2Documents
+                value={w2Docs}
+                onChange={onW2DocsChange}
+                onValidityChange={setW2Valid}
+              />
+            )}
           </div>
         </section>
       ) : (
@@ -352,11 +371,21 @@ export function DocumentSignatureStep({
           />
           <div className="space-y-4">
             {contractorTemplates.map(renderTemplate)}
-            <ContractorDocuments
-              value={contractorDocs}
-              onChange={onContractorDocsChange}
-              onValidityChange={setContractorValid}
-            />
+            {skip1099Structured ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>W-9 and Owner-Operator Agreement already on file</AlertTitle>
+                <AlertDescription>
+                  You've already completed these forms. No need to fill them out again.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <ContractorDocuments
+                value={contractorDocs}
+                onChange={onContractorDocsChange}
+                onValidityChange={setContractorValid}
+              />
+            )}
           </div>
         </section>
       )}

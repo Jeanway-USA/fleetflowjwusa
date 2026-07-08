@@ -79,6 +79,7 @@ export default function DriverOnboarding() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const revisionMode = searchParams.get('revision') === '1';
+  const docsOnlyMode = searchParams.get('docs') === '1';
   const { user, orgId, refreshOrgData } = useAuth();
 
   const [stepIndex, setStepIndex] = useState(0);
@@ -180,9 +181,39 @@ export default function DriverOnboarding() {
     ? (driverRow?.credentials_revision_notes ?? null)
     : null;
 
+  // Existence checks for the employment-specific structured forms so a driver
+  // completing only outstanding templates isn't forced to re-enter W-4/I-9/W-9/IOO.
+  const { data: structuredFormsPresent = { w4: false, i9: false, w9: false, ioo: false } } = useQuery({
+    queryKey: ['driver-structured-forms-present', driverRow?.id],
+    enabled: !!driverRow?.id,
+    queryFn: async () => {
+      const [w4, i9, w9, ioo] = await Promise.all([
+        supabase.from('driver_w4_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
+        supabase.from('driver_i9_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
+        supabase.from('driver_w9_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
+        supabase.from('driver_ioo_agreement').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
+      ]);
+      return {
+        w4: !!w4.data,
+        i9: !!i9.data,
+        w9: !!w9.data,
+        ioo: !!ioo.data,
+      };
+    },
+  });
+
+  const skipW2Structured = docsOnlyMode && structuredFormsPresent.w4 && structuredFormsPresent.i9;
+  const skip1099Structured = docsOnlyMode && structuredFormsPresent.w9 && structuredFormsPresent.ioo;
+
   // Deep-link: when ?revision=1, jump to first step that needs revision.
   useEffect(() => {
-    if (deepLinked || !revisionMode || !driverRow || templates.length === 0) return;
+    if (deepLinked || !driverRow) return;
+    if (docsOnlyMode && employmentType !== null) {
+      setStepIndex(2);
+      setDeepLinked(true);
+      return;
+    }
+    if (!revisionMode || templates.length === 0) return;
     if (driverRow.credentials_review_status === 'revision_requested') {
       setStepIndex(1);
       setDeepLinked(true);
@@ -193,7 +224,7 @@ export default function DriverOnboarding() {
     );
     if (hasDocRevision) setStepIndex(2);
     setDeepLinked(true);
-  }, [revisionMode, driverRow, templates, docRevisions, deepLinked]);
+  }, [revisionMode, docsOnlyMode, employmentType, driverRow, templates, docRevisions, deepLinked]);
 
 
   // 3-step flow: Employment (0) → Credentials (1) → Documents (2)
@@ -424,7 +455,7 @@ export default function DriverOnboarding() {
       return digits.length >= 4 ? `***-**-${digits.slice(-4)}` : '—';
     };
 
-    if (employmentType === 'W-2') {
+    if (employmentType === 'W-2' && !skipW2Structured) {
       // W-4 → driver_w4_info via SECURITY DEFINER RPC
       const { error: w4Err } = await supabase.rpc('upsert_driver_w4' as never, {
         _driver_id: driverRow.id,
@@ -569,7 +600,7 @@ export default function DriverOnboarding() {
       );
     }
 
-    if (employmentType === '1099') {
+    if (employmentType === '1099' && !skip1099Structured) {
       const { error: w9Err } = await supabase.rpc('upsert_driver_w9' as never, {
         _driver_id: driverRow.id,
         _legal_name: contractorDocs.w9_legalName,
@@ -988,7 +1019,18 @@ export default function DriverOnboarding() {
                 onW2DocsChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
                 contractorDocs={contractorDocs}
                 onContractorDocsChange={(patch) => setContractorDocs((prev) => ({ ...prev, ...patch }))}
+                skipW2Structured={skipW2Structured}
+                skip1099Structured={skip1099Structured}
               />
+              {docsOnlyMode && pendingTemplates.length === 0 && (skipW2Structured || skip1099Structured || (structuredFormsPresent.w4 && structuredFormsPresent.i9 && structuredFormsPresent.w9 && structuredFormsPresent.ioo)) && (
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertTitle>You're all caught up</AlertTitle>
+                  <AlertDescription>
+                    Every required document has already been signed. You can return to your dashboard.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           )}
 
