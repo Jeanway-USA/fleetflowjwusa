@@ -159,10 +159,17 @@ export function TruistAchStagingTab() {
               )}
               {ledgers.map((r) => {
                 const w = withholdingMap.get(r.id);
-                const eeTax = (w?.ee_social_security ?? 0)
-                  + (w?.ee_medicare ?? 0)
-                  + (w?.federal_income_withholding ?? 0);
-                const net = Number(r.gross_taxable_pay) - eeTax + Number(r.pass_through_fsc);
+                const eeTax = (Number(w?.ee_social_security) || 0)
+                  + (Number(w?.ee_medicare) || 0)
+                  + (Number(w?.federal_income_withholding) || 0);
+                // Salary-track ledger: base+bonus+holiday. Fallback to legacy load path for old rows.
+                const base = Number((r as { base_salary?: number }).base_salary) || 0;
+                const bonus = Number((r as { bonus_pay?: number }).bonus_pay) || 0;
+                const holiday = Number((r as { holiday_pay?: number }).holiday_pay) || 0;
+                const salaryGross = base + bonus + holiday;
+                const net = salaryGross > 0
+                  ? salaryGross - eeTax
+                  : Number(r.gross_taxable_pay) - eeTax + Number(r.pass_through_fsc);
                 const payout = payoutMap.get(r.id);
                 const locked = r.status === 'finalized';
                 return (
@@ -196,7 +203,7 @@ export function TruistAchStagingTab() {
                           onClick={() => finalize.mutate({ ledgerId: r.id, net })}
                           disabled={finalize.isPending || !(codes[r.id] ?? '').trim()}
                         >
-                          Submit Payout
+                          Confirm Payout
                         </Button>
                       )}
                     </TableCell>
