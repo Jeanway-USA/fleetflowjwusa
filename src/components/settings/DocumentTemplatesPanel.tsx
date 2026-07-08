@@ -224,6 +224,9 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!draft.id) throw new Error("No template selected");
+      const signers = (draft.signatory_roles && draft.signatory_roles.length > 0)
+        ? draft.signatory_roles
+        : ['driver'];
       const { error } = await supabase
         .from("document_templates")
         .update({
@@ -232,6 +235,7 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
           content: draft.content ?? "",
           is_active: draft.is_active ?? true,
           applies_to: draft.applies_to ?? 'shared',
+          signatory_roles: signers,
         } as never)
         .eq("id", draft.id);
       if (error) throw error;
