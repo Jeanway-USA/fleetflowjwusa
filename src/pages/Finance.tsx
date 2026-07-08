@@ -978,6 +978,14 @@ export default function Finance() {
           </div>
         </TabsContent>
 
+        {canManagePayroll && (
+          <TabsContent value="inhouse-payroll">
+            <div className="space-y-6 animate-in fade-in-50">
+              <InHousePayrollWorkspace />
+            </div>
+          </TabsContent>
+        )}
+
         <TabsContent value="commissions">
           <div className="space-y-6 animate-in fade-in-50">
             <CommissionsTab
