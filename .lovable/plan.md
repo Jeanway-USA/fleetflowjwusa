@@ -1,64 +1,52 @@
-# Multi-Asset Dispatch Availability & Hometime Timeline
+# Fleet Driver Retention & Performance Analytics Board
 
-Turn the existing `FleetTimelineScheduler` into a true 14-day multi-asset Gantt with distinct status strips, an outbound planning overlay, and hard hometime locks — and mirror the hometime signal into `DriverStatusGrid`.
+Enhance the existing performance module with a rolling-window revenue leaderboard, a 4-week safety-bonus progress ring on each scorecard, and a low-key retention flag when a driver's monthly mileage falls sharply below their baseline.
 
-## Data source (no new tables)
+## 1. Rolling-window data in `useDriverPerformanceData.ts`
 
-Approved hometime already lives in `driver_requests` with `request_type='home_time'`, `status='approved'`, `start_date`, `end_date`. That's the source of truth; no schema changes.
+- Extend `PerformancePeriod` with three new options used by the new leaderboard: `'week'` (current week), `'30d'` (rolling 30 days), `'ytd'` (year-to-date). Keep the existing monthly options intact for the scorecards.
+- Update `getPeriodRange` to handle the new values (using `startOfWeek`/`endOfWeek`, `subDays(now, 30)`, `startOfYear`).
+- Add three per-driver retention/bonus fields to `DriverMetric`, computed independently of the selected period so the badges are stable across tabs:
+  - `bonusWeeks` (0–4): count of consecutive completed weeks in the last 4 weeks with ≥1 delivered load and zero incidents (any severity). Resets to 0 when a week has an incident.
+  - `baselineMonthlyMiles`: average monthly miles across the trailing 6 full months, excluding the current month.
+  - `currentMonthMiles`: miles delivered in the current calendar month.
+  - `retentionFlag`: `true` when `baselineMonthlyMiles > 0` AND `currentMonthMiles` is more than 25% below baseline AND at least 10 days into the month (avoid false positives early in the month).
+- Return `bonusWeeks`, `baselineMonthlyMiles`, `currentMonthMiles`, `retentionFlag` on every `DriverMetric`.
 
-## 1. `FleetTimelineScheduler.tsx`
+## 2. Fleet Revenue Leaderboard card in `PerformanceLeaderboard.tsx`
 
-**Grid**
-- Extend the rolling window from 7 → **14 days**. `gridTemplateColumns: '140px repeat(14, minmax(56px, 1fr))'`, horizontal scroll preserved.
-- Prev/Next buttons step by 7 days (half-window nudge) instead of full 7 days × 1 offset multiplier; "Today" still snaps `weekOffset` to 0.
-- Widen `min-w-[600px]` → `min-w-[1080px]` so 14 columns don't crush.
+- Add a new top card **"Fleet Revenue Leaderboard"** rendered above the existing Driver Rankings table (still keyed off the parent's `metrics`/`selectedDriver`).
+- Local `useState` for `window: 'week' | '30d' | 'ytd'` with a small `Tabs` (or ToggleGroup) header: **Current Week · 30 Days · YTD**.
+- Because the parent hook is keyed to a single period, the leaderboard card calls `useDriverPerformanceData(window)` itself to get an independent metric set for the chosen rolling window. Sort by `totalRevenue` desc, take top 10.
+- Row layout (compact, no full table): rank chip · driver name · `Total Gross Generated` (right-aligned success color) · `Clean Miles Logged` (muted). Highlight the row if it matches `selectedDriver`.
+- Empty state reuses `EmptyState` with the `Trophy` icon.
+- Leave the existing Driver Rankings table unchanged below.
 
-**Color-blocked status strips per row-day cell**
+## 3. Bonus milestone ring + retention tag in `PerformanceScorecards.tsx`
 
-Each cell's background is picked from a shared `getCellStatus(driverId, day)` helper. Priority order (highest wins):
-
-1. `hometime` → muted-purple + a diagonal striped SVG pattern (`background-image: repeating-linear-gradient(45deg, hsl(var(--muted-foreground)/.15) 0 6px, transparent 6px 12px)`). Cell is `pointer-events-none` for drops.
-2. `active-transit` → primary/15 tint; the existing load bar renders on top.
-3. `outbound-planning` → amber/10 tint on the 1–3 days immediately after `delivery_date` of the last active load in the window, with a small `MapPin` chip labeled "Reload @ {destination_state}". Skipped if the driver has another load or hometime already scheduled in that gap.
-4. `idle` → default muted background (current look).
-
-Add a compact **legend row** above the grid (four swatches: Active Transit, Pre-Approved Hometime, Outbound Planning, Unassigned/Idle).
-
-**New query**
-```ts
-useQuery(['timeline-hometime', windowStart, windowEnd], () =>
-  supabase.from('driver_requests')
-    .select('driver_id, start_date, end_date, request_type, status')
-    .eq('request_type', 'home_time')
-    .eq('status', 'approved')
-    .gte('end_date', windowStart)
-    .lte('start_date', windowEnd)
-)
-```
-
-**Hometime buffer locks**
-- Extend `checkConflicts` with a hometime branch: if the load's pickup/delivery interval overlaps any approved hometime for the driver → `hasConflict: true, message: "Driver has approved hometime {start}–{end}. Move or reschedule the hometime first."`
-- Drop handler already respects the toast + early-return; the striped cells also block `onDrop` via `pointer-events-none` for immediate visual feedback.
-
-**Outbound Planning Window overlay**
-- After rendering active-load bars, compute for each driver the last-delivering load whose `delivery_date` falls inside the window. If the 3 days after delivery are free of loads/hometime, render an absolutely-positioned dashed amber strip across those cells with a `MapPin` chip: `"Reload near {stateFromDestination}"` (parse the last comma-separated token from `destination`). Clicking the chip is a no-op for v1 (dispatcher visual cue only).
-
-## 2. `DriverStatusGrid.tsx`
-
-- Add the same `driver_requests` fetch (scoped to today → +14d, approved home_time only) alongside the existing loads query.
-- Replace the binary Available / On Load pill with a 3-way status:
-  - `On Hometime` (purple pill, `Home` icon) — when today is within any approved hometime window.
-  - `On Load` (existing blue).
-  - `Available` (existing green) — but if hometime is *upcoming* within 7 days, append a small amber sub-line: `"Hometime {MMM d}–{MMM d}"`.
-- Precedence: Hometime > On Load > Available (matches the timeline lock: if hometime is active, dispatch should treat the driver as locked even if a stale load is still marked assigned).
-
-## Files touched
-
-- `src/components/dispatcher/FleetTimelineScheduler.tsx`
-- `src/components/dispatcher/DriverStatusGrid.tsx`
+- Add a small SVG progress ring component inline (48px, `stroke-primary` for progress, `stroke-muted` track, 4-segment tick marks at 25/50/75/100%). Center label shows `{bonusWeeks}/4`.
+- Place the ring in the card header row, right side, replacing/next-to the Trophy for non-podium drivers; keep Trophy for top 3 and put the ring immediately to its left.
+- Tooltip on the ring: "Consecutive clean weeks toward monthly Safety & Performance Bonus. Zero incidents required."
+- When `bonusWeeks === 4`, ring fills fully and shows a subtle `bg-success/10` badge "Bonus Earned" under the driver name.
+- Add a low-profile blue tag under the score badge when `retentionFlag` is true:
+  - Uses `Badge` with `className="bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500/10"` and copy **"Retention Review Required"**.
+  - Tooltip: "Monthly mileage is {pctDrop}% below the 6-month baseline. Audit routing and coordinate with agents."
+- No changes to score math or existing progress rows.
 
 ## Out of scope
 
-- No new tables, no changes to `driver_requests` write paths, no changes to `useDriverRequests` hook.
-- No new global CSS — diagonal pattern is inline via a Tailwind arbitrary `bg-[image:...]` class.
-- The "Outbound Planning" chip is a visual prompt only; auto-booking suggestions come later.
+- No new tables, RLS changes, or edge functions.
+- No changes to bonus payout amounts or accounting flows — the ring is purely a visual milestone tracker.
+- No changes to the period selector at the parent page level; the leaderboard card owns its own rolling-window state.
+
+## Technical notes
+
+- Bonus weeks use `startOfWeek(now, { weekStartsOn: 1 })` and iterate backward 4 completed weeks; a week counts as "clean" only if it has ≥1 delivered load in that window AND no `incidents` rows for the driver in that same window.
+- Baseline mileage sums `actual_miles` from `delivered` loads keyed by `delivery_date` month, over the prior 6 completed months. Skip drivers with <2 months of data (baseline undefined ⇒ `retentionFlag = false`).
+- The new leaderboard card mounts a second `useDriverPerformanceData` call — this is intentional and cheap given queries are cached by TanStack (`drivers`, `fleet_loads`, `incidents`, `fuel_purchases` keys are shared).
+
+## Files touched
+
+- `src/hooks/useDriverPerformanceData.ts` — extend period type, add rolling fields, compute bonusWeeks/baseline/retentionFlag.
+- `src/components/performance/PerformanceLeaderboard.tsx` — add Fleet Revenue Leaderboard card with window tabs above existing table.
+- `src/components/performance/PerformanceScorecards.tsx` — add bonus progress ring and retention tag.
