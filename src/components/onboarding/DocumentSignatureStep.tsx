@@ -268,7 +268,10 @@ export function DocumentSignatureStep({
       .filter(shouldValidateTemplate)
       .every((t) => computeTemplateValidity(t, state[t.id] ?? EMPTY_TEMPLATE_STATE));
 
-    const employmentFormsValid = employmentType === 'W-2' ? w2Valid : contractorValid;
+    const employmentFormsValid =
+      employmentType === 'W-2'
+        ? (skipW2Structured ? true : w2Valid)
+        : (skip1099Structured ? true : contractorValid);
 
     onValidityChange(templatesValid && employmentFormsValid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
