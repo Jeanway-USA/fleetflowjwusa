@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/formatters';
 import { CarrierDocumentHub } from './CarrierDocumentHub';
+import { useAgentVolumeStats } from '@/hooks/useCRMData';
 
 interface BrokerContact {
   id: string;
@@ -69,6 +70,14 @@ export function BrokerDatabase() {
     },
     enabled: !!orgId,
   });
+
+  const { data: volumeStats = {} } = useAgentVolumeStats();
+
+  const statsFor = (b: BrokerContact) => {
+    const code = (b.agent_code || '').trim();
+    if (!code) return null;
+    return volumeStats[code] || null;
+  };
 
   const createMutation = useMutation({
     mutationFn: async (broker: any) => {
