@@ -134,6 +134,7 @@ export default function DocumentSigningWorkspace() {
 
   const rendered = useMemo(() => hydrateTokens(templateContent, ctx), [templateContent, ctx]);
   const missingTokens = useMemo(() => extractUnresolvedTokens(templateContent, ctx), [templateContent, ctx]);
+  const consentKeys = useMemo(() => extractConsentKeys(templateContent), [templateContent]);
 
   useEffect(() => {
     // Prime field values from instance metadata so previously entered values persist.
@@ -144,6 +145,14 @@ export default function DocumentSigningWorkspace() {
         if (m[t]) seeded[t] = m[t];
       }
       if (Object.keys(seeded).length > 0) setFieldValues(seeded);
+
+      // Also seed consent selections from previously saved values.
+      const seededConsents: Record<string, 'yes' | 'no'> = {};
+      for (const key of consentKeys) {
+        const v = (m[`consent_${key}`] as string | undefined)?.toLowerCase();
+        if (v === 'yes' || v === 'no') seededConsents[key] = v;
+      }
+      if (Object.keys(seededConsents).length > 0) setConsentValues(seededConsents);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instance?.id]);
