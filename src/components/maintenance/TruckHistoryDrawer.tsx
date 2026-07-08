@@ -125,7 +125,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
               <ScrollArea className="h-[calc(100vh-200px)] pr-4">
                 <div className="space-y-6 py-6">
               {/* Stats Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -148,7 +148,38 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                     </p>
                   </CardContent>
                 </Card>
+                <Card
+                  className={cn(
+                    data.stats.opportunityRevenueLost > 0 &&
+                      'border-rose-200 bg-rose-50/40 dark:border-rose-900 dark:bg-rose-950/20'
+                  )}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <Clock className="h-4 w-4" />
+                      <span className="text-xs">Opportunity Revenue Lost</span>
+                    </div>
+                    <p
+                      className={cn(
+                        'text-xl font-bold',
+                        data.stats.opportunityRevenueLost > 0
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-muted-foreground'
+                      )}
+                    >
+                      {formatCurrency(data.stats.opportunityRevenueLost)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {data.stats.totalDaysDown}d down
+                      {data.stats.liveDaysDown > 0 && (
+                        <> · <span className="text-amber-600 dark:text-amber-400">{data.stats.liveDaysDown}d live</span></>
+                      )}
+                      {' · '}${data.stats.avgDailyRevenue.toLocaleString()}/day target
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
+
 
               {data.stats.lastServiceDate && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
