@@ -688,12 +688,6 @@ export default function DriverOnboarding() {
     const profileCompleted = !revisionMode;
     const shouldReturnToDashboard = docsOnlyMode || results.length === 0;
 
-    if (shouldReturnToDashboard) {
-      setCompletionPendingDashboard(true);
-    } else {
-      setSignedResults(results);
-    }
-
     if (profileCompleted) {
       // Mark onboarding complete on the user's profile so guards unlock the dashboard.
       const { error: profileError } = await supabase
@@ -720,7 +714,10 @@ export default function DriverOnboarding() {
     toast.success(revisionMode ? 'Revisions resubmitted. Admin will be notified.' : 'Documents submitted successfully');
 
     if (shouldReturnToDashboard) {
+      setCompletionPendingDashboard(true);
       navigate('/driver-dashboard', { replace: true });
+    } else {
+      setSignedResults(results);
     }
   };
 
