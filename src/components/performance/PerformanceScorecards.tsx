@@ -68,6 +68,52 @@ function ScoreRow({ label, value }: { label: string; value: number }) {
   );
 }
 
+function BonusRing({ weeks }: { weeks: number }) {
+  const size = 48;
+  const stroke = 4;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const pct = Math.min(4, Math.max(0, weeks)) / 4;
+  const dash = c * pct;
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="relative shrink-0 cursor-help" style={{ width: size, height: size }}>
+            <svg width={size} height={size} className="-rotate-90">
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={r}
+                fill="none"
+                strokeWidth={stroke}
+                className="stroke-muted"
+              />
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={r}
+                fill="none"
+                strokeWidth={stroke}
+                strokeLinecap="round"
+                strokeDasharray={`${dash} ${c - dash}`}
+                className={weeks >= 4 ? 'stroke-success' : 'stroke-primary'}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold">
+              {weeks}/4
+            </div>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[220px]">
+          <p className="text-xs">Consecutive clean weeks toward monthly Safety & Performance Bonus. Zero incidents required.</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+
 export function PerformanceScorecards({ metrics, selectedDriver }: PerformanceScorecardsProps) {
   const filteredMetrics = selectedDriver === 'all'
     ? metrics
