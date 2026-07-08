@@ -1,0 +1,1 @@
+UPDATE public.document_instances SET pdf_storage_path = NULL WHERE metadata->>'backfilled' = 'true';
