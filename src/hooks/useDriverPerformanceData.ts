@@ -58,9 +58,14 @@ export interface DriverMetric {
   revenuePerMile: number;
   mpg: number | null;
   fuelCostPerMile: number | null;
+  bonusWeeks: number;
+  baselineMonthlyMiles: number;
+  currentMonthMiles: number;
+  retentionFlag: boolean;
+  retentionDropPct: number;
 }
 
-export type PerformancePeriod = 'current' | 'last' | 'last3';
+export type PerformancePeriod = 'current' | 'last' | 'last3' | 'week' | '30d' | 'ytd';
 
 export function getPeriodRange(period: PerformancePeriod) {
   const now = new Date();
@@ -71,6 +76,12 @@ export function getPeriodRange(period: PerformancePeriod) {
       return { start: startOfMonth(subMonths(now, 1)), end: endOfMonth(subMonths(now, 1)) };
     case 'last3':
       return { start: startOfMonth(subMonths(now, 2)), end: endOfMonth(now) };
+    case 'week':
+      return { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) };
+    case '30d':
+      return { start: subDays(now, 30), end: now };
+    case 'ytd':
+      return { start: startOfYear(now), end: now };
     default:
       return { start: startOfMonth(now), end: endOfMonth(now) };
   }
