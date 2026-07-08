@@ -697,8 +697,6 @@ export default function DriverOnboarding() {
       if (profileError) {
         console.error('Failed to mark onboarding complete:', profileError);
         throw new Error(`Documents saved, but onboarding couldn't be marked complete: ${profileError.message}`);
-      } else {
-        await refreshOrgData();
       }
     }
 
@@ -715,6 +713,9 @@ export default function DriverOnboarding() {
 
     if (shouldReturnToDashboard) {
       setCompletionPendingDashboard(true);
+      if (profileCompleted) {
+        await refreshOrgData();
+      }
       navigate('/driver-dashboard', { replace: true });
     } else {
       setSignedResults(results);
@@ -875,12 +876,15 @@ export default function DriverOnboarding() {
             <div className="pt-4 flex justify-end">
               <Button
                 variant="outline"
-                onClick={() => {
+                disabled={completionPendingDashboard}
+                onClick={async () => {
+                  setCompletionPendingDashboard(true);
+                  await refreshOrgData();
                   try { localStorage.setItem('pending_driver_tour', '1'); } catch { /* ignore */ }
                   navigate('/driver-dashboard', { replace: true, state: { startTour: true } });
                 }}
               >
-                Go to Dashboard
+                {completionPendingDashboard ? 'Opening Dashboard…' : 'Go to Dashboard'}
               </Button>
             </div>
 
