@@ -1248,8 +1248,7 @@ export function useTruckHistory(truckId: string | null) {
       }
       for (const wo of workOrders || []) {
         if (wo.status === 'completed') continue;
-        const priority = ((wo as any).priority || 'medium').toLowerCase();
-        if (priority !== 'low' && priority !== 'medium') continue;
+
         if (!wo.entry_date) continue;
         const d = new Date(`${wo.entry_date.slice(0, 10)}T00:00:00`);
         if (d < thirtyAgo) continue;
@@ -1306,7 +1305,7 @@ export function useChronicIssueTrucks() {
           .gte('service_date', thirtyAgoIso),
         supabase
           .from('work_orders')
-          .select('id, truck_id, service_type, description, priority, status, entry_date')
+          .select('id, truck_id, service_type, description, status, entry_date')
           .gte('entry_date', thirtyAgoIso)
           .neq('status', 'completed'),
       ]);
@@ -1319,8 +1318,6 @@ export function useChronicIssueTrucks() {
       }
       for (const wo of wosRes.data || []) {
         if (!wo.truck_id) continue;
-        const priority = (wo.priority || 'medium').toLowerCase();
-        if (priority !== 'low' && priority !== 'medium') continue;
         if (!isMinorEntry(wo.service_type, wo.description)) continue;
         counts.set(wo.truck_id, (counts.get(wo.truck_id) || 0) + 1);
       }
