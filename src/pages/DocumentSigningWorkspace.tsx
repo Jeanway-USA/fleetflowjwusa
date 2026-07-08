@@ -222,12 +222,22 @@ export default function DocumentSigningWorkspace() {
       const unfilled = missingTokens.filter((t) => !fieldValues[t] || !fieldValues[t].trim());
       if (unfilled.length > 0) throw new Error(`Please fill: ${unfilled.join(', ')}`);
 
-      // Merge new metadata onto the instance, including role-scoped signer info.
+      // Ensure every consent has an explicit Yes/No.
+      const missingConsents = consentKeys.filter((k) => consentValues[k] !== 'yes' && consentValues[k] !== 'no');
+      if (missingConsents.length > 0) {
+        throw new Error(`Please answer: ${missingConsents.map((k) => k.replace(/_/g, ' ')).join(', ')}`);
+      }
+
+      // Merge new metadata onto the instance, including role-scoped signer info
+      // and consent selections.
       const roleKey = stepRole || 'signer';
       const dateSignedFormatted = new Date(`${dateSigned}T00:00:00`).toLocaleDateString();
+      const consentMeta: Record<string, string> = {};
+      for (const k of consentKeys) consentMeta[`consent_${k}`] = consentValues[k]!;
       const nextMeta = {
         ...(instance.metadata as Record<string, string> | null ?? {}),
         ...fieldValues,
+        ...consentMeta,
         [`${roleKey}_printed_name`]: printedName.trim(),
         [`${roleKey}_title`]: signerTitle.trim(),
         [`${roleKey}_date_signed`]: dateSignedFormatted,
