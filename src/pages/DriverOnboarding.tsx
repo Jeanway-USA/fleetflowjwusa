@@ -702,6 +702,7 @@ export default function DriverOnboarding() {
         .eq('user_id', user.id);
       if (profileError) {
         console.error('Failed to mark onboarding complete:', profileError);
+        throw new Error(`Documents saved, but onboarding couldn't be marked complete: ${profileError.message}`);
       } else {
         await refreshOrgData();
       }
@@ -713,6 +714,7 @@ export default function DriverOnboarding() {
       queryClient.invalidateQueries({ queryKey: ['onboarding-outstanding', driverRow.id] }),
       queryClient.invalidateQueries({ queryKey: ['driver_signed_documents', driverRow.id] }),
       queryClient.invalidateQueries({ queryKey: ['driver-signed-doc-counts', orgId] }),
+      queryClient.invalidateQueries({ queryKey: ['driver-home/driver', user.id] }),
     ]);
 
     toast.success(revisionMode ? 'Revisions resubmitted. Admin will be notified.' : 'Documents submitted successfully');
