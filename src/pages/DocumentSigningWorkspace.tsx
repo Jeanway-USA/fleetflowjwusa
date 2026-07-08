@@ -194,7 +194,6 @@ export default function DocumentSigningWorkspace() {
       queryClient.invalidateQueries({ queryKey: ['document-instance', instanceId] });
       queryClient.invalidateQueries({ queryKey: ['document_instances', orgId] });
       queryClient.invalidateQueries({ queryKey: ['document_signatures_mine', user?.id] });
-      setTimeout(() => navigate('/documents/signing'), 600);
     },
     onError: (e: Error) => toast.error(e.message),
   });
