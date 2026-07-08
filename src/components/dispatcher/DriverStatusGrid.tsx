@@ -5,9 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Users, Phone, AlertTriangle, Package, CheckCircle, Clock } from 'lucide-react';
+import { Users, Phone, AlertTriangle, Package, CheckCircle, Clock, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { addDays, isBefore, formatDistanceToNow } from 'date-fns';
+import { addDays, isBefore, formatDistanceToNow, format, parseISO, startOfDay } from 'date-fns';
 
 interface Driver {
   id: string;
@@ -22,9 +22,18 @@ interface Driver {
   hos_last_updated: string | null;
 }
 
+interface HometimeWindow {
+  driver_id: string;
+  start_date: string;
+  end_date: string;
+}
+
 interface DriverWithLoad extends Driver {
   activeLoad: boolean;
+  activeHometime: HometimeWindow | null;
+  upcomingHometime: HometimeWindow | null;
 }
+
 
 type HosTone = 'red' | 'yellow' | 'green' | 'muted';
 
