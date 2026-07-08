@@ -2,7 +2,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Phone, Mail, Globe, MapPin, Edit2, Clock, Info, ShieldCheck, ShieldAlert, MapPinned } from 'lucide-react';
+import { Phone, Mail, Globe, MapPin, Edit2, Clock, Info, ShieldCheck, ShieldAlert, MapPinned, Zap, Route } from 'lucide-react';
 import { ActivityTimeline } from './ActivityTimeline';
 import { ContactLoadHistory } from './ContactLoadHistory';
 import { lazy, Suspense } from 'react';
@@ -10,7 +10,9 @@ const ContactRevenueStats = lazy(() =>
   import('./ContactRevenueStats').then(m => ({ default: m.ContactRevenueStats })),
 );
 import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
-import { getSubTypeLabel, type UnifiedContact } from '@/hooks/useCRMData';
+import { getSubTypeLabel, useAgentVolumeStats, useAgentLanes, type UnifiedContact } from '@/hooks/useCRMData';
+import { formatCurrency } from '@/lib/formatters';
+import { format, parseISO } from 'date-fns';
 
 interface ContactDetailSheetProps {
   contact: UnifiedContact | null;
