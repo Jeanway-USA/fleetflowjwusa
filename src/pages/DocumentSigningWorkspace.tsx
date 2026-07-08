@@ -405,6 +405,16 @@ export default function DocumentSigningWorkspace() {
                     <Download className="h-4 w-4 mr-2" />
                     Download completed PDF
                   </Button>
+                ) : composeError ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-destructive">
+                      Could not assemble the final PDF: {composeError}
+                    </p>
+                    <Button size="sm" variant="outline" className="w-full" onClick={runCompose} disabled={composing}>
+                      {composing && <Loader2 className="h-3 w-3 mr-2 animate-spin" />}
+                      Retry
+                    </Button>
+                  </div>
                 ) : (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />
