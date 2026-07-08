@@ -37,7 +37,7 @@ export default function DriverStats() {
     queryFn: async () => {
       const { data, error } = await (supabase.from('driver_settings_safe' as any) as any)
         .select('pay_week_start_day')
-        .eq('user_id', user?.id)
+        .eq('driver_id', user?.id)
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -110,8 +110,8 @@ export default function DriverStats() {
         .from('trailer_assignments')
         .select('*, trailers(*)')
         .eq('driver_id', driver?.id)
-        .is('end_date', null)
-        .order('start_date', { ascending: false })
+        .is('released_at', null)
+        .order('assigned_at', { ascending: false })
         .limit(1)
         .maybeSingle();
       if (error && error.code !== 'PGRST116') throw error;
