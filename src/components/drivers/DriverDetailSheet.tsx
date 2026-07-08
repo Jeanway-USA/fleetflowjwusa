@@ -151,7 +151,7 @@ export function DriverDetailSheet({
     ? 'Lease-Purchase'
     : driver.employment_type === '1099_contractor'
       ? '1099 Contractor'
-      : 'W-2 Company';
+      : 'W-2 Employee';
 
 
 

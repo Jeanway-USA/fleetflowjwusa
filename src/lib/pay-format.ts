@@ -28,14 +28,14 @@ export function formatPayRate(payType: DriverPayType, payRate: number | null | u
 export function payTypeLabel(payType: DriverPayType): string {
   switch (payType) {
     case 'percentage':
-      return 'Percentage';
+      return 'Percentage of Line-Haul';
     case 'cpm':
     case 'per_mile':
       return 'CPM (Cents per Mile)';
     case 'hourly':
-      return 'Hourly';
+      return 'Hourly (legacy)';
     case 'flat':
-      return 'Flat Rate';
+      return 'Flat Salary';
     default:
       return '—';
   }
