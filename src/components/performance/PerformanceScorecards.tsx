@@ -2,10 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Trophy, Info, Fuel } from 'lucide-react';
+import { Trophy, Info, Fuel, ShieldCheck, Target } from 'lucide-react';
 import { DriverMetric } from '@/hooks/useDriverPerformanceData';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { Target } from 'lucide-react';
+
 
 interface PerformanceScorecardsProps {
   metrics: DriverMetric[];
@@ -68,6 +68,52 @@ function ScoreRow({ label, value }: { label: string; value: number }) {
   );
 }
 
+function BonusRing({ weeks }: { weeks: number }) {
+  const size = 48;
+  const stroke = 4;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const pct = Math.min(4, Math.max(0, weeks)) / 4;
+  const dash = c * pct;
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="relative shrink-0 cursor-help" style={{ width: size, height: size }}>
+            <svg width={size} height={size} className="-rotate-90">
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={r}
+                fill="none"
+                strokeWidth={stroke}
+                className="stroke-muted"
+              />
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={r}
+                fill="none"
+                strokeWidth={stroke}
+                strokeLinecap="round"
+                strokeDasharray={`${dash} ${c - dash}`}
+                className={weeks >= 4 ? 'stroke-success' : 'stroke-primary'}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold">
+              {weeks}/4
+            </div>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[220px]">
+          <p className="text-xs">Consecutive clean weeks toward monthly Safety & Performance Bonus. Zero incidents required.</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+
 export function PerformanceScorecards({ metrics, selectedDriver }: PerformanceScorecardsProps) {
   const filteredMetrics = selectedDriver === 'all'
     ? metrics
@@ -91,18 +137,46 @@ export function PerformanceScorecards({ metrics, selectedDriver }: PerformanceSc
         return (
           <Card key={metric.driver.id} className="card-elevated">
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start justify-between gap-2">
                 <CardTitle className="text-lg">{metric.driver.first_name} {metric.driver.last_name}</CardTitle>
-                {globalIndex < 3 && (
-                  <Trophy className={`h-5 w-5 ${
-                    globalIndex === 0 ? 'text-yellow-500' :
-                    globalIndex === 1 ? 'text-gray-400' :
-                    'text-amber-600'
-                  }`} />
+                <div className="flex items-center gap-2">
+                  <BonusRing weeks={metric.bonusWeeks} />
+                  {globalIndex < 3 && (
+                    <Trophy className={`h-5 w-5 ${
+                      globalIndex === 0 ? 'text-yellow-500' :
+                      globalIndex === 1 ? 'text-gray-400' :
+                      'text-amber-600'
+                    }`} />
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className={badge.color}>{badge.label}</Badge>
+                {metric.bonusWeeks >= 4 && (
+                  <Badge className="bg-success/10 text-success border-success/20 hover:bg-success/10 gap-1">
+                    <ShieldCheck className="h-3 w-3" />
+                    Bonus Earned
+                  </Badge>
+                )}
+                {metric.retentionFlag && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500/10 cursor-help">
+                          Retention Review Required
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-[240px]">
+                        <p className="text-xs">
+                          Monthly mileage is {metric.retentionDropPct.toFixed(0)}% below the 6-month baseline. Audit routing and coordinate with agents.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
               </div>
-              <Badge className={badge.color}>{badge.label}</Badge>
             </CardHeader>
+
             <CardContent className="space-y-4">
               <div className="text-center">
                 <div className={`text-4xl font-bold ${getScoreColor(metric.overallScore)}`}>

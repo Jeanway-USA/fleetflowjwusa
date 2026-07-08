@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ChevronUp, ChevronDown, Minus, Fuel } from 'lucide-react';
-import { DriverMetric } from '@/hooks/useDriverPerformanceData';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ChevronUp, ChevronDown, Minus, Fuel, Trophy, Target } from 'lucide-react';
+import { DriverMetric, useDriverPerformanceData, PerformancePeriod } from '@/hooks/useDriverPerformanceData';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { Target } from 'lucide-react';
+
 
 interface PerformanceLeaderboardProps {
   metrics: DriverMetric[];
@@ -44,6 +46,76 @@ function TrendIndicator({ value, average }: { value: number; average: number }) 
   return <ChevronDown className="h-4 w-4 text-destructive" />;
 }
 
+function FleetRevenueLeaderboardCard({ selectedDriver }: { selectedDriver: string }) {
+  const [window, setWindow] = useState<PerformancePeriod>('week');
+  const { driverMetrics } = useDriverPerformanceData(window);
+  const ranked = [...driverMetrics]
+    .filter(m => m.totalRevenue > 0 || m.totalMiles > 0)
+    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+    .slice(0, 10);
+
+  return (
+    <Card className="card-elevated">
+      <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-yellow-500" />
+            Fleet Revenue Leaderboard
+          </CardTitle>
+          <CardDescription>Top drivers by gross generated and clean miles</CardDescription>
+        </div>
+        <Tabs value={window} onValueChange={(v) => setWindow(v as PerformancePeriod)}>
+          <TabsList>
+            <TabsTrigger value="week">Current Week</TabsTrigger>
+            <TabsTrigger value="30d">30 Days</TabsTrigger>
+            <TabsTrigger value="ytd">YTD</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </CardHeader>
+      <CardContent>
+        {ranked.length === 0 ? (
+          <EmptyState
+            icon={Trophy}
+            title="No revenue in this window"
+            description="No delivered loads found for the selected rolling window."
+          />
+        ) : (
+          <div className="space-y-2">
+            {ranked.map((m, i) => {
+              const isHighlighted = selectedDriver !== 'all' && m.driver.id === selectedDriver;
+              return (
+                <div
+                  key={m.driver.id}
+                  className={`flex items-center gap-3 rounded-md border p-3 ${isHighlighted ? 'bg-primary/5 border-primary/30' : ''}`}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                    i === 0 ? 'bg-yellow-400 text-yellow-900' :
+                    i === 1 ? 'bg-gray-300 text-gray-800' :
+                    i === 2 ? 'bg-amber-600 text-white' :
+                    'bg-muted text-muted-foreground'
+                  }`}>
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{m.driver.first_name} {m.driver.last_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {m.totalMiles.toLocaleString()} clean miles logged
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-semibold text-success">{formatCurrency(m.totalRevenue)}</p>
+                    <p className="text-xs text-muted-foreground">Total Gross</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function PerformanceLeaderboard({ metrics, fleetAverages, selectedDriver }: PerformanceLeaderboardProps) {
   const filteredMetrics = selectedDriver === 'all'
     ? metrics
@@ -51,20 +123,25 @@ export function PerformanceLeaderboard({ metrics, fleetAverages, selectedDriver 
 
   if (filteredMetrics.length === 0) {
     return (
-      <Card className="card-elevated">
-        <CardContent className="pt-6">
-          <EmptyState
-            icon={Target}
-            title="No performance data available"
-            description="No delivered loads, inspections, or incidents found for the selected period. Data will appear here once drivers complete deliveries."
-          />
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <FleetRevenueLeaderboardCard selectedDriver={selectedDriver} />
+        <Card className="card-elevated">
+          <CardContent className="pt-6">
+            <EmptyState
+              icon={Target}
+              title="No performance data available"
+              description="No delivered loads, inspections, or incidents found for the selected period. Data will appear here once drivers complete deliveries."
+            />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <Card className="card-elevated">
+    <div className="space-y-4">
+      <FleetRevenueLeaderboardCard selectedDriver={selectedDriver} />
+      <Card className="card-elevated">
       <CardHeader>
         <CardTitle>Driver Rankings</CardTitle>
         <CardDescription>Sorted by overall performance score</CardDescription>
@@ -141,6 +218,8 @@ export function PerformanceLeaderboard({ metrics, fleetAverages, selectedDriver 
           </Table>
         </div>
       </CardContent>
-    </Card>
+      </Card>
+    </div>
   );
 }
+
