@@ -268,11 +268,39 @@ export function DocumentTemplatesPanel({ hideHeader = false }: DocumentTemplates
   });
 
   const copyToken = async (token: string) => {
+    const fallbackCopy = (text: string) => {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.top = "0";
+        ta.style.left = "0";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return ok;
+      } catch {
+        return false;
+      }
+    };
+
     try {
-      await navigator.clipboard.writeText(token);
-      toast.success(`Copied ${token}`);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(token);
+        toast.success(`Copied ${token}`);
+        return;
+      }
+      throw new Error("Clipboard API unavailable");
     } catch {
-      toast.error("Unable to copy");
+      if (fallbackCopy(token)) {
+        toast.success(`Copied ${token}`);
+      } else {
+        toast.error("Unable to copy");
+      }
     }
   };
 
