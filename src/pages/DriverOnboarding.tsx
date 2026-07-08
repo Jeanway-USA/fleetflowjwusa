@@ -600,7 +600,7 @@ export default function DriverOnboarding() {
       );
     }
 
-    if (employmentType === '1099') {
+    if (employmentType === '1099' && !skip1099Structured) {
       const { error: w9Err } = await supabase.rpc('upsert_driver_w9' as never, {
         _driver_id: driverRow.id,
         _legal_name: contractorDocs.w9_legalName,
