@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/formatters';
 import { CarrierDocumentHub } from './CarrierDocumentHub';
+import { useAgentVolumeStats } from '@/hooks/useCRMData';
 
 interface BrokerContact {
   id: string;
@@ -70,6 +71,14 @@ export function BrokerDatabase() {
     enabled: !!orgId,
   });
 
+  const { data: volumeStats = {} } = useAgentVolumeStats();
+
+  const statsFor = (b: BrokerContact) => {
+    const code = (b.agent_code || '').trim();
+    if (!code) return null;
+    return volumeStats[code] || null;
+  };
+
   const createMutation = useMutation({
     mutationFn: async (broker: any) => {
       const { error } = await supabase.from('crm_contacts').insert({
@@ -114,16 +123,44 @@ export function BrokerDatabase() {
   });
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return brokers;
-    const q = search.toLowerCase();
-    return brokers.filter(
-      (b) =>
-        b.company_name.toLowerCase().includes(q) ||
-        (b.contact_name && b.contact_name.toLowerCase().includes(q)) ||
-        (b.agent_code && b.agent_code.toLowerCase().includes(q)) ||
-        (b.email && b.email.toLowerCase().includes(q))
-    );
-  }, [brokers, search]);
+    const base = !search.trim()
+      ? brokers
+      : brokers.filter((b) => {
+          const q = search.toLowerCase();
+          return (
+            b.company_name.toLowerCase().includes(q) ||
+            (b.contact_name && b.contact_name.toLowerCase().includes(q)) ||
+            (b.agent_code && b.agent_code.toLowerCase().includes(q)) ||
+            (b.email && b.email.toLowerCase().includes(q))
+          );
+        });
+    // Default sort: highest adjusted gross revenue, then load count. No stats → bottom.
+    return [...base].sort((a, b) => {
+      const sa = statsFor(a);
+      const sb = statsFor(b);
+      const ra = sa?.adjustedGrossRevenue ?? -1;
+      const rb = sb?.adjustedGrossRevenue ?? -1;
+      if (rb !== ra) return rb - ra;
+      const la = sa?.loadCount ?? 0;
+      const lb = sb?.loadCount ?? 0;
+      if (lb !== la) return lb - la;
+      return a.company_name.localeCompare(b.company_name);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brokers, search, volumeStats]);
+
+  const totals = useMemo(() => {
+    let loads = 0;
+    let revenue = 0;
+    for (const b of brokers) {
+      const s = statsFor(b);
+      if (!s) continue;
+      loads += s.loadCount;
+      revenue += s.adjustedGrossRevenue;
+    }
+    return { loads, revenue };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brokers, volumeStats]);
 
   const openForm = (broker?: BrokerContact) => {
     if (broker) {
@@ -221,16 +258,12 @@ export function BrokerDatabase() {
           <p className="text-2xl font-bold">{brokers.filter(b => b.is_active).length}</p>
         </div>
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-sm text-muted-foreground">With MC#</p>
-          <p className="text-2xl font-bold">{brokers.filter(b => b.agent_code).length}</p>
+          <p className="text-sm text-muted-foreground">Total Loads Moved</p>
+          <p className="text-2xl font-bold">{totals.loads.toLocaleString()}</p>
         </div>
         <div className="rounded-lg border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Avg Days to Pay</p>
-          <p className="text-2xl font-bold">
-            {brokers.filter(b => b.tags?.[1]).length > 0
-              ? Math.round(brokers.filter(b => b.tags?.[1]).reduce((sum, b) => sum + parseInt(b.tags![1]) || 0, 0) / brokers.filter(b => b.tags?.[1]).length)
-              : '—'}
-          </p>
+          <p className="text-sm text-muted-foreground">Total Adj. Gross Revenue</p>
+          <p className="text-2xl font-bold">{formatCurrency(totals.revenue)}</p>
         </div>
       </div>
 
@@ -253,9 +286,32 @@ export function BrokerDatabase() {
                 </div>
               ),
             },
-            { key: 'mc_number', header: 'MC#', hiddenOnMobile: true, render: (b: BrokerContact) => b.agent_code ? <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{b.agent_code}</code> : '—' },
+            { key: 'mc_number', header: 'Code / MC#', hiddenOnMobile: true, render: (b: BrokerContact) => b.agent_code ? <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{b.agent_code}</code> : '—' },
+            {
+              key: 'load_count', header: 'Loads', hiddenOnMobile: true, sortable: true,
+              sortAccessor: (b: BrokerContact) => statsFor(b)?.loadCount ?? -1,
+              render: (b: BrokerContact) => {
+                const s = statsFor(b);
+                return s ? <span className="font-medium tabular-nums">{s.loadCount.toLocaleString()}</span> : <span className="text-muted-foreground">—</span>;
+              },
+            },
+            {
+              key: 'adj_gross_revenue', header: 'Adj. Gross Revenue', hiddenOnMobile: true, sortable: true,
+              sortAccessor: (b: BrokerContact) => statsFor(b)?.adjustedGrossRevenue ?? -1,
+              render: (b: BrokerContact) => {
+                const s = statsFor(b);
+                return s ? <span className="font-medium tabular-nums">{formatCurrency(s.adjustedGrossRevenue)}</span> : <span className="text-muted-foreground">—</span>;
+              },
+            },
+            {
+              key: 'priority', header: 'Priority', hiddenOnMobile: true,
+              render: (b: BrokerContact) => {
+                const s = statsFor(b);
+                if (!s || s.recentLoadCount60d <= 5) return <span className="text-muted-foreground">—</span>;
+                return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Priority Dispatch</Badge>;
+              },
+            },
             { key: 'credit', header: 'Credit Score', hiddenOnMobile: true, render: (b: BrokerContact) => getCreditBadge(b.tags) || '—' },
-            { key: 'days_to_pay', header: 'Avg Days to Pay', hiddenOnMobile: true, render: (b: BrokerContact) => b.tags?.[1] ? `${b.tags[1]} days` : '—' },
             { key: 'contact', header: 'Contact', hiddenOnMobile: true, render: (b: BrokerContact) => (
               <div className="text-sm">
                 {b.email && <div>{b.email}</div>}

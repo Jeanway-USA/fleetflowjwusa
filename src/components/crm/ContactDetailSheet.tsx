@@ -2,7 +2,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Phone, Mail, Globe, MapPin, Edit2, Clock, Info, ShieldCheck, ShieldAlert, MapPinned } from 'lucide-react';
+import { Phone, Mail, Globe, MapPin, Edit2, Clock, Info, ShieldCheck, ShieldAlert, MapPinned, Zap, Route } from 'lucide-react';
 import { ActivityTimeline } from './ActivityTimeline';
 import { ContactLoadHistory } from './ContactLoadHistory';
 import { lazy, Suspense } from 'react';
@@ -10,7 +10,9 @@ const ContactRevenueStats = lazy(() =>
   import('./ContactRevenueStats').then(m => ({ default: m.ContactRevenueStats })),
 );
 import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
-import { getSubTypeLabel, type UnifiedContact } from '@/hooks/useCRMData';
+import { getSubTypeLabel, useAgentVolumeStats, useAgentLanes, type UnifiedContact } from '@/hooks/useCRMData';
+import { formatCurrency } from '@/lib/formatters';
+import { format, parseISO } from 'date-fns';
 
 interface ContactDetailSheetProps {
   contact: UnifiedContact | null;
@@ -65,11 +67,20 @@ function Field({ icon: Icon, label, value, href }: { icon?: any; label: string; 
 }
 
 export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOnly = false }: ContactDetailSheetProps) {
+  const { data: volumeStats = {} } = useAgentVolumeStats();
+  const agencyCode = contact?.agent_code?.trim() || null;
+  const { data: lanes = [], isLoading: lanesLoading } = useAgentLanes(
+    open && agencyCode ? agencyCode : null,
+  );
+
   if (!contact) return null;
 
   const subType = getSubTypeLabel(contact);
   const kind = classify(contact);
   const supportsTabs = kind === 'broker' || (kind === 'agent' && contact.source === 'crm');
+  const stats = agencyCode ? volumeStats[agencyCode] : null;
+  const showPriority = !!stats && stats.recentLoadCount60d > 5;
+  const showLanesTab = supportsTabs && !!agencyCode;
 
   const handleEditClick = () => {
     onOpenChange(false);
@@ -117,6 +128,34 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {/* === Priority Dispatch panel === */}
+          {showPriority && (
+            <section className="rounded-lg border border-emerald-500/40 bg-emerald-500/5 px-4 py-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/40 gap-1">
+                  <Zap className="h-3 w-3" /> Priority Dispatch
+                </Badge>
+                <span className="text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                  {stats!.recentLoadCount60d} loads in last 60 days
+                </span>
+              </div>
+              {contact.phone && (
+                <a
+                  href={`tel:${contact.phone}`}
+                  className="flex items-center gap-2 text-lg font-semibold text-emerald-700 dark:text-emerald-300 hover:underline"
+                >
+                  <Phone className="h-5 w-5" /> {contact.phone}
+                </a>
+              )}
+              {stats!.topLane && (
+                <div className="text-xs text-muted-foreground">
+                  <span className="uppercase tracking-wide">Primary Lane · </span>
+                  <span className="text-foreground font-medium">{stats!.topLane}</span>
+                </div>
+              )}
+            </section>
+          )}
+
           {/* === Type-aware information section === */}
           {kind === 'broker' && (
             <section className="space-y-3 pb-4 border-b border-border">
@@ -246,9 +285,10 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
           {/* === Tabs (only for brokers and CRM-source agents) === */}
           {supportsTabs ? (
             <Tabs defaultValue="activity">
-              <TabsList className="w-full grid grid-cols-3">
+              <TabsList className={`w-full grid ${showLanesTab ? 'grid-cols-4' : 'grid-cols-3'}`}>
                 <TabsTrigger value="activity" className="text-xs">Activity</TabsTrigger>
                 <TabsTrigger value="loads" className="text-xs">Load History</TabsTrigger>
+                {showLanesTab && <TabsTrigger value="lanes" className="text-xs">Lanes</TabsTrigger>}
                 <TabsTrigger value="revenue" className="text-xs">Revenue</TabsTrigger>
               </TabsList>
               <TabsContent value="activity" className="mt-3">
@@ -257,6 +297,42 @@ export function ContactDetailSheet({ contact, open, onOpenChange, onEdit, readOn
               <TabsContent value="loads" className="mt-3">
                 <ContactLoadHistory contactId={contact.id} />
               </TabsContent>
+              {showLanesTab && (
+                <TabsContent value="lanes" className="mt-3">
+                  {lanesLoading ? (
+                    <div className="text-xs text-muted-foreground text-center py-6">Loading lanes…</div>
+                  ) : lanes.length === 0 ? (
+                    <div className="text-xs text-muted-foreground text-center py-6">
+                      No completed loads recorded for agency code {agencyCode} yet.
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-border rounded-md border">
+                      {lanes.map((lane) => (
+                        <li key={`${lane.origin}||${lane.destination}`} className="px-3 py-2.5">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-medium flex items-center gap-1.5">
+                                <Route className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                <span className="truncate">{lane.origin} → {lane.destination}</span>
+                              </div>
+                              <div className="text-[11px] text-muted-foreground mt-0.5">
+                                Revenue: {formatCurrency(lane.totalRevenue)}
+                                {lane.lastDeliveredAt && (
+                                  <> · Last: {format(parseISO(`${lane.lastDeliveredAt}T00:00:00`), 'MMM d, yyyy')}</>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="text-sm font-semibold tabular-nums">{lane.count}</div>
+                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">loads</div>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </TabsContent>
+              )}
               <TabsContent value="revenue" className="mt-3">
                 <Suspense fallback={<ChartSkeleton height={260} />}>
                   <ContactRevenueStats contactId={contact.id} />
