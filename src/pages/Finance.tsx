@@ -55,7 +55,8 @@ type AgentCommission = Database['public']['Tables']['agent_commissions']['Row'];
 
 export default function Finance() {
   const queryClient = useQueryClient();
-  const { orgId } = useAuth();
+  const { orgId, hasRole } = useAuth();
+  const canManagePayroll = hasRole('owner') || hasRole('payroll_admin');
   const { isIndependent } = useOrganizationMode();
   // Default to current month
   const now = new Date();
