@@ -79,6 +79,7 @@ export default function DriverOnboarding() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const revisionMode = searchParams.get('revision') === '1';
+  const docsOnlyMode = searchParams.get('docs') === '1';
   const { user, orgId, refreshOrgData } = useAuth();
 
   const [stepIndex, setStepIndex] = useState(0);
