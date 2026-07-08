@@ -1199,7 +1199,7 @@ export function useTruckHistory(truckId: string | null) {
         .eq('setting_key', 'avg_daily_truck_revenue')
         .maybeSingle();
       const avgDailyRevenue =
-        parseFloat(dailyRevSetting?.setting_value || '') || DEFAULT_DAILY_REVENUE_TARGET;
+        parseFloat(dailyRevSetting?.setting_value || '') || 0;
 
       // Calculate stats
       const totalSpend =
