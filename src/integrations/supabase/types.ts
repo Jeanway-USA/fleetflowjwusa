@@ -2167,6 +2167,7 @@ export type Database = {
         Row: {
           assigned_work_address_id: string | null
           avatar_url: string | null
+          base_salary_per_period: number
           created_at: string
           credentials_review_status: Database["public"]["Enums"]["onboarding_review_status"]
           credentials_reviewed_at: string | null
@@ -2211,6 +2212,7 @@ export type Database = {
         Insert: {
           assigned_work_address_id?: string | null
           avatar_url?: string | null
+          base_salary_per_period?: number
           created_at?: string
           credentials_review_status?: Database["public"]["Enums"]["onboarding_review_status"]
           credentials_reviewed_at?: string | null
@@ -2255,6 +2257,7 @@ export type Database = {
         Update: {
           assigned_work_address_id?: string | null
           avatar_url?: string | null
+          base_salary_per_period?: number
           created_at?: string
           credentials_review_status?: Database["public"]["Enums"]["onboarding_review_status"]
           credentials_reviewed_at?: string | null
@@ -3356,6 +3359,8 @@ export type Database = {
       }
       internal_payroll_ledger: {
         Row: {
+          base_salary: number
+          bonus_pay: number
           created_at: string
           driver_id: string
           employment_type: string
@@ -3364,6 +3369,7 @@ export type Database = {
           finalized_by: string | null
           gross_line_haul: number
           gross_taxable_pay: number
+          holiday_pay: number
           id: string
           org_id: string
           pass_through_fsc: number
@@ -3375,6 +3381,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          base_salary?: number
+          bonus_pay?: number
           created_at?: string
           driver_id: string
           employment_type?: string
@@ -3383,6 +3391,7 @@ export type Database = {
           finalized_by?: string | null
           gross_line_haul?: number
           gross_taxable_pay?: number
+          holiday_pay?: number
           id?: string
           org_id: string
           pass_through_fsc?: number
@@ -3394,6 +3403,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          base_salary?: number
+          bonus_pay?: number
           created_at?: string
           driver_id?: string
           employment_type?: string
@@ -3402,6 +3413,7 @@ export type Database = {
           finalized_by?: string | null
           gross_line_haul?: number
           gross_taxable_pay?: number
+          holiday_pay?: number
           id?: string
           org_id?: string
           pass_through_fsc?: number
@@ -5241,30 +5253,36 @@ export type Database = {
       }
       tax_filing_completions: {
         Row: {
-          confirmation_reference: string
+          confirmation_reference: string | null
           created_at: string
+          exempt_reason: string | null
           filed_by: string | null
-          filed_on: string
+          filed_on: string | null
           form_key: string
           id: string
+          is_exempt: boolean
           org_id: string
         }
         Insert: {
-          confirmation_reference: string
+          confirmation_reference?: string | null
           created_at?: string
+          exempt_reason?: string | null
           filed_by?: string | null
-          filed_on: string
+          filed_on?: string | null
           form_key: string
           id?: string
+          is_exempt?: boolean
           org_id: string
         }
         Update: {
-          confirmation_reference?: string
+          confirmation_reference?: string | null
           created_at?: string
+          exempt_reason?: string | null
           filed_by?: string | null
-          filed_on?: string
+          filed_on?: string | null
           form_key?: string
           id?: string
+          is_exempt?: boolean
           org_id?: string
         }
         Relationships: []
