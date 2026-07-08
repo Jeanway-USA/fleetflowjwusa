@@ -183,8 +183,6 @@ export default function Settings() {
             </TabsContent>
 
             <TabsContent value="payroll" className="space-y-6">
-              <EmployerOnboardingPortal />
-              <W2DriverSyncDashboard />
               <PayrollTaxesCard />
             </TabsContent>
           </Tabs>
