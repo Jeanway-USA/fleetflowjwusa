@@ -71,6 +71,10 @@ export interface DocumentSignatureStepProps {
   onW2DocsChange: (patch: Partial<W2DocsState>) => void;
   contractorDocs: ContractorDocsState;
   onContractorDocsChange: (patch: Partial<ContractorDocsState>) => void;
+  /** When true, W-2 structured forms (W-4/I-9/Direct Deposit) are already on file — hide their block. */
+  skipW2Structured?: boolean;
+  /** When true, 1099 structured forms (W-9/IOO) are already on file — hide their block. */
+  skip1099Structured?: boolean;
 }
 
 // ---------------------------------------------------------------------------
