@@ -87,14 +87,54 @@ export function DriverStatusGrid() {
       
       if (loadsError) throw loadsError;
 
+      // Approved hometime windows: active or upcoming within 14 days
+      const todayIso = format(new Date(), 'yyyy-MM-dd');
+      const horizonIso = format(addDays(new Date(), 14), 'yyyy-MM-dd');
+      const { data: hometimeRows } = await supabase
+        .from('driver_requests')
+        .select('driver_id, start_date, end_date')
+        .eq('request_type', 'home_time')
+        .eq('status', 'approved')
+        .not('start_date', 'is', null)
+        .not('end_date', 'is', null)
+        .gte('end_date', todayIso)
+        .lte('start_date', horizonIso);
+
+      const today = startOfDay(new Date());
+      const hometimeByDriver = new Map<string, HometimeWindow[]>();
+      for (const h of hometimeRows || []) {
+        if (!h.driver_id || !h.start_date || !h.end_date) continue;
+        const list = hometimeByDriver.get(h.driver_id) || [];
+        list.push(h as HometimeWindow);
+        hometimeByDriver.set(h.driver_id, list);
+      }
+
       const assignedDriverIds = new Set(activeLoads?.map(l => l.driver_id).filter(Boolean));
 
-      return driversData?.map(driver => ({
-        ...driver,
-        activeLoad: assignedDriverIds.has(driver.id),
-      })) as DriverWithLoad[];
+      return driversData?.map(driver => {
+        const windows = hometimeByDriver.get(driver.id) || [];
+        const active =
+          windows.find(w => {
+            const s = startOfDay(parseISO(`${w.start_date}T00:00:00`));
+            const e = startOfDay(parseISO(`${w.end_date}T00:00:00`));
+            return today >= s && today <= e;
+          }) || null;
+        const upcoming = active
+          ? null
+          : windows
+              .filter(w => startOfDay(parseISO(`${w.start_date}T00:00:00`)) > today)
+              .sort((a, b) => a.start_date.localeCompare(b.start_date))[0] || null;
+
+        return {
+          ...driver,
+          activeLoad: assignedDriverIds.has(driver.id),
+          activeHometime: active,
+          upcomingHometime: upcoming,
+        };
+      }) as DriverWithLoad[];
     },
   });
+
 
   const getExpiringCredentials = (driver: Driver) => {
     const warnings: string[] = [];
