@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, FileText, ShieldCheck, ClipboardList } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { DocumentTemplateRenderer } from '@/components/onboarding/DocumentTemplateRenderer';
 import {
   W2Documents,
@@ -36,11 +34,14 @@ export interface TemplateState {
   bankAccountType: 'checking' | 'savings' | '';
 }
 
+export type TemplateAudience = 'shared' | 'w2' | '1099';
+
 export interface DocumentTemplateRow {
   id: string;
   document_type: string;
   name?: string | null;
   content: string;
+  applies_to?: TemplateAudience | null;
 }
 
 interface DriverRowLike {
@@ -71,41 +72,6 @@ export interface DocumentSignatureStepProps {
   contractorDocs: ContractorDocsState;
   onContractorDocsChange: (patch: Partial<ContractorDocsState>) => void;
 }
-
-// ---------------------------------------------------------------------------
-// Categorization
-// ---------------------------------------------------------------------------
-
-const SHARED_DOCUMENT_TYPES = ['driver_agreement'] as const;
-const W2_DOCUMENT_TYPES = ['direct_deposit'] as const;
-const CONTRACTOR_DOCUMENT_TYPES: readonly string[] = [];
-
-// Placeholder cards used until real DB templates are seeded for these docs.
-interface PlaceholderDoc {
-  id: string;
-  title: string;
-  description: string;
-  Icon: typeof FileText;
-}
-
-const SHARED_PLACEHOLDERS: PlaceholderDoc[] = [
-  {
-    id: 'placeholder_safety_policy',
-    title: 'Company Safety Policy',
-    description: 'Acknowledgement of safety expectations, defensive driving, and reporting requirements.',
-    Icon: ShieldCheck,
-  },
-  {
-    id: 'placeholder_equipment_use',
-    title: 'Equipment Use Agreement',
-    description: 'Terms covering assigned tractor, trailer, ELD, and any company-provided equipment.',
-    Icon: ClipboardList,
-  },
-];
-
-// Employment-specific placeholder lists were replaced by real form components:
-// W2Documents (W-4 / I-9 / Direct Deposit) and ContractorDocuments (W-9 / IOO Agreement).
-
 
 // ---------------------------------------------------------------------------
 // Validity helper
@@ -152,52 +118,6 @@ const EMPTY_TEMPLATE_STATE: TemplateState = {
 // ---------------------------------------------------------------------------
 // Subcomponents
 // ---------------------------------------------------------------------------
-
-function PlaceholderDocumentCard({
-  doc,
-  checked,
-  onCheckedChange,
-}: {
-  doc: PlaceholderDoc;
-  checked: boolean;
-  onCheckedChange: (v: boolean) => void;
-}) {
-  const { Icon } = doc;
-  return (
-    <Card className="border-dashed bg-muted/30">
-      <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-        <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-md bg-muted text-muted-foreground">
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <CardTitle className="text-base">{doc.title}</CardTitle>
-            <Badge variant="secondary" className="uppercase tracking-wide text-[10px]">
-              Coming soon
-            </Badge>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">{doc.description}</p>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <label
-          htmlFor={`ack-${doc.id}`}
-          className="flex items-start gap-3 rounded-md border bg-background p-3 cursor-pointer hover:bg-accent/40"
-        >
-          <Checkbox
-            id={`ack-${doc.id}`}
-            checked={checked}
-            onCheckedChange={(v) => onCheckedChange(v === true)}
-            className="mt-0.5"
-          />
-          <span className="text-sm">
-            I acknowledge that this document is not yet available and I&apos;ll sign it as soon as it&apos;s ready.
-          </span>
-        </label>
-      </CardContent>
-    </Card>
-  );
-}
 
 function TemplateBlock({
   template,
@@ -306,29 +226,29 @@ export function DocumentSignatureStep({
   contractorDocs,
   onContractorDocsChange,
 }: DocumentSignatureStepProps) {
-  const [placeholderAcks, setPlaceholderAcks] = useState<Record<string, boolean>>({});
   const [w2Valid, setW2Valid] = useState(false);
   const [contractorValid, setContractorValid] = useState(false);
 
-  // Group templates by section
+  // Group templates by audience (applies_to). Fallback to 'shared' when absent.
+  const audienceOf = (t: DocumentTemplateRow): TemplateAudience =>
+    (t.applies_to as TemplateAudience | undefined) ?? 'shared';
+
   const sharedTemplates = useMemo(
-    () => templates.filter((t) => (SHARED_DOCUMENT_TYPES as readonly string[]).includes(t.document_type)),
+    () => templates.filter((t) => audienceOf(t) === 'shared'),
     [templates],
   );
   const w2Templates = useMemo(
-    () => templates.filter((t) => (W2_DOCUMENT_TYPES as readonly string[]).includes(t.document_type)),
+    () => templates.filter((t) => audienceOf(t) === 'w2'),
     [templates],
   );
   const contractorTemplates = useMemo(
-    () => templates.filter((t) => (CONTRACTOR_DOCUMENT_TYPES as readonly string[]).includes(t.document_type)),
+    () => templates.filter((t) => audienceOf(t) === '1099'),
     [templates],
   );
 
-  // Determine which real templates should count toward validity (skip approved ones in revision mode)
   const shouldValidateTemplate = (t: DocumentTemplateRow) =>
     !(revisionMode && docRevisions[t.document_type]?.status === 'approved');
 
-  // Aggregate validity: shared templates + shared placeholders + real form components
   useEffect(() => {
     if (employmentType === null) {
       onValidityChange(false);
@@ -342,14 +262,9 @@ export function DocumentSignatureStep({
       .filter(shouldValidateTemplate)
       .every((t) => computeTemplateValidity(t, state[t.id] ?? EMPTY_TEMPLATE_STATE));
 
-    const sharedPlaceholdersValid = SHARED_PLACEHOLDERS.every(
-      (p) => placeholderAcks[p.id] === true,
-    );
-
     const employmentFormsValid = employmentType === 'W-2' ? w2Valid : contractorValid;
 
-    onValidityChange(templatesValid && sharedPlaceholdersValid && employmentFormsValid);
-    // We intentionally omit onValidityChange from deps to avoid loops.
+    onValidityChange(templatesValid && employmentFormsValid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     employmentType,
@@ -357,7 +272,6 @@ export function DocumentSignatureStep({
     w2Templates,
     contractorTemplates,
     state,
-    placeholderAcks,
     w2Valid,
     contractorValid,
     revisionMode,
@@ -399,26 +313,18 @@ export function DocumentSignatureStep({
   return (
     <div className="space-y-8">
       {/* Shared Documents */}
-      <section className="space-y-4">
-        <SectionHeader
-          title="Shared Documents"
-          description="Every driver signs these agreements, regardless of employment type."
-          badge="All Drivers"
-        />
-        <div className="space-y-4">
-          {sharedTemplates.map(renderTemplate)}
-          {SHARED_PLACEHOLDERS.map((doc) => (
-            <PlaceholderDocumentCard
-              key={doc.id}
-              doc={doc}
-              checked={placeholderAcks[doc.id] === true}
-              onCheckedChange={(v) =>
-                setPlaceholderAcks((prev) => ({ ...prev, [doc.id]: v }))
-              }
-            />
-          ))}
-        </div>
-      </section>
+      {sharedTemplates.length > 0 && (
+        <section className="space-y-4">
+          <SectionHeader
+            title="Shared Documents"
+            description="Every driver signs these agreements, regardless of employment type."
+            badge="All Drivers"
+          />
+          <div className="space-y-4">
+            {sharedTemplates.map(renderTemplate)}
+          </div>
+        </section>
+      )}
 
       {/* Employment-specific block */}
       {employmentType === 'W-2' ? (
