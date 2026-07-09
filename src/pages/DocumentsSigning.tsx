@@ -8,8 +8,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, PenLine, Clock, CheckCircle2, FileSignature, ArrowRight, Send } from 'lucide-react';
+import { Loader2, PenLine, Clock, CheckCircle2, FileSignature, ArrowRight, Send, RotateCcw } from 'lucide-react';
 import { SendDocumentDialog } from '@/components/documents/SendDocumentDialog';
+import { ReopenDocumentDialog } from '@/components/documents/ReopenDocumentDialog';
 
 type InstanceStatus = 'draft' | 'pending_signatures' | 'completed' | 'voided';
 
