@@ -154,11 +154,16 @@ function InstanceList({
   rows,
   emptyMessage,
   highlight = false,
+  canManage = false,
+  orgId,
 }: {
   rows: DocumentInstance[];
   emptyMessage: string;
   highlight?: boolean;
+  canManage?: boolean;
+  orgId?: string | null;
 }) {
+  const [reopenTarget, setReopenTarget] = useState<DocumentInstance | null>(null);
   if (rows.length === 0) {
     return (
       <Card className="card-elevated">
@@ -171,29 +176,57 @@ function InstanceList({
   }
   return (
     <>
-      {rows.map((r) => (
-        <Card key={r.id} className={`card-elevated ${highlight ? 'border-primary/50' : ''}`}>
-          <CardContent className="p-4 flex flex-wrap items-center gap-4">
-            <div className="flex-1 min-w-[220px]">
-              <div className="font-medium">{r.title}</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Step {Math.min(r.current_step + 1, r.signatory_roles.length)} of{' '}
-                {r.signatory_roles.length} · {r.signatory_roles.join(' → ')}
+      {rows.map((r) => {
+        const canReopen = canManage && (r.status === 'completed' || r.status === 'pending_signatures');
+        return (
+          <Card key={r.id} className={`card-elevated ${highlight ? 'border-primary/50' : ''}`}>
+            <CardContent className="p-4 flex flex-wrap items-center gap-4">
+              <div className="flex-1 min-w-[220px]">
+                <div className="font-medium">{r.title}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Step {Math.min(r.current_step + 1, r.signatory_roles.length)} of{' '}
+                  {r.signatory_roles.length} · {r.signatory_roles.join(' → ')}
+                </div>
               </div>
-            </div>
-            <StatusBadge status={r.status} />
-            <div className="text-xs text-muted-foreground w-28 text-right">
-              {new Date(r.updated_at).toLocaleDateString()}
-            </div>
-            <Button asChild size="sm" variant={highlight ? 'default' : 'outline'}>
-              <Link to={`/documents/signing/${r.id}`}>
-                Open
-                <ArrowRight className="h-4 w-4 ml-1" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ))}
+              <StatusBadge status={r.status} />
+              <div className="text-xs text-muted-foreground w-28 text-right">
+                {new Date(r.updated_at).toLocaleDateString()}
+              </div>
+              {canReopen && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setReopenTarget(r)}
+                  title="Reopen for re-signing"
+                >
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  Reopen
+                </Button>
+              )}
+              <Button asChild size="sm" variant={highlight ? 'default' : 'outline'}>
+                <Link to={`/documents/signing/${r.id}`}>
+                  Open
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })}
+      {reopenTarget && (
+        <ReopenDocumentDialog
+          open={!!reopenTarget}
+          onOpenChange={(v) => !v && setReopenTarget(null)}
+          instance={{
+            id: reopenTarget.id,
+            org_id: orgId ?? null,
+            title: reopenTarget.title,
+            signatory_roles: reopenTarget.signatory_roles,
+            current_step: reopenTarget.current_step,
+            status: reopenTarget.status,
+          }}
+        />
+      )}
     </>
   );
 }
