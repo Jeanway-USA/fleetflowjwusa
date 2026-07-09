@@ -11,17 +11,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, CheckCircle2, FileText, Download } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, FileText, Download, RotateCcw } from 'lucide-react';
 import { SignaturePad } from '@/components/driver/SignaturePad';
 import { hydrateTokens, extractUnresolvedTokens, extractConsentKeys } from '@/lib/documents/hydrateTokens';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { composeCompletedPdf } from '@/lib/documents/composeCompletedPdf';
+import { ReopenDocumentDialog } from '@/components/documents/ReopenDocumentDialog';
 
 export default function DocumentSigningWorkspace() {
   const { instanceId } = useParams<{ instanceId: string }>();
   // Auto-navigation after signing removed so the completed PDF can render.
-  const { user, orgId, roles } = useAuth();
+  const { user, orgId, roles, canSimulateRoles } = useAuth();
   const queryClient = useQueryClient();
+  const [reopenOpen, setReopenOpen] = useState(false);
 
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
@@ -297,10 +299,30 @@ export default function DocumentSigningWorkspace() {
         title={instance.title}
         description={`Step ${Math.min(instance.current_step + 1, instance.signatory_roles.length)} of ${instance.signatory_roles.length} · Currently: ${stepRole || '—'}`}
       >
+        {canSimulateRoles && (instance.status === 'completed' || instance.status === 'pending_signatures') && (
+          <Button variant="outline" onClick={() => setReopenOpen(true)}>
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Reopen for re-signing
+          </Button>
+        )}
         <Button variant="outline" asChild>
           <Link to="/documents/signing"><ArrowLeft className="h-4 w-4 mr-2" />Dashboard</Link>
         </Button>
       </PageHeader>
+      {canSimulateRoles && (
+        <ReopenDocumentDialog
+          open={reopenOpen}
+          onOpenChange={setReopenOpen}
+          instance={{
+            id: instance.id,
+            org_id: orgId ?? null,
+            title: instance.title,
+            signatory_roles: instance.signatory_roles,
+            current_step: instance.current_step,
+            status: instance.status,
+          }}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 card-elevated">
