@@ -11,11 +11,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, CheckCircle2, FileText, Download } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, FileText, Download, RotateCcw } from 'lucide-react';
 import { SignaturePad } from '@/components/driver/SignaturePad';
 import { hydrateTokens, extractUnresolvedTokens, extractConsentKeys } from '@/lib/documents/hydrateTokens';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { composeCompletedPdf } from '@/lib/documents/composeCompletedPdf';
+import { ReopenDocumentDialog } from '@/components/documents/ReopenDocumentDialog';
 
 export default function DocumentSigningWorkspace() {
   const { instanceId } = useParams<{ instanceId: string }>();
