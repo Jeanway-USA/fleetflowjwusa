@@ -125,13 +125,13 @@ export default function DocumentsSigning() {
           ) : (
             <>
               <TabsContent value="action" className="space-y-3">
-                <InstanceList rows={actionRequired} emptyMessage="You're all caught up." highlight />
+                <InstanceList rows={actionRequired} emptyMessage="You're all caught up." highlight canManage={canSimulateRoles} orgId={orgId} />
               </TabsContent>
               <TabsContent value="pending" className="space-y-3">
-                <InstanceList rows={pendingOthers} emptyMessage="Nothing waiting on others." />
+                <InstanceList rows={pendingOthers} emptyMessage="Nothing waiting on others." canManage={canSimulateRoles} orgId={orgId} />
               </TabsContent>
               <TabsContent value="completed" className="space-y-3">
-                <InstanceList rows={completed} emptyMessage="No completed documents yet." />
+                <InstanceList rows={completed} emptyMessage="No completed documents yet." canManage={canSimulateRoles} orgId={orgId} />
               </TabsContent>
             </>
           )}
