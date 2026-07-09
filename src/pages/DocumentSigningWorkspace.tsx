@@ -299,10 +299,30 @@ export default function DocumentSigningWorkspace() {
         title={instance.title}
         description={`Step ${Math.min(instance.current_step + 1, instance.signatory_roles.length)} of ${instance.signatory_roles.length} · Currently: ${stepRole || '—'}`}
       >
+        {canSimulateRoles && (instance.status === 'completed' || instance.status === 'pending_signatures') && (
+          <Button variant="outline" onClick={() => setReopenOpen(true)}>
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Reopen for re-signing
+          </Button>
+        )}
         <Button variant="outline" asChild>
           <Link to="/documents/signing"><ArrowLeft className="h-4 w-4 mr-2" />Dashboard</Link>
         </Button>
       </PageHeader>
+      {canSimulateRoles && (
+        <ReopenDocumentDialog
+          open={reopenOpen}
+          onOpenChange={setReopenOpen}
+          instance={{
+            id: instance.id,
+            org_id: orgId ?? null,
+            title: instance.title,
+            signatory_roles: instance.signatory_roles,
+            current_step: instance.current_step,
+            status: instance.status,
+          }}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 card-elevated">
