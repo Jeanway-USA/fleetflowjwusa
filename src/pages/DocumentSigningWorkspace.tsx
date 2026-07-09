@@ -21,8 +21,9 @@ import { ReopenDocumentDialog } from '@/components/documents/ReopenDocumentDialo
 export default function DocumentSigningWorkspace() {
   const { instanceId } = useParams<{ instanceId: string }>();
   // Auto-navigation after signing removed so the completed PDF can render.
-  const { user, orgId, roles } = useAuth();
+  const { user, orgId, roles, canSimulateRoles } = useAuth();
   const queryClient = useQueryClient();
+  const [reopenOpen, setReopenOpen] = useState(false);
 
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
