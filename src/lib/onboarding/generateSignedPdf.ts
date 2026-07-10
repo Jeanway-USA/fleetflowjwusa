@@ -406,9 +406,6 @@ export function generateSignedPdf({
         case 'driver_address':
           buffer += driverAddress || '________________________';
           break;
-        case 'driver_name':
-          buffer += driverName || '________________________';
-          break;
         case 'cdl_number':
           buffer += cdlNumber || '________________________';
           break;
