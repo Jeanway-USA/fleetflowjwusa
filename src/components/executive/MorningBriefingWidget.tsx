@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Truck, Users, Wrench, FileWarning } from 'lucide-react';
+import { Truck, Users, Wrench, FileWarning, FileSignature } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { BriefingLoadsDialog } from './BriefingLoadsDialog';
@@ -20,12 +20,12 @@ interface BriefingMetric {
 }
 
 export function MorningBriefingWidget() {
-  const { orgId } = useAuth();
+  const { orgId, user, roles } = useAuth();
   const navigate = useNavigate();
   const [activeDialog, setActiveDialog] = useState<'pickup-today' | 'missing-pod' | null>(null);
 
   const { data: metrics } = useQuery({
-    queryKey: ['morning-briefing', orgId],
+    queryKey: ['morning-briefing', orgId, user?.id],
     queryFn: async () => {
       if (!orgId) return [];
 
@@ -147,6 +147,44 @@ export function MorningBriefingWidget() {
           action: 'dialog',
           dialogType: 'missing-pod',
         });
+      }
+
+      // Pending signatures for the current user
+      if (user?.id) {
+        const [{ data: pendingInstances }, { data: mySigs }] = await Promise.all([
+          supabase
+            .from('document_instances')
+            .select('id, signatory_roles, current_step, assigned_to_user')
+            .eq('org_id', orgId)
+            .eq('status', 'pending_signatures'),
+          supabase
+            .from('document_signatures')
+            .select('instance_id, step_index')
+            .eq('signer_id', user.id),
+        ]);
+
+        const signedSet = new Set(
+          (mySigs ?? []).map((s) => `${s.instance_id}:${s.step_index}`),
+        );
+
+        const pendingCount = (pendingInstances ?? []).filter((inst) => {
+          if (signedSet.has(`${inst.id}:${inst.current_step}`)) return false;
+          if (inst.assigned_to_user) return inst.assigned_to_user === user.id;
+          const stepRole = (inst.signatory_roles ?? [])[inst.current_step];
+          return !!stepRole && roles.includes(stepRole as (typeof roles)[number]);
+        }).length;
+
+        if (pendingCount > 0) {
+          results.push({
+            key: 'pending-signatures',
+            label: 'Pending Signatures',
+            count: pendingCount,
+            icon: FileSignature,
+            colorClass: 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20',
+            action: 'navigate',
+            route: '/documents/signing',
+          });
+        }
       }
 
       return results;
