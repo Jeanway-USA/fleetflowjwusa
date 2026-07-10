@@ -79,7 +79,6 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
   const c = ctx.company ?? {};
   const meta = ctx.instance?.metadata ?? {};
 
-  const driverName = [d.first_name, d.last_name].filter(Boolean).join(' ').trim();
   const contractorState = extractStateFromAddress(d.address) || (d.license_state ?? '');
 
   const map: Record<string, string> = {
