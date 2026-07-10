@@ -301,7 +301,6 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
             ty -= lineHeight;
           };
           draw(`Printed Name: ${ownerName}`);
-          draw(`Title: ${ownerTitle}`);
           draw(`Date Signed: ${ownerDate}`);
         }
       }
