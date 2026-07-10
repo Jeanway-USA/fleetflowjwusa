@@ -443,22 +443,6 @@ export function DocumentTemplateRenderer({
             className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[16ch]")}
           />
         );
-      case 'driver_printed_name':
-        return (
-          <span key={key} className="font-medium">
-            {driverName?.trim() || <span className="text-muted-foreground italic">[Printed name pending]</span>}
-          </span>
-        );
-      case 'driver_title':
-        return <span key={key} className="text-muted-foreground italic">[Title pending]</span>;
-      case 'driver_date_signed':
-        return <span key={key} className="font-medium">{todayFormatted}</span>;
-      case 'owner_printed_name':
-        return <span key={key} className="text-muted-foreground italic">[Owner printed name pending]</span>;
-      case 'owner_title':
-        return <span key={key} className="text-muted-foreground italic">[Owner title pending]</span>;
-      case 'owner_date_signed':
-        return <span key={key} className="text-muted-foreground italic">[Owner date pending]</span>;
       default:
         return <span key={key}>{`{{${name}}}`}</span>;
     }
