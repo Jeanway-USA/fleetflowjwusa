@@ -418,11 +418,7 @@ export function generateSignedPdf({
         case 'driver_signature': {
           flush();
           y += 8;
-          ensureRoom(90);
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(10);
-          doc.text('Driver Signature:', marginX, y);
-          y += 6;
+          ensureRoom(120);
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(BODY_SIZE);
           if (signature) {
@@ -431,11 +427,20 @@ export function generateSignedPdf({
             } catch {
               doc.text('[signature]', marginX, y + 20);
             }
-            y += 78;
+            y += 74;
           } else {
             doc.text('________________________', marginX, y + 20);
-            y += 30;
+            y += 26;
           }
+          // Printed Name / Title / Date Signed — mirrors owner signature block.
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(9);
+          doc.text(`Printed Name: ${driverName || '________________________'}`, marginX, y);
+          y += 12;
+          doc.text('Title: Employee / Driver', marginX, y);
+          y += 12;
+          doc.text(`Date Signed: ${todayFormatted}`, marginX, y);
+          y += 14;
           break;
         }
         case 'license_number':
