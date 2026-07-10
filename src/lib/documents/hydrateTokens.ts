@@ -87,7 +87,6 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
     current_date: new Date().toLocaleDateString(),
     company_name: c.name ?? '',
     company_address: c.address ?? '4700 Diplomacy Rd, Fort Worth, TX 76155',
-    driver_name: driverName,
     driver_address: d.address ?? '',
     contractor_state: contractorState,
     email: d.email ?? '',
@@ -105,7 +104,6 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
           : '',
     pay_type: fmtPayType(d.pay_type),
     pay_rate: fmtPayRate(d.pay_rate, d.pay_type),
-    signer_name: s.name ?? '',
     signer_role: s.role ?? '',
     signer_email: s.email ?? '',
   };
@@ -115,15 +113,6 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
     if (value != null && value !== '') {
       map[key] = String(value);
     }
-  }
-
-  // Role-scoped signer blocks. Fall back to blank so extractUnresolvedTokens
-  // knows to prompt for them if not already captured.
-  for (const role of ['driver', 'owner']) {
-    if (!(`${role}_printed_name` in map)) map[`${role}_printed_name`] =
-      role === 'driver' ? driverName : '';
-    if (!(`${role}_title` in map)) map[`${role}_title`] = '';
-    if (!(`${role}_date_signed` in map)) map[`${role}_date_signed`] = '';
   }
 
   return map;
