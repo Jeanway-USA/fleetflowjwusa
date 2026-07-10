@@ -132,9 +132,15 @@ Deno.serve(async (req) => {
 
     // ===== GET AUTH URL =====
     if (action === 'get_auth_url') {
-      const { redirect_uri } = body;
+      const { redirect_uri, state } = body;
       if (!isAllowedRedirectUri(redirect_uri)) {
         return new Response(JSON.stringify({ error: 'Invalid redirect_uri' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      // Require a client-supplied CSRF state token so Google echoes it back on redirect
+      if (typeof state !== 'string' || state.length < 16 || state.length > 256 || !/^[A-Za-z0-9_-]+$/.test(state)) {
+        return new Response(JSON.stringify({ error: 'Invalid state parameter' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -147,6 +153,7 @@ Deno.serve(async (req) => {
       authUrl.searchParams.set('scope', scope);
       authUrl.searchParams.set('access_type', 'offline');
       authUrl.searchParams.set('prompt', 'consent');
+      authUrl.searchParams.set('state', state);
 
       return new Response(JSON.stringify({ auth_url: authUrl.toString() }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

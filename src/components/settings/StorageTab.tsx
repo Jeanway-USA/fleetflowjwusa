@@ -81,9 +81,18 @@ export function StorageTab() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const authCode = urlParams.get('code');
+    const returnedState = urlParams.get('state');
 
     if (authCode && !isConnected) {
+      const expectedState = sessionStorage.getItem('gdrive_oauth_state');
+      sessionStorage.removeItem('gdrive_oauth_state');
       window.history.replaceState({}, '', window.location.pathname);
+
+      // CSRF protection: require a matching state token issued during handleConnect
+      if (!expectedState || !returnedState || expectedState !== returnedState) {
+        toast.error('Google Drive connection aborted: invalid or missing security token.');
+        return;
+      }
 
       const exchangeCode = async () => {
         try {
@@ -116,10 +125,17 @@ export function StorageTab() {
   const handleConnect = async () => {
     setIsConnecting(true);
     try {
+      // Generate CSRF state token and persist for callback validation
+      const stateBytes = new Uint8Array(32);
+      crypto.getRandomValues(stateBytes);
+      const state = Array.from(stateBytes, (b) => b.toString(16).padStart(2, '0')).join('');
+      sessionStorage.setItem('gdrive_oauth_state', state);
+
       const { data, error } = await supabase.functions.invoke('google-drive-auth', {
         body: {
           action: 'get_auth_url',
           redirect_uri: `${window.location.origin}/settings`,
+          state,
         },
       });
 
