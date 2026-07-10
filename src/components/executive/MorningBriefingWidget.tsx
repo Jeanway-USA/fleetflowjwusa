@@ -20,12 +20,12 @@ interface BriefingMetric {
 }
 
 export function MorningBriefingWidget() {
-  const { orgId } = useAuth();
+  const { orgId, user, roles } = useAuth();
   const navigate = useNavigate();
   const [activeDialog, setActiveDialog] = useState<'pickup-today' | 'missing-pod' | null>(null);
 
   const { data: metrics } = useQuery({
-    queryKey: ['morning-briefing', orgId],
+    queryKey: ['morning-briefing', orgId, user?.id],
     queryFn: async () => {
       if (!orgId) return [];
 
