@@ -21,7 +21,7 @@ const FILL_IN_INPUT_CLASS =
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|file_upload|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status|phone_number|pay_type|pay_rate|ssn|email|bank_account_type|bank_name|routing_number|account_number|driver_printed_name|driver_title|driver_date_signed|owner_printed_name|owner_title|owner_date_signed)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|cdl_number|contractor_state|owner_signature|driver_signature|file_upload|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status|phone_number|pay_type|pay_rate|ssn|email|bank_account_type|bank_name|routing_number|account_number)\s*\}\}/g;
 
 
 export interface DocumentTemplateRendererProps {
@@ -198,12 +198,6 @@ export function DocumentTemplateRenderer({
         return <span key={key} className="font-medium">{todayFormatted}</span>;
       case 'company_address':
         return <span key={key} className="font-medium">{COMPANY_ADDRESS}</span>;
-      case 'driver_name':
-        return (
-          <span key={key} className="font-medium">
-            {driverName?.trim() ? driverName : <span className="text-muted-foreground italic">[Your name]</span>}
-          </span>
-        );
       case 'cdl_number':
         return (
           <Input
@@ -449,22 +443,6 @@ export function DocumentTemplateRenderer({
             className={cn(FILL_IN_INPUT_CLASS, "mx-1 w-[16ch]")}
           />
         );
-      case 'driver_printed_name':
-        return (
-          <span key={key} className="font-medium">
-            {driverName?.trim() || <span className="text-muted-foreground italic">[Printed name pending]</span>}
-          </span>
-        );
-      case 'driver_title':
-        return <span key={key} className="text-muted-foreground italic">[Title pending]</span>;
-      case 'driver_date_signed':
-        return <span key={key} className="font-medium">{todayFormatted}</span>;
-      case 'owner_printed_name':
-        return <span key={key} className="text-muted-foreground italic">[Owner printed name pending]</span>;
-      case 'owner_title':
-        return <span key={key} className="text-muted-foreground italic">[Owner title pending]</span>;
-      case 'owner_date_signed':
-        return <span key={key} className="text-muted-foreground italic">[Owner date pending]</span>;
       default:
         return <span key={key}>{`{{${name}}}`}</span>;
     }

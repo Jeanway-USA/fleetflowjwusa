@@ -79,7 +79,6 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
   const c = ctx.company ?? {};
   const meta = ctx.instance?.metadata ?? {};
 
-  const driverName = [d.first_name, d.last_name].filter(Boolean).join(' ').trim();
   const contractorState = extractStateFromAddress(d.address) || (d.license_state ?? '');
 
   const map: Record<string, string> = {
@@ -87,7 +86,6 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
     current_date: new Date().toLocaleDateString(),
     company_name: c.name ?? '',
     company_address: c.address ?? '4700 Diplomacy Rd, Fort Worth, TX 76155',
-    driver_name: driverName,
     driver_address: d.address ?? '',
     contractor_state: contractorState,
     email: d.email ?? '',
@@ -105,7 +103,6 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
           : '',
     pay_type: fmtPayType(d.pay_type),
     pay_rate: fmtPayRate(d.pay_rate, d.pay_type),
-    signer_name: s.name ?? '',
     signer_role: s.role ?? '',
     signer_email: s.email ?? '',
   };
@@ -115,15 +112,6 @@ export function buildTokenMap(ctx: HydrationContext): Record<string, string> {
     if (value != null && value !== '') {
       map[key] = String(value);
     }
-  }
-
-  // Role-scoped signer blocks. Fall back to blank so extractUnresolvedTokens
-  // knows to prompt for them if not already captured.
-  for (const role of ['driver', 'owner']) {
-    if (!(`${role}_printed_name` in map)) map[`${role}_printed_name`] =
-      role === 'driver' ? driverName : '';
-    if (!(`${role}_title` in map)) map[`${role}_title`] = '';
-    if (!(`${role}_date_signed` in map)) map[`${role}_date_signed`] = '';
   }
 
   return map;
@@ -172,18 +160,13 @@ export function extractUnresolvedTokens(source: string, ctx: HydrationContext): 
     if (t.includes(':')) continue; // consent tokens handled separately
     if (!Object.prototype.hasOwnProperty.call(map, t) || !map[t]) seen.add(t);
   }
-  // Signature tokens are handled by the signature pad; printed name / title /
-  // date are prompted by the signing panel, not the generic missing-token loop.
+  // Signature tokens are handled by the signature pad, not the generic
+  // missing-token loop.
   seen.delete('driver_signature');
   seen.delete('owner_signature');
   seen.delete('signer_signature');
   seen.delete('page_break');
   seen.delete('file_upload');
-  for (const role of ['driver', 'owner']) {
-    seen.delete(`${role}_printed_name`);
-    seen.delete(`${role}_title`);
-    seen.delete(`${role}_date_signed`);
-  }
   return Array.from(seen);
 }
 

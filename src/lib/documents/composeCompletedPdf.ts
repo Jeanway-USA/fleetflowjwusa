@@ -257,11 +257,8 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
               }];
             })();
 
-        const ownerName = meta.owner_printed_name?.trim() || ownerSig.name;
-        const ownerTitle = meta.owner_title?.trim() || '';
-        const ownerDate =
-          meta.owner_date_signed?.trim() ||
-          format(new Date(ownerSig.signed_at), 'MMMM d, yyyy');
+        const ownerName = ownerSig.name;
+        const ownerDate = format(new Date(ownerSig.signed_at), 'MMMM d, yyyy');
 
         for (const hit of targets) {
           const page = pdfDoc.getPage(hit.pageIndex);
@@ -304,7 +301,6 @@ export async function composeCompletedPdf(instanceId: string): Promise<string | 
             ty -= lineHeight;
           };
           draw(`Printed Name: ${ownerName}`);
-          draw(`Title: ${ownerTitle}`);
           draw(`Date Signed: ${ownerDate}`);
         }
       }
