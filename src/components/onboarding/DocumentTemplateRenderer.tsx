@@ -238,9 +238,8 @@ export function DocumentTemplateRenderer({
       case 'driver_signature':
         return (
           <div key={key} className="my-4 not-prose">
-            <Label className="mb-2 block text-sm font-medium">Driver Signature</Label>
             {signature ? (
-              <div className="rounded-md border bg-card p-3">
+              <div className="space-y-1">
                 <img
                   src={signature}
                   alt="Driver signature"
@@ -249,13 +248,21 @@ export function DocumentTemplateRenderer({
                 <button
                   type="button"
                   onClick={() => onSignatureCapture('')}
-                  className="mt-2 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
                 >
                   Clear &amp; re-sign
                 </button>
+                <div className="pt-1 text-sm leading-relaxed">
+                  <div>Printed Name: <span className="font-medium">{driverName?.trim() || '—'}</span></div>
+                  <div>Title: <span className="font-medium">Employee / Driver</span></div>
+                  <div>Date Signed: <span className="font-medium">{todayFormatted}</span></div>
+                </div>
               </div>
             ) : (
-              <SignaturePad onSignatureCapture={onSignatureCapture} />
+              <>
+                <Label className="mb-2 block text-sm font-medium">Driver Signature</Label>
+                <SignaturePad onSignatureCapture={onSignatureCapture} />
+              </>
             )}
           </div>
         );
