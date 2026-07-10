@@ -198,12 +198,6 @@ export function DocumentTemplateRenderer({
         return <span key={key} className="font-medium">{todayFormatted}</span>;
       case 'company_address':
         return <span key={key} className="font-medium">{COMPANY_ADDRESS}</span>;
-      case 'driver_name':
-        return (
-          <span key={key} className="font-medium">
-            {driverName?.trim() ? driverName : <span className="text-muted-foreground italic">[Your name]</span>}
-          </span>
-        );
       case 'cdl_number':
         return (
           <Input
