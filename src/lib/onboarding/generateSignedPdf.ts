@@ -5,7 +5,7 @@ import { formatPayRate, payTypeLabel, type DriverPayType } from '@/lib/pay-forma
 
 const COMPANY_ADDRESS = '4700 Diplomacy Rd, Fort Worth, TX 76155';
 const TOKEN_REGEX =
-  /\{\{\s*(today_date|company_address|driver_address|driver_name|cdl_number|contractor_state|owner_signature|driver_signature|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status|pay_type|pay_rate|ssn|email|bank_account_type|bank_name|routing_number|account_number|driver_printed_name|driver_title|driver_date_signed|owner_printed_name|owner_title|owner_date_signed)\s*\}\}/g;
+  /\{\{\s*(today_date|company_address|driver_address|cdl_number|contractor_state|owner_signature|driver_signature|license_number|license_expiry|dot_medical_expiry|endorsements_list|twic_status|pay_type|pay_rate|ssn|email|bank_account_type|bank_name|routing_number|account_number)\s*\}\}/g;
 
 
 export interface GenerateSignedPdfArgs {
