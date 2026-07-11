@@ -311,8 +311,13 @@ export function reconcileRevenue(
   loads: RevenueReconcileLoad[],
   periodStart: string | null,
   periodEnd: string | null,
+  landstarSplit: number = 0.65,
 ): RevenueReconciliation {
   const tripMismatches: RevenueTripMismatch[] = [];
+
+  // Normalise split to fraction in case a caller passes 65 instead of 0.65
+  const splitFraction = landstarSplit > 1 ? landstarSplit / 100 : landstarSplit;
+  const applySplit = (gross: number) => Math.round(gross * splitFraction * 100) / 100;
 
   // Aggregate parsed revenue across contractor PDFs by normalized trip number
   const revenueByTrip = new Map<string, { flat: number; description: string; raw: string }>();
@@ -346,6 +351,8 @@ export function reconcileRevenue(
         load_id: null,
         load_label: null,
         expected_amount: 0,
+        expected_gross_amount: 0,
+        landstar_split: splitFraction,
         actual_amount: parsed.flat,
         delta_amount: parsed.flat,
         reason: 'no_load_match',
@@ -353,7 +360,8 @@ export function reconcileRevenue(
       unmatchedTotal += parsed.flat;
       continue;
     }
-    const expected = Number(load.rate) || 0;
+    const gross = Number(load.rate) || 0;
+    const expected = applySplit(gross);
     const delta = parsed.flat - expected;
     if (Math.abs(delta) > TRIP_RATE_TOLERANCE) {
       tripMismatches.push({
@@ -361,6 +369,8 @@ export function reconcileRevenue(
         load_id: load.id,
         load_label: load.landstar_load_id || `${load.origin} → ${load.destination}`,
         expected_amount: expected,
+        expected_gross_amount: gross,
+        landstar_split: splitFraction,
         actual_amount: parsed.flat,
         delta_amount: delta,
         reason: 'rate_mismatch',
@@ -374,7 +384,8 @@ export function reconcileRevenue(
     const inWindow = loads.filter(l =>
       l.delivery_date && l.delivery_date >= periodStart && l.delivery_date <= periodEnd,
     );
-    const expectedTotal = inWindow.reduce((s, l) => s + (Number(l.rate) || 0), 0);
+    const expectedGrossTotal = inWindow.reduce((s, l) => s + (Number(l.rate) || 0), 0);
+    const expectedTotal = applySplit(expectedGrossTotal);
     let actualTotal = 0;
     for (const v of revenueByTrip.values()) actualTotal += v.flat;
     actualTotal += unmatchedTotal;
