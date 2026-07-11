@@ -164,6 +164,7 @@ export function detectFileType(file: File): StagedFile['type'] {
 export function reconcileDocuments(
   stagedFiles: StagedFile[],
   loadsForRevenue: RevenueReconcileLoad[] = [],
+  landstarSplit: number = 0.65,
 ): ReconciliationResult {
   const allExpenses: (ExtractedExpense & { source: string; sourceType: StagedFile['type'] })[] = [];
   let periodStart: string | null = null;
