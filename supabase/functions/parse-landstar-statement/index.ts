@@ -197,7 +197,10 @@ GALLONS:
 REVENUE / LINEHAUL (NEW — CONTRACTOR PDF ONLY):
 - On contractor statements, in addition to expenses, also extract the per-trip revenue lines
 - Look for "TRACTOR L/H", "LINE HAUL", "LINEHAUL", "1099 REVENUE", "FLAT RATE", "TRIP RATE"
-- For each trip, capture the 7-digit numeric trip number and the gross flat-rate dollar amount paid for that trip
+- 1099 REVENUE is the truck's already-split revenue after the Landstar percentage cut. It is NOT the gross customer/dispatch rate.
+- For each trip, prefer the 1099 REVENUE amount when present and use that as flat_rate.
+- If both 1099 REVENUE and gross linehaul/flat-rate rows appear for the same trip, emit only one revenue entry for that trip using the 1099 REVENUE amount.
+- Only use TRACTOR L/H, LINE HAUL, LINEHAUL, FLAT RATE, or TRIP RATE as flat_rate when there is no 1099 REVENUE amount for that trip.
 - Also capture per-trip reimbursements (REIMB, REIMBURSEMENT, REFUND, REBATE, ADJUSTMENT CR) and sum them per trip
 - Emit one entry per unique trip number in the "revenue" array`;
 
@@ -227,7 +230,7 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
     {
       "date": "YYYY-MM-DD or null",
       "trip_number": "7-digit numeric trip number",
-      "flat_rate": number (gross linehaul/flat rate paid for the trip — positive),
+      "flat_rate": number (the statement's truck revenue for the trip — prefer 1099 REVENUE; positive),
       "reimbursement_total": number (sum of trip-level reimbursements — 0 if none),
       "description": "Original description"
     }
@@ -245,6 +248,7 @@ IMPORTANT:
 - Group related items (like fuel purchase + NATS discount) as separate line items
 - Advances (Cash Advance, Card Pre-Trip, Card Load, SPEC ADV, Direct-Deposit Bank) must have is_advance: true
 - Direct-Deposit Fee / DD Fee is a REAL expense (is_advance: false) — do not confuse with Direct-Deposit Bank transfers
+- For contractor PDF revenue, 1099 REVENUE is the final truck-share amount after the Landstar cut. Do not treat it as gross linehaul and do not add it together with gross linehaul for the same trip.
 - Always populate the "revenue" array for contractor PDFs; use an empty array [] for card_activity PDFs`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
