@@ -64,6 +64,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const { isLandstar } = useOrganizationMode();
+  const { landstarSplit } = usePaySettings();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [reconciliationResult, setReconciliationResult] = useState<ReconciliationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
