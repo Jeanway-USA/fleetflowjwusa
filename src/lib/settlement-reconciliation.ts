@@ -49,8 +49,10 @@ export interface RevenueTripMismatch {
   trip_number: string;
   load_id: string | null;
   load_label: string | null;
-  expected_amount: number; // from fleet_loads.rate
-  actual_amount: number;   // from statement
+  expected_amount: number;       // split-adjusted (truck's share)
+  expected_gross_amount: number; // dispatch gross rate before split
+  landstar_split: number;        // fraction applied (e.g. 0.65)
+  actual_amount: number;         // from statement
   delta_amount: number;
   reason: 'no_load_match' | 'rate_mismatch';
 }
