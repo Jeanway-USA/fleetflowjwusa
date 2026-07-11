@@ -502,7 +502,14 @@ export function ReconciliationPreview({
                         <TableCell className="text-xs">
                           {m.load_label || <span className="text-destructive font-medium">No matching load</span>}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-xs">{formatCurrency(m.expected_amount)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatCurrency(m.expected_amount)}
+                          {m.expected_gross_amount > 0 && m.landstar_split < 1 && (
+                            <div className="text-[10px] text-muted-foreground font-normal">
+                              {Math.round(m.landstar_split * 100)}% of {formatCurrency(m.expected_gross_amount)}
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-mono text-xs">{formatCurrency(m.actual_amount)}</TableCell>
                         <TableCell className="text-right font-mono text-xs font-semibold text-destructive">
                           {formatSigned(m.delta_amount)}

@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useStorageProvider } from '@/hooks/useStorageProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOrganizationMode } from '@/hooks/useOrganizationMode';
+import { usePaySettings } from '@/hooks/usePaySettings';
 
 interface FleetLoad {
   id: string;
@@ -63,6 +64,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const { isLandstar } = useOrganizationMode();
+  const { landstarSplit } = usePaySettings();
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [reconciliationResult, setReconciliationResult] = useState<ReconciliationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -220,7 +222,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     }
 
     // Reconcile (includes per-trip + period revenue cross-check against fleet_loads)
-    const result = reconcileDocuments(updatedFiles, existingLoads);
+    const result = reconcileDocuments(updatedFiles, existingLoads, landstarSplit);
     setReconciliationResult(result);
 
     // Save files to documents
