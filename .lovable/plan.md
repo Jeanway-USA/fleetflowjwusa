@@ -1,34 +1,26 @@
-## Problem
+## Plan
 
-On the Landstar contractor statement, the "1099 Revenue" column already reflects the truck's post-split share (Rate Base × truck %). Example from the uploaded statement: Rate Base $2,500 × 65% = $1,625 (1099 Revenue).
+1. **Correct the parser instructions for 1099 revenue**
+   - Update the document parsing function so `1099 REVENUE` is treated as the truck’s already-split revenue, not a gross linehaul amount.
+   - Tell the parser to prefer the actual `1099 REVENUE` row for reconciliation when present.
+   - Keep `TRACTOR L/H`, `LINE HAUL`, and similar gross/detail rows from being used as the final truck revenue when a 1099 revenue amount exists for the same trip.
 
-Reconciliation currently compares that $1,625 statement value against the dispatch load's stored gross `rate` ($2,500), producing a false −$875 per-trip discrepancy and a false period-total mismatch. Users can never clear the "Settlement halted — flat-rate discrepancies detected" banner even when the statement is correct.
+2. **Normalize revenue rows before reconciliation**
+   - Add a small revenue normalization step in `settlement-reconciliation.ts` that groups rows by trip number.
+   - For each trip, select the best statement amount in this order:
+     1. `1099 REVENUE` amount
+     2. explicit truck/net revenue amount
+     3. fallback flat-rate amount
+   - Prevent duplicate revenue rows for the same trip from being summed when they represent the same earning in different statement sections.
 
-## Fix
+3. **Fix period-total double counting**
+   - Update the period total calculation so it only sums the normalized per-trip statement revenue once.
+   - Ensure unmatched revenue is not added twice when a row has no trip number.
 
-Apply the org's Landstar truck split (from `usePaySettings` → `company_settings.truck_percentage`, default 0.65) to the dispatch expected amount before comparing to the parsed statement revenue. This keeps the dispatch load stored as gross and only normalizes at compare time.
+4. **Make the mismatch display clearer**
+   - Keep showing expected truck revenue as `65% of gross dispatch rate`.
+   - Label the statement amount as `1099 revenue` so it’s clear the app is comparing truck share to truck share.
 
-### Changes
-
-1. `src/lib/settlement-reconciliation.ts`
-   - Add a `landstarSplit: number` parameter to `reconcileRevenue` (and thread it through `reconcileDocuments`).
-   - When computing `expected` for a matched trip, use `expected = grossRate * landstarSplit` (rounded to cents) instead of raw `rate`. Preserve the gross value on the mismatch row as a new `expected_gross_amount` field so the UI can show both numbers.
-   - Apply the same split to `expectedTotal` in the period-total fallback.
-
-2. `src/components/finance/StatementUpload.tsx`
-   - Read `landstarSplit` via `usePaySettings()` and pass it into `reconcileDocuments`.
-
-3. `src/components/finance/ReconciliationPreview.tsx`
-   - Update the "Expected (dispatch)" column and period-mismatch banner to display the split-adjusted expected value. Optionally show the gross in a muted subtext (e.g., `$1,625.00  (65% of $2,500.00)`) so users understand the math.
-   - No change to tolerance thresholds (±$1/trip, ±$5/period) — they now apply to net figures, which matches the statement precision.
-
-### Non-changes
-
-- No change to how `fleet_loads.rate` is stored (still gross).
-- No change to expense parsing, advances, or credits.
-- No migration needed.
-
-### Verification
-
-- Load the current dataset (Unit #T433780, period 2026-07-01 → 2026-07-08, Trip 3625883, gross $2,500): expected should now compute to $1,625.00, matching the statement, and the halted-settlement banner should disappear.
-- Verify `usePaySettings` returns a fraction (0.65) — the hook already normalizes `65` → `0.65`.
+5. **Verification**
+   - Add or run a focused reconciliation check using the shown case: gross dispatch rate `$2,500`, truck split `65%`, statement 1099 revenue `$1,625`.
+   - Confirm this produces no blocking discrepancy and no period mismatch for that matched trip.
