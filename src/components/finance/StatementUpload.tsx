@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useStorageProvider } from '@/hooks/useStorageProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOrganizationMode } from '@/hooks/useOrganizationMode';
+import { usePaySettings } from '@/hooks/usePaySettings';
 
 interface FleetLoad {
   id: string;
