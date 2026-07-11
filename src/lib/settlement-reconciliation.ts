@@ -53,6 +53,7 @@ export interface RevenueTripMismatch {
   expected_gross_amount: number; // dispatch gross rate before split
   landstar_split: number;        // fraction applied (e.g. 0.65)
   actual_amount: number;         // from statement
+  actual_source_label: string;   // e.g. 1099 revenue, truck revenue, flat rate
   delta_amount: number;
   reason: 'no_load_match' | 'rate_mismatch';
 }
@@ -306,6 +307,56 @@ function normalizeTrip(value: string | null | undefined): string {
   return (value || '').replace(/[^0-9]/g, '').trim();
 }
 
+type RevenueSourceKind = '1099_revenue' | 'truck_revenue' | 'gross_linehaul' | 'flat_rate';
+
+interface NormalizedStatementRevenue {
+  flat: number;
+  description: string;
+  raw: string;
+  sourceKind: RevenueSourceKind;
+}
+
+const REVENUE_SOURCE_LABELS: Record<RevenueSourceKind, string> = {
+  '1099_revenue': '1099 revenue',
+  truck_revenue: 'truck revenue',
+  gross_linehaul: 'linehaul/flat rate',
+  flat_rate: 'statement flat rate',
+};
+
+function classifyRevenueSource(description: string): { kind: RevenueSourceKind; priority: number } {
+  const desc = description || '';
+  if (/\b1099\s*REVENUE\b/i.test(desc)) {
+    return { kind: '1099_revenue', priority: 3 };
+  }
+  if (/\b(TRUCK|TRACTOR|BCO|CONTRACTOR|NET)\b.*\b(REVENUE|PAY|EARNINGS)\b/i.test(desc)
+    || /\b(REVENUE|PAY|EARNINGS)\b.*\b(TRUCK|TRACTOR|BCO|CONTRACTOR|NET)\b/i.test(desc)) {
+    return { kind: 'truck_revenue', priority: 2 };
+  }
+  if (/\b(TRACTOR\s*L\/H|LINE\s*HAUL|LINEHAUL|FLAT\s*RATE|TRIP\s*RATE)\b/i.test(desc)) {
+    return { kind: 'gross_linehaul', priority: 1 };
+  }
+  return { kind: 'flat_rate', priority: 0 };
+}
+
+function normalizeStatementRevenue(rows: ExtractedRevenue[]): NormalizedStatementRevenue | null {
+  if (rows.length === 0) return null;
+
+  const ranked = rows
+    .map((row) => ({ row, ...classifyRevenueSource(row.description) }))
+    .filter(({ row }) => Number.isFinite(Number(row.flat_rate)) && Number(row.flat_rate) !== 0)
+    .sort((a, b) => b.priority - a.priority || Math.abs(Number(b.row.flat_rate)) - Math.abs(Number(a.row.flat_rate)));
+
+  if (ranked.length === 0) return null;
+
+  const selected = ranked[0];
+  return {
+    flat: Math.round(Math.abs(Number(selected.row.flat_rate)) * 100) / 100,
+    description: selected.row.description || '',
+    raw: selected.row.trip_number || normalizeTrip(selected.row.trip_number) || '',
+    sourceKind: selected.kind,
+  };
+}
+
 export function reconcileRevenue(
   stagedFiles: StagedFile[],
   loads: RevenueReconcileLoad[],
@@ -319,9 +370,12 @@ export function reconcileRevenue(
   const splitFraction = landstarSplit > 1 ? landstarSplit / 100 : landstarSplit;
   const applySplit = (gross: number) => Math.round(gross * splitFraction * 100) / 100;
 
-  // Aggregate parsed revenue across contractor PDFs by normalized trip number
-  const revenueByTrip = new Map<string, { flat: number; description: string; raw: string }>();
-  let unmatchedTotal = 0;
+  // Normalize parsed revenue across contractor PDFs by normalized trip number.
+  // Contractor statements may expose both gross linehaul and final 1099 revenue
+  // for the same trip. Reconciliation must compare dispatch truck-share against
+  // the final 1099/truck revenue, not sum every visible revenue-looking row.
+  const revenueRowsByTrip = new Map<string, ExtractedRevenue[]>();
+  let revenueWithoutTripTotal = 0;
 
   for (const sf of stagedFiles) {
     if (sf.status !== 'parsed' || !sf.data || sf.type !== 'contractor_pdf') continue;
@@ -330,15 +384,23 @@ export function reconcileRevenue(
       const trip = normalizeTrip(r.trip_number);
       const amount = Number(r.flat_rate) || 0;
       if (!trip) {
-        unmatchedTotal += amount;
+        revenueWithoutTripTotal += Math.abs(amount);
         continue;
       }
-      const existing = revenueByTrip.get(trip);
-      if (existing) {
-        existing.flat += amount;
-      } else {
-        revenueByTrip.set(trip, { flat: amount, description: r.description || '', raw: r.trip_number || trip });
-      }
+      const existing = revenueRowsByTrip.get(trip) || [];
+      existing.push(r);
+      revenueRowsByTrip.set(trip, existing);
+    }
+  }
+
+  const revenueByTrip = new Map<string, NormalizedStatementRevenue>();
+  for (const [trip, rows] of revenueRowsByTrip) {
+    const normalized = normalizeStatementRevenue(rows);
+    if (normalized) {
+      revenueByTrip.set(trip, {
+        ...normalized,
+        raw: normalized.raw || rows[0]?.trip_number || trip,
+      });
     }
   }
 
@@ -354,10 +416,10 @@ export function reconcileRevenue(
         expected_gross_amount: 0,
         landstar_split: splitFraction,
         actual_amount: parsed.flat,
+        actual_source_label: REVENUE_SOURCE_LABELS[parsed.sourceKind],
         delta_amount: parsed.flat,
         reason: 'no_load_match',
       });
-      unmatchedTotal += parsed.flat;
       continue;
     }
     const gross = Number(load.rate) || 0;
@@ -372,6 +434,7 @@ export function reconcileRevenue(
         expected_gross_amount: gross,
         landstar_split: splitFraction,
         actual_amount: parsed.flat,
+        actual_source_label: REVENUE_SOURCE_LABELS[parsed.sourceKind],
         delta_amount: delta,
         reason: 'rate_mismatch',
       });
@@ -388,7 +451,7 @@ export function reconcileRevenue(
     const expectedTotal = applySplit(expectedGrossTotal);
     let actualTotal = 0;
     for (const v of revenueByTrip.values()) actualTotal += v.flat;
-    actualTotal += unmatchedTotal;
+    actualTotal += revenueWithoutTripTotal;
     const delta = actualTotal - expectedTotal;
     period = {
       expected_total: expectedTotal,
