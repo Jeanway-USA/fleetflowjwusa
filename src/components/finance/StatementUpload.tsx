@@ -222,7 +222,7 @@ export function StatementUpload({ existingLoads, trucks, existingExpenses, onExp
     }
 
     // Reconcile (includes per-trip + period revenue cross-check against fleet_loads)
-    const result = reconcileDocuments(updatedFiles, existingLoads);
+    const result = reconcileDocuments(updatedFiles, existingLoads, landstarSplit);
     setReconciliationResult(result);
 
     // Save files to documents
