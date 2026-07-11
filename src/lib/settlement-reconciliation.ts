@@ -276,7 +276,7 @@ export function reconcileDocuments(
     }
   }
 
-  const revenue = reconcileRevenue(stagedFiles, loadsForRevenue, periodStart, periodEnd);
+  const revenue = reconcileRevenue(stagedFiles, loadsForRevenue, periodStart, periodEnd, landstarSplit);
 
   return {
     expenses,
