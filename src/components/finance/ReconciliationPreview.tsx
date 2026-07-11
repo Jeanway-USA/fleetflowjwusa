@@ -510,7 +510,12 @@ export function ReconciliationPreview({
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-xs">{formatCurrency(m.actual_amount)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {formatCurrency(m.actual_amount)}
+                          <div className="text-[10px] text-muted-foreground font-normal">
+                            {m.actual_source_label || '1099 revenue'}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right font-mono text-xs font-semibold text-destructive">
                           {formatSigned(m.delta_amount)}
                         </TableCell>
