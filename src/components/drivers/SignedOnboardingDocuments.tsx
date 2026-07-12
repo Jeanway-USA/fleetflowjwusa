@@ -153,21 +153,27 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
         These active templates have never been signed by this driver. Notify them to complete the missing paperwork.
       </p>
       <div className="space-y-2 pt-1">
-        {outstanding.map((t) => (
+        {outstanding.map((t) => {
+          const friendly = t.name ?? DOCUMENT_LABELS[t.document_type] ?? t.document_type;
+          return (
           <div key={t.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-md border bg-background p-2">
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
               <FileSignature className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="font-medium truncate">{t.name ?? t.document_type}</span>
-              <Badge variant="outline" className="text-[10px] uppercase">
-                {t.applies_to === 'shared' ? 'All' : t.applies_to === 'w2' ? 'W-2' : '1099'}
-              </Badge>
+              <span className="font-medium truncate">{friendly}</span>
+              {t.builtin ? (
+                <Badge variant="outline" className="text-[10px] uppercase">Built-in</Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px] uppercase">
+                  {t.applies_to === 'shared' ? 'All' : t.applies_to === 'w2' ? 'W-2' : '1099'}
+                </Badge>
+              )}
             </div>
             {canReview && (
               <Button
                 size="sm"
                 variant="outline"
                 disabled={notifyMutation.isPending}
-                onClick={() => notifyMutation.mutate({ document_type: t.document_type, name: t.name })}
+                onClick={() => notifyMutation.mutate({ document_type: t.document_type, name: friendly })}
               >
                 {notifyMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
@@ -178,7 +184,8 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
               </Button>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   ) : null;
