@@ -368,6 +368,15 @@ function W2Tab({ year }: { year: number }) {
   const generate = useMutation({
     mutationFn: async (row: W2Row) => {
       if (!employer) throw new Error('Employer info missing');
+      let ssnFull: string | null = null;
+      try {
+        const { data: ssn } = await supabase.rpc('get_driver_ssn' as never, {
+          _driver_id: row.driver_id,
+        } as never);
+        ssnFull = (ssn as string | null) ?? null;
+      } catch {
+        ssnFull = null;
+      }
       const blob = generateW2Pdf({
         year,
         employer,
@@ -375,6 +384,7 @@ function W2Tab({ year }: { year: number }) {
           firstName: row.first_name,
           lastName: row.last_name,
           tax_state: row.tax_state,
+          ssnFull,
         },
         totals: row,
       });
