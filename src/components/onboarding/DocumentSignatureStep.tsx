@@ -238,11 +238,15 @@ export function DocumentSignatureStep({
   onW2DocsChange,
   contractorDocs,
   onContractorDocsChange,
+  stateTax,
+  onStateTaxChange,
   skipW2Structured = false,
   skip1099Structured = false,
+  skipStateTax = false,
 }: DocumentSignatureStepProps) {
   const [w2Valid, setW2Valid] = useState(false);
   const [contractorValid, setContractorValid] = useState(false);
+  const [stateTaxValid, setStateTaxValid] = useState(false);
 
   // Group templates by audience (applies_to). Fallback to 'shared' when absent.
   const audienceOf = (t: DocumentTemplateRow): TemplateAudience =>
@@ -282,7 +286,9 @@ export function DocumentSignatureStep({
         ? (skipW2Structured ? true : w2Valid)
         : (skip1099Structured ? true : contractorValid);
 
-    onValidityChange(templatesValid && employmentFormsValid);
+    const stateFormValid = skipStateTax ? true : stateTaxValid;
+
+    onValidityChange(templatesValid && employmentFormsValid && stateFormValid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     employmentType,
@@ -292,6 +298,7 @@ export function DocumentSignatureStep({
     state,
     w2Valid,
     contractorValid,
+    stateTaxValid,
     revisionMode,
     docRevisions,
   ]);
