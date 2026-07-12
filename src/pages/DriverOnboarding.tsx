@@ -30,6 +30,11 @@ import {
   EMPTY_CONTRACTOR_DOCS_STATE,
   type ContractorDocsState,
 } from '@/components/onboarding/ContractorDocuments';
+import {
+  EMPTY_STATE_TAX_FORM,
+  type StateTaxFormState,
+} from '@/components/onboarding/StateTaxForm';
+import { stateHasIncomeTax } from '@/lib/us-states';
 import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
 
 
