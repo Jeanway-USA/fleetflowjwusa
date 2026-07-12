@@ -233,7 +233,7 @@ export function usePLTrend() {
           trailing30Expenses += amount;
           expensesByType.set(type, (expensesByType.get(type) || 0) + amount);
         }
-        if (isOnOrAfter(d, mpgCutoff)) trailing90Expenses += amount;
+        if (isOnOrAfter(d, trailing90Cutoff)) trailing90Expenses += amount;
         if (d >= monthStart && d <= monthEnd) monthToDateExpenses += amount;
       }
 
