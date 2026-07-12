@@ -95,10 +95,10 @@ export function usePLTrend() {
       const today = new Date();
       const horizonStart = startOfWeek(subDays(today, 7 * (WEEKS - 1)), { weekStartsOn: 1 });
       const horizonIso = format(horizonStart, 'yyyy-MM-dd');
-      const trailing90Iso = format(subDays(today, 90), 'yyyy-MM-dd');
-      const trailing30Iso = format(subDays(today, 30), 'yyyy-MM-dd');
+      const trailing90Cutoff = subDays(today, 90);
+      const trailing90Iso = format(trailing90Cutoff, 'yyyy-MM-dd');
 
-      const [loadsRes, expensesRes, payrollRes, commissionsRes, fuelRes] = await Promise.all([
+      const [loadsRes, expensesRes, payrollRes, commissionsRes] = await Promise.all([
         supabase
           .from('fleet_loads')
           .select('delivery_date, gross_revenue, truck_revenue, net_revenue, actual_miles, booked_miles, status, truck_id')
@@ -106,7 +106,7 @@ export function usePLTrend() {
         supabase
           .from('expenses')
           .select('expense_date, amount, expense_type, notes')
-          .gte('expense_date', horizonIso),
+          .gte('expense_date', trailing90Iso),
         supabase
           .from('driver_payroll')
           .select('period_end, net_pay')
@@ -115,17 +115,12 @@ export function usePLTrend() {
           .from('agent_commissions')
           .select('created_at, commission_amount')
           .gte('created_at', horizonIso),
-        supabase
-          .from('fuel_purchases')
-          .select('purchase_date, gallons, total_cost')
-          .gte('purchase_date', trailing90Iso),
       ]);
 
       const loads = loadsRes.data ?? [];
       const expenses = expensesRes.data ?? [];
       const payroll = payrollRes.data ?? [];
       const commissions = commissionsRes.data ?? [];
-      const fuel = fuelRes.data ?? [];
 
       // Weekly buckets
       const buckets: WeekPoint[] = Array.from({ length: WEEKS }, (_, i) => {
@@ -146,14 +141,9 @@ export function usePLTrend() {
         return idx >= 0 && idx < WEEKS ? idx : -1;
       };
 
-      // Trailing 90-day miles for MPG
-      const mpgCutoff = subDays(today, 90);
-      let miles90 = 0;
-
       // Trailing 30-day dispatch stats
       const trailing30Cutoff = subDays(today, 30);
       const dispatchDaySet30 = new Set<string>();
-      let miles30 = 0;
 
       // Month-to-date
       const monthStart = startOfMonth(today);
@@ -169,9 +159,7 @@ export function usePLTrend() {
         const rev = Number(l.gross_revenue) || 0;
         const miles = Number(l.actual_miles ?? l.booked_miles) || 0;
         if (idx >= 0) buckets[idx].revenue += rev;
-        if (isOnOrAfter(d, mpgCutoff)) miles90 += miles;
         if (isOnOrAfter(d, trailing30Cutoff)) {
-          miles30 += miles;
           dispatchDaySet30.add(l.delivery_date.slice(0, 10));
         }
         if (d >= monthStart && d <= monthEnd) {
@@ -251,9 +239,6 @@ export function usePLTrend() {
 
       // Dispatch cadence: distinct delivery days & miles in trailing 30d
       const plannedDispatchDays = dispatchDaySet30.size;
-      void miles30;
-      void miles90;
-      void fuel;
 
       const costPerDay = trailing30Expenses / 30;
 
