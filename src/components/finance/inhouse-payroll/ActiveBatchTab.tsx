@@ -320,7 +320,7 @@ export function ActiveBatchTab() {
         federal_income_withholding: result.fit,
         state_code: stateCode,
         state_suta: result.sutaEmployer,
-        state_sit: result.sit ?? 0,
+        state_sit: result.sitEmployee ?? 0,
         tx_twc_unemployment: stateCode === 'TX' ? result.sutaEmployer : 0,
         fl_reemployment: stateCode === 'FL' ? result.sutaEmployer : 0,
       },
