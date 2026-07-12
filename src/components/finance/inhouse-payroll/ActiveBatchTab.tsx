@@ -31,7 +31,9 @@ import {
   PAY_PERIODS_PER_YEAR,
   type W2W4,
   type FilingStatus,
+  type StateW4Snapshot,
 } from '@/utils/payCalculations';
+
 import {
   format, startOfWeek, endOfWeek, addWeeks, addDays,
   startOfMonth, endOfMonth, addMonths,
