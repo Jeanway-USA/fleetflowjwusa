@@ -302,6 +302,8 @@ function MultiStateTab({ year }: { year: number }) {
         onSaved={() => qc.invalidateQueries({ queryKey: ['payroll_config'] })}
       />
     </Card>
+    <StateFilingRegistry />
+    </div>
   );
 }
 
