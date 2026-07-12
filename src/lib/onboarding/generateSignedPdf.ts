@@ -143,6 +143,7 @@ export function generateSignedPdf({
   routingNumber,
   accountNumber,
   bankAccountType,
+  redact = true,
 
 }: GenerateSignedPdfArgs): Blob {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
