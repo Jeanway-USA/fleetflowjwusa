@@ -399,10 +399,11 @@ export default function DriverOnboarding() {
         template_id: tmpl.id,
         document_type: tmpl.document_type,
         file_path: filePath,
+        admin_file_path: adminFilePath,
         attachment_file_path: attachmentPath,
         driver_address: tState.driverAddress || null,
         signature_data_url: tState.signature,
-      });
+      } as never);
       if (insertError) throw insertError;
 
       // Persist latest direct deposit attachment + banking info on direct_deposit step
