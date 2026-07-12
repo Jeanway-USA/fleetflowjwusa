@@ -45,9 +45,19 @@ const EMPTY: SafetyBonusStatus = {
 };
 
 function toDateString(d: Date): string {
-  // YYYY-MM-DD in UTC to avoid timezone shifting
-  return d.toISOString().slice(0, 10);
+  // YYYY-MM-DD in local time (calendar-based, not UTC-shifted)
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
+
+function calendarMonthBounds(now: Date): { start: string; end: string } {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return { start: toDateString(start), end: toDateString(end) };
+}
+
 
 async function computeSafetyBonus(driverId: string): Promise<SafetyBonusStatus> {
   // 1) Resolve org from driver
