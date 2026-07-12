@@ -37,6 +37,7 @@ import { ActiveBatchTab } from '@/components/finance/inhouse-payroll/ActiveBatch
 
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
 import { SafetyBonusSettings } from '@/components/finance/SafetyBonusSettings';
+import { SafetyBonusPayouts } from '@/components/finance/SafetyBonusPayouts';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { InvoicingTab } from '@/components/finance/InvoicingTab';
