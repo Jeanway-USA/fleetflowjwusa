@@ -64,6 +64,24 @@ export async function generateSettlementPdf(
   const data = await buildSettlementDocumentData(settlementId);
   const { settlement: s, driver, org, reimbursementItems, deductionItems, breakdown, ytd } = data;
 
+  // Fetch full banking (owner/payroll only; RPC enforces access, silently null otherwise)
+  let bankRouting: string | null = null;
+  try {
+    const { supabase } = await import('@/integrations/supabase/client');
+    const { data: bank } = await supabase.rpc('get_driver_banking', {
+      _driver_id: s.driver_id,
+    });
+    const row = Array.isArray(bank) && bank.length > 0 ? (bank[0] as any) : null;
+    bankRouting = row?.routing_number ?? null;
+  } catch {
+    bankRouting = null;
+  }
+  const routingLabel = (() => {
+    const d = (bankRouting ?? '').replace(/\D/g, '');
+    if (d.length !== 9) return bankRouting || '—';
+    return `${d.slice(0, 4)}-${d.slice(4, 8)}-${d.slice(8)}`;
+  })();
+
   const driverName =
     `${driver?.first_name ?? ''} ${driver?.last_name ?? ''}`.trim() || 'Driver';
   const driverIdLabel =
