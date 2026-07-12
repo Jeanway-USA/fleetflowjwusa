@@ -270,6 +270,11 @@ const App = () => {
                         <DocumentTemplates />
                       </ProtectedRoute>
                     } />
+                    <Route path="/admin/tax-hub" element={
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin']}>
+                        <TaxHub />
+                      </ProtectedRoute>
+                    } />
                     <Route path="/driver-settings" element={
                       <ProtectedRoute allowedRoles={['driver']}>
                         <DriverSettings />
