@@ -767,6 +767,7 @@ export default function DriverOnboarding() {
       );
     }
 
+    const profileCompleted = !revisionMode;
     const shouldReturnToDashboard = docsOnlyMode || results.length === 0;
 
     if (profileCompleted) {
