@@ -417,7 +417,7 @@ function W2Tab({ year }: { year: number }) {
     },
   });
 
-  const missingEmployer = !employer?.ein || !employer?.business_address_line1;
+  const missingEmployer = !employer?.ein || !employer?.address_line1;
 
   return (
     <Card>
@@ -536,7 +536,7 @@ function Form1099Tab({ year }: { year: number }) {
     onError: (e: any) => toast.error(e.message ?? 'Generation failed'),
   });
 
-  const missingEmployer = !employer?.ein || !employer?.business_address_line1;
+  const missingEmployer = !employer?.ein || !employer?.address_line1;
 
   return (
     <Card>
@@ -663,7 +663,7 @@ function EmployerCard() {
     }
   };
 
-  const incomplete = !employer?.ein || !employer?.business_address_line1;
+  const incomplete = !employer?.ein || !employer?.address_line1;
 
   return (
     <Card>
