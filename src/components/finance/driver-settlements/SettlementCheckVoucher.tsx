@@ -112,7 +112,7 @@ export function SettlementCheckVoucher({ data }: Props) {
               label="Memo"
               value={`Settlement ${fmtDate(settlement.period_start)} – ${fmtDate(settlement.period_end)}`}
             />
-            <VField label="Bank Routing" value="XXXX-XXXX-XXXX" />
+            <VField label="Bank Routing" value={fmtRouting(banking?.routing_number)} />
             <VField label="Method" value="ACH Direct Deposit on File" />
           </div>
 
