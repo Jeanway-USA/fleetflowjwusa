@@ -428,6 +428,8 @@ function W2Tab({ year }: { year: number }) {
   });
 
   const missingEmployer = !employer?.ein || !employer?.address_line1;
+  const incompleteDrivers = rows.filter((r) => !r.has_i9 || !r.has_w4 || !r.has_state_tax);
+
 
   return (
     <Card>
