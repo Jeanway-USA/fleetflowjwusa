@@ -5,6 +5,7 @@ import type { W2Row } from '@/hooks/useTaxHubData';
 interface DriverBlock {
   firstName: string | null;
   lastName: string | null;
+  ssnFull?: string | null;
   ssnLast4?: string | null;
   address?: string | null;
   tax_state?: string | null;
