@@ -608,7 +608,7 @@ function Form1099Tab({ year }: { year: number }) {
                       <TableCell>{r.legal_name || <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell>
                         {r.tin_last4
-                          ? <Badge variant="outline">•••• {r.tin_last4}</Badge>
+                          ? <FullTinBadge driverId={r.driver_id} last4={r.tin_last4} />
                           : <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" /> No W-9</Badge>}
                       </TableCell>
                       <TableCell>{r.tax_state || '—'}</TableCell>
