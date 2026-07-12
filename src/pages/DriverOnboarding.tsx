@@ -191,27 +191,30 @@ export default function DriverOnboarding() {
 
   // Existence checks for the employment-specific structured forms so a driver
   // completing only outstanding templates isn't forced to re-enter W-4/I-9/W-9/IOO.
-  const { data: structuredFormsPresent = { w4: false, i9: false, w9: false, ioo: false } } = useQuery({
+  const { data: structuredFormsPresent = { w4: false, i9: false, w9: false, ioo: false, stateTax: false } } = useQuery({
     queryKey: ['driver-structured-forms-present', driverRow?.id],
     enabled: !!driverRow?.id,
     queryFn: async () => {
-      const [w4, i9, w9, ioo] = await Promise.all([
+      const [w4, i9, w9, ioo, stateTaxRow] = await Promise.all([
         supabase.from('driver_w4_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
         supabase.from('driver_i9_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
         supabase.from('driver_w9_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
         supabase.from('driver_ioo_agreement').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
+        supabase.from('driver_state_tax_info' as never).select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
       ]);
       return {
         w4: !!w4.data,
         i9: !!i9.data,
         w9: !!w9.data,
         ioo: !!ioo.data,
+        stateTax: !!(stateTaxRow as { data?: unknown }).data,
       };
     },
   });
 
   const skipW2Structured = docsOnlyMode && structuredFormsPresent.w4 && structuredFormsPresent.i9;
   const skip1099Structured = docsOnlyMode && structuredFormsPresent.w9 && structuredFormsPresent.ioo;
+  const skipStateTax = docsOnlyMode && structuredFormsPresent.stateTax;
 
   // Deep-link: when ?revision=1, jump to first step that needs revision.
   useEffect(() => {
