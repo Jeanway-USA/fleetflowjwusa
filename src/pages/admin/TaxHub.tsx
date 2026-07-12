@@ -810,3 +810,10 @@ export default function TaxHub() {
     </div>
   );
 }
+
+function FullTinBadge({ driverId, last4 }: { driverId: string; last4: string }) {
+  const { data, isLoading } = useDriverTin(driverId);
+  if (isLoading) return <Badge variant="outline">•••• {last4}</Badge>;
+  const full = data?.tin ? formatTin(data.tin, data.tin_type) : null;
+  return <Badge variant="outline" className="font-mono">{full || `•••• ${last4}`}</Badge>;
+}
