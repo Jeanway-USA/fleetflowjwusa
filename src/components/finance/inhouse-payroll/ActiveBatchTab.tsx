@@ -307,17 +307,22 @@ export function ActiveBatchTab() {
       ledgerId = ins.id;
     }
 
+    const stateCode = (state || '').toUpperCase();
     const { error: whErr } = await supabase.from('tax_withholding_ledger').upsert(
       {
         org_id: orgId,
         ledger_id: ledgerId!,
         ee_social_security: result.eeSocialSecurity,
         er_social_security: result.erSocialSecurity,
-        ee_medicare: result.eeMedicare + result.addlMedicare,
+        ee_medicare: result.eeMedicare,
         employer_medicare: result.erMedicare,
+        additional_medicare: result.addlMedicare,
         federal_income_withholding: result.fit,
-        tx_twc_unemployment: (state || '').toUpperCase() === 'TX' ? result.sutaEmployer : 0,
-        fl_reemployment: (state || '').toUpperCase() === 'FL' ? result.sutaEmployer : 0,
+        state_code: stateCode,
+        state_suta: result.sutaEmployer,
+        state_sit: result.sit ?? 0,
+        tx_twc_unemployment: stateCode === 'TX' ? result.sutaEmployer : 0,
+        fl_reemployment: stateCode === 'FL' ? result.sutaEmployer : 0,
       },
       { onConflict: 'ledger_id' },
     );
