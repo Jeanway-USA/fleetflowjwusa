@@ -29,6 +29,8 @@ export interface GenerateSignedPdfArgs {
   routingNumber?: string;
   accountNumber?: string;
   bankAccountType?: 'checking' | 'savings' | '';
+  /** When false, the ssn and account_number tokens render the full digits. Default true (redacted). */
+  redact?: boolean;
 }
 
 
