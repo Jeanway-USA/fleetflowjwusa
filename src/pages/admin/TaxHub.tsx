@@ -393,7 +393,7 @@ function W2Tab({ year }: { year: number }) {
         file_path: path,
         document_type: 'w2',
         status: 'issued',
-      } as never, { onConflict: 'org_id,driver_id,tax_year,document_type' } as never);
+      } as never, { onConflict: 'driver_id,tax_year,file_path' } as never);
       // Also trigger local download
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -524,7 +524,7 @@ function Form1099Tab({ year }: { year: number }) {
         file_path: path,
         document_type: '1099_nec',
         status: 'issued',
-      } as never, { onConflict: 'org_id,driver_id,tax_year,document_type' } as never);
+      } as never, { onConflict: 'driver_id,tax_year,file_path' } as never);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
