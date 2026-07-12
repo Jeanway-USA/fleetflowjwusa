@@ -2013,6 +2013,87 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_state_tax_info: {
+        Row: {
+          additional_withholding: number
+          allowances: number
+          created_at: string
+          driver_id: string
+          exempt: boolean
+          filing_status: string
+          id: string
+          org_id: string
+          residence_state: string
+          signed_at: string | null
+          updated_at: string
+          work_state: string
+        }
+        Insert: {
+          additional_withholding?: number
+          allowances?: number
+          created_at?: string
+          driver_id: string
+          exempt?: boolean
+          filing_status?: string
+          id?: string
+          org_id: string
+          residence_state: string
+          signed_at?: string | null
+          updated_at?: string
+          work_state: string
+        }
+        Update: {
+          additional_withholding?: number
+          allowances?: number
+          created_at?: string
+          driver_id?: string
+          exempt?: boolean
+          filing_status?: string
+          id?: string
+          org_id?: string
+          residence_state?: string
+          signed_at?: string | null
+          updated_at?: string
+          work_state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_state_tax_info_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_state_tax_info_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: true
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_state_tax_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_state_tax_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_infrastructure_stats"
+            referencedColumns: ["org_id"]
+          },
+          {
+            foreignKeyName: "driver_state_tax_info_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "super_admin_organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_w4_info: {
         Row: {
           created_at: string
@@ -6584,6 +6665,18 @@ export type Database = {
           _effective_date: string
           _legal_name: string
           _mc_number: string
+        }
+        Returns: string
+      }
+      upsert_driver_state_tax: {
+        Args: {
+          _additional_withholding: number
+          _allowances: number
+          _driver_id: string
+          _exempt: boolean
+          _filing_status: string
+          _residence_state: string
+          _work_state: string
         }
         Returns: string
       }

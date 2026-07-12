@@ -1,45 +1,65 @@
+
 ## Goal
 
-Split the single "Filing Registry" table into two clean sections — **Federal** and **State** — and place each on its natural tab in the Tax Hub. State filings are also organized per state (grouped/collapsible), and pulled from the org's active state list rather than hardcoded to TX + FL.
+Today's onboarding collects federal forms (W-4, I-9, W-9, IOO) but nothing about **where** the driver works and lives. The State Filing Registry relies on `drivers.tax_state`, which is currently unpopulated at signup. Add a dedicated **State Tax Withholding form** to onboarding that:
 
-## Current state
+1. Captures work state (SUTA) + residence state (SIT).
+2. Captures state W-4 withholding elections (generic — no per-state PDF templates needed, since the user said we build these forms ourselves).
+3. Populates `drivers.tax_state` so the Filing Registry automatically shows only the states we actually owe.
+4. Skips SIT fields when the residence state has no income tax (FL, TX, TN, NV, WA, SD, WY, AK, NH) — surfaces a friendly "No state income tax" note instead.
+5. Generates a signed PDF stored alongside W-4/I-9 in `driver_signed_documents` (document_type = `state_tax`) and is reviewable in `SignedOnboardingDocuments`.
 
-- `TaxFilingRegistryTab.tsx` renders one flat table that mixes federal (941, 940, W-2/1099), Texas TWC (C-3), and Florida DOR (RT-6) filings.
-- The Tax Hub Federal tab embeds this full mixed registry, so state deadlines clutter the federal view. The Multi-State tab has no filings surface at all.
+Applies to both W-2 employees (required) and 1099 contractors (residence state only, informational — many states require 1099 filings even without withholding).
 
-## Changes
+## What gets built
 
-### 1. Split the registry into Federal-only and State-only components (`src/components/finance/inhouse-payroll/`)
+### 1. Data layer (migration)
+New table `public.driver_state_tax_info`:
+- `driver_id` (PK, FK → drivers)
+- `org_id`
+- `work_state` (2-letter, required)
+- `residence_state` (2-letter, required)
+- `filing_status` (single/married/hoh/married_separate)
+- `allowances` (int, generic — states vary)
+- `additional_withholding` (numeric)
+- `exempt` (bool, checkbox for states that allow it)
+- `signed_at`, `signature_data`
+- `created_at` / `updated_at`
 
-- **Rename/refactor** `TaxFilingRegistryTab.tsx` into two focused components that share the same completion/void/exempt data model (`tax_filing_completions`) and `MarkFiledDialog` / `VoidExemptDialog`:
-  - `FederalFilingRegistry.tsx` — Form 941 (4 quarters), Form 940 (annual FUTA), W-2 / 1099-NEC (annual). Header: "Federal Filings — IRS / SSA".
-  - `StateFilingRegistry.tsx` — SUTA + (where applicable) state income-tax filings, grouped per state with a collapsible per-state section showing that state's deadlines.
-- Extract a shared helper file `filing-registry-shared.ts` containing:
-  - `Deadline` type
-  - `keyFor(deadline)` (unchanged, so existing `tax_filing_completions.form_key` values keep working)
-  - Federal deadline builder
-  - State deadline builder that takes a list of active state codes and returns per-state deadlines
-- Delete the old `TaxFilingRegistryTab.tsx` after both consumers migrate.
+GRANTs to `authenticated` + `service_role`, RLS: driver can insert/select own row; org admins (owner, safety, payroll_admin) can read within their org.
 
-### 2. Data-driven state list
+Security-definer RPC `upsert_driver_state_tax(_driver_id, _work_state, _residence_state, ...)` following the pattern of `upsert_driver_w4`. Inside the RPC, also `UPDATE drivers SET tax_state = _work_state WHERE id = _driver_id` so the Filing Registry lights up automatically.
 
-- `StateFilingRegistry` reads active states from `state_tax_configurations` (already loaded for the Multi-State tab) plus any state present in `drivers.tax_state`, so registry rows match the states actually shown on the Multi-State tab.
-- Build a static per-state form map for the states we can reliably support today. Ship with:
-  - **TX** — Form C-3 (SUI), quarterly.
-  - **FL** — Form RT-6 (reemployment tax), quarterly.
-  - **Generic fallback** for any other active state: two placeholder rows per year — "SUTA Return (Qn)" quarterly and, only if the state has `has_state_income_tax = true`, "State Withholding (Qn)". Jurisdiction shows the state code. This keeps the registry accurate-enough-not-to-mislead while we build state-specific form metadata later; a small banner on the section notes "Generic deadlines shown — verify form names with each state agency."
-- Each state block is collapsible, defaulting to expanded when it contains any Overdue or Due-in-≤30-days row; collapsed otherwise. A summary chip on the trigger shows counts (e.g. "TX · 4 due · 0 overdue").
+### 2. New onboarding component
+`src/components/onboarding/StateTaxForm.tsx` — self-contained form (like `W2Documents.tsx` conventions):
+- Work state dropdown (all 50 + DC, using `src/lib/us-states.ts`).
+- Residence state dropdown; if it matches work state, auto-mirror.
+- Auto-hide SIT election fields when residence state is in the no-SIT list; show a green banner explaining no state withholding needed.
+- Filing status radio, allowances, additional withholding, exempt checkbox.
+- Signature pad + attestation checkbox.
+- Exports `StateTaxFormState`, `EMPTY_STATE_TAX_FORM`, and a `validateStateTaxForm()` helper mirroring existing form patterns.
 
-### 3. Update Tax Hub tabs (`src/pages/admin/TaxHub.tsx`)
+### 3. Onboarding page wiring
+`src/pages/DriverOnboarding.tsx`:
+- Add `stateTax` to `structuredFormsPresent` query (probe `driver_state_tax_info`).
+- Extend `skipW2Structured` / `skip1099Structured` to include stateTax.
+- In the W-2 branch: call `upsert_driver_state_tax` RPC; generate signed PDF via `generateFormPdf` with document_type `state_tax`; label "State Tax Withholding".
+- 1099 branch: same, but only residence state + informational fields (skip filing status/allowances).
+- Add `state_tax` to `DOCUMENT_LABELS` in `SignedOnboardingDocuments.tsx` → "State Tax Withholding".
 
-- **Federal tab**: replace `<TaxFilingRegistryTab />` with `<FederalFilingRegistry />` and update the card description to "Federal payroll deadlines. Marking a form filed here locks the row for audit."
-- **Multi-State tab**: below the existing Multi-State Overview table, add a new card `State Filing Deadlines` containing `<StateFilingRegistry />`.
+### 4. Admin/UX polish
+- `StateFilingRegistry.tsx` already reads distinct `drivers.tax_state` values — no change needed; states will start appearing as drivers complete onboarding.
+- Add a small helper `src/lib/us-states.ts::NO_STATE_INCOME_TAX` (or extend existing file) to share the no-SIT list between the onboarding form and any future validation.
 
-### 4. Nothing else moves
+## Technical notes
 
-- `tax_filing_completions` table, its RLS, `MarkFiledDialog`, and `VoidExemptDialog` stay as-is — only presentation changes.
-- No schema changes. No changes to the Finance page (Tax Hub already owns the registry).
+- No new per-state PDF templates. The generated PDF uses the same generic `generateFormPdf` sections used by W-4/I-9 today, so it's uniform and printable.
+- The RPC pattern keeps RLS clean — drivers can't set another driver's `tax_state`.
+- `document_templates` is not touched — this is a system form, not a customizable template, matching the user's statement "it's not variable."
+- Backfill is not needed: existing drivers already have `tax_state` set via Drivers page; new hires get it via this form.
 
 ## Out of scope
-- Adding full state-specific form catalogs beyond TX and FL. Generic quarterly placeholders + a "verify with agency" banner cover other states without pretending they are legally exact form names.
-- Alerts / notifications for upcoming deadlines.
+
+- Local (city/county) tax withholding.
+- Per-state W-4 PDF facsimiles (e.g., NC-4, IL-W-4). Can be added later if legal review requires the actual state form.
+- Reciprocity agreements between neighboring states (e.g., NJ/PA). Flagged for a follow-up.

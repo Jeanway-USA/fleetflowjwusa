@@ -14,6 +14,11 @@ import {
   EMPTY_CONTRACTOR_DOCS_STATE,
   type ContractorDocsState,
 } from '@/components/onboarding/ContractorDocuments';
+import {
+  StateTaxForm,
+  EMPTY_STATE_TAX_FORM,
+  type StateTaxFormState,
+} from '@/components/onboarding/StateTaxForm';
 import type { DriverPayType } from '@/lib/pay-format';
 
 
@@ -71,10 +76,14 @@ export interface DocumentSignatureStepProps {
   onW2DocsChange: (patch: Partial<W2DocsState>) => void;
   contractorDocs: ContractorDocsState;
   onContractorDocsChange: (patch: Partial<ContractorDocsState>) => void;
+  stateTax: StateTaxFormState;
+  onStateTaxChange: (patch: Partial<StateTaxFormState>) => void;
   /** When true, W-2 structured forms (W-4/I-9/Direct Deposit) are already on file — hide their block. */
   skipW2Structured?: boolean;
   /** When true, 1099 structured forms (W-9/IOO) are already on file — hide their block. */
   skip1099Structured?: boolean;
+  /** When true, the state tax form is already on file — hide its block. */
+  skipStateTax?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -229,11 +238,15 @@ export function DocumentSignatureStep({
   onW2DocsChange,
   contractorDocs,
   onContractorDocsChange,
+  stateTax,
+  onStateTaxChange,
   skipW2Structured = false,
   skip1099Structured = false,
+  skipStateTax = false,
 }: DocumentSignatureStepProps) {
   const [w2Valid, setW2Valid] = useState(false);
   const [contractorValid, setContractorValid] = useState(false);
+  const [stateTaxValid, setStateTaxValid] = useState(false);
 
   // Group templates by audience (applies_to). Fallback to 'shared' when absent.
   const audienceOf = (t: DocumentTemplateRow): TemplateAudience =>
@@ -273,7 +286,9 @@ export function DocumentSignatureStep({
         ? (skipW2Structured ? true : w2Valid)
         : (skip1099Structured ? true : contractorValid);
 
-    onValidityChange(templatesValid && employmentFormsValid);
+    const stateFormValid = skipStateTax ? true : stateTaxValid;
+
+    onValidityChange(templatesValid && employmentFormsValid && stateFormValid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     employmentType,
@@ -283,6 +298,7 @@ export function DocumentSignatureStep({
     state,
     w2Valid,
     contractorValid,
+    stateTaxValid,
     revisionMode,
     docRevisions,
   ]);
@@ -389,6 +405,31 @@ export function DocumentSignatureStep({
           </div>
         </section>
       )}
+
+      {/* State Tax Withholding — applies to both W-2 and 1099 */}
+      <section className="space-y-4">
+        <SectionHeader
+          title="State Tax Withholding"
+          description="Tells us which state(s) we owe unemployment and income-tax withholding for."
+          badge="All Drivers"
+        />
+        {skipStateTax ? (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>State tax form already on file</AlertTitle>
+            <AlertDescription>
+              You've already completed this form. No need to fill it out again.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <StateTaxForm
+            value={stateTax}
+            onChange={onStateTaxChange}
+            onValidityChange={setStateTaxValid}
+            audience={employmentType === 'W-2' ? 'w2' : '1099'}
+          />
+        )}
+      </section>
     </div>
   );
 

@@ -30,6 +30,11 @@ import {
   EMPTY_CONTRACTOR_DOCS_STATE,
   type ContractorDocsState,
 } from '@/components/onboarding/ContractorDocuments';
+import {
+  EMPTY_STATE_TAX_FORM,
+  type StateTaxFormState,
+} from '@/components/onboarding/StateTaxForm';
+import { stateHasIncomeTax } from '@/lib/us-states';
 import { formatPayRate, payTypeLabel } from '@/lib/pay-format';
 
 
@@ -89,6 +94,7 @@ export default function DriverOnboarding() {
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [w2Docs, setW2Docs] = useState<W2DocsState>(EMPTY_W2_DOCS_STATE);
   const [contractorDocs, setContractorDocs] = useState<ContractorDocsState>(EMPTY_CONTRACTOR_DOCS_STATE);
+  const [stateTax, setStateTax] = useState<StateTaxFormState>(EMPTY_STATE_TAX_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
   const [completionPendingDashboard, setCompletionPendingDashboard] = useState(false);
@@ -185,27 +191,30 @@ export default function DriverOnboarding() {
 
   // Existence checks for the employment-specific structured forms so a driver
   // completing only outstanding templates isn't forced to re-enter W-4/I-9/W-9/IOO.
-  const { data: structuredFormsPresent = { w4: false, i9: false, w9: false, ioo: false } } = useQuery({
+  const { data: structuredFormsPresent = { w4: false, i9: false, w9: false, ioo: false, stateTax: false } } = useQuery({
     queryKey: ['driver-structured-forms-present', driverRow?.id],
     enabled: !!driverRow?.id,
     queryFn: async () => {
-      const [w4, i9, w9, ioo] = await Promise.all([
+      const [w4, i9, w9, ioo, stateTaxRow] = await Promise.all([
         supabase.from('driver_w4_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
         supabase.from('driver_i9_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
         supabase.from('driver_w9_info').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
         supabase.from('driver_ioo_agreement').select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
+        supabase.from('driver_state_tax_info' as never).select('driver_id').eq('driver_id', driverRow!.id).maybeSingle(),
       ]);
       return {
         w4: !!w4.data,
         i9: !!i9.data,
         w9: !!w9.data,
         ioo: !!ioo.data,
+        stateTax: !!(stateTaxRow as { data?: unknown }).data,
       };
     },
   });
 
   const skipW2Structured = docsOnlyMode && structuredFormsPresent.w4 && structuredFormsPresent.i9;
   const skip1099Structured = docsOnlyMode && structuredFormsPresent.w9 && structuredFormsPresent.ioo;
+  const skipStateTax = docsOnlyMode && structuredFormsPresent.stateTax;
 
   // Deep-link: when ?revision=1, jump to first step that needs revision.
   useEffect(() => {
@@ -685,6 +694,79 @@ export default function DriverOnboarding() {
       );
     }
 
+    // ------------------------------------------------------------------
+    // State Tax Withholding (applies to both W-2 and 1099 drivers).
+    // Also mirrors work_state onto drivers.tax_state via the RPC so the
+    // State Filing Registry surfaces only the states we actually owe.
+    // ------------------------------------------------------------------
+    if (!skipStateTax) {
+      const residenceHasSit = stateHasIncomeTax(stateTax.residenceState);
+      const { error: stErr } = await supabase.rpc('upsert_driver_state_tax' as never, {
+        _driver_id: driverRow.id,
+        _work_state: stateTax.workState,
+        _residence_state: stateTax.residenceState,
+        _filing_status: residenceHasSit ? (stateTax.filingStatus || 'single') : 'single',
+        _allowances: Number(stateTax.allowances || 0),
+        _additional_withholding: Number(stateTax.additionalWithholding || 0),
+        _exempt: !!stateTax.exempt,
+      } as never);
+      if (stErr) throw new Error(`Couldn't save your state tax form: ${stErr.message}`);
+
+      const stSections: FormPdfSection[] = [
+        {
+          heading: 'Jurisdictions',
+          fields: [
+            { label: 'Work state (SUTA)', value: stateTax.workState },
+            { label: 'State of residence', value: stateTax.residenceState },
+          ],
+        },
+      ];
+      if (employmentType === 'W-2' && residenceHasSit) {
+        stSections.push({
+          heading: 'State Income Tax Withholding',
+          fields: [
+            { label: 'Claiming exempt', value: stateTax.exempt ? 'Yes' : 'No' },
+            { label: 'Filing status', value: stateTax.exempt ? '—' : (stateTax.filingStatus || '—') },
+            { label: 'Allowances', value: stateTax.exempt ? '—' : (stateTax.allowances || '0') },
+            {
+              label: 'Additional withholding per pay period',
+              value: stateTax.exempt ? '—' : `$${stateTax.additionalWithholding || '0'}`,
+            },
+          ],
+          notes: [
+            'Employee certifies, under penalty of perjury, that the information provided is accurate and will notify the employer of any change.',
+          ],
+        });
+      } else if (employmentType === 'W-2' && !residenceHasSit) {
+        stSections.push({
+          heading: 'State Income Tax Withholding',
+          fields: [
+            { label: 'State income tax', value: `${stateTax.residenceState.toUpperCase()} has no state income tax — no withholding elections required.` },
+          ],
+        });
+      } else {
+        stSections.push({
+          heading: '1099 Contractor Note',
+          fields: [
+            { label: 'Withholding', value: 'Not applicable — 1099 contractors are not subject to state tax withholding by the payer.' },
+          ],
+        });
+      }
+
+      await uploadFormPdf(
+        'state_tax',
+        'State Tax Withholding',
+        generateFormPdf({
+          title: 'State Tax Withholding Election',
+          subtitle: 'Signed electronically as part of driver onboarding.',
+          driverName,
+          sections: stSections,
+          signatureLabel: employmentType === 'W-2' ? 'Employee signature' : 'Contractor signature',
+          signature: stateTax.signature,
+        }),
+      );
+    }
+
     const profileCompleted = !revisionMode;
     const shouldReturnToDashboard = docsOnlyMode || results.length === 0;
 
@@ -1043,8 +1125,11 @@ export default function DriverOnboarding() {
                 onW2DocsChange={(patch) => setW2Docs((prev) => ({ ...prev, ...patch }))}
                 contractorDocs={contractorDocs}
                 onContractorDocsChange={(patch) => setContractorDocs((prev) => ({ ...prev, ...patch }))}
+                stateTax={stateTax}
+                onStateTaxChange={(patch) => setStateTax((prev) => ({ ...prev, ...patch }))}
                 skipW2Structured={skipW2Structured}
                 skip1099Structured={skip1099Structured}
+                skipStateTax={skipStateTax}
               />
               {docsOnlyMode && pendingTemplates.length === 0 && (skipW2Structured || skip1099Structured || (structuredFormsPresent.w4 && structuredFormsPresent.i9 && structuredFormsPresent.w9 && structuredFormsPresent.ioo)) && (
                 <Alert>
