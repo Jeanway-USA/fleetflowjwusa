@@ -33,7 +33,7 @@ const RevenueTab = lazy(() =>
 import { CommissionsTab } from '@/components/finance/CommissionsTab';
 import { DriverSettlementsTab } from '@/components/finance/driver-settlements/DriverSettlementsTab';
 import { ActiveBatchTab } from '@/components/finance/inhouse-payroll/ActiveBatchTab';
-import { TaxFilingRegistryTab } from '@/components/finance/inhouse-payroll/TaxFilingRegistryTab';
+
 
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
 import { SafetyBonusSettings } from '@/components/finance/SafetyBonusSettings';
@@ -671,7 +671,7 @@ export default function Finance() {
             1. Run Payouts
           </TabsTrigger>
           <TabsTrigger value="compliance" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
-            2. Tax & Compliance
+            2. Expenses
           </TabsTrigger>
           <TabsTrigger value="analytics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
             3. Analytics & Audit Logs
@@ -717,56 +717,7 @@ export default function Finance() {
 
         {/* ===== VIEW 2 — TAX & COMPLIANCE ===== */}
         <TabsContent value="compliance">
-          <div className="space-y-6 animate-in fade-in-50">
-            {canManagePayroll ? (
-              <TaxFilingRegistryTab />
-            ) : (
-              <Card className="card-elevated">
-                <CardContent className="py-10 text-center text-muted-foreground">
-                  Tax & Compliance registry is available to payroll administrators only.
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* ===== VIEW 3 — ANALYTICS & AUDIT LOGS ===== */}
-        <TabsContent value="analytics">
           <div className="space-y-8 animate-in fade-in-50">
-            <PLSummaryTab
-              revenueTotals={revenueTotals}
-              loadExpenseTotals={loadExpenseTotals}
-              standaloneExpenseTotals={standaloneExpenseTotals}
-              loadLinkedExpenseTotals={loadLinkedExpenseTotals}
-              payrollTotals={payrollTotals}
-              commissionTotals={commissionTotals}
-              deadheadMiles={deadheadMiles}
-              totalEmptyMiles={totalEmptyMiles}
-              totalActualMilesWithDeadhead={totalActualMilesWithDeadhead}
-              netProfit={netProfit}
-              profitMargin={profitMargin}
-              totalExpenses={totalExpenses}
-              totalRevenueWithCommissions={totalRevenueWithCommissions}
-              getSetting={getSetting}
-            />
-            <Suspense fallback={<ChartSkeleton height={320} />}>
-              <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
-            </Suspense>
-            <Suspense fallback={<ChartSkeleton height={320} />}>
-              <LoadProfitabilityTab
-                deliveredLoads={deliveredLoads}
-                loadExpenses={loadExpenses}
-                drivers={drivers}
-                expenses={filteredExpenses}
-                totalExpenses={totalExpenses}
-                totalPayroll={totalPayroll}
-                revenueTotals={revenueTotals}
-                allLoads={loads}
-                isIndependent={isIndependent}
-              />
-            </Suspense>
-            <AuditReconciliation loads={loads} />
-
             <Card className="card-elevated">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
@@ -1018,6 +969,47 @@ export default function Finance() {
                 </div>
               </CardContent>
             </Card>
+          </div>
+        </TabsContent>
+
+        {/* ===== VIEW 3 — ANALYTICS & AUDIT LOGS ===== */}
+        <TabsContent value="analytics">
+          <div className="space-y-8 animate-in fade-in-50">
+            <PLSummaryTab
+              revenueTotals={revenueTotals}
+              loadExpenseTotals={loadExpenseTotals}
+              standaloneExpenseTotals={standaloneExpenseTotals}
+              loadLinkedExpenseTotals={loadLinkedExpenseTotals}
+              payrollTotals={payrollTotals}
+              commissionTotals={commissionTotals}
+              deadheadMiles={deadheadMiles}
+              totalEmptyMiles={totalEmptyMiles}
+              totalActualMilesWithDeadhead={totalActualMilesWithDeadhead}
+              netProfit={netProfit}
+              profitMargin={profitMargin}
+              totalExpenses={totalExpenses}
+              totalRevenueWithCommissions={totalRevenueWithCommissions}
+              getSetting={getSetting}
+            />
+            <Suspense fallback={<ChartSkeleton height={320} />}>
+              <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
+            </Suspense>
+            <Suspense fallback={<ChartSkeleton height={320} />}>
+              <LoadProfitabilityTab
+                deliveredLoads={deliveredLoads}
+                loadExpenses={loadExpenses}
+                drivers={drivers}
+                expenses={filteredExpenses}
+                totalExpenses={totalExpenses}
+                totalPayroll={totalPayroll}
+                revenueTotals={revenueTotals}
+                allLoads={loads}
+                isIndependent={isIndependent}
+              />
+            </Suspense>
+            <AuditReconciliation loads={loads} />
+
+
 
             {isIndependent && (
               <>
