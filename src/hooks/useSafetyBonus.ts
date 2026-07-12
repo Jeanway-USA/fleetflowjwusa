@@ -45,9 +45,19 @@ const EMPTY: SafetyBonusStatus = {
 };
 
 function toDateString(d: Date): string {
-  // YYYY-MM-DD in UTC to avoid timezone shifting
-  return d.toISOString().slice(0, 10);
+  // YYYY-MM-DD in local time (calendar-based, not UTC-shifted)
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
+
+function calendarMonthBounds(now: Date): { start: string; end: string } {
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return { start: toDateString(start), end: toDateString(end) };
+}
+
 
 async function computeSafetyBonus(driverId: string): Promise<SafetyBonusStatus> {
   // 1) Resolve org from driver
@@ -68,13 +78,11 @@ async function computeSafetyBonus(driverId: string): Promise<SafetyBonusStatus> 
   if (settingsErr) throw settingsErr;
   if (!settings) return EMPTY;
 
-  const periodDays = settings.period_length_days ?? 28;
   const maxBonus = Number(settings.max_bonus_amount ?? 0);
 
-  const endDate = new Date();
-  const startDate = new Date(endDate.getTime() - periodDays * 24 * 60 * 60 * 1000);
-  const periodStart = toDateString(startDate);
-  const periodEnd = toDateString(endDate);
+  // Calendar month window — resets to 0 on the 1st.
+  const { start: periodStart, end: periodEnd } = calendarMonthBounds(new Date());
+
 
   // 3) Tiers + period data in parallel
   const [tiersRes, loadsRes, incidentsRes, failuresRes] = await Promise.all([
@@ -168,8 +176,17 @@ async function computeSafetyBonus(driverId: string): Promise<SafetyBonusStatus> 
     ratePerMile: t.rate_per_mile,
   });
 
-  const rawBonus = isEligible ? currentSafeMiles * currentRate : 0;
-  const currentEarnedBonus = Math.min(rawBonus, maxBonus);
+  // Marginal tier calculation — each tier's rate only applies to miles inside that tier.
+  let rawBonus = 0;
+  if (isEligible && currentSafeMiles > 0) {
+    for (const t of tiers) {
+      if (currentSafeMiles <= t.min_miles) break;
+      const ceiling = t.max_miles ?? currentSafeMiles;
+      const inTier = Math.min(currentSafeMiles, ceiling) - t.min_miles;
+      if (inTier > 0) rawBonus += inTier * t.rate_per_mile;
+    }
+  }
+  const currentEarnedBonus = maxBonus > 0 ? Math.min(rawBonus, maxBonus) : rawBonus;
 
   return {
     isEligible,
@@ -193,8 +210,12 @@ async function computeSafetyBonus(driverId: string): Promise<SafetyBonusStatus> 
 }
 
 export function useSafetyBonus(driverId?: string | null) {
+  const monthKey = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  })();
   const query = useQuery({
-    queryKey: ["safety-bonus", driverId],
+    queryKey: ["safety-bonus", driverId, monthKey],
     queryFn: () => computeSafetyBonus(driverId as string),
     enabled: !!driverId,
     staleTime: 5 * 60 * 1000,

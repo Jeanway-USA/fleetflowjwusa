@@ -4837,6 +4837,57 @@ export type Database = {
         }
         Relationships: []
       }
+      safety_bonus_payouts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          driver_id: string
+          earned_amount: number
+          id: string
+          notes: string | null
+          org_id: string
+          paid_at: string | null
+          paid_in_settlement_id: string | null
+          period_end: string
+          period_start: string
+          safe_miles: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          driver_id: string
+          earned_amount?: number
+          id?: string
+          notes?: string | null
+          org_id: string
+          paid_at?: string | null
+          paid_in_settlement_id?: string | null
+          period_end: string
+          period_start: string
+          safe_miles?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string
+          earned_amount?: number
+          id?: string
+          notes?: string | null
+          org_id?: string
+          paid_at?: string | null
+          paid_in_settlement_id?: string | null
+          period_end?: string
+          period_start?: string
+          safe_miles?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       safety_bonus_settings: {
         Row: {
           created_at: string
@@ -6460,6 +6511,15 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      generate_safety_bonus_payouts: {
+        Args: { _period_start: string }
+        Returns: {
+          driver_id: string
+          earned_amount: number
+          safe_miles: number
+          status: string
+        }[]
       }
       get_1099_totals: {
         Args: { _year: number }
