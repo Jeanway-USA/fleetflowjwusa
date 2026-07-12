@@ -227,6 +227,17 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
                   <Download className="mr-1.5 h-4 w-4" />
                   Download
                 </Button>
+                {canDownloadFull && d.admin_file_path && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    title="Full unmasked copy for payroll/tax use"
+                    onClick={() => openSignedUrl(d.admin_file_path!, `${d.document_type}_full.pdf`, 'download')}
+                  >
+                    <ShieldCheck className="mr-1.5 h-4 w-4" />
+                    Full copy
+                  </Button>
+                )}
                 {d.attachment_file_path && (
                   <Button
                     size="sm"
