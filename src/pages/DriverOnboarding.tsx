@@ -694,7 +694,79 @@ export default function DriverOnboarding() {
       );
     }
 
-    const profileCompleted = !revisionMode;
+    // ------------------------------------------------------------------
+    // State Tax Withholding (applies to both W-2 and 1099 drivers).
+    // Also mirrors work_state onto drivers.tax_state via the RPC so the
+    // State Filing Registry surfaces only the states we actually owe.
+    // ------------------------------------------------------------------
+    if (!skipStateTax) {
+      const residenceHasSit = stateHasIncomeTax(stateTax.residenceState);
+      const { error: stErr } = await supabase.rpc('upsert_driver_state_tax' as never, {
+        _driver_id: driverRow.id,
+        _work_state: stateTax.workState,
+        _residence_state: stateTax.residenceState,
+        _filing_status: residenceHasSit ? (stateTax.filingStatus || 'single') : 'single',
+        _allowances: Number(stateTax.allowances || 0),
+        _additional_withholding: Number(stateTax.additionalWithholding || 0),
+        _exempt: !!stateTax.exempt,
+      } as never);
+      if (stErr) throw new Error(`Couldn't save your state tax form: ${stErr.message}`);
+
+      const stSections: FormPdfSection[] = [
+        {
+          heading: 'Jurisdictions',
+          fields: [
+            { label: 'Work state (SUTA)', value: stateTax.workState },
+            { label: 'State of residence', value: stateTax.residenceState },
+          ],
+        },
+      ];
+      if (employmentType === 'W-2' && residenceHasSit) {
+        stSections.push({
+          heading: 'State Income Tax Withholding',
+          fields: [
+            { label: 'Claiming exempt', value: stateTax.exempt ? 'Yes' : 'No' },
+            { label: 'Filing status', value: stateTax.exempt ? '—' : (stateTax.filingStatus || '—') },
+            { label: 'Allowances', value: stateTax.exempt ? '—' : (stateTax.allowances || '0') },
+            {
+              label: 'Additional withholding per pay period',
+              value: stateTax.exempt ? '—' : `$${stateTax.additionalWithholding || '0'}`,
+            },
+          ],
+          notes: [
+            'Employee certifies, under penalty of perjury, that the information provided is accurate and will notify the employer of any change.',
+          ],
+        });
+      } else if (employmentType === 'W-2' && !residenceHasSit) {
+        stSections.push({
+          heading: 'State Income Tax Withholding',
+          fields: [
+            { label: 'State income tax', value: `${stateTax.residenceState.toUpperCase()} has no state income tax — no withholding elections required.` },
+          ],
+        });
+      } else {
+        stSections.push({
+          heading: '1099 Contractor Note',
+          fields: [
+            { label: 'Withholding', value: 'Not applicable — 1099 contractors are not subject to state tax withholding by the payer.' },
+          ],
+        });
+      }
+
+      await uploadFormPdf(
+        'state_tax',
+        'State Tax Withholding',
+        generateFormPdf({
+          title: 'State Tax Withholding Election',
+          subtitle: 'Signed electronically as part of driver onboarding.',
+          driverName,
+          sections: stSections,
+          signatureLabel: employmentType === 'W-2' ? 'Employee signature' : 'Contractor signature',
+          signature: stateTax.signature,
+        }),
+      );
+    }
+
     const shouldReturnToDashboard = docsOnlyMode || results.length === 0;
 
     if (profileCompleted) {
