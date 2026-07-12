@@ -63,6 +63,7 @@ type WithholdingRow = {
   federal_income_withholding: number;
   tx_twc_unemployment: number;
   fl_reemployment: number;
+  state_suta: number;
 };
 
 function defaultPeriod(freq: string, ref = new Date()) {
