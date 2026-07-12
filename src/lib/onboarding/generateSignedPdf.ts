@@ -479,7 +479,9 @@ export function generateSignedPdf({
           break;
         case 'ssn': {
           const digits = (ssn || '').replace(/\D/g, '');
-          if (digits.length >= 4) {
+          if (!redact && digits.length === 9) {
+            buffer += `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+          } else if (digits.length >= 4) {
             buffer += `***-**-${digits.slice(-4)}`;
           } else {
             buffer += '________________________';
