@@ -58,8 +58,13 @@ export function generate1099NecPdf(opts: {
      recipient.business_name ? `DBA ${recipient.business_name}` : '',
      recipient.address || '',
      recipient.tax_state || ''].filter(Boolean).join('\n'), 9);
-  drawBox(M + 300, 240, 66, 'RECIPIENT\'s TIN',
-    recipient.tin_last4 ? `XXX-XX-${recipient.tin_last4}` : '(on file)');
+  const tinDigits = (tinFull ?? '').replace(/\D/g, '');
+  const tinLabel = tinDigits.length === 9
+    ? ((tinType ?? '').toLowerCase() === 'ein'
+        ? `${tinDigits.slice(0, 2)}-${tinDigits.slice(2)}`
+        : `${tinDigits.slice(0, 3)}-${tinDigits.slice(3, 5)}-${tinDigits.slice(5)}`)
+    : recipient.tin_last4 ? `XXX-XX-${recipient.tin_last4}` : '(on file)';
+  drawBox(M + 300, 240, 66, 'RECIPIENT\'s TIN', tinLabel);
   y += 76;
 
   // Numbered boxes
