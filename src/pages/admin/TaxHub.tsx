@@ -486,9 +486,24 @@ function W2Tab({ year }: { year: number }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => (
+                {rows.map((r) => {
+                  const missing: string[] = [];
+                  if (!r.has_w4) missing.push('W-4');
+                  if (!r.has_state_tax) missing.push('State');
+                  if (!r.has_i9) missing.push('I-9');
+                  return (
                   <TableRow key={r.driver_id}>
-                    <TableCell className="font-medium">{r.first_name} {r.last_name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span>{r.first_name} {r.last_name}</span>
+                        {missing.length > 0 && (
+                          <span className="text-[10px] uppercase tracking-wide rounded border border-amber-500/60 text-amber-700 dark:text-amber-400 px-1.5 py-0.5">
+                            Missing: {missing.join(', ')}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+
                     <TableCell>{r.tax_state || '—'}</TableCell>
                     <TableCell className="text-right">{formatCurrency(r.wages_box1)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(r.fit_box2)}</TableCell>
