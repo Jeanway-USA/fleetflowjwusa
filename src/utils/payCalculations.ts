@@ -569,6 +569,16 @@ export const DEFAULT_W4: W2W4 = {
   extra_withholding: 0,
 };
 
+export interface StateW4Snapshot {
+  exempt: boolean;
+  filing_status: FilingStatus;
+  allowances: number;
+  additional_withholding: number;
+}
+
+/** Approximate allowance value in dollars; used until per-state allowance tables land. */
+const STATE_ALLOWANCE_VALUE = 2000;
+
 export interface W2PayrollInput {
   grossTaxablePay: number;
   ytdGrossTaxablePay: number;
@@ -576,7 +586,16 @@ export interface W2PayrollInput {
   w4: W2W4;
   federal: W2FederalConfig;
   state?: W2StateConfig | null;
+  /**
+   * Snapshot of the driver's state-tax form. When provided:
+   * - exempt=true zeroes SIT
+   * - allowances reduce annualized taxable state wages by allowances*STATE_ALLOWANCE_VALUE
+   * - additional_withholding is added on top per period
+   * filing_status is accepted for audit but not yet branched on (single rate model).
+   */
+  stateW4?: StateW4Snapshot | null;
 }
+
 
 export interface W2PayrollResult {
   gross: number;
