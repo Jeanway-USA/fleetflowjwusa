@@ -176,8 +176,17 @@ async function computeSafetyBonus(driverId: string): Promise<SafetyBonusStatus> 
     ratePerMile: t.rate_per_mile,
   });
 
-  const rawBonus = isEligible ? currentSafeMiles * currentRate : 0;
-  const currentEarnedBonus = Math.min(rawBonus, maxBonus);
+  // Marginal tier calculation — each tier's rate only applies to miles inside that tier.
+  let rawBonus = 0;
+  if (isEligible && currentSafeMiles > 0) {
+    for (const t of tiers) {
+      if (currentSafeMiles <= t.min_miles) break;
+      const ceiling = t.max_miles ?? currentSafeMiles;
+      const inTier = Math.min(currentSafeMiles, ceiling) - t.min_miles;
+      if (inTier > 0) rawBonus += inTier * t.rate_per_mile;
+    }
+  }
+  const currentEarnedBonus = maxBonus > 0 ? Math.min(rawBonus, maxBonus) : rawBonus;
 
   return {
     isEligible,
