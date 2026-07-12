@@ -4261,10 +4261,16 @@ export type Database = {
         Row: {
           applied_promo_code_id: string | null
           banner_url: string | null
+          business_address_line1: string | null
+          business_address_line2: string | null
+          business_city: string | null
+          business_state: string | null
+          business_zip: string | null
           company_timezone: string
           complimentary_ends_at: string | null
           created_at: string
           dot_number: string | null
+          ein: string | null
           factoring_enabled: boolean | null
           factoring_fee_percentage: number | null
           factoring_provider_name: string | null
@@ -4289,10 +4295,16 @@ export type Database = {
         Insert: {
           applied_promo_code_id?: string | null
           banner_url?: string | null
+          business_address_line1?: string | null
+          business_address_line2?: string | null
+          business_city?: string | null
+          business_state?: string | null
+          business_zip?: string | null
           company_timezone?: string
           complimentary_ends_at?: string | null
           created_at?: string
           dot_number?: string | null
+          ein?: string | null
           factoring_enabled?: boolean | null
           factoring_fee_percentage?: number | null
           factoring_provider_name?: string | null
@@ -4317,10 +4329,16 @@ export type Database = {
         Update: {
           applied_promo_code_id?: string | null
           banner_url?: string | null
+          business_address_line1?: string | null
+          business_address_line2?: string | null
+          business_city?: string | null
+          business_state?: string | null
+          business_zip?: string | null
           company_timezone?: string
           complimentary_ends_at?: string | null
           created_at?: string
           dot_number?: string | null
+          ein?: string | null
           factoring_enabled?: boolean | null
           factoring_fee_percentage?: number | null
           factoring_provider_name?: string | null
@@ -5126,34 +5144,46 @@ export type Database = {
       }
       state_tax_configurations: {
         Row: {
+          agency_notes: string | null
           created_at: string
+          deposit_frequency: string | null
           has_state_income_tax: boolean
           id: string
           org_id: string
+          sit_account_number: string | null
           sit_rate: number
           state_code: string
+          suta_account_number: string | null
           suta_rate: number
           suta_wage_base: number
           updated_at: string
         }
         Insert: {
+          agency_notes?: string | null
           created_at?: string
+          deposit_frequency?: string | null
           has_state_income_tax?: boolean
           id?: string
           org_id: string
+          sit_account_number?: string | null
           sit_rate?: number
           state_code: string
+          suta_account_number?: string | null
           suta_rate?: number
           suta_wage_base?: number
           updated_at?: string
         }
         Update: {
+          agency_notes?: string | null
           created_at?: string
+          deposit_frequency?: string | null
           has_state_income_tax?: boolean
           id?: string
           org_id?: string
+          sit_account_number?: string | null
           sit_rate?: number
           state_code?: string
+          suta_account_number?: string | null
           suta_rate?: number
           suta_wage_base?: number
           updated_at?: string
@@ -5236,28 +5266,34 @@ export type Database = {
       tax_documents: {
         Row: {
           created_at: string
+          document_type: string
           driver_id: string
           file_path: string
           id: string
           org_id: string
+          status: string
           tax_year: number
           uploaded_by: string | null
         }
         Insert: {
           created_at?: string
+          document_type?: string
           driver_id: string
           file_path: string
           id?: string
           org_id: string
+          status?: string
           tax_year: number
           uploaded_by?: string | null
         }
         Update: {
           created_at?: string
+          document_type?: string
           driver_id?: string
           file_path?: string
           id?: string
           org_id?: string
+          status?: string
           tax_year?: number
           uploaded_by?: string | null
         }
@@ -5301,6 +5337,7 @@ export type Database = {
       }
       tax_withholding_ledger: {
         Row: {
+          additional_medicare: number
           created_at: string
           ee_medicare: number
           ee_social_security: number
@@ -5311,10 +5348,14 @@ export type Database = {
           id: string
           ledger_id: string
           org_id: string
+          state_code: string | null
+          state_sit: number
+          state_suta: number
           tx_twc_unemployment: number
           updated_at: string
         }
         Insert: {
+          additional_medicare?: number
           created_at?: string
           ee_medicare?: number
           ee_social_security?: number
@@ -5325,10 +5366,14 @@ export type Database = {
           id?: string
           ledger_id: string
           org_id: string
+          state_code?: string | null
+          state_sit?: number
+          state_suta?: number
           tx_twc_unemployment?: number
           updated_at?: string
         }
         Update: {
+          additional_medicare?: number
           created_at?: string
           ee_medicare?: number
           ee_social_security?: number
@@ -5339,6 +5384,9 @@ export type Database = {
           id?: string
           ledger_id?: string
           org_id?: string
+          state_code?: string | null
+          state_sit?: number
+          state_suta?: number
           tx_twc_unemployment?: number
           updated_at?: string
         }
@@ -6332,6 +6380,22 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_1099_totals: {
+        Args: { _year: number }
+        Returns: {
+          address: string
+          business_name: string
+          driver_id: string
+          fed_tax_withheld_box4: number
+          first_name: string
+          last_name: string
+          legal_name: string
+          nonemployee_comp_box1: number
+          state_tax_withheld_box5: number
+          tax_state: string
+          tin_last4: string
+        }[]
+      }
       get_driver_banking: {
         Args: { _driver_id: string }
         Returns: {
@@ -6350,6 +6414,23 @@ export type Database = {
       }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: { Args: { _user_id: string }; Returns: string }
+      get_w2_totals: {
+        Args: { _year: number }
+        Returns: {
+          driver_id: string
+          first_name: string
+          fit_box2: number
+          last_name: string
+          medicare_tax_box6: number
+          medicare_wages_box5: number
+          ss_tax_box4: number
+          ss_wages_box3: number
+          state_tax_box17: number
+          state_wages_box16: number
+          tax_state: string
+          wages_box1: number
+        }[]
+      }
       gusto_get_tokens: {
         Args: { _org_id: string }
         Returns: {

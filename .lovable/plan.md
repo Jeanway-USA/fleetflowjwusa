@@ -1,110 +1,123 @@
+# Multi-State Tax Hub + W-2 / 1099 Generation
 
-# Tax-Ready W-2 Payroll Rebuild
+Build a dedicated **Tax Hub** under `/admin/tax-hub` that centralizes multi-state employer tax tracking and generates IRS-accurate W-2 and 1099-NEC forms for each worker. The Payroll section on Finance stays focused on running payroll; the Tax Hub is the compliance + reporting brain.
 
-Goal: turn the Finances → Run Payouts section into a **fully automated W-2 payroll engine** that is IRS-ready, uses each driver's real W-4 + tax state, and requires no manual number entry. Only three buttons: **Generate Batch**, **Finalize Batch**, **Void / Delete**.
+## 1. Route and navigation
 
-## 1. Remove ACH Staging entirely
-- Delete the "Truist ACH Staging" section from `src/pages/Finance.tsx` and the `TruistAchStagingTab.tsx` component.
-- Finalizing a batch will mark rows `finalized` directly (no ACH ref step). The `truist_payout_logs` table stays untouched in DB (historical) but is no longer surfaced in UI.
+- New page `src/pages/admin/TaxHub.tsx` at `/admin/tax-hub`, guarded by `owner` + `payroll_admin`.
+- Add a link to the admin section of the sidebar next to "Document Templates".
+- Move `TaxFilingRegistryTab` into Tax Hub (kept intact) so all tax compliance lives in one place. Finance keeps only "Active Batch" and "History".
 
-## 2. Real tax engine (replaces the stub `usePayrollTaxConfig` / stripped `calculatePayrollTaxes`)
+## 2. Tax Hub layout
 
-Rewrite `src/utils/payCalculations.ts`'s payroll-tax section into a proper engine driven by `payroll_settings` + `driver_w4_info` + `state_tax_configurations`. New pure function:
+Single page with four tabs:
 
-```
-calculateW2Payroll({
-  grossTaxablePay,          // base + bonus + holiday (existing)
-  ytdGrossTaxablePay,       // for SS wage-base cap
-  ytdMedicareWages,         // for additional Medicare threshold
-  payFrequency,             // weekly / biweekly / semimonthly / monthly
-  w4: { filing_status, multiple_jobs, dependents_amount, other_income,
-        deductions, extra_withholding, step_2c_checkbox },
-  federalConfig: payroll_settings row (rates, wage bases, fit_brackets,
-                                       standard_deduction),
-  stateConfig: state_tax_configurations row for driver's tax_state,
-})  → {
-  fica: { eeSS, erSS, eeMedicare, erMedicare, addlMedicare },
-  fit,                       // IRS Pub 15-T Worksheet 1A (percentage method,
-                             //   2020+ W-4, annualized wages)
-  state: { suta_er, sit_ee },
-  totals: { eeWithholding, erLiability, netPay },
-}
-```
+### Tab A — Multi-State Overview
+Table of every state the company has active employees in (derived from `drivers.tax_state` where `employment_type = 'W2'`). Columns: State, Active Employees, YTD Wages, YTD SUTA Accrued, YTD SIT Withheld, SUTA Rate, SUTA Wage Base, Has SIT, Registration #, Deposit Frequency, Status.
 
-FIT algorithm (Pub 15-T Worksheet 1A):
-```
-annualWages     = grossTaxablePay * payPeriodsPerYear
-adjustedAnnual  = annualWages + other_income
-                  - (deductions + standardDeduction[filing])
-                  - dependents_amount
-                  (multiple_jobs / step_2c_checkbox flips to the
-                   "Form W-4 Step 2 checkbox" bracket table)
-annualFIT       = bracketLookup(fit_brackets[filing], adjustedAnnual)
-periodFIT       = max(annualFIT, 0) / payPeriodsPerYear + extra_withholding
-```
+Data sources:
+- Wages / SUTA / SIT: sum `internal_payroll_ledger` + `tax_withholding_ledger` (status ∈ finalized) grouped by driver's tax state for the current year.
+- Rates: `state_tax_configurations` row per state (already seeded).
 
-SUTA: `min(gross, max(0, suta_wage_base - ytdGrossTaxablePay)) * suta_rate` (employer-only).
-SIT: `gross * sit_rate` (only if `has_state_income_tax`).
-Additional Medicare: 0.9% on wages above threshold within the year (employee only).
+Each row opens a **State Detail Sheet** that lets an owner edit the state-level values that aren't legally fixed:
+- SUTA rate (assigned yearly by each state agency)
+- SUTA wage base (set by state law but stored here for override / historical)
+- SIT rate / has SIT toggle
+- State registration number (SUTA account ID, SIT withholding ID)
+- Deposit frequency (monthly / quarterly / annual)
+- Contact/agency notes
 
-Replace `usePayrollTaxConfig` with `usePayrollConfig` that returns the full `payroll_settings` row + a `state_tax_configurations` map keyed by state code. Ensure the row is seeded if missing.
+These edits write back to `state_tax_configurations` (new columns added below).
 
-## 3. Automatic Active Batch (no manual number inputs)
+### Tab B — Federal Overview
+Cards summarizing YTD employer-side federal position:
+- Total wages (Box 1 basis)
+- Total FIT withheld
+- Total FICA (employee + employer)
+- Additional Medicare withheld
+- FUTA accrued (0.6% × min(wages, 7000) per employee)
+- 941 quarterly rollups (Q1–Q4) with links into the existing Filing Registry rows for the matching quarter.
 
-Rewrite `ActiveBatchTab.tsx`:
+### Tab C — W-2 Preparation
+One row per W-2 employee for the selected tax year (year selector defaults to prior calendar year Jan–Mar, else current year).
+Columns: Employee, SSN status (has W-4 + address? warning icons), Box 1 Wages, Box 2 FIT, Box 3 SS Wages, Box 4 SS Tax, Box 5 Medicare Wages, Box 6 Medicare Tax, State, Box 16 State Wages, Box 17 State Tax, Status (Draft / Issued).
 
-- Header shows the pay period (defaults to current week per `payroll_settings.pay_frequency`) with a small period navigator and one **Generate Batch** button.
-- On Generate Batch: for every active W-2 driver
-  1. Pull `base_salary_per_period`, W-4, tax state.
-  2. Roll up **YTD gross / Medicare wages** from prior finalized ledger rows this calendar year.
-  3. Compute bonus and holiday **automatically** from existing sources instead of manual input:
-     - Bonus = safety-bonus accruals + any settlement bonus items dated in the period (existing `safety_bonus_settings` / `settlement_line_items` — bonus category).
-     - Holiday = per-period holiday-pay entries from a new lightweight source: use `driver_settings.holiday_pay_period` if present; otherwise 0. (Automatic, no per-row input.)
-  4. Call `calculateW2Payroll` and upsert `internal_payroll_ledger` + `tax_withholding_ledger`.
-- Table shows read-only columns: Driver · Filing · Base · Bonus · Holiday · Gross · FIT · FICA (SS + Medicare) · SUTA · SIT · Net Payout · Status.
-- No inline numeric inputs. Any driver-level tweak (filing status, extra withholding, base salary) is done on the driver profile — payroll re-computes on next Generate.
-- **Edit action per row** → opens a small dialog that lets an admin only override the *inputs* that are legitimately per-run: an additional one-time bonus and an additional one-time deduction (both stored on the ledger row). Everything else is derived. This preserves the "no manual FIT/net entry" rule while still supporting corrections.
-- **Delete action per row**: allowed when status = `draft`; hard-deletes the ledger row (cascade drops `tax_withholding_ledger`). Uses existing RLS delete policy.
-- **Void action per row**: allowed when status = `finalized`; flips row to a new `voided` status and stamps `voided_at` / `voided_by` (small migration: extend `internal_payroll_ledger.status` check + add `voided_at`, `voided_by`, plus loosen the `protect_finalized_payroll_ledger` trigger so `finalized → voided` is the one legal transition). Voided rows are excluded from YTD accumulators.
-- **Finalize Batch button** (batch-level): flips all `draft` rows in the period to `finalized`, stamps `finalized_at` / `finalized_by`, and triggers PDF stub regen through existing `generateW2PayStubPdf`.
+Actions per row: **Preview**, **Generate W-2 PDF**, **Mark Issued**, **Regenerate**.
+Bulk action: **Generate All W-2s** (produces one merged PDF and stores each individual PDF in storage under `w2/{year}/{driver_id}.pdf`).
 
-## 4. Batch summary card
+Box numbers computed from finalized `internal_payroll_ledger` + `tax_withholding_ledger` rows for the year (voided rows excluded). The generator prints the official IRS 2024/2025 Form W-2 layout — clean typography, exact field positioning — matching what the IRS accepts for employee copies (Copy B/C/2). Employer Copy A must be filed electronically via SSA Business Services Online; Tax Hub links out and stores a confirmation ref via the existing Filing Registry.
 
-Above the table, show live totals for the period:
-- Employees paid · Total Gross · Total FIT · Total FICA (EE + ER) · Total SUTA · Total SIT · Total Net Pay · Total Employer Tax Liability.
+### Tab D — 1099-NEC Preparation
+Same shape as Tab C but for contractors (`employment_type = '1099'` or Independent drivers).
+Pulls totals from `driver_settlements` net taxable pay for the year (excluding reimbursements and pass-through FSC). Threshold: only include workers ≥ $600 in the year (with a "show below threshold" toggle).
+Columns: Contractor, TIN status (from `driver_w9_info.tin_last4`), Legal Name (from W-9), Address (from W-9), Total Nonemployee Compensation (Box 1), Federal Tax Withheld (Box 4), State Tax Withheld (Box 5), Status.
 
-These come straight from the ledger + withholding rows — no client math.
+Actions: **Preview**, **Generate 1099-NEC PDF**, **Mark Issued**, **Regenerate**. Bulk: **Generate All 1099s**.
 
-## 5. Compliance / analytics tabs
-- Keep the existing **Tax & Compliance** tab (Tax Filing Registry) unchanged.
-- Update the payroll YTD widgets on the Analytics tab to sum from the new columns (they already do — just verify after the calc engine changes).
+Missing W-9 data blocks generation with a clear inline warning and a shortcut into the driver profile W-9 form.
 
-## 6. Migration (schema-only, minimal)
+## 3. PDF generators
+
+Two new modules under `src/lib/pdf/`:
+- `generateW2Pdf.ts` — builds one W-2 per employee using existing `pdf-lib`/`jspdf` stack (same as `generateW2PayStubPdf`). Renders the 2024/2025 W-2 employee-copy layout with all lettered/numbered boxes.
+- `generate1099NecPdf.ts` — builds the 1099-NEC 2024/2025 Copy B layout.
+
+Each accepts a `year` + `driverId` and reads directly from ledger data via a small server-side aggregator (see §5) so a client can render without recomputing math.
+
+Both save the resulting file to storage bucket `tax-documents` under `{org_id}/{year}/w2/{driver_id}.pdf` or `.../1099/{driver_id}.pdf`, and insert a `tax_documents` row (table already exists) so the driver's profile "Tax Documents" section (existing `DriverTaxDocuments.tsx`) automatically shows them for download.
+
+## 4. Data model changes (single migration)
 
 ```sql
-ALTER TABLE public.internal_payroll_ledger
-  ADD COLUMN IF NOT EXISTS voided_at   timestamptz,
-  ADD COLUMN IF NOT EXISTS voided_by   uuid,
-  ADD COLUMN IF NOT EXISTS one_time_bonus     numeric NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS one_time_deduction numeric NOT NULL DEFAULT 0;
+-- Extend per-state config with registration + cadence
+ALTER TABLE public.state_tax_configurations
+  ADD COLUMN IF NOT EXISTS suta_account_number text,
+  ADD COLUMN IF NOT EXISTS sit_account_number  text,
+  ADD COLUMN IF NOT EXISTS deposit_frequency   text
+    CHECK (deposit_frequency IN ('monthly','quarterly','annual','semiweekly')),
+  ADD COLUMN IF NOT EXISTS agency_notes text,
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
--- Update protect_finalized_payroll_ledger() to allow finalized → voided,
--- and to allow one_time_* edits pre-finalize only.
+-- Aggregator RPC used by W-2 / 1099 tabs (SECURITY DEFINER, org-scoped).
+CREATE OR REPLACE FUNCTION public.get_w2_totals(_year int)
+RETURNS TABLE (
+  driver_id uuid, wages_box1 numeric, fit_box2 numeric,
+  ss_wages_box3 numeric, ss_tax_box4 numeric,
+  medicare_wages_box5 numeric, medicare_tax_box6 numeric,
+  state_code text, state_wages_box16 numeric, state_tax_box17 numeric
+) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$ ... $$;
+
+CREATE OR REPLACE FUNCTION public.get_1099_totals(_year int)
+RETURNS TABLE (
+  driver_id uuid, nonemployee_comp_box1 numeric,
+  fed_tax_withheld_box4 numeric, state_tax_withheld_box5 numeric,
+  state_code text
+) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$ ... $$;
 ```
 
-No new tables. All grants/RLS already in place.
+`tax_documents` (already exists, 7 cols, 5 policies) is reused — no schema change needed there.
+
+## 5. What we still need from you
+
+Confirm/answer so the output is legally accurate:
+
+1. **Form year to target first.** Should the Tax Hub launch with **2025 forms** (calendar year we're currently in, printed Jan 2026) or **2024 forms** (prior year, still typical use case)? The layout is nearly identical but box wording differs.
+2. **Employer identity for forms.** Confirm we should read the employer name, EIN, and address from `organizations` and `company_settings`. If EIN isn't already stored, we'll add an EIN field to Company Settings.
+3. **State registration numbers.** For each state where you have W-2 employees, do you already have your SUTA and SIT account numbers? If yes, we'll surface a "Complete state setup" prompt on first load; if no, forms print with a placeholder and a warning.
+4. **1099 delivery preference.** Should generated 1099s auto-email to the contractor (via existing Resend integration), or only save to storage for the owner to distribute?
+5. **Copy A / e-filing.** Do you want Tax Hub to also produce the IRS **e-file transmittal file** (`EFW2` for W-2s, `IRIS`/`FIRE` XML for 1099s), or is generating the recipient copies + a printable employer copy sufficient for now? E-file generation is a much larger scope; I recommend Phase 2.
 
 ## Technical details
 
-- Files touched (frontend): `src/pages/Finance.tsx`, `src/components/finance/inhouse-payroll/ActiveBatchTab.tsx`, delete `TruistAchStagingTab.tsx`, new `EditPayrollRowDialog.tsx`, new `BatchTotalsCard.tsx`, `src/hooks/usePayrollConfig.ts` (replaces `usePayrollTaxConfig.ts`), `src/utils/payCalculations.ts` (extend tax engine), tests in `src/utils/payCalculations.test.ts`.
-- `driver_payroll` table (used for pay stub PDFs) keeps working — the PDF generator already reads the withholding rows.
-- Idempotent Generate Batch: existing `draft` rows are updated in-place; `finalized`/`voided` rows are skipped.
-- All numeric formatting via existing `formatCurrency`; no hardcoded colors; uses existing shadcn primitives.
+- Files: new `src/pages/admin/TaxHub.tsx`, new components under `src/components/tax-hub/`: `MultiStateOverviewTab.tsx`, `FederalOverviewTab.tsx`, `W2PreparationTab.tsx`, `Form1099Tab.tsx`, `StateDetailSheet.tsx`, `W2PreviewDialog.tsx`, `Form1099PreviewDialog.tsx`. New PDF modules `src/lib/pdf/generateW2Pdf.ts`, `generate1099NecPdf.ts`. New hook `src/hooks/useTaxHubData.ts` wrapping the two RPCs. Route added to `App.tsx`. Sidebar link added.
+- Auth: `owner` + `payroll_admin`.
+- No hardcoded colors; uses existing shadcn primitives, `formatCurrency`, and design tokens.
+- All queries org-scoped; RLS unchanged since we reuse existing tables.
 
 ## Verification
-1. Run Generate Batch for the current week on a driver with `base_salary_per_period = 2000`, filing single, FL: FIT ≈ Pub 15-T output for $2,000 weekly; FICA = 6.2% + 1.45%; SUTA = 2.7% on wages up to $7k; SIT = 0.
-2. Same driver, TX tax state: SUTA uses TX row; SIT = 0.
-3. Delete draft row → row gone. Void finalized row → row status becomes `voided`, excluded from YTD next run.
-4. No inputs anywhere in the payroll table except the Edit dialog's optional one-time bonus/deduction.
 
-Ends with the user seeing an accurate, IRS-ready W-2 payroll table generated by a single button click.
+1. Multi-State tab shows one row per state that has an active W-2 driver, with YTD wages matching the sum of finalized ledger rows.
+2. Federal tab totals reconcile to the sum of state-level YTD wages within $0.01.
+3. Generating a W-2 for a test driver: Box 3 = min(wages, SS wage base); Box 4 = Box 3 × 6.2%; Box 5 = full wages; Box 6 = Box 5 × 1.45% + addl-Medicare; Box 16 uses driver's tax state.
+4. Generating a 1099 for a contractor with ≥ $600 shows the exact NEC total from settlements; contractor below $600 hidden unless toggled.
+5. Missing W-9 (no `tin_last4`) blocks 1099 generation with an inline warning.
