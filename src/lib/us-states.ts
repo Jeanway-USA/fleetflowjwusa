@@ -9,6 +9,21 @@ export const US_STATES = [
 export type USState = typeof US_STATES[number];
 
 /**
+ * US states with no broad-based personal state income tax.
+ * (NH taxes only interest/dividends — treated as no-SIT for wage withholding.)
+ * Used by driver onboarding to hide SIT withholding fields and by the
+ * State Filing Registry to skip state income-tax filings.
+ */
+export const NO_STATE_INCOME_TAX: readonly string[] = [
+  'AK', 'FL', 'NV', 'NH', 'SD', 'TN', 'TX', 'WA', 'WY',
+] as const;
+
+export function stateHasIncomeTax(code: string | null | undefined): boolean {
+  if (!code) return false;
+  return !NO_STATE_INCOME_TAX.includes(code.toUpperCase());
+}
+
+/**
  * Attempt to extract a US state abbreviation from a vendor/location string.
  * Common patterns: "PILOT DALLAS TX", "TA FORT WORTH TX", "LOVES #123 GA"
  */
