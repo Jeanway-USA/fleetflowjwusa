@@ -20,6 +20,7 @@ const DOCUMENT_LABELS: Record<string, string> = {
   i9: 'Form I-9 — Employment Eligibility',
   w9: 'Form W-9 — Taxpayer Identification',
   ioo_agreement: 'Independent Owner-Operator Agreement',
+  state_tax: 'State Tax Withholding',
 };
 
 type ReviewStatus = 'pending' | 'approved' | 'revision_requested';
