@@ -3371,6 +3371,8 @@ export type Database = {
           gross_taxable_pay: number
           holiday_pay: number
           id: string
+          one_time_bonus: number
+          one_time_deduction: number
           org_id: string
           pass_through_fsc: number
           pay_model: string
@@ -3379,6 +3381,8 @@ export type Database = {
           status: string
           total_miles: number
           updated_at: string
+          voided_at: string | null
+          voided_by: string | null
         }
         Insert: {
           base_salary?: number
@@ -3393,6 +3397,8 @@ export type Database = {
           gross_taxable_pay?: number
           holiday_pay?: number
           id?: string
+          one_time_bonus?: number
+          one_time_deduction?: number
           org_id: string
           pass_through_fsc?: number
           pay_model: string
@@ -3401,6 +3407,8 @@ export type Database = {
           status?: string
           total_miles?: number
           updated_at?: string
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Update: {
           base_salary?: number
@@ -3415,6 +3423,8 @@ export type Database = {
           gross_taxable_pay?: number
           holiday_pay?: number
           id?: string
+          one_time_bonus?: number
+          one_time_deduction?: number
           org_id?: string
           pass_through_fsc?: number
           pay_model?: string
@@ -3423,6 +3433,8 @@ export type Database = {
           status?: string
           total_miles?: number
           updated_at?: string
+          voided_at?: string | null
+          voided_by?: string | null
         }
         Relationships: [
           {

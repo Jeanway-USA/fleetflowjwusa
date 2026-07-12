@@ -33,8 +33,8 @@ const RevenueTab = lazy(() =>
 import { CommissionsTab } from '@/components/finance/CommissionsTab';
 import { DriverSettlementsTab } from '@/components/finance/driver-settlements/DriverSettlementsTab';
 import { ActiveBatchTab } from '@/components/finance/inhouse-payroll/ActiveBatchTab';
-import { TruistAchStagingTab } from '@/components/finance/inhouse-payroll/TruistAchStagingTab';
 import { TaxFilingRegistryTab } from '@/components/finance/inhouse-payroll/TaxFilingRegistryTab';
+
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
 import { SafetyBonusSettings } from '@/components/finance/SafetyBonusSettings';
 import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
@@ -682,28 +682,18 @@ export default function Finance() {
         <TabsContent value="payouts">
           <div className="space-y-8 animate-in fade-in-50">
             {canManagePayroll && (
-              <>
-                <section className="space-y-2">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Users className="h-5 w-5 text-primary" /> W-2 Active Payroll Batch
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Salary-based batch: $2,000 base default · edit Bonus / Holiday / FIT with live net calculations.
-                  </p>
-                  <ActiveBatchTab />
-                </section>
-
-                <section className="space-y-2">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Landmark className="h-5 w-5 text-primary" /> Truist ACH Staging
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Confirm and lock finalized payouts with a Truist clearing reference number.
-                  </p>
-                  <TruistAchStagingTab />
-                </section>
-              </>
+              <section className="space-y-2">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" /> W-2 Active Payroll Batch
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Automatic tax-ready W-2 payroll — FIT via IRS Pub 15-T, FICA, additional Medicare,
+                  and per-state SUTA/SIT computed from each driver's W-4 and tax state.
+                </p>
+                <ActiveBatchTab />
+              </section>
             )}
+
 
             <section className="space-y-2">
               <h3 className="text-lg font-semibold flex items-center gap-2">

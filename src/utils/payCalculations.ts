@@ -512,3 +512,186 @@ export function calculatePayrollTaxes(input: PayrollTaxInput): PayrollTaxResult 
     netPay: net,
   };
 }
+
+// ============================================================================
+// Tax-Ready W-2 Payroll Engine (IRS Pub 15-T Worksheet 1A percentage method)
+// ============================================================================
+
+export type PayFrequency = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+
+export const PAY_PERIODS_PER_YEAR: Record<PayFrequency, number> = {
+  weekly: 52,
+  biweekly: 26,
+  semimonthly: 24,
+  monthly: 12,
+};
+
+export type FilingStatus = 'single' | 'married_joint' | 'head_of_household';
+
+export interface FitBracket { over: number; base: number; rate: number }
+
+export interface W2FederalConfig {
+  social_security_rate: number;
+  social_security_wage_base: number;
+  medicare_rate: number;
+  additional_medicare_rate: number;
+  additional_medicare_threshold: number;
+  pay_frequency: PayFrequency;
+  fit_brackets: Record<FilingStatus, FitBracket[]>;
+  standard_deduction: Record<FilingStatus, number>;
+}
+
+export interface W2StateConfig {
+  state_code: string;
+  suta_rate: number;
+  suta_wage_base: number;
+  has_state_income_tax: boolean;
+  sit_rate: number;
+}
+
+export interface W2W4 {
+  filing_status: FilingStatus;
+  multiple_jobs: boolean;
+  step_2c_checkbox: boolean;
+  dependents_amount: number;
+  other_income: number;
+  deductions: number;
+  extra_withholding: number;
+}
+
+export const DEFAULT_W4: W2W4 = {
+  filing_status: 'single',
+  multiple_jobs: false,
+  step_2c_checkbox: false,
+  dependents_amount: 0,
+  other_income: 0,
+  deductions: 0,
+  extra_withholding: 0,
+};
+
+export interface W2PayrollInput {
+  grossTaxablePay: number;
+  ytdGrossTaxablePay: number;
+  ytdMedicareWages: number;
+  w4: W2W4;
+  federal: W2FederalConfig;
+  state?: W2StateConfig | null;
+}
+
+export interface W2PayrollResult {
+  gross: number;
+  fit: number;
+  eeSocialSecurity: number;
+  erSocialSecurity: number;
+  eeMedicare: number;
+  erMedicare: number;
+  addlMedicare: number;
+  sutaEmployer: number;
+  sitEmployee: number;
+  totalEmployeeWithholding: number;
+  totalEmployerLiability: number;
+  netPay: number;
+}
+
+function bracketLookup(brackets: FitBracket[], adjustedAnnual: number): number {
+  if (adjustedAnnual <= 0 || !brackets?.length) return 0;
+  // Brackets ordered ascending by `over`. Find highest whose `over` <= wages.
+  let match = brackets[0];
+  for (const b of brackets) {
+    if (adjustedAnnual > b.over) match = b;
+  }
+  return match.base + (adjustedAnnual - match.over) * match.rate;
+}
+
+/**
+ * IRS Pub 15-T Worksheet 1A percentage method, 2020+ Form W-4.
+ * Returns the FIT to withhold for a single pay period.
+ */
+export function calculateFitPub15T(input: {
+  grossTaxablePay: number;
+  w4: W2W4;
+  federal: W2FederalConfig;
+}): number {
+  const { grossTaxablePay, w4, federal } = input;
+  const periods = PAY_PERIODS_PER_YEAR[federal.pay_frequency] ?? 52;
+  const filing = (w4.filing_status ?? 'single') as FilingStatus;
+  const useStep2 = !!(w4.multiple_jobs || w4.step_2c_checkbox);
+
+  const annualWages = Math.max(0, grossTaxablePay) * periods
+    + Math.max(0, w4.other_income || 0);
+  const standardDed = federal.standard_deduction?.[filing] ?? 0;
+  // Step 2 checkbox halves the standard deduction (Pub 15-T Worksheet 1A line 1i).
+  const effStandard = useStep2 ? standardDed / 2 : standardDed;
+  const adjustedAnnual = Math.max(
+    0,
+    annualWages - (Math.max(0, w4.deductions || 0) + effStandard),
+  );
+
+  const brackets = federal.fit_brackets?.[filing] ?? [];
+  let annualTax = bracketLookup(brackets, adjustedAnnual);
+  // Dependents credit reduces annual tax.
+  annualTax = Math.max(0, annualTax - Math.max(0, w4.dependents_amount || 0));
+  const periodFit = annualTax / periods + Math.max(0, w4.extra_withholding || 0);
+  return round2(Math.max(0, periodFit));
+}
+
+export function calculateW2Payroll(input: W2PayrollInput): W2PayrollResult {
+  const gross = Math.max(0, Number(input.grossTaxablePay) || 0);
+  const ytdGross = Math.max(0, Number(input.ytdGrossTaxablePay) || 0);
+  const ytdMed = Math.max(0, Number(input.ytdMedicareWages) || 0);
+  const f = input.federal;
+  const s = input.state ?? null;
+
+  // Social Security capped at wage base (year-to-date aware).
+  const ssRemaining = Math.max(0, f.social_security_wage_base - ytdGross);
+  const ssTaxable = Math.min(gross, ssRemaining);
+  const eeSS = round2(ssTaxable * f.social_security_rate);
+  const erSS = round2(ssTaxable * f.social_security_rate);
+
+  // Medicare (no cap).
+  const eeMed = round2(gross * f.medicare_rate);
+  const erMed = round2(gross * f.medicare_rate);
+
+  // Additional Medicare (employee-only) on wages over threshold within year.
+  const threshold = f.additional_medicare_threshold;
+  const prior = ytdMed;
+  const total = prior + gross;
+  const overNow = Math.max(0, total - threshold);
+  const overPrior = Math.max(0, prior - threshold);
+  const addlBase = Math.max(0, overNow - overPrior);
+  const addlMed = round2(addlBase * f.additional_medicare_rate);
+
+  // FIT via Pub 15-T.
+  const fit = calculateFitPub15T({ grossTaxablePay: gross, w4: input.w4, federal: f });
+
+  // State SUTA (employer-only, wage-base capped).
+  let sutaEr = 0;
+  if (s && s.suta_rate > 0 && s.suta_wage_base > 0) {
+    const remaining = Math.max(0, s.suta_wage_base - ytdGross);
+    const taxable = Math.min(gross, remaining);
+    sutaEr = round2(taxable * s.suta_rate);
+  }
+
+  // State income tax (employee).
+  const sit = s && s.has_state_income_tax ? round2(gross * s.sit_rate) : 0;
+
+  const totalEE = round2(eeSS + eeMed + addlMed + fit + sit);
+  const totalER = round2(erSS + erMed + sutaEr);
+  const net = round2(gross - totalEE);
+
+  return {
+    gross: round2(gross),
+    fit,
+    eeSocialSecurity: eeSS,
+    erSocialSecurity: erSS,
+    eeMedicare: eeMed,
+    erMedicare: erMed,
+    addlMedicare: addlMed,
+    sutaEmployer: sutaEr,
+    sitEmployee: sit,
+    totalEmployeeWithholding: totalEE,
+    totalEmployerLiability: totalER,
+    netPay: net,
+  };
+}
+
