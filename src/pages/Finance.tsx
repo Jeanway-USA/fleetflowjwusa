@@ -1020,6 +1020,7 @@ export default function Finance() {
 
             <CompensationSettingsTab getSetting={getSetting} />
             <SafetyBonusSettings />
+            <SafetyBonusPayouts />
           </div>
         </TabsContent>
       </Tabs>
