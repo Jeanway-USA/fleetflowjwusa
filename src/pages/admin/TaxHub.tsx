@@ -9,6 +9,7 @@ import {
 } from '@/hooks/useTaxHubData';
 import { generateW2Pdf } from '@/lib/pdf/generateW2Pdf';
 import { generate1099NecPdf } from '@/lib/pdf/generate1099NecPdf';
+import { useDriverTin, formatTin } from '@/hooks/useSensitiveDriverData';
 import { FederalFilingRegistry } from '@/components/finance/inhouse-payroll/FederalFilingRegistry';
 import { StateFilingRegistry } from '@/components/finance/inhouse-payroll/StateFilingRegistry';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -368,6 +369,15 @@ function W2Tab({ year }: { year: number }) {
   const generate = useMutation({
     mutationFn: async (row: W2Row) => {
       if (!employer) throw new Error('Employer info missing');
+      let ssnFull: string | null = null;
+      try {
+        const { data: ssn } = await supabase.rpc('get_driver_ssn' as never, {
+          _driver_id: row.driver_id,
+        } as never);
+        ssnFull = (ssn as string | null) ?? null;
+      } catch {
+        ssnFull = null;
+      }
       const blob = generateW2Pdf({
         year,
         employer,
@@ -375,6 +385,7 @@ function W2Tab({ year }: { year: number }) {
           firstName: row.first_name,
           lastName: row.last_name,
           tax_state: row.tax_state,
+          ssnFull,
         },
         totals: row,
       });
@@ -508,7 +519,20 @@ function Form1099Tab({ year }: { year: number }) {
     mutationFn: async (row: Row1099) => {
       if (!employer) throw new Error('Employer info missing');
       if (!row.tin_last4) throw new Error('W-9 / TIN missing — collect it from the contractor first.');
-      const blob = generate1099NecPdf({ year, employer, recipient: row });
+      let tinFull: string | null = null;
+      let tinType: string | null = null;
+      try {
+        const { data: tinRows } = await supabase.rpc('get_driver_tin' as never, {
+          _driver_id: row.driver_id,
+        } as never);
+        const arr = tinRows as any[] | null;
+        const tr = arr && arr.length > 0 ? arr[0] : null;
+        tinFull = tr?.tin ?? null;
+        tinType = tr?.tin_type ?? null;
+      } catch {
+        tinFull = null;
+      }
+      const blob = generate1099NecPdf({ year, employer, recipient: row, tinFull, tinType });
       const path = `${orgId}/${year}/1099/${row.driver_id}.pdf`;
       const { error: upErr } = await supabase.storage.from('tax-documents')
         .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
@@ -585,7 +609,7 @@ function Form1099Tab({ year }: { year: number }) {
                       <TableCell>{r.legal_name || <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell>
                         {r.tin_last4
-                          ? <Badge variant="outline">•••• {r.tin_last4}</Badge>
+                          ? <FullTinBadge driverId={r.driver_id} last4={r.tin_last4} />
                           : <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" /> No W-9</Badge>}
                       </TableCell>
                       <TableCell>{r.tax_state || '—'}</TableCell>
@@ -785,4 +809,11 @@ export default function TaxHub() {
       </Tabs>
     </div>
   );
+}
+
+function FullTinBadge({ driverId, last4 }: { driverId: string; last4: string }) {
+  const { data, isLoading } = useDriverTin(driverId);
+  if (isLoading) return <Badge variant="outline">•••• {last4}</Badge>;
+  const full = data?.tin ? formatTin(data.tin, data.tin_type) : null;
+  return <Badge variant="outline" className="font-mono">{full || `•••• ${last4}`}</Badge>;
 }

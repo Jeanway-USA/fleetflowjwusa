@@ -5,6 +5,7 @@ import type { W2Row } from '@/hooks/useTaxHubData';
 interface DriverBlock {
   firstName: string | null;
   lastName: string | null;
+  ssnFull?: string | null;
   ssnLast4?: string | null;
   address?: string | null;
   tax_state?: string | null;
@@ -55,7 +56,11 @@ export function generateW2Pdf(opts: {
 
   // Row 1: Employer identification block
   const rowH = 44;
-  drawBox(M, 220, rowH, 'a  Employee SSN', driver.ssnLast4 ? `XXX-XX-${driver.ssnLast4}` : '(on file)');
+  const ssnDigits = (driver.ssnFull ?? '').replace(/\D/g, '');
+  const ssnLabel = ssnDigits.length === 9
+    ? `${ssnDigits.slice(0, 3)}-${ssnDigits.slice(3, 5)}-${ssnDigits.slice(5)}`
+    : driver.ssnLast4 ? `XXX-XX-${driver.ssnLast4}` : '(on file)';
+  drawBox(M, 220, rowH, 'a  Employee SSN', ssnLabel);
   drawBox(M + 220, 320, rowH, 'b  Employer identification number (EIN)', employer.ein || '—');
   y += rowH;
 

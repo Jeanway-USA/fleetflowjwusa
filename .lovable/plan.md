@@ -1,84 +1,72 @@
+# Unmask private info for owner / payroll admin
 
-## Problems
+Goal: owners and payroll admins can view and download full SSN, TIN, and bank routing/account numbers everywhere they need to run payroll, taxes, and settlements. Drivers and other roles keep the current redacted view. Every decrypt is logged to `audit_logs`.
 
-1. **Bonus over-pays.** `useSafetyBonus.ts` computes `currentEarnedBonus = currentSafeMiles * currentRate`. Once the driver hits Tier 2 (e.g. 4,000 mi at $0.10), every mile from mile 1 gets $0.10 retroactively. It should be **marginal**: each tier's rate only applies to miles inside that tier.
-2. **Period isn't monthly.** The hook computes `endDate = now`, `startDate = now − periodDays` (defaults to a rolling 28-day window). The widget already shows "this month" / "resets end of month". Result: the dollar amount and safe miles never actually reset on the 1st. It needs to be scoped to the **calendar month** (1st → last day).
-3. **No payout record.** Nothing stores that a bonus was earned/paid for a given month, so once the month rolls over the earned amount is lost with no audit trail and no way to include it in a settlement/payroll run.
+## 1. Database — new decrypt RPCs (migration)
 
-## Fix
+Create two `SECURITY DEFINER` functions in `public`, both gated on `is_owner(auth.uid()) OR has_role(auth.uid(),'payroll_admin')` and scoped to the caller's org. Each writes an `audit_logs` row on every call (action `ssn_decrypt_view` / `tin_decrypt_view`), mirroring the existing `get_driver_banking` pattern.
 
-### 1. Marginal tier calculation (`src/hooks/useSafetyBonus.ts`)
+- `get_driver_ssn(_driver_id uuid) → text` — decrypts `driver_i9_info.ssn_encrypted` with `banking_encryption_key` and returns the digits.
+- `get_driver_tin(_driver_id uuid) → text` — decrypts `driver_w9_info.tin_encrypted` and returns the digits.
+- `get_driver_tin_by_org` variant is not needed — Tax Hub already loops per driver.
 
-Replace the single-multiplication earn calc with a marginal walk across tiers:
+No schema changes to storage or existing tables.
 
-```text
-earned = 0
-for each tier (sorted by min_miles):
-  if miles <= tier.min_miles: break
-  ceiling  = tier.max_miles ?? miles
-  inTier   = min(miles, ceiling) - tier.min_miles
-  earned  += inTier * tier.rate_per_mile
-earned = min(earned, max_bonus)
-```
+## 2. Client hooks
 
-`currentRate` (displayed) stays as the rate of the tier the driver is currently in — that's already correct and matches the "Current rate" line.
+New file `src/hooks/useSensitiveDriverData.ts`:
 
-Example with the screenshot's tiers (Tier 1 = 2,000–3,999 mi @ $0.05, Tier 2 = 4,000+ @ $0.10) at 4,696 miles:
+- `useDriverSsn(driverId)` — `enabled` only when `isOwner || hasRole('payroll_admin')`, calls `supabase.rpc('get_driver_ssn')`. 5 min staleTime.
+- `useDriverTin(driverId)` — same shape for W-9 TIN.
+- `useDriverBankingFull(driverId)` — thin wrapper around existing `get_driver_banking` used by the settlement voucher and the "admin copy" signed-doc regenerator.
 
-```text
-Tier 1: (min(4696, 4000) − 2000) × 0.05  = 2000 × 0.05 = $100.00
-Tier 2: (4696 − 4000) × 0.10            =  696 × 0.10 = $69.60
-Total                                     = $169.60
-```
+## 3. Settlement check voucher — real routing number
 
-(Today's buggy math would show `4696 × 0.05 = $234.80`, which matches the screenshot and confirms the bug.)
+- `SettlementCheckVoucher.tsx`: replace hardcoded `"XXXX-XXXX-XXXX"` with a `useDriverBankingFull(driverId)` fetch. Render the real 9-digit routing when available; fall back to `—` when banking hasn't been set. Only owner/payroll can render this component (already gated by the settlements module).
+- `generateSettlementPdf.ts`: accept `bankRouting`/`bankAccountLast4` params from the caller and stamp them into the check-voucher block instead of the placeholder. Callers in `SettlementCheckVoucher` (preview) and the settlement PDF button pass the values from the same RPC.
 
-### 2. Calendar-month period (`src/hooks/useSafetyBonus.ts`)
+## 4. Tax Hub — full SSN/TIN
 
-- Replace the rolling `endDate − periodDays` window with `startOfMonth(now)` / `endOfMonth(now)` (via `date-fns`, matching what `MonthlyBonusWidget` already displays).
-- Use those bounds for `fleet_loads.delivery_date`, `incidents.incident_date`, and the service-failure query.
-- Keep `period_length_days` in `safety_bonus_settings` for now (the settings UI still writes it) but stop using it for the math. Note in the plan that this field is effectively deprecated for math; we can hide it in the settings UI in a follow-up if desired.
-- The widget's "resets in Nd" / "Resets tomorrow" copy already lines up with a calendar month — no change needed there.
+- `TaxHub.tsx` 1099 list: replace the `•••• {tin_last4}` badge with the full TIN from `useDriverTin`, formatted `XX-XXXXXXX` (EIN) or `XXX-XX-XXXX` (SSN) based on `tin_type`. Missing TIN still shows the "collect W-9" state.
+- W-2 tab (if driver list is shown there): add SSN column pulled from `useDriverSsn`.
+- Values render inline for allowed roles; the page itself is already `owner|payroll_admin`-only, so no extra gate is needed.
 
-### 3. Bonus payout ledger
+## 5. W-2 & 1099-NEC PDFs — full number for admin generation
 
-New table `safety_bonus_payouts` (migration) so we can record and pay out earned bonuses:
+- `generateW2Pdf.ts`: replace `ssnLast4?: string | null` with `ssnFull?: string | null`. Format as `XXX-XX-XXXX` when full digits are available; fall back to `XXX-XX-{last4}` if only last4 is passed.
+- `generate1099NecPdf.ts`: same treatment for `tin`. Format EIN vs SSN based on `tin_type` supplied by the caller.
+- Caller in `TaxHub.tsx` (per-driver W-2 / 1099 export): pre-fetch full SSN/TIN via the new RPCs before calling the PDF generator. If the RPC fails (e.g., no encrypted value on file), fall back to the existing last-4 behavior and toast a warning.
 
-```text
-id             uuid pk
-org_id         uuid not null
-driver_id      uuid not null
-period_start   date not null      -- first of month
-period_end     date not null      -- last of month
-safe_miles     integer not null
-earned_amount  numeric(10,2) not null
-status         text not null default 'pending'   -- pending | approved | paid | void
-paid_at        timestamptz
-paid_in_settlement_id uuid        -- optional link to driver_settlements
-notes          text
-created_by     uuid
-created_at     timestamptz default now()
-updated_at     timestamptz default now()
-unique (driver_id, period_start)
-```
+## 6. Signed onboarding PDFs — dual copy
 
-- Standard GRANT + RLS (owner/payroll_admin manage; driver reads own; org-scoped).
-- Add a "Safety Bonus Payouts" panel inside the existing `SafetyBonusSettings` card on the Finance page:
-  - Month selector (defaults to previous month once we're past the 1st).
-  - Table: driver, safe miles, tier reached, earned amount, status, action.
-  - "Generate for month" button: runs the same marginal calc server-side (RPC `generate_safety_bonus_payouts(_org_id, _period_start)`) and inserts a row per eligible driver with `status='pending'`. Idempotent via the unique key.
-  - Per-row actions: Approve, Mark Paid, Void.
-- On the driver widget, show a small "Last month: $X — {status}" line under the current-period card once a payout row exists so the driver can see the earned bonus was recorded.
+`src/lib/onboarding/generateSignedPdf.ts` — parameterize masking:
 
-Out of scope for this change: automatic inclusion into settlement PDFs / driver_settlements line items. The ledger + status flag is enough to "record and pay out"; wiring it into a settlement run can be a follow-up if you want.
+- Add a `redact: boolean` option (default `true`). When `false`, the `ssn` and `account_number` tokens render the full digits instead of `***-**-1234` / `****1234`.
 
-## Technical Notes
+`src/pages/DriverOnboarding.tsx` (signing flow) — generate and store TWO artifacts per signed document:
 
-- Files touched:
-  - `src/hooks/useSafetyBonus.ts` — marginal calc + calendar-month window.
-  - `src/components/driver/MonthlyBonusWidget.tsx` — no logic change; verify labels still read correctly with the new numbers.
-  - `src/components/finance/SafetyBonusSettings.tsx` — add Payouts section.
-  - New migration: `safety_bonus_payouts` table (GRANT, RLS, trigger for `updated_at`) + `generate_safety_bonus_payouts` SECURITY DEFINER RPC that recomputes marginal earnings for each active driver in the org for the given month and upserts rows.
-- The RPC re-uses the same tier walk logic so the widget and the ledger can never drift.
-- Eligibility checks (accidents / CSA / service failures) run inside the RPC against the same month window; ineligible drivers get `earned_amount = 0` and `status = 'void'` with a reason in `notes`.
-- Query keys for `useSafetyBonus` stay keyed by `driverId`; add the current `YYYY-MM` to the key so a month rollover invalidates cleanly.
+- `redacted` copy at existing path `signed-documents/{org_id}/{driver_id}/{document_type}/{id}.pdf` (unchanged behavior, drivers keep access).
+- `full` copy at `signed-documents/{org_id}/{driver_id}/{document_type}/{id}.full.pdf` — new path, RLS-restricted below.
+- Insert into `driver_signed_documents`: keep `file_path` = redacted, add new nullable column `admin_file_path` for the full copy (migration section 1 adds this column).
+
+`SignedOnboardingDocuments.tsx` (admin view):
+
+- Add a second "Download (full data)" button per row that opens `admin_file_path` via a signed URL. Only rendered when `isOwner || hasRole('payroll_admin')` and `admin_file_path` is not null.
+- Existing Preview/Download continue to use `file_path` (redacted).
+
+Storage RLS on `signed-documents` for `*.full.pdf` objects: restrict SELECT to `is_owner(auth.uid()) OR has_role(auth.uid(),'payroll_admin')` scoped to the org prefix. Achieved via a policy that checks the object name matches `%.full.pdf` and enforces the role predicate.
+
+Backfill: no retroactive generation of full copies for documents already signed — those keep `admin_file_path IS NULL`. Owners can request a re-sign via the existing Revision Request flow if a full copy is required.
+
+## 7. Roles kept unchanged
+
+- Drivers, dispatcher, safety, admin (generic), and everyone else continue to see the redacted values everywhere. The `safety` role loses no existing capability — it never had SSN/TIN access.
+- Impersonating super admins inherit whatever role they impersonate; the RPCs check `auth.uid()`, so impersonation still works within the destination org's role.
+
+## Technical notes
+
+- New DB column: `driver_signed_documents.admin_file_path text NULL` — migration adds it. No default; old rows stay null.
+- The two decrypt RPCs read the encryption key from `public.internal_config` (same key used by `get_driver_banking` / `upsert_driver_w9`).
+- Audit log entries include `driver_id` and the acting user id so we can produce a "who viewed what" report later.
+- Types file (`src/integrations/supabase/types.ts`) will regenerate after the migration approval — no manual edits.
+- No changes to storage buckets, only a new object-name-scoped RLS policy on `storage.objects`.

@@ -29,6 +29,8 @@ export interface GenerateSignedPdfArgs {
   routingNumber?: string;
   accountNumber?: string;
   bankAccountType?: 'checking' | 'savings' | '';
+  /** When false, the ssn and account_number tokens render the full digits. Default true (redacted). */
+  redact?: boolean;
 }
 
 
@@ -141,6 +143,7 @@ export function generateSignedPdf({
   routingNumber,
   accountNumber,
   bankAccountType,
+  redact = true,
 
 }: GenerateSignedPdfArgs): Blob {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
@@ -476,7 +479,9 @@ export function generateSignedPdf({
           break;
         case 'ssn': {
           const digits = (ssn || '').replace(/\D/g, '');
-          if (digits.length >= 4) {
+          if (!redact && digits.length === 9) {
+            buffer += `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+          } else if (digits.length >= 4) {
             buffer += `***-**-${digits.slice(-4)}`;
           } else {
             buffer += '________________________';
@@ -499,7 +504,9 @@ export function generateSignedPdf({
           break;
         case 'account_number': {
           const digits = (accountNumber || '').replace(/\D/g, '');
-          if (digits.length >= 4) {
+          if (!redact && digits.length > 0) {
+            buffer += digits;
+          } else if (digits.length >= 4) {
             buffer += `****${digits.slice(-4)}`;
           } else {
             buffer += '________________________';

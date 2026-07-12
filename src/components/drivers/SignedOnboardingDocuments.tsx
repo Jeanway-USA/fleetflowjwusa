@@ -33,6 +33,7 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
   const { isOwner, hasRole, user } = useAuth();
   const canView = isOwner || hasRole('safety') || hasRole('payroll_admin');
   const canReview = isOwner || hasRole('payroll_admin') || hasRole('safety');
+  const canDownloadFull = isOwner || hasRole('payroll_admin');
   const queryClient = useQueryClient();
   const [revisionTarget, setRevisionTarget] = useState<{ id: string; label: string } | null>(null);
 
@@ -42,14 +43,15 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('driver_signed_documents')
-        .select('id, document_type, file_path, attachment_file_path, signed_at, review_status, revision_notes, reviewed_at')
+        .select('id, document_type, file_path, admin_file_path, attachment_file_path, signed_at, review_status, revision_notes, reviewed_at' as never)
         .eq('driver_id', driverId)
         .order('signed_at', { ascending: false });
       if (error) throw error;
-      return (data ?? []) as Array<{
+      return ((data ?? []) as unknown) as Array<{
         id: string;
         document_type: string;
         file_path: string;
+        admin_file_path: string | null;
         attachment_file_path: string | null;
         signed_at: string;
         review_status: ReviewStatus;
@@ -225,6 +227,17 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
                   <Download className="mr-1.5 h-4 w-4" />
                   Download
                 </Button>
+                {canDownloadFull && d.admin_file_path && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    title="Full unmasked copy for payroll/tax use"
+                    onClick={() => openSignedUrl(d.admin_file_path!, `${d.document_type}_full.pdf`, 'download')}
+                  >
+                    <ShieldCheck className="mr-1.5 h-4 w-4" />
+                    Full copy
+                  </Button>
+                )}
                 {d.attachment_file_path && (
                   <Button
                     size="sm"
