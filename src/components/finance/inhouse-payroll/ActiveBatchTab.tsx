@@ -303,6 +303,7 @@ export function ActiveBatchTab() {
       holidayPay: 0,
     });
 
+    const stateW4 = stateW4Map.get(driverId) ?? null;
     const result = calculateW2Payroll({
       grossTaxablePay: grossTaxable,
       ytdGrossTaxablePay: ytdGross,
@@ -310,7 +311,9 @@ export function ActiveBatchTab() {
       w4,
       federal: config.federal,
       state: stateCfg,
+      stateW4,
     });
+
 
     const netPayout = Math.max(0, result.netPay - oneTimeDeduction);
 
