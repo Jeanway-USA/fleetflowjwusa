@@ -42,7 +42,8 @@ export function useDriverTin(driverId: string | null | undefined) {
         _driver_id: driverId,
       } as never);
       if (error) throw error;
-      const row = Array.isArray(data) && data.length > 0 ? (data[0] as any) : null;
+      const arr = data as any[] | null;
+      const row = arr && arr.length > 0 ? arr[0] : null;
       return (row as DecryptedTin | null);
     },
   });
