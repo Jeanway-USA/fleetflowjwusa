@@ -737,11 +737,11 @@ function FleetRunwaySection({
               <div className="absolute inset-0 flex flex-col items-center justify-end pb-2 pointer-events-none">
                 <p
                   className={`text-3xl font-bold tabular-nums ${
-                    !hasCostPerDay
+                    !hasExpenses
                       ? 'text-muted-foreground'
-                      : pct >= 1
+                      : coverageRatio >= 1
                       ? 'text-success'
-                      : pct >= 0.9
+                      : coverageRatio >= 0.9
                       ? 'text-warning'
                       : 'text-destructive'
                   }`}
