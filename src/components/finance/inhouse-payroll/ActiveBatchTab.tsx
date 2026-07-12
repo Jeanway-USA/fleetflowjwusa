@@ -468,7 +468,7 @@ export function ActiveBatchTab() {
       const eeMed = Number(wh.ee_medicare) || 0;
       const erSS = Number(wh.er_social_security) || 0;
       const erMed = Number(wh.employer_medicare) || 0;
-      const stSuta = (Number(wh.tx_twc_unemployment) || 0) + (Number(wh.fl_reemployment) || 0);
+      const stSuta = (Number(wh.state_suta) || 0) || ((Number(wh.tx_twc_unemployment) || 0) + (Number(wh.fl_reemployment) || 0));
       eeFica += eeSS + eeMed;
       erFica += erSS + erMed;
       suta += stSuta;
