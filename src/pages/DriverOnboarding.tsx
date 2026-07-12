@@ -94,6 +94,7 @@ export default function DriverOnboarding() {
   const [state, setState] = useState<Record<string, TemplateState>>({});
   const [w2Docs, setW2Docs] = useState<W2DocsState>(EMPTY_W2_DOCS_STATE);
   const [contractorDocs, setContractorDocs] = useState<ContractorDocsState>(EMPTY_CONTRACTOR_DOCS_STATE);
+  const [stateTax, setStateTax] = useState<StateTaxFormState>(EMPTY_STATE_TAX_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [signedResults, setSignedResults] = useState<SignedResult[] | null>(null);
   const [completionPendingDashboard, setCompletionPendingDashboard] = useState(false);
