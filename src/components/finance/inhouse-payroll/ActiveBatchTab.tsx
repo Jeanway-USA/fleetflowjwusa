@@ -627,6 +627,13 @@ export function ActiveBatchTab() {
                     ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim()
                     : r.driver_id.slice(0, 8);
                   const w4 = w4Map.get(r.driver_id) ?? DEFAULT_W4;
+                  const hasW4 = w4Map.has(r.driver_id);
+                  const hasStateTax = stateW4Map.has(r.driver_id);
+                  const hasI9 = i9Set.has(r.driver_id);
+                  const missing: string[] = [];
+                  if (!hasW4) missing.push('W-4');
+                  if (!hasStateTax) missing.push('State Tax');
+                  if (!hasI9) missing.push('I-9');
                   const wh = whMap.get(r.id);
                   const state = driver?.tax_state || driver?.license_state || config?.defaultTaxState || '—';
                   const gross = Number(r.gross_taxable_pay) || 0;
@@ -639,7 +646,21 @@ export function ActiveBatchTab() {
 
                   return (
                     <TableRow key={r.id} className={r.status === 'voided' ? 'opacity-60' : ''}>
-                      <TableCell className="font-medium">{name}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>{name}</span>
+                          {missing.length > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-500/60 text-amber-700 dark:text-amber-400 text-[10px]"
+                              title={`Missing signed form(s): ${missing.join(', ')}. Withholding uses defaults until collected.`}
+                            >
+                              Missing: {missing.join(', ')}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+
                       <TableCell className="capitalize text-xs">
                         {w4.filing_status.replace('_', ' ')}
                       </TableCell>
