@@ -405,6 +405,31 @@ export function DocumentSignatureStep({
           </div>
         </section>
       )}
+
+      {/* State Tax Withholding — applies to both W-2 and 1099 */}
+      <section className="space-y-4">
+        <SectionHeader
+          title="State Tax Withholding"
+          description="Tells us which state(s) we owe unemployment and income-tax withholding for."
+          badge="All Drivers"
+        />
+        {skipStateTax ? (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>State tax form already on file</AlertTitle>
+            <AlertDescription>
+              You've already completed this form. No need to fill it out again.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <StateTaxForm
+            value={stateTax}
+            onChange={onStateTaxChange}
+            onValidityChange={setStateTaxValid}
+            audience={employmentType === 'W-2' ? 'w2' : '1099'}
+          />
+        )}
+      </section>
     </div>
   );
 
