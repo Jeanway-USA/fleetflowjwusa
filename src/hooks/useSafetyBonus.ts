@@ -78,13 +78,11 @@ async function computeSafetyBonus(driverId: string): Promise<SafetyBonusStatus> 
   if (settingsErr) throw settingsErr;
   if (!settings) return EMPTY;
 
-  const periodDays = settings.period_length_days ?? 28;
   const maxBonus = Number(settings.max_bonus_amount ?? 0);
 
-  const endDate = new Date();
-  const startDate = new Date(endDate.getTime() - periodDays * 24 * 60 * 60 * 1000);
-  const periodStart = toDateString(startDate);
-  const periodEnd = toDateString(endDate);
+  // Calendar month window — resets to 0 on the 1st.
+  const { start: periodStart, end: periodEnd } = calendarMonthBounds(new Date());
+
 
   // 3) Tiers + period data in parallel
   const [tiersRes, loadsRes, incidentsRes, failuresRes] = await Promise.all([
