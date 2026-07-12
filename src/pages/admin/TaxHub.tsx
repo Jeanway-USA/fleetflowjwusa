@@ -453,6 +453,16 @@ function W2Tab({ year }: { year: number }) {
             </AlertDescription>
           </Alert>
         )}
+        {incompleteDrivers.length > 0 && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>{incompleteDrivers.length} employee{incompleteDrivers.length === 1 ? '' : 's'} missing signed tax forms</AlertTitle>
+            <AlertDescription>
+              Employees without a signed W-4, State Tax, or I-9 on file have used default withholding assumptions and may print without a complete address. Collect the missing forms before finalizing year-end filings.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {isLoading ? (
           <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
         ) : rows.length === 0 ? (
