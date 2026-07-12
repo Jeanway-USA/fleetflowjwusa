@@ -9,7 +9,8 @@ import {
 } from '@/hooks/useTaxHubData';
 import { generateW2Pdf } from '@/lib/pdf/generateW2Pdf';
 import { generate1099NecPdf } from '@/lib/pdf/generate1099NecPdf';
-import { TaxFilingRegistryTab } from '@/components/finance/inhouse-payroll/TaxFilingRegistryTab';
+import { FederalFilingRegistry } from '@/components/finance/inhouse-payroll/FederalFilingRegistry';
+import { StateFilingRegistry } from '@/components/finance/inhouse-payroll/StateFilingRegistry';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
