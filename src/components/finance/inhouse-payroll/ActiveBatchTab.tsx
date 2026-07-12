@@ -219,6 +219,49 @@ export function ActiveBatchTab() {
     return m;
   }, [w4s]);
 
+  const { data: stateTaxes = [] } = useQuery({
+    queryKey: ['w2_state_taxes', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_state_tax_info')
+        .select('driver_id, filing_status, allowances, additional_withholding, exempt')
+        .eq('org_id', orgId!);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const stateW4Map = useMemo(() => {
+    const m = new Map<string, StateW4Snapshot>();
+    for (const r of stateTaxes as any[]) {
+      m.set(r.driver_id, {
+        exempt: !!r.exempt,
+        filing_status: (r.filing_status ?? 'single') as FilingStatus,
+        allowances: Number(r.allowances) || 0,
+        additional_withholding: Number(r.additional_withholding) || 0,
+      });
+    }
+    return m;
+  }, [stateTaxes]);
+
+  const { data: i9s = [] } = useQuery({
+    queryKey: ['w2_i9s', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_i9_info')
+        .select('driver_id')
+        .eq('org_id', orgId!);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const i9Set = useMemo(
+    () => new Set((i9s as any[]).map((r) => r.driver_id)),
+    [i9s],
+  );
+
+
   const driverMap = useMemo(() => {
     const m = new Map<string, (typeof drivers)[number]>();
     drivers.forEach((d) => m.set(d.id, d));
