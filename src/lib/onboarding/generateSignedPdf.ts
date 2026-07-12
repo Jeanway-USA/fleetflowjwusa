@@ -504,7 +504,9 @@ export function generateSignedPdf({
           break;
         case 'account_number': {
           const digits = (accountNumber || '').replace(/\D/g, '');
-          if (digits.length >= 4) {
+          if (!redact && digits.length > 0) {
+            buffer += digits;
+          } else if (digits.length >= 4) {
             buffer += `****${digits.slice(-4)}`;
           } else {
             buffer += '________________________';
