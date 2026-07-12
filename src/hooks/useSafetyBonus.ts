@@ -210,8 +210,12 @@ async function computeSafetyBonus(driverId: string): Promise<SafetyBonusStatus> 
 }
 
 export function useSafetyBonus(driverId?: string | null) {
+  const monthKey = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  })();
   const query = useQuery({
-    queryKey: ["safety-bonus", driverId],
+    queryKey: ["safety-bonus", driverId, monthKey],
     queryFn: () => computeSafetyBonus(driverId as string),
     enabled: !!driverId,
     staleTime: 5 * 60 * 1000,
