@@ -33,6 +33,7 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
   const { isOwner, hasRole, user } = useAuth();
   const canView = isOwner || hasRole('safety') || hasRole('payroll_admin');
   const canReview = isOwner || hasRole('payroll_admin') || hasRole('safety');
+  const canDownloadFull = isOwner || hasRole('payroll_admin');
   const queryClient = useQueryClient();
   const [revisionTarget, setRevisionTarget] = useState<{ id: string; label: string } | null>(null);
 
