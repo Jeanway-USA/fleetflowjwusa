@@ -63,6 +63,7 @@ type WithholdingRow = {
   federal_income_withholding: number;
   tx_twc_unemployment: number;
   fl_reemployment: number;
+  state_suta: number;
 };
 
 function defaultPeriod(freq: string, ref = new Date()) {
@@ -467,7 +468,7 @@ export function ActiveBatchTab() {
       const eeMed = Number(wh.ee_medicare) || 0;
       const erSS = Number(wh.er_social_security) || 0;
       const erMed = Number(wh.employer_medicare) || 0;
-      const stSuta = (Number(wh.tx_twc_unemployment) || 0) + (Number(wh.fl_reemployment) || 0);
+      const stSuta = (Number(wh.state_suta) || 0) || ((Number(wh.tx_twc_unemployment) || 0) + (Number(wh.fl_reemployment) || 0));
       eeFica += eeSS + eeMed;
       erFica += erSS + erMed;
       suta += stSuta;
@@ -583,7 +584,7 @@ export function ActiveBatchTab() {
                   const gross = Number(r.gross_taxable_pay) || 0;
                   const fit = Number(wh?.federal_income_withholding) || 0;
                   const eeFica = (Number(wh?.ee_social_security) || 0) + (Number(wh?.ee_medicare) || 0);
-                  const suta = (Number(wh?.tx_twc_unemployment) || 0) + (Number(wh?.fl_reemployment) || 0);
+                  const suta = (Number(wh?.state_suta) || 0) || ((Number(wh?.tx_twc_unemployment) || 0) + (Number(wh?.fl_reemployment) || 0));
                   const oneTimeDed = Number(r.one_time_deduction) || 0;
                   const net = Math.max(0, gross - eeFica - fit - oneTimeDed);
                   const locked = r.status === 'finalized' || r.status === 'voided';
