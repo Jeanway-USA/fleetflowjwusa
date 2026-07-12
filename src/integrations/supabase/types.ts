@@ -1961,6 +1961,7 @@ export type Database = {
       }
       driver_signed_documents: {
         Row: {
+          admin_file_path: string | null
           attachment_file_path: string | null
           created_at: string
           document_type: string
@@ -1978,6 +1979,7 @@ export type Database = {
           template_id: string | null
         }
         Insert: {
+          admin_file_path?: string | null
           attachment_file_path?: string | null
           created_at?: string
           document_type: string
@@ -1995,6 +1997,7 @@ export type Database = {
           template_id?: string | null
         }
         Update: {
+          admin_file_path?: string | null
           attachment_file_path?: string | null
           created_at?: string
           document_type?: string
@@ -6549,6 +6552,16 @@ export type Database = {
         }[]
       }
       get_driver_id_for_user: { Args: { _user_id: string }; Returns: string }
+      get_driver_ssn: { Args: { _driver_id: string }; Returns: string }
+      get_driver_tin: {
+        Args: { _driver_id: string }
+        Returns: {
+          business_name: string
+          legal_name: string
+          tin: string
+          tin_type: string
+        }[]
+      }
       get_public_load_by_tracking: {
         Args: { _tracking_id: string }
         Returns: Json
