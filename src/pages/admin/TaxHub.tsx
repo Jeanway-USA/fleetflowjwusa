@@ -9,7 +9,8 @@ import {
 } from '@/hooks/useTaxHubData';
 import { generateW2Pdf } from '@/lib/pdf/generateW2Pdf';
 import { generate1099NecPdf } from '@/lib/pdf/generate1099NecPdf';
-import { TaxFilingRegistryTab } from '@/components/finance/inhouse-payroll/TaxFilingRegistryTab';
+import { FederalFilingRegistry } from '@/components/finance/inhouse-payroll/FederalFilingRegistry';
+import { StateFilingRegistry } from '@/components/finance/inhouse-payroll/StateFilingRegistry';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -231,6 +232,7 @@ function MultiStateTab({ year }: { year: number }) {
   }, [agg, year]);
 
   return (
+    <div className="space-y-4">
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Landmark className="h-5 w-5" /> Multi-State Overview — {year}</CardTitle>
@@ -300,6 +302,8 @@ function MultiStateTab({ year }: { year: number }) {
         onSaved={() => qc.invalidateQueries({ queryKey: ['payroll_config'] })}
       />
     </Card>
+    <StateFilingRegistry />
+    </div>
   );
 }
 
@@ -348,15 +352,7 @@ function FederalTab({ year }: { year: number }) {
         <Card1 label="FUTA accrued (0.6%)" value={totals.futa} icon={Building2} />
         <Card1 label="941 total liability" value={totals.fit + totals.ss_ee + totals.ss_er + totals.med_ee + totals.med_er} icon={FileText} />
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Filing Registry</CardTitle>
-          <CardDescription>All federal, TX, and FL deadlines. Marking a form filed here locks the row for audit.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <TaxFilingRegistryTab />
-        </CardContent>
-      </Card>
+      <FederalFilingRegistry />
     </div>
   );
 }
