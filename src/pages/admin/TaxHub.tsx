@@ -521,7 +521,9 @@ function W2Tab({ year }: { year: number }) {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
+
               </TableBody>
             </Table>
           </div>
