@@ -22,7 +22,7 @@ interface Props {
 
 export function SettlementCheckVoucher({ data }: Props) {
   const { settlement, driver } = data;
-  const { data: banking } = useDriverBankingFull(driver?.id);
+  const { data: banking } = useDriverBankingFull(settlement.driver_id);
   const driverName =
     `${driver?.first_name ?? ''} ${driver?.last_name ?? ''}`.trim() || 'Driver';
   const statementNo = String(settlement.id).slice(0, 8).toUpperCase();
