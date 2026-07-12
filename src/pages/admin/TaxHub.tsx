@@ -232,6 +232,7 @@ function MultiStateTab({ year }: { year: number }) {
   }, [agg, year]);
 
   return (
+    <div className="space-y-4">
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Landmark className="h-5 w-5" /> Multi-State Overview — {year}</CardTitle>
