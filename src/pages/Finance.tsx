@@ -671,7 +671,7 @@ export default function Finance() {
             1. Run Payouts
           </TabsTrigger>
           <TabsTrigger value="compliance" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
-            2. Tax & Compliance
+            2. Expenses
           </TabsTrigger>
           <TabsTrigger value="analytics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
             3. Analytics & Audit Logs
