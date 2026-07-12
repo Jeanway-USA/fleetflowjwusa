@@ -47,10 +47,11 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
         .eq('driver_id', driverId)
         .order('signed_at', { ascending: false });
       if (error) throw error;
-      return (data ?? []) as Array<{
+      return ((data ?? []) as unknown) as Array<{
         id: string;
         document_type: string;
         file_path: string;
+        admin_file_path: string | null;
         attachment_file_path: string | null;
         signed_at: string;
         review_status: ReviewStatus;
