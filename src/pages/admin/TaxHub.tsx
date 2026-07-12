@@ -518,7 +518,20 @@ function Form1099Tab({ year }: { year: number }) {
     mutationFn: async (row: Row1099) => {
       if (!employer) throw new Error('Employer info missing');
       if (!row.tin_last4) throw new Error('W-9 / TIN missing — collect it from the contractor first.');
-      const blob = generate1099NecPdf({ year, employer, recipient: row });
+      let tinFull: string | null = null;
+      let tinType: string | null = null;
+      try {
+        const { data: tinRows } = await supabase.rpc('get_driver_tin' as never, {
+          _driver_id: row.driver_id,
+        } as never);
+        const arr = tinRows as any[] | null;
+        const tr = arr && arr.length > 0 ? arr[0] : null;
+        tinFull = tr?.tin ?? null;
+        tinType = tr?.tin_type ?? null;
+      } catch {
+        tinFull = null;
+      }
+      const blob = generate1099NecPdf({ year, employer, recipient: row, tinFull, tinType });
       const path = `${orgId}/${year}/1099/${row.driver_id}.pdf`;
       const { error: upErr } = await supabase.storage.from('tax-documents')
         .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
