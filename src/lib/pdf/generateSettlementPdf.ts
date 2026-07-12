@@ -682,7 +682,7 @@ export async function generateSettlementPdf(
       'MEMO',
       `Settlement ${fmtDate(s.period_start)} - ${fmtDate(s.period_end)}`,
     );
-    labelField(vx + 14, fieldRowY + 26, 'BANK ROUTING', 'XXXX-XXXX-XXXX');
+    labelField(vx + 14, fieldRowY + 26, 'BANK ROUTING', routingLabel);
     labelField(colMid + 6, fieldRowY + 26, 'METHOD', 'ACH Direct Deposit on File');
 
     // Signature
