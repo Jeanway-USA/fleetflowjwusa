@@ -349,15 +349,7 @@ function FederalTab({ year }: { year: number }) {
         <Card1 label="FUTA accrued (0.6%)" value={totals.futa} icon={Building2} />
         <Card1 label="941 total liability" value={totals.fit + totals.ss_ee + totals.ss_er + totals.med_ee + totals.med_er} icon={FileText} />
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Filing Registry</CardTitle>
-          <CardDescription>All federal, TX, and FL deadlines. Marking a form filed here locks the row for audit.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <TaxFilingRegistryTab />
-        </CardContent>
-      </Card>
+      <FederalFilingRegistry />
     </div>
   );
 }
