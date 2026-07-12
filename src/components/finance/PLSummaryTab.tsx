@@ -630,24 +630,22 @@ function FleetRunwaySection({
     );
   }
 
-  const hasFixed = runway.fixedMonthly > 0;
-  const hasFuelInputs = runway.avgFleetMpg > 0 && runway.fuelPricePerGallon > 0;
+  const hasExpenses = runway.trailing30Expenses !== 0 || runway.monthToDateExpenses !== 0;
   const hasDispatch = runway.plannedDispatchDays > 0;
   const hasCostPerDay = runway.costPerDay > 0;
 
-  const pct = runway.breakEvenMTD > 0 ? runway.monthToDateRevenue / runway.breakEvenMTD : 0;
-  const pctDisplay = Math.round(pct * 100);
-  const delta = runway.monthToDateRevenue - runway.breakEvenMTD;
+  const coverageRatio = runway.monthToDateExpenses > 0 ? runway.monthToDateRevenue / runway.monthToDateExpenses : 0;
+  const delta = runway.monthToDateNet;
 
   const gaugeColor =
-    pct >= 1 ? 'hsl(var(--success))' : pct >= 0.9 ? 'hsl(var(--warning))' : 'hsl(var(--destructive))';
+    coverageRatio >= 1 ? 'hsl(var(--success))' : coverageRatio >= 0.9 ? 'hsl(var(--warning))' : 'hsl(var(--destructive))';
   const statusLabel =
-    !hasCostPerDay ? 'Awaiting data'
-      : pct >= 1 ? 'Net profit MTD'
-      : pct >= 0.9 ? 'Approaching break-even'
+    !hasExpenses ? 'Awaiting expenses'
+      : coverageRatio >= 1 ? 'Net profit MTD'
+      : coverageRatio >= 0.9 ? 'Approaching break-even'
       : 'Below break-even';
 
-  const gaugeValue = Math.max(0, Math.min(pct * 100, 150));
+  const gaugeValue = Math.max(0, Math.min(coverageRatio * 100, 150));
   const gaugeData = [{ name: 'progress', value: gaugeValue, fill: gaugeColor }];
 
   return (
@@ -663,7 +661,7 @@ function FleetRunwaySection({
           {/* Cost Per Day breakdown */}
           <div className="rounded-lg border bg-card p-5">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Fleet Cost Per Day
+              Recorded P&amp;L Cost Per Day
             </p>
             <p className="text-4xl font-bold tabular-nums mt-1">
               {hasCostPerDay ? formatCurrency(runway.costPerDay) : '—'}
@@ -671,55 +669,49 @@ function FleetRunwaySection({
             <p className="text-xs text-muted-foreground mt-2">
               {hasCostPerDay ? (
                 <>
-                  ({formatCurrency(runway.fixedMonthly)} fixed + {formatCurrency(runway.projectedFuelMonthly)} projected fuel) ÷ {runway.plannedDispatchDays} dispatch days (last 30d)
+                  {formatCurrency(runway.trailing30Expenses)} recorded P&amp;L expenses ÷ 30 calendar days
                 </>
               ) : (
-                <>Add recurring expenses, fuel purchases, and delivered loads to activate.</>
+                <>Record P&amp;L expenses to calculate a cost-per-day run rate.</>
               )}
             </p>
 
             <div className="mt-4 space-y-1.5">
-              {hasFixed ? (
-                runway.fixedBreakdown.map((entry) => (
+              {hasExpenses ? (
+                runway.expenseBreakdown.map((entry) => (
                   <div
                     key={entry.expenseType}
                     className="flex items-center justify-between text-xs border-b border-border/40 last:border-0 py-1"
                   >
                     <span className="text-muted-foreground truncate pr-2">{entry.expenseType}</span>
-                    <span className="font-mono tabular-nums">{formatCurrency(entry.monthlyAmount)}/mo</span>
+                    <span className="font-mono tabular-nums">{formatCurrency(entry.amount)}</span>
                   </div>
                 ))
               ) : (
                 <p className="text-xs text-muted-foreground italic">
-                  No recurring overhead recorded in the last 90 days.
+                  No P&amp;L expenses recorded in the last 30 days.
                 </p>
               )}
               <div className="flex items-center justify-between text-xs pt-1.5">
-                <span className="text-muted-foreground">
-                  {hasFuelInputs
-                    ? <>Projected fuel · {runway.avgFleetMpg.toFixed(2)} mpg @ {formatCurrency(runway.fuelPricePerGallon)}/gal</>
-                    : <>Projected fuel · log fuel purchases to compute</>}
-                </span>
-                <span className="font-mono tabular-nums">
-                  {hasFuelInputs && hasDispatch ? formatCurrency(runway.projectedFuelMonthly) : '—'}
-                </span>
+                <span className="text-muted-foreground">Trailing 90-day recorded P&amp;L expenses</span>
+                <span className="font-mono tabular-nums">{formatCurrency(runway.trailing90Expenses)}</span>
               </div>
             </div>
           </div>
 
-          {/* Break-Even Gauge */}
+          {/* Revenue vs Expenses Gauge */}
           <div className="rounded-lg border bg-card p-5 flex flex-col">
             <div className="flex items-center justify-between">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                Break-Even Gauge · Month-to-Date
+                MTD 1099 Revenue vs Recorded Expenses
               </p>
               <span
                 className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
-                  !hasCostPerDay
+                  !hasExpenses
                     ? 'bg-muted text-muted-foreground'
-                    : pct >= 1
+                    : coverageRatio >= 1
                     ? 'bg-success/10 text-success'
-                    : pct >= 0.9
+                    : coverageRatio >= 0.9
                     ? 'bg-warning/10 text-warning'
                     : 'bg-destructive/10 text-destructive'
                 }`}
@@ -754,37 +746,38 @@ function FleetRunwaySection({
                       : 'text-destructive'
                   }`}
                 >
-                  {hasCostPerDay ? `${pctDisplay}%` : '—'}
+                  {hasExpenses ? `${coverageRatio.toFixed(1)}×` : '—'}
                 </p>
-                <p className="text-xs text-muted-foreground">of break-even</p>
+                <p className="text-xs text-muted-foreground">revenue to expenses</p>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-3 mt-2 text-center">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">MTD Revenue</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">MTD 1099 Revenue</p>
                 <p className="text-sm font-semibold tabular-nums">{formatCurrency(runway.monthToDateRevenue)}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Break-Even</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">MTD Expenses</p>
                 <p className="text-sm font-semibold tabular-nums">
-                  {hasCostPerDay ? formatCurrency(runway.breakEvenMTD) : '—'}
+                  {hasExpenses ? formatCurrency(runway.monthToDateExpenses) : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Delta</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Net After Expenses</p>
                 <p
                   className={`text-sm font-semibold tabular-nums ${
-                    !hasCostPerDay ? 'text-muted-foreground' : delta >= 0 ? 'text-success' : 'text-destructive'
+                    !hasExpenses ? 'text-muted-foreground' : delta >= 0 ? 'text-success' : 'text-destructive'
                   }`}
                 >
-                  {hasCostPerDay ? `${delta >= 0 ? '+' : ''}${formatCurrency(delta)}` : '—'}
+                  {hasExpenses ? `${delta >= 0 ? '+' : ''}${formatCurrency(delta)}` : '—'}
                 </p>
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground mt-2 text-center">
               {runway.monthToDateDays} dispatch days logged this month
               {hasDispatch && <> · {runway.plannedDispatchDays}/30d cadence</>}
+              {runway.activeTrucksMTD > 0 && <> · {runway.activeTrucksMTD} active truck{runway.activeTrucksMTD === 1 ? '' : 's'}</>}
             </p>
           </div>
         </div>
