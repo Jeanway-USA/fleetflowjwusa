@@ -314,7 +314,7 @@ export default function DriverOnboarding() {
         DOCUMENT_LABELS[tmpl.document_type] ??
         tmpl.document_type;
 
-      const blob = generateSignedPdf({
+      const signedPdfArgs = {
         title,
         content: tmpl.content,
         driverAddress: tState.driverAddress,
@@ -335,12 +335,21 @@ export default function DriverOnboarding() {
         routingNumber: tState.routingNumber,
         accountNumber: tState.accountNumber,
         bankAccountType: tState.bankAccountType,
-      });
+      };
+
+      const blob = generateSignedPdf({ ...signedPdfArgs, redact: true });
+      const hasSensitive = !!(tState.ssn || tState.accountNumber);
+      const fullBlob = hasSensitive
+        ? generateSignedPdf({ ...signedPdfArgs, redact: false })
+        : null;
 
 
       const timestamp = Date.now();
       const safeType = tmpl.document_type.replace(/[^a-z0-9_-]/gi, '_');
       const filePath = `${orgId}/${driverRow.id}/${safeType}-${timestamp}.pdf`;
+      const adminFilePath = fullBlob
+        ? `${orgId}/${driverRow.id}/${safeType}-${timestamp}.full.pdf`
+        : null;
 
       const { error: uploadError } = await supabase.storage
         .from('signed-documents')
@@ -349,6 +358,19 @@ export default function DriverOnboarding() {
           upsert: false,
         });
       if (uploadError) throw uploadError;
+
+      if (fullBlob && adminFilePath) {
+        const { error: fullUploadError } = await supabase.storage
+          .from('signed-documents')
+          .upload(adminFilePath, fullBlob, {
+            contentType: 'application/pdf',
+            upsert: false,
+          });
+        if (fullUploadError) {
+          // Non-fatal: admin copy is a convenience artifact. Log and continue.
+          console.error('[onboarding] Full-data admin PDF upload failed', fullUploadError);
+        }
+      }
 
       // Upload supplemental attachment when the template includes a {{file_upload}} token
       const templateHasFileUpload = /\{\{\s*file_upload\s*\}\}/.test(tmpl.content);
