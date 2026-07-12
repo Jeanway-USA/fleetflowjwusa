@@ -11,8 +11,12 @@ export function generate1099NecPdf(opts: {
   year: number;
   employer: EmployerInfo;
   recipient: Row1099;
+  /** Full unmasked TIN digits (owner/payroll only). Falls back to last-4. */
+  tinFull?: string | null;
+  /** 'ssn' or 'ein' — controls formatting of the full TIN when provided. */
+  tinType?: string | null;
 }): Blob {
-  const { year, employer, recipient } = opts;
+  const { year, employer, recipient, tinFull, tinType } = opts;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const W = 612;
   const M = 36;
