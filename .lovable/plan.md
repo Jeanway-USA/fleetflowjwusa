@@ -1,65 +1,84 @@
 
-## Goal
+## Problems
 
-Today's onboarding collects federal forms (W-4, I-9, W-9, IOO) but nothing about **where** the driver works and lives. The State Filing Registry relies on `drivers.tax_state`, which is currently unpopulated at signup. Add a dedicated **State Tax Withholding form** to onboarding that:
+1. **Bonus over-pays.** `useSafetyBonus.ts` computes `currentEarnedBonus = currentSafeMiles * currentRate`. Once the driver hits Tier 2 (e.g. 4,000 mi at $0.10), every mile from mile 1 gets $0.10 retroactively. It should be **marginal**: each tier's rate only applies to miles inside that tier.
+2. **Period isn't monthly.** The hook computes `endDate = now`, `startDate = now − periodDays` (defaults to a rolling 28-day window). The widget already shows "this month" / "resets end of month". Result: the dollar amount and safe miles never actually reset on the 1st. It needs to be scoped to the **calendar month** (1st → last day).
+3. **No payout record.** Nothing stores that a bonus was earned/paid for a given month, so once the month rolls over the earned amount is lost with no audit trail and no way to include it in a settlement/payroll run.
 
-1. Captures work state (SUTA) + residence state (SIT).
-2. Captures state W-4 withholding elections (generic — no per-state PDF templates needed, since the user said we build these forms ourselves).
-3. Populates `drivers.tax_state` so the Filing Registry automatically shows only the states we actually owe.
-4. Skips SIT fields when the residence state has no income tax (FL, TX, TN, NV, WA, SD, WY, AK, NH) — surfaces a friendly "No state income tax" note instead.
-5. Generates a signed PDF stored alongside W-4/I-9 in `driver_signed_documents` (document_type = `state_tax`) and is reviewable in `SignedOnboardingDocuments`.
+## Fix
 
-Applies to both W-2 employees (required) and 1099 contractors (residence state only, informational — many states require 1099 filings even without withholding).
+### 1. Marginal tier calculation (`src/hooks/useSafetyBonus.ts`)
 
-## What gets built
+Replace the single-multiplication earn calc with a marginal walk across tiers:
 
-### 1. Data layer (migration)
-New table `public.driver_state_tax_info`:
-- `driver_id` (PK, FK → drivers)
-- `org_id`
-- `work_state` (2-letter, required)
-- `residence_state` (2-letter, required)
-- `filing_status` (single/married/hoh/married_separate)
-- `allowances` (int, generic — states vary)
-- `additional_withholding` (numeric)
-- `exempt` (bool, checkbox for states that allow it)
-- `signed_at`, `signature_data`
-- `created_at` / `updated_at`
+```text
+earned = 0
+for each tier (sorted by min_miles):
+  if miles <= tier.min_miles: break
+  ceiling  = tier.max_miles ?? miles
+  inTier   = min(miles, ceiling) - tier.min_miles
+  earned  += inTier * tier.rate_per_mile
+earned = min(earned, max_bonus)
+```
 
-GRANTs to `authenticated` + `service_role`, RLS: driver can insert/select own row; org admins (owner, safety, payroll_admin) can read within their org.
+`currentRate` (displayed) stays as the rate of the tier the driver is currently in — that's already correct and matches the "Current rate" line.
 
-Security-definer RPC `upsert_driver_state_tax(_driver_id, _work_state, _residence_state, ...)` following the pattern of `upsert_driver_w4`. Inside the RPC, also `UPDATE drivers SET tax_state = _work_state WHERE id = _driver_id` so the Filing Registry lights up automatically.
+Example with the screenshot's tiers (Tier 1 = 2,000–3,999 mi @ $0.05, Tier 2 = 4,000+ @ $0.10) at 4,696 miles:
 
-### 2. New onboarding component
-`src/components/onboarding/StateTaxForm.tsx` — self-contained form (like `W2Documents.tsx` conventions):
-- Work state dropdown (all 50 + DC, using `src/lib/us-states.ts`).
-- Residence state dropdown; if it matches work state, auto-mirror.
-- Auto-hide SIT election fields when residence state is in the no-SIT list; show a green banner explaining no state withholding needed.
-- Filing status radio, allowances, additional withholding, exempt checkbox.
-- Signature pad + attestation checkbox.
-- Exports `StateTaxFormState`, `EMPTY_STATE_TAX_FORM`, and a `validateStateTaxForm()` helper mirroring existing form patterns.
+```text
+Tier 1: (min(4696, 4000) − 2000) × 0.05  = 2000 × 0.05 = $100.00
+Tier 2: (4696 − 4000) × 0.10            =  696 × 0.10 = $69.60
+Total                                     = $169.60
+```
 
-### 3. Onboarding page wiring
-`src/pages/DriverOnboarding.tsx`:
-- Add `stateTax` to `structuredFormsPresent` query (probe `driver_state_tax_info`).
-- Extend `skipW2Structured` / `skip1099Structured` to include stateTax.
-- In the W-2 branch: call `upsert_driver_state_tax` RPC; generate signed PDF via `generateFormPdf` with document_type `state_tax`; label "State Tax Withholding".
-- 1099 branch: same, but only residence state + informational fields (skip filing status/allowances).
-- Add `state_tax` to `DOCUMENT_LABELS` in `SignedOnboardingDocuments.tsx` → "State Tax Withholding".
+(Today's buggy math would show `4696 × 0.05 = $234.80`, which matches the screenshot and confirms the bug.)
 
-### 4. Admin/UX polish
-- `StateFilingRegistry.tsx` already reads distinct `drivers.tax_state` values — no change needed; states will start appearing as drivers complete onboarding.
-- Add a small helper `src/lib/us-states.ts::NO_STATE_INCOME_TAX` (or extend existing file) to share the no-SIT list between the onboarding form and any future validation.
+### 2. Calendar-month period (`src/hooks/useSafetyBonus.ts`)
 
-## Technical notes
+- Replace the rolling `endDate − periodDays` window with `startOfMonth(now)` / `endOfMonth(now)` (via `date-fns`, matching what `MonthlyBonusWidget` already displays).
+- Use those bounds for `fleet_loads.delivery_date`, `incidents.incident_date`, and the service-failure query.
+- Keep `period_length_days` in `safety_bonus_settings` for now (the settings UI still writes it) but stop using it for the math. Note in the plan that this field is effectively deprecated for math; we can hide it in the settings UI in a follow-up if desired.
+- The widget's "resets in Nd" / "Resets tomorrow" copy already lines up with a calendar month — no change needed there.
 
-- No new per-state PDF templates. The generated PDF uses the same generic `generateFormPdf` sections used by W-4/I-9 today, so it's uniform and printable.
-- The RPC pattern keeps RLS clean — drivers can't set another driver's `tax_state`.
-- `document_templates` is not touched — this is a system form, not a customizable template, matching the user's statement "it's not variable."
-- Backfill is not needed: existing drivers already have `tax_state` set via Drivers page; new hires get it via this form.
+### 3. Bonus payout ledger
 
-## Out of scope
+New table `safety_bonus_payouts` (migration) so we can record and pay out earned bonuses:
 
-- Local (city/county) tax withholding.
-- Per-state W-4 PDF facsimiles (e.g., NC-4, IL-W-4). Can be added later if legal review requires the actual state form.
-- Reciprocity agreements between neighboring states (e.g., NJ/PA). Flagged for a follow-up.
+```text
+id             uuid pk
+org_id         uuid not null
+driver_id      uuid not null
+period_start   date not null      -- first of month
+period_end     date not null      -- last of month
+safe_miles     integer not null
+earned_amount  numeric(10,2) not null
+status         text not null default 'pending'   -- pending | approved | paid | void
+paid_at        timestamptz
+paid_in_settlement_id uuid        -- optional link to driver_settlements
+notes          text
+created_by     uuid
+created_at     timestamptz default now()
+updated_at     timestamptz default now()
+unique (driver_id, period_start)
+```
+
+- Standard GRANT + RLS (owner/payroll_admin manage; driver reads own; org-scoped).
+- Add a "Safety Bonus Payouts" panel inside the existing `SafetyBonusSettings` card on the Finance page:
+  - Month selector (defaults to previous month once we're past the 1st).
+  - Table: driver, safe miles, tier reached, earned amount, status, action.
+  - "Generate for month" button: runs the same marginal calc server-side (RPC `generate_safety_bonus_payouts(_org_id, _period_start)`) and inserts a row per eligible driver with `status='pending'`. Idempotent via the unique key.
+  - Per-row actions: Approve, Mark Paid, Void.
+- On the driver widget, show a small "Last month: $X — {status}" line under the current-period card once a payout row exists so the driver can see the earned bonus was recorded.
+
+Out of scope for this change: automatic inclusion into settlement PDFs / driver_settlements line items. The ledger + status flag is enough to "record and pay out"; wiring it into a settlement run can be a follow-up if you want.
+
+## Technical Notes
+
+- Files touched:
+  - `src/hooks/useSafetyBonus.ts` — marginal calc + calendar-month window.
+  - `src/components/driver/MonthlyBonusWidget.tsx` — no logic change; verify labels still read correctly with the new numbers.
+  - `src/components/finance/SafetyBonusSettings.tsx` — add Payouts section.
+  - New migration: `safety_bonus_payouts` table (GRANT, RLS, trigger for `updated_at`) + `generate_safety_bonus_payouts` SECURITY DEFINER RPC that recomputes marginal earnings for each active driver in the org for the given month and upserts rows.
+- The RPC re-uses the same tier walk logic so the widget and the ledger can never drift.
+- Eligibility checks (accidents / CSA / service failures) run inside the RPC against the same month window; ineligible drivers get `earned_amount = 0` and `status = 'void'` with a reason in `notes`.
+- Query keys for `useSafetyBonus` stay keyed by `driverId`; add the current `YYYY-MM` to the key so a month rollover invalidates cleanly.
