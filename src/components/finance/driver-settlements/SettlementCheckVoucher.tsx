@@ -5,9 +5,16 @@ import {
   CORPORATE_HEADER,
   type SettlementDocumentData,
 } from '@/lib/settlement-document-data';
+import { useDriverBankingFull } from '@/hooks/useSensitiveDriverData';
 
 const fmtDate = (d?: string | null) =>
   d ? format(parseISO(`${d}T00:00:00`), 'MMM d, yyyy') : '—';
+
+const fmtRouting = (r: string | null | undefined) => {
+  const d = (r ?? '').replace(/\D/g, '');
+  if (d.length !== 9) return r || '—';
+  return `${d.slice(0, 4)}-${d.slice(4, 8)}-${d.slice(8)}`;
+};
 
 interface Props {
   data: SettlementDocumentData;
@@ -15,6 +22,7 @@ interface Props {
 
 export function SettlementCheckVoucher({ data }: Props) {
   const { settlement, driver } = data;
+  const { data: banking } = useDriverBankingFull(driver?.id);
   const driverName =
     `${driver?.first_name ?? ''} ${driver?.last_name ?? ''}`.trim() || 'Driver';
   const statementNo = String(settlement.id).slice(0, 8).toUpperCase();
