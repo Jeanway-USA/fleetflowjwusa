@@ -382,13 +382,15 @@ function W2Tab({ year }: { year: number }) {
         year,
         employer,
         driver: {
-          firstName: row.first_name,
-          lastName: row.last_name,
+          firstName: row.i9_full_name?.split(' ')?.[0] ?? row.first_name,
+          lastName: row.i9_full_name?.split(' ')?.slice(1).join(' ') || row.last_name,
           tax_state: row.tax_state,
           ssnFull,
+          address: row.i9_address ?? null,
         },
         totals: row,
       });
+
       const path = `${orgId}/${year}/w2/${row.driver_id}.pdf`;
       const { error: upErr } = await supabase.storage.from('tax-documents')
         .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
