@@ -6574,6 +6574,11 @@ export type Database = {
           driver_id: string
           first_name: string
           fit_box2: number
+          has_i9: boolean
+          has_state_tax: boolean
+          has_w4: boolean
+          i9_address: string
+          i9_full_name: string
           last_name: string
           medicare_tax_box6: number
           medicare_wages_box5: number

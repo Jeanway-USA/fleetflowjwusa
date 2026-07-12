@@ -386,9 +386,12 @@ function W2Tab({ year }: { year: number }) {
           lastName: row.last_name,
           tax_state: row.tax_state,
           ssnFull,
+          address: row.i9_address ?? null,
         },
         totals: row,
       });
+
+
       const path = `${orgId}/${year}/w2/${row.driver_id}.pdf`;
       const { error: upErr } = await supabase.storage.from('tax-documents')
         .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
@@ -425,6 +428,8 @@ function W2Tab({ year }: { year: number }) {
   });
 
   const missingEmployer = !employer?.ein || !employer?.address_line1;
+  const incompleteDrivers = rows.filter((r) => !r.has_i9 || !r.has_w4 || !r.has_state_tax);
+
 
   return (
     <Card>
@@ -448,6 +453,16 @@ function W2Tab({ year }: { year: number }) {
             </AlertDescription>
           </Alert>
         )}
+        {incompleteDrivers.length > 0 && (
+          <Alert>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>{incompleteDrivers.length} employee{incompleteDrivers.length === 1 ? '' : 's'} missing signed tax forms</AlertTitle>
+            <AlertDescription>
+              Employees without a signed W-4, State Tax, or I-9 on file have used default withholding assumptions and may print without a complete address. Collect the missing forms before finalizing year-end filings.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {isLoading ? (
           <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
         ) : rows.length === 0 ? (
@@ -471,9 +486,24 @@ function W2Tab({ year }: { year: number }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => (
+                {rows.map((r) => {
+                  const missing: string[] = [];
+                  if (!r.has_w4) missing.push('W-4');
+                  if (!r.has_state_tax) missing.push('State');
+                  if (!r.has_i9) missing.push('I-9');
+                  return (
                   <TableRow key={r.driver_id}>
-                    <TableCell className="font-medium">{r.first_name} {r.last_name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span>{r.first_name} {r.last_name}</span>
+                        {missing.length > 0 && (
+                          <span className="text-[10px] uppercase tracking-wide rounded border border-amber-500/60 text-amber-700 dark:text-amber-400 px-1.5 py-0.5">
+                            Missing: {missing.join(', ')}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+
                     <TableCell>{r.tax_state || '—'}</TableCell>
                     <TableCell className="text-right">{formatCurrency(r.wages_box1)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(r.fit_box2)}</TableCell>
@@ -491,7 +521,9 @@ function W2Tab({ year }: { year: number }) {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
+
               </TableBody>
             </Table>
           </div>

@@ -569,6 +569,16 @@ export const DEFAULT_W4: W2W4 = {
   extra_withholding: 0,
 };
 
+export interface StateW4Snapshot {
+  exempt: boolean;
+  filing_status: FilingStatus;
+  allowances: number;
+  additional_withholding: number;
+}
+
+/** Approximate allowance value in dollars; used until per-state allowance tables land. */
+const STATE_ALLOWANCE_VALUE = 2000;
+
 export interface W2PayrollInput {
   grossTaxablePay: number;
   ytdGrossTaxablePay: number;
@@ -576,7 +586,16 @@ export interface W2PayrollInput {
   w4: W2W4;
   federal: W2FederalConfig;
   state?: W2StateConfig | null;
+  /**
+   * Snapshot of the driver's state-tax form. When provided:
+   * - exempt=true zeroes SIT
+   * - allowances reduce annualized taxable state wages by allowances*STATE_ALLOWANCE_VALUE
+   * - additional_withholding is added on top per period
+   * filing_status is accepted for audit but not yet branched on (single rate model).
+   */
+  stateW4?: StateW4Snapshot | null;
 }
+
 
 export interface W2PayrollResult {
   gross: number;
@@ -672,8 +691,26 @@ export function calculateW2Payroll(input: W2PayrollInput): W2PayrollResult {
     sutaEr = round2(taxable * s.suta_rate);
   }
 
-  // State income tax (employee).
-  const sit = s && s.has_state_income_tax ? round2(gross * s.sit_rate) : 0;
+  // State income tax (employee). Uses driver's signed state-tax form when present.
+  let sit = 0;
+  if (s && s.has_state_income_tax) {
+    const sw4 = input.stateW4 ?? null;
+    if (sw4?.exempt) {
+      sit = 0;
+    } else if (sw4) {
+      const periods = PAY_PERIODS_PER_YEAR[f.pay_frequency] ?? 52;
+      const annualWages = gross * periods;
+      const allowanceReduction = Math.max(0, sw4.allowances || 0) * STATE_ALLOWANCE_VALUE;
+      const annualTaxable = Math.max(0, annualWages - allowanceReduction);
+      sit = round2(
+        (annualTaxable * s.sit_rate) / periods
+          + Math.max(0, sw4.additional_withholding || 0),
+      );
+    } else {
+      sit = round2(gross * s.sit_rate);
+    }
+  }
+
 
   const totalEE = round2(eeSS + eeMed + addlMed + fit + sit);
   const totalER = round2(erSS + erMed + sutaEr);

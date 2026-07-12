@@ -31,7 +31,9 @@ import {
   PAY_PERIODS_PER_YEAR,
   type W2W4,
   type FilingStatus,
+  type StateW4Snapshot,
 } from '@/utils/payCalculations';
+
 import {
   format, startOfWeek, endOfWeek, addWeeks, addDays,
   startOfMonth, endOfMonth, addMonths,
@@ -217,6 +219,49 @@ export function ActiveBatchTab() {
     return m;
   }, [w4s]);
 
+  const { data: stateTaxes = [] } = useQuery({
+    queryKey: ['w2_state_taxes', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_state_tax_info')
+        .select('driver_id, filing_status, allowances, additional_withholding, exempt')
+        .eq('org_id', orgId!);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const stateW4Map = useMemo(() => {
+    const m = new Map<string, StateW4Snapshot>();
+    for (const r of stateTaxes as any[]) {
+      m.set(r.driver_id, {
+        exempt: !!r.exempt,
+        filing_status: (r.filing_status ?? 'single') as FilingStatus,
+        allowances: Number(r.allowances) || 0,
+        additional_withholding: Number(r.additional_withholding) || 0,
+      });
+    }
+    return m;
+  }, [stateTaxes]);
+
+  const { data: i9s = [] } = useQuery({
+    queryKey: ['w2_i9s', orgId],
+    enabled: !!orgId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_i9_info')
+        .select('driver_id')
+        .eq('org_id', orgId!);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const i9Set = useMemo(
+    () => new Set((i9s as any[]).map((r) => r.driver_id)),
+    [i9s],
+  );
+
+
   const driverMap = useMemo(() => {
     const m = new Map<string, (typeof drivers)[number]>();
     drivers.forEach((d) => m.set(d.id, d));
@@ -258,6 +303,7 @@ export function ActiveBatchTab() {
       holidayPay: 0,
     });
 
+    const stateW4 = stateW4Map.get(driverId) ?? null;
     const result = calculateW2Payroll({
       grossTaxablePay: grossTaxable,
       ytdGrossTaxablePay: ytdGross,
@@ -265,7 +311,9 @@ export function ActiveBatchTab() {
       w4,
       federal: config.federal,
       state: stateCfg,
+      stateW4,
     });
+
 
     const netPayout = Math.max(0, result.netPay - oneTimeDeduction);
 
@@ -579,6 +627,13 @@ export function ActiveBatchTab() {
                     ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim()
                     : r.driver_id.slice(0, 8);
                   const w4 = w4Map.get(r.driver_id) ?? DEFAULT_W4;
+                  const hasW4 = w4Map.has(r.driver_id);
+                  const hasStateTax = stateW4Map.has(r.driver_id);
+                  const hasI9 = i9Set.has(r.driver_id);
+                  const missing: string[] = [];
+                  if (!hasW4) missing.push('W-4');
+                  if (!hasStateTax) missing.push('State Tax');
+                  if (!hasI9) missing.push('I-9');
                   const wh = whMap.get(r.id);
                   const state = driver?.tax_state || driver?.license_state || config?.defaultTaxState || '—';
                   const gross = Number(r.gross_taxable_pay) || 0;
@@ -591,7 +646,21 @@ export function ActiveBatchTab() {
 
                   return (
                     <TableRow key={r.id} className={r.status === 'voided' ? 'opacity-60' : ''}>
-                      <TableCell className="font-medium">{name}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span>{name}</span>
+                          {missing.length > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-500/60 text-amber-700 dark:text-amber-400 text-[10px]"
+                              title={`Missing signed form(s): ${missing.join(', ')}. Withholding uses defaults until collected.`}
+                            >
+                              Missing: {missing.join(', ')}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+
                       <TableCell className="capitalize text-xs">
                         {w4.filing_status.replace('_', ' ')}
                       </TableCell>

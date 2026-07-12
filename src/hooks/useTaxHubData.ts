@@ -15,7 +15,13 @@ export interface W2Row {
   medicare_tax_box6: number;
   state_wages_box16: number;
   state_tax_box17: number;
+  has_w4: boolean;
+  has_state_tax: boolean;
+  has_i9: boolean;
+  i9_address: string | null;
+  i9_full_name: string | null;
 }
+
 
 export interface Row1099 {
   driver_id: string;
