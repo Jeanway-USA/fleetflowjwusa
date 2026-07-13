@@ -227,23 +227,51 @@ export function SignedOnboardingDocuments({ driverId }: Props) {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => openSignedUrl(d.file_path, `${d.document_type}.pdf`, 'preview')}>
-                  <Eye className="mr-1.5 h-4 w-4" />
-                  Preview
-                </Button>
-                <Button size="sm" onClick={() => openSignedUrl(d.file_path, `${d.document_type}.pdf`, 'download')}>
-                  <Download className="mr-1.5 h-4 w-4" />
-                  Download
-                </Button>
-                {canDownloadFull && d.admin_file_path && (
+                {(() => {
+                  // Privileged roles always get the unmasked artifact when one exists on disk.
+                  const previewPath = canDownloadFull && d.admin_file_path ? d.admin_file_path : d.file_path;
+                  const downloadPath = previewPath;
+                  const downloadName = canDownloadFull && d.admin_file_path ? `${d.document_type}_full.pdf` : `${d.document_type}.pdf`;
+                  return (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => openSignedUrl(previewPath, downloadName, 'preview')}>
+                        <Eye className="mr-1.5 h-4 w-4" />
+                        Preview
+                      </Button>
+                      <Button size="sm" onClick={() => openSignedUrl(downloadPath, downloadName, 'download')}>
+                        <Download className="mr-1.5 h-4 w-4" />
+                        Download
+                      </Button>
+                    </>
+                  );
+                })()}
+                {canDownloadFull && !d.admin_file_path && isRegenerable(d.document_type) && (
                   <Button
                     size="sm"
                     variant="secondary"
-                    title="Full unmasked copy for payroll/tax use"
-                    onClick={() => openSignedUrl(d.admin_file_path!, `${d.document_type}_full.pdf`, 'download')}
+                    title="Regenerate an unmasked payroll/tax copy from stored data"
+                    onClick={async () => {
+                      try {
+                        const result = await regenerateAdminPdf(driverId, d.document_type);
+                        if (!result) {
+                          toast.error('Cannot regenerate this document type.');
+                          return;
+                        }
+                        const url = URL.createObjectURL(result.blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = result.filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        URL.revokeObjectURL(url);
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : 'Failed to regenerate PDF');
+                      }
+                    }}
                   >
                     <ShieldCheck className="mr-1.5 h-4 w-4" />
-                    Full copy
+                    Unmasked PDF
                   </Button>
                 )}
                 {d.attachment_file_path && (
