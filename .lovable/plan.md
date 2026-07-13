@@ -1,37 +1,53 @@
+# Fix: Uncensored onboarding PDFs for payroll/tax use
+
 ## Problem
 
-During onboarding, four structured PDFs (W-4, I-9, W-9, Direct Deposit) are generated with SSN / TIN / bank account numbers already masked (`***-**-0068`, `****6789`). Only one file is stored per document, so even the owner and payroll admin can never see the full digits from those signed forms — which they legally need for W-2 processing, 1099 filing, ACH setup, and tax filings.
+- Existing signed onboarding documents (W-4, I-9, W-9, Direct Deposit, and template-driven forms) were saved before admin PDFs were introduced, so `admin_file_path IS NULL` and the "Full copy" button never appears.
+- The default "Preview" and "Download" buttons always fetch the masked `file_path`, so even owner/payroll_admin get censored data unless they notice the small secondary "Full copy" chip.
+- Result: from your point of view, admin downloads still look censored.
 
-The infrastructure for an unmasked admin copy already exists: `driver_signed_documents.admin_file_path` is a real column, `SignedOnboardingDocuments` already shows a **"Full copy"** button (owner + payroll_admin only), and other doc types populate it. The onboarding wizard just never writes one for these four forms.
+## Fix (frontend only — no schema/RLS changes)
 
-## Fix (frontend only, in `src/pages/DriverOnboarding.tsx`)
+### 1. Owner/payroll_admin always get the unmasked PDF
 
-Generate a second unmasked PDF at onboarding time and store its path in `admin_file_path`.
+In `src/components/drivers/SignedOnboardingDocuments.tsx`:
 
-1. Extend `uploadFormPdf(docType, label, blob)` to also accept an optional `adminBlob`. When provided:
-   - Upload it to `${orgId}/${driverRow.id}/${safe}-${ts}_admin.pdf` in the same `signed-documents` bucket.
-   - Include `admin_file_path` in the `driver_signed_documents` insert (alongside `file_path`).
+- When `canDownloadFull` is true (owner or payroll_admin):
+  - "Preview" and "Download" resolve to `admin_file_path` when it exists, falling back to `file_path`.
+  - If neither an `admin_file_path` nor an on-the-fly unmasked PDF is available, fall back to `file_path` (still the masked copy) so nothing breaks.
+- Remove the redundant "Full copy" button now that Preview/Download already return the unmasked artifact for privileged roles.
+- Non-privileged roles (safety, etc.) keep seeing the masked `file_path` — unchanged.
 
-2. For each of the four affected forms, build a parallel "admin sections" array that uses the raw digits instead of `maskTail(...)`/`****last4`, generate a second PDF via `generateFormPdf`, and pass it as `adminBlob`:
-   - **W-4** — replace `maskTail(w2Docs.w4_ssn)` with the full 9-digit SSN formatted `XXX-XX-XXXX`.
-   - **I-9** — same treatment for `w2Docs.i9_ssn`.
-   - **W-9** — replace `maskTail(contractorDocs.w9_tin)` with full TIN formatted per `tinType` (`XX-XXXXXXX` for EIN, `XXX-XX-XXXX` for SSN).
-   - **Direct Deposit** — replace the `****last4` account with the full account number; routing number already shows in full so it stays.
+### 2. On-demand unmasked PDF for historical docs
 
-3. Add a tiny local helper `formatSsn`/`formatTin` (or reuse the pattern from `useSensitiveDriverData.ts`) so the admin PDF is nicely formatted.
+For documents whose `admin_file_path` is null (everything signed before the previous fix), add a per-row "Regenerate unmasked PDF" action visible only to `canDownloadFull`. It generates the PDF client-side from the authoritative DB tables and downloads it directly (no upload, no schema write).
 
-No changes to storage RLS, database schema, or the driver-facing masked PDF. The redacted `file_path` copy remains exactly as it is today — non-payroll roles (dispatcher, safety, driver themselves) still only ever see the masked version. Only owner and `payroll_admin` see the "Full copy" button that reveals the unmasked PDF.
+New helper `src/lib/onboarding/regenerateAdminPdf.ts`:
 
-## What the owner / payroll admin will see after this
+- Input: `{ driverId, documentType }`.
+- Reads driver identity from `drivers` (name, address on file).
+- For each supported `document_type`, queries the corresponding table over RLS (owner/payroll_admin only):
+  - `w4` → `driver_w4_info` + `drivers`
+  - `i9` → `driver_i9_info`
+  - `w9` → `driver_w9_info`
+  - `direct_deposit`, `direct_deposit_form` → `driver_banking_info` (via existing `get_driver_banking` RPC if present, otherwise direct select) — uses full account/routing numbers
+  - Template-based docs with `ssn`/`account_number` tokens → re-render `generateSignedPdf({ ...args, redact: false })` using `driver_w4_info.ssn` / `driver_banking_info.account_number` as the source of truth
+- Builds the PDF using the existing `generateFormPdf` / `generateSignedPdf` helpers with the same `fullSsn`/`fullTin`/`fullAccount` formatters already in `DriverOnboarding.tsx` (extract them into `src/lib/onboarding/mask.ts` and reuse from both files).
+- Triggers a browser download; nothing is written to storage or the DB.
 
-On the driver profile → **Signed Onboarding Documents** section, for W-4, I-9, W-9, and Direct Deposit rows, the existing **Full copy** button will now appear and download an unmasked PDF containing the complete SSN / TIN / bank account number needed for payroll and tax filing.
+### 3. Keep the write-time admin copy for new signings
+
+The existing write path in `src/pages/DriverOnboarding.tsx` already stores an unmasked PDF at `admin_file_path` for W-4/I-9/W-9/Direct Deposit and for the template-based direct deposit form. No changes required there — the new UI just consumes that file when it exists and falls back to the regeneration helper when it does not.
 
 ## Files touched
 
-- `src/pages/DriverOnboarding.tsx` — only file that needs edits.
+- `src/components/drivers/SignedOnboardingDocuments.tsx` — reroute Preview/Download to `admin_file_path` for privileged roles; add "Regenerate unmasked PDF" action for rows without one; drop the "Full copy" chip.
+- `src/lib/onboarding/mask.ts` (new) — extract `fullSsn`, `fullTin`, `fullAccount` from `DriverOnboarding.tsx` for reuse.
+- `src/pages/DriverOnboarding.tsx` — swap local helpers for the shared `mask.ts` exports (no behavior change).
+- `src/lib/onboarding/regenerateAdminPdf.ts` (new) — assembles unmasked PDFs for historical documents from `driver_w4_info` / `driver_i9_info` / `driver_w9_info` / `driver_banking_info`.
 
 ## Out of scope
 
-- No RLS/migration changes (columns and policies already exist).
-- No changes to the redacted copies or to any other role's access.
-- No changes to how SSN/TIN/banking are stored in the encrypted tables (`get_driver_ssn`, `get_driver_tin`, `get_driver_banking` RPCs continue to work exactly as they do).
+- No RLS/schema/migration changes. Access is already restricted to owner/payroll_admin/safety by existing policies on `driver_signed_documents` and the source tables.
+- Non-privileged roles continue to see the masked PDF exactly as before.
+- No changes to storage bucket policies or edge functions.
