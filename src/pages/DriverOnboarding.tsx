@@ -457,6 +457,7 @@ export default function DriverOnboarding() {
       docType: string,
       label: string,
       blob: Blob,
+      adminBlob?: Blob,
     ) => {
       const ts = Date.now();
       const safe = docType.replace(/[^a-z0-9_-]/gi, '_');
@@ -465,16 +466,27 @@ export default function DriverOnboarding() {
         .from('signed-documents')
         .upload(filePath, blob, { contentType: 'application/pdf', upsert: false });
       if (upErr) throw new Error(`Couldn't upload ${label}: ${upErr.message}`);
+
+      let adminFilePath: string | null = null;
+      if (adminBlob) {
+        adminFilePath = `${orgId}/${driverRow.id}/${safe}-${ts}_admin.pdf`;
+        const { error: adminUpErr } = await supabase.storage
+          .from('signed-documents')
+          .upload(adminFilePath, adminBlob, { contentType: 'application/pdf', upsert: false });
+        if (adminUpErr) throw new Error(`Couldn't upload admin copy of ${label}: ${adminUpErr.message}`);
+      }
+
       const { error: insErr } = await supabase.from('driver_signed_documents').insert({
         org_id: orgId,
         driver_id: driverRow.id,
         template_id: null,
         document_type: docType,
         file_path: filePath,
+        admin_file_path: adminFilePath,
         attachment_file_path: null,
         driver_address: null,
         signature_data_url: null,
-      });
+      } as never);
       if (insErr) throw new Error(`Couldn't record ${label}: ${insErr.message}`);
       results.push({
         title: label,
@@ -487,6 +499,22 @@ export default function DriverOnboarding() {
     const maskTail = (v: string) => {
       const digits = v.replace(/\D/g, '');
       return digits.length >= 4 ? `***-**-${digits.slice(-4)}` : '—';
+    };
+
+    const fullSsn = (v: string) => {
+      const d = (v || '').replace(/\D/g, '');
+      return d.length === 9 ? `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}` : (v || '—');
+    };
+    const fullTin = (v: string, tinType: string) => {
+      const d = (v || '').replace(/\D/g, '');
+      if (d.length !== 9) return v || '—';
+      return (tinType || '').toLowerCase() === 'ein'
+        ? `${d.slice(0, 2)}-${d.slice(2)}`
+        : `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
+    };
+    const fullAccount = (v: string) => {
+      const d = (v || '').replace(/\D/g, '');
+      return d.length > 0 ? d : '—';
     };
 
     if (employmentType === 'W-2' && !skipW2Structured) {

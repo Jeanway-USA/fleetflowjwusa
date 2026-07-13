@@ -1,27 +1,37 @@
 ## Problem
 
-The onboarding wizard saves the W-2 direct deposit PDF under `document_type = 'direct_deposit_form'` (see `src/pages/DriverOnboarding.tsx` line 625), but the "outstanding docs" check in `src/lib/onboarding/outstanding.ts` looks for `document_type = 'direct_deposit'` in its `BUILTIN_W2` list.
+During onboarding, four structured PDFs (W-4, I-9, W-9, Direct Deposit) are generated with SSN / TIN / bank account numbers already masked (`***-**-0068`, `****6789`). Only one file is stored per document, so even the owner and payroll admin can never see the full digits from those signed forms — which they legally need for W-2 processing, 1099 filing, ACH setup, and tax filings.
 
-Result: the signed row exists (admin view shows the completed doc), the onboarding page correctly says everything is done (it checks `direct_deposit_form`), but `fetchOutstandingTemplates` never finds a match and keeps reporting 1 outstanding built-in — driving the red "Action Required / Complete Documents" banner on the driver dashboard and the "Outstanding documents (1)" card in admin.
+The infrastructure for an unmasked admin copy already exists: `driver_signed_documents.admin_file_path` is a real column, `SignedOnboardingDocuments` already shows a **"Full copy"** button (owner + payroll_admin only), and other doc types populate it. The onboarding wizard just never writes one for these four forms.
 
-## Fix
+## Fix (frontend only, in `src/pages/DriverOnboarding.tsx`)
 
-In `src/lib/onboarding/outstanding.ts`, change the W-2 built-in entry from:
+Generate a second unmasked PDF at onboarding time and store its path in `admin_file_path`.
 
-```ts
-{ document_type: 'direct_deposit', name: 'Direct Deposit Authorization' }
-```
+1. Extend `uploadFormPdf(docType, label, blob)` to also accept an optional `adminBlob`. When provided:
+   - Upload it to `${orgId}/${driverRow.id}/${safe}-${ts}_admin.pdf` in the same `signed-documents` bucket.
+   - Include `admin_file_path` in the `driver_signed_documents` insert (alongside `file_path`).
 
-to:
+2. For each of the four affected forms, build a parallel "admin sections" array that uses the raw digits instead of `maskTail(...)`/`****last4`, generate a second PDF via `generateFormPdf`, and pass it as `adminBlob`:
+   - **W-4** — replace `maskTail(w2Docs.w4_ssn)` with the full 9-digit SSN formatted `XXX-XX-XXXX`.
+   - **I-9** — same treatment for `w2Docs.i9_ssn`.
+   - **W-9** — replace `maskTail(contractorDocs.w9_tin)` with full TIN formatted per `tinType` (`XX-XXXXXXX` for EIN, `XXX-XX-XXXX` for SSN).
+   - **Direct Deposit** — replace the `****last4` account with the full account number; routing number already shows in full so it stays.
 
-```ts
-{ document_type: 'direct_deposit_form', name: 'Direct Deposit Authorization' }
-```
+3. Add a tiny local helper `formatSsn`/`formatTin` (or reuse the pattern from `useSensitiveDriverData.ts`) so the admin PDF is nicely formatted.
 
-That's the actual `document_type` written to `driver_signed_documents` by the onboarding flow, so the "already signed" set will match and the phantom outstanding item disappears for both the driver banner and the admin card.
+No changes to storage RLS, database schema, or the driver-facing masked PDF. The redacted `file_path` copy remains exactly as it is today — non-payroll roles (dispatcher, safety, driver themselves) still only ever see the masked version. Only owner and `payroll_admin` see the "Full copy" button that reveals the unmasked PDF.
 
-No other changes: onboarding logic, DB, and admin labels (`SignedOnboardingDocuments.tsx` already maps both keys to "Direct Deposit Authorization") stay as-is.
+## What the owner / payroll admin will see after this
 
-## Scope
+On the driver profile → **Signed Onboarding Documents** section, for W-4, I-9, W-9, and Direct Deposit rows, the existing **Full copy** button will now appear and download an unmasked PDF containing the complete SSN / TIN / bank account number needed for payroll and tax filing.
 
-- Edit only `src/lib/onboarding/outstanding.ts` (one string).
+## Files touched
+
+- `src/pages/DriverOnboarding.tsx` — only file that needs edits.
+
+## Out of scope
+
+- No RLS/migration changes (columns and policies already exist).
+- No changes to the redacted copies or to any other role's access.
+- No changes to how SSN/TIN/banking are stored in the encrypted tables (`get_driver_ssn`, `get_driver_tin`, `get_driver_banking` RPCs continue to work exactly as they do).
