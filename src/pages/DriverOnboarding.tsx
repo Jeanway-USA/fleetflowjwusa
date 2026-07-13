@@ -580,6 +580,15 @@ export default function DriverOnboarding() {
           ],
         },
       ];
+      const w4AdminSections: FormPdfSection[] = [
+        {
+          ...w4Sections[0],
+          fields: w4Sections[0].fields.map((f) =>
+            f.label === 'Social Security Number' ? { ...f, value: fullSsn(w2Docs.w4_ssn) } : f,
+          ),
+        },
+        w4Sections[1],
+      ];
       await uploadFormPdf(
         'w4',
         'Federal W-4 Withholding Certificate',
@@ -588,6 +597,14 @@ export default function DriverOnboarding() {
           subtitle: 'Signed electronically as part of driver onboarding.',
           driverName,
           sections: w4Sections,
+          signatureLabel: 'Employee signature',
+          signature: w2Docs.w4_signature,
+        }),
+        generateFormPdf({
+          title: 'Form W-4 — Employee Withholding Certificate (Payroll Copy)',
+          subtitle: 'Unmasked copy for payroll and tax filing use only.',
+          driverName,
+          sections: w4AdminSections,
           signatureLabel: 'Employee signature',
           signature: w2Docs.w4_signature,
         }),
@@ -613,6 +630,14 @@ export default function DriverOnboarding() {
           notes: [
             'The employee attests, under penalty of perjury, that the information provided is true and correct.',
           ],
+        },
+      ];
+      const i9AdminSections: FormPdfSection[] = [
+        {
+          ...i9Sections[0],
+          fields: i9Sections[0].fields.map((f) =>
+            f.label === 'SSN' ? { ...f, value: fullSsn(w2Docs.i9_ssn) } : f,
+          ),
         },
       ];
       await uploadFormPdf(
