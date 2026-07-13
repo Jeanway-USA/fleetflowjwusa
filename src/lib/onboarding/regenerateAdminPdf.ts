@@ -140,7 +140,8 @@ export async function regenerateAdminPdf(
       if (w9Err) throw w9Err;
       if (tinErr) throw tinErr;
       if (!w9) throw new Error('No W-9 data on file for this driver yet.');
-      const tinRow = Array.isArray(tinRows) && tinRows.length > 0 ? (tinRows[0] as { tin: string | null; tin_type: string | null }) : null;
+      const tinArr = (tinRows as unknown as Array<{ tin: string | null; tin_type: string | null }> | null) ?? [];
+      const tinRow = tinArr.length > 0 ? tinArr[0] : null;
       const sections: FormPdfSection[] = [
         {
           heading: 'Contractor Information',
