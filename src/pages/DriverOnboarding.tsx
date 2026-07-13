@@ -651,6 +651,14 @@ export default function DriverOnboarding() {
           signatureLabel: 'Employee signature',
           signature: w2Docs.i9_signature,
         }),
+        generateFormPdf({
+          title: 'Form I-9 — Employment Eligibility Verification (Payroll Copy)',
+          subtitle: 'Unmasked copy for payroll and tax filing use only.',
+          driverName,
+          sections: i9AdminSections,
+          signatureLabel: 'Employee signature',
+          signature: w2Docs.i9_signature,
+        }),
       );
 
       // Direct Deposit form PDF (structured artifact separate from the DB template)
@@ -674,6 +682,14 @@ export default function DriverOnboarding() {
           ],
         },
       ];
+      const ddAdminSections: FormPdfSection[] = [
+        {
+          ...ddSections[0],
+          fields: ddSections[0].fields.map((f) =>
+            f.label === 'Account number' ? { ...f, value: fullAccount(w2Docs.dd_accountNumber) } : f,
+          ),
+        },
+      ];
       await uploadFormPdf(
         'direct_deposit_form',
         'Direct Deposit Authorization',
@@ -681,6 +697,14 @@ export default function DriverOnboarding() {
           title: 'Direct Deposit Authorization',
           driverName,
           sections: ddSections,
+          signatureLabel: 'Employee signature',
+          signature: w2Docs.dd_signature,
+        }),
+        generateFormPdf({
+          title: 'Direct Deposit Authorization (Payroll Copy)',
+          subtitle: 'Unmasked copy for payroll and ACH setup use only.',
+          driverName,
+          sections: ddAdminSections,
           signatureLabel: 'Employee signature',
           signature: w2Docs.dd_signature,
         }),
