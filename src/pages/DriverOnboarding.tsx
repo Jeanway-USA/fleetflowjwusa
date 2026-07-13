@@ -738,6 +738,16 @@ export default function DriverOnboarding() {
       if (iooErr) throw new Error(`Couldn't save your Owner-Operator agreement: ${iooErr.message}`);
 
       // W-9 PDF
+      const w9BaseFields = [
+        { label: 'Legal name', value: contractorDocs.w9_legalName },
+        { label: 'Business name', value: contractorDocs.w9_businessName || '—' },
+        { label: 'Tax classification', value: contractorDocs.w9_taxClass },
+        { label: 'Address', value: contractorDocs.w9_address },
+        { label: 'TIN type', value: contractorDocs.w9_tinType.toUpperCase() },
+      ];
+      const w9Notes = [
+        'The contractor certifies, under penalty of perjury, that the TIN provided is correct and that they are not subject to backup withholding.',
+      ];
       await uploadFormPdf(
         'w9',
         'Form W-9 — Taxpayer Identification',
@@ -748,17 +758,25 @@ export default function DriverOnboarding() {
           sections: [
             {
               heading: 'Contractor Information',
+              fields: [...w9BaseFields, { label: 'TIN', value: maskTail(contractorDocs.w9_tin) }],
+              notes: w9Notes,
+            },
+          ],
+          signatureLabel: 'Contractor signature',
+          signature: contractorDocs.w9_signature,
+        }),
+        generateFormPdf({
+          title: 'Form W-9 — Request for Taxpayer Identification (Payroll Copy)',
+          subtitle: 'Unmasked copy for 1099 filing and tax reporting use only.',
+          driverName,
+          sections: [
+            {
+              heading: 'Contractor Information',
               fields: [
-                { label: 'Legal name', value: contractorDocs.w9_legalName },
-                { label: 'Business name', value: contractorDocs.w9_businessName || '—' },
-                { label: 'Tax classification', value: contractorDocs.w9_taxClass },
-                { label: 'Address', value: contractorDocs.w9_address },
-                { label: 'TIN type', value: contractorDocs.w9_tinType.toUpperCase() },
-                { label: 'TIN', value: maskTail(contractorDocs.w9_tin) },
+                ...w9BaseFields,
+                { label: 'TIN', value: fullTin(contractorDocs.w9_tin, contractorDocs.w9_tinType) },
               ],
-              notes: [
-                'The contractor certifies, under penalty of perjury, that the TIN provided is correct and that they are not subject to backup withholding.',
-              ],
+              notes: w9Notes,
             },
           ],
           signatureLabel: 'Contractor signature',
