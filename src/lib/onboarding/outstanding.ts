@@ -22,7 +22,7 @@ const BUILTIN_W2: Array<{ document_type: string; name: string }> = [
   { document_type: 'w4', name: 'Federal W-4 Withholding' },
   { document_type: 'i9', name: 'Form I-9 — Employment Eligibility' },
   { document_type: 'state_tax', name: 'State Tax Withholding' },
-  { document_type: 'direct_deposit', name: 'Direct Deposit Authorization' },
+  { document_type: 'direct_deposit_form', name: 'Direct Deposit Authorization' },
 ];
 
 const BUILTIN_1099: Array<{ document_type: string; name: string }> = [
