@@ -457,6 +457,7 @@ export default function DriverOnboarding() {
       docType: string,
       label: string,
       blob: Blob,
+      adminBlob?: Blob,
     ) => {
       const ts = Date.now();
       const safe = docType.replace(/[^a-z0-9_-]/gi, '_');
@@ -465,16 +466,27 @@ export default function DriverOnboarding() {
         .from('signed-documents')
         .upload(filePath, blob, { contentType: 'application/pdf', upsert: false });
       if (upErr) throw new Error(`Couldn't upload ${label}: ${upErr.message}`);
+
+      let adminFilePath: string | null = null;
+      if (adminBlob) {
+        adminFilePath = `${orgId}/${driverRow.id}/${safe}-${ts}_admin.pdf`;
+        const { error: adminUpErr } = await supabase.storage
+          .from('signed-documents')
+          .upload(adminFilePath, adminBlob, { contentType: 'application/pdf', upsert: false });
+        if (adminUpErr) throw new Error(`Couldn't upload admin copy of ${label}: ${adminUpErr.message}`);
+      }
+
       const { error: insErr } = await supabase.from('driver_signed_documents').insert({
         org_id: orgId,
         driver_id: driverRow.id,
         template_id: null,
         document_type: docType,
         file_path: filePath,
+        admin_file_path: adminFilePath,
         attachment_file_path: null,
         driver_address: null,
         signature_data_url: null,
-      });
+      } as never);
       if (insErr) throw new Error(`Couldn't record ${label}: ${insErr.message}`);
       results.push({
         title: label,
@@ -487,6 +499,22 @@ export default function DriverOnboarding() {
     const maskTail = (v: string) => {
       const digits = v.replace(/\D/g, '');
       return digits.length >= 4 ? `***-**-${digits.slice(-4)}` : '—';
+    };
+
+    const fullSsn = (v: string) => {
+      const d = (v || '').replace(/\D/g, '');
+      return d.length === 9 ? `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}` : (v || '—');
+    };
+    const fullTin = (v: string, tinType: string) => {
+      const d = (v || '').replace(/\D/g, '');
+      if (d.length !== 9) return v || '—';
+      return (tinType || '').toLowerCase() === 'ein'
+        ? `${d.slice(0, 2)}-${d.slice(2)}`
+        : `${d.slice(0, 3)}-${d.slice(3, 5)}-${d.slice(5)}`;
+    };
+    const fullAccount = (v: string) => {
+      const d = (v || '').replace(/\D/g, '');
+      return d.length > 0 ? d : '—';
     };
 
     if (employmentType === 'W-2' && !skipW2Structured) {
@@ -552,6 +580,15 @@ export default function DriverOnboarding() {
           ],
         },
       ];
+      const w4AdminSections: FormPdfSection[] = [
+        {
+          ...w4Sections[0],
+          fields: w4Sections[0].fields.map((f) =>
+            f.label === 'Social Security Number' ? { ...f, value: fullSsn(w2Docs.w4_ssn) } : f,
+          ),
+        },
+        w4Sections[1],
+      ];
       await uploadFormPdf(
         'w4',
         'Federal W-4 Withholding Certificate',
@@ -560,6 +597,14 @@ export default function DriverOnboarding() {
           subtitle: 'Signed electronically as part of driver onboarding.',
           driverName,
           sections: w4Sections,
+          signatureLabel: 'Employee signature',
+          signature: w2Docs.w4_signature,
+        }),
+        generateFormPdf({
+          title: 'Form W-4 — Employee Withholding Certificate (Payroll Copy)',
+          subtitle: 'Unmasked copy for payroll and tax filing use only.',
+          driverName,
+          sections: w4AdminSections,
           signatureLabel: 'Employee signature',
           signature: w2Docs.w4_signature,
         }),
@@ -587,6 +632,14 @@ export default function DriverOnboarding() {
           ],
         },
       ];
+      const i9AdminSections: FormPdfSection[] = [
+        {
+          ...i9Sections[0],
+          fields: i9Sections[0].fields.map((f) =>
+            f.label === 'SSN' ? { ...f, value: fullSsn(w2Docs.i9_ssn) } : f,
+          ),
+        },
+      ];
       await uploadFormPdf(
         'i9',
         'Form I-9 — Employment Eligibility',
@@ -595,6 +648,14 @@ export default function DriverOnboarding() {
           subtitle: 'Section 1 attestation completed by the employee.',
           driverName,
           sections: i9Sections,
+          signatureLabel: 'Employee signature',
+          signature: w2Docs.i9_signature,
+        }),
+        generateFormPdf({
+          title: 'Form I-9 — Employment Eligibility Verification (Payroll Copy)',
+          subtitle: 'Unmasked copy for payroll and tax filing use only.',
+          driverName,
+          sections: i9AdminSections,
           signatureLabel: 'Employee signature',
           signature: w2Docs.i9_signature,
         }),
@@ -621,6 +682,14 @@ export default function DriverOnboarding() {
           ],
         },
       ];
+      const ddAdminSections: FormPdfSection[] = [
+        {
+          ...ddSections[0],
+          fields: ddSections[0].fields.map((f) =>
+            f.label === 'Account number' ? { ...f, value: fullAccount(w2Docs.dd_accountNumber) } : f,
+          ),
+        },
+      ];
       await uploadFormPdf(
         'direct_deposit_form',
         'Direct Deposit Authorization',
@@ -628,6 +697,14 @@ export default function DriverOnboarding() {
           title: 'Direct Deposit Authorization',
           driverName,
           sections: ddSections,
+          signatureLabel: 'Employee signature',
+          signature: w2Docs.dd_signature,
+        }),
+        generateFormPdf({
+          title: 'Direct Deposit Authorization (Payroll Copy)',
+          subtitle: 'Unmasked copy for payroll and ACH setup use only.',
+          driverName,
+          sections: ddAdminSections,
           signatureLabel: 'Employee signature',
           signature: w2Docs.dd_signature,
         }),
@@ -661,6 +738,16 @@ export default function DriverOnboarding() {
       if (iooErr) throw new Error(`Couldn't save your Owner-Operator agreement: ${iooErr.message}`);
 
       // W-9 PDF
+      const w9BaseFields = [
+        { label: 'Legal name', value: contractorDocs.w9_legalName },
+        { label: 'Business name', value: contractorDocs.w9_businessName || '—' },
+        { label: 'Tax classification', value: contractorDocs.w9_taxClass },
+        { label: 'Address', value: contractorDocs.w9_address },
+        { label: 'TIN type', value: contractorDocs.w9_tinType.toUpperCase() },
+      ];
+      const w9Notes = [
+        'The contractor certifies, under penalty of perjury, that the TIN provided is correct and that they are not subject to backup withholding.',
+      ];
       await uploadFormPdf(
         'w9',
         'Form W-9 — Taxpayer Identification',
@@ -671,17 +758,25 @@ export default function DriverOnboarding() {
           sections: [
             {
               heading: 'Contractor Information',
+              fields: [...w9BaseFields, { label: 'TIN', value: maskTail(contractorDocs.w9_tin) }],
+              notes: w9Notes,
+            },
+          ],
+          signatureLabel: 'Contractor signature',
+          signature: contractorDocs.w9_signature,
+        }),
+        generateFormPdf({
+          title: 'Form W-9 — Request for Taxpayer Identification (Payroll Copy)',
+          subtitle: 'Unmasked copy for 1099 filing and tax reporting use only.',
+          driverName,
+          sections: [
+            {
+              heading: 'Contractor Information',
               fields: [
-                { label: 'Legal name', value: contractorDocs.w9_legalName },
-                { label: 'Business name', value: contractorDocs.w9_businessName || '—' },
-                { label: 'Tax classification', value: contractorDocs.w9_taxClass },
-                { label: 'Address', value: contractorDocs.w9_address },
-                { label: 'TIN type', value: contractorDocs.w9_tinType.toUpperCase() },
-                { label: 'TIN', value: maskTail(contractorDocs.w9_tin) },
+                ...w9BaseFields,
+                { label: 'TIN', value: fullTin(contractorDocs.w9_tin, contractorDocs.w9_tinType) },
               ],
-              notes: [
-                'The contractor certifies, under penalty of perjury, that the TIN provided is correct and that they are not subject to backup withholding.',
-              ],
+              notes: w9Notes,
             },
           ],
           signatureLabel: 'Contractor signature',
