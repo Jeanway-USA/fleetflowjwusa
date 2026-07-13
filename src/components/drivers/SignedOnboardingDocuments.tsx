@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { RequestRevisionDialog } from './RequestRevisionDialog';
 import { fetchOutstandingTemplates } from '@/lib/onboarding/outstanding';
+import { regenerateAdminPdf, isRegenerable } from '@/lib/onboarding/regenerateAdminPdf';
 
 const DOCUMENT_LABELS: Record<string, string> = {
   driver_agreement: 'Driver Agreement',
