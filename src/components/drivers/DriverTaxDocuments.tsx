@@ -33,10 +33,11 @@ interface Props {
 }
 
 export function DriverTaxDocuments({ driver }: Props) {
-  const driverUserId = driver.user_id ?? null;
-  const { data: docs = [], isLoading } = useTaxDocuments(driverUserId);
+  const driverId = driver.id;
+  const hasUserAccount = !!driver.user_id;
+  const { data: docs = [], isLoading } = useTaxDocuments(driverId);
   const upload = useUploadTaxDocument();
-  const remove = useDeleteTaxDocument(driverUserId);
+  const remove = useDeleteTaxDocument(driverId);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const years = useMemo(() => {
@@ -47,10 +48,10 @@ export function DriverTaxDocuments({ driver }: Props) {
   const [file, setFile] = useState<File | null>(null);
 
   const handleSubmit = async () => {
-    if (!driverUserId) return;
+    if (!hasUserAccount) return;
     if (!file) return;
     await upload.mutateAsync({
-      driverUserId,
+      driverId,
       taxYear: Number(year),
       file,
     });
