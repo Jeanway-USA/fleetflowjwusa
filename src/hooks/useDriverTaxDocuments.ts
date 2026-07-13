@@ -15,18 +15,18 @@ export interface TaxDocument {
 
 const BUCKET = 'tax-documents';
 
-/** Admin/dispatcher: list tax documents for a given driver (by their auth user id). */
-export function useTaxDocuments(driverUserId: string | null | undefined) {
+/** Admin/dispatcher: list tax documents for a given driver (by drivers.id). */
+export function useTaxDocuments(driverId: string | null | undefined) {
   return useQuery({
-    queryKey: ['tax-documents', driverUserId],
-    enabled: !!driverUserId,
+    queryKey: ['tax-documents', driverId],
+    enabled: !!driverId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tax_documents')
         .select('*')
-        .eq('driver_id', driverUserId as string)
+        .eq('driver_id', driverId as string)
         .order('tax_year', { ascending: false })
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -35,7 +35,7 @@ export function useTaxDocuments(driverUserId: string | null | undefined) {
   });
 }
 
-/** Driver: list own tax documents using current auth user. */
+/** Driver: list own tax documents by resolving their drivers.id from auth user. */
 export function useMyTaxDocuments() {
   const { user } = useAuth();
   return useQuery({
@@ -44,10 +44,19 @@ export function useMyTaxDocuments() {
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
+      const { data: driverRow, error: dErr } = await supabase
+        .from('drivers')
+        .select('id')
+        .eq('user_id', user!.id)
+        .maybeSingle();
+      if (dErr) throw dErr;
+      const driverId = (driverRow as { id?: string } | null)?.id;
+      if (!driverId) return [] as TaxDocument[];
+
       const { data, error } = await supabase
         .from('tax_documents')
         .select('*')
-        .eq('driver_id', user!.id)
+        .eq('driver_id', driverId)
         .order('tax_year', { ascending: false })
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -57,7 +66,7 @@ export function useMyTaxDocuments() {
 }
 
 interface UploadArgs {
-  driverUserId: string;
+  driverId: string;
   taxYear: number;
   file: File;
 }
@@ -65,7 +74,7 @@ interface UploadArgs {
 export function useUploadTaxDocument() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ driverUserId, taxYear, file }: UploadArgs) => {
+    mutationFn: async ({ driverId, taxYear, file }: UploadArgs) => {
       if (file.type !== 'application/pdf') {
         throw new Error('Only PDF files are allowed');
       }
@@ -73,14 +82,14 @@ export function useUploadTaxDocument() {
         throw new Error('File must be 10 MB or smaller');
       }
       const id = crypto.randomUUID();
-      const path = `${driverUserId}/${taxYear}/${id}.pdf`;
+      const path = `${driverId}/${taxYear}/${id}.pdf`;
       const { error: upErr } = await supabase.storage
         .from(BUCKET)
         .upload(path, file, { contentType: 'application/pdf', upsert: false });
       if (upErr) throw upErr;
 
       const { error: dbErr } = await supabase.from('tax_documents').insert({
-        driver_id: driverUserId,
+        driver_id: driverId,
         tax_year: taxYear,
         file_path: path,
       } as any);
@@ -91,14 +100,14 @@ export function useUploadTaxDocument() {
       }
     },
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: ['tax-documents', vars.driverUserId] });
+      qc.invalidateQueries({ queryKey: ['tax-documents', vars.driverId] });
       toast.success('1099 uploaded');
     },
     onError: (err: any) => toast.error(err?.message ?? 'Upload failed'),
   });
 }
 
-export function useDeleteTaxDocument(driverUserId: string | null | undefined) {
+export function useDeleteTaxDocument(driverId: string | null | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (doc: TaxDocument) => {
@@ -107,7 +116,7 @@ export function useDeleteTaxDocument(driverUserId: string | null | undefined) {
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['tax-documents', driverUserId] });
+      qc.invalidateQueries({ queryKey: ['tax-documents', driverId] });
       toast.success('Document deleted');
     },
     onError: (err: any) => toast.error(err?.message ?? 'Delete failed'),
