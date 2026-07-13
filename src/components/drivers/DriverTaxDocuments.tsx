@@ -73,7 +73,7 @@ export function DriverTaxDocuments({ driver }: Props) {
         </div>
       </div>
 
-      {!driverUserId ? (
+      {!hasUserAccount ? (
         <p className="text-xs text-muted-foreground italic">
           This driver has no linked user account. They must accept their invite before tax
           documents can be uploaded.
