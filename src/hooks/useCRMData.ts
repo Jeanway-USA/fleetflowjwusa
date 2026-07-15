@@ -231,15 +231,16 @@ export function useContactMutations() {
 
   const deleteContact = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('crm_contacts').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-contacts'] });
-      toast({ title: 'Contact deleted successfully' });
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({
+        table: 'crm_contacts',
+        id,
+        queryClient,
+        invalidateKeys: [['crm-contacts']],
+      });
     },
     onError: (error) => {
-      toast({ title: 'Error deleting contact', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error archiving contact', description: error.message, variant: 'destructive' });
     },
   });
 
