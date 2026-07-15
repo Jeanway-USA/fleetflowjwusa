@@ -60,11 +60,13 @@ interface Load {
   destination: string;
   pickup_date: string | null;
   pickup_time: string | null;
+  pickup_end_time?: string | null;
   pickup_time_type: string | null;
   pickup_at?: string | null;
   pickup_tz?: string | null;
   delivery_date: string | null;
   delivery_time: string | null;
+  delivery_end_time?: string | null;
   delivery_time_type: string | null;
   delivery_at?: string | null;
   delivery_tz?: string | null;
