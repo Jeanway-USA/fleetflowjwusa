@@ -18,6 +18,7 @@ interface UpcomingLoad {
   status: string;
   pickup_date: string | null;
   pickup_time: string | null;
+  pickup_end_time?: string | null;
   pickup_time_type: string | null;
   pickup_at?: string | null;
   pickup_tz?: string | null;
