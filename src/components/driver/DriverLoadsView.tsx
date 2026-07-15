@@ -376,7 +376,11 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
                 </span>
                 <p className="text-sm font-medium">{formatDate(load.pickup_date)}</p>
                 {load.pickup_time && (
-                  <p className="text-xs text-primary font-medium">{load.pickup_time}</p>
+                  <p className="text-xs text-primary font-medium">
+                    {load.pickup_time_type === 'window' && load.pickup_end_time
+                      ? `${load.pickup_time} - ${load.pickup_end_time}`
+                      : load.pickup_time}
+                  </p>
                 )}
               </div>
               <div className="space-y-1">
@@ -385,7 +389,11 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
                 </span>
                 <p className="text-sm font-medium">{formatDate(load.delivery_date)}</p>
                 {load.delivery_time && (
-                  <p className="text-xs text-primary font-medium">{load.delivery_time}</p>
+                  <p className="text-xs text-primary font-medium">
+                    {load.delivery_time_type === 'window' && load.delivery_end_time
+                      ? `${load.delivery_time} - ${load.delivery_end_time}`
+                      : load.delivery_time}
+                  </p>
                 )}
               </div>
             </div>
