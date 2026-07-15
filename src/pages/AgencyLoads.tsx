@@ -69,12 +69,13 @@ export default function AgencyLoads() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('agency_loads').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agency_loads'] });
-      toast.success('Load deleted');
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({
+        table: 'agency_loads',
+        id,
+        queryClient,
+        invalidateKeys: [['agency_loads']],
+      });
     },
     onError: (error) => toast.error(error.message),
   });
