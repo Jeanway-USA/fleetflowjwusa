@@ -10,6 +10,7 @@ interface Load {
   destination: string;
   pickup_date: string | null;
   pickup_time?: string | null;
+  pickup_end_time?: string | null;
   pickup_time_type?: string | null;
   status: string;
   booked_miles: number | null;
