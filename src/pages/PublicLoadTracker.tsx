@@ -165,7 +165,7 @@ export default function PublicLoadTracker() {
               <div className="font-medium">{data.destination || "—"}</div>
               <div className="text-sm text-muted-foreground mt-1">
                 Delivery: {formatDate(data.delivery_date)}
-                {data.delivery_time ? ` · ${data.delivery_time}` : ""}
+                {data.delivery_time ? ` · ${data.delivery_time_type === 'window' && data.delivery_end_time ? `${data.delivery_time} - ${data.delivery_end_time}` : data.delivery_time}` : ""}
               </div>
             </div>
           </CardContent>
