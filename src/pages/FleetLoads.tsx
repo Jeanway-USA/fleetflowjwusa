@@ -1292,68 +1292,123 @@ export default function FleetLoads() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="pickup_date">Pickup Date</Label>
-                    <Input 
-                      id="pickup_date" 
-                      type="date" 
-                      value={formData.pickup_date || ''} 
-                      onChange={(e) => setFormData({ ...formData, pickup_date: e.target.value })} 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pickup_time">Pickup Time</Label>
-                    <Input 
-                      id="pickup_time" 
-                      type="text" 
-                      value={formData.pickup_time || ''} 
-                      onChange={(e) => setFormData({ ...formData, pickup_time: e.target.value })} 
-                      placeholder="8:00 AM"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="pickup_time_type">Pickup Time Type</Label>
-                    <Select value={formData.pickup_time_type || 'appointment'} onValueChange={(v) => setFormData({ ...formData, pickup_time_type: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="appointment">Strict Appointment</SelectItem>
-                        <SelectItem value="window">Open Window</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="delivery_date">Delivery Date</Label>
-                    <Input 
-                      id="delivery_date" 
-                      type="date" 
-                      value={formData.delivery_date || ''} 
-                      onChange={(e) => setFormData({ ...formData, delivery_date: e.target.value })} 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="delivery_time">Delivery Time</Label>
-                    <Input 
-                      id="delivery_time" 
-                      type="text" 
-                      value={formData.delivery_time || ''} 
-                      onChange={(e) => setFormData({ ...formData, delivery_time: e.target.value })} 
-                      placeholder="2:00 PM"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="delivery_time_type">Delivery Time Type</Label>
-                    <Select value={formData.delivery_time_type || 'appointment'} onValueChange={(v) => setFormData({ ...formData, delivery_time_type: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="appointment">Strict Appointment</SelectItem>
-                        <SelectItem value="window">Open Window</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                {(() => {
+                  const pickupType = (formData as any).pickup_time_type || 'appointment';
+                  const deliveryType = (formData as any).delivery_time_type || 'appointment';
+                  const pickupLabel = pickupType === 'appointment' ? 'Appointment Time' : pickupType === 'fcfs' ? 'Start Time' : 'Window Start';
+                  const deliveryLabel = deliveryType === 'appointment' ? 'Appointment Time' : deliveryType === 'fcfs' ? 'Start Time' : 'Window Start';
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="pickup_date">Pickup Date</Label>
+                          <Input
+                            id="pickup_date"
+                            type="date"
+                            value={formData.pickup_date || ''}
+                            onChange={(e) => setFormData({ ...formData, pickup_date: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="pickup_time_type">Pickup Time Type</Label>
+                          <Select
+                            value={pickupType}
+                            onValueChange={(v) =>
+                              setFormData({
+                                ...formData,
+                                pickup_time_type: v,
+                                // Clear stale end time when switching away from Open Window
+                                ...(v !== 'window' ? { pickup_end_time: null as any } : {}),
+                              })
+                            }
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="appointment">Strict Appointment</SelectItem>
+                              <SelectItem value="fcfs">First Come First Served</SelectItem>
+                              <SelectItem value="window">Open Window</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="pickup_time">{pickupLabel}</Label>
+                          <Input
+                            id="pickup_time"
+                            type="text"
+                            value={formData.pickup_time || ''}
+                            onChange={(e) => setFormData({ ...formData, pickup_time: e.target.value })}
+                            placeholder="8:00 AM"
+                          />
+                        </div>
+                        {pickupType === 'window' && (
+                          <div className="space-y-2">
+                            <Label htmlFor="pickup_end_time">Window End</Label>
+                            <Input
+                              id="pickup_end_time"
+                              type="text"
+                              value={(formData as any).pickup_end_time || ''}
+                              onChange={(e) => setFormData({ ...formData, pickup_end_time: e.target.value } as any)}
+                              placeholder="5:00 PM"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="delivery_date">Delivery Date</Label>
+                          <Input
+                            id="delivery_date"
+                            type="date"
+                            value={formData.delivery_date || ''}
+                            onChange={(e) => setFormData({ ...formData, delivery_date: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="delivery_time_type">Delivery Time Type</Label>
+                          <Select
+                            value={deliveryType}
+                            onValueChange={(v) =>
+                              setFormData({
+                                ...formData,
+                                delivery_time_type: v,
+                                ...(v !== 'window' ? { delivery_end_time: null as any } : {}),
+                              })
+                            }
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="appointment">Strict Appointment</SelectItem>
+                              <SelectItem value="fcfs">First Come First Served</SelectItem>
+                              <SelectItem value="window">Open Window</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="delivery_time">{deliveryLabel}</Label>
+                          <Input
+                            id="delivery_time"
+                            type="text"
+                            value={formData.delivery_time || ''}
+                            onChange={(e) => setFormData({ ...formData, delivery_time: e.target.value })}
+                            placeholder="2:00 PM"
+                          />
+                        </div>
+                        {deliveryType === 'window' && (
+                          <div className="space-y-2">
+                            <Label htmlFor="delivery_end_time">Window End</Label>
+                            <Input
+                              id="delivery_end_time"
+                              type="text"
+                              value={(formData as any).delivery_end_time || ''}
+                              onChange={(e) => setFormData({ ...formData, delivery_end_time: e.target.value } as any)}
+                              placeholder="6:00 PM"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  );
+                })()}
 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
