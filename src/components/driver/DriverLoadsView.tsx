@@ -251,9 +251,9 @@ function DriverLoadCard({ load, payRate, payType, onStatusUpdate }: DriverLoadCa
               {load.status !== 'delivered' && (
                 <div className="pl-6">
                   {load.status === 'in_transit' ? (
-                    load.delivery_time && <TimeTypeBadge timeType={load.delivery_time_type} time={load.delivery_time} variant="driver" />
+                    load.delivery_time && <TimeTypeBadge timeType={load.delivery_time_type} time={load.delivery_time} endTime={load.delivery_end_time} variant="driver" />
                   ) : (
-                    load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="driver" />
+                    load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} endTime={load.pickup_end_time} variant="driver" />
                   )}
                 </div>
               )}
