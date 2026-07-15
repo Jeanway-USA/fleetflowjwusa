@@ -158,12 +158,13 @@ export default function Incidents() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('incidents').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['incidents'] });
-      toast.success('Incident deleted');
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({
+        table: 'incidents',
+        id,
+        queryClient,
+        invalidateKeys: [['incidents']],
+      });
     },
     onError: (error) => toast.error(error.message),
   });
