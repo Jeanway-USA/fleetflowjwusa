@@ -448,9 +448,10 @@ export function ActiveLoadsBoard() {
                               tz={load.pickup_tz}
                               legacyDate={load.pickup_date}
                               legacyTime={load.pickup_time}
+                              legacyEndTime={load.pickup_end_time}
                               withDate
                             />
-                            {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="compact" />}
+                            {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} endTime={load.pickup_end_time} variant="compact" />}
                           </span>
                         )}
                         {(load.delivery_at || load.delivery_date) && (
@@ -461,9 +462,10 @@ export function ActiveLoadsBoard() {
                               tz={load.delivery_tz}
                               legacyDate={load.delivery_date}
                               legacyTime={load.delivery_time}
+                              legacyEndTime={load.delivery_end_time}
                               withDate
                             />
-                            {load.delivery_time && <TimeTypeBadge timeType={load.delivery_time_type} time={load.delivery_time} variant="compact" />}
+                            {load.delivery_time && <TimeTypeBadge timeType={load.delivery_time_type} time={load.delivery_time} endTime={load.delivery_end_time} variant="compact" />}
                           </span>
                         )}
                         {load.rate && <span className="ml-auto font-medium text-foreground">${load.rate.toLocaleString()}</span>}
