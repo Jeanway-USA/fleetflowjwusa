@@ -18,6 +18,7 @@ interface UpcomingLoad {
   status: string;
   pickup_date: string | null;
   pickup_time: string | null;
+  pickup_end_time?: string | null;
   pickup_time_type: string | null;
   pickup_at?: string | null;
   pickup_tz?: string | null;
@@ -55,6 +56,7 @@ export function UpcomingPickups() {
           status,
           pickup_date,
           pickup_time,
+          pickup_end_time,
           pickup_time_type,
           pickup_at,
           pickup_tz,
@@ -159,10 +161,11 @@ export function UpcomingPickups() {
                         tz={load.pickup_tz}
                         legacyDate={load.pickup_date}
                         legacyTime={load.pickup_time}
+                        legacyEndTime={load.pickup_end_time}
                         withDate
                       />)
                     </span>
-                    {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="compact" />}
+                    {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} endTime={load.pickup_end_time} variant="compact" />}
                   </div>
                 )}
 

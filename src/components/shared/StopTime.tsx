@@ -12,9 +12,9 @@
  * Legacy-row fallback (when *_at / *_tz columns aren't populated yet):
  *   <StopTime legacyDate={load.pickup_date} legacyTime={load.pickup_time} />
  *
- * The legacy path treats the date+time as a wall clock in the stop's tz
- * (falling back to the org's company timezone). The Company/Local toggle
- * still flips the secondary "(06:00 PDT) your time" line.
+ * Open Window ranges (new): pass legacyEndTime (or utcEndIso) to render a
+ * `HH:MM - HH:MM` range in the stop's zone. If only start info is provided,
+ * behavior is unchanged.
  */
 
 import { useTimeDisplay } from '@/contexts/TimeDisplayContext';
@@ -28,6 +28,10 @@ interface StopTimeProps {
   legacyDate?: string | null;
   /** Legacy time string ("08:00" or "8:00 AM"). Used only when utcIso is missing. */
   legacyTime?: string | null;
+  /** Optional UTC instant marking the END of an Open Window range. */
+  utcEndIso?: string | null;
+  /** Optional legacy end time ("17:00"). Renders as `start - end` when present. */
+  legacyEndTime?: string | null;
   /** When true, render `Mon, Jun 15 · 08:00 CST`. Default false. */
   withDate?: boolean;
   /** When true, render only the date (`Mon, Jun 15`) — no time line. */
@@ -44,6 +48,8 @@ export function StopTime({
   tz,
   legacyDate,
   legacyTime,
+  utcEndIso,
+  legacyEndTime,
   withDate = false,
   dateOnly = false,
   hideSecondary = false,
@@ -59,10 +65,22 @@ export function StopTime({
     effectiveIso = combineToUtc(legacyDate, legacyTime ?? '00:00', effectiveTz);
   }
 
+  // Resolve optional end instant for Open Window ranges.
+  let effectiveEndIso: string | null | undefined = utcEndIso;
+  if (!effectiveEndIso && legacyDate && legacyEndTime) {
+    effectiveEndIso = combineToUtc(legacyDate, legacyEndTime, effectiveTz);
+  }
+
   const formatted = formatStopTime(effectiveIso, effectiveTz, {
     viewerTz,
     hideSecondary: hideSecondary || dateOnly,
   });
+  const formattedEnd = effectiveEndIso
+    ? formatStopTime(effectiveEndIso, effectiveTz, {
+        viewerTz,
+        hideSecondary: hideSecondary || dateOnly,
+      })
+    : null;
 
   if (!formatted) return <span className={className}>{placeholder}</span>;
 
@@ -70,12 +88,25 @@ export function StopTime({
     return <span className={className}>{formatted.dateLabel}</span>;
   }
 
+  // For ranges, strip the trailing tz abbreviation from the start half so we
+  // don't render "08:00 CST - 15:00 CST" — keep it once at the end.
+  const stripZone = (label: string) => label.replace(/\s+[A-Z]{2,5}$/, '');
+  const timeLine = formattedEnd
+    ? `${stripZone(formatted.timeLabel)} - ${formattedEnd.timeLabel}`
+    : formatted.timeLabel;
+  const fullLine = withDate ? `${formatted.dateLabel} · ${timeLine}` : timeLine;
+  const secondaryLine = formatted.secondaryLabel
+    ? formattedEnd?.secondaryLabel
+      ? `${stripZone(formatted.secondaryLabel)} - ${formattedEnd.secondaryLabel}`
+      : formatted.secondaryLabel
+    : undefined;
+
   return (
     <span className={cn('inline-flex flex-col leading-tight', className)}>
-      <span>{withDate ? formatted.full : formatted.timeLabel}</span>
-      {formatted.secondaryLabel && (
+      <span>{fullLine}</span>
+      {secondaryLine && (
         <span className="text-[10px] text-muted-foreground">
-          ({formatted.secondaryLabel} your time)
+          ({secondaryLine} your time)
         </span>
       )}
     </span>

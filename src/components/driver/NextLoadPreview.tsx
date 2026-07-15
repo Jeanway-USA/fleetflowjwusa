@@ -10,6 +10,7 @@ interface Load {
   destination: string;
   pickup_date: string | null;
   pickup_time?: string | null;
+  pickup_end_time?: string | null;
   pickup_time_type?: string | null;
   status: string;
   booked_miles: number | null;
@@ -89,7 +90,7 @@ export function NextLoadPreview({ load, payRate, payType }: NextLoadPreviewProps
               ? format(parseISO(`${load.pickup_date}T00:00:00`), 'EEE, MMM d')
               : 'Date TBD'}
             {load.pickup_time && (
-              <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="compact" />
+              <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} endTime={load.pickup_end_time} variant="compact" />
             )}
           </div>
           <div className="flex items-center gap-3">

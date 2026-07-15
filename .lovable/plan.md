@@ -1,53 +1,57 @@
-# Fix: Uncensored onboarding PDFs for payroll/tax use
+# Support "Open Window" time ranges for Fleet Loads
 
-## Problem
+## 1. Database (migration)
 
-- Existing signed onboarding documents (W-4, I-9, W-9, Direct Deposit, and template-driven forms) were saved before admin PDFs were introduced, so `admin_file_path IS NULL` and the "Full copy" button never appears.
-- The default "Preview" and "Download" buttons always fetch the masked `file_path`, so even owner/payroll_admin get censored data unless they notice the small secondary "Full copy" chip.
-- Result: from your point of view, admin downloads still look censored.
+Add two optional columns to `public.fleet_loads`:
 
-## Fix (frontend only — no schema/RLS changes)
+- `pickup_end_time text NULL`
+- `delivery_end_time text NULL`
 
-### 1. Owner/payroll_admin always get the unmasked PDF
+Kept as `text` to match the existing `pickup_time` / `delivery_time` columns (they store strings like `"08:00"` / `"8:00 AM"`, per the datetime memory). No RLS/policy changes needed — the existing row policies already cover new columns.
 
-In `src/components/drivers/SignedOnboardingDocuments.tsx`:
+Not touching `pickup_at` / `delivery_at` UTC columns in this pass — those keep pointing at the window START (matches current behavior of `pickup_time`). Window END is display-only for now.
 
-- When `canDownloadFull` is true (owner or payroll_admin):
-  - "Preview" and "Download" resolve to `admin_file_path` when it exists, falling back to `file_path`.
-  - If neither an `admin_file_path` nor an on-the-fly unmasked PDF is available, fall back to `file_path` (still the masked copy) so nothing breaks.
-- Remove the redundant "Full copy" button now that Preview/Download already return the unmasked artifact for privileged roles.
-- Non-privileged roles (safety, etc.) keep seeing the masked `file_path` — unchanged.
+## 2. Time Type dropdown
 
-### 2. On-demand unmasked PDF for historical docs
+Extend the two `Select`s in `src/pages/FleetLoads.tsx` (Add/Edit Load modal) to three options:
 
-For documents whose `admin_file_path` is null (everything signed before the previous fix), add a per-row "Regenerate unmasked PDF" action visible only to `canDownloadFull`. It generates the PDF client-side from the authoritative DB tables and downloads it directly (no upload, no schema write).
+- `appointment` → Strict Appointment
+- `fcfs` → First Come First Served
+- `window` → Open Window
 
-New helper `src/lib/onboarding/regenerateAdminPdf.ts`:
+Conditional inputs inside the same 3-col grid cell that currently holds the single time input:
 
-- Input: `{ driverId, documentType }`.
-- Reads driver identity from `drivers` (name, address on file).
-- For each supported `document_type`, queries the corresponding table over RLS (owner/payroll_admin only):
-  - `w4` → `driver_w4_info` + `drivers`
-  - `i9` → `driver_i9_info`
-  - `w9` → `driver_w9_info`
-  - `direct_deposit`, `direct_deposit_form` → `driver_banking_info` (via existing `get_driver_banking` RPC if present, otherwise direct select) — uses full account/routing numbers
-  - Template-based docs with `ssn`/`account_number` tokens → re-render `generateSignedPdf({ ...args, redact: false })` using `driver_w4_info.ssn` / `driver_banking_info.account_number` as the source of truth
-- Builds the PDF using the existing `generateFormPdf` / `generateSignedPdf` helpers with the same `fullSsn`/`fullTin`/`fullAccount` formatters already in `DriverOnboarding.tsx` (extract them into `src/lib/onboarding/mask.ts` and reuse from both files).
-- Triggers a browser download; nothing is written to storage or the DB.
+- `appointment` → one input, label "Appointment Time", binds to `pickup_time` / `delivery_time`.
+- `fcfs` → one input, label "Start Time", binds to `pickup_time` / `delivery_time`.
+- `window` → two side-by-side inputs, labels "Window Start" and "Window End", binding to `pickup_time` + new `pickup_end_time` (and delivery counterparts). When the user switches away from `window`, clear the `*_end_time` value on submit.
 
-### 3. Keep the write-time admin copy for new signings
+Persist `pickup_end_time` / `delivery_end_time` in the create + update mutations (both the FleetLoads insert path around line 1105 and the update path around line 690/726).
 
-The existing write path in `src/pages/DriverOnboarding.tsx` already stores an unmasked PDF at `admin_file_path` for W-4/I-9/W-9/Direct Deposit and for the template-based direct deposit form. No changes required there — the new UI just consumes that file when it exists and falls back to the regeneration helper when it does not.
+## 3. Display as a range
 
-## Files touched
+Render `HH:MM - HH:MM` whenever an end time exists, otherwise fall back to today's single-time output.
 
-- `src/components/drivers/SignedOnboardingDocuments.tsx` — reroute Preview/Download to `admin_file_path` for privileged roles; add "Regenerate unmasked PDF" action for rows without one; drop the "Full copy" chip.
-- `src/lib/onboarding/mask.ts` (new) — extract `fullSsn`, `fullTin`, `fullAccount` from `DriverOnboarding.tsx` for reuse.
-- `src/pages/DriverOnboarding.tsx` — swap local helpers for the shared `mask.ts` exports (no behavior change).
-- `src/lib/onboarding/regenerateAdminPdf.ts` (new) — assembles unmasked PDFs for historical documents from `driver_w4_info` / `driver_i9_info` / `driver_w9_info` / `driver_banking_info`.
+- **`src/components/shared/TimeTypeBadge.tsx`** — accept an optional `endTime` prop; when present, render `Window: 07:00 - 15:00` (full variant), `OPEN WINDOW: 07:00 - 15:00` (driver variant), and keep the tooltip.
+- **`src/components/shared/StopTime.tsx`** — accept optional `legacyEndTime` (and, for symmetry, an optional `utcEndIso` we won't populate yet). When provided, render the time line as `start - end` in the stop's zone; secondary "your time" line follows the same range shape.
+- **Call sites to update** so they pass the new end time through:
+  - `src/pages/FleetLoads.tsx` (table column at line 895, plus any modal summary using `pickup_time` / `delivery_time`)
+  - `src/components/dispatcher/UpcomingPickups.tsx`
+  - `src/components/dispatcher/ActiveLoadsBoard.tsx`
+  - `src/components/driver/ActiveLoadCard.tsx`
+  - `src/components/driver/DriverLoadsView.tsx`
+  - `src/components/driver/NextLoadPreview.tsx`
+  - `src/pages/PublicLoadTracker.tsx`
 
-## Out of scope
+Each of these currently reads `pickup_time` / `delivery_time` (and often the matching `*_time_type`). They'll additionally read `pickup_end_time` / `delivery_end_time` and forward them to `StopTime` / `TimeTypeBadge`.
 
-- No RLS/schema/migration changes. Access is already restricted to owner/payroll_admin/safety by existing policies on `driver_signed_documents` and the source tables.
-- Non-privileged roles continue to see the masked PDF exactly as before.
-- No changes to storage bucket policies or edge functions.
+## 4. Out of scope
+
+- No changes to `agency_loads`, `load_intermediate_stops`, or the `pickup_at` UTC contract.
+- No changes to auto-arrival / geofence / status-email logic — they continue to key off the start time.
+- No backfill; existing rows keep `*_end_time = NULL` and render exactly as today.
+
+## Technical notes
+
+- Columns are nullable text to match the existing loose format ("08:00" or "8:00 AM"). Range display uses whatever string is stored (no reformatting).
+- TypeScript types regenerate automatically after the migration runs, so the form code that reads `formData.pickup_end_time` compiles once the migration is approved.
+- Switching Time Type in the form must reset stale values: `appointment`/`fcfs` → set `*_end_time` to `null`; `window` → keep whatever's there.

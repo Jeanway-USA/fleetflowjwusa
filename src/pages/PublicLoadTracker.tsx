@@ -25,9 +25,11 @@ type PublicLoad = {
   destination: string | null;
   pickup_date: string | null;
   pickup_time: string | null;
+  pickup_end_time?: string | null;
   pickup_time_type: string | null;
   delivery_date: string | null;
   delivery_time: string | null;
+  delivery_end_time?: string | null;
   delivery_time_type: string | null;
   pickup_at: string | null;
   delivery_at: string | null;
@@ -153,7 +155,7 @@ export default function PublicLoadTracker() {
               <div className="font-medium">{data.origin || "—"}</div>
               <div className="text-sm text-muted-foreground mt-1">
                 Pickup: {formatDate(data.pickup_date)}
-                {data.pickup_time ? ` · ${data.pickup_time}` : ""}
+                {data.pickup_time ? ` · ${data.pickup_time_type === 'window' && data.pickup_end_time ? `${data.pickup_time} - ${data.pickup_end_time}` : data.pickup_time}` : ""}
               </div>
             </div>
             <div>
@@ -163,7 +165,7 @@ export default function PublicLoadTracker() {
               <div className="font-medium">{data.destination || "—"}</div>
               <div className="text-sm text-muted-foreground mt-1">
                 Delivery: {formatDate(data.delivery_date)}
-                {data.delivery_time ? ` · ${data.delivery_time}` : ""}
+                {data.delivery_time ? ` · ${data.delivery_time_type === 'window' && data.delivery_end_time ? `${data.delivery_time} - ${data.delivery_end_time}` : data.delivery_time}` : ""}
               </div>
             </div>
           </CardContent>
