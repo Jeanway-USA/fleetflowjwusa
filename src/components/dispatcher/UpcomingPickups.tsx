@@ -56,6 +56,7 @@ export function UpcomingPickups() {
           status,
           pickup_date,
           pickup_time,
+          pickup_end_time,
           pickup_time_type,
           pickup_at,
           pickup_tz,
