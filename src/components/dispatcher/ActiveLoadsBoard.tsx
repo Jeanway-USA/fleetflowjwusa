@@ -524,6 +524,7 @@ export function ActiveLoadsBoard() {
                         tz={selectedLoad.pickup_tz}
                         legacyDate={selectedLoad.pickup_date}
                         legacyTime={selectedLoad.pickup_time}
+                        legacyEndTime={selectedLoad.pickup_end_time}
                         withDate
                         className="font-medium text-foreground"
                       />
@@ -547,6 +548,7 @@ export function ActiveLoadsBoard() {
                         tz={selectedLoad.delivery_tz}
                         legacyDate={selectedLoad.delivery_date}
                         legacyTime={selectedLoad.delivery_time}
+                        legacyEndTime={selectedLoad.delivery_end_time}
                         withDate
                         className="font-medium text-foreground"
                       />
