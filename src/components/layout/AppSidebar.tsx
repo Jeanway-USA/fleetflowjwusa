@@ -20,6 +20,7 @@ import {
   Fuel,
   BarChart,
   Receipt,
+  Archive,
   ShieldCheck,
   ChevronsUpDown,
   Plus,
@@ -246,6 +247,7 @@ export function AppSidebar() {
     { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta', tmsMode: 'independent' as TmsMode },
     { title: 'Tax Hub', icon: Receipt, path: '/admin/tax-hub', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
     { title: 'Audit Trail', icon: ShieldCheck, path: '/audit-trail', roles: ['owner', 'payroll_admin'] },
+    { title: 'Archive', icon: Archive, path: '/archive', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'maintenance'] },
   ];
 
   const filteredOps = useMemo(() => filterByRoleAndTier(operationsItems), [filterByRoleAndTier]);

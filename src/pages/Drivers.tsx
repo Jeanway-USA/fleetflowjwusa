@@ -21,7 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { compressImage } from '@/lib/compress-image';
-import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off, Eye, MoreHorizontal, FileSpreadsheet, FileSignature } from 'lucide-react';
+import { Pencil, Trash2, FileText, Phone, Mail, Calendar, CreditCard, Shield, Upload, User, Users, AlertTriangle, Link, Link2Off, Eye, MoreHorizontal, FileSpreadsheet, FileSignature, Archive } from 'lucide-react';
 import { CSVImportDialog } from '@/components/shared/CSVImportDialog';
 import { SignedOnboardingDocuments } from '@/components/drivers/SignedOnboardingDocuments';
 import { CredentialsCompliance } from '@/components/drivers/CredentialsCompliance';
@@ -105,7 +105,7 @@ export default function Drivers() {
   const { data: drivers = [], isLoading } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('drivers').select('*').order('last_name');
+      const { data, error } = await supabase.from('drivers').select('*').is('deleted_at', null).order('last_name');
       if (error) throw error;
       return data;
     },
@@ -226,21 +226,17 @@ export default function Drivers() {
   });
 
 
-  // Undoable delete hook
-  const { deleteWithUndo } = useUndoableDelete<any>({
-    onDelete: async (id) => {
-      const { error } = await supabase.from('drivers').delete().eq('id', id);
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['drivers'] });
-    },
-    onRestore: async (driver) => {
-      const { error } = await supabase.from('drivers').insert(driver);
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['drivers'] });
-    },
-    getItemName: (driver) => `${driver.first_name} ${driver.last_name}`,
-    entityName: 'Driver',
-  });
+  // Archive with undo — uses soft-delete RPC
+  const deleteWithUndo = async (driver: any) => {
+    const { archiveWithUndo } = await import('@/lib/soft-delete');
+    await archiveWithUndo({
+      table: 'drivers',
+      id: driver.id,
+      itemName: `${driver.first_name} ${driver.last_name}`,
+      queryClient,
+      invalidateKeys: [['drivers']],
+    });
+  };
 
   const openDialog = async (driver?: any) => {
     setEditingDriver(driver || null);
@@ -506,8 +502,8 @@ export default function Drivers() {
 
                       <DropdownMenuSeparator />
                       <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(driver)}>
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
+                        <Archive className="h-4 w-4 mr-2" />
+                        Archive
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

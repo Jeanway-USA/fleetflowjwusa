@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock, Truck as TruckIcon, MoreHorizontal, FileSpreadsheet, Landmark } from 'lucide-react';
+import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock, Truck as TruckIcon, MoreHorizontal, FileSpreadsheet, Landmark, Archive } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -121,7 +121,8 @@ export default function Trucks() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('trucks')
-        .select('*, drivers!trucks_current_driver_id_fkey(id, first_name, last_name)');
+        .select('*, drivers!trucks_current_driver_id_fkey(id, first_name, last_name)')
+        .is('deleted_at', null);
       if (error) throw error;
       const rows = (data ?? []) as TruckWithDriver[];
       // Natural sort by unit_number so "T-101" and "433780" order sensibly.
@@ -219,22 +220,18 @@ export default function Trucks() {
     onError: (error) => toast.error(error.message),
   });
 
-  // Undoable delete hook
-  const { deleteWithUndo } = useUndoableDelete<TruckWithDriver>({
-    onDelete: async (id) => {
-      const { error } = await supabase.from('trucks').delete().eq('id', id);
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['trucks'] });
-    },
-    onRestore: async (truck) => {
-      const { drivers: _, ...truckData } = truck;
-      const { error } = await supabase.from('trucks').insert(truckData);
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['trucks'] });
-    },
-    getItemName: (truck) => truck.unit_number,
-    entityName: 'Truck',
-  });
+  // Archive with undo — uses soft-delete RPC
+  const deleteWithUndo = async (truck: TruckWithDriver) => {
+    const { archiveWithUndo } = await import('@/lib/soft-delete');
+    await archiveWithUndo({
+      table: 'trucks',
+      id: truck.id,
+      itemName: truck.unit_number,
+      queryClient,
+      invalidateKeys: [['trucks']],
+    });
+  };
+
 
   const openDialog = (truck?: TruckWithDriver) => {
     setEditingTruck(truck || null);
@@ -393,7 +390,7 @@ export default function Trucks() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(truck)}>
-              <Trash2 className="mr-2 h-4 w-4" /> Delete
+              <Archive className="mr-2 h-4 w-4" /> Archive
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -414,10 +411,13 @@ export default function Trucks() {
   const handleBulkDelete = async () => {
     setBulkUpdating(true);
     try {
-      const { error } = await supabase.from('trucks').delete().in('id', [...selectedIds]);
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['trucks'] });
-      toast.success(`${selectedIds.size} truck(s) deleted`);
+      const { archiveManyWithUndo } = await import('@/lib/soft-delete');
+      await archiveManyWithUndo({
+        table: 'trucks',
+        ids: [...selectedIds],
+        queryClient,
+        invalidateKeys: [['trucks']],
+      });
       setSelectedIds(new Set());
       setMassDeleteOpen(false);
     } catch (e: any) { toast.error(e.message); }
@@ -464,7 +464,7 @@ export default function Trucks() {
               <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
             </Button>
             <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
-              <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+              <Archive className="mr-1 h-3 w-3" /> Archive ({ids.size})
             </Button>
           </>
         )}
@@ -473,8 +473,8 @@ export default function Trucks() {
         open={massDeleteOpen}
         onOpenChange={setMassDeleteOpen}
         onConfirm={handleBulkDelete}
-        title="Delete Selected Trucks"
-        description={`Are you sure you want to delete ${selectedIds.size} truck(s)? This action cannot be undone.`}
+        title="Archive Selected Trucks"
+        description={`Archive ${selectedIds.size} truck(s)? They can be restored from the Archive page.`}
         isDeleting={bulkUpdating}
       />
       <BulkStatusEditDialog

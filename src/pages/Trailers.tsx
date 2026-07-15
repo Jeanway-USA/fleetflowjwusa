@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, User, AlertTriangle, CheckCircle, Clock, History, Container, MoreHorizontal } from 'lucide-react';
+import { Pencil, Trash2, FileText, User, AlertTriangle, CheckCircle, Clock, History, Container, MoreHorizontal, Archive } from 'lucide-react';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -110,6 +110,7 @@ export default function Trailers() {
       const { data, error } = await supabase
         .from('trailers')
         .select('*')
+        .is('deleted_at', null)
         .order('unit_number');
       if (error) throw error;
       return (data ?? []) as TrailerWithDriver[];
@@ -182,22 +183,16 @@ export default function Trailers() {
     onError: (error) => toast.error(error.message),
   });
 
-  // Undoable delete hook
-  const { deleteWithUndo } = useUndoableDelete<TrailerWithDriver>({
-    onDelete: async (id) => {
-      const { error } = await supabase.from('trailers').delete().eq('id', id);
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['trailers'] });
-    },
-    onRestore: async (trailer) => {
-      const { drivers: _, ...trailerData } = trailer;
-      const { error } = await supabase.from('trailers').insert(trailerData);
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['trailers'] });
-    },
-    getItemName: (trailer) => trailer.unit_number,
-    entityName: 'Trailer',
-  });
+  const deleteWithUndo = async (trailer: TrailerWithDriver) => {
+    const { archiveWithUndo } = await import('@/lib/soft-delete');
+    await archiveWithUndo({
+      table: 'trailers',
+      id: trailer.id,
+      itemName: trailer.unit_number,
+      queryClient,
+      invalidateKeys: [['trailers']],
+    });
+  };
 
   const openDialog = (trailer?: TrailerWithDriver) => {
     setEditingTrailer(trailer || null);
@@ -208,10 +203,13 @@ export default function Trailers() {
   const handleBulkDelete = async () => {
     setBulkUpdating(true);
     try {
-      const { error } = await supabase.from('trailers').delete().in('id', [...selectedIds]);
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['trailers'] });
-      toast.success(`${selectedIds.size} trailer(s) deleted`);
+      const { archiveManyWithUndo } = await import('@/lib/soft-delete');
+      await archiveManyWithUndo({
+        table: 'trailers',
+        ids: [...selectedIds],
+        queryClient,
+        invalidateKeys: [['trailers']],
+      });
       setSelectedIds(new Set());
       setMassDeleteOpen(false);
     } catch (e: any) { toast.error(e.message); }
@@ -329,7 +327,7 @@ export default function Trailers() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(trailer)}>
-              <Trash2 className="mr-2 h-4 w-4" /> Delete
+              <Archive className="mr-2 h-4 w-4" /> Archive
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -360,7 +358,7 @@ export default function Trailers() {
               <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
             </Button>
             <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
-              <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+              <Archive className="mr-1 h-3 w-3" /> Archive ({ids.size})
             </Button>
           </>
         )}
@@ -369,8 +367,8 @@ export default function Trailers() {
         open={massDeleteOpen}
         onOpenChange={setMassDeleteOpen}
         onConfirm={handleBulkDelete}
-        title="Delete Selected Trailers"
-        description={`Are you sure you want to delete ${selectedIds.size} trailer(s)? This action cannot be undone.`}
+        title="Archive Selected Trailers"
+        description={`Archive ${selectedIds.size} trailer(s)? They can be restored from the Archive page.`}
         isDeleting={bulkUpdating}
       />
       <BulkStatusEditDialog

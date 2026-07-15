@@ -63,6 +63,7 @@ const SettlementPrint = lazy(() => import("./pages/SettlementPrint"));
 const AuditTrail = lazy(() => import("./pages/AuditTrail"));
 const Unauthorized = lazy(() => import("./pages/Unauthorized"));
 const PublicLoadTracker = lazy(() => import("./pages/PublicLoadTracker"));
+const Archive = lazy(() => import("./pages/Archive"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -295,6 +296,11 @@ const App = () => {
                     <Route path="/audit-trail" element={
                       <ProtectedRoute allowedRoles={['owner', 'payroll_admin']}>
                         <AuditTrail />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/archive" element={
+                      <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety', 'maintenance']}>
+                        <Archive />
                       </ProtectedRoute>
                     } />
                     <Route path="/401" element={<Unauthorized />} />
