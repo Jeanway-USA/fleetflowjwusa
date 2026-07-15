@@ -381,15 +381,16 @@ export function useFacilityMutations() {
 
   const deleteFacility = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('facilities').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['facilities'] });
-      toast({ title: 'Facility deleted successfully' });
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({
+        table: 'facilities',
+        id,
+        queryClient,
+        invalidateKeys: [['facilities']],
+      });
     },
     onError: (error) => {
-      toast({ title: 'Error deleting facility', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error archiving facility', description: error.message, variant: 'destructive' });
     },
   });
 
