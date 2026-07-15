@@ -155,7 +155,7 @@ export default function PublicLoadTracker() {
               <div className="font-medium">{data.origin || "—"}</div>
               <div className="text-sm text-muted-foreground mt-1">
                 Pickup: {formatDate(data.pickup_date)}
-                {data.pickup_time ? ` · ${data.pickup_time}` : ""}
+                {data.pickup_time ? ` · ${data.pickup_time_type === 'window' && data.pickup_end_time ? `${data.pickup_time} - ${data.pickup_end_time}` : data.pickup_time}` : ""}
               </div>
             </div>
             <div>
