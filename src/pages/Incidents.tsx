@@ -344,7 +344,7 @@ export default function Incidents() {
                   <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
                 </Button>
                 <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
-                  <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+                  <Archive className="mr-1 h-3 w-3" /> Archive ({ids.size})
                 </Button>
               </>
             )}
@@ -355,17 +355,20 @@ export default function Incidents() {
             onConfirm={async () => {
               setBulkUpdating(true);
               try {
-                const { error } = await supabase.from('incidents').delete().in('id', [...selectedIds]);
-                if (error) throw error;
-                queryClient.invalidateQueries({ queryKey: ['incidents'] });
-                toast.success(`${selectedIds.size} incident(s) deleted`);
+                const { archiveManyWithUndo } = await import('@/lib/soft-delete');
+                await archiveManyWithUndo({
+                  table: 'incidents',
+                  ids: [...selectedIds],
+                  queryClient,
+                  invalidateKeys: [['incidents']],
+                });
                 setSelectedIds(new Set());
                 setMassDeleteOpen(false);
               } catch (e: any) { toast.error(e.message); }
               finally { setBulkUpdating(false); }
             }}
-            title="Delete Selected Incidents"
-            description={`Are you sure you want to delete ${selectedIds.size} incident(s)? This action cannot be undone.`}
+            title="Archive Selected Incidents"
+            description={`Archive ${selectedIds.size} incident(s)? They can be restored from the Archive page.`}
             isDeleting={bulkUpdating}
           />
           <BulkStatusEditDialog
