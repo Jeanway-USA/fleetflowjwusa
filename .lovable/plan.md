@@ -1,57 +1,97 @@
-# Support "Open Window" time ranges for Fleet Loads
 
-## 1. Database (migration)
+# Site-Wide Soft Delete + Archive System
 
-Add two optional columns to `public.fleet_loads`:
+## 1. Database Migration
 
-- `pickup_end_time text NULL`
-- `delivery_end_time text NULL`
+Add `deleted_at timestamptz NULL` and `archived_by uuid NULL` to these tables (skip `is_archived` — use `deleted_at IS NOT NULL` as the canonical archived state; single source of truth avoids drift):
 
-Kept as `text` to match the existing `pickup_time` / `delivery_time` columns (they store strings like `"08:00"` / `"8:00 AM"`, per the datetime memory). No RLS/policy changes needed — the existing row policies already cover new columns.
+**Core:** `drivers`, `trucks`, `trailers`, `fleet_loads`, `agency_loads`, `crm_contacts`, `facilities`, `parts_inventory`, `truck_stops`, `company_resources`, `document_templates`
 
-Not touching `pickup_at` / `delivery_at` UTC columns in this pass — those keep pointing at the window START (matches current behavior of `pickup_time`). Window END is display-only for now.
+**Financial working data:** `expenses`, `fuel_purchases`, `maintenance_requests`, `work_orders`, `incidents`, `detention_requests`, `driver_requests`
 
-## 2. Time Type dropdown
+**Explicitly skipped (audit/immutable):** `audit_logs`, `load_status_logs`, `driver_signed_documents`, `document_instances`, `document_signatures`, `settlements`, `driver_settlements`, `driver_payroll`, `internal_payroll_ledger`, `agent_commissions`, `general_ledger`, `tax_*`, `safety_bonus_payouts`, `truist_payout_logs`, `driver_notifications`, `driver_locations`, `messages`, `changelog`, `user_feedback`.
 
-Extend the two `Select`s in `src/pages/FleetLoads.tsx` (Add/Edit Load modal) to three options:
+Migration also adds:
+- Partial index `WHERE deleted_at IS NOT NULL` on each table for fast Archive queries.
+- Index `WHERE deleted_at IS NULL` on hot tables (`fleet_loads`, `drivers`, `trucks`) for active-list queries.
+- RLS policies remain — active reads add `deleted_at IS NULL` filter at the app layer (not RLS) so restore paths can still fetch archived rows.
+- New RPC `archive_record(_table text, _id uuid)` and `restore_record(_table text, _id uuid)` — SECURITY DEFINER, validates table name from allow-list, enforces `has_archive_access(_user, _table)` role gating, stamps `deleted_at`/`archived_by`.
+- New RPC `has_archive_access(_user_id uuid, _table text)` returning boolean, role-scoped:
 
-- `appointment` → Strict Appointment
-- `fcfs` → First Come First Served
-- `window` → Open Window
+  | Table group | Allowed roles |
+  |---|---|
+  | drivers, driver_requests | owner, payroll_admin |
+  | trucks, trailers, parts_inventory, maintenance_requests, work_orders | owner, maintenance, dispatcher |
+  | fleet_loads, agency_loads, facilities, truck_stops, detention_requests | owner, dispatcher |
+  | crm_contacts, company_resources, document_templates | owner, dispatcher |
+  | expenses, fuel_purchases | owner, payroll_admin |
+  | incidents | owner, safety |
 
-Conditional inputs inside the same 3-col grid cell that currently holds the single time input:
+## 2. Global Data Layer
 
-- `appointment` → one input, label "Appointment Time", binds to `pickup_time` / `delivery_time`.
-- `fcfs` → one input, label "Start Time", binds to `pickup_time` / `delivery_time`.
-- `window` → two side-by-side inputs, labels "Window Start" and "Window End", binding to `pickup_time` + new `pickup_end_time` (and delivery counterparts). When the user switches away from `window`, clear the `*_end_time` value on submit.
+- New helper `src/lib/soft-delete.ts` exporting:
+  - `activeFilter(query)` → applies `.is('deleted_at', null)`
+  - `useSoftDelete(table)` hook returning `{ archive, restore, purge }` mutations, each wired to `useUndoableDelete` (10s toast timeout).
+- Sweep all `supabase.from(<table>).select(...)` reads in `src/pages/**`, `src/components/**`, `src/hooks/**` for the tables above and add `.is('deleted_at', null)` **except**:
+  - Archive page queries (fetch `deleted_at IS NOT NULL`)
+  - Historical/audit contexts already reading finalized snapshots
+  - Foreign-key joins where hiding parent would orphan child rows (e.g. showing an active load whose driver was archived — display driver name with "(archived)" suffix).
+- Update TanStack Query keys — no key changes; invalidations already broad.
 
-Persist `pickup_end_time` / `delivery_end_time` in the create + update mutations (both the FleetLoads insert path around line 1105 and the update path around line 690/726).
+## 3. UI Behavior
 
-## 3. Display as a range
+- Replace every "Delete" label/icon on the covered entities with **"Archive"** (button text, dropdown items, tooltips, confirm-dialog titles). Icon changes from `Trash2` to `Archive`.
+- New `ConfirmArchiveDialog` component (fork of `ConfirmDeleteDialog`) with copy: "Archive this X? You can restore it from the Archive page within 30 days."
+- Archive action wired through `useUndoableDelete` (already exists) with **10s** toast + Undo button that calls `restore_record` RPC.
+- **Active-association warnings** — before archive, run a quick count query. Examples:
+  - Driver: active loads count (`fleet_loads.driver_id = X AND status IN ('booked','in_transit','at_pickup','at_delivery')`)
+  - Truck: active loads + open work orders
+  - Trailer: active assignments
+  - CRM contact: active loads referencing broker
+  If count > 0, dialog shows red-tinted warning listing associations, still allows archive (doesn't block).
 
-Render `HH:MM - HH:MM` whenever an end time exists, otherwise fall back to today's single-time output.
+**Files touched (delete → archive rename):** `Drivers.tsx`, `Trucks.tsx`, `Trailers.tsx`, `FleetLoads.tsx`, `AgencyLoads.tsx`, `CRM.tsx`, `Incidents.tsx`, `MaintenanceManagement.tsx`, `Documents.tsx`, `IFTA.tsx`, plus dropdowns in `OrgActionsDropdown`, detail sheets (`DriverDetailSheet`, `ContactDetailSheet`, etc.), and bulk-action bars in `DataTable` consumers.
 
-- **`src/components/shared/TimeTypeBadge.tsx`** — accept an optional `endTime` prop; when present, render `Window: 07:00 - 15:00` (full variant), `OPEN WINDOW: 07:00 - 15:00` (driver variant), and keep the tooltip.
-- **`src/components/shared/StopTime.tsx`** — accept optional `legacyEndTime` (and, for symmetry, an optional `utcEndIso` we won't populate yet). When provided, render the time line as `start - end` in the stop's zone; secondary "your time" line follows the same range shape.
-- **Call sites to update** so they pass the new end time through:
-  - `src/pages/FleetLoads.tsx` (table column at line 895, plus any modal summary using `pickup_time` / `delivery_time`)
-  - `src/components/dispatcher/UpcomingPickups.tsx`
-  - `src/components/dispatcher/ActiveLoadsBoard.tsx`
-  - `src/components/driver/ActiveLoadCard.tsx`
-  - `src/components/driver/DriverLoadsView.tsx`
-  - `src/components/driver/NextLoadPreview.tsx`
-  - `src/pages/PublicLoadTracker.tsx`
+## 4. Archive/Trash Page
 
-Each of these currently reads `pickup_time` / `delivery_time` (and often the matching `*_time_type`). They'll additionally read `pickup_end_time` / `delivery_end_time` and forward them to `StopTime` / `TimeTypeBadge`.
+New route `/archive` → `src/pages/Archive.tsx`, added to sidebar under "Admin" section (only visible when the user has archive access to at least one entity type).
 
-## 4. Out of scope
+Layout:
+```text
++-------------------------------------------------+
+| Archive                          [Search input] |
++-------------------------------------------------+
+| Tabs: Drivers | Trucks | Loads | CRM | ... (role-gated) |
++-------------------------------------------------+
+| [x] | Name | Archived | By | Actions            |
+| [x] | ...  | 2d ago   | JD | Restore  Delete    |
++-------------------------------------------------+
+| Bulk: [Restore selected] [Permanently delete]   |
++-------------------------------------------------+
+```
 
-- No changes to `agency_loads`, `load_intermediate_stops`, or the `pickup_at` UTC contract.
-- No changes to auto-arrival / geofence / status-email logic — they continue to key off the start time.
-- No backfill; existing rows keep `*_end_time = NULL` and render exactly as today.
+- Tabs render only for entity types the current user can access (`has_archive_access`).
+- Each tab uses `DataTable` with `deleted_at IS NOT NULL` filter, columns per entity, search input filters current tab.
+- Row actions: **Restore** (calls `restore_record`) and **Permanently Delete** (uses existing `ConfirmDeleteDialog` — single confirmation, hard `DELETE FROM ...`).
+- Bulk actions in existing `DataTable` bulk bar.
+- 30-day retention hint in header — no auto-purge job in this pass (can add later).
 
-## Technical notes
+## 5. Permissions & RBAC
 
-- Columns are nullable text to match the existing loose format ("08:00" or "8:00 AM"). Range display uses whatever string is stored (no reformatting).
-- TypeScript types regenerate automatically after the migration runs, so the form code that reads `formData.pickup_end_time` compiles once the migration is approved.
-- Switching Time Type in the form must reset stale values: `appointment`/`fcfs` → set `*_end_time` to `null`; `window` → keep whatever's there.
+- Sidebar link visibility gated by a new `useArchiveAccess()` hook that checks the user's roles against the table→role map above.
+- Server-side enforcement lives entirely in `archive_record`/`restore_record`/hard-delete RPCs — client checks are UX only.
+- Hard delete permission = same as archive permission for that table (owner has it for all).
+
+## Out of scope
+
+- Auto-purge cron after 30 days
+- Restoring cascaded children (archiving a driver doesn't archive their loads; loads keep the driver_id and show "(archived)")
+- Bulk export of archived data
+- Archive of tables not listed in section 1
+
+## Technical Notes
+
+- All RLS policies for covered tables need re-review to ensure they don't block updates when `deleted_at` is set. Since existing policies check `org_id`/role and not `deleted_at`, no policy changes required — verified against schema.
+- The `has_archive_access` function is `STABLE SECURITY DEFINER` with `search_path=public`, same pattern as `has_role`.
+- Undo restores by clearing `deleted_at` and `archived_by`. No history table needed; the columns themselves are the history.
+- New types will regenerate after migration approval.

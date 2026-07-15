@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Pencil, Trash2, MoreHorizontal, Briefcase } from 'lucide-react';
+import { Pencil, Trash2, MoreHorizontal, Briefcase, Archive } from 'lucide-react';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -35,7 +35,7 @@ export default function AgencyLoads() {
   const { data: loads = [], isLoading } = useQuery({
     queryKey: ['agency_loads'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('agency_loads').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('agency_loads').select('*').is('deleted_at', null).order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -69,12 +69,13 @@ export default function AgencyLoads() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('agency_loads').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agency_loads'] });
-      toast.success('Load deleted');
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({
+        table: 'agency_loads',
+        id,
+        queryClient,
+        invalidateKeys: [['agency_loads']],
+      });
     },
     onError: (error) => toast.error(error.message),
   });
@@ -130,7 +131,7 @@ export default function AgencyLoads() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
-              <Trash2 className="mr-2 h-4 w-4" /> Delete
+              <Archive className="mr-2 h-4 w-4" /> Archive
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -161,7 +162,7 @@ export default function AgencyLoads() {
               <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
             </Button>
             <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
-              <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+              <Archive className="mr-1 h-3 w-3" /> Archive ({ids.size})
             </Button>
           </>
         )}
@@ -172,17 +173,20 @@ export default function AgencyLoads() {
         onConfirm={async () => {
           setBulkUpdating(true);
           try {
-            const { error } = await supabase.from('agency_loads').delete().in('id', [...selectedIds]);
-            if (error) throw error;
-            queryClient.invalidateQueries({ queryKey: ['agency_loads'] });
-            toast.success(`${selectedIds.size} load(s) deleted`);
+            const { archiveManyWithUndo } = await import('@/lib/soft-delete');
+            await archiveManyWithUndo({
+              table: 'agency_loads',
+              ids: [...selectedIds],
+              queryClient,
+              invalidateKeys: [['agency_loads']],
+            });
             setSelectedIds(new Set());
             setMassDeleteOpen(false);
           } catch (e: any) { toast.error(e.message); }
           finally { setBulkUpdating(false); }
         }}
-        title="Delete Selected Loads"
-        description={`Are you sure you want to delete ${selectedIds.size} load(s)? This action cannot be undone.`}
+        title="Archive Selected Loads"
+        description={`Archive ${selectedIds.size} load(s)? They can be restored from the Archive page.`}
         isDeleting={bulkUpdating}
       />
       <BulkStatusEditDialog

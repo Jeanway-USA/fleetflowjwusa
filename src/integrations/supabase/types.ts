@@ -71,11 +71,13 @@ export type Database = {
       }
       agency_loads: {
         Row: {
+          archived_by: string | null
           broker_name: string | null
           broker_rate: number | null
           carrier_name: string | null
           carrier_rate: number | null
           created_at: string
+          deleted_at: string | null
           delivery_at: string | null
           delivery_date: string | null
           delivery_tz: string | null
@@ -93,11 +95,13 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_by?: string | null
           broker_name?: string | null
           broker_rate?: number | null
           carrier_name?: string | null
           carrier_rate?: number | null
           created_at?: string
+          deleted_at?: string | null
           delivery_at?: string | null
           delivery_date?: string | null
           delivery_tz?: string | null
@@ -115,11 +119,13 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_by?: string | null
           broker_name?: string | null
           broker_rate?: number | null
           carrier_name?: string | null
           carrier_rate?: number | null
           created_at?: string
+          deleted_at?: string | null
           delivery_at?: string | null
           delivery_date?: string | null
           delivery_tz?: string | null
@@ -336,7 +342,9 @@ export type Database = {
           address: string | null
           agent_code: string | null
           agent_status: string | null
+          archived_by: string | null
           created_at: string
+          deleted_at: string | null
           email: string | null
           id: string
           name: string
@@ -352,7 +360,9 @@ export type Database = {
           address?: string | null
           agent_code?: string | null
           agent_status?: string | null
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           name: string
@@ -368,7 +378,9 @@ export type Database = {
           address?: string | null
           agent_code?: string | null
           agent_status?: string | null
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           name?: string
@@ -589,11 +601,13 @@ export type Database = {
           address: string | null
           agent_code: string | null
           agent_status: string | null
+          archived_by: string | null
           city: string | null
           company_name: string
           contact_name: string | null
           contact_type: string
           created_at: string
+          deleted_at: string | null
           email: string | null
           id: string
           is_active: boolean
@@ -609,11 +623,13 @@ export type Database = {
           address?: string | null
           agent_code?: string | null
           agent_status?: string | null
+          archived_by?: string | null
           city?: string | null
           company_name: string
           contact_name?: string | null
           contact_type: string
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
@@ -629,11 +645,13 @@ export type Database = {
           address?: string | null
           agent_code?: string | null
           agent_status?: string | null
+          archived_by?: string | null
           city?: string | null
           company_name?: string
           contact_name?: string | null
           contact_type?: string
           created_at?: string
+          deleted_at?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
@@ -671,7 +689,9 @@ export type Database = {
       }
       detention_requests: {
         Row: {
+          archived_by: string | null
           created_at: string
+          deleted_at: string | null
           driver_id: string
           id: string
           load_id: string
@@ -683,7 +703,9 @@ export type Database = {
           status: string
         }
         Insert: {
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           driver_id: string
           id?: string
           load_id: string
@@ -695,7 +717,9 @@ export type Database = {
           status?: string
         }
         Update: {
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           driver_id?: string
           id?: string
           load_id?: string
@@ -932,9 +956,11 @@ export type Database = {
       document_templates: {
         Row: {
           applies_to: string
+          archived_by: string | null
           content: string
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           document_type: string
           id: string
           is_active: boolean
@@ -947,9 +973,11 @@ export type Database = {
         }
         Insert: {
           applies_to?: string
+          archived_by?: string | null
           content: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           document_type: string
           id?: string
           is_active?: boolean
@@ -962,9 +990,11 @@ export type Database = {
         }
         Update: {
           applies_to?: string
+          archived_by?: string | null
           content?: string
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           document_type?: string
           id?: string
           is_active?: boolean
@@ -1633,7 +1663,9 @@ export type Database = {
       }
       driver_requests: {
         Row: {
+          archived_by: string | null
           created_at: string
+          deleted_at: string | null
           description: string | null
           driver_id: string
           end_date: string | null
@@ -1652,7 +1684,9 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           driver_id: string
           end_date?: string | null
@@ -1671,7 +1705,9 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           driver_id?: string
           end_date?: string | null
@@ -2249,6 +2285,7 @@ export type Database = {
       }
       drivers: {
         Row: {
+          archived_by: string | null
           assigned_work_address_id: string | null
           avatar_url: string | null
           base_salary_per_period: number
@@ -2257,6 +2294,7 @@ export type Database = {
           credentials_reviewed_at: string | null
           credentials_reviewed_by: string | null
           credentials_revision_notes: string | null
+          deleted_at: string | null
           direct_deposit_attachment_url: string | null
           dod_clearance_level: string
           email: string | null
@@ -2294,6 +2332,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          archived_by?: string | null
           assigned_work_address_id?: string | null
           avatar_url?: string | null
           base_salary_per_period?: number
@@ -2302,6 +2341,7 @@ export type Database = {
           credentials_reviewed_at?: string | null
           credentials_reviewed_by?: string | null
           credentials_revision_notes?: string | null
+          deleted_at?: string | null
           direct_deposit_attachment_url?: string | null
           dod_clearance_level?: string
           email?: string | null
@@ -2339,6 +2379,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          archived_by?: string | null
           assigned_work_address_id?: string | null
           avatar_url?: string | null
           base_salary_per_period?: number
@@ -2347,6 +2388,7 @@ export type Database = {
           credentials_reviewed_at?: string | null
           credentials_reviewed_by?: string | null
           credentials_revision_notes?: string | null
+          deleted_at?: string | null
           direct_deposit_attachment_url?: string | null
           dod_clearance_level?: string
           email?: string | null
@@ -2412,7 +2454,9 @@ export type Database = {
           amount: number
           approved_at: string | null
           approved_by: string | null
+          archived_by: string | null
           created_at: string
+          deleted_at: string | null
           description: string | null
           expense_date: string
           expense_type: string
@@ -2431,7 +2475,9 @@ export type Database = {
           amount?: number
           approved_at?: string | null
           approved_by?: string | null
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           expense_date?: string
           expense_type: string
@@ -2450,7 +2496,9 @@ export type Database = {
           amount?: number
           approved_at?: string | null
           approved_by?: string | null
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           expense_date?: string
           expense_type?: string
@@ -2507,11 +2555,13 @@ export type Database = {
         Row: {
           address: string
           appointment_required: boolean | null
+          archived_by: string | null
           city: string | null
           contact_email: string | null
           contact_name: string | null
           contact_phone: string | null
           created_at: string
+          deleted_at: string | null
           dock_info: string | null
           facility_type: string
           id: string
@@ -2526,11 +2576,13 @@ export type Database = {
         Insert: {
           address: string
           appointment_required?: boolean | null
+          archived_by?: string | null
           city?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string
+          deleted_at?: string | null
           dock_info?: string | null
           facility_type?: string
           id?: string
@@ -2545,11 +2597,13 @@ export type Database = {
         Update: {
           address?: string
           appointment_required?: boolean | null
+          archived_by?: string | null
           city?: string | null
           contact_email?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           created_at?: string
+          deleted_at?: string | null
           dock_info?: string | null
           facility_type?: string
           id?: string
@@ -2592,6 +2646,7 @@ export type Database = {
           advance_available: number | null
           advance_taken: number | null
           agency_code: string | null
+          archived_by: string | null
           auto_email_updates: boolean
           booked_miles: number | null
           cf_7512_number: string | null
@@ -2599,6 +2654,7 @@ export type Database = {
           current_route_geometry: Json | null
           current_route_origin: Json | null
           current_route_updated_at: string | null
+          deleted_at: string | null
           delivery_at: string | null
           delivery_date: string | null
           delivery_end_time: string | null
@@ -2664,6 +2720,7 @@ export type Database = {
           advance_available?: number | null
           advance_taken?: number | null
           agency_code?: string | null
+          archived_by?: string | null
           auto_email_updates?: boolean
           booked_miles?: number | null
           cf_7512_number?: string | null
@@ -2671,6 +2728,7 @@ export type Database = {
           current_route_geometry?: Json | null
           current_route_origin?: Json | null
           current_route_updated_at?: string | null
+          deleted_at?: string | null
           delivery_at?: string | null
           delivery_date?: string | null
           delivery_end_time?: string | null
@@ -2736,6 +2794,7 @@ export type Database = {
           advance_available?: number | null
           advance_taken?: number | null
           agency_code?: string | null
+          archived_by?: string | null
           auto_email_updates?: boolean
           booked_miles?: number | null
           cf_7512_number?: string | null
@@ -2743,6 +2802,7 @@ export type Database = {
           current_route_geometry?: Json | null
           current_route_origin?: Json | null
           current_route_updated_at?: string | null
+          deleted_at?: string | null
           delivery_at?: string | null
           delivery_date?: string | null
           delivery_end_time?: string | null
@@ -2849,7 +2909,9 @@ export type Database = {
       }
       fuel_purchases: {
         Row: {
+          archived_by: string | null
           created_at: string
+          deleted_at: string | null
           driver_id: string | null
           gallons: number
           id: string
@@ -2865,7 +2927,9 @@ export type Database = {
           vendor: string | null
         }
         Insert: {
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           driver_id?: string | null
           gallons?: number
           id?: string
@@ -2881,7 +2945,9 @@ export type Database = {
           vendor?: string | null
         }
         Update: {
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           driver_id?: string | null
           gallons?: number
           id?: string
@@ -3306,8 +3372,10 @@ export type Database = {
       }
       incidents: {
         Row: {
+          archived_by: string | null
           citation_issued: boolean | null
           created_at: string
+          deleted_at: string | null
           description: string
           driver_id: string | null
           estimated_damage: number | null
@@ -3331,8 +3399,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_by?: string | null
           citation_issued?: boolean | null
           created_at?: string
+          deleted_at?: string | null
           description: string
           driver_id?: string | null
           estimated_damage?: number | null
@@ -3356,8 +3426,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_by?: string | null
           citation_issued?: boolean | null
           created_at?: string
+          deleted_at?: string | null
           description?: string
           driver_id?: string | null
           estimated_damage?: number | null
@@ -4138,7 +4210,9 @@ export type Database = {
       maintenance_requests: {
         Row: {
           admin_notes: string | null
+          archived_by: string | null
           created_at: string
+          deleted_at: string | null
           description: string
           driver_id: string
           id: string
@@ -4151,7 +4225,9 @@ export type Database = {
         }
         Insert: {
           admin_notes?: string | null
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           description: string
           driver_id: string
           id?: string
@@ -4164,7 +4240,9 @@ export type Database = {
         }
         Update: {
           admin_notes?: string | null
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           description?: string
           driver_id?: string
           id?: string
@@ -4523,8 +4601,10 @@ export type Database = {
       }
       parts_inventory: {
         Row: {
+          archived_by: string | null
           category: string | null
           created_at: string
+          deleted_at: string | null
           id: string
           last_restocked: string | null
           min_threshold: number
@@ -4540,8 +4620,10 @@ export type Database = {
           vendor_name: string | null
         }
         Insert: {
+          archived_by?: string | null
           category?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           last_restocked?: string | null
           min_threshold?: number
@@ -4557,8 +4639,10 @@ export type Database = {
           vendor_name?: string | null
         }
         Update: {
+          archived_by?: string | null
           category?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           last_restocked?: string | null
           min_threshold?: number
@@ -5605,8 +5689,10 @@ export type Database = {
       }
       trailers: {
         Row: {
+          archived_by: string | null
           created_at: string
           current_driver_id: string | null
+          deleted_at: string | null
           id: string
           last_inspection_date: string | null
           license_plate: string | null
@@ -5626,8 +5712,10 @@ export type Database = {
           year: number | null
         }
         Insert: {
+          archived_by?: string | null
           created_at?: string
           current_driver_id?: string | null
+          deleted_at?: string | null
           id?: string
           last_inspection_date?: string | null
           license_plate?: string | null
@@ -5647,8 +5735,10 @@ export type Database = {
           year?: number | null
         }
         Update: {
+          archived_by?: string | null
           created_at?: string
           current_driver_id?: string | null
+          deleted_at?: string | null
           id?: string
           last_inspection_date?: string | null
           license_plate?: string | null
@@ -5738,9 +5828,11 @@ export type Database = {
       truck_stops: {
         Row: {
           amenities: string[] | null
+          archived_by: string | null
           brand: string | null
           city: string | null
           created_at: string
+          deleted_at: string | null
           fetched_at: string
           id: string
           latitude: number
@@ -5752,9 +5844,11 @@ export type Database = {
         }
         Insert: {
           amenities?: string[] | null
+          archived_by?: string | null
           brand?: string | null
           city?: string | null
           created_at?: string
+          deleted_at?: string | null
           fetched_at?: string
           id?: string
           latitude: number
@@ -5766,9 +5860,11 @@ export type Database = {
         }
         Update: {
           amenities?: string[] | null
+          archived_by?: string | null
           brand?: string | null
           city?: string | null
           created_at?: string
+          deleted_at?: string | null
           fetched_at?: string
           id?: string
           latitude?: number
@@ -5782,9 +5878,11 @@ export type Database = {
       }
       trucks: {
         Row: {
+          archived_by: string | null
           created_at: string
           current_driver_id: string | null
           current_odometer: number | null
+          deleted_at: string | null
           down_payment: number | null
           financing_fees: number | null
           id: string
@@ -5811,9 +5909,11 @@ export type Database = {
           year: number | null
         }
         Insert: {
+          archived_by?: string | null
           created_at?: string
           current_driver_id?: string | null
           current_odometer?: number | null
+          deleted_at?: string | null
           down_payment?: number | null
           financing_fees?: number | null
           id?: string
@@ -5840,9 +5940,11 @@ export type Database = {
           year?: number | null
         }
         Update: {
+          archived_by?: string | null
           created_at?: string
           current_driver_id?: string | null
           current_odometer?: number | null
+          deleted_at?: string | null
           down_payment?: number | null
           financing_fees?: number | null
           id?: string
@@ -6050,10 +6152,12 @@ export type Database = {
       }
       work_orders: {
         Row: {
+          archived_by: string | null
           completed_at: string | null
           cost_estimate: number | null
           created_at: string
           days_down: number | null
+          deleted_at: string | null
           description: string | null
           entry_date: string
           estimated_completion: string | null
@@ -6072,10 +6176,12 @@ export type Database = {
           vendor: string | null
         }
         Insert: {
+          archived_by?: string | null
           completed_at?: string | null
           cost_estimate?: number | null
           created_at?: string
           days_down?: number | null
+          deleted_at?: string | null
           description?: string | null
           entry_date?: string
           estimated_completion?: string | null
@@ -6094,10 +6200,12 @@ export type Database = {
           vendor?: string | null
         }
         Update: {
+          archived_by?: string | null
           completed_at?: string | null
           cost_estimate?: number | null
           created_at?: string
           days_down?: number | null
+          deleted_at?: string | null
           description?: string | null
           entry_date?: string
           estimated_completion?: string | null
@@ -6461,6 +6569,10 @@ export type Database = {
       }
     }
     Functions: {
+      archive_record: {
+        Args: { _id: string; _table: string }
+        Returns: undefined
+      }
       auto_cleanup_empty_orgs: { Args: never; Returns: number }
       create_audit_log: {
         Args: {
@@ -6618,6 +6730,10 @@ export type Database = {
         Returns: undefined
       }
       has_admin_access: { Args: { _user_id: string }; Returns: boolean }
+      has_archive_access: {
+        Args: { _table: string; _user_id: string }
+        Returns: boolean
+      }
       has_operations_access: { Args: { _user_id: string }; Returns: boolean }
       has_payroll_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
@@ -6666,6 +6782,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      restore_record: {
+        Args: { _id: string; _table: string }
+        Returns: undefined
       }
       seed_state_tax_configurations: {
         Args: { _org_id: string }

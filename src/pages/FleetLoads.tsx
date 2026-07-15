@@ -28,7 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search, Archive } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 
@@ -105,7 +105,7 @@ export default function FleetLoads() {
   const { data: loads = [], isLoading } = useQuery({
     queryKey: ['fleet_loads'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('fleet_loads').select('*').order('pickup_date', { ascending: false });
+      const { data, error } = await supabase.from('fleet_loads').select('*').is('deleted_at', null).order('pickup_date', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -350,13 +350,13 @@ export default function FleetLoads() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('fleet_loads').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
-      queryClient.invalidateQueries({ queryKey: ['load_accessorials'] });
-      toast.success('Load deleted');
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({
+        table: 'fleet_loads',
+        id,
+        queryClient,
+        invalidateKeys: [['fleet_loads'], ['load_accessorials']],
+      });
     },
     onError: (error: any) => toast.error(error.message),
   });
@@ -980,7 +980,7 @@ export default function FleetLoads() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      <Archive className="mr-2 h-4 w-4" /> Archive
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -1004,7 +1004,7 @@ export default function FleetLoads() {
                   <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
                 </Button>
                 <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
-                  <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+                  <Archive className="mr-1 h-3 w-3" /> Archive ({ids.size})
                 </Button>
               </>
             )}
@@ -1016,17 +1016,20 @@ export default function FleetLoads() {
             onConfirm={async () => {
               setBulkUpdating(true);
               try {
-                const { error } = await supabase.from('fleet_loads').delete().in('id', [...selectedIds]);
-                if (error) throw error;
-                queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
-                toast.success(`${selectedIds.size} load(s) deleted`);
+                const { archiveManyWithUndo } = await import('@/lib/soft-delete');
+                await archiveManyWithUndo({
+                  table: 'fleet_loads',
+                  ids: [...selectedIds],
+                  queryClient,
+                  invalidateKeys: [['fleet_loads']],
+                });
                 setSelectedIds(new Set());
                 setMassDeleteOpen(false);
               } catch (e: any) { toast.error(e.message); }
               finally { setBulkUpdating(false); }
             }}
-            title="Delete Selected Loads"
-            description={`Are you sure you want to delete ${selectedIds.size} load(s)? This action cannot be undone.`}
+            title="Archive Selected Loads"
+            description={`Archive ${selectedIds.size} load(s)? They can be restored from the Archive page.`}
             isDeleting={bulkUpdating}
           />
           <BulkStatusEditDialog

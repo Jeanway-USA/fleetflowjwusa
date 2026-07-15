@@ -170,6 +170,7 @@ export function useContacts(typeFilter?: string) {
       let query = supabase
         .from('crm_contacts')
         .select('*')
+        .is('deleted_at', null)
         .order('company_name');
 
       if (typeFilter && typeFilter !== 'all') {
@@ -230,15 +231,16 @@ export function useContactMutations() {
 
   const deleteContact = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('crm_contacts').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['crm-contacts'] });
-      toast({ title: 'Contact deleted successfully' });
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({
+        table: 'crm_contacts',
+        id,
+        queryClient,
+        invalidateKeys: [['crm-contacts']],
+      });
     },
     onError: (error) => {
-      toast({ title: 'Error deleting contact', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error archiving contact', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -254,6 +256,7 @@ export function useCompanyResources() {
       const { data, error } = await supabase
         .from('company_resources')
         .select('*')
+        .is('deleted_at', null)
         .order('name');
       if (error) throw error;
       return data as CompanyResource[];
@@ -303,15 +306,16 @@ export function useResourceMutations() {
 
   const deleteResource = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('company_resources').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['company_resources'] });
-      toast({ title: 'Resource deleted successfully' });
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({
+        table: 'company_resources',
+        id,
+        queryClient,
+        invalidateKeys: [['company_resources']],
+      });
     },
     onError: (error) => {
-      toast({ title: 'Error deleting resource', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error archiving resource', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -327,6 +331,7 @@ export function useFacilities() {
       const { data, error } = await supabase
         .from('facilities')
         .select('*')
+        .is('deleted_at', null)
         .order('name');
       if (error) throw error;
       return data as Facility[];
@@ -376,15 +381,16 @@ export function useFacilityMutations() {
 
   const deleteFacility = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('facilities').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['facilities'] });
-      toast({ title: 'Facility deleted successfully' });
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({
+        table: 'facilities',
+        id,
+        queryClient,
+        invalidateKeys: [['facilities']],
+      });
     },
     onError: (error) => {
-      toast({ title: 'Error deleting facility', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error archiving facility', description: error.message, variant: 'destructive' });
     },
   });
 

@@ -15,7 +15,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Plus, AlertTriangle, Eye, Pencil, Trash2, FileWarning, Car, Users, Camera, MoreHorizontal } from 'lucide-react';
+import { Plus, AlertTriangle, Eye, Pencil, Trash2, FileWarning, Car, Users, Camera, MoreHorizontal, Archive } from 'lucide-react';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -91,6 +91,7 @@ export default function Incidents() {
       const { data, error } = await supabase
         .from('incidents')
         .select('*')
+        .is('deleted_at', null)
         .order('incident_date', { ascending: false });
       if (error) throw error;
       return data as Incident[];
@@ -157,12 +158,13 @@ export default function Incidents() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('incidents').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['incidents'] });
-      toast.success('Incident deleted');
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({
+        table: 'incidents',
+        id,
+        queryClient,
+        invalidateKeys: [['incidents']],
+      });
     },
     onError: (error) => toast.error(error.message),
   });
@@ -319,7 +321,7 @@ export default function Incidents() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(incident.id)}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      <Archive className="mr-2 h-4 w-4" /> Archive
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -342,7 +344,7 @@ export default function Incidents() {
                   <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
                 </Button>
                 <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
-                  <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
+                  <Archive className="mr-1 h-3 w-3" /> Archive ({ids.size})
                 </Button>
               </>
             )}
@@ -353,17 +355,20 @@ export default function Incidents() {
             onConfirm={async () => {
               setBulkUpdating(true);
               try {
-                const { error } = await supabase.from('incidents').delete().in('id', [...selectedIds]);
-                if (error) throw error;
-                queryClient.invalidateQueries({ queryKey: ['incidents'] });
-                toast.success(`${selectedIds.size} incident(s) deleted`);
+                const { archiveManyWithUndo } = await import('@/lib/soft-delete');
+                await archiveManyWithUndo({
+                  table: 'incidents',
+                  ids: [...selectedIds],
+                  queryClient,
+                  invalidateKeys: [['incidents']],
+                });
                 setSelectedIds(new Set());
                 setMassDeleteOpen(false);
               } catch (e: any) { toast.error(e.message); }
               finally { setBulkUpdating(false); }
             }}
-            title="Delete Selected Incidents"
-            description={`Are you sure you want to delete ${selectedIds.size} incident(s)? This action cannot be undone.`}
+            title="Archive Selected Incidents"
+            description={`Archive ${selectedIds.size} incident(s)? They can be restored from the Archive page.`}
             isDeleting={bulkUpdating}
           />
           <BulkStatusEditDialog
