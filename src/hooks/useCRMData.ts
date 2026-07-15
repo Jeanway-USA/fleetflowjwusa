@@ -256,6 +256,7 @@ export function useCompanyResources() {
       const { data, error } = await supabase
         .from('company_resources')
         .select('*')
+        .is('deleted_at', null)
         .order('name');
       if (error) throw error;
       return data as CompanyResource[];
