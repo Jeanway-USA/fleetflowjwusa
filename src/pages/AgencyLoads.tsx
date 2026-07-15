@@ -131,7 +131,7 @@ export default function AgencyLoads() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
-              <Trash2 className="mr-2 h-4 w-4" /> Delete
+              <Archive className="mr-2 h-4 w-4" /> Archive
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
