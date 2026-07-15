@@ -511,6 +511,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
                     tz={load.pickup_tz}
                     legacyDate={load.pickup_date}
                     legacyTime={load.pickup_time}
+                    legacyEndTime={load.pickup_end_time}
                     withDate
                     className="font-medium text-foreground"
                   />
@@ -534,6 +535,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
                     tz={load.delivery_tz}
                     legacyDate={load.delivery_date}
                     legacyTime={load.delivery_time}
+                    legacyEndTime={load.delivery_end_time}
                     withDate
                     className="font-medium text-foreground"
                   />
