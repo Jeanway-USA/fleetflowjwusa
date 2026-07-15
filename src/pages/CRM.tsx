@@ -275,6 +275,7 @@ export default function CRM() {
 function AgentCRM() {
   const { hasRole, isOwner } = useAuth();
   const canEdit = isOwner || hasRole('dispatcher');
+  const queryClient = useQueryClient();
 
   const [scope, setScope] = useState<'agencies' | 'shops'>('agencies');
   const [typeFilter, setTypeFilter] = useState('all');
