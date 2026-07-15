@@ -170,6 +170,7 @@ export function useContacts(typeFilter?: string) {
       let query = supabase
         .from('crm_contacts')
         .select('*')
+        .is('deleted_at', null)
         .order('company_name');
 
       if (typeFilter && typeFilter !== 'all') {
