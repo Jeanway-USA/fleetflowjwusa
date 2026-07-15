@@ -306,15 +306,16 @@ export function useResourceMutations() {
 
   const deleteResource = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('company_resources').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['company_resources'] });
-      toast({ title: 'Resource deleted successfully' });
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({
+        table: 'company_resources',
+        id,
+        queryClient,
+        invalidateKeys: [['company_resources']],
+      });
     },
     onError: (error) => {
-      toast({ title: 'Error deleting resource', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error archiving resource', description: error.message, variant: 'destructive' });
     },
   });
 
