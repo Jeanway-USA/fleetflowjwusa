@@ -331,6 +331,7 @@ export function useFacilities() {
       const { data, error } = await supabase
         .from('facilities')
         .select('*')
+        .is('deleted_at', null)
         .order('name');
       if (error) throw error;
       return data as Facility[];
