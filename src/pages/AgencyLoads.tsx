@@ -35,7 +35,7 @@ export default function AgencyLoads() {
   const { data: loads = [], isLoading } = useQuery({
     queryKey: ['agency_loads'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('agency_loads').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('agency_loads').select('*').is('deleted_at', null).order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
