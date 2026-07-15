@@ -123,7 +123,7 @@ function actionsColumn(ctx: ColumnCtx) {
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); ctx.setDeleteTarget(contact); }}>
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                <Archive className="mr-2 h-4 w-4" /> Archive
               </DropdownMenuItem>
             </>
           )}
