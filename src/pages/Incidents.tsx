@@ -91,6 +91,7 @@ export default function Incidents() {
       const { data, error } = await supabase
         .from('incidents')
         .select('*')
+        .is('deleted_at', null)
         .order('incident_date', { ascending: false });
       if (error) throw error;
       return data as Incident[];
