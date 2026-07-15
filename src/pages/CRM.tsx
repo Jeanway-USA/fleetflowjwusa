@@ -424,8 +424,8 @@ function AgentCRM() {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="Delete Contact"
-        description={`Are you sure you want to delete "${deleteTarget?.company_name}"? This action cannot be undone.`}
+        title="Archive Contact"
+        description={`Archive "${deleteTarget?.company_name}"? You can restore it from the Archive page.`}
         isDeleting={isDeleting}
       />
       <ConfirmDeleteDialog
@@ -434,20 +434,18 @@ function AgentCRM() {
         onConfirm={async () => {
           setBulkUpdating(true);
           try {
-            // CRM contacts only (not resources/facilities from unified view) - delete from crm_contacts
-            const { error } = await supabase.from('crm_contacts').delete().in('id', [...selectedIds]);
-            if (error) throw error;
-            // Also try resources and facilities tables for any selected unified contacts
-            await supabase.from('company_resources').delete().in('id', [...selectedIds]);
-            await supabase.from('facilities').delete().in('id', [...selectedIds]);
-            toast.success(`${selectedIds.size} contact(s) deleted`);
+            const { archiveManyWithUndo } = await import('@/lib/soft-delete');
+            // Try each table; the RPC will reject any that don't belong.
+            await archiveManyWithUndo({ table: 'crm_contacts', ids: [...selectedIds], queryClient, invalidateKeys: [['crm-contacts']] });
+            await archiveManyWithUndo({ table: 'company_resources', ids: [...selectedIds], queryClient, invalidateKeys: [['company_resources']] });
+            await archiveManyWithUndo({ table: 'facilities', ids: [...selectedIds], queryClient, invalidateKeys: [['facilities']] });
             setSelectedIds(new Set());
             setMassDeleteOpen(false);
           } catch (e: any) { toast.error(e.message); }
           finally { setBulkUpdating(false); }
         }}
-        title="Delete Selected Contacts"
-        description={`Are you sure you want to delete ${selectedIds.size} contact(s)? This action cannot be undone.`}
+        title="Archive Selected Contacts"
+        description={`Archive ${selectedIds.size} contact(s)? They can be restored from the Archive page.`}
         isDeleting={bulkUpdating}
       />
     </>
