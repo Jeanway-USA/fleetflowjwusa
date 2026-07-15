@@ -303,6 +303,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
                     tz={load.delivery_tz}
                     legacyDate={load.delivery_date}
                     legacyTime={load.delivery_time}
+                    legacyEndTime={load.delivery_end_time}
                     withDate
                   />
                 </span>
@@ -314,6 +315,7 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
                     tz={load.pickup_tz}
                     legacyDate={load.pickup_date}
                     legacyTime={load.pickup_time}
+                    legacyEndTime={load.pickup_end_time}
                     withDate
                   />
                 </span>
@@ -322,9 +324,9 @@ export function ActiveLoadCard({ load, payRate, payType, driverId, onStatusUpdat
             {load.status !== 'delivered' && (
               <div className="pl-6">
                 {load.status === 'in_transit' ? (
-                  load.delivery_time && <TimeTypeBadge timeType={load.delivery_time_type} time={load.delivery_time} variant="driver" />
+                  load.delivery_time && <TimeTypeBadge timeType={load.delivery_time_type} time={load.delivery_time} endTime={load.delivery_end_time} variant="driver" />
                 ) : (
-                  load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} variant="driver" />
+                  load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} endTime={load.pickup_end_time} variant="driver" />
                 )}
               </div>
             )}
