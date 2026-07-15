@@ -8,7 +8,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { ExpensesList } from '@/components/shared/ExpensesList';
 import { LoadingButton } from '@/components/shared/LoadingButton';
-import { useUndoableDelete } from '@/hooks/useUndoableDelete';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
