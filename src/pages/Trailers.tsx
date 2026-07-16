@@ -352,6 +352,8 @@ export default function Trailers() {
         emptyAction={{ label: 'Add First Trailer', onClick: () => openDialog() }}
         tableId="trailers"
         exportFilename="trailers"
+        highlightRowId={highlightId}
+
         onRowDoubleClick={(trailer) => openDialog(trailer)}
         selectable
         selectedIds={selectedIds}
