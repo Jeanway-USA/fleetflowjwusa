@@ -1,45 +1,53 @@
-# Global Search Enhancement
+# Reusable Toast System (semantic `notify` wrapper on sonner)
 
-The existing `CommandPalette` (mounted globally, ⌘K + `/` hotkeys, wired through `TopBar`'s search button) already covers most of the request. This plan closes the gaps.
+The app already renders `<Sonner />` globally in `App.tsx` and ~109 files import `toast` from `sonner`. This plan adds a thin, typed, on-brand wrapper without touching existing call sites.
 
 ## Changes
 
-### 1. `src/components/shared/CommandPalette.tsx` — expand queries
+### 1. `src/components/ui/sonner.tsx` — position + richColors
+Configure the global Toaster:
+- `position="bottom-right"`
+- `richColors` (enables semantic success/error/warning/info tinting that respects dark mode via CSS vars)
+- `closeButton`
+- `expand={false}`, `visibleToasts={4}`
+- Keep the existing `classNames` styling on the base toast (border/shadow/foreground) so custom `toast()` calls still look on-brand; rich color variants override background/foreground per type.
 
-Add a **Trailers** category and broaden field coverage. All queries stay `.eq('org_id', orgId)` + `.limit(6)` so RLS + performance are unaffected.
+No changes to how sonner is mounted in `App.tsx`.
 
-- **Drivers** — search `first_name`, `last_name`, `email`, `phone`, `cdl_number`. No SSN.
-- **Trucks** — search `unit_number`, `vin`, `make`, `model`, `license_plate`.
-- **Trailers** (new) — search `unit_number`, `vin`, `license_plate`. Navigate to `/trailers?highlight=<id>`.
-- **Loads** — add `customer_name`, `broker_name`, `po_number`, `reference_number` to the existing `landstar_load_id`/`agency_code`/`origin`/`destination` `.or(...)` filter (only columns that exist on `fleet_loads` — I'll verify against the schema at build time and drop any that don't).
-- **Contacts** — keep existing (already covers customers, brokers, agents via `crm_contacts`).
+### 2. `src/lib/notify.ts` — new semantic wrapper
+Single file exporting a `notify` object plus a `useNotify()` hook (returns the same object — components can `import { notify }` or `const notify = useNotify()`; both work).
 
-Each `.or()` clause stays a single string literal (no dynamic concatenation of select columns) so supabase-js type parsing stays cheap per the query-builder-type-performance rule.
+API:
+```ts
+notify.success(message, opts?)
+notify.error(message, opts?)     // longer default duration (7s)
+notify.warning(message, opts?)
+notify.info(message, opts?)
+notify.loading(message, opts?)
+notify.promise(promise, { loading, success, error })
+notify.dismiss(id?)
 
-### 2. Navigate + highlight (no auto-open sheet)
+// Undo helper — matches how Archive already works elsewhere in the app.
+notify.undo(message, onUndo, opts?)   // 10s default, matches archive undo window
 
-Switch result URLs from `?id=` to `?highlight=<id>` for drivers, trucks, trailers. Loads keep `?load=<id>` (existing detail-sheet behavior on that page is out of scope). Contacts keep `?id=<id>`.
+// Generic action button
+notify.action(message, { label, onClick, type? }, opts?)
+```
 
-Add a small `useHighlightRow(id)` behavior on the three list pages (`Drivers`, `Trucks`, `Trailers`):
-- Read `?highlight=` from the URL.
-- Scroll the matching row into view (`element.scrollIntoView({ block: 'center' })`).
-- Apply a temporary `data-highlight="true"` ring (`ring-2 ring-primary/60 bg-primary/5`) that fades after ~2.5s.
-- Clear the query param after applying so refreshes don't re-trigger.
+`opts` is a subset of sonner's `ExternalToast`: `{ description?, duration?, id?, important? }`. No new deps.
 
-Implemented as one shared hook in `src/hooks/useHighlightRow.ts` + a `data-row-id={row.id}` attribute on the existing table rows in the three pages.
+### 3. Documentation
+Add short JSDoc on each method with examples so autocomplete surfaces usage. No separate README.
 
-### 3. TopBar — no changes needed
+## Explicitly out of scope
 
-`TopBar.tsx` already dispatches `open-command-palette` and shows the ⌘K hint; no edits.
-
-## Out of scope
-
-- No new indexes / migrations. Existing `ilike` queries on limited `.eq(org_id)` result sets are fast enough for typical org sizes; revisit only if slow-query logs flag them.
-- No SSN / sensitive PII search.
-- No changes to load detail routing, CRM, or sidebar.
+- No migration of existing 109 `toast(...)` sites — they keep working unchanged.
+- No changes to the legacy shadcn `use-toast` / `<Toaster />` (still mounted, still functional for its ~5 callers).
+- No changes to `App.tsx`, business logic, or any page code.
+- No new context — sonner is already global; a plain module export + trivial hook is enough.
 
 ## Technical notes
 
-- `useHighlightRow` uses `useSearchParams` and `useEffect` with a `MutationObserver` fallback so late-rendered rows (after React Query resolves) still get highlighted.
-- Trailer query and category use existing `Truck` icon (matches sidebar convention).
-- All new fields are searched case-insensitively via `ilike`.
+- `richColors` uses sonner's CSS variables that already resolve from `--background`, `--foreground`, etc., so dark theme works with no extra styling.
+- Undo helper builds on sonner's built-in `action: { label, onClick }`; if user doesn't click within `duration`, no callback fires — matching current `soft-delete` archive UX.
+- Wrapper returns the sonner toast id (`string | number`) so callers can programmatically `dismiss(id)`.
