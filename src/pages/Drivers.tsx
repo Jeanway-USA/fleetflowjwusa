@@ -89,6 +89,19 @@ export default function Drivers() {
   const [profileDriver, setProfileDriver] = useState<any>(null);
   const [leaseForm, setLeaseForm] = useState<{ id?: string; weekly_lease_amount: number; escrow_cpm_rate: number; total_weeks_remaining: number }>({ weekly_lease_amount: 0, escrow_cpm_rate: 0, total_weeks_remaining: 0 });
 
+  // Toolbar / bulk selection state
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'name_asc' | 'name_desc' | 'hire_recent' | 'compliance'>('name_asc');
+  const [view, setView] = useState<'grid' | 'list'>(() => {
+    if (typeof window === 'undefined') return 'grid';
+    return (localStorage.getItem('drivers-view') as 'grid' | 'list') || 'grid';
+  });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try { localStorage.setItem('drivers-view', view); } catch {}
+  }, [view]);
+
 
 
 
