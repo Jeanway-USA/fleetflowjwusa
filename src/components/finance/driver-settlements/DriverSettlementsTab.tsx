@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
+import { archiveWithUndo } from '@/lib/soft-delete';
 import {
   FileText,
   MoreHorizontal,
