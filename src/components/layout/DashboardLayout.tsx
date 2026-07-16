@@ -1,88 +1,27 @@
 import { ReactNode, useEffect, useRef, useState, useCallback } from 'react';
-import { SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
+import { SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
+import { TopBar } from './TopBar';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { AlertTriangle, CircleHelp, Compass, ShieldAlert, Sparkles } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { WelcomeBetaModal } from '@/components/shared/WelcomeBetaModal';
 import { Button } from '@/components/ui/button';
 import { DemoControls } from '@/components/demo/DemoControls';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useSubscriptionTier } from '@/hooks/useSubscriptionTier';
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { CommandPalette } from '@/components/shared/CommandPalette';
 import { BetaFeedbackWidget } from '@/components/shared/BetaFeedbackWidget';
 import { DiscordBanner } from '@/components/shared/DiscordBanner';
-import { OfflineIndicator } from '@/components/shared/OfflineIndicator';
-import { DocumentSyncBootstrap } from '@/components/shared/DocumentSyncBootstrap';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProductTour } from '@/components/shared/ProductTour';
 import { useProductTour } from '@/hooks/useProductTour';
 import { getTourForRoute } from '@/lib/tour-steps';
-import { TimeDisplayToggle } from '@/components/shared/TimeDisplayToggle';
-import { DriverMessages } from '@/components/driver/DriverMessages';
-
-const ROUTE_LABELS: Record<string, string> = {
-  '/executive-dashboard': 'Executive Dashboard',
-  '/dispatcher-dashboard': 'Dispatcher Dashboard',
-  '/driver-dashboard': 'Driver Dashboard',
-  '/trucks': 'Trucks',
-  '/trailers': 'Trailers',
-  '/drivers': 'Drivers',
-  '/fleet-loads': 'Fleet Loads',
-  '/agency-loads': 'Agency Loads',
-  '/finance': 'Finance & P/L',
-  '/insights': 'Company Insights',
-  '/ifta': 'IFTA Reporting',
-  '/crm': 'CRM',
-  '/maintenance': 'Maintenance',
-  '/documents': 'Documents',
-  '/safety': 'Safety',
-  '/incidents': 'Incidents',
-  '/driver-performance': 'Driver Performance',
-  '/settings': 'Settings',
-  '/driver-stats': 'My Stats',
-  '/driver/loads': 'My Loads',
-  '/driver-settings': 'My Settings',
-  '/super-admin': 'Super Admin',
-};
-
-const ROUTE_GROUPS: Record<string, { label: string; path: string }> = {
-  '/trucks': { label: 'Fleet', path: '/trucks' },
-  '/trailers': { label: 'Fleet', path: '/trucks' },
-  '/drivers': { label: 'Fleet', path: '/drivers' },
-  '/fleet-loads': { label: 'Loads', path: '/fleet-loads' },
-  '/agency-loads': { label: 'Loads', path: '/fleet-loads' },
-  '/finance': { label: 'Finance', path: '/finance' },
-  '/insights': { label: 'Finance', path: '/finance' },
-  '/ifta': { label: 'Finance', path: '/finance' },
-  '/crm': { label: 'Operations', path: '/crm' },
-  '/maintenance': { label: 'Operations', path: '/maintenance' },
-  '/documents': { label: 'Operations', path: '/documents' },
-  '/safety': { label: 'Operations', path: '/safety' },
-  '/incidents': { label: 'Operations', path: '/incidents' },
-  '/driver-performance': { label: 'Operations', path: '/driver-performance' },
-};
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
+
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { isDemoMode, signOut, primaryColor, simulatedOrgId, simulatedOrgName, clearOrgSimulation } = useAuth();
