@@ -21,7 +21,7 @@ type ToastId = string | number;
 
 export type NotifyOptions = Pick<
   ExternalToast,
-  "description" | "duration" | "id" | "important" | "position" | "dismissible"
+  "description" | "duration" | "id" | "position" | "dismissible"
 >;
 
 export type NotifyActionType = "default" | "destructive";
