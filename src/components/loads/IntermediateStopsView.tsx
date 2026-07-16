@@ -53,6 +53,7 @@ export function IntermediateStopsView({ loadId, compact = false }: IntermediateS
         .from('load_intermediate_stops')
         .select('*')
         .eq('load_id', loadId)
+        .is('deleted_at', null)
         .order('stop_number', { ascending: true });
       if (error) throw error;
       return (data ?? []) as IntermediateStop[];

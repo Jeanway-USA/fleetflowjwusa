@@ -50,6 +50,7 @@ export function InvoicePreviewDialog({ load, open, onClose, mode, onConfirm, con
         .from('load_accessorials')
         .select('accessorial_type, amount, percentage')
         .eq('load_id', load.id)
+        .is('deleted_at', null)
         .then(({ data }) => {
           if (data && data.length > 0) {
             setItemizedAccessorials(

@@ -88,6 +88,7 @@ export function SafetyBonusPayouts() {
         .select('*, drivers:driver_id ( first_name, last_name )')
         .eq('org_id', orgId!)
         .eq('period_start', periodStart)
+        .is('deleted_at', null)
         .order('earned_amount', { ascending: false });
       if (error) throw error;
       return data ?? [];

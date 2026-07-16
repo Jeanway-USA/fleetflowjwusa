@@ -107,7 +107,7 @@ export default function Finance() {
   const { data: loadExpenses = [] } = useQuery({
     queryKey: ['load_expenses'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('load_expenses').select('*');
+      const { data, error } = await supabase.from('load_expenses').select('*').is('deleted_at', null);
       if (error) throw error;
       return data;
     },
@@ -143,7 +143,7 @@ export default function Finance() {
   const { data: payrolls = [], isLoading: payrollsLoading } = useQuery({
     queryKey: ['driver_payroll'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('driver_payroll').select('*').order('period_end', { ascending: false });
+      const { data, error } = await supabase.from('driver_payroll').select('*').is('deleted_at', null).order('period_end', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -152,7 +152,7 @@ export default function Finance() {
   const { data: commissions = [], isLoading: commissionsLoading } = useQuery({
     queryKey: ['agent_commissions'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('agent_commissions').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('agent_commissions').select('*').is('deleted_at', null).order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },

@@ -130,7 +130,7 @@ export default function FleetLoads() {
   const { data: allAccessorials = [] } = useQuery({
     queryKey: ['load_accessorials'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('load_accessorials').select('*');
+      const { data, error } = await supabase.from('load_accessorials').select('*').is('deleted_at', null);
       if (error) throw error;
       return data;
     },
@@ -378,7 +378,8 @@ export default function FleetLoads() {
       const { data: loadAccs } = await supabase
         .from('load_accessorials')
         .select('*')
-        .eq('load_id', load.id);
+        .eq('load_id', load.id)
+        .is('deleted_at', null);
       
       if (loadAccs && loadAccs.length > 0) {
         setAccessorials(loadAccs.map((a: any) => ({

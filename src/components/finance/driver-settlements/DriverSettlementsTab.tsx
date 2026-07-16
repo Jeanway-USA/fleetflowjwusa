@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
+import { archiveWithUndo } from '@/lib/soft-delete';
 import {
   FileText,
   MoreHorizontal,
@@ -92,6 +93,7 @@ export function DriverSettlementsTab() {
       const { data, error } = await supabase
         .from('driver_settlements')
         .select('*')
+        .is('deleted_at', null)
         .order('period_end', { ascending: false });
       if (error) throw error;
       return (data ?? []) as DriverSettlement[];
@@ -144,20 +146,19 @@ export function DriverSettlementsTab() {
 
   const deleteSettlement = useMutation({
     mutationFn: async (id: string) => {
-      // Belt-and-suspenders: FK is ON DELETE CASCADE, but explicitly purge
-      // child line items first so legacy DBs without the cascade also clean up.
-      await supabase.from('driver_settlement_items').delete().eq('settlement_id', id);
-      const { error } = await supabase.from('driver_settlements').delete().eq('id', id);
-      if (error) throw error;
+      await archiveWithUndo({
+        table: 'driver_settlements',
+        id,
+        queryClient: qc,
+        invalidateKeys: [
+          ['driver_settlements'],
+          ['driver_settlement_items'],
+          ['driver_settlement', id],
+        ],
+      });
     },
-    onSuccess: (_data, id) => {
-      // Admin-side caches
-      qc.invalidateQueries({ queryKey: ['driver_settlements'] });
-      qc.invalidateQueries({ queryKey: ['driver_settlement_items'] });
-      qc.invalidateQueries({ queryKey: ['driver_settlement', id] });
-      // Driver-side caches are purged in real-time via the Realtime publication
-      // on `driver_settlements` (see useDriverSettlementsRealtime).
-      toast.success('Settlement deleted');
+    onSuccess: () => {
+      /* archiveWithUndo handles toast + invalidation */
     },
     onError: (e: any) => toast.error(e.message),
   });

@@ -25,6 +25,16 @@ export const ARCHIVABLE_TABLES = [
   'incidents',
   'detention_requests',
   'driver_requests',
+  'settlements',
+  'driver_settlements',
+  'driver_payroll',
+  'load_expenses',
+  'agent_commissions',
+  'safety_bonus_payouts',
+  'load_status_logs',
+  'load_intermediate_stops',
+  'load_accessorials',
+  'maintenance_logs',
 ] as const;
 
 export type ArchivableTable = (typeof ARCHIVABLE_TABLES)[number];
@@ -51,6 +61,16 @@ export const TABLE_LABELS: Record<ArchivableTable, { singular: string; plural: s
   incidents: { singular: 'Incident', plural: 'Incidents' },
   detention_requests: { singular: 'Detention Request', plural: 'Detention Requests' },
   driver_requests: { singular: 'Driver Request', plural: 'Driver Requests' },
+  settlements: { singular: 'Settlement', plural: 'Settlements' },
+  driver_settlements: { singular: 'Driver Settlement', plural: 'Driver Settlements' },
+  driver_payroll: { singular: 'Payroll Record', plural: 'Payroll Records' },
+  load_expenses: { singular: 'Load Expense', plural: 'Load Expenses' },
+  agent_commissions: { singular: 'Commission', plural: 'Agent Commissions' },
+  safety_bonus_payouts: { singular: 'Safety Bonus', plural: 'Safety Bonus Payouts' },
+  load_status_logs: { singular: 'Status Log', plural: 'Load Status Logs' },
+  load_intermediate_stops: { singular: 'Stop', plural: 'Intermediate Stops' },
+  load_accessorials: { singular: 'Accessorial', plural: 'Load Accessorials' },
+  maintenance_logs: { singular: 'Maintenance Log', plural: 'Maintenance Logs' },
 };
 
 /**
@@ -66,6 +86,7 @@ export const ARCHIVE_ROLE_MAP: Record<ArchivableTable, string[]> = {
   parts_inventory: ['owner', 'maintenance', 'dispatcher'],
   maintenance_requests: ['owner', 'maintenance', 'dispatcher'],
   work_orders: ['owner', 'maintenance', 'dispatcher'],
+  maintenance_logs: ['owner', 'maintenance', 'dispatcher'],
   fleet_loads: ['owner', 'dispatcher'],
   agency_loads: ['owner', 'dispatcher'],
   facilities: ['owner', 'dispatcher'],
@@ -74,8 +95,17 @@ export const ARCHIVE_ROLE_MAP: Record<ArchivableTable, string[]> = {
   crm_contacts: ['owner', 'dispatcher'],
   company_resources: ['owner', 'dispatcher'],
   document_templates: ['owner', 'dispatcher'],
+  load_status_logs: ['owner', 'dispatcher'],
+  load_intermediate_stops: ['owner', 'dispatcher'],
+  load_accessorials: ['owner', 'dispatcher'],
   expenses: ['owner', 'payroll_admin'],
   fuel_purchases: ['owner', 'payroll_admin'],
+  settlements: ['owner', 'payroll_admin'],
+  driver_settlements: ['owner', 'payroll_admin'],
+  driver_payroll: ['owner', 'payroll_admin'],
+  load_expenses: ['owner', 'payroll_admin'],
+  agent_commissions: ['owner', 'payroll_admin'],
+  safety_bonus_payouts: ['owner', 'payroll_admin'],
   incidents: ['owner', 'safety'],
 };
 

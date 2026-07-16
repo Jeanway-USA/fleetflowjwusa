@@ -100,6 +100,7 @@ export function useDriverSettlementsList(driverId: string | null | undefined) {
           'id, period_start, period_end, payment_date, gross_pay, deductions, reimbursements, escrow_credited_amount, net_pay, status, org_id, driver_id, ytd_gross, ytd_net, ytd_deductions, ytd_reimbursements',
         )
         .eq('driver_id', driverId!)
+        .is('deleted_at', null)
         .order('period_end', { ascending: false });
       if (error) throw error;
       return (data ?? []) as SettlementRow[];

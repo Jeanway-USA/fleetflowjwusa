@@ -22,6 +22,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Separator } from '@/components/ui/separator';
 import { calculateWeeklyPay } from '@/utils/payCalculations';
 import { usePaySettings } from '@/hooks/usePaySettings';
+import { archiveWithUndo } from '@/lib/soft-delete';
 
 interface Settlement {
   id: string;
@@ -128,6 +129,7 @@ export function SettlementsTab() {
       const { data, error } = await supabase
         .from('settlements')
         .select('*')
+        .is('deleted_at', null)
         .order('period_end', { ascending: false });
       if (error) throw error;
       return data as Settlement[];
@@ -203,12 +205,15 @@ export function SettlementsTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('settlements').delete().eq('id', id);
-      if (error) throw error;
+      await archiveWithUndo({
+        table: 'settlements',
+        id,
+        queryClient,
+        invalidateKeys: [['settlements']],
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settlements'] });
-      toast.success('Settlement deleted');
+      /* archiveWithUndo handles toast + invalidation */
     },
     onError: (error) => toast.error(error.message),
   });

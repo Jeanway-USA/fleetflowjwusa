@@ -465,6 +465,7 @@ export function useServiceHistory(searchQuery?: string) {
           cost,
           trucks (unit_number)
         `)
+        .is('deleted_at', null)
         .order('service_date', { ascending: false });
 
       if (searchQuery) {
@@ -1188,6 +1189,7 @@ export function useTruckHistory(truckId: string | null) {
         .from('maintenance_logs')
         .select('*')
         .eq('truck_id', truckId)
+        .is('deleted_at', null)
         .order('service_date', { ascending: false });
 
       if (logsError) throw logsError;

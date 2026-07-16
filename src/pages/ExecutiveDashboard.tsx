@@ -371,7 +371,8 @@ export default function ExecutiveDashboard() {
       const { data: pendingSettlements } = await supabase
         .from('settlements')
         .select('id, status')
-        .in('status', ['draft', 'pending']);
+        .in('status', ['draft', 'pending'])
+        .is('deleted_at', null);
 
       if (pendingSettlements && pendingSettlements.length > 0) {
         actions.push({

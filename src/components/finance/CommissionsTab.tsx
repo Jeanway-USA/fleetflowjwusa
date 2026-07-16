@@ -16,6 +16,7 @@ import { Plus, Pencil, Trash2, Briefcase, MoreHorizontal } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
+import { archiveWithUndo } from '@/lib/soft-delete';
 
 type AgentCommission = Database['public']['Tables']['agent_commissions']['Row'];
 type AgentCommissionInsert = Database['public']['Tables']['agent_commissions']['Insert'];
@@ -72,12 +73,15 @@ export function CommissionsTab({ filteredCommissions, commissionTotals, commissi
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('agent_commissions').delete().eq('id', id);
-      if (error) throw error;
+      await archiveWithUndo({
+        table: 'agent_commissions',
+        id,
+        queryClient,
+        invalidateKeys: [['agent_commissions']],
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent_commissions'] });
-      toast.success('Commission deleted');
+      /* archiveWithUndo handles toast + invalidation */
     },
     onError: (error) => toast.error(error.message),
   });
