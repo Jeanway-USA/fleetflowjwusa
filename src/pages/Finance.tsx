@@ -107,7 +107,7 @@ export default function Finance() {
   const { data: loadExpenses = [] } = useQuery({
     queryKey: ['load_expenses'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('load_expenses').select('*');
+      const { data, error } = await supabase.from('load_expenses').select('*').is('deleted_at', null);
       if (error) throw error;
       return data;
     },
