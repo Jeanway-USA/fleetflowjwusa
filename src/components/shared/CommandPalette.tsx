@@ -274,11 +274,14 @@ export function CommandPalette() {
                   {searchResults.drivers.map((d: any) => (
                     <CommandItem
                       key={d.id}
-                      value={`driver ${d.first_name ?? ''} ${d.last_name ?? ''}`}
-                      onSelect={() => run(() => navigate(`/drivers?id=${d.id}`))}
+                      value={`driver ${d.first_name ?? ''} ${d.last_name ?? ''} ${d.email ?? ''} ${d.phone ?? ''} ${d.license_number ?? ''}`}
+                      onSelect={() => run(() => navigate(`/drivers?highlight=${d.id}`))}
                     >
                       <User className="mr-2 h-4 w-4" />
-                      {(d.first_name || '') + ' ' + (d.last_name || '')}
+                      <span className="truncate">
+                        {(d.first_name || '') + ' ' + (d.last_name || '')}
+                        {d.email && <span className="ml-2 text-muted-foreground">{d.email}</span>}
+                      </span>
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -291,8 +294,8 @@ export function CommandPalette() {
                   {searchResults.trucks.map((t: any) => (
                     <CommandItem
                       key={t.id}
-                      value={`truck ${t.unit_number}`}
-                      onSelect={() => run(() => navigate(`/trucks?id=${t.id}`))}
+                      value={`truck ${t.unit_number ?? ''} ${t.vin ?? ''} ${t.license_plate ?? ''} ${t.make ?? ''} ${t.model ?? ''}`}
+                      onSelect={() => run(() => navigate(`/trucks?highlight=${t.id}`))}
                     >
                       <Truck className="mr-2 h-4 w-4" />
                       Unit {t.unit_number}
@@ -302,6 +305,25 @@ export function CommandPalette() {
                 </CommandGroup>
               </>
             )}
+            {searchResults.trailers.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Trailers">
+                  {searchResults.trailers.map((t: any) => (
+                    <CommandItem
+                      key={t.id}
+                      value={`trailer ${t.unit_number ?? ''} ${t.vin ?? ''} ${t.license_plate ?? ''} ${t.make ?? ''} ${t.model ?? ''}`}
+                      onSelect={() => run(() => navigate(`/trailers?highlight=${t.id}`))}
+                    >
+                      <Truck className="mr-2 h-4 w-4" />
+                      Trailer {t.unit_number}
+                      {t.make && <span className="ml-2 text-muted-foreground">{t.make} {t.model}</span>}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+
             {searchResults.contacts.length > 0 && (
               <>
                 <CommandSeparator />
