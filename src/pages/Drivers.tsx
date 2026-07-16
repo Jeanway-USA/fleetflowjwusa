@@ -408,6 +408,80 @@ export default function Drivers() {
     return format(parseISO(date), 'MM/dd/yyyy');
   };
 
+  const filteredDrivers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const parseExp = (d: any) => {
+      const dates = [d.license_expiry, d.medical_card_expiry, (d as any).mvr_expiry]
+        .filter(Boolean)
+        .map((s: string) => new Date(s + 'T00:00:00').getTime());
+      return dates.length ? Math.min(...dates) : Number.POSITIVE_INFINITY;
+    };
+    let list = (drivers as any[]).filter((d) => {
+      if (statusFilter !== 'all' && (d.status || '').toLowerCase() !== statusFilter) return false;
+      if (!q) return true;
+      const hay = [
+        d.first_name, d.last_name, `${d.first_name || ''} ${d.last_name || ''}`,
+        d.email, d.phone, d.license_number, d.landstar_operator_id,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+    list = [...list].sort((a, b) => {
+      if (sortBy === 'name_asc' || sortBy === 'name_desc') {
+        const av = `${a.last_name || ''} ${a.first_name || ''}`.trim().toLowerCase();
+        const bv = `${b.last_name || ''} ${b.first_name || ''}`.trim().toLowerCase();
+        return sortBy === 'name_asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      if (sortBy === 'hire_recent') {
+        const av = a.hire_date ? new Date(a.hire_date + 'T00:00:00').getTime() : 0;
+        const bv = b.hire_date ? new Date(b.hire_date + 'T00:00:00').getTime() : 0;
+        return bv - av;
+      }
+      return parseExp(a) - parseExp(b);
+    });
+    return list;
+  }, [drivers, search, statusFilter, sortBy]);
+
+  const visibleIds = useMemo(() => filteredDrivers.map((d: any) => d.id), [filteredDrivers]);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const toggleSelectAllVisible = () =>
+    setSelectedIds((prev) => {
+      if (allVisibleSelected) {
+        const next = new Set(prev);
+        visibleIds.forEach((id) => next.delete(id));
+        return next;
+      }
+      const next = new Set(prev);
+      visibleIds.forEach((id) => next.add(id));
+      return next;
+    });
+  const clearSelection = () => setSelectedIds(new Set());
+  const bulkArchive = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    await archiveManyWithUndo({
+      table: 'drivers',
+      ids,
+      queryClient,
+      invalidateKeys: [['drivers']],
+    });
+    clearSelection();
+  };
+
+  const statusTone = (status: string): { cls: string; dot: string; label: string } => {
+    const s = (status || '').toLowerCase();
+    if (s === 'active') return { cls: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30 dark:text-emerald-400', dot: 'bg-emerald-500', label: 'Active' };
+    if (s === 'inactive') return { cls: 'bg-muted text-muted-foreground border-border', dot: 'bg-muted-foreground', label: 'Inactive' };
+    if (s === 'onboarding') return { cls: 'bg-amber-500/15 text-amber-600 border-amber-500/30 dark:text-amber-400', dot: 'bg-amber-500', label: 'Onboarding' };
+    if (s === 'archived') return { cls: 'bg-destructive/10 text-destructive border-destructive/30', dot: 'bg-destructive', label: 'Archived' };
+    return { cls: 'bg-muted text-muted-foreground border-border', dot: 'bg-muted-foreground', label: status || 'Unknown' };
+  };
+
   if (isLoading) {
     return (
       <>
