@@ -205,12 +205,15 @@ export function SettlementsTab() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('settlements').delete().eq('id', id);
-      if (error) throw error;
+      await archiveWithUndo({
+        table: 'settlements',
+        id,
+        queryClient,
+        invalidateKeys: [['settlements']],
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['settlements'] });
-      toast.success('Settlement deleted');
+      /* archiveWithUndo handles toast + invalidation */
     },
     onError: (error) => toast.error(error.message),
   });
