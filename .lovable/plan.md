@@ -1,61 +1,75 @@
-## Goal
-Polish the existing shell (`DashboardLayout` + `AppSidebar`) into a cleaner, more consistent top-nav experience. Keep the current sidebar architecture — role-based menu, collapsible desktop, mobile sheet — since it already works. Focus the work on the **top bar**: a real global search input, notifications bell, theme toggle, and user profile dropdown, all in a consistent order across every page.
 
-## Non-Goals
-- No new pages, no new routes, no rewrite of `AppSidebar` role logic.
-- No changes to business logic, data fetching, or auth.
-- Not building a new notifications backend — reuse existing `NotificationCenter` / `DriverMessages`.
-- Not replacing `CommandPalette` — the new search bar opens it.
+## Sidebar polish & regrouping
 
-## Changes
+Refine `src/components/layout/AppSidebar.tsx` only. No routing, auth, or data changes. Existing role/tier/tmsMode filtering, simulation mode, branding header, workspace switcher, footer, and `collapsible="icon"` behavior stay intact.
 
-### 1. New header component: `src/components/layout/TopBar.tsx`
-Extract the header out of `DashboardLayout` into a dedicated component so the layout file is readable and the header is reusable. Contents, left → right:
+### 1. Regroup nav items
 
-1. `SidebarTrigger` — visible on all breakpoints (currently `lg:hidden`). On desktop it collapses the sidebar to the icon rail; on mobile it opens the drawer. Solves the "sidebar can disappear" issue.
-2. Breadcrumbs (existing `ROUTE_LABELS` / `ROUTE_GROUPS` logic moved in unchanged).
-3. Flex spacer.
-4. **Global search** — an actual `Input` with a `Search` icon (not a button that says "Search…"). Read-only trigger that dispatches `open-command-palette`; on `md+` shows the input, on mobile collapses to an icon button. Keeps ⌘K kbd hint.
-5. `TimeDisplayToggle` (existing).
-6. **Theme toggle** — reuse `src/components/shared/ThemeToggle.tsx`.
-7. **Notifications** — role-aware slot:
-   - drivers → existing `DriverMessages` bell (unchanged)
-   - everyone else → existing `NotificationCenter` bell
-   Both are already built; TopBar just picks one.
-8. **User profile dropdown** — new small component. Avatar (initials from `user.email`) → dropdown with: role/email label, Settings (routes to `/settings` or `/driver-settings` based on role), Sign out. Replaces the standalone "Help" dropdown's sign-out affordance and consolidates account actions in one place. Help item ("Replay Welcome Tour") moves into this dropdown so we don't add another header button.
+Replace the current four groups (Operations / Fleet Care / Safety & Compliance / Administration) with a cleaner taxonomy that matches how users think about the product:
 
-Ordering, spacing, and heights stay consistent with current header (`h-12 sm:h-14`, `gap-2`).
+```text
+DASHBOARDS            (non-collapsible, role-aware — unchanged)
+  Executive / Dispatcher / Driver / Maintenance views
 
-### 2. `DashboardLayout.tsx` slim-down
-- Replace the inline `<header>` block (lines ~285–353) with `<TopBar />`.
-- Keep the demo banner, impersonation banner, `DiscordBanner`, tour, welcome modal, error boundaries, and content padding exactly as-is.
-- Keep `SidebarProvider` wrapper and the `⌘B` shortcut.
+OPERATIONS
+  Fleet Loads, Agency Loads, Drivers, Trucks, Trailers
 
-### 3. `AppSidebar.tsx` — minor polish only
-- Ensure `collapsible="icon"` is set so desktop collapse leaves an icon rail (per shadcn sidebar guidance) — verify current setting and adjust if needed.
-- No changes to the role-based menu items themselves.
+FINANCE
+  Finance & P/L, Tax Hub, IFTA Reporting  (Settlements link stays inside Finance page)
 
-### 4. Mobile behavior
-- `SidebarProvider` already renders the sidebar as a `Sheet` under `md`. No new code needed; verified by making `SidebarTrigger` always visible.
+COMPLIANCE & SAFETY
+  Safety, Incidents, Driver Performance, Maintenance, Documents, Document Signing
 
-### 5. Consistency sweep
-- Confirm every route in `src/App.tsx` that renders through `ProtectedRoute` already gets `DashboardLayout` (per the project's "no page wraps itself in DashboardLayout" rule). No changes expected; note-only.
+CRM & SALES
+  Broker/Agent CRM (label already mode-aware)
 
-## Technical Details
+REPORTS & INSIGHTS
+  Company Insights, Audit Trail, Archive
 
-- `TopBar` is a client component under `src/components/layout/TopBar.tsx`. It reads `useAuth`, `useLocation`, `useSubscriptionTier`, `useSidebar`, `useTheme` — same hooks the layout uses today.
-- Search input is `<Input readOnly>` with `onClick`/`onFocus` dispatching `new CustomEvent('open-command-palette')`. Keeps a single source of truth (CommandPalette) and requires zero new search infra.
-- Profile avatar uses `Avatar` + `AvatarFallback` from `@/components/ui/avatar` with initials derived from `user.email`. No image upload.
-- All colors via semantic tokens (`bg-background/95`, `text-muted-foreground`, `border-border`) — no hardcoded colors.
-- Only `code` changes; no DB migrations, no edge functions, no new secrets.
+SETTINGS & ADMIN     (collapsed by default for everyone; owners only)
+  Settings
+```
 
-## Files Touched
-- **new** `src/components/layout/TopBar.tsx`
-- **new** `src/components/layout/UserMenu.tsx` (avatar + dropdown, kept small)
-- **edit** `src/components/layout/DashboardLayout.tsx` (header block → `<TopBar />`)
-- **edit (if needed)** `src/components/layout/AppSidebar.tsx` (ensure `collapsible="icon"`)
+Group memberships are set per nav item; role/tier filtering already hides items the user can't see, so empty groups auto-hide via the existing `if (items.length === 0) return null` guard in `CollapsibleNavGroup`.
 
-## Verification
-- Load `/dispatcher-dashboard`, `/driver-dashboard`, `/fleet-loads`, `/settings` — header order identical, breadcrumbs correct, search opens palette, theme toggle switches, user menu signs out.
-- Resize to mobile: sidebar becomes drawer via `SidebarTrigger`; search collapses to icon.
-- Driver role sees `DriverMessages` bell; dispatcher/executive/admin see `NotificationCenter`.
+### 2. Default-open logic
+
+- Open by default: Operations, Finance, Compliance & Safety, CRM & Sales.
+- Collapsed by default: Reports & Insights, Settings & Admin.
+- Keep the existing "auto-expand the group containing the active route" effect and the `localStorage` persistence (`sidebar-groups` key) so user overrides stick.
+
+### 3. Visual polish
+
+Inside `CollapsibleNavGroup` and the Dashboards block:
+
+- Group header: bump spacing to `px-3 pt-4 pb-1.5`, keep uppercase 11px tracking, add a subtle `text-muted-foreground/70` and hover `text-foreground`.
+- Add a thin `border-t border-sidebar-border/50` between adjacent groups (skip before the first group) for clearer visual separation.
+- Menu buttons: tighten to `h-9`, `gap-2.5`, `rounded-md`, `text-sm`.
+- Hover: `hover:bg-sidebar-accent/60`.
+- Active state: replace the current `border-l-2` treatment with a full pill — `bg-primary/10 text-primary font-medium` plus a 3px left accent bar via a `::before` pseudo (using an absolutely positioned `<span>` since Tailwind pseudo-content is awkward). Keeps the active row obvious without shifting content on hover.
+- Icons: `h-4 w-4 shrink-0`, `text-muted-foreground` at rest, `text-primary` when active.
+- Chevron on group headers: keep the existing rotate animation, size `h-3.5 w-3.5`.
+
+### 4. Icon-collapsed mode
+
+`Sidebar collapsible="icon"` already collapses to a rail. Verify group labels hide (Tailwind `group-data-[collapsible=icon]:hidden` on the header text and chevron container) so only icons render in rail mode. No structural change beyond that class addition.
+
+### 5. Role visibility (unchanged mechanics, updated mapping)
+
+Reuse `filterByRoleAndTier`. New group→items mapping:
+
+- Finance items keep `roles: ['owner', 'payroll_admin']` and their existing `feature` gates.
+- Reports & Insights: Company Insights (`insights`), Audit Trail (owner/payroll_admin), Archive (multi-role, already correct).
+- Settings & Admin: only `Settings` for owners not currently simulating (existing `actuallyIsOwner && !isSimulating` check moves here).
+
+### 6. Out of scope
+
+- No changes to `TopBar`, `DashboardLayout`, routes, or `useSubscriptionTier`.
+- Sidebar header (logo + workspace switcher) and footer (sign-out) untouched.
+- Mobile drawer already handled by `SidebarProvider`; no extra work.
+
+### Technical notes
+
+- All colors via existing sidebar semantic tokens (`--sidebar-border`, `--sidebar-accent`, `--primary`, `--muted-foreground`) — no hardcoded hex.
+- Keep `data-tour` attributes (`nav-fleet-loads`, `nav-finance`, `sidebar-nav`) on their current items so the product tour keeps working.
+- Update `STORAGE_KEY` defaults object to include the new group keys (`operations`, `finance`, `compliance`, `crm`, `reports`, `admin`) — old `fleetcare`/`safety`/`administration` keys become stale but harmless.

@@ -133,30 +133,34 @@ interface CollapsibleNavGroupProps {
   currentPath: string;
 }
 
+// Shared classes for menu buttons (active pill + left accent bar)
+const NAV_BUTTON_CLASS =
+  "relative h-9 gap-2.5 rounded-md text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-foreground " +
+  "data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-medium " +
+  "data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1.5 data-[active=true]:before:bottom-1.5 " +
+  "data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-primary " +
+  "[&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0 [&>svg]:text-muted-foreground data-[active=true]:[&>svg]:text-primary";
+
 function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, currentPath }: CollapsibleNavGroupProps) {
   if (items.length === 0) return null;
 
   return (
     <Collapsible open={isOpen} onOpenChange={(open) => onToggle(groupKey, open)}>
-      <SidebarGroup className="py-0">
-        <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors group">
+      <SidebarGroup className="py-0 border-t border-sidebar-border/50 first:border-t-0 group-data-[collapsible=icon]:border-t-0">
+        <CollapsibleTrigger className="flex w-full items-center justify-between px-3 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground transition-colors group group-data-[collapsible=icon]:hidden">
           <span>{label}</span>
           <ChevronRight className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-90" />
         </CollapsibleTrigger>
-        <CollapsibleContent>
+        <CollapsibleContent className="group-data-[collapsible=icon]:!hidden">
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => {
                 const active = currentPath === item.path || currentPath.startsWith(item.path + '/');
                 return (
                   <SidebarMenuItem key={item.path} {...(item.tourId ? { 'data-tour': item.tourId } : {})}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={active}
-                      className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary"
-                    >
+                    <SidebarMenuButton asChild isActive={active} className={NAV_BUTTON_CLASS}>
                       <Link to={item.path}>
-                        <item.icon className="h-4 w-4" />
+                        <item.icon />
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -166,6 +170,24 @@ function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, current
             </SidebarMenu>
           </SidebarGroupContent>
         </CollapsibleContent>
+        {/* Icon-rail mode: render items flat without the collapsible header */}
+        <SidebarGroupContent className="hidden group-data-[collapsible=icon]:block">
+          <SidebarMenu>
+            {items.map((item) => {
+              const active = currentPath === item.path || currentPath.startsWith(item.path + '/');
+              return (
+                <SidebarMenuItem key={`icon-${item.path}`}>
+                  <SidebarMenuButton asChild isActive={active} tooltip={item.title} className={NAV_BUTTON_CLASS}>
+                    <Link to={item.path}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroupContent>
       </SidebarGroup>
     </Collapsible>
   );
@@ -223,57 +245,70 @@ export function AppSidebar() {
   const operationsItems: NavItem[] = [
     { title: 'Fleet Loads', icon: Package, path: '/fleet-loads', roles: ['owner', 'dispatcher', 'safety'], feature: 'loads', tourId: 'nav-fleet-loads' },
     { title: 'Agency Loads', icon: Building2, path: '/agency-loads', roles: ['owner', 'dispatcher'], feature: 'agency_loads' },
-    { title: 'Trailers', icon: Container, path: '/trailers', roles: ['owner', 'safety', 'maintenance'], feature: 'trailers' },
-    { title: 'Trucks', icon: Truck, path: '/trucks', roles: ['owner', 'safety', 'maintenance'], feature: 'trucks' },
-    { title: currentTmsMode === 'independent' ? 'Broker CRM' : 'Agent CRM', icon: currentTmsMode === 'independent' ? Building2 : Contact, path: '/crm', roles: ['owner', 'dispatcher'], feature: 'crm' },
     { title: 'Drivers', icon: Users, path: '/drivers', roles: ['owner', 'payroll_admin'], feature: 'drivers' },
+    { title: 'Trucks', icon: Truck, path: '/trucks', roles: ['owner', 'safety', 'maintenance'], feature: 'trucks' },
+    { title: 'Trailers', icon: Container, path: '/trailers', roles: ['owner', 'safety', 'maintenance'], feature: 'trailers' },
   ];
 
-  const fleetCareItems: NavItem[] = [
-    { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'maintenance'], feature: 'maintenance_full' },
+  const financeItems: NavItem[] = [
+    { title: 'Finance & P/L', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'], feature: 'profit_loss', tourId: 'nav-finance' },
+    { title: 'Tax Hub', icon: Receipt, path: '/admin/tax-hub', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
+    { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta', tmsMode: 'independent' as TmsMode },
   ];
 
-  const safetyItems: NavItem[] = [
+  const complianceItems: NavItem[] = [
     { title: 'Safety', icon: Shield, path: '/safety', roles: ['owner', 'safety'], feature: 'safety' },
     { title: 'Incidents', icon: AlertTriangle, path: '/incidents', roles: ['owner', 'safety'], feature: 'incidents' },
     { title: 'Driver Performance', icon: Award, path: '/driver-performance', roles: ['owner', 'safety'], feature: 'driver_performance' },
+    { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'maintenance'], feature: 'maintenance_full' },
     { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety'], feature: 'documents' },
     { title: 'Document Signing', icon: FileText, path: '/documents/signing', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver', 'maintenance'] },
   ];
 
-  const administrationItems: NavItem[] = [
-    { title: 'Finance & P/L', icon: TrendingUp, path: '/finance', roles: ['owner', 'payroll_admin'], feature: 'profit_loss', tourId: 'nav-finance' },
+  const crmItems: NavItem[] = [
+    { title: currentTmsMode === 'independent' ? 'Broker CRM' : 'Agent CRM', icon: currentTmsMode === 'independent' ? Building2 : Contact, path: '/crm', roles: ['owner', 'dispatcher'], feature: 'crm' },
+  ];
+
+  const reportsItems: NavItem[] = [
     { title: 'Company Insights', icon: BarChart3, path: '/insights', roles: ['owner', 'payroll_admin'], feature: 'insights' },
-    { title: 'IFTA Reporting', icon: Fuel, path: '/ifta', roles: ['owner', 'payroll_admin'], feature: 'ifta', tmsMode: 'independent' as TmsMode },
-    { title: 'Tax Hub', icon: Receipt, path: '/admin/tax-hub', roles: ['owner', 'payroll_admin'], feature: 'profit_loss' },
     { title: 'Audit Trail', icon: ShieldCheck, path: '/audit-trail', roles: ['owner', 'payroll_admin'] },
     { title: 'Archive', icon: Archive, path: '/archive', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'maintenance'] },
   ];
 
   const filteredOps = useMemo(() => filterByRoleAndTier(operationsItems), [filterByRoleAndTier]);
-  const filteredFleetCare = useMemo(() => filterByRoleAndTier(fleetCareItems), [filterByRoleAndTier]);
-  const filteredSafety = useMemo(() => filterByRoleAndTier(safetyItems), [filterByRoleAndTier]);
-  const filteredAdministration = useMemo(() => filterByRoleAndTier(administrationItems), [filterByRoleAndTier]);
+  const filteredFinance = useMemo(() => filterByRoleAndTier(financeItems), [filterByRoleAndTier]);
+  const filteredCompliance = useMemo(() => filterByRoleAndTier(complianceItems), [filterByRoleAndTier]);
+  const filteredCrm = useMemo(() => filterByRoleAndTier(crmItems), [filterByRoleAndTier]);
+  const filteredReports = useMemo(() => filterByRoleAndTier(reportsItems), [filterByRoleAndTier]);
 
-  // Settings goes in administration only for owners
-  const administrationWithSettings = useMemo(() => {
+  // Settings & Admin — owners only, and not while simulating another role
+  const adminItems = useMemo<NavItem[]>(() => {
     if (actuallyIsOwner && !isSimulating) {
-      return [...filteredAdministration, { title: 'Settings', icon: Settings, path: '/settings', roles: ['owner'] as AppRole[], feature: undefined }];
+      return [{ title: 'Settings', icon: Settings, path: '/settings', roles: ['owner'] as AppRole[] }];
     }
-    return filteredAdministration;
-  }, [filteredAdministration, actuallyIsOwner, isSimulating]);
+    return [];
+  }, [actuallyIsOwner, isSimulating]);
 
   const collapsibleGroups = useMemo(() => [
     { key: 'operations', label: 'Operations', items: filteredOps },
-    { key: 'fleetcare', label: 'Fleet Care', items: filteredFleetCare },
-    { key: 'safety', label: 'Safety & Compliance', items: filteredSafety },
-    { key: 'administration', label: 'Administration', items: administrationWithSettings },
-  ], [filteredOps, filteredFleetCare, filteredSafety, administrationWithSettings]);
+    { key: 'finance', label: 'Finance', items: filteredFinance },
+    { key: 'compliance', label: 'Compliance & Safety', items: filteredCompliance },
+    { key: 'crm', label: 'CRM & Sales', items: filteredCrm },
+    { key: 'reports', label: 'Reports & Insights', items: filteredReports },
+    { key: 'admin', label: 'Settings & Admin', items: adminItems },
+  ], [filteredOps, filteredFinance, filteredCompliance, filteredCrm, filteredReports, adminItems]);
 
   // --- Collapsible state with localStorage + auto-expand ---
   const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>(() => {
     const saved = loadGroupState();
-    const defaults: Record<string, boolean> = { operations: true, fleetcare: true, safety: true, administration: true };
+    const defaults: Record<string, boolean> = {
+      operations: true,
+      finance: true,
+      compliance: true,
+      crm: true,
+      reports: false,
+      admin: false,
+    };
     return { ...defaults, ...saved };
   });
 
@@ -384,7 +419,7 @@ export function AppSidebar() {
         {/* Dashboards — non-collapsible */}
         {filteredDashboards.length > 0 && (
           <SidebarGroup className="py-0 mt-1">
-            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="px-3 pt-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
               {actuallyIsOwner ? 'Dashboards' : 'Main'}
             </div>
             <SidebarGroupContent>
@@ -395,6 +430,7 @@ export function AppSidebar() {
                     <SidebarMenuItem key={item.path}>
                       <SidebarMenuButton
                         isActive={active}
+                        tooltip={item.title}
                         onClick={() => {
                           if (actuallyIsOwner && pathToRole[item.path]) {
                             handleDashboardSwitch(item.path, pathToRole[item.path]);
@@ -402,9 +438,9 @@ export function AppSidebar() {
                             navigate(item.path);
                           }
                         }}
-                        className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary"
+                        className={NAV_BUTTON_CLASS}
                       >
-                        <item.icon className="h-4 w-4" />
+                        <item.icon />
                         <span>{item.title}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -430,40 +466,28 @@ export function AppSidebar() {
 
         {/* Driver account section */}
         {hasRole('driver') && (
-          <SidebarGroup className="py-0">
-            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">My Account</div>
+          <SidebarGroup className="py-0 border-t border-sidebar-border/50 group-data-[collapsible=icon]:border-t-0">
+            <div className="px-3 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 group-data-[collapsible=icon]:hidden">My Account</div>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath === '/driver/loads'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <Link to="/driver/loads">
-                      <Package className="h-4 w-4" />
-                      <span>My Loads</span>
-                    </Link>
+                  <SidebarMenuButton asChild isActive={currentPath === '/driver/loads'} tooltip="My Loads" className={NAV_BUTTON_CLASS}>
+                    <Link to="/driver/loads"><Package /><span>My Loads</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath === '/driver/settlements'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <Link to="/driver/settlements">
-                      <Receipt className="h-4 w-4" />
-                      <span>My Settlements</span>
-                    </Link>
+                  <SidebarMenuButton asChild isActive={currentPath === '/driver/settlements'} tooltip="My Settlements" className={NAV_BUTTON_CLASS}>
+                    <Link to="/driver/settlements"><Receipt /><span>My Settlements</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath === '/driver-stats'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <Link to="/driver-stats">
-                      <BarChart className="h-4 w-4" />
-                      <span>My Stats</span>
-                    </Link>
+                  <SidebarMenuButton asChild isActive={currentPath === '/driver-stats'} tooltip="My Stats" className={NAV_BUTTON_CLASS}>
+                    <Link to="/driver-stats"><BarChart /><span>My Stats</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath === '/driver-settings'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <Link to="/driver-settings">
-                      <Settings className="h-4 w-4" />
-                      <span>My Settings</span>
-                    </Link>
+                  <SidebarMenuButton asChild isActive={currentPath === '/driver-settings'} tooltip="My Settings" className={NAV_BUTTON_CLASS}>
+                    <Link to="/driver-settings"><Settings /><span>My Settings</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -473,16 +497,13 @@ export function AppSidebar() {
 
         {/* Super Admin */}
         {isSuperAdmin && (
-          <SidebarGroup className="py-0">
-            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">System</div>
+          <SidebarGroup className="py-0 border-t border-sidebar-border/50 group-data-[collapsible=icon]:border-t-0">
+            <div className="px-3 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 group-data-[collapsible=icon]:hidden">System</div>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath === '/super-admin'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <Link to="/super-admin">
-                      <ShieldCheck className="h-4 w-4" />
-                      <span>Super Admin</span>
-                    </Link>
+                  <SidebarMenuButton asChild isActive={currentPath === '/super-admin'} tooltip="Super Admin" className={NAV_BUTTON_CLASS}>
+                    <Link to="/super-admin"><ShieldCheck /><span>Super Admin</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
