@@ -466,40 +466,28 @@ export function AppSidebar() {
 
         {/* Driver account section */}
         {hasRole('driver') && (
-          <SidebarGroup className="py-0">
-            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">My Account</div>
+          <SidebarGroup className="py-0 border-t border-sidebar-border/50 group-data-[collapsible=icon]:border-t-0">
+            <div className="px-3 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 group-data-[collapsible=icon]:hidden">My Account</div>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath === '/driver/loads'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <Link to="/driver/loads">
-                      <Package className="h-4 w-4" />
-                      <span>My Loads</span>
-                    </Link>
+                  <SidebarMenuButton asChild isActive={currentPath === '/driver/loads'} tooltip="My Loads" className={NAV_BUTTON_CLASS}>
+                    <Link to="/driver/loads"><Package /><span>My Loads</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath === '/driver/settlements'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <Link to="/driver/settlements">
-                      <Receipt className="h-4 w-4" />
-                      <span>My Settlements</span>
-                    </Link>
+                  <SidebarMenuButton asChild isActive={currentPath === '/driver/settlements'} tooltip="My Settlements" className={NAV_BUTTON_CLASS}>
+                    <Link to="/driver/settlements"><Receipt /><span>My Settlements</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath === '/driver-stats'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <Link to="/driver-stats">
-                      <BarChart className="h-4 w-4" />
-                      <span>My Stats</span>
-                    </Link>
+                  <SidebarMenuButton asChild isActive={currentPath === '/driver-stats'} tooltip="My Stats" className={NAV_BUTTON_CLASS}>
+                    <Link to="/driver-stats"><BarChart /><span>My Stats</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath === '/driver-settings'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <Link to="/driver-settings">
-                      <Settings className="h-4 w-4" />
-                      <span>My Settings</span>
-                    </Link>
+                  <SidebarMenuButton asChild isActive={currentPath === '/driver-settings'} tooltip="My Settings" className={NAV_BUTTON_CLASS}>
+                    <Link to="/driver-settings"><Settings /><span>My Settings</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -509,16 +497,13 @@ export function AppSidebar() {
 
         {/* Super Admin */}
         {isSuperAdmin && (
-          <SidebarGroup className="py-0">
-            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">System</div>
+          <SidebarGroup className="py-0 border-t border-sidebar-border/50 group-data-[collapsible=icon]:border-t-0">
+            <div className="px-3 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 group-data-[collapsible=icon]:hidden">System</div>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={currentPath === '/super-admin'} className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary">
-                    <Link to="/super-admin">
-                      <ShieldCheck className="h-4 w-4" />
-                      <span>Super Admin</span>
-                    </Link>
+                  <SidebarMenuButton asChild isActive={currentPath === '/super-admin'} tooltip="Super Admin" className={NAV_BUTTON_CLASS}>
+                    <Link to="/super-admin"><ShieldCheck /><span>Super Admin</span></Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
