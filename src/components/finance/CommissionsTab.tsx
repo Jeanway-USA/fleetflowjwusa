@@ -73,12 +73,15 @@ export function CommissionsTab({ filteredCommissions, commissionTotals, commissi
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('agent_commissions').delete().eq('id', id);
-      if (error) throw error;
+      await archiveWithUndo({
+        table: 'agent_commissions',
+        id,
+        queryClient,
+        invalidateKeys: [['agent_commissions']],
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent_commissions'] });
-      toast.success('Commission deleted');
+      /* archiveWithUndo handles toast + invalidation */
     },
     onError: (error) => toast.error(error.message),
   });
