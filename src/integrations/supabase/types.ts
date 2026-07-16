@@ -169,9 +169,11 @@ export type Database = {
       agent_commissions: {
         Row: {
           agent_name: string
+          archived_by: string | null
           commission_amount: number
           commission_rate: number
           created_at: string
+          deleted_at: string | null
           id: string
           load_id: string | null
           notes: string | null
@@ -182,9 +184,11 @@ export type Database = {
         }
         Insert: {
           agent_name: string
+          archived_by?: string | null
           commission_amount?: number
           commission_rate?: number
           created_at?: string
+          deleted_at?: string | null
           id?: string
           load_id?: string | null
           notes?: string | null
@@ -195,9 +199,11 @@ export type Database = {
         }
         Update: {
           agent_name?: string
+          archived_by?: string | null
           commission_amount?: number
           commission_rate?: number
           created_at?: string
+          deleted_at?: string | null
           id?: string
           load_id?: string | null
           notes?: string | null
@@ -1424,7 +1430,9 @@ export type Database = {
       driver_payroll: {
         Row: {
           additional_medicare_tax: number | null
+          archived_by: string | null
           created_at: string
+          deleted_at: string | null
           driver_id: string
           employer_fica_total: number | null
           employer_medicare_tax: number | null
@@ -1458,7 +1466,9 @@ export type Database = {
         }
         Insert: {
           additional_medicare_tax?: number | null
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           driver_id: string
           employer_fica_total?: number | null
           employer_medicare_tax?: number | null
@@ -1492,7 +1502,9 @@ export type Database = {
         }
         Update: {
           additional_medicare_tax?: number | null
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           driver_id?: string
           employer_fica_total?: number | null
           employer_medicare_tax?: number | null
@@ -1915,8 +1927,10 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          archived_by: string | null
           created_at: string
           deductions: number
+          deleted_at: string | null
           driver_id: string
           escrow_credited_amount: number
           generated_at: string
@@ -1942,8 +1956,10 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          archived_by?: string | null
           created_at?: string
           deductions?: number
+          deleted_at?: string | null
           driver_id: string
           escrow_credited_amount?: number
           generated_at?: string
@@ -1969,8 +1985,10 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          archived_by?: string | null
           created_at?: string
           deductions?: number
+          deleted_at?: string | null
           driver_id?: string
           escrow_credited_amount?: number
           generated_at?: string
@@ -3737,7 +3755,9 @@ export type Database = {
         Row: {
           accessorial_type: string
           amount: number
+          archived_by: string | null
           created_at: string
+          deleted_at: string | null
           id: string
           is_driver_pay: boolean
           load_id: string
@@ -3749,7 +3769,9 @@ export type Database = {
         Insert: {
           accessorial_type: string
           amount?: number
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           is_driver_pay?: boolean
           load_id: string
@@ -3761,7 +3783,9 @@ export type Database = {
         Update: {
           accessorial_type?: string
           amount?: number
+          archived_by?: string | null
           created_at?: string
+          deleted_at?: string | null
           id?: string
           is_driver_pay?: boolean
           load_id?: string
@@ -3803,9 +3827,11 @@ export type Database = {
       }
       load_expenses: {
         Row: {
+          archived_by: string | null
           card_load: number | null
           cell_phone: number | null
           created_at: string
+          deleted_at: string | null
           food_bev: number | null
           fuel_cost: number | null
           fuel_gallons: number | null
@@ -3842,9 +3868,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_by?: string | null
           card_load?: number | null
           cell_phone?: number | null
           created_at?: string
+          deleted_at?: string | null
           food_bev?: number | null
           fuel_cost?: number | null
           fuel_gallons?: number | null
@@ -3881,9 +3909,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_by?: string | null
           card_load?: number | null
           cell_phone?: number | null
           created_at?: string
+          deleted_at?: string | null
           food_bev?: number | null
           fuel_cost?: number | null
           fuel_gallons?: number | null
@@ -3952,8 +3982,10 @@ export type Database = {
       }
       load_intermediate_stops: {
         Row: {
+          archived_by: string | null
           completed_at: string | null
           created_at: string
+          deleted_at: string | null
           facility_name: string | null
           id: string
           load_id: string
@@ -3967,8 +3999,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_by?: string | null
           completed_at?: string | null
           created_at?: string
+          deleted_at?: string | null
           facility_name?: string | null
           id?: string
           load_id: string
@@ -3982,8 +4016,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_by?: string | null
           completed_at?: string | null
           created_at?: string
+          deleted_at?: string | null
           facility_name?: string | null
           id?: string
           load_id?: string
@@ -4008,8 +4044,10 @@ export type Database = {
       }
       load_status_logs: {
         Row: {
+          archived_by: string | null
           changed_at: string
           changed_by: string | null
+          deleted_at: string | null
           id: string
           load_id: string
           new_status: string
@@ -4018,8 +4056,10 @@ export type Database = {
           previous_status: string | null
         }
         Insert: {
+          archived_by?: string | null
           changed_at?: string
           changed_by?: string | null
+          deleted_at?: string | null
           id?: string
           load_id: string
           new_status: string
@@ -4028,8 +4068,10 @@ export type Database = {
           previous_status?: string | null
         }
         Update: {
+          archived_by?: string | null
           changed_at?: string
           changed_by?: string | null
+          deleted_at?: string | null
           id?: string
           load_id?: string
           new_status?: string
@@ -4070,8 +4112,10 @@ export type Database = {
       }
       maintenance_logs: {
         Row: {
+          archived_by: string | null
           cost: number | null
           created_at: string
+          deleted_at: string | null
           description: string | null
           id: string
           next_service_date: string | null
@@ -4083,8 +4127,10 @@ export type Database = {
           vendor: string | null
         }
         Insert: {
+          archived_by?: string | null
           cost?: number | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           id?: string
           next_service_date?: string | null
@@ -4096,8 +4142,10 @@ export type Database = {
           vendor?: string | null
         }
         Update: {
+          archived_by?: string | null
           cost?: number | null
           created_at?: string
+          deleted_at?: string | null
           description?: string | null
           id?: string
           next_service_date?: string | null
@@ -4932,8 +4980,10 @@ export type Database = {
       }
       safety_bonus_payouts: {
         Row: {
+          archived_by: string | null
           created_at: string
           created_by: string | null
+          deleted_at: string | null
           driver_id: string
           earned_amount: number
           id: string
@@ -4948,8 +4998,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_by?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           driver_id: string
           earned_amount?: number
           id?: string
@@ -4964,8 +5016,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_by?: string | null
           created_at?: string
           created_by?: string | null
+          deleted_at?: string | null
           driver_id?: string
           earned_amount?: number
           id?: string
@@ -5269,9 +5323,11 @@ export type Database = {
       }
       settlements: {
         Row: {
+          archived_by: string | null
           cash_advances: number | null
           cpp_benefits: number | null
           created_at: string
+          deleted_at: string | null
           driver_id: string
           driver_pay: number
           escrow_deduction: number | null
@@ -5294,9 +5350,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_by?: string | null
           cash_advances?: number | null
           cpp_benefits?: number | null
           created_at?: string
+          deleted_at?: string | null
           driver_id: string
           driver_pay?: number
           escrow_deduction?: number | null
@@ -5319,9 +5377,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_by?: string | null
           cash_advances?: number | null
           cpp_benefits?: number | null
           created_at?: string
+          deleted_at?: string | null
           driver_id?: string
           driver_pay?: number
           escrow_deduction?: number | null
@@ -6602,8 +6662,10 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          archived_by: string | null
           created_at: string
           deductions: number
+          deleted_at: string | null
           driver_id: string
           escrow_credited_amount: number
           generated_at: string
@@ -6752,8 +6814,10 @@ export type Database = {
         Returns: {
           approved_at: string | null
           approved_by: string | null
+          archived_by: string | null
           created_at: string
           deductions: number
+          deleted_at: string | null
           driver_id: string
           escrow_credited_amount: number
           generated_at: string
