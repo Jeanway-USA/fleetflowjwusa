@@ -123,6 +123,62 @@ const VIEW_CONFIG: Record<ArchivableTable, ArchiveViewConfig> = {
     label: (r) => r.request_type ?? 'Driver Request',
     meta: (r) => r.status,
   },
+  settlements: {
+    select: 'id, period_start, period_end, net_pay, status, deleted_at',
+    label: (r) =>
+      `${r.period_start ?? '?'} → ${r.period_end ?? '?'} — $${Number(r.net_pay ?? 0).toFixed(2)}`,
+    meta: (r) => r.status,
+  },
+  driver_settlements: {
+    select: 'id, period_start, period_end, net_pay, status, deleted_at',
+    label: (r) =>
+      `${r.period_start ?? '?'} → ${r.period_end ?? '?'} — $${Number(r.net_pay ?? 0).toFixed(2)}`,
+    meta: (r) => r.status,
+  },
+  driver_payroll: {
+    select: 'id, period_start, period_end, net_pay, status, deleted_at',
+    label: (r) =>
+      `${r.period_start ?? '?'} → ${r.period_end ?? '?'} — $${Number(r.net_pay ?? 0).toFixed(2)}`,
+    meta: (r) => r.status,
+  },
+  load_expenses: {
+    select: 'id, load_id, operating_total, personal_total, deleted_at',
+    label: (r) =>
+      `Load ${String(r.load_id ?? '').slice(0, 8)} — $${Number(r.operating_total ?? 0).toFixed(2)}`,
+    meta: (r) => (r.personal_total ? `Personal $${Number(r.personal_total).toFixed(2)}` : null),
+  },
+  agent_commissions: {
+    select: 'id, agent_name, commission_amount, status, payout_date, deleted_at',
+    label: (r) => `${r.agent_name ?? 'Agent'} — $${Number(r.commission_amount ?? 0).toFixed(2)}`,
+    meta: (r) => r.status,
+  },
+  safety_bonus_payouts: {
+    select: 'id, period_start, period_end, earned_amount, status, deleted_at',
+    label: (r) =>
+      `${r.period_start ?? '?'} → ${r.period_end ?? '?'} — $${Number(r.earned_amount ?? 0).toFixed(2)}`,
+    meta: (r) => r.status,
+  },
+  load_status_logs: {
+    select: 'id, load_id, previous_status, new_status, changed_at, deleted_at',
+    label: (r) => `${r.previous_status ?? '?'} → ${r.new_status ?? '?'}`,
+    meta: (r) => (r.load_id ? `Load ${String(r.load_id).slice(0, 8)}` : null),
+  },
+  load_intermediate_stops: {
+    select: 'id, load_id, stop_number, stop_type, facility_name, location, deleted_at',
+    label: (r) =>
+      `Stop ${r.stop_number ?? '?'} — ${r.facility_name ?? r.location ?? 'Unknown'}`,
+    meta: (r) => r.stop_type,
+  },
+  load_accessorials: {
+    select: 'id, load_id, accessorial_type, amount, deleted_at',
+    label: (r) => `${r.accessorial_type ?? 'Accessorial'} — $${Number(r.amount ?? 0).toFixed(2)}`,
+    meta: (r) => (r.load_id ? `Load ${String(r.load_id).slice(0, 8)}` : null),
+  },
+  maintenance_logs: {
+    select: 'id, service_type, service_date, cost, vendor, deleted_at',
+    label: (r) => `${r.service_type ?? 'Service'} — $${Number(r.cost ?? 0).toFixed(2)}`,
+    meta: (r) => r.vendor,
+  },
 };
 
 function ArchiveTab({ table }: { table: ArchivableTable }) {
