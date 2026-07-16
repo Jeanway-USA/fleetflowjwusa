@@ -64,13 +64,8 @@ export function UserMenu({ onReplayTour, hasTour }: UserMenuProps) {
           <Settings className="mr-2 h-4 w-4" />
           Settings
         </DropdownMenuItem>
-        {!isDriver && (
-          <DropdownMenuItem onClick={() => navigate('/profile')}>
-            <UserIcon className="mr-2 h-4 w-4" />
-            Profile
-          </DropdownMenuItem>
-        )}
         {hasTour && onReplayTour && (
+
           <DropdownMenuItem onClick={onReplayTour}>
             <Compass className="mr-2 h-4 w-4" />
             Replay welcome tour
