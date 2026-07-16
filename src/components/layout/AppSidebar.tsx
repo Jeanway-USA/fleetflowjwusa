@@ -45,6 +45,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
@@ -202,6 +203,7 @@ export function AppSidebar() {
   const hideDiscord = orgName?.toLowerCase().includes('jeanway') ?? false;
   const { tmsMode: currentTmsMode } = useOrganizationMode();
   const { theme } = useTheme();
+  const { isMobile, setOpenMobile } = useSidebar();
   const actuallyIsOwner = roles.includes('owner');
   const { url: signedBannerUrl } = useSignedUrl('branding-assets', bannerUrl || null);
   const { url: signedLogoUrl } = useSignedUrl('branding-assets', logoUrl || null);
@@ -209,6 +211,13 @@ export function AppSidebar() {
   const bannerSrc = signedBannerUrl || signedLogoUrl || null;
   const currentPath = location.pathname;
   const simulationSwitchTimerRef = useRef<number | null>(null);
+
+  // Auto-close the mobile drawer whenever the route changes so tapping
+  // a nav item on phones dismisses the sheet instead of covering the page.
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPath, isMobile]);
 
   const tierFeatures = TIER_FEATURES[subscriptionTier] || TIER_FEATURES.all_in_one;
 
