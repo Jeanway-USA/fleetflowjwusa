@@ -93,6 +93,7 @@ export function DriverSettlementsTab() {
       const { data, error } = await supabase
         .from('driver_settlements')
         .select('*')
+        .is('deleted_at', null)
         .order('period_end', { ascending: false });
       if (error) throw error;
       return (data ?? []) as DriverSettlement[];
