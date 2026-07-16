@@ -39,6 +39,7 @@ export function DriverPayStubsCard() {
         .select('*')
         .eq('driver_id', driver!.id)
         .eq('employment_type', 'w2_company')
+        .is('deleted_at', null)
         .order('period_end', { ascending: false });
       if (error) throw error;
       return data ?? [];
