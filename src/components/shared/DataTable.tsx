@@ -60,7 +60,9 @@ interface DataTableProps<T> {
   selectedIds?: Set<string>;
   onSelectionChange?: (ids: Set<string>) => void;
   bulkActions?: (ids: Set<string>) => React.ReactNode;
+  highlightRowId?: string | null;
 }
+
 
 function exportToCsv<T extends { id: string }>(columns: Column<T>[], data: T[], filename: string) {
   const escape = (val: string) => `"${val.replace(/"/g, '""')}"`;
