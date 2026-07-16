@@ -233,6 +233,15 @@ export function DataTable<T extends { id: string }>({
     rowVirtualizer.measure();
   }, [density, rowVirtualizer]);
 
+  // Scroll a highlighted row into view (for global search navigation).
+  useEffect(() => {
+    if (!highlightRowId) return;
+    const idx = sortedData.findIndex((item) => item.id === highlightRowId);
+    if (idx < 0) return;
+    rowVirtualizer.scrollToIndex(idx, { align: 'center' });
+  }, [highlightRowId, sortedData, rowVirtualizer]);
+
+
   const toggleColumn = (key: string) => {
     setColumnVisibility(prev => ({
       ...prev,
