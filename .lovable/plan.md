@@ -1,75 +1,45 @@
+# Global Search Enhancement
 
-## Sidebar polish & regrouping
+The existing `CommandPalette` (mounted globally, ⌘K + `/` hotkeys, wired through `TopBar`'s search button) already covers most of the request. This plan closes the gaps.
 
-Refine `src/components/layout/AppSidebar.tsx` only. No routing, auth, or data changes. Existing role/tier/tmsMode filtering, simulation mode, branding header, workspace switcher, footer, and `collapsible="icon"` behavior stay intact.
+## Changes
 
-### 1. Regroup nav items
+### 1. `src/components/shared/CommandPalette.tsx` — expand queries
 
-Replace the current four groups (Operations / Fleet Care / Safety & Compliance / Administration) with a cleaner taxonomy that matches how users think about the product:
+Add a **Trailers** category and broaden field coverage. All queries stay `.eq('org_id', orgId)` + `.limit(6)` so RLS + performance are unaffected.
 
-```text
-DASHBOARDS            (non-collapsible, role-aware — unchanged)
-  Executive / Dispatcher / Driver / Maintenance views
+- **Drivers** — search `first_name`, `last_name`, `email`, `phone`, `cdl_number`. No SSN.
+- **Trucks** — search `unit_number`, `vin`, `make`, `model`, `license_plate`.
+- **Trailers** (new) — search `unit_number`, `vin`, `license_plate`. Navigate to `/trailers?highlight=<id>`.
+- **Loads** — add `customer_name`, `broker_name`, `po_number`, `reference_number` to the existing `landstar_load_id`/`agency_code`/`origin`/`destination` `.or(...)` filter (only columns that exist on `fleet_loads` — I'll verify against the schema at build time and drop any that don't).
+- **Contacts** — keep existing (already covers customers, brokers, agents via `crm_contacts`).
 
-OPERATIONS
-  Fleet Loads, Agency Loads, Drivers, Trucks, Trailers
+Each `.or()` clause stays a single string literal (no dynamic concatenation of select columns) so supabase-js type parsing stays cheap per the query-builder-type-performance rule.
 
-FINANCE
-  Finance & P/L, Tax Hub, IFTA Reporting  (Settlements link stays inside Finance page)
+### 2. Navigate + highlight (no auto-open sheet)
 
-COMPLIANCE & SAFETY
-  Safety, Incidents, Driver Performance, Maintenance, Documents, Document Signing
+Switch result URLs from `?id=` to `?highlight=<id>` for drivers, trucks, trailers. Loads keep `?load=<id>` (existing detail-sheet behavior on that page is out of scope). Contacts keep `?id=<id>`.
 
-CRM & SALES
-  Broker/Agent CRM (label already mode-aware)
+Add a small `useHighlightRow(id)` behavior on the three list pages (`Drivers`, `Trucks`, `Trailers`):
+- Read `?highlight=` from the URL.
+- Scroll the matching row into view (`element.scrollIntoView({ block: 'center' })`).
+- Apply a temporary `data-highlight="true"` ring (`ring-2 ring-primary/60 bg-primary/5`) that fades after ~2.5s.
+- Clear the query param after applying so refreshes don't re-trigger.
 
-REPORTS & INSIGHTS
-  Company Insights, Audit Trail, Archive
+Implemented as one shared hook in `src/hooks/useHighlightRow.ts` + a `data-row-id={row.id}` attribute on the existing table rows in the three pages.
 
-SETTINGS & ADMIN     (collapsed by default for everyone; owners only)
-  Settings
-```
+### 3. TopBar — no changes needed
 
-Group memberships are set per nav item; role/tier filtering already hides items the user can't see, so empty groups auto-hide via the existing `if (items.length === 0) return null` guard in `CollapsibleNavGroup`.
+`TopBar.tsx` already dispatches `open-command-palette` and shows the ⌘K hint; no edits.
 
-### 2. Default-open logic
+## Out of scope
 
-- Open by default: Operations, Finance, Compliance & Safety, CRM & Sales.
-- Collapsed by default: Reports & Insights, Settings & Admin.
-- Keep the existing "auto-expand the group containing the active route" effect and the `localStorage` persistence (`sidebar-groups` key) so user overrides stick.
+- No new indexes / migrations. Existing `ilike` queries on limited `.eq(org_id)` result sets are fast enough for typical org sizes; revisit only if slow-query logs flag them.
+- No SSN / sensitive PII search.
+- No changes to load detail routing, CRM, or sidebar.
 
-### 3. Visual polish
+## Technical notes
 
-Inside `CollapsibleNavGroup` and the Dashboards block:
-
-- Group header: bump spacing to `px-3 pt-4 pb-1.5`, keep uppercase 11px tracking, add a subtle `text-muted-foreground/70` and hover `text-foreground`.
-- Add a thin `border-t border-sidebar-border/50` between adjacent groups (skip before the first group) for clearer visual separation.
-- Menu buttons: tighten to `h-9`, `gap-2.5`, `rounded-md`, `text-sm`.
-- Hover: `hover:bg-sidebar-accent/60`.
-- Active state: replace the current `border-l-2` treatment with a full pill — `bg-primary/10 text-primary font-medium` plus a 3px left accent bar via a `::before` pseudo (using an absolutely positioned `<span>` since Tailwind pseudo-content is awkward). Keeps the active row obvious without shifting content on hover.
-- Icons: `h-4 w-4 shrink-0`, `text-muted-foreground` at rest, `text-primary` when active.
-- Chevron on group headers: keep the existing rotate animation, size `h-3.5 w-3.5`.
-
-### 4. Icon-collapsed mode
-
-`Sidebar collapsible="icon"` already collapses to a rail. Verify group labels hide (Tailwind `group-data-[collapsible=icon]:hidden` on the header text and chevron container) so only icons render in rail mode. No structural change beyond that class addition.
-
-### 5. Role visibility (unchanged mechanics, updated mapping)
-
-Reuse `filterByRoleAndTier`. New group→items mapping:
-
-- Finance items keep `roles: ['owner', 'payroll_admin']` and their existing `feature` gates.
-- Reports & Insights: Company Insights (`insights`), Audit Trail (owner/payroll_admin), Archive (multi-role, already correct).
-- Settings & Admin: only `Settings` for owners not currently simulating (existing `actuallyIsOwner && !isSimulating` check moves here).
-
-### 6. Out of scope
-
-- No changes to `TopBar`, `DashboardLayout`, routes, or `useSubscriptionTier`.
-- Sidebar header (logo + workspace switcher) and footer (sign-out) untouched.
-- Mobile drawer already handled by `SidebarProvider`; no extra work.
-
-### Technical notes
-
-- All colors via existing sidebar semantic tokens (`--sidebar-border`, `--sidebar-accent`, `--primary`, `--muted-foreground`) — no hardcoded hex.
-- Keep `data-tour` attributes (`nav-fleet-loads`, `nav-finance`, `sidebar-nav`) on their current items so the product tour keeps working.
-- Update `STORAGE_KEY` defaults object to include the new group keys (`operations`, `finance`, `compliance`, `crm`, `reports`, `admin`) — old `fleetcare`/`safety`/`administration` keys become stale but harmless.
+- `useHighlightRow` uses `useSearchParams` and `useEffect` with a `MutationObserver` fallback so late-rendered rows (after React Query resolves) still get highlighted.
+- Trailer query and category use existing `Truck` icon (matches sidebar convention).
+- All new fields are searched case-insensitively via `ilike`.

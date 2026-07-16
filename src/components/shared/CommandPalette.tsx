@@ -134,21 +134,26 @@ export function CommandPalette() {
     queryFn: async () => {
       const term = debounced.trim();
       const like = `%${term}%`;
-      const [loads, drivers, trucks, contacts] = await Promise.all([
+      const [loads, drivers, trucks, trailers, contacts] = await Promise.all([
         supabase.from('fleet_loads')
-          .select('id, landstar_load_id, agency_code, origin, destination, status')
+          .select('id, landstar_load_id, agency_code, origin, destination, status, invoice_number, pickup_number, tracking_id')
           .eq('org_id', orgId!)
-          .or(`landstar_load_id.ilike.${like},agency_code.ilike.${like},origin.ilike.${like},destination.ilike.${like}`)
+          .or(`landstar_load_id.ilike.${like},agency_code.ilike.${like},origin.ilike.${like},destination.ilike.${like},invoice_number.ilike.${like},pickup_number.ilike.${like},tracking_id.ilike.${like}`)
           .limit(6),
         supabase.from('drivers')
-          .select('id, first_name, last_name')
+          .select('id, first_name, last_name, email, phone, license_number')
           .eq('org_id', orgId!)
-          .or(`first_name.ilike.${like},last_name.ilike.${like}`)
+          .or(`first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},phone.ilike.${like},license_number.ilike.${like}`)
           .limit(6),
         supabase.from('trucks')
-          .select('id, unit_number, make, model')
+          .select('id, unit_number, make, model, vin, license_plate')
           .eq('org_id', orgId!)
-          .ilike('unit_number', like)
+          .or(`unit_number.ilike.${like},vin.ilike.${like},license_plate.ilike.${like},make.ilike.${like},model.ilike.${like}`)
+          .limit(6),
+        supabase.from('trailers')
+          .select('id, unit_number, make, model, vin, license_plate')
+          .eq('org_id', orgId!)
+          .or(`unit_number.ilike.${like},vin.ilike.${like},license_plate.ilike.${like},make.ilike.${like},model.ilike.${like}`)
           .limit(6),
         supabase.from('crm_contacts')
           .select('id, company_name, agent_code, contact_type')
@@ -160,8 +165,10 @@ export function CommandPalette() {
         loads: loads.data ?? [],
         drivers: drivers.data ?? [],
         trucks: trucks.data ?? [],
+        trailers: trailers.data ?? [],
         contacts: contacts.data ?? [],
       };
+
     },
   });
 
@@ -180,7 +187,7 @@ export function CommandPalette() {
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput
-        placeholder="Search loads, drivers, trucks, contacts… or type a command"
+        placeholder="Search loads, drivers, trucks, trailers, contacts… or type a command"
         value={search}
         onValueChange={setSearch}
       />
@@ -267,11 +274,14 @@ export function CommandPalette() {
                   {searchResults.drivers.map((d: any) => (
                     <CommandItem
                       key={d.id}
-                      value={`driver ${d.first_name ?? ''} ${d.last_name ?? ''}`}
-                      onSelect={() => run(() => navigate(`/drivers?id=${d.id}`))}
+                      value={`driver ${d.first_name ?? ''} ${d.last_name ?? ''} ${d.email ?? ''} ${d.phone ?? ''} ${d.license_number ?? ''}`}
+                      onSelect={() => run(() => navigate(`/drivers?highlight=${d.id}`))}
                     >
                       <User className="mr-2 h-4 w-4" />
-                      {(d.first_name || '') + ' ' + (d.last_name || '')}
+                      <span className="truncate">
+                        {(d.first_name || '') + ' ' + (d.last_name || '')}
+                        {d.email && <span className="ml-2 text-muted-foreground">{d.email}</span>}
+                      </span>
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -284,8 +294,8 @@ export function CommandPalette() {
                   {searchResults.trucks.map((t: any) => (
                     <CommandItem
                       key={t.id}
-                      value={`truck ${t.unit_number}`}
-                      onSelect={() => run(() => navigate(`/trucks?id=${t.id}`))}
+                      value={`truck ${t.unit_number ?? ''} ${t.vin ?? ''} ${t.license_plate ?? ''} ${t.make ?? ''} ${t.model ?? ''}`}
+                      onSelect={() => run(() => navigate(`/trucks?highlight=${t.id}`))}
                     >
                       <Truck className="mr-2 h-4 w-4" />
                       Unit {t.unit_number}
@@ -295,6 +305,25 @@ export function CommandPalette() {
                 </CommandGroup>
               </>
             )}
+            {searchResults.trailers.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Trailers">
+                  {searchResults.trailers.map((t: any) => (
+                    <CommandItem
+                      key={t.id}
+                      value={`trailer ${t.unit_number ?? ''} ${t.vin ?? ''} ${t.license_plate ?? ''} ${t.make ?? ''} ${t.model ?? ''}`}
+                      onSelect={() => run(() => navigate(`/trailers?highlight=${t.id}`))}
+                    >
+                      <Truck className="mr-2 h-4 w-4" />
+                      Trailer {t.unit_number}
+                      {t.make && <span className="ml-2 text-muted-foreground">{t.make} {t.model}</span>}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+
             {searchResults.contacts.length > 0 && (
               <>
                 <CommandSeparator />

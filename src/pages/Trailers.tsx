@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useHighlightRow } from '@/hooks/useHighlightRow';
+
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -94,6 +96,8 @@ const toEditableTrailer = (trailer?: TrailerWithDriver | null): Partial<TrailerI
 };
 
 export default function Trailers() {
+  const highlightId = useHighlightRow();
+
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTrailer, setEditingTrailer] = useState<TrailerWithDriver | null>(null);
@@ -348,6 +352,8 @@ export default function Trailers() {
         emptyAction={{ label: 'Add First Trailer', onClick: () => openDialog() }}
         tableId="trailers"
         exportFilename="trailers"
+        highlightRowId={highlightId}
+
         onRowDoubleClick={(trailer) => openDialog(trailer)}
         selectable
         selectedIds={selectedIds}

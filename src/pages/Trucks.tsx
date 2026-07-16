@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useHighlightRow } from '@/hooks/useHighlightRow';
+
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { DataTable } from '@/components/shared/DataTable';
@@ -96,6 +98,8 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
 
 
 export default function Trucks() {
+  const highlightId = useHighlightRow();
+
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTruck, setEditingTruck] = useState<TruckWithDriver | null>(null);
@@ -454,8 +458,10 @@ export default function Trucks() {
         emptyAction={{ label: 'Add First Truck', onClick: () => openDialog() }}
         tableId="trucks"
         exportFilename="trucks"
+        highlightRowId={highlightId}
         onRowDoubleClick={(truck) => openDialog(truck)}
         selectable
+
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
         bulkActions={(ids) => (

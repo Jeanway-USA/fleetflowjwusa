@@ -60,7 +60,9 @@ interface DataTableProps<T> {
   selectedIds?: Set<string>;
   onSelectionChange?: (ids: Set<string>) => void;
   bulkActions?: (ids: Set<string>) => React.ReactNode;
+  highlightRowId?: string | null;
 }
+
 
 function exportToCsv<T extends { id: string }>(columns: Column<T>[], data: T[], filename: string) {
   const escape = (val: string) => `"${val.replace(/"/g, '""')}"`;
@@ -100,6 +102,7 @@ export function DataTable<T extends { id: string }>({
   selectedIds,
   onSelectionChange,
   bulkActions,
+  highlightRowId,
 }: DataTableProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<{ time: number; id: string }>({ time: 0, id: '' });
@@ -229,6 +232,15 @@ export function DataTable<T extends { id: string }>({
   useEffect(() => {
     rowVirtualizer.measure();
   }, [density, rowVirtualizer]);
+
+  // Scroll a highlighted row into view (for global search navigation).
+  useEffect(() => {
+    if (!highlightRowId) return;
+    const idx = sortedData.findIndex((item) => item.id === highlightRowId);
+    if (idx < 0) return;
+    rowVirtualizer.scrollToIndex(idx, { align: 'center' });
+  }, [highlightRowId, sortedData, rowVirtualizer]);
+
 
   const toggleColumn = (key: string) => {
     setColumnVisibility(prev => ({
@@ -517,6 +529,8 @@ export function DataTable<T extends { id: string }>({
                   <tr
                     key={item.id}
                     data-index={virtualRow.index}
+                    data-row-id={item.id}
+
                     onClick={() => onRowClick?.(item)}
                     onDoubleClick={() => onRowDoubleClick?.(item)}
                     onTouchEnd={() => handleTouchEnd(item)}

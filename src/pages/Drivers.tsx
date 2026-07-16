@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHighlightRow } from '@/hooks/useHighlightRow';
+
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
@@ -70,6 +72,8 @@ function DriverAvatar({ avatarPath, initials }: { avatarPath: string | null; ini
 }
 
 export default function Drivers() {
+  useHighlightRow();
+
   const { isOwner, orgId } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -417,7 +421,7 @@ export default function Drivers() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {drivers.map((driver: any) => (
-            <Card key={driver.id} className="card-elevated overflow-hidden">
+            <Card key={driver.id} data-row-id={driver.id} className="card-elevated overflow-hidden">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
