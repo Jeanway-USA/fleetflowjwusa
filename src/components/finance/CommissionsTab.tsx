@@ -16,6 +16,7 @@ import { Plus, Pencil, Trash2, Briefcase, MoreHorizontal } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { formatCurrency } from '@/lib/formatters';
 import type { Database } from '@/integrations/supabase/types';
+import { archiveWithUndo } from '@/lib/soft-delete';
 
 type AgentCommission = Database['public']['Tables']['agent_commissions']['Row'];
 type AgentCommissionInsert = Database['public']['Tables']['agent_commissions']['Insert'];
