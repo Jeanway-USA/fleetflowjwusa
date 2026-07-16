@@ -133,30 +133,34 @@ interface CollapsibleNavGroupProps {
   currentPath: string;
 }
 
+// Shared classes for menu buttons (active pill + left accent bar)
+const NAV_BUTTON_CLASS =
+  "relative h-9 gap-2.5 rounded-md text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-foreground " +
+  "data-[active=true]:bg-primary/10 data-[active=true]:text-primary data-[active=true]:font-medium " +
+  "data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1.5 data-[active=true]:before:bottom-1.5 " +
+  "data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-primary " +
+  "[&>svg]:h-4 [&>svg]:w-4 [&>svg]:shrink-0 [&>svg]:text-muted-foreground data-[active=true]:[&>svg]:text-primary";
+
 function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, currentPath }: CollapsibleNavGroupProps) {
   if (items.length === 0) return null;
 
   return (
     <Collapsible open={isOpen} onOpenChange={(open) => onToggle(groupKey, open)}>
-      <SidebarGroup className="py-0">
-        <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors group">
+      <SidebarGroup className="py-0 border-t border-sidebar-border/50 first:border-t-0 group-data-[collapsible=icon]:border-t-0">
+        <CollapsibleTrigger className="flex w-full items-center justify-between px-3 pt-4 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground transition-colors group group-data-[collapsible=icon]:hidden">
           <span>{label}</span>
           <ChevronRight className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-90" />
         </CollapsibleTrigger>
-        <CollapsibleContent>
+        <CollapsibleContent className="group-data-[collapsible=icon]:!hidden">
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => {
                 const active = currentPath === item.path || currentPath.startsWith(item.path + '/');
                 return (
                   <SidebarMenuItem key={item.path} {...(item.tourId ? { 'data-tour': item.tourId } : {})}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={active}
-                      className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary"
-                    >
+                    <SidebarMenuButton asChild isActive={active} className={NAV_BUTTON_CLASS}>
                       <Link to={item.path}>
-                        <item.icon className="h-4 w-4" />
+                        <item.icon />
                         <span>{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -166,6 +170,24 @@ function CollapsibleNavGroup({ groupKey, label, items, isOpen, onToggle, current
             </SidebarMenu>
           </SidebarGroupContent>
         </CollapsibleContent>
+        {/* Icon-rail mode: render items flat without the collapsible header */}
+        <SidebarGroupContent className="hidden group-data-[collapsible=icon]:block">
+          <SidebarMenu>
+            {items.map((item) => {
+              const active = currentPath === item.path || currentPath.startsWith(item.path + '/');
+              return (
+                <SidebarMenuItem key={`icon-${item.path}`}>
+                  <SidebarMenuButton asChild isActive={active} tooltip={item.title} className={NAV_BUTTON_CLASS}>
+                    <Link to={item.path}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </SidebarGroupContent>
       </SidebarGroup>
     </Collapsible>
   );
