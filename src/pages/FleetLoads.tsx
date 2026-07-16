@@ -378,7 +378,8 @@ export default function FleetLoads() {
       const { data: loadAccs } = await supabase
         .from('load_accessorials')
         .select('*')
-        .eq('load_id', load.id);
+        .eq('load_id', load.id)
+        .is('deleted_at', null);
       
       if (loadAccs && loadAccs.length > 0) {
         setAccessorials(loadAccs.map((a: any) => ({
