@@ -96,6 +96,8 @@ const toEditableTrailer = (trailer?: TrailerWithDriver | null): Partial<TrailerI
 };
 
 export default function Trailers() {
+  const highlightId = useHighlightRow();
+
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTrailer, setEditingTrailer] = useState<TrailerWithDriver | null>(null);
