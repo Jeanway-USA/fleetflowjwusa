@@ -80,7 +80,8 @@ export function CompensationSettingsTab({ getSetting }: CompensationSettingsTabP
       // Fetch all accessorials
       const { data: allAccessorials, error: accError } = await supabase
         .from('load_accessorials')
-        .select('*');
+        .select('*')
+        .is('deleted_at', null);
       if (accError) throw accError;
 
       let updated = 0;
