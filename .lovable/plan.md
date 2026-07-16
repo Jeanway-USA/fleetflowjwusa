@@ -1,53 +1,74 @@
-# Reusable Toast System (semantic `notify` wrapper on sonner)
+# Drivers Page: Cleaner Cards + Toolbar + Bulk Select
 
-The app already renders `<Sonner />` globally in `App.tsx` and ~109 files import `toast` from `sonner`. This plan adds a thin, typed, on-brand wrapper without touching existing call sites.
+Refactors `src/pages/Drivers.tsx` presentation only. No schema/API changes.
 
-## Changes
+## 1. New toolbar above the grid
 
-### 1. `src/components/ui/sonner.tsx` — position + richColors
-Configure the global Toaster:
-- `position="bottom-right"`
-- `richColors` (enables semantic success/error/warning/info tinting that respects dark mode via CSS vars)
-- `closeButton`
-- `expand={false}`, `visibleToasts={4}`
-- Keep the existing `classNames` styling on the base toast (border/shadow/foreground) so custom `toast()` calls still look on-brand; rich color variants override background/foreground per type.
+New `<DriversToolbar />` rendered between `PageHeader` and the grid:
 
-No changes to how sonner is mounted in `App.tsx`.
+- **Search input** — filters by name, email, phone, CDL, Landstar ID (client-side over already-loaded drivers).
+- **Status filter** — `Select`: All / Active / Inactive / Onboarding / Archived (uses existing `driver.status`).
+- **Sort** — `Select`: Name A–Z, Name Z–A, Recently Hired, Compliance (soonest expiry first).
+- **View toggle** — Grid / Table (table view uses existing `DataTable` pattern; keeps parity with other list pages). Persist choice in `localStorage`.
+- **Bulk actions bar** appears only when `selectedIds.size > 0`: shows "N selected", `Archive Selected`, `Clear` buttons. Archive runs existing soft-delete mutation in a loop, then a single `notify.undo("N drivers archived", …)` from the new `notify` helper.
 
-### 2. `src/lib/notify.ts` — new semantic wrapper
-Single file exporting a `notify` object plus a `useNotify()` hook (returns the same object — components can `import { notify }` or `const notify = useNotify()`; both work).
+All state kept in the page component (`search`, `statusFilter`, `sortBy`, `view`, `selectedIds: Set<string>`). No new context.
 
-API:
-```ts
-notify.success(message, opts?)
-notify.error(message, opts?)     // longer default duration (7s)
-notify.warning(message, opts?)
-notify.info(message, opts?)
-notify.loading(message, opts?)
-notify.promise(promise, { loading, success, error })
-notify.dismiss(id?)
+## 2. Card redesign (in-place, same file)
 
-// Undo helper — matches how Archive already works elsewhere in the app.
-notify.undo(message, onUndo, opts?)   // 10s default, matches archive undo window
+The card at lines ~422–592 gets restructured for scannability:
 
-// Generic action button
-notify.action(message, { label, onClick, type? }, opts?)
+```text
+┌──────────────────────────────────────────────┐
+│ ☐  [Avatar]  Name                     [•••]  │
+│              [Status] [Onboarding]           │
+│              Landstar #12345 · CDL A         │
+├──────────────────────────────────────────────┤
+│ 📞 phone      ✉ email        (icon-only if   │
+│                                narrow)       │
+├──────────────────────────────────────────────┤
+│ Credentials & Compliance                     │
+│   License      · exp 12/24  ●                │
+│   Medical      · exp 03/25  ●                │
+│   MVR          · exp 08/25  ●                │
+├──────────────────────────────────────────────┤
+│ [View] [Edit] [Archive]                      │
+└──────────────────────────────────────────────┘
 ```
 
-`opts` is a subset of sonner's `ExternalToast`: `{ description?, duration?, id?, important? }`. No new deps.
+Concretely:
+- Left checkbox for bulk select (only shows on hover OR when any driver is selected — same pattern as Gmail).
+- Header: avatar + name + badges row + a single meta line (Landstar ID · CDL class) instead of scattered lines.
+- Status badges upgraded via a small local helper `driverStatusBadge(status)` returning tone-aware `<Badge>` variants:
+  - `active` → `bg-emerald-500/15 text-emerald-500 border-emerald-500/30` (semantic tokens via `success` variant added to Badge if missing — otherwise inline HSL-token classes already used elsewhere).
+  - `inactive` → muted/secondary.
+  - `onboarding` → `warning` tone (amber via `--warning` if defined, else `secondary` w/ dot).
+  - `archived` → outline destructive.
+  Small colored dot before the label for glanceability.
+- Contact block: phone + email condensed to a single row of icon chips (kept as `<a href>`).
+- **Credentials & Compliance** section: keep existing `<CredentialsCompliance variant="section" />` but wrap in a labeled block with consistent `grid-cols-[1fr_auto_auto]` alignment (label · date · status dot). If tightening the internal grid is needed, edit `src/components/drivers/CredentialsCompliance.tsx` in the same pass — only alignment/spacing tweaks, no logic change.
+- **Quick actions footer**: three visible buttons — `View` (opens `DriverDetailSheet` = current `setSelectedDriver`), `Edit` (existing `openDialog(driver)`), `Archive` (existing `deleteWithUndo(driver)`). Overflow menu (`•••`) retains View Dashboard, Invite, Signed Documents, etc.
 
-### 3. Documentation
-Add short JSDoc on each method with examples so autocomplete surfaces usage. No separate README.
+## 3. Files
 
-## Explicitly out of scope
+- **Edit** `src/pages/Drivers.tsx`:
+  - Add filter/sort/search/view/selection state.
+  - Extract the card body into a local `DriverCard` component (top of file, unexported) to keep the page readable.
+  - Add `DriversToolbar` as a local component in the same file.
+  - Compute `filteredDrivers` via `useMemo`.
+- **Edit** `src/components/drivers/CredentialsCompliance.tsx` (only if needed for alignment): tighten row grid to `grid-cols-[1fr_auto_auto] gap-x-3`.
+- **New** none. No new routes, no new tables.
 
-- No migration of existing 109 `toast(...)` sites — they keep working unchanged.
-- No changes to the legacy shadcn `use-toast` / `<Toaster />` (still mounted, still functional for its ~5 callers).
-- No changes to `App.tsx`, business logic, or any page code.
-- No new context — sonner is already global; a plain module export + trivial hook is enough.
+## 4. Out of scope
+
+- No changes to `DriverDetailSheet`, add/edit dialog, banking, i9/w4/w9, or CSV import.
+- No server-side filtering — dataset is small and already loaded.
+- No changes to StatusBadge globally; the driver-specific tones live in the page helper so other pages are untouched.
+- No changes to permissions or archive logic — reuses existing mutation.
 
 ## Technical notes
 
-- `richColors` uses sonner's CSS variables that already resolve from `--background`, `--foreground`, etc., so dark theme works with no extra styling.
-- Undo helper builds on sonner's built-in `action: { label, onClick }`; if user doesn't click within `duration`, no callback fires — matching current `soft-delete` archive UX.
-- Wrapper returns the sonner toast id (`string | number`) so callers can programmatically `dismiss(id)`.
+- Bulk archive: iterates `selectedIds` and calls the existing single-driver soft-delete mutation via `Promise.allSettled`, then invalidates `['drivers']` once. Uses `notify.undo` for a single grouped toast; Undo iterates and restores `deleted_at = null`.
+- Sort by compliance uses `Math.min(license_expiry, medical_card_expiry, mvr_expiry)` ignoring nulls; nulls sort last.
+- All colors go through existing semantic tokens (`--primary`, `--muted-foreground`, `--destructive`, `--warning` if present) — no hardcoded hex.
+- Checkbox column stays keyboard-accessible (`Space` toggles, focus ring via existing `Checkbox`).
