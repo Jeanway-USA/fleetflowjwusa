@@ -517,6 +517,8 @@ export function DataTable<T extends { id: string }>({
                   <tr
                     key={item.id}
                     data-index={virtualRow.index}
+                    data-row-id={item.id}
+
                     onClick={() => onRowClick?.(item)}
                     onDoubleClick={() => onRowDoubleClick?.(item)}
                     onTouchEnd={() => handleTouchEnd(item)}
