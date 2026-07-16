@@ -39,6 +39,7 @@ export function StatusHistoryLog({ loadId, pickupDate, pickupTime, deliveryDate,
         .from('load_status_logs')
         .select('*')
         .eq('load_id', loadId)
+        .is('deleted_at', null)
         .order('changed_at', { ascending: true });
       
       if (error) throw error;
