@@ -419,7 +419,7 @@ export function AppSidebar() {
         {/* Dashboards — non-collapsible */}
         {filteredDashboards.length > 0 && (
           <SidebarGroup className="py-0 mt-1">
-            <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="px-3 pt-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
               {actuallyIsOwner ? 'Dashboards' : 'Main'}
             </div>
             <SidebarGroupContent>
@@ -430,6 +430,7 @@ export function AppSidebar() {
                     <SidebarMenuItem key={item.path}>
                       <SidebarMenuButton
                         isActive={active}
+                        tooltip={item.title}
                         onClick={() => {
                           if (actuallyIsOwner && pathToRole[item.path]) {
                             handleDashboardSwitch(item.path, pathToRole[item.path]);
@@ -437,9 +438,9 @@ export function AppSidebar() {
                             navigate(item.path);
                           }
                         }}
-                        className="hover:bg-sidebar-accent data-[active=true]:bg-primary/15 data-[active=true]:text-primary data-[active=true]:font-semibold data-[active=true]:border-l-2 data-[active=true]:border-primary"
+                        className={NAV_BUTTON_CLASS}
                       >
-                        <item.icon className="h-4 w-4" />
+                        <item.icon />
                         <span>{item.title}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
