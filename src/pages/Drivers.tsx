@@ -507,177 +507,292 @@ export default function Drivers() {
           action={{ label: 'Add Driver', onClick: () => openDialog() }}
         />
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {drivers.map((driver: any) => (
-            <Card key={driver.id} data-row-id={driver.id} className="card-elevated overflow-hidden">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="relative group">
-                      <DriverAvatar 
-                        avatarPath={driver.avatar_url} 
-                        initials={getInitials(driver.first_name, driver.last_name)} 
-                      />
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        id={`avatar-${driver.id}`}
-                        onChange={(e) => handleAvatarUpload(e, driver.id)}
-                      />
-                      <label
-                        htmlFor={`avatar-${driver.id}`}
-                        className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                      >
-                        <Upload className="h-5 w-5 text-white" />
-                      </label>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg">{driver.first_name} {driver.last_name}</h3>
-                      <div className="flex items-center gap-2 flex-wrap mt-1">
-                        <StatusBadge status={driver.status} />
-                        {(() => {
-                          const s = getOnboardingStatus(driver);
-                          const variant = s.tone === 'ok' ? 'default' : s.tone === 'warn' ? 'secondary' : 'outline';
-                          return <Badge variant={variant as any} className="text-xs">{s.label}</Badge>;
-                        })()}
-                      </div>
-                      {driver.landstar_operator_id && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Landstar ID: <span className="font-mono">{driver.landstar_operator_id}</span>
-                        </p>
-                      )}
-                    </div>
+        <>
+          {/* Toolbar */}
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name, email, phone, CDL, Landstar ID…"
+                className="pl-9 pr-9"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted text-muted-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="onboarding">Onboarding</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+              <SelectTrigger className="w-full sm:w-[190px]">
+                <ArrowUpDown className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name_asc">Name (A–Z)</SelectItem>
+                <SelectItem value="name_desc">Name (Z–A)</SelectItem>
+                <SelectItem value="hire_recent">Recently hired</SelectItem>
+                <SelectItem value="compliance">Compliance (soonest)</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="inline-flex rounded-md border border-border overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setView('grid')}
+                aria-label="Grid view"
+                aria-pressed={view === 'grid'}
+                className={`px-2.5 py-2 text-sm ${view === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('list')}
+                aria-label="List view"
+                aria-pressed={view === 'list'}
+                className={`px-2.5 py-2 text-sm border-l border-border ${view === 'list' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}
+              >
+                <ListIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
 
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {isOwner && (
-                        <DropdownMenuItem onClick={() => navigate(`/driver-view/${driver.id}`)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Dashboard
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem onClick={() => setProfileDriver(driver)}>
-                        <User className="h-4 w-4 mr-2" />
-                        View Profile
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setSelectedDriver(driver)}>
-                        <FileText className="h-4 w-4 mr-2" />
-                        Documents
-                      </DropdownMenuItem>
+          {/* Bulk action bar */}
+          {selectedIds.size > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+              <Checkbox
+                checked={allVisibleSelected}
+                onCheckedChange={toggleSelectAllVisible}
+                aria-label="Select all visible"
+              />
+              <span className="text-sm font-medium">
+                {selectedIds.size} selected
+              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={bulkArchive}>
+                  <Archive className="h-4 w-4 mr-2" /> Archive selected
+                </Button>
+                <Button variant="ghost" size="sm" onClick={clearSelection}>
+                  Clear
+                </Button>
+              </div>
+            </div>
+          )}
 
-                      {isOwner && (
-                        <DropdownMenuItem onClick={() => setSignedDocsDriver(driver)}>
-                          <FileSignature className="h-4 w-4 mr-2" />
-                          Signed Documents
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem onClick={() => openDialog(driver)}>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      {isOwner && !driver.user_id && (
-                        <DropdownMenuItem
-                          disabled={!driver.email || inviteDriverMutation.isPending}
-                          onClick={() => inviteDriverMutation.mutate(driver)}
+          {filteredDrivers.length === 0 ? (
+            <div className="rounded-md border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
+              No drivers match your filters.
+            </div>
+          ) : (
+            <div className={view === 'grid' ? 'grid gap-6 md:grid-cols-2 lg:grid-cols-3' : 'flex flex-col gap-3'}>
+              {filteredDrivers.map((driver: any) => {
+                const tone = statusTone(driver.status);
+                const onb = getOnboardingStatus(driver);
+                const selected = selectedIds.has(driver.id);
+                return (
+                  <Card
+                    key={driver.id}
+                    data-row-id={driver.id}
+                    className={`card-elevated overflow-hidden group transition-colors ${selected ? 'ring-2 ring-primary/50' : ''}`}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`pt-1 transition-opacity ${selected || selectedIds.size > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}
                         >
-                          <Mail className="h-4 w-4 mr-2" />
-                          {driver.email ? 'Invite to log in' : 'Add email to invite'}
-                        </DropdownMenuItem>
-                      )}
+                          <Checkbox
+                            checked={selected}
+                            onCheckedChange={() => toggleSelect(driver.id)}
+                            aria-label={`Select ${driver.first_name} ${driver.last_name}`}
+                          />
+                        </div>
+                        <div className="relative group/avatar shrink-0">
+                          <DriverAvatar
+                            avatarPath={driver.avatar_url}
+                            initials={getInitials(driver.first_name, driver.last_name)}
+                          />
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            id={`avatar-${driver.id}`}
+                            onChange={(e) => handleAvatarUpload(e, driver.id)}
+                          />
+                          <label
+                            htmlFor={`avatar-${driver.id}`}
+                            className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover/avatar:opacity-100 transition-opacity cursor-pointer"
+                          >
+                            <Upload className="h-5 w-5 text-white" />
+                          </label>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-semibold text-lg truncate">
+                            {driver.first_name} {driver.last_name}
+                          </h3>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${tone.cls}`}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
+                              {tone.label}
+                            </span>
+                            <Badge
+                              variant={onb.tone === 'ok' ? 'default' : onb.tone === 'warn' ? 'secondary' : 'outline'}
+                              className="text-xs"
+                            >
+                              {onb.label}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 truncate">
+                            {driver.landstar_operator_id && (
+                              <>Landstar #<span className="font-mono">{driver.landstar_operator_id}</span></>
+                            )}
+                            {driver.landstar_operator_id && driver.license_number && <span className="mx-1.5">·</span>}
+                            {driver.license_number && <>CDL {driver.license_number}</>}
+                            {!driver.landstar_operator_id && !driver.license_number && <>No CDL on file</>}
+                          </p>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {isOwner && (
+                              <DropdownMenuItem onClick={() => navigate(`/driver-view/${driver.id}`)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Dashboard
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => setProfileDriver(driver)}>
+                              <User className="h-4 w-4 mr-2" />
+                              View Profile
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSelectedDriver(driver)}>
+                              <FileText className="h-4 w-4 mr-2" />
+                              Documents
+                            </DropdownMenuItem>
+                            {isOwner && (
+                              <DropdownMenuItem onClick={() => setSignedDocsDriver(driver)}>
+                                <FileSignature className="h-4 w-4 mr-2" />
+                                Signed Documents
+                              </DropdownMenuItem>
+                            )}
+                            {isOwner && !driver.user_id && (
+                              <DropdownMenuItem
+                                disabled={!driver.email || inviteDriverMutation.isPending}
+                                onClick={() => inviteDriverMutation.mutate(driver)}
+                              >
+                                <Mail className="h-4 w-4 mr-2" />
+                                {driver.email ? 'Invite to log in' : 'Add email to invite'}
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* Contact + link row */}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+                        {driver.phone && (
+                          <a href={`tel:${driver.phone}`} className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline">
+                            <Phone className="h-4 w-4" />
+                            <span>{driver.phone}</span>
+                          </a>
+                        )}
+                        {driver.email && (
+                          <a href={`mailto:${driver.email}`} className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground min-w-0">
+                            <Mail className="h-4 w-4 shrink-0" />
+                            <span className="truncate">{driver.email}</span>
+                          </a>
+                        )}
+                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                          {driver.user_id ? (
+                            <><Link className="h-3.5 w-3.5 text-primary" /> Linked</>
+                          ) : (
+                            <><Link2Off className="h-3.5 w-3.5" /> No login</>
+                          )}
+                        </span>
+                      </div>
 
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(driver)}>
-                        <Archive className="h-4 w-4 mr-2" />
-                        Archive
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Linked User Account */}
-                <div className="flex items-center gap-2 text-sm">
-                  {driver.user_id ? (
-                    <>
-                      <Link className="h-4 w-4 text-primary" />
-                      <span className="text-primary font-medium">
-                        Linked to: {getLinkedUser(driver.user_id)?.email || 'Unknown User'}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Link2Off className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">No linked user account</span>
-                    </>
-                  )}
-                </div>
+                      {/* Credentials & Compliance */}
+                      <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+                        <CredentialsCompliance driver={driver} variant="section" />
+                        {((driver as any).mvr_expiry || driver.hazmat_expiry) && (
+                          <div className="mt-3 pt-3 border-t border-border/60 space-y-2">
+                            {(driver as any).mvr_expiry && (
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground inline-flex items-center gap-2">
+                                  <Shield className="h-4 w-4" /> Annual MVR
+                                </span>
+                                <span className={isExpiringSoon((driver as any).mvr_expiry) ? 'text-destructive font-medium' : 'font-medium'}>
+                                  {formatDate((driver as any).mvr_expiry)}
+                                </span>
+                              </div>
+                            )}
+                            {driver.hazmat_expiry && (
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground inline-flex items-center gap-2">
+                                  <AlertTriangle className="h-4 w-4" /> HAZMAT
+                                </span>
+                                <span className={isExpiringSoon(driver.hazmat_expiry) ? 'text-destructive font-medium' : 'font-medium'}>
+                                  {formatDate(driver.hazmat_expiry)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
 
-                {driver.phone && (
-                  <a
-                    href={`tel:${driver.phone}`}
-                    className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                  >
-                    <Phone className="h-4 w-4" />
-                    <span>{driver.phone}</span>
-                  </a>
-                )}
-                {driver.email && (
-                  <a
-                    href={`mailto:${driver.email}`}
-                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    <Mail className="h-4 w-4" />
-                    <span className="truncate">{driver.email}</span>
-                  </a>
-                )}
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Pay Rate</span>
+                        <span className="font-medium">{formatPayRate(driver.pay_type, driver.pay_rate)}</span>
+                      </div>
 
-                <div className="pt-2 border-t">
-                  <CredentialsCompliance driver={driver} variant="section" />
-                </div>
-
-                {(driver as any).mvr_expiry && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-2">
-                      <Shield className="h-4 w-4" />
-                      Annual MVR
-                    </span>
-                    <span className={isExpiringSoon((driver as any).mvr_expiry) ? 'text-destructive font-medium' : ''}>
-                      {formatDate((driver as any).mvr_expiry)}
-                    </span>
-                  </div>
-                )}
-
-                {driver.hazmat_expiry && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4" />
-                      HAZMAT
-                    </span>
-                    <span className={isExpiringSoon(driver.hazmat_expiry) ? 'text-destructive font-medium' : ''}>
-                      {formatDate(driver.hazmat_expiry)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="pt-2 border-t flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Pay Rate</span>
-                  <span className="font-medium">
-                    {formatPayRate(driver.pay_type, driver.pay_rate)}
-                  </span>
-                </div>
-
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                      {/* Quick actions */}
+                      <div className="pt-2 border-t flex items-center gap-2">
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setProfileDriver(driver)}>
+                          <Eye className="h-4 w-4 mr-1.5" /> View
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1" onClick={() => openDialog(driver)}>
+                          <Pencil className="h-4 w-4 mr-1.5" /> Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 text-destructive hover:text-destructive"
+                          onClick={() => deleteWithUndo(driver)}
+                        >
+                          <Archive className="h-4 w-4 mr-1.5" /> Archive
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
+
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
