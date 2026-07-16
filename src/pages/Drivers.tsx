@@ -72,6 +72,8 @@ function DriverAvatar({ avatarPath, initials }: { avatarPath: string | null; ini
 }
 
 export default function Drivers() {
+  useHighlightRow();
+
   const { isOwner, orgId } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
