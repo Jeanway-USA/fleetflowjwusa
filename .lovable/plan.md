@@ -1,74 +1,80 @@
-# Drivers Page: Cleaner Cards + Toolbar + Bulk Select
 
-Refactors `src/pages/Drivers.tsx` presentation only. No schema/API changes.
+## Extend soft-delete to finance & load/maintenance sub-records
 
-## 1. New toolbar above the grid
+Adds archiving with Undo toast + Archive page support to 10 more tables. Everything reuses the existing `archive_record` / `restore_record` RPCs and `archiveWithUndo` helper — no new infrastructure.
 
-New `<DriversToolbar />` rendered between `PageHeader` and the grid:
+### Tables getting `deleted_at`
 
-- **Search input** — filters by name, email, phone, CDL, Landstar ID (client-side over already-loaded drivers).
-- **Status filter** — `Select`: All / Active / Inactive / Onboarding / Archived (uses existing `driver.status`).
-- **Sort** — `Select`: Name A–Z, Name Z–A, Recently Hired, Compliance (soonest expiry first).
-- **View toggle** — Grid / Table (table view uses existing `DataTable` pattern; keeps parity with other list pages). Persist choice in `localStorage`.
-- **Bulk actions bar** appears only when `selectedIds.size > 0`: shows "N selected", `Archive Selected`, `Clear` buttons. Archive runs existing soft-delete mutation in a loop, then a single `notify.undo("N drivers archived", …)` from the new `notify` helper.
+Finance & payroll (6):
+- `settlements`
+- `driver_settlements`
+- `driver_payroll`
+- `load_expenses`
+- `agent_commissions`
+- `safety_bonus_payouts`
 
-All state kept in the page component (`search`, `statusFilter`, `sortBy`, `view`, `selectedIds: Set<string>`). No new context.
+Load & maintenance sub-records (4):
+- `load_status_logs`
+- `load_intermediate_stops`
+- `load_accessorials`
+- `maintenance_logs`
 
-## 2. Card redesign (in-place, same file)
+### 1. Migration
 
-The card at lines ~422–592 gets restructured for scannability:
+For each of the 10 tables:
+- `ALTER TABLE public.<t> ADD COLUMN deleted_at timestamptz;`
+- `CREATE INDEX IF NOT EXISTS <t>_active_idx ON public.<t> (org_id) WHERE deleted_at IS NULL;`
 
-```text
-┌──────────────────────────────────────────────┐
-│ ☐  [Avatar]  Name                     [•••]  │
-│              [Status] [Onboarding]           │
-│              Landstar #12345 · CDL A         │
-├──────────────────────────────────────────────┤
-│ 📞 phone      ✉ email        (icon-only if   │
-│                                narrow)       │
-├──────────────────────────────────────────────┤
-│ Credentials & Compliance                     │
-│   License      · exp 12/24  ●                │
-│   Medical      · exp 03/25  ●                │
-│   MVR          · exp 08/25  ●                │
-├──────────────────────────────────────────────┤
-│ [View] [Edit] [Archive]                      │
-└──────────────────────────────────────────────┘
-```
+Update the two allow-list RPCs (`public.archive_record`, `public.restore_record`) to include the 10 new table names in their `CASE` branch — same pattern as the existing 18.
 
-Concretely:
-- Left checkbox for bulk select (only shows on hover OR when any driver is selected — same pattern as Gmail).
-- Header: avatar + name + badges row + a single meta line (Landstar ID · CDL class) instead of scattered lines.
-- Status badges upgraded via a small local helper `driverStatusBadge(status)` returning tone-aware `<Badge>` variants:
-  - `active` → `bg-emerald-500/15 text-emerald-500 border-emerald-500/30` (semantic tokens via `success` variant added to Badge if missing — otherwise inline HSL-token classes already used elsewhere).
-  - `inactive` → muted/secondary.
-  - `onboarding` → `warning` tone (amber via `--warning` if defined, else `secondary` w/ dot).
-  - `archived` → outline destructive.
-  Small colored dot before the label for glanceability.
-- Contact block: phone + email condensed to a single row of icon chips (kept as `<a href>`).
-- **Credentials & Compliance** section: keep existing `<CredentialsCompliance variant="section" />` but wrap in a labeled block with consistent `grid-cols-[1fr_auto_auto]` alignment (label · date · status dot). If tightening the internal grid is needed, edit `src/components/drivers/CredentialsCompliance.tsx` in the same pass — only alignment/spacing tweaks, no logic change.
-- **Quick actions footer**: three visible buttons — `View` (opens `DriverDetailSheet` = current `setSelectedDriver`), `Edit` (existing `openDialog(driver)`), `Archive` (existing `deleteWithUndo(driver)`). Overflow menu (`•••`) retains View Dashboard, Invite, Signed Documents, etc.
+Update `public.has_archive_access(_table text)` to map each new table to a role list:
+- Finance tables → `owner`, `payroll_admin`
+- Load sub-records (`load_status_logs`, `load_intermediate_stops`, `load_accessorials`) → `owner`, `dispatcher`
+- `maintenance_logs` → `owner`, `maintenance`, `dispatcher`
 
-## 3. Files
+No schema changes to RLS beyond that — existing SELECT/UPDATE policies already scope by `org_id` and continue to apply.
 
-- **Edit** `src/pages/Drivers.tsx`:
-  - Add filter/sort/search/view/selection state.
-  - Extract the card body into a local `DriverCard` component (top of file, unexported) to keep the page readable.
-  - Add `DriversToolbar` as a local component in the same file.
-  - Compute `filteredDrivers` via `useMemo`.
-- **Edit** `src/components/drivers/CredentialsCompliance.tsx` (only if needed for alignment): tighten row grid to `grid-cols-[1fr_auto_auto] gap-x-3`.
-- **New** none. No new routes, no new tables.
+### 2. Client wiring (`src/lib/soft-delete.ts`)
 
-## 4. Out of scope
+- Append the 10 tables to `ARCHIVABLE_TABLES`.
+- Add entries to `TABLE_LABELS` (e.g. `settlements → Settlement / Settlements`, `load_status_logs → Status Log / Status Logs`, etc.).
+- Add matching entries to `ARCHIVE_ROLE_MAP` mirroring the DB.
 
-- No changes to `DriverDetailSheet`, add/edit dialog, banking, i9/w4/w9, or CSV import.
-- No server-side filtering — dataset is small and already loaded.
-- No changes to StatusBadge globally; the driver-specific tones live in the page helper so other pages are untouched.
-- No changes to permissions or archive logic — reuses existing mutation.
+### 3. Query filters
 
-## Technical notes
+Add `.is('deleted_at', null)` to the primary list queries for the six finance tables where a user-facing list exists:
+- Settlements list (BCO + Independent settlement pages)
+- Driver Settlements tab
+- Driver Payroll list
+- Load Expenses displayed on load detail (filter but keep aggregates as-is — this only hides archived rows)
+- Agent Commissions report
+- Safety Bonus Payouts list
 
-- Bulk archive: iterates `selectedIds` and calls the existing single-driver soft-delete mutation via `Promise.allSettled`, then invalidates `['drivers']` once. Uses `notify.undo` for a single grouped toast; Undo iterates and restores `deleted_at = null`.
-- Sort by compliance uses `Math.min(license_expiry, medical_card_expiry, mvr_expiry)` ignoring nulls; nulls sort last.
-- All colors go through existing semantic tokens (`--primary`, `--muted-foreground`, `--destructive`, `--warning` if present) — no hardcoded hex.
-- Checkbox column stays keyboard-accessible (`Space` toggles, focus ring via existing `Checkbox`).
+Load sub-records (`load_status_logs`, `load_intermediate_stops`, `load_accessorials`) and `maintenance_logs` are surfaced inside parent-record detail views only. Filter their fetches too so archived rows disappear from the parent detail.
+
+Any aggregate / analytics queries (P&L, True Net Income, IFTA, leaderboard) are **not** touched — they must still count historical rows. This matches how the existing 18 tables already behave.
+
+### 4. Delete → Archive UI
+
+Replace hard-`DELETE` mutations with `archiveWithUndo({ table, id, queryClient, invalidateKeys })` on the pages that expose delete actions for these entities:
+- `src/pages/Settlements.tsx` (and Independent variant if separate)
+- `src/pages/DriverPayroll.tsx` / Driver Settlements tab
+- Any load-detail component that lets users delete expenses / accessorials / intermediate stops / status logs
+- Maintenance log entry rows inside truck/trailer maintenance history
+
+Bulk actions where they already exist get `archiveManyWithUndo`.
+
+### 5. Archive page (`src/pages/Archive.tsx`)
+
+Add a `VIEW_CONFIG` entry for each new table: columns to show, primary label field, and secondary metadata. Tabs render automatically from `accessibleTables`, so no route or layout changes.
+
+### Out of scope
+- Documents, communications, notifications tables (deferred per your last answer).
+- No `is_archived` boolean — `deleted_at IS NULL` remains the single source of truth.
+- No changes to analytics/reporting aggregates.
+- No changes to cascade behavior — archiving a parent (e.g. a load) does not auto-archive its sub-records; that stays a separate discussion.
+
+### Technical notes
+- RPC allow-list is authoritative; client `ARCHIVE_ROLE_MAP` is only for UI gating.
+- Partial indexes on `(org_id) WHERE deleted_at IS NULL` keep active-row lookups fast without bloating archived rows.
+- Existing `archiveWithUndo` already handles the 10s Undo toast and query invalidation.
