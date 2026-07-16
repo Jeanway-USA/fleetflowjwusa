@@ -177,11 +177,6 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
     return () => window.removeEventListener('keydown', handler);
   }, [toggleSidebar]);
 
-  // Breadcrumb generation
-  const pathSegment = '/' + location.pathname.split('/')[1];
-  const pageLabel = ROUTE_LABELS[pathSegment] || ROUTE_LABELS[location.pathname];
-  const group = ROUTE_GROUPS[pathSegment];
-
   return (
     <div className="min-h-screen flex w-full bg-background">
       <AppSidebar />
@@ -221,75 +216,8 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
             </Button>
           </div>
         )}
-        <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-12 sm:h-14 items-center gap-4 px-4 lg:px-6">
-            <SidebarTrigger className="lg:hidden h-10 w-10" />
-            {pageLabel && (
-              <Breadcrumb>
-                <BreadcrumbList>
-                  {group && (
-                    <>
-                      <BreadcrumbItem>
-                        <BreadcrumbLink asChild>
-                          <Link to={group.path}>{group.label}</Link>
-                        </BreadcrumbLink>
-                      </BreadcrumbItem>
-                      <BreadcrumbSeparator />
-                    </>
-                  )}
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>{pageLabel}</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            )}
-            <OfflineIndicator />
-            <DocumentSyncBootstrap />
-            {tier === 'open_beta' && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/15 to-yellow-500/15 border border-amber-500/30">
-                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">Beta Member</span>
-              </div>
-            )}
-            <div className="flex-1" />
-            <TimeDisplayToggle />
-            {isDriverRole && (
-              <ErrorBoundary compact>
-                <DriverMessages />
-              </ErrorBoundary>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden md:inline-flex h-7 gap-2 text-xs text-muted-foreground"
-              onClick={() => window.dispatchEvent(new CustomEvent('open-command-palette'))}
-              aria-label="Open command palette"
-            >
-              <span>Search…</span>
-              <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium">
-                ⌘K
-              </kbd>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7 text-muted-foreground">
-                  <CircleHelp className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Help</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>Help & Resources</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {tourDef && (
-                  <DropdownMenuItem onClick={() => tour.startTour()}>
-                    <Compass className="mr-2 h-4 w-4" />
-                    Replay Welcome Tour
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </header>
+        <TopBar onReplayTour={() => tour.startTour()} hasTour={!!tourDef} />
+
         <DiscordBanner />
         <div className="flex-1 p-2 sm:p-4 lg:p-6 animate-fade-in">
           <ErrorBoundary>
