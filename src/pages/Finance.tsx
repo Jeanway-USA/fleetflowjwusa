@@ -152,7 +152,7 @@ export default function Finance() {
   const { data: commissions = [], isLoading: commissionsLoading } = useQuery({
     queryKey: ['agent_commissions'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('agent_commissions').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('agent_commissions').select('*').is('deleted_at', null).order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
