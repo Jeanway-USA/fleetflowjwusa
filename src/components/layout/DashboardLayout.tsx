@@ -73,15 +73,14 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
   const navigate = useNavigate();
   const { toggleSidebar } = useSidebar();
   const location = useLocation();
-  const { tier } = useSubscriptionTier();
   const tourDef = getTourForRoute(location.pathname);
   const tour = useProductTour({ tourId: tourDef?.id || 'none', totalSteps: tourDef?.steps.length || 0 });
   const [showWelcome, setShowWelcome] = useState(false);
   const [tourFlagLoaded, setTourFlagLoaded] = useState(false);
   const [hasSeenTour, setHasSeenTour] = useState<boolean | null>(null);
-  const { user, hasRole } = useAuth();
-  const isDriverRole = hasRole('driver');
+  const { user } = useAuth();
   const autoStartedRef = useRef(false);
+
 
   // Persist tour completion server-side so it doesn't re-trigger on other devices.
   const persistTourCompletion = useCallback(async () => {
