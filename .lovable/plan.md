@@ -1,97 +1,61 @@
+## Goal
+Polish the existing shell (`DashboardLayout` + `AppSidebar`) into a cleaner, more consistent top-nav experience. Keep the current sidebar architecture — role-based menu, collapsible desktop, mobile sheet — since it already works. Focus the work on the **top bar**: a real global search input, notifications bell, theme toggle, and user profile dropdown, all in a consistent order across every page.
 
-# Site-Wide Soft Delete + Archive System
+## Non-Goals
+- No new pages, no new routes, no rewrite of `AppSidebar` role logic.
+- No changes to business logic, data fetching, or auth.
+- Not building a new notifications backend — reuse existing `NotificationCenter` / `DriverMessages`.
+- Not replacing `CommandPalette` — the new search bar opens it.
 
-## 1. Database Migration
+## Changes
 
-Add `deleted_at timestamptz NULL` and `archived_by uuid NULL` to these tables (skip `is_archived` — use `deleted_at IS NOT NULL` as the canonical archived state; single source of truth avoids drift):
+### 1. New header component: `src/components/layout/TopBar.tsx`
+Extract the header out of `DashboardLayout` into a dedicated component so the layout file is readable and the header is reusable. Contents, left → right:
 
-**Core:** `drivers`, `trucks`, `trailers`, `fleet_loads`, `agency_loads`, `crm_contacts`, `facilities`, `parts_inventory`, `truck_stops`, `company_resources`, `document_templates`
+1. `SidebarTrigger` — visible on all breakpoints (currently `lg:hidden`). On desktop it collapses the sidebar to the icon rail; on mobile it opens the drawer. Solves the "sidebar can disappear" issue.
+2. Breadcrumbs (existing `ROUTE_LABELS` / `ROUTE_GROUPS` logic moved in unchanged).
+3. Flex spacer.
+4. **Global search** — an actual `Input` with a `Search` icon (not a button that says "Search…"). Read-only trigger that dispatches `open-command-palette`; on `md+` shows the input, on mobile collapses to an icon button. Keeps ⌘K kbd hint.
+5. `TimeDisplayToggle` (existing).
+6. **Theme toggle** — reuse `src/components/shared/ThemeToggle.tsx`.
+7. **Notifications** — role-aware slot:
+   - drivers → existing `DriverMessages` bell (unchanged)
+   - everyone else → existing `NotificationCenter` bell
+   Both are already built; TopBar just picks one.
+8. **User profile dropdown** — new small component. Avatar (initials from `user.email`) → dropdown with: role/email label, Settings (routes to `/settings` or `/driver-settings` based on role), Sign out. Replaces the standalone "Help" dropdown's sign-out affordance and consolidates account actions in one place. Help item ("Replay Welcome Tour") moves into this dropdown so we don't add another header button.
 
-**Financial working data:** `expenses`, `fuel_purchases`, `maintenance_requests`, `work_orders`, `incidents`, `detention_requests`, `driver_requests`
+Ordering, spacing, and heights stay consistent with current header (`h-12 sm:h-14`, `gap-2`).
 
-**Explicitly skipped (audit/immutable):** `audit_logs`, `load_status_logs`, `driver_signed_documents`, `document_instances`, `document_signatures`, `settlements`, `driver_settlements`, `driver_payroll`, `internal_payroll_ledger`, `agent_commissions`, `general_ledger`, `tax_*`, `safety_bonus_payouts`, `truist_payout_logs`, `driver_notifications`, `driver_locations`, `messages`, `changelog`, `user_feedback`.
+### 2. `DashboardLayout.tsx` slim-down
+- Replace the inline `<header>` block (lines ~285–353) with `<TopBar />`.
+- Keep the demo banner, impersonation banner, `DiscordBanner`, tour, welcome modal, error boundaries, and content padding exactly as-is.
+- Keep `SidebarProvider` wrapper and the `⌘B` shortcut.
 
-Migration also adds:
-- Partial index `WHERE deleted_at IS NOT NULL` on each table for fast Archive queries.
-- Index `WHERE deleted_at IS NULL` on hot tables (`fleet_loads`, `drivers`, `trucks`) for active-list queries.
-- RLS policies remain — active reads add `deleted_at IS NULL` filter at the app layer (not RLS) so restore paths can still fetch archived rows.
-- New RPC `archive_record(_table text, _id uuid)` and `restore_record(_table text, _id uuid)` — SECURITY DEFINER, validates table name from allow-list, enforces `has_archive_access(_user, _table)` role gating, stamps `deleted_at`/`archived_by`.
-- New RPC `has_archive_access(_user_id uuid, _table text)` returning boolean, role-scoped:
+### 3. `AppSidebar.tsx` — minor polish only
+- Ensure `collapsible="icon"` is set so desktop collapse leaves an icon rail (per shadcn sidebar guidance) — verify current setting and adjust if needed.
+- No changes to the role-based menu items themselves.
 
-  | Table group | Allowed roles |
-  |---|---|
-  | drivers, driver_requests | owner, payroll_admin |
-  | trucks, trailers, parts_inventory, maintenance_requests, work_orders | owner, maintenance, dispatcher |
-  | fleet_loads, agency_loads, facilities, truck_stops, detention_requests | owner, dispatcher |
-  | crm_contacts, company_resources, document_templates | owner, dispatcher |
-  | expenses, fuel_purchases | owner, payroll_admin |
-  | incidents | owner, safety |
+### 4. Mobile behavior
+- `SidebarProvider` already renders the sidebar as a `Sheet` under `md`. No new code needed; verified by making `SidebarTrigger` always visible.
 
-## 2. Global Data Layer
+### 5. Consistency sweep
+- Confirm every route in `src/App.tsx` that renders through `ProtectedRoute` already gets `DashboardLayout` (per the project's "no page wraps itself in DashboardLayout" rule). No changes expected; note-only.
 
-- New helper `src/lib/soft-delete.ts` exporting:
-  - `activeFilter(query)` → applies `.is('deleted_at', null)`
-  - `useSoftDelete(table)` hook returning `{ archive, restore, purge }` mutations, each wired to `useUndoableDelete` (10s toast timeout).
-- Sweep all `supabase.from(<table>).select(...)` reads in `src/pages/**`, `src/components/**`, `src/hooks/**` for the tables above and add `.is('deleted_at', null)` **except**:
-  - Archive page queries (fetch `deleted_at IS NOT NULL`)
-  - Historical/audit contexts already reading finalized snapshots
-  - Foreign-key joins where hiding parent would orphan child rows (e.g. showing an active load whose driver was archived — display driver name with "(archived)" suffix).
-- Update TanStack Query keys — no key changes; invalidations already broad.
+## Technical Details
 
-## 3. UI Behavior
+- `TopBar` is a client component under `src/components/layout/TopBar.tsx`. It reads `useAuth`, `useLocation`, `useSubscriptionTier`, `useSidebar`, `useTheme` — same hooks the layout uses today.
+- Search input is `<Input readOnly>` with `onClick`/`onFocus` dispatching `new CustomEvent('open-command-palette')`. Keeps a single source of truth (CommandPalette) and requires zero new search infra.
+- Profile avatar uses `Avatar` + `AvatarFallback` from `@/components/ui/avatar` with initials derived from `user.email`. No image upload.
+- All colors via semantic tokens (`bg-background/95`, `text-muted-foreground`, `border-border`) — no hardcoded colors.
+- Only `code` changes; no DB migrations, no edge functions, no new secrets.
 
-- Replace every "Delete" label/icon on the covered entities with **"Archive"** (button text, dropdown items, tooltips, confirm-dialog titles). Icon changes from `Trash2` to `Archive`.
-- New `ConfirmArchiveDialog` component (fork of `ConfirmDeleteDialog`) with copy: "Archive this X? You can restore it from the Archive page within 30 days."
-- Archive action wired through `useUndoableDelete` (already exists) with **10s** toast + Undo button that calls `restore_record` RPC.
-- **Active-association warnings** — before archive, run a quick count query. Examples:
-  - Driver: active loads count (`fleet_loads.driver_id = X AND status IN ('booked','in_transit','at_pickup','at_delivery')`)
-  - Truck: active loads + open work orders
-  - Trailer: active assignments
-  - CRM contact: active loads referencing broker
-  If count > 0, dialog shows red-tinted warning listing associations, still allows archive (doesn't block).
+## Files Touched
+- **new** `src/components/layout/TopBar.tsx`
+- **new** `src/components/layout/UserMenu.tsx` (avatar + dropdown, kept small)
+- **edit** `src/components/layout/DashboardLayout.tsx` (header block → `<TopBar />`)
+- **edit (if needed)** `src/components/layout/AppSidebar.tsx` (ensure `collapsible="icon"`)
 
-**Files touched (delete → archive rename):** `Drivers.tsx`, `Trucks.tsx`, `Trailers.tsx`, `FleetLoads.tsx`, `AgencyLoads.tsx`, `CRM.tsx`, `Incidents.tsx`, `MaintenanceManagement.tsx`, `Documents.tsx`, `IFTA.tsx`, plus dropdowns in `OrgActionsDropdown`, detail sheets (`DriverDetailSheet`, `ContactDetailSheet`, etc.), and bulk-action bars in `DataTable` consumers.
-
-## 4. Archive/Trash Page
-
-New route `/archive` → `src/pages/Archive.tsx`, added to sidebar under "Admin" section (only visible when the user has archive access to at least one entity type).
-
-Layout:
-```text
-+-------------------------------------------------+
-| Archive                          [Search input] |
-+-------------------------------------------------+
-| Tabs: Drivers | Trucks | Loads | CRM | ... (role-gated) |
-+-------------------------------------------------+
-| [x] | Name | Archived | By | Actions            |
-| [x] | ...  | 2d ago   | JD | Restore  Delete    |
-+-------------------------------------------------+
-| Bulk: [Restore selected] [Permanently delete]   |
-+-------------------------------------------------+
-```
-
-- Tabs render only for entity types the current user can access (`has_archive_access`).
-- Each tab uses `DataTable` with `deleted_at IS NOT NULL` filter, columns per entity, search input filters current tab.
-- Row actions: **Restore** (calls `restore_record`) and **Permanently Delete** (uses existing `ConfirmDeleteDialog` — single confirmation, hard `DELETE FROM ...`).
-- Bulk actions in existing `DataTable` bulk bar.
-- 30-day retention hint in header — no auto-purge job in this pass (can add later).
-
-## 5. Permissions & RBAC
-
-- Sidebar link visibility gated by a new `useArchiveAccess()` hook that checks the user's roles against the table→role map above.
-- Server-side enforcement lives entirely in `archive_record`/`restore_record`/hard-delete RPCs — client checks are UX only.
-- Hard delete permission = same as archive permission for that table (owner has it for all).
-
-## Out of scope
-
-- Auto-purge cron after 30 days
-- Restoring cascaded children (archiving a driver doesn't archive their loads; loads keep the driver_id and show "(archived)")
-- Bulk export of archived data
-- Archive of tables not listed in section 1
-
-## Technical Notes
-
-- All RLS policies for covered tables need re-review to ensure they don't block updates when `deleted_at` is set. Since existing policies check `org_id`/role and not `deleted_at`, no policy changes required — verified against schema.
-- The `has_archive_access` function is `STABLE SECURITY DEFINER` with `search_path=public`, same pattern as `has_role`.
-- Undo restores by clearing `deleted_at` and `archived_by`. No history table needed; the columns themselves are the history.
-- New types will regenerate after migration approval.
+## Verification
+- Load `/dispatcher-dashboard`, `/driver-dashboard`, `/fleet-loads`, `/settings` — header order identical, breadcrumbs correct, search opens palette, theme toggle switches, user menu signs out.
+- Resize to mobile: sidebar becomes drawer via `SidebarTrigger`; search collapses to icon.
+- Driver role sees `DriverMessages` bell; dispatcher/executive/admin see `NotificationCenter`.
