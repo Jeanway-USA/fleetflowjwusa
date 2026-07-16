@@ -187,7 +187,7 @@ export function CommandPalette() {
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput
-        placeholder="Search loads, drivers, trucks, contacts… or type a command"
+        placeholder="Search loads, drivers, trucks, trailers, contacts… or type a command"
         value={search}
         onValueChange={setSearch}
       />
