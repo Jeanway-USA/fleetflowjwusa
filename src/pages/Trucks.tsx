@@ -98,6 +98,8 @@ const toEditableTruck = (truck?: TruckWithDriver | null): Partial<TruckInsert> =
 
 
 export default function Trucks() {
+  const highlightId = useHighlightRow();
+
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTruck, setEditingTruck] = useState<TruckWithDriver | null>(null);
