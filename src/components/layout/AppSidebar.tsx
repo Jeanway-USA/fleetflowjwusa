@@ -329,7 +329,7 @@ export function AppSidebar() {
   const filteredDashboards = actuallyIsOwner ? dashboardNavItems : dashboardNavItems.filter(item => item.roles.some(r => hasRole(r)));
 
   return (
-    <Sidebar className="border-r border-sidebar-border">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border p-4 space-y-2">
         <div className="flex items-center justify-center">
           {bannerSrc ? (

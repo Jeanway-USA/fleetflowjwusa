@@ -1,88 +1,27 @@
 import { ReactNode, useEffect, useRef, useState, useCallback } from 'react';
-import { SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
+import { SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
+import { TopBar } from './TopBar';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { AlertTriangle, CircleHelp, Compass, ShieldAlert, Sparkles } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { AlertTriangle, ShieldAlert } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { WelcomeBetaModal } from '@/components/shared/WelcomeBetaModal';
 import { Button } from '@/components/ui/button';
 import { DemoControls } from '@/components/demo/DemoControls';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useSubscriptionTier } from '@/hooks/useSubscriptionTier';
-import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
 import { CommandPalette } from '@/components/shared/CommandPalette';
 import { BetaFeedbackWidget } from '@/components/shared/BetaFeedbackWidget';
 import { DiscordBanner } from '@/components/shared/DiscordBanner';
-import { OfflineIndicator } from '@/components/shared/OfflineIndicator';
-import { DocumentSyncBootstrap } from '@/components/shared/DocumentSyncBootstrap';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProductTour } from '@/components/shared/ProductTour';
 import { useProductTour } from '@/hooks/useProductTour';
 import { getTourForRoute } from '@/lib/tour-steps';
-import { TimeDisplayToggle } from '@/components/shared/TimeDisplayToggle';
-import { DriverMessages } from '@/components/driver/DriverMessages';
-
-const ROUTE_LABELS: Record<string, string> = {
-  '/executive-dashboard': 'Executive Dashboard',
-  '/dispatcher-dashboard': 'Dispatcher Dashboard',
-  '/driver-dashboard': 'Driver Dashboard',
-  '/trucks': 'Trucks',
-  '/trailers': 'Trailers',
-  '/drivers': 'Drivers',
-  '/fleet-loads': 'Fleet Loads',
-  '/agency-loads': 'Agency Loads',
-  '/finance': 'Finance & P/L',
-  '/insights': 'Company Insights',
-  '/ifta': 'IFTA Reporting',
-  '/crm': 'CRM',
-  '/maintenance': 'Maintenance',
-  '/documents': 'Documents',
-  '/safety': 'Safety',
-  '/incidents': 'Incidents',
-  '/driver-performance': 'Driver Performance',
-  '/settings': 'Settings',
-  '/driver-stats': 'My Stats',
-  '/driver/loads': 'My Loads',
-  '/driver-settings': 'My Settings',
-  '/super-admin': 'Super Admin',
-};
-
-const ROUTE_GROUPS: Record<string, { label: string; path: string }> = {
-  '/trucks': { label: 'Fleet', path: '/trucks' },
-  '/trailers': { label: 'Fleet', path: '/trucks' },
-  '/drivers': { label: 'Fleet', path: '/drivers' },
-  '/fleet-loads': { label: 'Loads', path: '/fleet-loads' },
-  '/agency-loads': { label: 'Loads', path: '/fleet-loads' },
-  '/finance': { label: 'Finance', path: '/finance' },
-  '/insights': { label: 'Finance', path: '/finance' },
-  '/ifta': { label: 'Finance', path: '/finance' },
-  '/crm': { label: 'Operations', path: '/crm' },
-  '/maintenance': { label: 'Operations', path: '/maintenance' },
-  '/documents': { label: 'Operations', path: '/documents' },
-  '/safety': { label: 'Operations', path: '/safety' },
-  '/incidents': { label: 'Operations', path: '/incidents' },
-  '/driver-performance': { label: 'Operations', path: '/driver-performance' },
-};
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
+
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { isDemoMode, signOut, primaryColor, simulatedOrgId, simulatedOrgName, clearOrgSimulation } = useAuth();
@@ -134,15 +73,14 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
   const navigate = useNavigate();
   const { toggleSidebar } = useSidebar();
   const location = useLocation();
-  const { tier } = useSubscriptionTier();
   const tourDef = getTourForRoute(location.pathname);
   const tour = useProductTour({ tourId: tourDef?.id || 'none', totalSteps: tourDef?.steps.length || 0 });
   const [showWelcome, setShowWelcome] = useState(false);
   const [tourFlagLoaded, setTourFlagLoaded] = useState(false);
   const [hasSeenTour, setHasSeenTour] = useState<boolean | null>(null);
-  const { user, hasRole } = useAuth();
-  const isDriverRole = hasRole('driver');
+  const { user } = useAuth();
   const autoStartedRef = useRef(false);
+
 
   // Persist tour completion server-side so it doesn't re-trigger on other devices.
   const persistTourCompletion = useCallback(async () => {
@@ -238,11 +176,6 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
     return () => window.removeEventListener('keydown', handler);
   }, [toggleSidebar]);
 
-  // Breadcrumb generation
-  const pathSegment = '/' + location.pathname.split('/')[1];
-  const pageLabel = ROUTE_LABELS[pathSegment] || ROUTE_LABELS[location.pathname];
-  const group = ROUTE_GROUPS[pathSegment];
-
   return (
     <div className="min-h-screen flex w-full bg-background">
       <AppSidebar />
@@ -282,75 +215,8 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
             </Button>
           </div>
         )}
-        <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-12 sm:h-14 items-center gap-4 px-4 lg:px-6">
-            <SidebarTrigger className="lg:hidden h-10 w-10" />
-            {pageLabel && (
-              <Breadcrumb>
-                <BreadcrumbList>
-                  {group && (
-                    <>
-                      <BreadcrumbItem>
-                        <BreadcrumbLink asChild>
-                          <Link to={group.path}>{group.label}</Link>
-                        </BreadcrumbLink>
-                      </BreadcrumbItem>
-                      <BreadcrumbSeparator />
-                    </>
-                  )}
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>{pageLabel}</BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            )}
-            <OfflineIndicator />
-            <DocumentSyncBootstrap />
-            {tier === 'open_beta' && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/15 to-yellow-500/15 border border-amber-500/30">
-                <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">Beta Member</span>
-              </div>
-            )}
-            <div className="flex-1" />
-            <TimeDisplayToggle />
-            {isDriverRole && (
-              <ErrorBoundary compact>
-                <DriverMessages />
-              </ErrorBoundary>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden md:inline-flex h-7 gap-2 text-xs text-muted-foreground"
-              onClick={() => window.dispatchEvent(new CustomEvent('open-command-palette'))}
-              aria-label="Open command palette"
-            >
-              <span>Search…</span>
-              <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium">
-                ⌘K
-              </kbd>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1.5 text-xs h-7 text-muted-foreground">
-                  <CircleHelp className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Help</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>Help & Resources</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {tourDef && (
-                  <DropdownMenuItem onClick={() => tour.startTour()}>
-                    <Compass className="mr-2 h-4 w-4" />
-                    Replay Welcome Tour
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </header>
+        <TopBar onReplayTour={() => tour.startTour()} hasTour={!!tourDef} />
+
         <DiscordBanner />
         <div className="flex-1 p-2 sm:p-4 lg:p-6 animate-fade-in">
           <ErrorBoundary>
