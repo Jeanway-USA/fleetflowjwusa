@@ -129,6 +129,7 @@ export function SettlementsTab() {
       const { data, error } = await supabase
         .from('settlements')
         .select('*')
+        .is('deleted_at', null)
         .order('period_end', { ascending: false });
       if (error) throw error;
       return data as Settlement[];
