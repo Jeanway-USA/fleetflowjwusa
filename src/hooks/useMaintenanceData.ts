@@ -465,6 +465,7 @@ export function useServiceHistory(searchQuery?: string) {
           cost,
           trucks (unit_number)
         `)
+        .is('deleted_at', null)
         .order('service_date', { ascending: false });
 
       if (searchQuery) {
