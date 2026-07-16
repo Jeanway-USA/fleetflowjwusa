@@ -130,7 +130,7 @@ export default function FleetLoads() {
   const { data: allAccessorials = [] } = useQuery({
     queryKey: ['load_accessorials'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('load_accessorials').select('*');
+      const { data, error } = await supabase.from('load_accessorials').select('*').is('deleted_at', null);
       if (error) throw error;
       return data;
     },
