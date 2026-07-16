@@ -458,8 +458,10 @@ export default function Trucks() {
         emptyAction={{ label: 'Add First Truck', onClick: () => openDialog() }}
         tableId="trucks"
         exportFilename="trucks"
+        highlightRowId={highlightId}
         onRowDoubleClick={(truck) => openDialog(truck)}
         selectable
+
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
         bulkActions={(ids) => (
