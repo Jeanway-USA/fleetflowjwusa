@@ -1316,8 +1316,10 @@ export default function FleetLoads() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* Add/Edit Load Dialog */}
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
