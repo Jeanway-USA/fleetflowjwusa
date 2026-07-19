@@ -111,9 +111,21 @@ export function DataTable<T extends { id: string }>({
   onSelectionChange,
   bulkActions,
   highlightRowId,
+  wrapCells,
+  expandable,
+  renderExpanded,
 }: DataTableProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<{ time: number; id: string }>({ time: 0, id: '' });
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+  const useStaticLayout = Boolean(wrapCells || (expandable && renderExpanded));
 
   const [density, setDensity] = useState<Density>(() => {
     try {
