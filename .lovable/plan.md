@@ -1,80 +1,64 @@
+# QoL Polish: Filtering, Bulk Actions, Cards, States, Navbar
 
-## Extend soft-delete to finance & load/maintenance sub-records
+Most infrastructure is already in place (soft-delete + Undo, `DataTable` selection + column filters, `EmptyState`, `CommandPalette`, TopBar with theme/search/notifications). This plan closes the gaps consistently rather than rebuilding.
 
-Adds archiving with Undo toast + Archive page support to 10 more tables. Everything reuses the existing `archive_record` / `restore_record` RPCs and `archiveWithUndo` helper — no new infrastructure.
+## 1. Advanced Filtering & Bulk Actions
 
-### Tables getting `deleted_at`
+**Shared toolbar component** — `src/components/shared/ListToolbar.tsx`
+- Debounced search input (300ms), status multi-select, "More filters" popover slot, active-filter chips with individual clear + "Clear all", result count.
+- Reused on Drivers, Trucks, Trailers, AgencyLoads. FleetLoads already has a comparable toolbar — align its styling only.
 
-Finance & payroll (6):
-- `settlements`
-- `driver_settlements`
-- `driver_payroll`
-- `load_expenses`
-- `agent_commissions`
-- `safety_bonus_payouts`
+**Per-page filter additions** (all client-side over existing queries):
+- **Drivers**: employment type, compliance status (CDL/medical expiring < 30d / expired), onboarding stage. Already has search + status + sort — extend it.
+- **Trucks**: status, assigned/unassigned, PM due (<= threshold), year range.
+- **Trailers**: status, type, assigned/unassigned.
+- **AgencyLoads**: status, date range (pickup), broker text, margin sign.
 
-Load & maintenance sub-records (4):
-- `load_status_logs`
-- `load_intermediate_stops`
-- `load_accessorials`
-- `maintenance_logs`
+**Bulk actions** — extend the existing `bulkActions` slot:
+- Drivers: Archive, Export CSV, Set Status.
+- Trucks: Archive, Export CSV, Set Status, Assign Driver (opens existing DriverAssignmentSelect in a dialog looping over selection).
+- Trailers: Archive, Export CSV, Set Status.
+- AgencyLoads: Archive, Export CSV, Set Status (already partial).
+- Reuse `DataTable`'s existing CSV export helper for the Export action.
 
-### 1. Migration
+## 2. Drivers Card Design
 
-For each of the 10 tables:
-- `ALTER TABLE public.<t> ADD COLUMN deleted_at timestamptz;`
-- `CREATE INDEX IF NOT EXISTS <t>_active_idx ON public.<t> (org_id) WHERE deleted_at IS NULL;`
+Redesign the grid-card variant in `src/pages/Drivers.tsx` (list-view untouched):
+- Header row: avatar/initials, name, employment-type chip.
+- Status badge with tone dot; compliance strip below (CDL expiry, medical, MVR) with amber/red highlight when expiring/expired.
+- Quick actions row (always visible on desktop, revealed on tap on mobile): View, Edit, Message, Archive.
+- Consistent spacing tokens; hover ring + subtle shadow. No new business logic.
 
-Update the two allow-list RPCs (`public.archive_record`, `public.restore_record`) to include the 10 new table names in their `CASE` branch — same pattern as the existing 18.
+## 3. Empty States & Loading Skeletons
 
-Update `public.has_archive_access(_table text)` to map each new table to a role list:
-- Finance tables → `owner`, `payroll_admin`
-- Load sub-records (`load_status_logs`, `load_intermediate_stops`, `load_accessorials`) → `owner`, `dispatcher`
-- `maintenance_logs` → `owner`, `maintenance`, `dispatcher`
+**Skeletons** — `src/components/shared/ListSkeleton.tsx` with `variant="table" | "cards"`:
+- Cards: 6 shimmering card placeholders matching the driver-card layout.
+- Table: header + 8 row placeholders (already partially in `DataTable`; standardize).
+- Wire into Drivers (cards), Trucks, Trailers, AgencyLoads, FleetLoads while `isLoading`.
 
-No schema changes to RLS beyond that — existing SELECT/UPDATE policies already scope by `org_id` and continue to apply.
+**Empty states** — enrich `EmptyState`:
+- Support a secondary action + optional inline illustration (simple SVG per entity, colored with `--muted-foreground`).
+- Distinguish "no records yet" (primary CTA to create) vs "no results for current filters" (CTA to clear filters). Already used in FleetLoads for search-empty — extend to all list pages.
 
-### 2. Client wiring (`src/lib/soft-delete.ts`)
+## 4. Top Navbar Polish
 
-- Append the 10 tables to `ARCHIVABLE_TABLES`.
-- Add entries to `TABLE_LABELS` (e.g. `settlements → Settlement / Settlements`, `load_status_logs → Status Log / Status Logs`, etc.).
-- Add matching entries to `ARCHIVE_ROLE_MAP` mirroring the DB.
+`src/components/layout/TopBar.tsx`:
+- Tighten spacing/alignment; group left cluster (SidebarTrigger + breadcrumb + beta chip) and right cluster (search, time toggle, theme, notifications, user menu) with consistent `gap-2`.
+- **Company switcher** (only if user belongs to >1 org, or is impersonating/super-admin): dropdown next to the breadcrumb showing current org name; picking one calls existing impersonation/switch logic. If only one org, render the org name as a static label to fill the space.
+- Notification bell: standardize size (`h-9 w-9`), add unread-count dot animation.
+- Search button: unify height with other icon buttons; ensure ⌘K hint visible on md+.
+- User menu (`UserMenu.tsx`): show avatar + name + role chip on md+, icon-only on mobile; consistent dropdown widths.
 
-### 3. Query filters
+## Technical Details
 
-Add `.is('deleted_at', null)` to the primary list queries for the six finance tables where a user-facing list exists:
-- Settlements list (BCO + Independent settlement pages)
-- Driver Settlements tab
-- Driver Payroll list
-- Load Expenses displayed on load detail (filter but keep aggregates as-is — this only hides archived rows)
-- Agent Commissions report
-- Safety Bonus Payouts list
+- No schema changes. All filtering is client-side over already-fetched `useQuery` data.
+- `ListToolbar` is presentational; state stays in each page for simplicity.
+- Column filters on `DataTable` remain the source of truth for table pages; the toolbar wraps common filters above the table.
+- All new UI uses semantic tokens (`bg-card`, `text-muted-foreground`, `border-border`) — no hardcoded colors.
+- Company-switcher logic reuses the existing impersonation context; no new backend surface.
 
-Load sub-records (`load_status_logs`, `load_intermediate_stops`, `load_accessorials`) and `maintenance_logs` are surfaced inside parent-record detail views only. Filter their fetches too so archived rows disappear from the parent detail.
+## Out of Scope
 
-Any aggregate / analytics queries (P&L, True Net Income, IFTA, leaderboard) are **not** touched — they must still count historical rows. This matches how the existing 18 tables already behave.
-
-### 4. Delete → Archive UI
-
-Replace hard-`DELETE` mutations with `archiveWithUndo({ table, id, queryClient, invalidateKeys })` on the pages that expose delete actions for these entities:
-- `src/pages/Settlements.tsx` (and Independent variant if separate)
-- `src/pages/DriverPayroll.tsx` / Driver Settlements tab
-- Any load-detail component that lets users delete expenses / accessorials / intermediate stops / status logs
-- Maintenance log entry rows inside truck/trailer maintenance history
-
-Bulk actions where they already exist get `archiveManyWithUndo`.
-
-### 5. Archive page (`src/pages/Archive.tsx`)
-
-Add a `VIEW_CONFIG` entry for each new table: columns to show, primary label field, and secondary metadata. Tabs render automatically from `accessibleTables`, so no route or layout changes.
-
-### Out of scope
-- Documents, communications, notifications tables (deferred per your last answer).
-- No `is_archived` boolean — `deleted_at IS NULL` remains the single source of truth.
-- No changes to analytics/reporting aggregates.
-- No changes to cascade behavior — archiving a parent (e.g. a load) does not auto-archive its sub-records; that stays a separate discussion.
-
-### Technical notes
-- RPC allow-list is authoritative; client `ARCHIVE_ROLE_MAP` is only for UI gating.
-- Partial indexes on `(org_id) WHERE deleted_at IS NULL` keep active-row lookups fast without bloating archived rows.
-- Existing `archiveWithUndo` already handles the 10s Undo toast and query invalidation.
+- Server-side pagination / cursor filtering.
+- Redesigning FleetLoads (largest page, already has toolbar) beyond skeleton + toolbar-style alignment.
+- Building a new notification system — only visual polish on the existing bell.
