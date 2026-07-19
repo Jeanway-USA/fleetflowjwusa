@@ -1,38 +1,37 @@
-## Fleet Loads table styling refinement
+## Mobile-responsive Fleet Loads table
 
-Scope: visual polish on `DataTable` (static layout branch, used by Fleet Loads via `wrapCells`/`expandable`) and `StatusBadge`. No behavior or column changes.
+Scope: give `DataTable` a mobile card view and use it in Fleet Loads. Tablet/desktop layout is unchanged.
 
-Note on tokens: the project design system forbids hardcoded Tailwind color classes (`bg-gray-50`, `text-white`, etc.). I'll match the user's intent using semantic tokens that already exist (`border-border`, `bg-muted/30`, `text-muted-foreground`, plus `success`/`warning`/`primary`/`destructive` for badges). This keeps light/dark mode correct and stays consistent with the rest of FleetFlow.
+### `src/components/shared/DataTable.tsx`
 
-### Changes in `src/components/shared/DataTable.tsx` (static-layout branch only)
+- Add optional prop `renderMobileCard?: (item: T) => React.ReactNode`.
+- Below `md` (`<768px`): when `renderMobileCard` is provided, hide the `<table>` (and its sticky header) and render a vertical stack of card `<div>`s inside the same scroll container. Each card:
+  - Uses `rounded-lg border border-border bg-card p-3` with `space-y-2`.
+  - Fires the same `onRowClick` / `onRowDoubleClick` / `toggleExpand` handlers the table row does, and keeps the row-highlight pulse via `data-row-id`.
+  - Shows the selection checkbox and expand chevron inline in a top action row when `selectable` / `expandable` are on.
+  - Renders `renderExpanded` in a `border-t pt-2 mt-2` block when the row is expanded.
+- Toolbar (search, filters, density, columns, bulk actions) stays visible on mobile so features aren't lost.
+- Tablet path unchanged — the existing container is already `overflow-auto`; explicitly add `overflow-x-auto` on the table wrapper so wide tables can scroll horizontally on mid-size screens without wrapping the page.
+- When `renderMobileCard` is not provided, mobile behaviour is unchanged (existing `hiddenOnMobile` column hints keep working).
 
-1. Container: drop the heavy outer border ring — replace `rounded-lg border border-border overflow-auto` with `rounded-lg overflow-auto` on the static-layout code path so rows use only their horizontal dividers.
-2. Header row: change `<tr>` from `border-b bg-muted/50` to `border-b border-border bg-transparent`. Update `<th>` classes to `text-[11px] font-semibold uppercase tracking-wider text-muted-foreground` for a muted, uppercase, semi-bold header.
-3. Body rows: on each data `<tr>` replace `border-b transition-colors hover:bg-muted/50` with:
-   - `border-b border-border/60` (subtle horizontal divider)
-   - `even:bg-muted/30` (subtle zebra)
-   - `hover:bg-muted/50 cursor-pointer transition-colors`
-   - keep the existing `isSelected` (`bg-primary/5`) and `isExpanded` (`bg-muted/40`) overrides layered on top.
-4. Expanded panel row: keep the accent background but align it to the new divider (`border-b border-border/60 bg-muted/20`).
-5. Empty-state cell keeps current styling.
+### `src/pages/FleetLoads.tsx`
 
-### Changes in `src/components/shared/StatusBadge.tsx`
+Pass `renderMobileCard` to the Fleet Loads `DataTable`. Card content (top to bottom):
 
-Convert the outline badge into a soft "pill":
-- Remove `variant="outline"` (drop the border).
-- New base classes: `rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide`.
-- Colour tokens per status type (soft bg + strong fg using existing semantic tokens):
-  - success (delivered/paid/active/valid): `bg-success/15 text-success`
-  - warning (in_transit/expiring_soon/out_of_service/inactive): `bg-warning/15 text-warning`
-  - error (cancelled/expired/suspended/down): `bg-destructive/15 text-destructive`
-  - info (booked/assigned/approved): `bg-primary/15 text-primary`
-  - default (pending/unknown): `bg-muted text-muted-foreground`
-- Keep `displayText` transform; drop `capitalize` since we uppercase.
+1. Header row: **Load ID** (reference or short id, `font-semibold`) on the left, `StatusBadge` on the right.
+2. Origin block: small uppercase "From" label + `City, ST` + zip line (reuses `formatAddressDisplay`).
+3. Destination block: small uppercase "To" label + `City, ST` + zip line.
+4. Meta row: rate (`text-success font-medium`) and driver name / "Unassigned" separated with a subtle divider dot.
+5. Actions dropdown pinned to the header row's right side beside the status badge.
 
-Because `StatusBadge` is used site-wide, this pill treatment lands consistently everywhere status badges appear (Fleet Loads, Agency Loads, Drivers, etc.), which matches the "highly readable modern aesthetic" goal.
+Everything uses `whitespace-normal break-words` so nothing clips off-screen; card width is 100% of the container. No horizontal scroll needed in card mode.
+
+### Notes
+
+- Uses semantic tokens (`bg-card`, `border-border`, `text-muted-foreground`) — no hardcoded gray classes.
+- No schema, no column, no behavior changes; the desktop table and the newly added expand/wrap features stay identical.
+- I'll also switch the preview viewport to mobile after building so the change is visible immediately; the user can toggle it back with the device switcher above the preview.
 
 ### Out of scope
 
-- No changes to virtualized (non-wrap) `DataTable` path — Fleet Loads uses the static path via `wrapCells`.
-- No column reordering, width tuning, or new data in the table.
-- No changes to the expanded-row content layout inside `FleetLoads.tsx`.
+- Applying `renderMobileCard` to other tables (Agency Loads, Drivers, etc.) — those keep their current `hiddenOnMobile` behaviour until requested.
