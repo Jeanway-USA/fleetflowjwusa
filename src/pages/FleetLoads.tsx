@@ -87,6 +87,8 @@ export default function FleetLoads() {
   const [massEditOpen, setMassEditOpen] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [agencyBlocked, setAgencyBlocked] = useState(false);
+  const bulkInputRef = useRef<HTMLInputElement>(null);
+  const [bulkImporting, setBulkImporting] = useState(false);
 
 
   // Fetch settings for calculations
