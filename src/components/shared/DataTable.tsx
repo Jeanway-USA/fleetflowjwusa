@@ -489,19 +489,19 @@ export function DataTable<T extends { id: string }>({
                   const isSorted = sortState?.key === key;
                   const SortIcon = !col.sortable ? null : (isSorted ? (sortState!.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown);
                   return (
-                    <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground", col.hiddenOnMobile && "hidden md:table-cell")} style={{ height: `${rowHeight}px`, width: computedWidths[i] }}>
+                    <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground overflow-hidden whitespace-nowrap", col.hiddenOnMobile && "hidden md:table-cell")} style={{ height: `${rowHeight}px`, width: computedWidths[i] }}>
                       {col.sortable ? (
                         <button
                           type="button"
                           onClick={() => cycleSort(key)}
-                          className={cn("flex items-center gap-1 h-full w-full text-left hover:text-foreground transition-colors", isSorted && "text-foreground")}
+                          className={cn("flex items-center gap-1 h-full w-full text-left hover:text-foreground transition-colors min-w-0", isSorted && "text-foreground")}
                           aria-label={`Sort by ${col.header}`}
                         >
-                          <span>{col.header}</span>
-                          {SortIcon && <SortIcon className="h-3.5 w-3.5 opacity-70" />}
+                          <span className="truncate">{col.header}</span>
+                          {SortIcon && <SortIcon className="h-3.5 w-3.5 opacity-70 shrink-0" />}
                         </button>
                       ) : (
-                        <div className="flex items-center h-full">{col.header}</div>
+                        <div className="flex items-center h-full truncate">{col.header}</div>
                       )}
                     </th>
                   );
