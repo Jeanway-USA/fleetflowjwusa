@@ -18,6 +18,7 @@ import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Database } from '@/integrations/supabase/types';
+import { cn } from '@/lib/utils';
 
 type AgencyLoad = Database['public']['Tables']['agency_loads']['Row'];
 type AgencyLoadInsert = Database['public']['Tables']['agency_loads']['Insert'];
@@ -105,39 +106,243 @@ export default function AgencyLoads() {
     }
   };
 
+  // Split a "City, ST 12345" style string into pieces so we can stack City/ST above ZIP.
+  const formatAddressDisplay = (address: string | null) => {
+    if (!address) return { city: '-', state: '', zip: '', full: '' };
+    const parts = address.split(',').map((p) => p.trim());
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const m = parts[i].match(/\b([A-Z]{2})\s*(\d{5}(-\d{4})?)?\b/);
+      if (m) {
+        const city = i > 0 ? parts[i - 1].trim() : '';
+        return { city, state: m[1], zip: m[2] || '', full: address };
+      }
+    }
+    return { city: parts[0] || '-', state: '', zip: '', full: address };
+  };
+
+  const fmtMoney = (n: number | null | undefined) =>
+    `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const fmtDate = (d: string | null | undefined) => {
+    if (!d) return '-';
+    try {
+      return new Date(d.length === 10 ? d + 'T00:00:00' : d).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+      });
+    } catch { return '-'; }
+  };
+
+  const fmtDateTime = (d: string | null | undefined, tz?: string | null) => {
+    if (!d) return '-';
+    try {
+      const dt = new Date(d);
+      const s = dt.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+      return tz ? `${s} ${tz}` : s;
+    } catch { return '-'; }
+  };
+
+  const marginPct = (l: AgencyLoad) => {
+    const br = Number(l.broker_rate) || 0;
+    if (!br) return null;
+    return ((Number(l.margin) || 0) / br) * 100;
+  };
+
+  const RowActions = ({ load }: { load: AgencyLoad }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => openDialog(load)}>
+          <Pencil className="mr-2 h-4 w-4" /> Edit
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
+          <Archive className="mr-2 h-4 w-4" /> Archive
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   const columns = [
-    { key: 'load_reference', header: 'Reference', render: (l: AgencyLoad) => l.load_reference || '-' },
-    { key: 'broker_name', header: 'Broker' },
-    { key: 'carrier_name', header: 'Carrier', hiddenOnMobile: true },
-    { key: 'origin', header: 'Origin' },
-    { key: 'destination', header: 'Destination' },
-    { key: 'broker_rate', header: 'Broker Rate', hiddenOnMobile: true, render: (l: AgencyLoad) => `$${l.broker_rate?.toFixed(2) || '0.00'}` },
-    { key: 'carrier_rate', header: 'Carrier Rate', hiddenOnMobile: true, render: (l: AgencyLoad) => `$${l.carrier_rate?.toFixed(2) || '0.00'}` },
-    { key: 'margin', header: 'Margin', render: (l: AgencyLoad) => <span className={Number(l.margin) >= 0 ? 'text-success' : 'text-destructive'}>${l.margin?.toFixed(2) || '0.00'}</span> },
-    { key: 'status', header: 'Status', render: (l: AgencyLoad) => <StatusBadge status={l.status} /> },
     {
-      key: 'actions',
-      header: '',
-      render: (load: AgencyLoad) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => openDialog(load)}>
-              <Pencil className="mr-2 h-4 w-4" /> Edit
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
-              <Archive className="mr-2 h-4 w-4" /> Archive
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      key: 'load',
+      header: 'Load',
+      render: (l: AgencyLoad) => (
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="font-mono font-semibold text-foreground whitespace-normal break-words">
+            {l.load_reference || l.id.slice(0, 8)}
+          </span>
+          {l.load_reference && (
+            <span className="text-xs text-muted-foreground">{l.id.slice(0, 8)}</span>
+          )}
+        </div>
       ),
     },
+    {
+      key: 'agency',
+      header: 'Agency / Carrier',
+      render: (l: AgencyLoad) => (
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className="font-medium text-foreground whitespace-normal break-words">
+            {l.broker_name || 'Unassigned agency'}
+          </span>
+          <span className="text-xs text-muted-foreground whitespace-normal break-words">
+            {l.carrier_name || 'Unassigned carrier'}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'origin',
+      header: 'Origin',
+      render: (l: AgencyLoad) => {
+        const a = formatAddressDisplay(l.origin);
+        return (
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="font-medium text-foreground whitespace-normal break-words">
+              {[a.city, a.state].filter(Boolean).join(', ') || a.full || '-'}
+            </span>
+            {a.zip && <span className="text-xs text-muted-foreground">{a.zip}</span>}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'destination',
+      header: 'Destination',
+      render: (l: AgencyLoad) => {
+        const a = formatAddressDisplay(l.destination);
+        return (
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="font-medium text-foreground whitespace-normal break-words">
+              {[a.city, a.state].filter(Boolean).join(', ') || a.full || '-'}
+            </span>
+            {a.zip && <span className="text-xs text-muted-foreground">{a.zip}</span>}
+          </div>
+        );
+      },
+    },
+    { key: 'status', header: 'Status', render: (l: AgencyLoad) => <StatusBadge status={l.status} /> },
+    {
+      key: 'margin',
+      header: 'Margin',
+      render: (l: AgencyLoad) => {
+        const pct = marginPct(l);
+        return (
+          <div className="flex flex-col items-end gap-0.5">
+            <span className={cn('font-semibold', Number(l.margin) >= 0 ? 'text-success' : 'text-destructive')}>
+              {fmtMoney(l.margin)}
+            </span>
+            {pct !== null && (
+              <span className="text-xs text-muted-foreground">{pct.toFixed(1)}%</span>
+            )}
+          </div>
+        );
+      },
+    },
+    { key: 'actions', header: '', render: (load: AgencyLoad) => <RowActions load={load} /> },
   ];
+
+  const renderExpanded = (l: AgencyLoad) => {
+    const pct = marginPct(l);
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Broker Rate</div>
+            <div className="text-sm font-semibold">{fmtMoney(l.broker_rate)}</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Carrier Rate</div>
+            <div className="text-sm font-semibold">{fmtMoney(l.carrier_rate)}</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Margin</div>
+            <div className={cn('text-sm font-semibold', Number(l.margin) >= 0 ? 'text-success' : 'text-destructive')}>
+              {fmtMoney(l.margin)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Margin %</div>
+            <div className="text-sm font-semibold">{pct !== null ? `${pct.toFixed(1)}%` : '—'}</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Pickup</div>
+            <div className="text-sm">{l.pickup_at ? fmtDateTime(l.pickup_at, l.pickup_tz) : fmtDate(l.pickup_date)}</div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Delivery</div>
+            <div className="text-sm">{l.delivery_at ? fmtDateTime(l.delivery_at, l.delivery_tz) : fmtDate(l.delivery_date)}</div>
+          </div>
+          <div className="col-span-2">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Reference</div>
+            <div className="text-sm font-mono break-all">{l.load_reference || '—'}</div>
+          </div>
+        </div>
+        {l.notes && (
+          <div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Notes</div>
+            <div className="text-sm whitespace-pre-wrap break-words rounded-md border border-border/60 bg-muted/30 p-3">
+              {l.notes}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderMobileCard = (l: AgencyLoad) => {
+    const o = formatAddressDisplay(l.origin);
+    const d = formatAddressDisplay(l.destination);
+    const pct = marginPct(l);
+    return (
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="font-mono font-semibold text-sm break-words">
+              {l.load_reference || l.id.slice(0, 8)}
+            </div>
+            <div className="text-xs text-muted-foreground break-words">
+              {l.broker_name || 'Unassigned agency'}
+            </div>
+            <div className="text-xs text-muted-foreground break-words">
+              {l.carrier_name || 'Unassigned carrier'}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <StatusBadge status={l.status} />
+            <RowActions load={l} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">From</div>
+            <div className="font-medium break-words">
+              {[o.city, o.state].filter(Boolean).join(', ') || o.full || '-'}
+            </div>
+            {o.zip && <div className="text-xs text-muted-foreground">{o.zip}</div>}
+          </div>
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">To</div>
+            <div className="font-medium break-words">
+              {[d.city, d.state].filter(Boolean).join(', ') || d.full || '-'}
+            </div>
+            {d.zip && <div className="text-xs text-muted-foreground">{d.zip}</div>}
+          </div>
+        </div>
+        <div className="flex items-center justify-between text-xs pt-2 border-t border-border/60">
+          <span className={cn('font-semibold', Number(l.margin) >= 0 ? 'text-success' : 'text-destructive')}>
+            {fmtMoney(l.margin)}
+          </span>
+          {pct !== null && <span className="text-muted-foreground">{pct.toFixed(1)}% margin</span>}
+          <span className="text-muted-foreground">{fmtDate(l.pickup_date)}</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -153,6 +358,10 @@ export default function AgencyLoads() {
         tableId="agency-loads"
         exportFilename="agency-loads"
         onRowDoubleClick={(load) => openDialog(load)}
+        wrapCells
+        expandable
+        renderExpanded={renderExpanded}
+        renderMobileCard={renderMobileCard}
         selectable
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}

@@ -1,37 +1,51 @@
-## Mobile-responsive Fleet Loads table
+## Agency Loads: wrapped cells, two-tier primary cells, expandable rows
 
-Scope: give `DataTable` a mobile card view and use it in Fleet Loads. Tablet/desktop layout is unchanged.
+Reuses the same `wrapCells` + `expandable` + `renderExpanded` + `renderMobileCard` support already added to `DataTable` for Fleet Loads. No component changes.
 
-### `src/components/shared/DataTable.tsx`
+### Note on fields (verified against `agency_loads` schema)
 
-- Add optional prop `renderMobileCard?: (item: T) => React.ReactNode`.
-- Below `md` (`<768px`): when `renderMobileCard` is provided, hide the `<table>` (and its sticky header) and render a vertical stack of card `<div>`s inside the same scroll container. Each card:
-  - Uses `rounded-lg border border-border bg-card p-3` with `space-y-2`.
-  - Fires the same `onRowClick` / `onRowDoubleClick` / `toggleExpand` handlers the table row does, and keeps the row-highlight pulse via `data-row-id`.
-  - Shows the selection checkbox and expand chevron inline in a top action row when `selectable` / `expandable` are on.
-  - Renders `renderExpanded` in a `border-t pt-2 mt-2` block when the row is expanded.
-- Toolbar (search, filters, density, columns, bulk actions) stays visible on mobile so features aren't lost.
-- Tablet path unchanged — the existing container is already `overflow-auto`; explicitly add `overflow-x-auto` on the table wrapper so wide tables can scroll horizontally on mid-size screens without wrapping the page.
-- When `renderMobileCard` is not provided, mobile behaviour is unchanged (existing `hiddenOnMobile` column hints keep working).
+The table doesn't currently store dedicated agent-contact, percentage-split, tracking-variable, or commodity columns. Available columns: `load_reference`, `broker_name`, `carrier_name`, `broker_rate`, `carrier_rate`, `margin`, `origin`, `destination`, `pickup_date`, `delivery_date`, `pickup_at`, `delivery_at`, `pickup_tz`, `delivery_tz`, `status`, `notes`.
 
-### `src/pages/FleetLoads.tsx`
+I'll map the request onto those fields: "Agency" = `broker_name`, "Carrier" = `carrier_name`, "split/pay details" = broker rate / carrier rate / margin / margin %. If you want first-class Agent Contact / Commodity / Tracking columns, that's a follow-up schema change I'll flag at the end.
 
-Pass `renderMobileCard` to the Fleet Loads `DataTable`. Card content (top to bottom):
+### Primary (always-visible) columns
 
-1. Header row: **Load ID** (reference or short id, `font-semibold`) on the left, `StatusBadge` on the right.
-2. Origin block: small uppercase "From" label + `City, ST` + zip line (reuses `formatAddressDisplay`).
-3. Destination block: small uppercase "To" label + `City, ST` + zip line.
-4. Meta row: rate (`text-success font-medium`) and driver name / "Unassigned" separated with a subtle divider dot.
-5. Actions dropdown pinned to the header row's right side beside the status badge.
+1. **Load** — two-tier: `load_reference` in mono/semibold, `broker_name` (agency) muted underneath. Wraps.
+2. **Agency / Carrier** — two-tier: `broker_name` on top, `carrier_name` muted underneath (falls back to "Unassigned carrier"). Wraps.
+3. **Origin** — City, ST on top; ZIP muted underneath (reusing the same `formatAddressDisplay` helper as Fleet Loads, moved into a small shared util or duplicated locally in this page). Wraps.
+4. **Destination** — same treatment as Origin. Wraps.
+5. **Status** — `StatusBadge` pill.
+6. **Margin** — top-right stacked: dollar margin + margin % of broker rate.
+7. **Actions** — dropdown (Edit / Archive), unchanged.
 
-Everything uses `whitespace-normal break-words` so nothing clips off-screen; card width is 100% of the container. No horizontal scroll needed in card mode.
+The existing standalone `broker_name`, `carrier_name`, `broker_rate`, `carrier_rate` columns are removed from the top-level table (their data moves into the two-tier cells and the expanded row) to save horizontal room.
 
-### Notes
+### Expanded row (via `renderExpanded`)
 
-- Uses semantic tokens (`bg-card`, `border-border`, `text-muted-foreground`) — no hardcoded gray classes.
-- No schema, no column, no behavior changes; the desktop table and the newly added expand/wrap features stay identical.
-- I'll also switch the preview viewport to mobile after building so the change is visible immediately; the user can toggle it back with the device switcher above the preview.
+Grid of label/value chips (2 cols on mobile, 4 on desktop):
 
-### Out of scope
+- Broker rate, Carrier rate, Margin, Margin %
+- Pickup date + time (formatted with `pickup_tz` when present)
+- Delivery date + time (formatted with `delivery_tz` when present)
+- Load reference (full, for copyability)
+- Notes (full-width, `whitespace-pre-wrap`) when set
 
-- Applying `renderMobileCard` to other tables (Agency Loads, Drivers, etc.) — those keep their current `hiddenOnMobile` behaviour until requested.
+Click anywhere on a row toggles expansion (same pattern as Fleet Loads); double-click still opens the edit dialog; bulk-selection and archive stay intact.
+
+### Mobile (`renderMobileCard`)
+
+Card layout matching Fleet Loads:
+
+1. Header row: `load_reference` (mono semibold) + `StatusBadge` + actions dropdown.
+2. Agency + Carrier stacked (bold agency, muted carrier).
+3. From / To rows with city/state and zip muted underneath.
+4. Bottom row: margin dollar (colored) · margin % · pickup date.
+
+### Files touched
+
+- `src/pages/AgencyLoads.tsx` — rewrite `columns` array, add `wrapCells`, `expandable`, `renderExpanded`, and `renderMobileCard`; add a local `formatAddressDisplay` helper mirroring Fleet Loads.
+
+### Out of scope / follow-up
+
+- No schema changes. If you want dedicated **Agent Contact (name/phone/email)**, **Commodity**, and **Tracking ID** fields on agency loads, I'll do that as a separate migration + form update — say the word and I'll queue it.
+- No changes to the create/edit dialog, other pages, or shared `DataTable`.
