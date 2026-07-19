@@ -966,7 +966,7 @@ export default function FleetLoads() {
       </div>
 
       {/* Action Bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex-1 flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <Input
