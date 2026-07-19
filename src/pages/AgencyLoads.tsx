@@ -558,6 +558,53 @@ export default function AgencyLoads() {
                 <Input id="carrier_rate" type="number" step="0.01" value={formData.carrier_rate || ''} onChange={(e) => setFormData({ ...formData, carrier_rate: parseFloat(e.target.value) || 0 })} />
               </div>
             </div>
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-4">
+              <div className="text-sm font-semibold">Landstar / Revenue</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="gross_linehaul">Gross Linehaul ($)</Label>
+                  <Input id="gross_linehaul" type="number" step="0.01" value={formData.gross_linehaul ?? ''} onChange={(e) => setFormData({ ...formData, gross_linehaul: e.target.value === '' ? null : parseFloat(e.target.value) })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fuel_surcharge">Fuel Surcharge ($)</Label>
+                  <Input id="fuel_surcharge" type="number" step="0.01" value={formData.fuel_surcharge ?? ''} onChange={(e) => setFormData({ ...formData, fuel_surcharge: e.target.value === '' ? null : parseFloat(e.target.value) })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tarp_fee">Tarp Fee ($)</Label>
+                  <Input id="tarp_fee" type="number" step="0.01" value={formData.tarp_fee ?? ''} onChange={(e) => setFormData({ ...formData, tarp_fee: e.target.value === '' ? null : parseFloat(e.target.value) })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bco_split_pct">BCO Split % (65–75)</Label>
+                  <Input id="bco_split_pct" type="number" step="0.5" min={65} max={75} value={formData.bco_split_pct ?? 72} onChange={(e) => setFormData({ ...formData, bco_split_pct: e.target.value === '' ? 72 : parseFloat(e.target.value) })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="exception_status">Exception Status</Label>
+                  <Select value={formData.exception_status || 'normal'} onValueChange={(v) => setFormData({ ...formData, exception_status: v })}>
+                    <SelectTrigger id="exception_status"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="normal">Normal</SelectItem>
+                      <SelectItem value="disrupted">Disrupted</SelectItem>
+                      <SelectItem value="pending_update">Pending Update</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pay2day">Settlement</Label>
+                  <label className="flex items-center gap-2 h-10 px-3 rounded-md border border-input bg-background cursor-pointer">
+                    <input
+                      id="pay2day"
+                      type="checkbox"
+                      className="h-4 w-4 accent-primary"
+                      checked={!!formData.pay2day}
+                      onChange={(e) => setFormData({ ...formData, pay2day: e.target.checked })}
+                    />
+                    <span className="text-sm">Pay2Day fast settlement</span>
+                  </label>
+                </div>
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>
               <Textarea id="notes" value={formData.notes || ''} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
