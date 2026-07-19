@@ -490,6 +490,146 @@ export function DataTable<T extends { id: string }>({
           className="rounded-lg border border-border overflow-auto"
           style={{ maxHeight: 600 }}
         >
+          {useStaticLayout ? (
+            <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
+              <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background">
+                <tr className="border-b bg-muted/50">
+                  {showSelection && (
+                    <th className={cn(thClass, "w-10 text-center")} style={{ width: '40px' }}>
+                      <div className="flex items-center justify-center">
+                        <Checkbox
+                          checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                          onCheckedChange={toggleAll}
+                          aria-label="Select all rows"
+                        />
+                      </div>
+                    </th>
+                  )}
+                  {expandable && renderExpanded && (
+                    <th className={cn(thClass, "w-8")} style={{ width: '32px' }} aria-hidden />
+                  )}
+                  {visibleColumns.map((col, i) => {
+                    const key = String(col.key);
+                    const isSorted = sortState?.key === key;
+                    const SortIcon = !col.sortable ? null : (isSorted ? (sortState!.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown);
+                    return (
+                      <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground whitespace-nowrap", col.hiddenOnMobile && "hidden md:table-cell")} style={{ width: computedWidths[i] }}>
+                        {col.sortable ? (
+                          <button
+                            type="button"
+                            onClick={() => cycleSort(key)}
+                            className={cn("flex items-center gap-1 w-full text-left hover:text-foreground transition-colors", isSorted && "text-foreground")}
+                            aria-label={`Sort by ${col.header}`}
+                          >
+                            <span>{col.header}</span>
+                            {SortIcon && <SortIcon className="h-3.5 w-3.5 opacity-70 shrink-0" />}
+                          </button>
+                        ) : (
+                          <span>{col.header}</span>
+                        )}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {sortedData.length === 0 && (
+                  <tr>
+                    <td colSpan={visibleColumns.length + (showSelection ? 1 : 0) + (expandable && renderExpanded ? 1 : 0)} className={cn(tdClass, "text-center text-muted-foreground py-8")}>
+                      No rows match the current filters.
+                    </td>
+                  </tr>
+                )}
+                {sortedData.map((item, idx) => {
+                  const isSelected = showSelection && safeSelectedIds.has(item.id);
+                  const isExpanded = expandable && renderExpanded && expandedIds.has(item.id);
+                  const canRowToggle = expandable && renderExpanded && !onRowClick;
+                  const totalCols = visibleColumns.length + (showSelection ? 1 : 0) + (expandable && renderExpanded ? 1 : 0);
+                  return (
+                    <React.Fragment key={item.id}>
+                      <tr
+                        data-index={idx}
+                        data-row-id={item.id}
+                        onClick={() => {
+                          if (onRowClick) onRowClick(item);
+                          else if (canRowToggle) toggleExpand(item.id);
+                        }}
+                        onDoubleClick={() => onRowDoubleClick?.(item)}
+                        onTouchEnd={() => handleTouchEnd(item)}
+                        className={cn(
+                          "border-b transition-colors hover:bg-muted/50",
+                          (onRowClick || onRowDoubleClick || canRowToggle) && "cursor-pointer",
+                          isSelected && "bg-primary/5",
+                          isExpanded && "bg-muted/30"
+                        )}
+                      >
+                        {showSelection && (
+                          <td className={cn(tdClass, "w-10 text-center align-top")} style={{ width: '40px' }} onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-center pt-1">
+                              <Checkbox
+                                checked={safeSelectedIds.has(item.id)}
+                                onCheckedChange={() => toggleRow(item.id)}
+                                aria-label={`Select row ${idx + 1}`}
+                              />
+                            </div>
+                          </td>
+                        )}
+                        {expandable && renderExpanded && (
+                          <td className={cn(tdClass, "w-8 align-top")} style={{ width: '32px' }} onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="mt-0.5 flex h-6 w-6 items-center justify-center rounded hover:bg-muted text-muted-foreground"
+                              onClick={() => toggleExpand(item.id)}
+                              aria-label={isExpanded ? 'Collapse row' : 'Expand row'}
+                              aria-expanded={isExpanded ? true : false}
+                            >
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </button>
+                          </td>
+                        )}
+                        {visibleColumns.map((col, j) => {
+                          const raw = item[col.key as keyof T];
+                          const isPrimitive = raw == null || typeof raw === 'string' || typeof raw === 'number';
+                          const shouldWrap = wrapCells || col.wrap;
+                          const titleAttr = !col.render && isPrimitive && !shouldWrap ? String(raw ?? '') : undefined;
+                          return (
+                            <td
+                              key={j}
+                              className={cn(
+                                tdClass,
+                                "align-top py-2",
+                                shouldWrap ? "whitespace-normal break-words" : "overflow-hidden",
+                                col.hiddenOnMobile && "hidden md:table-cell"
+                              )}
+                              style={{ width: computedWidths[j] }}
+                              title={titleAttr}
+                            >
+                              {shouldWrap ? (
+                                <div className="min-w-0">
+                                  {col.render ? col.render(item) : <span>{String(raw ?? '-')}</span>}
+                                </div>
+                              ) : (
+                                <div className="flex items-center min-w-0 whitespace-nowrap">
+                                  {col.render ? col.render(item) : <span className="truncate">{String(raw ?? '-')}</span>}
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                      {isExpanded && (
+                        <tr className="border-b bg-muted/20">
+                          <td colSpan={totalCols} className="px-4 py-4">
+                            {renderExpanded!(item)}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
           <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
             <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background" style={{ display: 'block' }}>
               <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
@@ -600,6 +740,7 @@ export function DataTable<T extends { id: string }>({
               })}
             </tbody>
           </table>
+          )}
         </div>
       </div>
 
