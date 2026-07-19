@@ -786,10 +786,6 @@ export default function FleetLoads() {
         </div>
         <div className="flex w-full sm:w-auto items-center gap-2">
           <NotificationCenter />
-          <Button onClick={() => openDialog()} className="w-full sm:w-auto gradient-gold text-primary-foreground">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Load
-          </Button>
         </div>
       </div>
 
