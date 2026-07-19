@@ -864,40 +864,67 @@ export default function FleetLoads() {
         </div>
       </div>
 
-      {/* Search + Month Filter */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="flex-1">
-          <Input
-            leftIcon={<Search className="h-4 w-4" />}
-            rightIcon={
-              searchInput ? (
-                <button
-                  type="button"
-                  onClick={() => { setSearchInput(''); setSearchTerm(''); }}
-                  className="text-muted-foreground hover:text-foreground"
-                  aria-label="Clear search"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              ) : undefined
-            }
-            placeholder="Search loads by ID, origin, destination, status, driver, truck…"
-            value={searchInput}
-            onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
+      {/* Action Bar */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+        <div className="flex-1 flex flex-col sm:flex-row gap-3">
+          <div className="flex-1">
+            <Input
+              leftIcon={<Search className="h-4 w-4" />}
+              rightIcon={
+                searchInput ? (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchInput(''); setSearchTerm(''); }}
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : undefined
+              }
+              placeholder="Search loads by ID or destination…"
+              value={searchInput}
+              onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
+            />
+          </div>
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Filter by month" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Loads</SelectItem>
+              <SelectItem value="2026-01">January 2026</SelectItem>
+              <SelectItem value="2026-02">February 2026</SelectItem>
+              <SelectItem value="2026-03">March 2026</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => openDialog()}
+            className="gradient-gold text-primary-foreground"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Load Manually
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => bulkInputRef.current?.click()}
+            disabled={bulkImporting}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {bulkImporting ? 'Uploading…' : 'Bulk Upload'}
+          </Button>
+          <input
+            ref={bulkInputRef}
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            onChange={handleBulkUpload}
           />
         </div>
-        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filter by month" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Loads</SelectItem>
-            <SelectItem value="2026-01">January 2026</SelectItem>
-            <SelectItem value="2026-02">February 2026</SelectItem>
-            <SelectItem value="2026-03">March 2026</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
+
 
       {/* Loads Table */}
       <Card className="card-elevated">
