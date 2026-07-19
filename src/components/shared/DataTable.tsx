@@ -557,10 +557,10 @@ export function DataTable<T extends { id: string }>({
                         onDoubleClick={() => onRowDoubleClick?.(item)}
                         onTouchEnd={() => handleTouchEnd(item)}
                         className={cn(
-                          "border-b transition-colors hover:bg-muted/50",
+                          "border-b border-border/60 even:bg-muted/30 transition-colors hover:bg-muted/50",
                           (onRowClick || onRowDoubleClick || canRowToggle) && "cursor-pointer",
                           isSelected && "bg-primary/5",
-                          isExpanded && "bg-muted/30"
+                          isExpanded && "bg-muted/40"
                         )}
                       >
                         {showSelection && (
