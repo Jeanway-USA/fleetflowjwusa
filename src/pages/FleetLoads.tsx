@@ -878,7 +878,8 @@ export default function FleetLoads() {
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
+      <div className="-m-2 sm:-m-4 lg:-m-6 p-4 sm:p-6 lg:p-8 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-border/50 min-h-[calc(100vh-4rem)] space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Fleet Loads</h1>
           <p className="text-sm text-muted-foreground mt-1">{timeframeLabel}</p>
@@ -889,7 +890,8 @@ export default function FleetLoads() {
       </div>
 
       {/* Rate Confirmation Upload */}
-      <div className="mb-6">
+      <div>
+
         {isIndependent ? (
           <SmartLoadCreator
             onDataExtracted={handleRateConfirmationData}
@@ -922,7 +924,7 @@ export default function FleetLoads() {
       </div>
 
       {/* KPI Summary Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-card border border-border/60 rounded-xl shadow-sm p-6 flex items-start justify-between">
           <div className="min-w-0">
             <p className="text-sm font-medium text-muted-foreground">Total Gross Income</p>
@@ -964,7 +966,7 @@ export default function FleetLoads() {
       </div>
 
       {/* Action Bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex-1 flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <Input
@@ -1314,8 +1316,10 @@ export default function FleetLoads() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* Add/Edit Load Dialog */}
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
