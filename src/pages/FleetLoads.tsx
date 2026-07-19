@@ -581,23 +581,19 @@ export default function FleetLoads() {
   // Format address for display - condense for mobile
   const formatAddressDisplay = (address: string | null) => {
     if (!address) return '-';
-    
+
     const parts = address.split(',').map(p => p.trim());
-    
-    // Look for a part containing a 2-letter state abbreviation followed by a zip code
+
     for (let i = parts.length - 1; i >= 0; i--) {
       const part = parts[i].trim();
-      // Match state + optional ZIP+4 (e.g. "KY 42240-4455" or "GA 30474" or just "GA")
       const stateMatch = part.match(/\b([A-Z]{2})\s*(\d{5}(-\d{4})?)?\b/);
       if (stateMatch) {
-        // The city is the part immediately before the state part
         const city = i > 0 ? parts[i - 1].trim() : '';
-        return { city, state: stateMatch[1], full: address };
+        return { city, state: stateMatch[1], zip: stateMatch[2] || '', full: address };
       }
     }
-    
-    // Fallback: just return first meaningful part
-    return { city: parts[0], state: '', full: address };
+
+    return { city: parts[0], state: '', zip: '', full: address };
   };
 
   // Filter loads by month
