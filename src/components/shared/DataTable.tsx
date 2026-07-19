@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Download, SlidersHorizontal, RotateCcw, Rows3, AlignJustify, X, Filter, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
+import { Download, SlidersHorizontal, RotateCcw, Rows3, AlignJustify, X, Filter, ArrowUp, ArrowDown, ChevronsUpDown, ChevronRight, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
