@@ -28,7 +28,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search, Archive } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search, Archive, CheckCircle2 } from 'lucide-react';
+import { NotificationCenter } from '@/components/shared/NotificationCenter';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 
@@ -645,6 +646,25 @@ export default function FleetLoads() {
       actualMiles: acc.actualMiles + getDisplayMiles(load),
     }), { loads: 0, rate: 0, fuelSurcharge: 0, accessorials: 0, grossRevenue: 0, netRevenue: 0, settlement: 0, bookedMiles: 0, actualMiles: 0 });
 
+  // KPI-specific aggregates
+  const PENDING_STATUSES = new Set(['in_transit', 'dispatched', 'at_pickup', 'at_delivery', 'assigned', 'pending']);
+  const pendingIncome = filteredLoads
+    .filter((l: any) => PENDING_STATUSES.has(l.status))
+    .reduce((sum: number, l: any) => sum + (l.gross_revenue || 0), 0);
+  const pendingCount = filteredLoads.filter((l: any) => PENDING_STATUSES.has(l.status)).length;
+  const completedCount = filteredLoads.filter((l: any) => l.status === 'delivered').length;
+
+  const timeframeLabel = selectedMonth === 'all'
+    ? `Showing all loads · ${totals.loads} total`
+    : (() => {
+        try {
+          const d = parseISO(`${selectedMonth}-01`);
+          return `Showing ${format(d, 'MMMM yyyy')} · ${totals.loads} loads`;
+        } catch {
+          return `Showing ${selectedMonth} · ${totals.loads} loads`;
+        }
+      })();
+
   // Format intermediate stops for notes
   const formatIntermediateStops = (stops: any[]): string => {
     if (!stops || stops.length === 0) return '';
@@ -756,11 +776,19 @@ export default function FleetLoads() {
 
   return (
     <>
-      <PageHeader 
-        title="Fleet Loads" 
-        description="Track loads, revenue, and settlements" 
-        action={{ label: 'Add Load', onClick: () => openDialog() }} 
-      />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Fleet Loads</h1>
+          <p className="text-sm text-muted-foreground mt-1">{timeframeLabel}</p>
+        </div>
+        <div className="flex w-full sm:w-auto items-center gap-2">
+          <NotificationCenter />
+          <Button onClick={() => openDialog()} className="w-full sm:w-auto gradient-gold text-primary-foreground">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Load
+          </Button>
+        </div>
+      </div>
 
       {/* Rate Confirmation Upload */}
       <div className="mb-6">
@@ -795,50 +823,46 @@ export default function FleetLoads() {
         )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Loads</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totals.loads}</div>
-            <p className="text-xs text-muted-foreground">{totals.actualMiles.toLocaleString()} actual miles</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Gross Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totals.grossRevenue)}</div>
-            <p className="text-xs text-muted-foreground">Rate + FSC + Accessorials</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
-            <TrendingUp className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">{formatCurrency(totals.netRevenue)}</div>
-            <p className="text-xs text-muted-foreground">Truck + Trailer share</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Avg Per Mile</CardTitle>
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {totals.actualMiles > 0 ? formatCurrency(totals.netRevenue / totals.actualMiles) : '$0.00'}
-            </div>
-            <p className="text-xs text-muted-foreground">Net revenue per mile</p>
-          </CardContent>
-        </Card>
+      {/* KPI Summary Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-6 flex items-start justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-muted-foreground">Total Gross Income</p>
+            <p className="text-2xl font-bold mt-2 truncate">{formatCurrency(totals.grossRevenue)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {totals.actualMiles > 0
+                ? `${formatCurrency(totals.grossRevenue / totals.actualMiles)}/mi · ${totals.actualMiles.toLocaleString()} mi`
+                : 'Rate + FSC + Accessorials'}
+            </p>
+          </div>
+          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-emerald-500/10 shrink-0">
+            <DollarSign className="h-5 w-5 text-emerald-600" />
+          </div>
+        </div>
+
+        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-6 flex items-start justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-muted-foreground">Pending Income (In Transit)</p>
+            <p className="text-2xl font-bold mt-2 truncate">{formatCurrency(pendingIncome)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {pendingCount} load{pendingCount === 1 ? '' : 's'} in transit
+            </p>
+          </div>
+          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-amber-500/10 shrink-0">
+            <Truck className="h-5 w-5 text-amber-600" />
+          </div>
+        </div>
+
+        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-6 flex items-start justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-muted-foreground">Completed Loads</p>
+            <p className="text-2xl font-bold mt-2 truncate">{completedCount.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-1">Delivered this period</p>
+          </div>
+          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-blue-500/10 shrink-0">
+            <CheckCircle2 className="h-5 w-5 text-blue-600" />
+          </div>
+        </div>
       </div>
 
       {/* Search + Month Filter */}
