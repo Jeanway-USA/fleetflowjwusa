@@ -776,11 +776,19 @@ export default function FleetLoads() {
 
   return (
     <>
-      <PageHeader 
-        title="Fleet Loads" 
-        description="Track loads, revenue, and settlements" 
-        action={{ label: 'Add Load', onClick: () => openDialog() }} 
-      />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Fleet Loads</h1>
+          <p className="text-sm text-muted-foreground mt-1">{timeframeLabel}</p>
+        </div>
+        <div className="flex w-full sm:w-auto items-center gap-2">
+          <NotificationCenter />
+          <Button onClick={() => openDialog()} className="w-full sm:w-auto gradient-gold text-primary-foreground">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Load
+          </Button>
+        </div>
+      </div>
 
       {/* Rate Confirmation Upload */}
       <div className="mb-6">
