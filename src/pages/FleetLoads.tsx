@@ -645,6 +645,25 @@ export default function FleetLoads() {
       actualMiles: acc.actualMiles + getDisplayMiles(load),
     }), { loads: 0, rate: 0, fuelSurcharge: 0, accessorials: 0, grossRevenue: 0, netRevenue: 0, settlement: 0, bookedMiles: 0, actualMiles: 0 });
 
+  // KPI-specific aggregates
+  const PENDING_STATUSES = new Set(['in_transit', 'dispatched', 'at_pickup', 'at_delivery', 'assigned', 'pending']);
+  const pendingIncome = filteredLoads
+    .filter((l: any) => PENDING_STATUSES.has(l.status))
+    .reduce((sum: number, l: any) => sum + (l.gross_revenue || 0), 0);
+  const pendingCount = filteredLoads.filter((l: any) => PENDING_STATUSES.has(l.status)).length;
+  const completedCount = filteredLoads.filter((l: any) => l.status === 'delivered').length;
+
+  const timeframeLabel = selectedMonth === 'all'
+    ? `Showing all loads · ${totals.loads} total`
+    : (() => {
+        try {
+          const d = parseISO(`${selectedMonth}-01`);
+          return `Showing ${format(d, 'MMMM yyyy')} · ${totals.loads} loads`;
+        } catch {
+          return `Showing ${selectedMonth} · ${totals.loads} loads`;
+        }
+      })();
+
   // Format intermediate stops for notes
   const formatIntermediateStops = (stops: any[]): string => {
     if (!stops || stops.length === 0) return '';
