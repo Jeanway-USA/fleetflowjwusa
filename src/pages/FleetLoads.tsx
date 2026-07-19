@@ -878,7 +878,8 @@ export default function FleetLoads() {
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
+      <div className="-m-2 sm:-m-4 lg:-m-6 p-4 sm:p-6 lg:p-8 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-border/50 min-h-[calc(100vh-4rem)] space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Fleet Loads</h1>
           <p className="text-sm text-muted-foreground mt-1">{timeframeLabel}</p>
@@ -889,7 +890,8 @@ export default function FleetLoads() {
       </div>
 
       {/* Rate Confirmation Upload */}
-      <div className="mb-6">
+      <div>
+
         {isIndependent ? (
           <SmartLoadCreator
             onDataExtracted={handleRateConfirmationData}
