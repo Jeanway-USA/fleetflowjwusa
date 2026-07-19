@@ -69,6 +69,8 @@ interface DataTableProps<T> {
   expandable?: boolean;
   /** Content rendered in the full-width panel below an expanded row. */
   renderExpanded?: (item: T) => React.ReactNode;
+  /** Custom card renderer used below the `md` breakpoint. When provided, the table is hidden on mobile and a stacked list of cards is shown instead. */
+  renderMobileCard?: (item: T) => React.ReactNode;
 }
 
 
