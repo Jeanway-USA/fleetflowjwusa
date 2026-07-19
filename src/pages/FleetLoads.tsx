@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,7 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search, Archive, CheckCircle2 } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search, Archive, CheckCircle2, Upload } from 'lucide-react';
 import { NotificationCenter } from '@/components/shared/NotificationCenter';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
@@ -86,6 +87,8 @@ export default function FleetLoads() {
   const [massEditOpen, setMassEditOpen] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
   const [agencyBlocked, setAgencyBlocked] = useState(false);
+  const bulkInputRef = useRef<HTMLInputElement>(null);
+  const [bulkImporting, setBulkImporting] = useState(false);
 
 
   // Fetch settings for calculations
@@ -398,6 +401,105 @@ export default function FleetLoads() {
       setAccessorials([]);
     }
     setDialogOpen(true);
+  };
+
+  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const isXlsx = file.name.toLowerCase().endsWith('.xlsx') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if (!isXlsx) {
+      toast.error('Only .xlsx files are supported for bulk upload');
+      return;
+    }
+    if (!orgId) {
+      toast.error('Missing organization context');
+      return;
+    }
+    setBulkImporting(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: null });
+      if (raw.length === 0) {
+        toast.error('The spreadsheet is empty');
+        return;
+      }
+      const pick = (row: Record<string, any>, keys: string[]) => {
+        const map = new Map<string, any>();
+        for (const k of Object.keys(row)) map.set(k.toLowerCase().trim(), row[k]);
+        for (const k of keys) {
+          const v = map.get(k.toLowerCase());
+          if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+        }
+        return null;
+      };
+      const buildAddress = (city: any, state: any, zip: any, combined: any) => {
+        if (combined) return String(combined).trim();
+        const parts = [city, state].filter((p) => p != null && String(p).trim() !== '').map((p) => String(p).trim());
+        const base = parts.join(', ');
+        const z = zip != null && String(zip).trim() !== '' ? String(zip).trim() : '';
+        return [base, z].filter(Boolean).join(' ') || null;
+      };
+      const parseDate = (v: any): string | null => {
+        if (v == null || v === '') return null;
+        if (typeof v === 'number') {
+          const d = XLSX.SSF?.parse_date_code?.(v);
+          if (d) return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+        }
+        const s = String(v).trim();
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+        return null;
+      };
+      const rows = raw.map((r) => {
+        const origin = buildAddress(
+          pick(r, ['Origin City', 'origin_city']),
+          pick(r, ['Origin State', 'origin_state']),
+          pick(r, ['Origin Zip', 'Origin ZIP', 'origin_zip']),
+          pick(r, ['Origin', 'origin']),
+        );
+        const destination = buildAddress(
+          pick(r, ['Destination City', 'destination_city']),
+          pick(r, ['Destination State', 'destination_state']),
+          pick(r, ['Destination Zip', 'Destination ZIP', 'destination_zip']),
+          pick(r, ['Destination', 'destination']),
+        );
+        const rate = pick(r, ['Gross Revenue', 'Rate', 'rate', 'gross_revenue']);
+        return {
+          org_id: orgId,
+          landstar_load_id: pick(r, ['Landstar Load ID', 'Load ID', 'landstar_load_id', 'load_id']) || null,
+          origin,
+          destination,
+          pickup_date: parseDate(pick(r, ['Pickup Date', 'pickup_date'])),
+          delivery_date: parseDate(pick(r, ['Delivery Date', 'delivery_date'])),
+          rate: rate != null ? Number(String(rate).replace(/[^0-9.\-]/g, '')) || null : null,
+          commodity: pick(r, ['Commodity', 'commodity']),
+          weight: (() => {
+            const w = pick(r, ['Weight', 'weight']);
+            return w != null ? Number(String(w).replace(/[^0-9.\-]/g, '')) || null : null;
+          })(),
+          agency_code: pick(r, ['Agency Code', 'agency_code', 'Agent']),
+          status: 'pending',
+        };
+      }).filter((r) => r.origin || r.destination || r.landstar_load_id);
+
+      if (rows.length === 0) {
+        toast.error('No valid rows found. Expected columns like Load ID, Origin, Destination.');
+        return;
+      }
+      const { error } = await supabase.from('fleet_loads').insert(rows);
+      if (error) throw error;
+      toast.success(`Imported ${rows.length} load${rows.length === 1 ? '' : 's'}`);
+      queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
+    } catch (err: any) {
+      console.error('Bulk upload failed:', err);
+      toast.error(err?.message || 'Bulk upload failed');
+    } finally {
+      setBulkImporting(false);
+    }
   };
 
   // Auto-open dialog from command palette quick action
@@ -783,10 +885,6 @@ export default function FleetLoads() {
         </div>
         <div className="flex w-full sm:w-auto items-center gap-2">
           <NotificationCenter />
-          <Button onClick={() => openDialog()} className="w-full sm:w-auto gradient-gold text-primary-foreground">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Load
-          </Button>
         </div>
       </div>
 
@@ -865,40 +963,67 @@ export default function FleetLoads() {
         </div>
       </div>
 
-      {/* Search + Month Filter */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="flex-1">
-          <Input
-            leftIcon={<Search className="h-4 w-4" />}
-            rightIcon={
-              searchInput ? (
-                <button
-                  type="button"
-                  onClick={() => { setSearchInput(''); setSearchTerm(''); }}
-                  className="text-muted-foreground hover:text-foreground"
-                  aria-label="Clear search"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              ) : undefined
-            }
-            placeholder="Search loads by ID, origin, destination, status, driver, truck…"
-            value={searchInput}
-            onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
+      {/* Action Bar */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+        <div className="flex-1 flex flex-col sm:flex-row gap-3">
+          <div className="flex-1">
+            <Input
+              leftIcon={<Search className="h-4 w-4" />}
+              rightIcon={
+                searchInput ? (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchInput(''); setSearchTerm(''); }}
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : undefined
+              }
+              placeholder="Search loads by ID or destination…"
+              value={searchInput}
+              onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
+            />
+          </div>
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Filter by month" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Loads</SelectItem>
+              <SelectItem value="2026-01">January 2026</SelectItem>
+              <SelectItem value="2026-02">February 2026</SelectItem>
+              <SelectItem value="2026-03">March 2026</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => openDialog()}
+            className="gradient-gold text-primary-foreground"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Load Manually
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => bulkInputRef.current?.click()}
+            disabled={bulkImporting}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {bulkImporting ? 'Uploading…' : 'Bulk Upload'}
+          </Button>
+          <input
+            ref={bulkInputRef}
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            onChange={handleBulkUpload}
           />
         </div>
-        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filter by month" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Loads</SelectItem>
-            <SelectItem value="2026-01">January 2026</SelectItem>
-            <SelectItem value="2026-02">February 2026</SelectItem>
-            <SelectItem value="2026-03">March 2026</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
+
 
       {/* Loads Table */}
       <Card className="card-elevated">
