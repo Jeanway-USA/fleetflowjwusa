@@ -823,50 +823,46 @@ export default function FleetLoads() {
         )}
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Loads</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totals.loads}</div>
-            <p className="text-xs text-muted-foreground">{totals.actualMiles.toLocaleString()} actual miles</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Gross Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totals.grossRevenue)}</div>
-            <p className="text-xs text-muted-foreground">Rate + FSC + Accessorials</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
-            <TrendingUp className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">{formatCurrency(totals.netRevenue)}</div>
-            <p className="text-xs text-muted-foreground">Truck + Trailer share</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Avg Per Mile</CardTitle>
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {totals.actualMiles > 0 ? formatCurrency(totals.netRevenue / totals.actualMiles) : '$0.00'}
-            </div>
-            <p className="text-xs text-muted-foreground">Net revenue per mile</p>
-          </CardContent>
-        </Card>
+      {/* KPI Summary Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-6 flex items-start justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-muted-foreground">Total Gross Income</p>
+            <p className="text-2xl font-bold mt-2 truncate">{formatCurrency(totals.grossRevenue)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {totals.actualMiles > 0
+                ? `${formatCurrency(totals.grossRevenue / totals.actualMiles)}/mi · ${totals.actualMiles.toLocaleString()} mi`
+                : 'Rate + FSC + Accessorials'}
+            </p>
+          </div>
+          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-emerald-500/10 shrink-0">
+            <DollarSign className="h-5 w-5 text-emerald-600" />
+          </div>
+        </div>
+
+        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-6 flex items-start justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-muted-foreground">Pending Income (In Transit)</p>
+            <p className="text-2xl font-bold mt-2 truncate">{formatCurrency(pendingIncome)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {pendingCount} load{pendingCount === 1 ? '' : 's'} in transit
+            </p>
+          </div>
+          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-amber-500/10 shrink-0">
+            <Truck className="h-5 w-5 text-amber-600" />
+          </div>
+        </div>
+
+        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-6 flex items-start justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-muted-foreground">Completed Loads</p>
+            <p className="text-2xl font-bold mt-2 truncate">{completedCount.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground mt-1">Delivered this period</p>
+          </div>
+          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-blue-500/10 shrink-0">
+            <CheckCircle2 className="h-5 w-5 text-blue-600" />
+          </div>
+        </div>
       </div>
 
       {/* Search + Month Filter */}
