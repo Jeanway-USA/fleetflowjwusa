@@ -116,6 +116,7 @@ export function DataTable<T extends { id: string }>({
   wrapCells,
   expandable,
   renderExpanded,
+  renderMobileCard,
 }: DataTableProps<T>) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<{ time: number; id: string }>({ time: 0, id: '' });
