@@ -246,29 +246,94 @@ export default function AgencyLoads() {
     { key: 'actions', header: '', render: (load: AgencyLoad) => <RowActions load={load} /> },
   ];
 
+  const exceptionMeta = (status: string | null | undefined) => {
+    switch (status) {
+      case 'disrupted':
+        return { label: 'Disrupted', cls: 'bg-destructive/15 text-destructive border-destructive/30' };
+      case 'pending_update':
+        return { label: 'Pending Update', cls: 'bg-warning/15 text-warning border-warning/30' };
+      default:
+        return { label: 'Normal', cls: 'bg-success/15 text-success border-success/30' };
+    }
+  };
+
   const renderExpanded = (l: AgencyLoad) => {
-    const pct = marginPct(l);
+    const linehaul = Number(l.gross_linehaul) || 0;
+    const fsc = Number(l.fuel_surcharge) || 0;
+    const tarp = Number(l.tarp_fee) || 0;
+    const splitPct = Number(l.bco_split_pct) || 72;
+    const linehaulPay = linehaul * (splitPct / 100);
+    const totalRevenue = linehaul + fsc + tarp;
+    const bcoPayout = linehaulPay + fsc + tarp;
+    const exc = exceptionMeta(l.exception_status);
+
+    const Line = ({ label, value, strong, accent }: { label: string; value: string; strong?: boolean; accent?: boolean }) => (
+      <div className="flex items-baseline justify-between gap-3 py-1.5">
+        <span className={cn('text-sm', accent ? 'text-foreground' : 'text-muted-foreground')}>{label}</span>
+        <span className={cn('text-sm font-mono tabular-nums', strong ? 'font-semibold text-foreground' : 'text-foreground')}>
+          {value}
+        </span>
+      </div>
+    );
+
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Broker Rate</div>
-            <div className="text-sm font-semibold">{fmtMoney(l.broker_rate)}</div>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Carrier Rate</div>
-            <div className="text-sm font-semibold">{fmtMoney(l.carrier_rate)}</div>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Margin</div>
-            <div className={cn('text-sm font-semibold', Number(l.margin) >= 0 ? 'text-success' : 'text-destructive')}>
-              {fmtMoney(l.margin)}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Revenue Segregation */}
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-4">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+              Revenue Segregation
+            </div>
+            <Line label="Gross Linehaul" value={fmtMoney(linehaul)} />
+            <Line label="Fuel Surcharge" value={fmtMoney(fsc)} />
+            <Line label="Accessorials (Tarp)" value={fmtMoney(tarp)} />
+            <div className="border-t border-border/60 mt-2 pt-2">
+              <Line label="Total Load Revenue" value={fmtMoney(totalRevenue)} strong accent />
             </div>
           </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Margin %</div>
-            <div className="text-sm font-semibold">{pct !== null ? `${pct.toFixed(1)}%` : '—'}</div>
+
+          {/* BCO Pay Calculation */}
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+              BCO Pay Calculation
+            </div>
+            <Line label={`Linehaul split (${splitPct}% of Gross Linehaul)`} value={fmtMoney(linehaulPay)} />
+            <Line label="+ Fuel Surcharge (100% pass-through)" value={fmtMoney(fsc)} />
+            <Line label="+ Tarp Fee (100% pass-through)" value={fmtMoney(tarp)} />
+            <div className="border-t border-primary/30 mt-2 pt-2">
+              <Line label="BCO Payout" value={fmtMoney(bcoPayout)} strong accent />
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+              Split applies to linehaul only. Fuel and accessorials pay through at 100%. Deductions are handled at the truck-gross level and are not shown here.
+            </p>
           </div>
+        </div>
+
+        {/* Tracking & Settlement Variables */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mr-1">
+            Exception:
+          </span>
+          <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold', exc.cls)}>
+            {exc.label}
+          </span>
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold ml-3 mr-1">
+            Settlement:
+          </span>
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+              l.pay2day
+                ? 'bg-primary/15 text-primary border-primary/30'
+                : 'bg-muted text-muted-foreground border-border'
+            )}
+          >
+            {l.pay2day ? 'Pay2Day Fast Settlement' : 'Standard Settlement'}
+          </span>
+        </div>
+
+        {/* Timing + reference + notes */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-border/60">
           <div>
             <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Pickup</div>
             <div className="text-sm">{l.pickup_at ? fmtDateTime(l.pickup_at, l.pickup_tz) : fmtDate(l.pickup_date)}</div>
