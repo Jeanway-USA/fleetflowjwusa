@@ -581,23 +581,19 @@ export default function FleetLoads() {
   // Format address for display - condense for mobile
   const formatAddressDisplay = (address: string | null) => {
     if (!address) return '-';
-    
+
     const parts = address.split(',').map(p => p.trim());
-    
-    // Look for a part containing a 2-letter state abbreviation followed by a zip code
+
     for (let i = parts.length - 1; i >= 0; i--) {
       const part = parts[i].trim();
-      // Match state + optional ZIP+4 (e.g. "KY 42240-4455" or "GA 30474" or just "GA")
       const stateMatch = part.match(/\b([A-Z]{2})\s*(\d{5}(-\d{4})?)?\b/);
       if (stateMatch) {
-        // The city is the part immediately before the state part
         const city = i > 0 ? parts[i - 1].trim() : '';
-        return { city, state: stateMatch[1], full: address };
+        return { city, state: stateMatch[1], zip: stateMatch[2] || '', full: address };
       }
     }
-    
-    // Fallback: just return first meaningful part
-    return { city: parts[0], state: '', full: address };
+
+    return { city: parts[0], state: '', zip: '', full: address };
   };
 
   // Filter loads by month
@@ -920,19 +916,23 @@ export default function FleetLoads() {
                 ) : <span className="text-muted-foreground">-</span>
               },
               { key: 'agency_code', header: 'Agent', hiddenOnMobile: true, render: (load: any) => <span className="font-mono text-xs">{load.agency_code || '-'}</span> },
-              { key: 'origin', header: 'Origin', render: (load: any) => {
+              { key: 'origin', header: 'Origin', wrap: true, render: (load: any) => {
                 const addr = formatAddressDisplay(load.origin);
-                return typeof addr === 'string' ? addr : (
-                  <div title={addr.full}>
-                    {addr.city}{addr.state ? `, ${addr.state}` : ''}
+                if (typeof addr === 'string') return addr;
+                return (
+                  <div className="flex flex-col leading-tight" title={addr.full}>
+                    <span className="font-medium break-words">{addr.city}{addr.state ? `, ${addr.state}` : ''}</span>
+                    {addr.zip && <span className="text-xs text-muted-foreground">{addr.zip}</span>}
                   </div>
                 );
               }},
-              { key: 'destination', header: 'Destination', render: (load: any) => {
+              { key: 'destination', header: 'Destination', wrap: true, render: (load: any) => {
                 const addr = formatAddressDisplay(load.destination);
-                return typeof addr === 'string' ? addr : (
-                  <div title={addr.full}>
-                    {addr.city}{addr.state ? `, ${addr.state}` : ''}
+                if (typeof addr === 'string') return addr;
+                return (
+                  <div className="flex flex-col leading-tight" title={addr.full}>
+                    <span className="font-medium break-words">{addr.city}{addr.state ? `, ${addr.state}` : ''}</span>
+                    {addr.zip && <span className="text-xs text-muted-foreground">{addr.zip}</span>}
                   </div>
                 );
               }},
@@ -1009,6 +1009,39 @@ export default function FleetLoads() {
                 </Button>
               </>
             )}
+            wrapCells
+            expandable
+            renderExpanded={(load: any) => {
+              const originAddr = formatAddressDisplay(load.origin);
+              const destAddr = formatAddressDisplay(load.destination);
+              const detail = (label: string, value: React.ReactNode) => (
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+                  <span className="text-sm break-words">{value ?? <span className="text-muted-foreground">—</span>}</span>
+                </div>
+              );
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {detail('Origin (full)', typeof originAddr === 'string' ? originAddr : originAddr.full)}
+                  {detail('Destination (full)', typeof destAddr === 'string' ? destAddr : destAddr.full)}
+                  {detail('Broker', load.broker_name)}
+                  {detail('Commodity', load.commodity)}
+                  {detail('Weight', load.weight ? `${Number(load.weight).toLocaleString()} lbs` : null)}
+                  {detail('Pieces', load.pieces)}
+                  {detail('Dimensions', load.dimensions)}
+                  {detail('Trailer Type', load.trailer_type)}
+                  {detail('Pickup #', load.pickup_number)}
+                  {detail('Delivery #', load.delivery_number)}
+                  {detail('Rate', formatCurrency(load.rate))}
+                  {detail('Fuel Surcharge', formatCurrency(load.fuel_surcharge))}
+                  {load.notes && (
+                    <div className="col-span-2 md:col-span-4">
+                      {detail('Notes', <span className="whitespace-pre-wrap">{load.notes}</span>)}
+                    </div>
+                  )}
+                </div>
+              );
+            }}
           />
           )}
           <ConfirmDeleteDialog
