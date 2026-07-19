@@ -567,7 +567,7 @@ export function DataTable<T extends { id: string }>({
                       const titleAttr = !col.render && isPrimitive ? String(raw ?? '') : undefined;
                       return (
                         <td key={j} className={cn(tdClass, "overflow-hidden", col.hiddenOnMobile && "hidden md:table-cell")} style={{ height: `${virtualRow.size}px`, width: computedWidths[j] }} title={titleAttr}>
-                          <div className="flex items-center h-full min-w-0 whitespace-nowrap [&>*]:truncate [&_span]:truncate">
+                          <div className="flex items-center h-full min-w-0 whitespace-nowrap">
                             {col.render
                               ? col.render(item)
                               : <span className="truncate">{String(raw ?? '-')}</span>}
