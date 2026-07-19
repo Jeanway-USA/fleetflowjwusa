@@ -1,32 +1,30 @@
-## Fleet Loads Action Bar
+## Goal
+Wrap the Fleet Loads page in a cohesive master container with a neutral page background, generous responsive padding, and consistent vertical rhythm between the header, KPI grid, action bar, and table.
 
-Insert a new Action Bar row directly between the KPI grid and the loads `DataTable` in `src/pages/FleetLoads.tsx`, replacing the existing inline search + month filter row.
+## Scope
+Only `src/pages/FleetLoads.tsx`. No changes to `DashboardLayout` (which already provides `bg-background` and `p-2 sm:p-4 lg:p-6` for all pages), no changes to shared components, no logic changes.
 
-### Layout
-- Flex container: `flex flex-col md:flex-row md:items-center md:justify-between gap-3` — full width, stacks vertically on mobile, splits into left/right groups on `md+`.
-- **Left cluster** (`flex-1 flex flex-col sm:flex-row gap-3`):
-  - Existing `Input` with `Search` left icon + clear-`X` right icon, placeholder updated to "Search loads by ID or destination…".
-  - Existing month `Select` (kept for parity with current filtering).
-- **Right cluster** (`flex items-center gap-2`):
-  - Primary solid `Button` — "Add Load Manually" with `Plus` icon (reuses the current `openCreate()` handler, moved out of the page header).
-  - Outlined secondary `Button variant="outline"` — "Bulk Upload" with `Upload` icon; triggers a hidden `<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">` via ref.
+## Changes
 
-The old "Add Load" button in the page header is removed so the action bar becomes the single source for those actions.
+**`src/pages/FleetLoads.tsx`**
+1. Wrap the entire returned page (Header + KPI grid + Action Bar + DataTable + dialogs where appropriate) in a single master `<div>`:
+   - Neutral surface: `bg-slate-50 dark:bg-slate-900/40` with `rounded-xl` and a subtle `border border-border/50` so the white cards/table pop against it.
+   - Negative-margin trick (`-m-2 sm:-m-4 lg:-m-6`) to cancel the parent `DashboardLayout` padding so the master container spans edge-to-edge inside the page frame.
+   - Responsive inner padding: `p-4 sm:p-6 lg:p-8`.
+   - Minimum height: `min-h-[calc(100vh-4rem)]` so the background fills the viewport when content is short.
+2. Apply `space-y-6` on the master container so the Page Header, KPI grid, Action Bar, and DataTable card are separated by consistent vertical spacing. Remove any ad-hoc `mb-*` / `mt-*` currently used between those top-level blocks so spacing is driven exclusively by `space-y-6`.
+3. Keep dialogs (Add Load, Edit Load, Archive Confirm, etc.) rendered as siblings outside the visual stack but inside the master container — they are portaled by Radix so they won't affect layout.
+4. Dark mode: use semantic-friendly slate tokens above; do not hardcode any card/text colors — the existing KPI cards and DataTable already use `bg-card` and will contrast correctly.
 
-### Bulk Upload (XLSX only)
-- Hidden file input `ref={bulkInputRef}` with `accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"` — no CSV formats accepted.
-- On change:
-  1. Reject anything whose filename doesn't end in `.xlsx` or whose MIME isn't the Excel spreadsheet type → `notify.error("Only .xlsx files are supported")`.
-  2. Read the file as `ArrayBuffer` and parse with the already-installed `xlsx` package (`XLSX.read(buf, { type: 'array' })`, `sheet_to_json`).
-  3. Map recognized columns (Landstar Load ID, Origin City/State/Zip, Destination City/State/Zip, Pickup Date, Delivery Date, Gross Revenue, Commodity, Weight, Agency Code) to `fleet_loads` insert rows, defaulting missing fields to null.
-  4. Insert via existing `supabase.from('fleet_loads').insert(rows)` with `org_id` from context; on success show `notify.success("Imported N loads")` and refresh the query. On per-row failure, surface count of skipped rows.
-- No CSV code path, no CSV MIME accepted, and no fallback parser — strictly `.xlsx`.
+## Technical Details
+- Tailwind only; no new files, no new dependencies.
+- Vertical flow target order inside the master container:
+  1. Header block (title + subtext + right-side actions)
+  2. KPI grid (`grid-cols-1 md:grid-cols-3 gap-6`)
+  3. Action Bar (search/filter left, buttons right)
+  4. DataTable card
+- Mobile: `p-4` and `space-y-6` remain; the KPI grid already collapses to one column.
 
-### Technical notes
-- New state: `bulkInputRef = useRef<HTMLInputElement>(null)`, `bulkImporting` boolean for button spinner.
-- Reuses existing `notify` helper, `queryClient.invalidateQueries` pattern, and the current `openCreate` flow.
-- No schema changes; `xlsx` is already a dependency (used by `parse-landstar-xlsx.ts`).
-- Purely presentation + import wiring — no changes to load business logic, KPI math, or table columns.
-
-### Files touched
-- `src/pages/FleetLoads.tsx` — remove header "Add Load" button, replace inline search row with the new Action Bar, add bulk upload handler.
+## Out of Scope
+- Agency Loads and other pages (can be replicated later if desired).
+- Any change to card styling, table styling, filters, or upload logic.
