@@ -1,13 +1,31 @@
-## No changes needed — already applied
+## Agency Loads mobile card — bring it in line with the request
 
-Agency Loads renders through the shared `DataTable` static-layout branch, which is the same code path Fleet Loads uses. That branch already implements every item in this request (verified in `src/components/shared/DataTable.tsx` lines 566–697):
+The shared `DataTable` already handles horizontal scroll on tablet (`overflow-x-auto` + `min-w-[640px]`), hides the `<thead>` and swaps to a stacked card list below `md` (`md:hidden` / `hidden md:block`), and supports tap-to-expand. Those pieces are done and don't need editing.
 
-- **Subtle horizontal dividers, no heavy borders** — rows use `border-b border-border/60`; the outer heavy border is disabled when `wrapCells`/expandable is on (`!useStaticLayout && "border border-border"`).
-- **Alternating row background** — `even:bg-muted/30` on each row.
-- **Muted, uppercase, semi-bold headers** — `th` uses `text-[11px] font-semibold uppercase tracking-wider text-muted-foreground`.
-- **Hover + pointer** — `hover:bg-muted/50 transition-colors`, and `cursor-pointer` is added whenever the row is expandable/clickable (Agency Loads is expandable, so this applies).
-- **Status pills** — Agency Loads uses `<StatusBadge status={l.status} />`, the same component Fleet Loads uses; it already renders soft-bg / darker-text rounded pills with bold small text, and its color mapping is shared across both pages.
+What's actually off is Agency Loads' own `renderMobileCard` in `src/pages/AgencyLoads.tsx`: it uses a 2-column grid for From/To and buries the agency name as a muted subtitle. The request wants Load ID + Agency + Status prominent at the top, and Origin/Destination stacked vertically.
 
-The one intentional deviation from the literal request: this project's design system forbids raw Tailwind color literals like `border-gray-100`, `bg-gray-50/50`, `hover:bg-gray-50` in components — we use semantic tokens (`border-border/60`, `bg-muted/30`, `hover:bg-muted/50`) that render as the same soft grays in light mode and stay correct in dark mode. Swapping them for the literal gray classes would break dark mode and violate the project's design-system rule, so we keep the semantic tokens. Visually the result matches what you asked for.
+### Changes (single file: `src/pages/AgencyLoads.tsx`, mobile card only)
 
-No files to touch. If you'd still like me to force the literal `gray-*` classes anyway (light-mode only, dark mode will look wrong), say so and I'll do a one-line override on the Agency Loads page.
+1. **Top row** — three-item header:
+   - Left: `load_reference` (mono, semibold) with the short id fallback beneath it.
+   - Middle (new position, elevated from subtitle): `broker_name` shown as the agency name in `text-sm font-medium`.
+   - Right: `StatusBadge` + actions dropdown (unchanged).
+   - Carrier moves down into a small "Carrier: …" line under the agency name so it's still visible but doesn't compete with it.
+
+2. **Origin / Destination — stacked vertically** (replace the current 2-col grid):
+   - `From` block: label + City, ST (medium weight) + ZIP muted.
+   - Downward chevron/route separator.
+   - `To` block: same shape.
+   - Full width, no side-by-side.
+
+3. **Footer row** (unchanged): margin $ · margin % · pickup date, separated by a thin `border-t border-border/60`.
+
+4. **Tap-to-expand** — already works via the shared `DataTable`'s mobile branch (`canRowToggle` toggles `renderExpanded`). The expanded panel already shows rates, margin %, pickup/delivery datetimes, reference, and notes — no change needed. Only cosmetic: leave the chevron button in the header row so users know the card is expandable.
+
+### Out of scope
+
+- No changes to `DataTable`, Fleet Loads, or the desktop table.
+- No schema or data changes.
+- Semantic tokens stay in use per the project's design-system rule (no raw `gray-*` literals).
+
+Preview is already switched to mobile so the changes are visible immediately; you can toggle back with the device button above the preview.
