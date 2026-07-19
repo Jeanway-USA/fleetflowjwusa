@@ -916,19 +916,23 @@ export default function FleetLoads() {
                 ) : <span className="text-muted-foreground">-</span>
               },
               { key: 'agency_code', header: 'Agent', hiddenOnMobile: true, render: (load: any) => <span className="font-mono text-xs">{load.agency_code || '-'}</span> },
-              { key: 'origin', header: 'Origin', render: (load: any) => {
+              { key: 'origin', header: 'Origin', wrap: true, render: (load: any) => {
                 const addr = formatAddressDisplay(load.origin);
-                return typeof addr === 'string' ? addr : (
-                  <div title={addr.full}>
-                    {addr.city}{addr.state ? `, ${addr.state}` : ''}
+                if (typeof addr === 'string') return addr;
+                return (
+                  <div className="flex flex-col leading-tight" title={addr.full}>
+                    <span className="font-medium break-words">{addr.city}{addr.state ? `, ${addr.state}` : ''}</span>
+                    {addr.zip && <span className="text-xs text-muted-foreground">{addr.zip}</span>}
                   </div>
                 );
               }},
-              { key: 'destination', header: 'Destination', render: (load: any) => {
+              { key: 'destination', header: 'Destination', wrap: true, render: (load: any) => {
                 const addr = formatAddressDisplay(load.destination);
-                return typeof addr === 'string' ? addr : (
-                  <div title={addr.full}>
-                    {addr.city}{addr.state ? `, ${addr.state}` : ''}
+                if (typeof addr === 'string') return addr;
+                return (
+                  <div className="flex flex-col leading-tight" title={addr.full}>
+                    <span className="font-medium break-words">{addr.city}{addr.state ? `, ${addr.state}` : ''}</span>
+                    {addr.zip && <span className="text-xs text-muted-foreground">{addr.zip}</span>}
                   </div>
                 );
               }},
