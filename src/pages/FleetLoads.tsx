@@ -1042,6 +1042,67 @@ export default function FleetLoads() {
                 </div>
               );
             }}
+            renderMobileCard={(load: any) => {
+              const originAddr = formatAddressDisplay(load.origin);
+              const destAddr = formatAddressDisplay(load.destination);
+              const originShort = typeof originAddr === 'string' ? originAddr : `${originAddr.city}${originAddr.state ? `, ${originAddr.state}` : ''}`;
+              const destShort = typeof destAddr === 'string' ? destAddr : `${destAddr.city}${destAddr.state ? `, ${destAddr.state}` : ''}`;
+              const loadId = load.landstar_load_id || load.load_reference || (load.id ? `#${String(load.id).slice(0, 8)}` : '—');
+              const miles = (load.actual_miles && load.actual_miles > 0)
+                ? load.actual_miles.toLocaleString()
+                : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : null);
+              return (
+                <div className="space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-mono font-semibold text-sm break-all">{loadId}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <StatusBadge status={load.status} />
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openDialog(load)}>
+                              <Pencil className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
+                              <Archive className="mr-2 h-4 w-4" /> Archive
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-sm">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground pt-0.5">From</span>
+                    <div className="min-w-0 break-words">
+                      <div className="font-medium leading-tight">{originShort}</div>
+                      {typeof originAddr !== 'string' && originAddr.zip && (
+                        <div className="text-xs text-muted-foreground">{originAddr.zip}</div>
+                      )}
+                    </div>
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground pt-0.5">To</span>
+                    <div className="min-w-0 break-words">
+                      <div className="font-medium leading-tight">{destShort}</div>
+                      {typeof destAddr !== 'string' && destAddr.zip && (
+                        <div className="text-xs text-muted-foreground">{destAddr.zip}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs pt-1 border-t border-border/60">
+                    <span className="font-semibold text-success">{formatCurrency(load.net_revenue ?? load.rate)}</span>
+                    {miles && <span className="text-muted-foreground">{miles} mi</span>}
+                    <span className="text-muted-foreground truncate">
+                      {load.driver_id ? load.driver_name : <em className="not-italic">Unassigned</em>}
+                    </span>
+                  </div>
+                </div>
+              );
+            }}
           />
           )}
           <ConfirmDeleteDialog
