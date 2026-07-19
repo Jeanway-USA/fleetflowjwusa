@@ -403,6 +403,105 @@ export default function FleetLoads() {
     setDialogOpen(true);
   };
 
+  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const isXlsx = file.name.toLowerCase().endsWith('.xlsx') ||
+      file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    if (!isXlsx) {
+      toast.error('Only .xlsx files are supported for bulk upload');
+      return;
+    }
+    if (!orgId) {
+      toast.error('Missing organization context');
+      return;
+    }
+    setBulkImporting(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: null });
+      if (raw.length === 0) {
+        toast.error('The spreadsheet is empty');
+        return;
+      }
+      const pick = (row: Record<string, any>, keys: string[]) => {
+        const map = new Map<string, any>();
+        for (const k of Object.keys(row)) map.set(k.toLowerCase().trim(), row[k]);
+        for (const k of keys) {
+          const v = map.get(k.toLowerCase());
+          if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+        }
+        return null;
+      };
+      const buildAddress = (city: any, state: any, zip: any, combined: any) => {
+        if (combined) return String(combined).trim();
+        const parts = [city, state].filter((p) => p != null && String(p).trim() !== '').map((p) => String(p).trim());
+        const base = parts.join(', ');
+        const z = zip != null && String(zip).trim() !== '' ? String(zip).trim() : '';
+        return [base, z].filter(Boolean).join(' ') || null;
+      };
+      const parseDate = (v: any): string | null => {
+        if (v == null || v === '') return null;
+        if (typeof v === 'number') {
+          const d = XLSX.SSF?.parse_date_code?.(v);
+          if (d) return `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+        }
+        const s = String(v).trim();
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+        return null;
+      };
+      const rows = raw.map((r) => {
+        const origin = buildAddress(
+          pick(r, ['Origin City', 'origin_city']),
+          pick(r, ['Origin State', 'origin_state']),
+          pick(r, ['Origin Zip', 'Origin ZIP', 'origin_zip']),
+          pick(r, ['Origin', 'origin']),
+        );
+        const destination = buildAddress(
+          pick(r, ['Destination City', 'destination_city']),
+          pick(r, ['Destination State', 'destination_state']),
+          pick(r, ['Destination Zip', 'Destination ZIP', 'destination_zip']),
+          pick(r, ['Destination', 'destination']),
+        );
+        const rate = pick(r, ['Gross Revenue', 'Rate', 'rate', 'gross_revenue']);
+        return {
+          org_id: orgId,
+          landstar_load_id: pick(r, ['Landstar Load ID', 'Load ID', 'landstar_load_id', 'load_id']) || null,
+          origin,
+          destination,
+          pickup_date: parseDate(pick(r, ['Pickup Date', 'pickup_date'])),
+          delivery_date: parseDate(pick(r, ['Delivery Date', 'delivery_date'])),
+          rate: rate != null ? Number(String(rate).replace(/[^0-9.\-]/g, '')) || null : null,
+          commodity: pick(r, ['Commodity', 'commodity']),
+          weight: (() => {
+            const w = pick(r, ['Weight', 'weight']);
+            return w != null ? Number(String(w).replace(/[^0-9.\-]/g, '')) || null : null;
+          })(),
+          agency_code: pick(r, ['Agency Code', 'agency_code', 'Agent']),
+          status: 'pending',
+        };
+      }).filter((r) => r.origin || r.destination || r.landstar_load_id);
+
+      if (rows.length === 0) {
+        toast.error('No valid rows found. Expected columns like Load ID, Origin, Destination.');
+        return;
+      }
+      const { error } = await supabase.from('fleet_loads').insert(rows);
+      if (error) throw error;
+      toast.success(`Imported ${rows.length} load${rows.length === 1 ? '' : 's'}`);
+      queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
+    } catch (err: any) {
+      console.error('Bulk upload failed:', err);
+      toast.error(err?.message || 'Bulk upload failed');
+    } finally {
+      setBulkImporting(false);
+    }
+  };
+
   // Auto-open dialog from command palette quick action
   useEffect(() => {
     const action = searchParams.get('action');
