@@ -487,7 +487,7 @@ export function DataTable<T extends { id: string }>({
       <div className="relative">
         <div
           ref={scrollRef}
-          className="rounded-lg border border-border overflow-auto"
+          className={cn("rounded-lg overflow-auto", !useStaticLayout && "border border-border")}
           style={{ maxHeight: 600 }}
         >
           {useStaticLayout ? (
