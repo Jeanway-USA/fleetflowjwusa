@@ -618,7 +618,7 @@ export function DataTable<T extends { id: string }>({
                         })}
                       </tr>
                       {isExpanded && (
-                        <tr className="border-b bg-muted/20">
+                        <tr className="border-b border-border/60 bg-muted/20">
                           <td colSpan={totalCols} className="px-4 py-4">
                             {renderExpanded!(item)}
                           </td>
