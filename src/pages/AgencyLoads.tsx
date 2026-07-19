@@ -18,6 +18,7 @@ import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import type { Database } from '@/integrations/supabase/types';
+import { cn } from '@/lib/utils';
 
 type AgencyLoad = Database['public']['Tables']['agency_loads']['Row'];
 type AgencyLoadInsert = Database['public']['Tables']['agency_loads']['Insert'];
