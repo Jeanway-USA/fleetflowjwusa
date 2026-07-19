@@ -493,7 +493,7 @@ export function DataTable<T extends { id: string }>({
           {useStaticLayout ? (
             <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
               <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background">
-                <tr className="border-b bg-muted/50">
+                <tr className="border-b border-border bg-transparent">
                   {showSelection && (
                     <th className={cn(thClass, "w-10 text-center")} style={{ width: '40px' }}>
                       <div className="flex items-center justify-center">
