@@ -488,9 +488,77 @@ export function DataTable<T extends { id: string }>({
       )}
 
       <div className="relative">
+        {renderMobileCard && (
+          <div className="md:hidden space-y-2 max-h-[600px] overflow-y-auto pr-1">
+            {sortedData.length === 0 ? (
+              <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
+                No rows match the current filters.
+              </div>
+            ) : (
+              sortedData.map((item) => {
+                const isSelected = showSelection && safeSelectedIds.has(item.id);
+                const isExpanded = expandable && renderExpanded && expandedIds.has(item.id);
+                const canRowToggle = expandable && renderExpanded && !onRowClick;
+                return (
+                  <div
+                    key={item.id}
+                    data-row-id={item.id}
+                    onClick={() => {
+                      if (onRowClick) onRowClick(item);
+                      else if (canRowToggle) toggleExpand(item.id);
+                    }}
+                    onDoubleClick={() => onRowDoubleClick?.(item)}
+                    onTouchEnd={() => handleTouchEnd(item)}
+                    className={cn(
+                      "rounded-lg border border-border bg-card p-3 space-y-2 transition-colors",
+                      (onRowClick || onRowDoubleClick || canRowToggle) && "cursor-pointer active:bg-muted/50",
+                      isSelected && "bg-primary/5 border-primary/40",
+                      isExpanded && "bg-muted/30"
+                    )}
+                  >
+                    {(showSelection || (expandable && renderExpanded)) && (
+                      <div className="flex items-center justify-between gap-2 -mt-1" onClick={(e) => e.stopPropagation()}>
+                        {showSelection ? (
+                          <Checkbox
+                            checked={safeSelectedIds.has(item.id)}
+                            onCheckedChange={() => toggleRow(item.id)}
+                            aria-label="Select row"
+                          />
+                        ) : <span />}
+                        {expandable && renderExpanded && (
+                          <button
+                            type="button"
+                            className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground"
+                            onClick={() => toggleExpand(item.id)}
+                            aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                            aria-expanded={isExpanded ? true : false}
+                          >
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <div className="min-w-0 break-words">
+                      {renderMobileCard(item)}
+                    </div>
+                    {isExpanded && (
+                      <div className="border-t border-border pt-2 mt-2">
+                        {renderExpanded!(item)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
         <div
           ref={scrollRef}
-          className={cn("rounded-lg overflow-auto", !useStaticLayout && "border border-border")}
+          className={cn(
+            "rounded-lg overflow-auto overflow-x-auto",
+            !useStaticLayout && "border border-border",
+            renderMobileCard && "hidden md:block"
+          )}
           style={{ maxHeight: 600 }}
         >
           {useStaticLayout ? (
