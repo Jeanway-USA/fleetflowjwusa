@@ -1,58 +1,38 @@
+## Fleet Loads table styling refinement
 
-# Fleet Loads table: wrapping, stacked cells, expandable rows
+Scope: visual polish on `DataTable` (static layout branch, used by Fleet Loads via `wrapCells`/`expandable`) and `StatusBadge`. No behavior or column changes.
 
-## Scope
+Note on tokens: the project design system forbids hardcoded Tailwind color classes (`bg-gray-50`, `text-white`, etc.). I'll match the user's intent using semantic tokens that already exist (`border-border`, `bg-muted/30`, `text-muted-foreground`, plus `success`/`warning`/`primary`/`destructive` for badges). This keeps light/dark mode correct and stays consistent with the rest of FleetFlow.
 
-Changes are limited to the Fleet Loads table experience. The shared `DataTable` currently forces every body cell to `whitespace-nowrap` + `truncate` inside fixed-height virtualized rows (from the previous overlap fix). To satisfy this request we need multi-line wrapping and variable row heights, which conflicts with that global rule. So we extend `DataTable` with opt-in features rather than flipping the default and breaking every other table.
+### Changes in `src/components/shared/DataTable.tsx` (static-layout branch only)
 
-## Changes
+1. Container: drop the heavy outer border ring — replace `rounded-lg border border-border overflow-auto` with `rounded-lg overflow-auto` on the static-layout code path so rows use only their horizontal dividers.
+2. Header row: change `<tr>` from `border-b bg-muted/50` to `border-b border-border bg-transparent`. Update `<th>` classes to `text-[11px] font-semibold uppercase tracking-wider text-muted-foreground` for a muted, uppercase, semi-bold header.
+3. Body rows: on each data `<tr>` replace `border-b transition-colors hover:bg-muted/50` with:
+   - `border-b border-border/60` (subtle horizontal divider)
+   - `even:bg-muted/30` (subtle zebra)
+   - `hover:bg-muted/50 cursor-pointer transition-colors`
+   - keep the existing `isSelected` (`bg-primary/5`) and `isExpanded` (`bg-muted/40`) overrides layered on top.
+4. Expanded panel row: keep the accent background but align it to the new divider (`border-b border-border/60 bg-muted/20`).
+5. Empty-state cell keeps current styling.
 
-### 1. `src/components/shared/DataTable.tsx` — opt-in wrapping + expandable rows
+### Changes in `src/components/shared/StatusBadge.tsx`
 
-Add three new, backward-compatible props:
+Convert the outline badge into a soft "pill":
+- Remove `variant="outline"` (drop the border).
+- New base classes: `rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide`.
+- Colour tokens per status type (soft bg + strong fg using existing semantic tokens):
+  - success (delivered/paid/active/valid): `bg-success/15 text-success`
+  - warning (in_transit/expiring_soon/out_of_service/inactive): `bg-warning/15 text-warning`
+  - error (cancelled/expired/suspended/down): `bg-destructive/15 text-destructive`
+  - info (booked/assigned/approved): `bg-primary/15 text-primary`
+  - default (pending/unknown): `bg-muted text-muted-foreground`
+- Keep `displayText` transform; drop `capitalize` since we uppercase.
 
-- `wrapCells?: boolean` — when true, body `<td>` uses `whitespace-normal break-words` and cell content wrapper drops `whitespace-nowrap`/`truncate`. Default false, preserving current single-line clipping everywhere else.
-- `expandable?: boolean` and `renderExpanded?: (item: T) => React.ReactNode` — when both provided, prepend a chevron column, track an `expandedIds: Set<string>` in local state, and render an extra `<tr>` beneath any expanded row with a full-width `<td colSpan={...}>` containing `renderExpanded(item)`.
-- Per-column `wrap?: boolean` on the `Column<T>` type so specific columns (Origin / Destination) can wrap even when `wrapCells` is false.
+Because `StatusBadge` is used site-wide, this pill treatment lands consistently everywhere status badges appear (Fleet Loads, Agency Loads, Drivers, etc.), which matches the "highly readable modern aesthetic" goal.
 
-Virtualization: switch the row virtualizer to dynamic sizing via `measureElement`, keyed on `virtualRow.index` and the row's expanded state, so wrapped content and the expanded panel push subsequent rows down instead of overlapping. `estimateSize` keeps returning the density row height as the initial guess; actual heights are measured after mount. This only kicks in when `wrapCells` or `expandable` is true — non-Fleet-Loads tables keep the current fixed-height fast path.
+### Out of scope
 
-Row click behavior: when `expandable` is on and no `onRowClick` is provided, clicking a row toggles its expanded state. If `onRowClick` is provided, expansion is only toggled via the chevron button so existing single-click semantics stay intact.
-
-### 2. `src/pages/FleetLoads.tsx` — column definitions and expanded panel
-
-- Turn on `wrapCells` and `expandable` on the Fleet Loads `<DataTable>`.
-- Rewrite Origin and Destination column `render` callbacks to a two-tier stacked cell:
-
-  ```text
-  ┌─────────────────────────┐
-  │ Grand Prairie, TX       │  ← city, state (font-medium)
-  │ 75052                   │  ← zip (text-xs text-muted-foreground)
-  └─────────────────────────┘
-  ```
-
-  Implemented as `<div class="flex flex-col leading-tight"><span>{city}, {state}</span><span class="text-xs text-muted-foreground">{zip}</span></div>`, with graceful fallback when zip is missing.
-
-- Keep the primary columns visible at all times: Load ID / Reference, Status, Origin, Destination, Pickup Date, Delivery Date, plus the existing actions column.
-- Move secondary fields out of the row into `renderExpanded`. The expanded panel is a compact grid of label/value pairs inside a subtle `bg-muted/30` block:
-  - Weight, Commodity, Pieces/Dimensions
-  - Broker / Carrier / Rate details already captured on the load
-  - Notes / special instructions (wraps freely, since it's inside the expanded panel)
-- Hide those secondary fields from the collapsed row (either drop them from `columns` or mark them `hiddenOnMobile` → replaced by expansion on all sizes).
-
-### 3. Nothing else changes
-
-- No schema changes, no query changes, no other tables touched.
-- Agency Loads, Drivers, Trucks, etc. keep the current single-line clipping until we choose to opt them in later.
-
-## Technical notes
-
-- The dynamic-height branch uses `rowVirtualizer.measureElement` via a `ref` on each rendered `<tr>` and `data-index={virtualRow.index}`. TanStack Virtual handles the recompute; we just need to remeasure when a row expands/collapses (calling `rowVirtualizer.measure()` from the expand toggle, or letting `measureElement` observe via ResizeObserver — the latter is preferred and needs no manual call).
-- Expanded panel row is rendered as a sibling virtual item with its own measured height; simplest implementation is to render `<React.Fragment>` per virtual row containing the main `<tr>` and, when expanded, a second `<tr>` — both wrapped in a single positioned container div so the virtualizer measures their combined height.
-- `title` tooltips on wrapped cells become unnecessary (full text is visible), but the existing `title` fallback stays for non-wrapped tables.
-
-## Out of scope
-
-- Retrofitting wrap/expand into Agency Loads, Drivers, Trucks, Trailers, etc.
-- Column resizing or user-configurable expanded field sets.
-- Persisting expanded state across navigations.
+- No changes to virtualized (non-wrap) `DataTable` path — Fleet Loads uses the static path via `wrapCells`.
+- No column reordering, width tuning, or new data in the table.
+- No changes to the expanded-row content layout inside `FleetLoads.tsx`.

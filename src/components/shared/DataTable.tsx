@@ -487,13 +487,13 @@ export function DataTable<T extends { id: string }>({
       <div className="relative">
         <div
           ref={scrollRef}
-          className="rounded-lg border border-border overflow-auto"
+          className={cn("rounded-lg overflow-auto", !useStaticLayout && "border border-border")}
           style={{ maxHeight: 600 }}
         >
           {useStaticLayout ? (
             <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
               <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background">
-                <tr className="border-b bg-muted/50">
+                <tr className="border-b border-border bg-transparent">
                   {showSelection && (
                     <th className={cn(thClass, "w-10 text-center")} style={{ width: '40px' }}>
                       <div className="flex items-center justify-center">
@@ -513,7 +513,7 @@ export function DataTable<T extends { id: string }>({
                     const isSorted = sortState?.key === key;
                     const SortIcon = !col.sortable ? null : (isSorted ? (sortState!.dir === 'asc' ? ArrowUp : ArrowDown) : ChevronsUpDown);
                     return (
-                      <th key={i} className={cn(thClass, "text-left font-semibold text-muted-foreground whitespace-nowrap", col.hiddenOnMobile && "hidden md:table-cell")} style={{ width: computedWidths[i] }}>
+                      <th key={i} className={cn(thClass, "text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap", col.hiddenOnMobile && "hidden md:table-cell")} style={{ width: computedWidths[i] }}>
                         {col.sortable ? (
                           <button
                             type="button"
@@ -557,10 +557,10 @@ export function DataTable<T extends { id: string }>({
                         onDoubleClick={() => onRowDoubleClick?.(item)}
                         onTouchEnd={() => handleTouchEnd(item)}
                         className={cn(
-                          "border-b transition-colors hover:bg-muted/50",
+                          "border-b border-border/60 even:bg-muted/30 transition-colors hover:bg-muted/50",
                           (onRowClick || onRowDoubleClick || canRowToggle) && "cursor-pointer",
                           isSelected && "bg-primary/5",
-                          isExpanded && "bg-muted/30"
+                          isExpanded && "bg-muted/40"
                         )}
                       >
                         {showSelection && (
@@ -618,7 +618,7 @@ export function DataTable<T extends { id: string }>({
                         })}
                       </tr>
                       {isExpanded && (
-                        <tr className="border-b bg-muted/20">
+                        <tr className="border-b border-border/60 bg-muted/20">
                           <td colSpan={totalCols} className="px-4 py-4">
                             {renderExpanded!(item)}
                           </td>
