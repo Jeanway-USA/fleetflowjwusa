@@ -924,7 +924,7 @@ export default function FleetLoads() {
       </div>
 
       {/* KPI Summary Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-card border border-border/60 rounded-xl shadow-sm p-6 flex items-start justify-between">
           <div className="min-w-0">
             <p className="text-sm font-medium text-muted-foreground">Total Gross Income</p>
