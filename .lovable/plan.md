@@ -1,31 +1,72 @@
-## Agency Loads mobile card — bring it in line with the request
+## Landstar-aware expanded view for Agency Loads
 
-The shared `DataTable` already handles horizontal scroll on tablet (`overflow-x-auto` + `min-w-[640px]`), hides the `<thead>` and swaps to a stacked card list below `md` (`md:hidden` / `hidden md:block`), and supports tap-to-expand. Those pieces are done and don't need editing.
+The agency_loads schema (verified) has no fields for linehaul, fuel surcharge, tarp fee, BCO split %, exception status, or Pay2Day. This work needs a small migration, form additions, and a rewritten expanded row.
 
-What's actually off is Agency Loads' own `renderMobileCard` in `src/pages/AgencyLoads.tsx`: it uses a 2-column grid for From/To and buries the agency name as a muted subtitle. The request wants Load ID + Agency + Status prominent at the top, and Origin/Destination stacked vertically.
+### 1. Migration — new columns on `public.agency_loads`
 
-### Changes (single file: `src/pages/AgencyLoads.tsx`, mobile card only)
+- `gross_linehaul numeric` — the portion of revenue the split applies to.
+- `fuel_surcharge numeric` — passed through at 100%.
+- `tarp_fee numeric` — passed through at 100%.
+- `bco_split_pct numeric default 72` — allowed range 65–75 (soft-checked in the form).
+- `exception_status text default 'normal'` — enum-like: `normal | disrupted | pending_update`.
+- `pay2day boolean default false`.
 
-1. **Top row** — three-item header:
-   - Left: `load_reference` (mono, semibold) with the short id fallback beneath it.
-   - Middle (new position, elevated from subtitle): `broker_name` shown as the agency name in `text-sm font-medium`.
-   - Right: `StatusBadge` + actions dropdown (unchanged).
-   - Carrier moves down into a small "Carrier: …" line under the agency name so it's still visible but doesn't compete with it.
+All nullable/defaulted so existing rows keep working. No RLS changes (existing 3 policies already cover new columns).
 
-2. **Origin / Destination — stacked vertically** (replace the current 2-col grid):
-   - `From` block: label + City, ST (medium weight) + ZIP muted.
-   - Downward chevron/route separator.
-   - `To` block: same shape.
-   - Full width, no side-by-side.
+### 2. Edit dialog (`src/pages/AgencyLoads.tsx`)
 
-3. **Footer row** (unchanged): margin $ · margin % · pickup date, separated by a thin `border-t border-border/60`.
+Add a "Landstar / Revenue" section to the existing form with:
 
-4. **Tap-to-expand** — already works via the shared `DataTable`'s mobile branch (`canRowToggle` toggles `renderExpanded`). The expanded panel already shows rates, margin %, pickup/delivery datetimes, reference, and notes — no change needed. Only cosmetic: leave the chevron button in the header row so users know the card is expandable.
+- Number inputs: Gross Linehaul, Fuel Surcharge, Tarp Fee.
+- BCO Split % input (default 72, min 65, max 75, step 0.5).
+- Select: Exception Status (Normal / Disrupted / Pending Update).
+- Checkbox: Pay2Day fast settlement.
+
+Leaves `broker_rate` / `carrier_rate` / `margin` alone — they stay as the brokerage view; the new fields cover the BCO Landstar view side-by-side.
+
+### 3. Expanded row (`renderExpanded`) — full rewrite
+
+Two side-by-side sections in a `grid grid-cols-1 md:grid-cols-2 gap-4`, with a clean card feel using existing semantic tokens (`bg-muted/30`, `border-border/60`, `text-muted-foreground` labels).
+
+**A. Revenue Segregation** (non-overlapping fields, each on its own row inside the card):
+
+```text
+Gross Linehaul       $ X,XXX.XX
+Fuel Surcharge       $   XXX.XX
+Accessorials (Tarp)  $   XXX.XX
+──────────────────────────────
+Total Load Revenue   $ X,XXX.XX   (sum, read-only)
+```
+
+**B. BCO Pay Calculation** (Landstar split logic, math shown inline):
+
+```text
+Linehaul split (72% of Gross Linehaul)     $ X,XXX.XX
++ Fuel Surcharge (100% pass-through)       $   XXX.XX
++ Tarp Fee (100% pass-through)             $   XXX.XX
+──────────────────────────────
+BCO Payout                                  $ X,XXX.XX
+```
+
+The percentage only multiplies `gross_linehaul`; fuel and tarp are added at 100%. A small caption under the block spells this out: "Split applies to linehaul only. Fuel and accessorials pay through at 100%. Deductions are handled at the truck-gross level and are not shown here."
+
+Below both cards, a **status strip**:
+
+- `Exception:` pill using `StatusBadge`-style tokens: green for Normal, amber for Pending Update, red for Disrupted.
+- `Pay2Day:` badge — filled accent pill when enabled ("Pay2Day Fast Settlement"), muted outline pill when disabled ("Standard Settlement").
+
+Pickup/Delivery datetimes, reference, and notes remain at the bottom of the expanded panel (unchanged).
+
+### 4. Explicit exclusion
+
+No deductions field or column anywhere in the expanded view, form, or calculation, per your constraint.
+
+### Files touched
+
+- New migration file under `supabase/migrations/` adding the six columns with defaults.
+- `src/pages/AgencyLoads.tsx` — form additions, `renderExpanded` rewrite, and a small helper for the BCO payout formula.
 
 ### Out of scope
 
-- No changes to `DataTable`, Fleet Loads, or the desktop table.
-- No schema or data changes.
-- Semantic tokens stay in use per the project's design-system rule (no raw `gray-*` literals).
-
-Preview is already switched to mobile so the changes are visible immediately; you can toggle back with the device button above the preview.
+- No changes to the desktop columns, mobile card summary, `DataTable`, Fleet Loads, or settlements.
+- No automation of `margin` from the new fields (kept independent for the brokerage view).

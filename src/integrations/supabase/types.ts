@@ -72,6 +72,7 @@ export type Database = {
       agency_loads: {
         Row: {
           archived_by: string | null
+          bco_split_pct: number
           broker_name: string | null
           broker_rate: number | null
           carrier_name: string | null
@@ -82,20 +83,26 @@ export type Database = {
           delivery_date: string | null
           delivery_tz: string | null
           destination: string
+          exception_status: string
+          fuel_surcharge: number | null
+          gross_linehaul: number | null
           id: string
           load_reference: string | null
           margin: number | null
           notes: string | null
           org_id: string
           origin: string
+          pay2day: boolean
           pickup_at: string | null
           pickup_date: string | null
           pickup_tz: string | null
           status: string
+          tarp_fee: number | null
           updated_at: string
         }
         Insert: {
           archived_by?: string | null
+          bco_split_pct?: number
           broker_name?: string | null
           broker_rate?: number | null
           carrier_name?: string | null
@@ -106,20 +113,26 @@ export type Database = {
           delivery_date?: string | null
           delivery_tz?: string | null
           destination: string
+          exception_status?: string
+          fuel_surcharge?: number | null
+          gross_linehaul?: number | null
           id?: string
           load_reference?: string | null
           margin?: number | null
           notes?: string | null
           org_id: string
           origin: string
+          pay2day?: boolean
           pickup_at?: string | null
           pickup_date?: string | null
           pickup_tz?: string | null
           status?: string
+          tarp_fee?: number | null
           updated_at?: string
         }
         Update: {
           archived_by?: string | null
+          bco_split_pct?: number
           broker_name?: string | null
           broker_rate?: number | null
           carrier_name?: string | null
@@ -130,16 +143,21 @@ export type Database = {
           delivery_date?: string | null
           delivery_tz?: string | null
           destination?: string
+          exception_status?: string
+          fuel_surcharge?: number | null
+          gross_linehaul?: number | null
           id?: string
           load_reference?: string | null
           margin?: number | null
           notes?: string | null
           org_id?: string
           origin?: string
+          pay2day?: boolean
           pickup_at?: string | null
           pickup_date?: string | null
           pickup_tz?: string | null
           status?: string
+          tarp_fee?: number | null
           updated_at?: string
         }
         Relationships: [
