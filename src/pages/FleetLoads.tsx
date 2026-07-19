@@ -29,7 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search, Archive, CheckCircle2 } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search, Archive, CheckCircle2, Upload } from 'lucide-react';
 import { NotificationCenter } from '@/components/shared/NotificationCenter';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
