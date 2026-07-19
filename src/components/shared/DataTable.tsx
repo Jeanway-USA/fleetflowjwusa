@@ -42,6 +42,8 @@ interface Column<T> {
   filter?: ColumnFilter<T>;
   sortable?: boolean;
   sortAccessor?: (item: T) => string | number | null | undefined;
+  /** When true, this cell will wrap and break long words instead of truncating. */
+  wrap?: boolean;
 }
 
 interface DataTableProps<T> {
@@ -61,6 +63,12 @@ interface DataTableProps<T> {
   onSelectionChange?: (ids: Set<string>) => void;
   bulkActions?: (ids: Set<string>) => React.ReactNode;
   highlightRowId?: string | null;
+  /** Allow every body cell to wrap onto multiple lines. Disables row virtualization. */
+  wrapCells?: boolean;
+  /** Enables per-row expand toggle rendering. Disables row virtualization. */
+  expandable?: boolean;
+  /** Content rendered in the full-width panel below an expanded row. */
+  renderExpanded?: (item: T) => React.ReactNode;
 }
 
 
