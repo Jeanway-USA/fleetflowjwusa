@@ -561,15 +561,20 @@ export function DataTable<T extends { id: string }>({
                         </div>
                       </td>
                     )}
-                    {visibleColumns.map((col, j) => (
-                      <td key={j} className={cn(tdClass, col.hiddenOnMobile && "hidden md:table-cell")} style={{ height: `${virtualRow.size}px`, width: computedWidths[j] }}>
-                        <div className="flex items-center h-full">
-                          {col.render
-                            ? col.render(item)
-                            : String(item[col.key as keyof T] ?? '-')}
-                        </div>
-                      </td>
-                    ))}
+                    {visibleColumns.map((col, j) => {
+                      const raw = item[col.key as keyof T];
+                      const isPrimitive = raw == null || typeof raw === 'string' || typeof raw === 'number';
+                      const titleAttr = !col.render && isPrimitive ? String(raw ?? '') : undefined;
+                      return (
+                        <td key={j} className={cn(tdClass, "overflow-hidden", col.hiddenOnMobile && "hidden md:table-cell")} style={{ height: `${virtualRow.size}px`, width: computedWidths[j] }} title={titleAttr}>
+                          <div className="flex items-center h-full min-w-0 whitespace-nowrap [&>*]:truncate [&_span]:truncate">
+                            {col.render
+                              ? col.render(item)
+                              : <span className="truncate">{String(raw ?? '-')}</span>}
+                          </div>
+                        </td>
+                      );
+                    })}
                   </tr>
                 );
               })}
