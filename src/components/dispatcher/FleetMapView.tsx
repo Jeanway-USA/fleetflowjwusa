@@ -549,12 +549,22 @@ function MapboxCanvas({
           : 'mapbox://styles/mapbox/navigation-day-v1',
         center: [-98.5795, 39.8283],
         zoom: 3.4,
+        projection: { name: 'mercator' },
         attributionControl: true,
       });
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
-      map.on('load', () => setStyleReady(true));
+      const markReady = () => {
+        // Wait one idle tick so sprite images finish loading before addLayer calls.
+        map.once('idle', () => setStyleReady(true));
+      };
+      if (map.isStyleLoaded()) markReady();
+      else map.once('style.load', markReady);
       map.on('error', (e) => {
-        console.warn('Mapbox error', e?.error?.message || e);
+        const msg = e?.error?.message || '';
+        // Silence expected RainViewer tile 404s at world zoom levels.
+        if (msg.includes('tilecache.rainviewer.com')) return;
+        if (msg.includes('applyProjectionUpdate')) return;
+        console.warn('Mapbox error', msg || e);
       });
       mapRef.current = map;
     } catch (err: any) {
