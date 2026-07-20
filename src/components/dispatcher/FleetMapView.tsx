@@ -670,6 +670,52 @@ export function FleetMapView() {
         ))}
       </MapContainer>
 
+      {/* Overlay control panel */}
+      <div
+        className={`absolute top-2 ${isExpanded ? 'right-2' : 'right-12'} z-[500] bg-gray-900/80 backdrop-blur-sm text-white border border-white/10 rounded-lg shadow-lg p-3 space-y-2 min-w-[180px]`}
+      >
+        <p className="text-[10px] uppercase tracking-wider text-white/60 font-semibold mb-1">
+          Map Overlays
+        </p>
+        <div className="flex items-center justify-between gap-3">
+          <Label
+            htmlFor="weather-toggle"
+            className="flex items-center gap-2 text-xs font-medium cursor-pointer text-white"
+          >
+            <Cloud className="h-3.5 w-3.5 text-sky-400" />
+            Weather Radar
+          </Label>
+          <Switch
+            id="weather-toggle"
+            checked={weatherEnabled}
+            onCheckedChange={setWeatherEnabled}
+            className="data-[state=checked]:bg-primary"
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <Label
+            htmlFor="traffic-toggle"
+            className="flex items-center gap-2 text-xs font-medium cursor-pointer text-white"
+          >
+            <TrafficCone className="h-3.5 w-3.5 text-amber-400" />
+            Traffic Conditions
+          </Label>
+          <Switch
+            id="traffic-toggle"
+            checked={trafficEnabled}
+            onCheckedChange={setTrafficEnabled}
+            className="data-[state=checked]:bg-primary"
+          />
+        </div>
+        {(weatherEnabled && !WEATHER_TILE_URL) || (trafficEnabled && !TRAFFIC_TILE_URL) ? (
+          <p className="text-[10px] text-amber-300/90 pt-1 border-t border-white/10">
+            Demo mode — provider key not yet configured.
+          </p>
+        ) : null}
+      </div>
+
+
+
       {!isExpanded && loads.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
           <div className="text-center text-muted-foreground">
