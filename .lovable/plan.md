@@ -1,32 +1,22 @@
-## Goal
-Make the Command Center map's "Weather Radar" and "Traffic Conditions" toggles render real Leaflet layers on top of the existing OSM base — without ever reloading the base tiles.
+## Problem
 
-## Changes (single file: `src/components/dispatcher/FleetMapView.tsx`)
+The Weather Radar toggle in `FleetMapView.tsx` gets stuck on "Loading radar frames…". Root cause: the fetch stores `${host}${latest.path}` in state, and then the `<TileLayer>` prepends `https://tilecache.rainviewer.com` again — producing a malformed URL like `https://tilecache.rainviewer.com https://tilecache.rainviewer.com/v2/radar/.../256/...`. Tiles never render, and there's no explicit loading/error state, so the UI stays on the placeholder forever.
 
-### 1. Weather Radar — RainViewer live tile layer
-- Remove the OpenWeatherMap key gate and `WEATHER_TILE_URL` constant.
-- Add a `useQuery` (or lightweight `useEffect`) that fetches `https://api.rainviewer.com/public/weather-maps.json` when `weatherEnabled` flips on, caches the response, and picks the most recent frame from `radar.past` (`frames[frames.length-1].path`). Refetch every ~5 min.
-- Store the frame path in state; when present and `weatherEnabled` is true, render a `<TileLayer>` with:
-  - `url = https://tilecache.rainviewer.com/{path}/256/{z}/{x}/{y}/2/1_1.png`
-  - `opacity={0.6}`, `zIndex={400}`, `attribution="© RainViewer"`
-- Because it's declared inside `<MapContainer>` and only mounts/unmounts based on the toggle, react-leaflet adds/removes the layer without touching the OSM base tile layer.
+## Fix (single file: `src/components/dispatcher/FleetMapView.tsx`)
 
-### 2. Traffic Conditions — mocked polylines
-- Define a static `MOCK_TRAFFIC_SEGMENTS` array (module-scope const) with 4–6 major US interstate segments as `{ id, name, severity: 'heavy' | 'moderate' | 'light', coords: [lat,lng][] }`. Examples:
-  - I-95 NYC → Philadelphia (heavy, red)
-  - I-10 Houston → San Antonio (moderate, amber)
-  - I-405 LA loop (heavy, red)
-  - I-90 Chicago → Cleveland (moderate, amber)
-  - I-75 Atlanta → Chattanooga (light, green)
-- Severity → color map: `heavy = #dc2626`, `moderate = #f59e0b`, `light = #16a34a`.
-- When `trafficEnabled` is true, render one `<Polyline>` per segment inside the MapContainer with `weight={5}`, `opacity={0.75}`, and a `<Popup>` showing the interstate name + severity label.
+1. **Replace `rainviewerPath` state with a fully-built `radarTileUrl` string** and a `radarLoading` boolean.
+2. **Rewrite the RainViewer effect** to use `try / catch / finally`:
+   - `try`: fetch `https://api.rainviewer.com/public/weather-maps.json`, then
+     ```ts
+     const host = data.host;
+     const latestFrame = data.radar.past[data.radar.past.length - 1];
+     setRadarTileUrl(`${host}${latestFrame.path}/256/{z}/{x}/{y}/2/1_1.png`);
+     ```
+   - `catch`: `toast.error("Weather radar is temporarily unavailable")` and clear the URL.
+   - `finally`: `setRadarLoading(false)` so the UI never hangs.
+   - Keep the 5-minute refresh interval and the cancelled-flag guard.
+3. **Update the `<TileLayer>`** to consume `radarTileUrl` directly (no extra host prefix) with `opacity={0.5}`.
+4. **Update the overlay status text** to show "Loading radar frames…" only while `radarLoading === true`, and hide it once the URL is set or the fetch fails.
+5. When the toggle flips off, clear `radarTileUrl` and reset `radarLoading` so a re-enable shows the loading state briefly, then the fresh tiles.
 
-### 3. Layer management
-- Rendering is done conditionally inside `<MapContainer>` (`{weatherEnabled && rainviewerPath && <TileLayer …/>}` and `{trafficEnabled && MOCK_TRAFFIC_SEGMENTS.map(...)}`), so react-leaflet mounts/unmounts only those layers — the base OSM `<TileLayer>` stays mounted and never reloads.
-- Keep the existing overlay control panel UI and `localStorage` persistence exactly as they are.
-- Remove the "Demo mode — provider key not yet configured" banner (no longer applicable; both layers now work out of the box).
-
-## Technical notes
-- All new logic lives in the presentation component; no schema, hooks, or backend changes.
-- RainViewer is a free public API — no key, no secret needed.
-- The mocked traffic layer is intentionally static; if we later want a real feed we can swap the polyline source for a fetch without touching the layer-toggle machinery.
+No other files change. Traffic overlay logic is untouched.
