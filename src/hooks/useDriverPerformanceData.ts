@@ -100,7 +100,7 @@ export function useDriverPerformanceData(selectedPeriod: PerformancePeriod) {
   const { data: loads = [] } = useQuery({
     queryKey: ['fleet_loads'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('fleet_loads').select('*');
+      const { data, error } = await supabase.from('fleet_loads').select('*').is('deleted_at', null);
       if (error) throw error;
       return data as FleetLoad[];
     },

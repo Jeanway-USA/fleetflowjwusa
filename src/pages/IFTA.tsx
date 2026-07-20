@@ -83,7 +83,7 @@ export default function IFTA() {
   const { data: trucks = [] } = useQuery({
     queryKey: ['trucks'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('trucks').select('id, unit_number');
+      const { data, error } = await supabase.from('trucks').select('id, unit_number').is('deleted_at', null);
       if (error) throw error;
       return data;
     },
@@ -126,7 +126,7 @@ export default function IFTA() {
   const { data: loads = [] } = useQuery({
     queryKey: ['fleet_loads'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('fleet_loads').select('*');
+      const { data, error } = await supabase.from('fleet_loads').select('*').is('deleted_at', null);
       if (error) throw error;
       return data;
     },

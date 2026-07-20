@@ -30,7 +30,7 @@ export function PredictiveServiceCalendar() {
   const { data: trucks } = useQuery({
     queryKey: ['trucks'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('trucks').select('*').eq('status', 'active');
+      const { data, error } = await supabase.from('trucks').select('*').eq('status', 'active').is('deleted_at', null);
       if (error) throw error;
       return data || [];
     },

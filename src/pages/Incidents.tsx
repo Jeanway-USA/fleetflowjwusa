@@ -110,7 +110,7 @@ export default function Incidents() {
   const { data: trucks = [] } = useQuery({
     queryKey: ['trucks'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('trucks').select('id, unit_number');
+      const { data, error } = await supabase.from('trucks').select('id, unit_number').is('deleted_at', null);
       if (error) throw error;
       return data;
     },
@@ -119,7 +119,7 @@ export default function Incidents() {
   const { data: trailers = [] } = useQuery({
     queryKey: ['trailers'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('trailers').select('id, unit_number');
+      const { data, error } = await supabase.from('trailers').select('id, unit_number').is('deleted_at', null);
       if (error) throw error;
       return data;
     },
