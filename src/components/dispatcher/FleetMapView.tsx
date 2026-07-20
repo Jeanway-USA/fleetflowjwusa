@@ -223,6 +223,36 @@ export function FleetMapView() {
     }
   }, [weatherEnabled, trafficEnabled]);
 
+  // RainViewer: fetch the most recent radar frame path when weather overlay is enabled
+  const [rainviewerPath, setRainviewerPath] = useState<string | null>(null);
+  useEffect(() => {
+    if (!weatherEnabled) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(RAINVIEWER_INDEX_URL, { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        const frames = json?.radar?.past;
+        const host = json?.host;
+        if (!Array.isArray(frames) || frames.length === 0 || !host) return;
+        const latest = frames[frames.length - 1];
+        if (latest?.path && !cancelled) {
+          setRainviewerPath(`${host}${latest.path}`);
+        }
+      } catch {
+        /* offline / blocked — silently ignore */
+      }
+    };
+    load();
+    const interval = setInterval(load, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [weatherEnabled]);
+
+
   // Fetch ALL driver locations (not just recent ones)
   const { data: initialLocations } = useQuery({
     queryKey: ['driver-locations'],
