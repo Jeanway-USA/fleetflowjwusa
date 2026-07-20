@@ -204,9 +204,11 @@ export function DriverStatusGrid() {
             {drivers.map((driver) => {
               const expiringCreds = getExpiringCredentials(driver);
               const hos = getHosState(driver.remaining_drive_hours, driver.hos_last_updated);
+              const eld = getEldSyncState(driver.hos_last_updated);
+              const isSafetyAlert = hos.tone === 'muted';
               const hosBadge = (
-                <Badge variant="outline" className={`${HOS_TONE_CLASSES[hos.tone]} shrink-0 gap-1`}>
-                  <Clock className="h-3 w-3" />
+                <Badge variant="outline" className={`${HOS_TONE_CLASSES[hos.tone]} shrink-0 gap-1 font-semibold`}>
+                  {isSafetyAlert ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                   {hos.label}
                 </Badge>
               );
