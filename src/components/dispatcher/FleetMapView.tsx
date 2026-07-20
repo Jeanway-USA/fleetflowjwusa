@@ -4,7 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Truck, Navigation, Radio } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { MapPin, Truck, Navigation, Radio, Cloud, TrafficCone } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -12,6 +14,18 @@ import { geocodeLocationAsync, interpolatePosition, getProgressFromStatus } from
 import { fetchRoutesBatch } from '@/lib/routing';
 import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
+
+const OVERLAY_STORAGE_KEY = 'fleet-map-overlays';
+// TODO: wire real providers when keys are configured
+//   - Weather: OpenWeatherMap tile URL requires VITE_OPENWEATHERMAP_API_KEY
+//     e.g. https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=KEY
+//   - Traffic: Google Maps traffic is only available via the Maps JS SDK
+//     (google.maps.TrafficLayer) — not a raster tile endpoint.
+const OPENWEATHER_API_KEY = (import.meta.env.VITE_OPENWEATHERMAP_API_KEY as string | undefined) || '';
+const WEATHER_TILE_URL = OPENWEATHER_API_KEY
+  ? `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${OPENWEATHER_API_KEY}`
+  : '';
+const TRAFFIC_TILE_URL = ''; // placeholder — Google Traffic requires JS SDK
 
 
 
@@ -134,6 +148,36 @@ export function FleetMapView() {
   const [routeKeys, setRouteKeys] = useState<Map<string, string>>(new Map());
   // Live, driver-GPS-derived route geometry per load (overrides static OSRM result when present)
   const [liveRouteGeometries, setLiveRouteGeometries] = useState<Map<string, [number, number][]>>(new Map());
+
+  // Environmental overlay toggles (persisted)
+  const [weatherEnabled, setWeatherEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = window.localStorage.getItem(OVERLAY_STORAGE_KEY);
+      return raw ? !!JSON.parse(raw).weather : false;
+    } catch {
+      return false;
+    }
+  });
+  const [trafficEnabled, setTrafficEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = window.localStorage.getItem(OVERLAY_STORAGE_KEY);
+      return raw ? !!JSON.parse(raw).traffic : false;
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        OVERLAY_STORAGE_KEY,
+        JSON.stringify({ weather: weatherEnabled, traffic: trafficEnabled }),
+      );
+    } catch {
+      /* no-op */
+    }
+  }, [weatherEnabled, trafficEnabled]);
 
   // Fetch ALL driver locations (not just recent ones)
   const { data: initialLocations } = useQuery({
@@ -486,8 +530,31 @@ export function FleetMapView() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        
+
+        {/* Weather radar overlay (OpenWeatherMap precipitation) */}
+        {weatherEnabled && WEATHER_TILE_URL && (
+          <TileLayer
+            key="weather-overlay"
+            url={WEATHER_TILE_URL}
+            opacity={0.6}
+            zIndex={400}
+            attribution='Weather &copy; OpenWeatherMap'
+          />
+        )}
+
+        {/* Traffic overlay placeholder — Google Traffic requires JS SDK integration */}
+        {trafficEnabled && TRAFFIC_TILE_URL && (
+          <TileLayer
+            key="traffic-overlay"
+            url={TRAFFIC_TILE_URL}
+            opacity={0.6}
+            zIndex={400}
+          />
+        )}
+
         <FitBounds loads={loads} />
+
+
 
         {loads.map(load => (
           <div key={load.id}>
@@ -602,6 +669,52 @@ export function FleetMapView() {
           </div>
         ))}
       </MapContainer>
+
+      {/* Overlay control panel */}
+      <div
+        className={`absolute top-2 ${isExpanded ? 'right-2' : 'right-12'} z-[500] bg-gray-900/80 backdrop-blur-sm text-white border border-white/10 rounded-lg shadow-lg p-3 space-y-2 min-w-[180px]`}
+      >
+        <p className="text-[10px] uppercase tracking-wider text-white/60 font-semibold mb-1">
+          Map Overlays
+        </p>
+        <div className="flex items-center justify-between gap-3">
+          <Label
+            htmlFor="weather-toggle"
+            className="flex items-center gap-2 text-xs font-medium cursor-pointer text-white"
+          >
+            <Cloud className="h-3.5 w-3.5 text-sky-400" />
+            Weather Radar
+          </Label>
+          <Switch
+            id="weather-toggle"
+            checked={weatherEnabled}
+            onCheckedChange={setWeatherEnabled}
+            className="data-[state=checked]:bg-primary"
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <Label
+            htmlFor="traffic-toggle"
+            className="flex items-center gap-2 text-xs font-medium cursor-pointer text-white"
+          >
+            <TrafficCone className="h-3.5 w-3.5 text-amber-400" />
+            Traffic Conditions
+          </Label>
+          <Switch
+            id="traffic-toggle"
+            checked={trafficEnabled}
+            onCheckedChange={setTrafficEnabled}
+            className="data-[state=checked]:bg-primary"
+          />
+        </div>
+        {(weatherEnabled && !WEATHER_TILE_URL) || (trafficEnabled && !TRAFFIC_TILE_URL) ? (
+          <p className="text-[10px] text-amber-300/90 pt-1 border-t border-white/10">
+            Demo mode — provider key not yet configured.
+          </p>
+        ) : null}
+      </div>
+
+
 
       {!isExpanded && loads.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
