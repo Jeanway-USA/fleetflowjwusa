@@ -1,29 +1,32 @@
-## Diagnosis
+## Plan: Restore the In-Transit Map
 
-Two crashes in the console explain the black canvas:
+### Goal
+Make the Dispatcher Dashboard In-Transit map visibly render again, while preserving Mapbox traffic, RainViewer radar, truck clustering, route markers, and forecast sidebar behavior.
 
-1. `Cannot read properties of undefined (reading 'applyProjectionUpdate')` — thrown from Mapbox GL v3's `_updateProjection` during style load.
-2. `Cannot read properties of undefined (reading 'get')` — thrown from Mapbox's `addImages` while loading style sprite icons.
+### What I found
+- Mapbox network tile requests are succeeding, so the public token and CSP are not the main blocker.
+- The map component currently delays all operational layers until an `idle` event after `style.load`.
+- The visible state is a black map area with only the overlay controls, which points to the Mapbox canvas/style lifecycle not becoming usable or not resizing/painting correctly inside the current container.
 
-Both are known Mapbox GL v3 issues that fire when the map initializes with the default **globe** projection in an environment where the style/sprite hasn't fully resolved before the projection is updated. When either throws, the WebGL painter aborts and the canvas stays black — the only DOM still rendered is our overlay control panel, which matches what you're seeing.
+### Implementation Steps
+1. **Harden Mapbox initialization**
+   - Add explicit `load`, `style.load`, `idle`, and `resize` handling.
+   - Call `map.resize()` after mount and after the container/layout settles so Mapbox paints into the visible card.
+   - Track a `mapLoaded`/`styleReady` state that cannot remain stuck waiting for `idle`.
 
-## Fix
+2. **Use a safer base style fallback**
+   - Keep Mapbox navigation styles when they load correctly.
+   - Add fallback behavior to switch to a stable Mapbox streets/light or dark style if the navigation style fails or does not become ready.
 
-Force the map to use the Mercator projection (skips the globe init path that crashes) and defer layer/source setup until *after* the style is fully idle, not just `load`.
+3. **Move custom layer setup behind reliable readiness checks**
+   - Ensure traffic, radar, routes, points, and truck layers only run after the style is actually loaded.
+   - Guard every `addSource`/`addLayer` call from running during style swaps.
 
-Edit `src/components/dispatcher/FleetMapView.tsx` inside `MapboxCanvas`:
+4. **Improve visible failure states**
+   - If Mapbox throws an actual map-load error, show a clear message inside the map area instead of leaving a black panel.
+   - Keep noisy RainViewer tile misses filtered so weather tile gaps do not blank the map.
 
-1. Pass `projection: 'mercator'` in the `new mapboxgl.Map({...})` options.
-2. Replace `map.on('load', () => setStyleReady(true))` with a handler that waits for `style.load` and one additional `idle` tick before flipping `styleReady`, so sprite images finish loading before we call `addLayer`.
-3. In the theme-change effect, use the same `style.load` + `idle` gate before re-adding sources/layers.
-4. Guard every `addSource`/`addLayer` call with `map.isStyleLoaded()` and swallow-log errors (some are already guarded; extend to the traffic, routes, points, and trucks effects).
-5. Silence the noisy RainViewer 404s: subscribe to `map.on('error', ...)` and ignore errors whose `error.message` starts with `Failed to fetch https://tilecache.rainviewer.com` (some radar tiles legitimately 404 at world zoom levels).
-
-## Verification
-
-- Reload `/dispatcher-dashboard` → map tiles render (light/dark navigation style).
-- Toggle Traffic → congestion-colored lines appear.
-- Toggle Weather Radar → RainViewer raster overlays; residual tile 404s no longer flood the console.
-- Click a truck marker → forecast sidebar appears and map re-centers.
-
-No schema, edge function, or non-map file changes.
+5. **Verify in the live preview**
+   - Open `/dispatcher-dashboard` with Playwright.
+   - Confirm the base map is visible under the overlay widget.
+   - Check the console for remaining Mapbox errors and confirm at least one route/point/truck layer can render when data is present.
