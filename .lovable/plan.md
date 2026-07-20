@@ -1,67 +1,22 @@
-# Fleet Roster Tab — ELD Sync + HOS Clarity
-
-Modernize the driver and truck status cards inside the existing Fleet Roster tab. The tab layout (Driver Status + Truck Status side-by-side on top, Driver Leaderboard full-width below) is already in place from the earlier tabbed refactor — this pass focuses on card content and clarity.
+## Goal
+Add a sleek overlay control menu to the In Transit map in the Command Center with two toggle switches — "Weather Radar" and "Traffic Conditions" — wired to placeholder Leaflet layer logic ready for future third-party API keys.
 
 ## Changes
 
-### 1. `src/components/dispatcher/DriverStatusGrid.tsx`
+### `src/components/dispatcher/FleetMapView.tsx`
+1. Import shadcn `Switch` (`@/components/ui/switch`), `Label`, and `Cloud` / `TrafficCone` icons from lucide-react.
+2. Add two React state flags: `weatherEnabled`, `trafficEnabled` (both default `false`). Persist to `localStorage` (`fleet-map-overlays`) so preferences survive reload.
+3. Inside `renderMapContent`, next to the existing `MapContainer`, render a floating control card absolutely positioned at `top-2 right-2` (right-12 on non-expanded views to avoid overlapping the existing Expand button from `ExpandableMap`). Styling:
+   - `bg-gray-900/80 backdrop-blur-sm text-white border border-white/10 rounded-lg shadow-lg p-3`
+   - `z-[500]` so it sits above tiles but below Leaflet popups.
+   - Two rows: icon + label + `Switch`. Switch uses accent color via `data-[state=checked]:bg-primary` (amber gold, matches design system).
+4. Add two conditional `TileLayer` components inside `MapContainer`:
+   - Weather: OpenWeatherMap precipitation URL pattern `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${key}` behind a `weatherEnabled && apiKey` guard. Since no key is configured yet, render a placeholder OSM-styled overlay using a transparent tile stub (leave URL variable + `TODO` comment) so the toggle visibly no-ops without breaking. Also show a small "Demo mode" hint in the popover when enabled without key.
+   - Traffic: Google Maps traffic requires the JS SDK, not a raster tile URL — leave a `TODO` comment + stub tile layer. Toggle state is preserved for when the SDK is wired later.
+5. Both overlay layers use `opacity={0.6}` and `zIndex={400}` so they sit above base tiles but under markers/polylines.
+6. Control menu stays visible in both inline and expanded modes.
 
-**ELD Sync Indicator (new)**
-- Derive an ELD sync state from `drivers.hos_last_updated` (existing column, already fetched):
-  - `< 30 min` → **live** — solid green dot with a pinging halo (`animate-ping`) + "ELD live · <time> ago"
-  - `< 4 h` → **recent** — solid green dot, no pulse + "ELD synced <time> ago"
-  - `< 14 h` → **stale** — amber dot + "ELD stale · <time> ago"
-  - null / `>= 14 h` → **offline** — gray dot + "ELD offline"
-- Rendered as a compact row under the driver name, before the HOS badge row.
-
-**HOS badge clarity**
-- Rework `HOS_TONE_CLASSES` / `getHosState` so `No HOS` and `Pending Reset` use amber warning styling (`bg-warning/10 text-warning border-warning/20`) instead of muted gray, so they read as safety alerts.
-- Keep the amber "≤6h remaining" and red "≤2h remaining" tones (already correct).
-- Add an `AlertTriangle` icon inline with `No HOS` / `Pending Reset` to draw the eye.
-
-### 2. `src/components/dispatcher/TruckStatusGrid.tsx`
-
-**ELD Sync Indicator (new)**
-- Extend the query to also fetch `hos_last_updated` from the joined `current_driver`.
-- When a truck has an assigned driver, render the same ELD indicator (dot + relative timestamp) beneath the driver name.
-- When unassigned, render a neutral "No ELD paired" chip so the field never disappears silently.
-
-### 3. Shared helper: `src/components/dispatcher/eldSync.ts` (new)
-
-Single source of truth used by both cards:
-
-```ts
-export type EldTone = 'live' | 'recent' | 'stale' | 'offline';
-export function getEldSyncState(lastUpdated: string | null): {
-  tone: EldTone;
-  label: string;     // "ELD live · 4m ago" etc.
-  dotClass: string;  // Tailwind classes
-  pulse: boolean;
-}
-```
-
-Prevents drift between driver and truck cards.
-
-### 4. Fleet Roster tab (`src/pages/DispatcherDashboard.tsx`)
-
-Verify — no structural change needed. Current tab already renders:
-
-```
-grid grid-cols-1 md:grid-cols-2   → DriverStatusGrid | TruckStatusGrid
-full width                        → DriverLeaderboard
-```
-
-Only tweak: swap the wrapping div's `md:grid-cols-2` to keep the two cards balanced with `items-stretch` so ELD indicator rows don't cause height drift.
-
-## Files Touched
-
-- **New**: `src/components/dispatcher/eldSync.ts`
-- **Edit**: `src/components/dispatcher/DriverStatusGrid.tsx` — ELD row, elevate No HOS / Pending Reset to warning tone
-- **Edit**: `src/components/dispatcher/TruckStatusGrid.tsx` — join `hos_last_updated`, render ELD row
-- **Edit**: `src/pages/DispatcherDashboard.tsx` — add `items-stretch` to the Fleet Roster grid (minor)
-
-## Out of Scope
-
-- No new columns or schema changes; uses existing `drivers.hos_last_updated`.
-- No integration with an external ELD vendor API — the indicator reflects the freshness of the HOS data the system already stores.
-- No changes to the leaderboard beyond it already spanning full width.
+### Notes
+- No new dependencies; `Switch` already exists in the shadcn library.
+- No backend/env changes. Actual OpenWeatherMap/Google Traffic wiring is deferred until the user provides keys — the plan explicitly leaves placeholder hooks.
+- No changes to routing, geocoding, or marker logic.

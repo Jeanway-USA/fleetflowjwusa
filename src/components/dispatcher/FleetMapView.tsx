@@ -4,7 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Truck, Navigation, Radio } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { MapPin, Truck, Navigation, Radio, Cloud, TrafficCone } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -12,6 +14,18 @@ import { geocodeLocationAsync, interpolatePosition, getProgressFromStatus } from
 import { fetchRoutesBatch } from '@/lib/routing';
 import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
+
+const OVERLAY_STORAGE_KEY = 'fleet-map-overlays';
+// TODO: wire real providers when keys are configured
+//   - Weather: OpenWeatherMap tile URL requires VITE_OPENWEATHERMAP_API_KEY
+//     e.g. https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=KEY
+//   - Traffic: Google Maps traffic is only available via the Maps JS SDK
+//     (google.maps.TrafficLayer) — not a raster tile endpoint.
+const OPENWEATHER_API_KEY = (import.meta.env.VITE_OPENWEATHERMAP_API_KEY as string | undefined) || '';
+const WEATHER_TILE_URL = OPENWEATHER_API_KEY
+  ? `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${OPENWEATHER_API_KEY}`
+  : '';
+const TRAFFIC_TILE_URL = ''; // placeholder — Google Traffic requires JS SDK
 
 
 
