@@ -1075,6 +1075,12 @@ function MapboxCanvas({
     const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
     loads.forEach((load) => {
       if (!load.truckCoords) return;
+      // Snap live trucks to the drawn route so the marker rides along it
+      let coord = { lat: load.truckCoords.lat, lng: load.truckCoords.lng };
+      if (load.isLiveLocation && load.liveRouteGeometry && load.liveRouteGeometry.length >= 2) {
+        const snapped = snapPointToRoute(coord, load.liveRouteGeometry);
+        if (snapped) coord = snapped;
+      }
       features.push({
         type: 'Feature',
         properties: {
@@ -1089,7 +1095,7 @@ function MapboxCanvas({
         },
         geometry: {
           type: 'Point',
-          coordinates: [load.truckCoords.lng, load.truckCoords.lat],
+          coordinates: [coord.lng, coord.lat],
         },
       });
     });
