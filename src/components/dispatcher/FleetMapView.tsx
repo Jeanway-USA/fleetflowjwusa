@@ -32,6 +32,7 @@ import { geocodeLocationAsync, interpolatePosition, getProgressFromStatus } from
 import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
 import { WeatherForecastPanel } from './WeatherForecastPanel';
+import { snapPointToRoute } from '@/lib/geo/snapToRoute';
 
 const OVERLAY_STORAGE_KEY = 'fleet-map-overlays-v2';
 const RAINVIEWER_INDEX_URL = 'https://api.rainviewer.com/public/weather-maps.json';
@@ -65,6 +66,7 @@ interface LoadWithLocation {
   isLiveLocation: boolean;
   stopCoords: { lat: number; lng: number; stop: IntermediateStop }[];
   liveRouteGeometry: [number, number][] | null;
+  routeCongestion: string[] | null;
 }
 
 function isLocationLive(loc: DriverLocation): boolean {
@@ -128,6 +130,8 @@ export function FleetMapView() {
   const [liveRouteGeometries, setLiveRouteGeometries] = useState<
     Map<string, [number, number][]>
   >(new Map());
+  const [routeCongestions, setRouteCongestions] = useState<Map<string, string[]>>(new Map());
+  const routeFetchAttemptsRef = useRef<Map<string, number>>(new Map());
 
   const { data: initialLocations } = useQuery({
     queryKey: ['driver-locations'],
@@ -213,6 +217,7 @@ export function FleetMapView() {
           notes,
           current_route_geometry,
           current_route_updated_at,
+          current_route_congestion,
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
           truck:trucks!fleet_loads_truck_id_fkey(unit_number)
         `)
@@ -242,7 +247,18 @@ export function FleetMapView() {
       });
       return next;
     });
+    setRouteCongestions((prev) => {
+      const next = new Map(prev);
+      rawLoads.forEach((load: any) => {
+        const raw = load.current_route_congestion;
+        if (Array.isArray(raw) && raw.length > 0) {
+          next.set(load.id, raw.map((c: any) => (typeof c === 'string' ? c : 'unknown')));
+        }
+      });
+      return next;
+    });
   }, [rawLoads]);
+
 
   useEffect(() => {
     const ids = (rawLoads ?? []).map((l: any) => l.id).filter(Boolean);
@@ -350,9 +366,75 @@ export function FleetMapView() {
         isLiveLocation,
         stopCoords,
         liveRouteGeometry: liveRouteGeometries.get(load.id) ?? null,
+        routeCongestion: routeCongestions.get(load.id) ?? null,
       } as LoadWithLocation;
     });
-  }, [rawLoads, driverLocations, geocodedCoords, loadStops, liveRouteGeometries]);
+  }, [rawLoads, driverLocations, geocodedCoords, loadStops, liveRouteGeometries, routeCongestions]);
+
+  // ---- Auto-fetch truck-friendly routes for loads that don't have one yet ----
+  useEffect(() => {
+    if (!rawLoads) return;
+    const attempts = routeFetchAttemptsRef.current;
+    const stale = 30 * 60 * 1000;
+    (async () => {
+      for (const load of rawLoads as any[]) {
+        const origin = geocodedCoords.get(load.origin);
+        const destination = geocodedCoords.get(load.destination);
+        if (!origin || !destination) continue;
+        // Skip if we already have geometry
+        if (liveRouteGeometries.has(load.id)) continue;
+        // Skip if the DB row is fresh (already fetched previously)
+        if (load.current_route_updated_at) {
+          const age = Date.now() - new Date(load.current_route_updated_at).getTime();
+          if (age < stale) continue;
+        }
+        const key = `${load.id}:${origin.lat.toFixed(3)},${origin.lng.toFixed(3)}->${destination.lat.toFixed(3)},${destination.lng.toFixed(3)}`;
+        const prev = attempts.get(key) ?? 0;
+        if (prev >= 2) continue;
+        attempts.set(key, prev + 1);
+        const stops = loadStops.get(load.id) ?? [];
+        const waypoints = stops
+          .map((s) => {
+            const c = geocodedCoords.get(s.address);
+            return c ? { lat: c.lat, lng: c.lng } : null;
+          })
+          .filter((c): c is { lat: number; lng: number } => !!c);
+        try {
+          const { data, error } = await supabase.functions.invoke('route-load', {
+            body: { origin, destination, waypoints },
+          });
+          if (error || !data?.geometry || !Array.isArray(data.geometry)) continue;
+          const geom = data.geometry as [number, number][];
+          const cong = (data.congestion as string[]) ?? [];
+          setLiveRouteGeometries((prev) => {
+            const next = new Map(prev);
+            next.set(load.id, geom);
+            return next;
+          });
+          setRouteCongestions((prev) => {
+            const next = new Map(prev);
+            next.set(load.id, cong);
+            return next;
+          });
+          // Background persist — non-blocking, ignore failure
+          supabase
+            .from('fleet_loads')
+            .update({
+              current_route_geometry: geom as any,
+              current_route_congestion: cong as any,
+              current_route_distance_m: data.distance_m ?? null,
+              current_route_duration_s: data.duration_s ?? null,
+              current_route_updated_at: new Date().toISOString(),
+            })
+            .eq('id', load.id)
+            .then(() => {});
+        } catch (err) {
+          console.warn('route-load failed for', load.id, err);
+        }
+      }
+    })();
+  }, [rawLoads, geocodedCoords, loadStops, liveRouteGeometries]);
+
 
   // ---- RainViewer radar tile URL template ----
   const [radarUrlTemplate, setRadarUrlTemplate] = useState<string | null>(null);
@@ -370,7 +452,7 @@ export function FleetMapView() {
         const host = data.host;
         const latestFrame = data.radar?.past?.[data.radar.past.length - 1];
         if (!host || !latestFrame?.path) throw new Error('Malformed RainViewer response');
-        if (!cancelled) setRadarUrlTemplate(`${host}${latestFrame.path}/256/{z}/{x}/{y}/2/1_1.png`);
+        if (!cancelled) setRadarUrlTemplate(`${host}${latestFrame.path}/256/{z}/{x}/{y}/4/1_1.png`);
       } catch (err) {
         if (!cancelled) {
           setRadarUrlTemplate(null);
@@ -771,58 +853,78 @@ function MapboxCanvas({
     }
   }, [styleReady, overlays.traffic, overlays.trafficOpacity]);
 
-  // ---- Radar raster layer ----
+  // ---- Radar raster layer. Re-attach on style swaps (styledata fires after fallback style loads). ----
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !styleReady) return;
+    if (!map) return;
     const SRC = 'rainviewer-src';
     const LYR = 'rainviewer-lyr';
-    try {
-      // Remove first to allow url template refresh
-      if (map.getLayer(LYR)) map.removeLayer(LYR);
-      if (map.getSource(SRC)) map.removeSource(SRC);
-      if (overlays.weather && radarUrlTemplate) {
+
+    const applyRadar = () => {
+      if (!map.isStyleLoaded()) return;
+      try {
+        if (map.getLayer(LYR)) map.removeLayer(LYR);
+        if (map.getSource(SRC)) map.removeSource(SRC);
+        if (!overlays.weather || !radarUrlTemplate) return;
         map.addSource(SRC, {
           type: 'raster',
           tiles: [radarUrlTemplate],
           tileSize: 256,
         });
-        map.addLayer({
-          id: LYR,
-          type: 'raster',
-          source: SRC,
-          paint: { 'raster-opacity': overlays.radarOpacity / 100 },
-        });
+        // Insert beneath route/point/truck layers so those stay visible above radar
+        const beforeId = ['load-routes-lyr', 'load-points-circle', 'trucks-point']
+          .find((id) => map.getLayer(id));
+        map.addLayer(
+          {
+            id: LYR,
+            type: 'raster',
+            source: SRC,
+            paint: { 'raster-opacity': overlays.radarOpacity / 100 },
+          },
+          beforeId,
+        );
+      } catch (err) {
+        console.warn('Radar layer error:', err);
       }
-    } catch (err) {
-      console.warn('Radar layer error:', err);
-    }
+    };
+
+    applyRadar();
+    map.on('styledata', applyRadar);
+    return () => {
+      map.off('styledata', applyRadar);
+    };
   }, [styleReady, overlays.weather, radarUrlTemplate, overlays.radarOpacity]);
 
-  // ---- Route lines source/layer ----
+  // ---- Route lines source/layer (per-segment features carrying congestion) ----
   const routeFC = useMemo(() => {
     const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
     loads.forEach((load) => {
       let coords: [number, number][] | null = null;
+      let congestion: string[] | null = null;
       if (load.liveRouteGeometry && load.liveRouteGeometry.length >= 2) {
         // liveRouteGeometry is [lat, lng]; Mapbox wants [lng, lat]
         coords = load.liveRouteGeometry.map(([la, ln]) => [ln, la] as [number, number]);
+        congestion = load.routeCongestion ?? null;
       } else if (load.originCoords && load.destCoords) {
         coords = [
           [load.originCoords.lng, load.originCoords.lat],
           [load.destCoords.lng, load.destCoords.lat],
         ];
       }
-      if (!coords) return;
-      features.push({
-        type: 'Feature',
-        id: loadFeatureId(load.id),
-        properties: {
-          id: load.id,
-          live: !!load.liveRouteGeometry,
-        },
-        geometry: { type: 'LineString', coordinates: coords },
-      });
+      if (!coords || coords.length < 2) return;
+      const live = !!load.liveRouteGeometry;
+      for (let i = 0; i < coords.length - 1; i++) {
+        const cong = congestion && congestion[i] ? congestion[i] : 'unknown';
+        features.push({
+          type: 'Feature',
+          properties: {
+            loadId: load.id,
+            live,
+            congestion: cong,
+          },
+          geometry: { type: 'LineString', coordinates: [coords[i], coords[i + 1]] },
+        });
+      }
     });
     return { type: 'FeatureCollection', features } as GeoJSON.FeatureCollection<GeoJSON.LineString>;
   }, [loads]);
@@ -832,7 +934,27 @@ function MapboxCanvas({
     if (!map || !styleReady) return;
     const SRC = 'load-routes';
     const LYR = 'load-routes-lyr';
-    const LYR_SEL = 'load-routes-selected';
+
+    const congestionColor: any = [
+      'match',
+      ['get', 'congestion'],
+      'low', '#22c55e',
+      'moderate', '#eab308',
+      'heavy', '#f97316',
+      'severe', '#dc2626',
+      /* unknown / other */ ['case', ['get', 'live'], LIVE_ROUTE_COLOR, LOAD_STATUS_COLOR],
+    ];
+    const plainColor: any = [
+      'case', ['get', 'live'], LIVE_ROUTE_COLOR, LOAD_STATUS_COLOR,
+    ];
+    const colorExpr = overlays.traffic ? congestionColor : plainColor;
+    const widthExpr: any = [
+      'case',
+      ['==', ['get', 'loadId'], selectedLoadId ?? ''],
+      6,
+      3.5,
+    ];
+
     try {
       const src = map.getSource(SRC) as mapboxgl.GeoJSONSource | undefined;
       if (!src) {
@@ -843,34 +965,21 @@ function MapboxCanvas({
           source: SRC,
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: {
-            'line-color': [
-              'case',
-              ['get', 'live'],
-              LIVE_ROUTE_COLOR,
-              LOAD_STATUS_COLOR,
-            ],
-            'line-width': [
-              'case',
-              ['==', ['get', 'id'], selectedLoadId ?? ''],
-              6,
-              3.5,
-            ],
-            'line-opacity': 0.85,
+            'line-color': colorExpr,
+            'line-width': widthExpr,
+            'line-opacity': 0.9,
           },
         });
       } else {
         src.setData(routeFC);
-        map.setPaintProperty(LYR, 'line-width', [
-          'case',
-          ['==', ['get', 'id'], selectedLoadId ?? ''],
-          6,
-          3.5,
-        ]);
+        map.setPaintProperty(LYR, 'line-color', colorExpr);
+        map.setPaintProperty(LYR, 'line-width', widthExpr);
       }
     } catch (err) {
       console.warn('Routes layer error:', err);
     }
-  }, [routeFC, styleReady, selectedLoadId]);
+  }, [routeFC, styleReady, selectedLoadId, overlays.traffic]);
+
 
   // ---- Origin/destination/stop symbol sources ----
   const pointFC = useMemo(() => {
@@ -966,6 +1075,12 @@ function MapboxCanvas({
     const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
     loads.forEach((load) => {
       if (!load.truckCoords) return;
+      // Snap live trucks to the drawn route so the marker rides along it
+      let coord = { lat: load.truckCoords.lat, lng: load.truckCoords.lng };
+      if (load.isLiveLocation && load.liveRouteGeometry && load.liveRouteGeometry.length >= 2) {
+        const snapped = snapPointToRoute(coord, load.liveRouteGeometry);
+        if (snapped) coord = snapped;
+      }
       features.push({
         type: 'Feature',
         properties: {
@@ -980,7 +1095,7 @@ function MapboxCanvas({
         },
         geometry: {
           type: 'Point',
-          coordinates: [load.truckCoords.lng, load.truckCoords.lat],
+          coordinates: [coord.lng, coord.lat],
         },
       });
     });
