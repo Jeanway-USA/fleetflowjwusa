@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -223,25 +224,35 @@ export function FleetMapView() {
     }
   }, [weatherEnabled, trafficEnabled]);
 
-  // RainViewer: fetch the most recent radar frame path when weather overlay is enabled
-  const [rainviewerPath, setRainviewerPath] = useState<string | null>(null);
+  // RainViewer: fetch the most recent radar frame and build the full tile URL
+  const [radarTileUrl, setRadarTileUrl] = useState<string | null>(null);
+  const [radarLoading, setRadarLoading] = useState(false);
   useEffect(() => {
-    if (!weatherEnabled) return;
+    if (!weatherEnabled) {
+      setRadarTileUrl(null);
+      setRadarLoading(false);
+      return;
+    }
     let cancelled = false;
     const load = async () => {
+      setRadarLoading(true);
       try {
         const res = await fetch(RAINVIEWER_INDEX_URL, { cache: 'no-store' });
-        if (!res.ok) return;
-        const json = await res.json();
-        const frames = json?.radar?.past;
-        const host = json?.host;
-        if (!Array.isArray(frames) || frames.length === 0 || !host) return;
-        const latest = frames[frames.length - 1];
-        if (latest?.path && !cancelled) {
-          setRainviewerPath(`${host}${latest.path}`);
+        if (!res.ok) throw new Error(`RainViewer ${res.status}`);
+        const data = await res.json();
+        const host = data.host;
+        const latestFrame = data.radar.past[data.radar.past.length - 1];
+        if (!host || !latestFrame?.path) throw new Error('Malformed RainViewer response');
+        if (!cancelled) {
+          setRadarTileUrl(`${host}${latestFrame.path}/256/{z}/{x}/{y}/2/1_1.png`);
         }
-      } catch {
-        /* offline / blocked — silently ignore */
+      } catch (err) {
+        if (!cancelled) {
+          setRadarTileUrl(null);
+          toast.error('Weather radar is temporarily unavailable');
+        }
+      } finally {
+        if (!cancelled) setRadarLoading(false);
       }
     };
     load();
@@ -606,11 +617,11 @@ export function FleetMapView() {
         />
 
         {/* Weather radar overlay — RainViewer live tiles */}
-        {weatherEnabled && rainviewerPath && (
+        {weatherEnabled && radarTileUrl && (
           <TileLayer
-            key={`weather-${rainviewerPath}`}
-            url={`https://tilecache.rainviewer.com${rainviewerPath}/256/{z}/{x}/{y}/2/1_1.png`}
-            opacity={0.6}
+            key={`weather-${radarTileUrl}`}
+            url={radarTileUrl}
+            opacity={0.5}
             zIndex={400}
             attribution='Weather &copy; <a href="https://www.rainviewer.com/">RainViewer</a>'
           />
@@ -794,7 +805,7 @@ export function FleetMapView() {
             className="data-[state=checked]:bg-primary"
           />
         </div>
-        {weatherEnabled && !rainviewerPath ? (
+        {weatherEnabled && radarLoading && !radarTileUrl ? (
           <p className="text-[10px] text-white/60 pt-1 border-t border-white/10">
             Loading radar frames…
           </p>
