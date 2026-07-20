@@ -68,7 +68,11 @@ function destinationRegion(destination: string | null | undefined) {
   return parts[parts.length - 1] || destination;
 }
 
-export function FleetTimelineScheduler() {
+interface FleetTimelineSchedulerProps {
+  hideUnassignedTray?: boolean;
+}
+
+export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTimelineSchedulerProps = {}) {
   const queryClient = useQueryClient();
   const [weekOffset, setWeekOffset] = useState(0);
   const [draggedLoad, setDraggedLoad] = useState<TimelineLoad | null>(null);
@@ -294,22 +298,38 @@ export function FleetTimelineScheduler() {
   const handleDragEnd = () => setDraggedLoad(null);
   const handleDragOver = (e: React.DragEvent) => e.preventDefault();
 
-  const handleDrop = async (driverId: string) => {
-    if (!draggedLoad) return;
+  const resolveDroppedLoad = (e: React.DragEvent): TimelineLoad | null => {
+    if (draggedLoad) return draggedLoad;
+    // External drag (from UnassignedLoadsDrawer)
+    try {
+      const json = e.dataTransfer.getData('application/x-load-json');
+      if (json) return JSON.parse(json) as TimelineLoad;
+    } catch {
+      /* fall through */
+    }
+    const id = e.dataTransfer.getData('application/x-load-id');
+    if (!id) return null;
+    const match = unassignedLoads?.find(l => l.id === id);
+    return match || null;
+  };
 
-    const { hasConflict, message } = checkConflicts(driverId, draggedLoad);
+  const handleDrop = async (driverId: string, e: React.DragEvent) => {
+    const load = resolveDroppedLoad(e);
+    if (!load) return;
+
+    const { hasConflict, message } = checkConflicts(driverId, load);
     if (hasConflict) {
       toast.warning('Schedule Conflict', { description: message, icon: <AlertTriangle className="h-4 w-4" /> });
       setDraggedLoad(null);
       return;
     }
 
-    setAssigningLoad(draggedLoad.id);
+    setAssigningLoad(load.id);
     try {
       const { error } = await supabase
         .from('fleet_loads')
         .update({ driver_id: driverId, status: 'assigned' })
-        .eq('id', draggedLoad.id);
+        .eq('id', load.id);
 
       if (error) throw error;
 
@@ -320,6 +340,7 @@ export function FleetTimelineScheduler() {
       queryClient.invalidateQueries({ queryKey: ['timeline-unassigned-loads'] });
       queryClient.invalidateQueries({ queryKey: ['dispatcher-stats'] });
       queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
+      queryClient.invalidateQueries({ queryKey: ['upcoming-pickups-dispatcher'] });
     } catch {
       toast.error('Failed to assign load');
     } finally {
@@ -432,7 +453,7 @@ export function FleetTimelineScheduler() {
                           <div
                             key={day.toISOString()}
                             onDragOver={onHometime ? undefined : handleDragOver}
-                            onDrop={onHometime ? undefined : () => handleDrop(driver.id)}
+                            onDrop={onHometime ? undefined : (e) => handleDrop(driver.id, e)}
                             className={[
                               'relative border-b border-l border-border min-h-[44px] transition-colors',
                               onHometime
@@ -498,41 +519,43 @@ export function FleetTimelineScheduler() {
               </div>
             </div>
 
-            {/* Unassigned Loads Tray */}
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">
-                Unassigned Loads — drag onto a driver row ({unassignedLoads?.length || 0})
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {unassignedLoads && unassignedLoads.length > 0 ? (
-                  unassignedLoads.map(load => (
-                    <div
-                      key={load.id}
-                      draggable
-                      onDragStart={() => handleDragStart(load)}
-                      onDragEnd={handleDragEnd}
-                      className={`flex items-center gap-1.5 p-2 rounded-md border border-border bg-muted/30 cursor-grab active:cursor-grabbing hover:bg-muted/50 transition-colors text-xs ${
-                        draggedLoad?.id === load.id ? 'opacity-50 ring-2 ring-primary' : ''
-                      } ${assigningLoad === load.id ? 'opacity-50 pointer-events-none' : ''}`}
-                    >
-                      <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <Package className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <span className="font-medium">{load.landstar_load_id || load.id.slice(0, 8)}</span>
-                      <span className="text-muted-foreground hidden sm:inline">
-                        <MapPin className="h-2.5 w-2.5 inline" /> {load.origin?.split(',')[0]} → {load.destination?.split(',')[0]}
-                      </span>
-                      {load.pickup_date && (
-                        <Badge variant="outline" className="text-[10px] h-4 px-1">
-                          {format(parseISO(load.pickup_date), 'M/d')}
-                        </Badge>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-muted-foreground py-2">No unassigned loads</p>
-                )}
+            {/* Unassigned Loads Tray (hidden when external drawer is used) */}
+            {!hideUnassignedTray && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">
+                  Unassigned Loads — drag onto a driver row ({unassignedLoads?.length || 0})
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {unassignedLoads && unassignedLoads.length > 0 ? (
+                    unassignedLoads.map(load => (
+                      <div
+                        key={load.id}
+                        draggable
+                        onDragStart={() => handleDragStart(load)}
+                        onDragEnd={handleDragEnd}
+                        className={`flex items-center gap-1.5 p-2 rounded-md border border-border bg-muted/30 cursor-grab active:cursor-grabbing hover:bg-muted/50 transition-colors text-xs ${
+                          draggedLoad?.id === load.id ? 'opacity-50 ring-2 ring-primary' : ''
+                        } ${assigningLoad === load.id ? 'opacity-50 pointer-events-none' : ''}`}
+                      >
+                        <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <Package className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="font-medium">{load.landstar_load_id || load.id.slice(0, 8)}</span>
+                        <span className="text-muted-foreground hidden sm:inline">
+                          <MapPin className="h-2.5 w-2.5 inline" /> {load.origin?.split(',')[0]} → {load.destination?.split(',')[0]}
+                        </span>
+                        {load.pickup_date && (
+                          <Badge variant="outline" className="text-[10px] h-4 px-1">
+                            {format(parseISO(load.pickup_date), 'M/d')}
+                          </Badge>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground py-2">No unassigned loads</p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </CardContent>

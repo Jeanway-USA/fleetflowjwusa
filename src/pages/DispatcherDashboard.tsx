@@ -18,8 +18,8 @@ const FleetMapView = lazy(() =>
   import('@/components/dispatcher/FleetMapView').then(m => ({ default: m.FleetMapView })),
 );
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
-import { DriverAssignmentPanel } from '@/components/dispatcher/DriverAssignmentPanel';
 import { FleetTimelineScheduler } from '@/components/dispatcher/FleetTimelineScheduler';
+import { UnassignedLoadsDrawer } from '@/components/dispatcher/UnassignedLoadsDrawer';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
@@ -242,15 +242,18 @@ export default function DispatcherDashboard() {
 
         {/* Dispatch Board */}
         <TabsContent value="dispatch-board" className="mt-6 space-y-6">
-          <div id="assign-driver" className="scroll-mt-20">
-            <ErrorBoundary compact>
-              <DriverAssignmentPanel />
-            </ErrorBoundary>
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-4">
+            <div className="lg:col-span-3">
+              <ErrorBoundary compact>
+                <FleetTimelineScheduler hideUnassignedTray />
+              </ErrorBoundary>
+            </div>
+            <div className="lg:col-span-1">
+              <ErrorBoundary compact>
+                <UnassignedLoadsDrawer />
+              </ErrorBoundary>
+            </div>
           </div>
-
-          <ErrorBoundary compact>
-            <FleetTimelineScheduler />
-          </ErrorBoundary>
 
           <div data-tour="active-loads">
             <ErrorBoundary compact>
