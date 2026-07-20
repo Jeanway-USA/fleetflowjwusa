@@ -18,8 +18,8 @@ const FleetMapView = lazy(() =>
   import('@/components/dispatcher/FleetMapView').then(m => ({ default: m.FleetMapView })),
 );
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
-import { DriverAssignmentPanel } from '@/components/dispatcher/DriverAssignmentPanel';
 import { FleetTimelineScheduler } from '@/components/dispatcher/FleetTimelineScheduler';
+import { UnassignedLoadsDrawer } from '@/components/dispatcher/UnassignedLoadsDrawer';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
