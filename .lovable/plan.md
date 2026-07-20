@@ -1,25 +1,34 @@
-# Command Center Layout Fix
+# Add Upcoming Pickups to Dispatch Board
 
 File: `src/pages/DispatcherDashboard.tsx` only.
 
 ## Changes
 
-1. **Remove `UpcomingPickups` from the Command Center tab** — delete the `<ErrorBoundary>` wrapping `<UpcomingPickups />` inside the right column (lines ~236–238). Leave the import in place if unused elsewhere or drop it (will check on build; safe to remove).
+1. Re-add the import: `import { UpcomingPickups } from '@/components/dispatcher/UpcomingPickups';`
 
-2. **Match Alerts height to Map**
-   - Add `items-stretch` to the map/alerts grid.
-   - Wrap the Map column and Alerts column with `h-full flex flex-col` and pass `className="h-full"` down where possible; the alerts `<ErrorBoundary>` gets `h-full` and its child `<DispatcherAlerts />` container/card already fills the wrapper (its root Card has no fixed height). Since `UpcomingPickups` is gone, Alerts is the only widget in the right column and will now stretch naturally when we drop the `space-y-6` wrapper and use `h-full`.
+2. In the Dispatch Board tab's right-side column (currently just `<UnassignedLoadsDrawer />` in `lg:col-span-1`), stack the two widgets under a "Planning & Scheduling" heading:
 
-3. **Move the Quick Actions bar into the Command Center tab**
-   - Cut the "Quick Actions Footer" Card (lines 278–300) out of the outer container.
-   - Re-insert it inside `TabsContent value="command-center"` as a full-width row **beneath** the map/alerts grid (still inside the `space-y-6` stack, so the existing gap is preserved).
-   - This removes the footer from Dispatch Board and Fleet Roster tabs; the user explicitly wants it scoped to the Command Center to eliminate the dead space below the map.
+```tsx
+<div className="lg:col-span-1 space-y-6">
+  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+    Planning & Scheduling
+  </h3>
+  <ErrorBoundary compact>
+    <UnassignedLoadsDrawer />
+  </ErrorBoundary>
+  <ErrorBoundary compact>
+    <UpcomingPickups />
+  </ErrorBoundary>
+</div>
+```
+
+No changes to `UpcomingPickups.tsx` — its existing 48-hour filter stays intact, and it already renders as a self-contained Card that fills its parent width, so it will size cleanly inside the 1/4-width column.
 
 ## Result
 
 ```text
-[ In Transit Map        2/3 ] [ Alerts & Actions 1/3 ]   <- equal height row
-[ Quick Actions: All Loads · All Drivers · All Trucks ]  <- full-width
+[ 14-Day Fleet Timeline           3/4 ] [ Planning & Scheduling   1/4 ]
+                                        [   Unassigned Loads          ]
+                                        [   Upcoming Pickups (48h)    ]
+[ Active Loads Board                              full width          ]
 ```
-
-No new components, no other tab changes, no CSS files touched.
