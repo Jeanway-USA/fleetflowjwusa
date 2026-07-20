@@ -130,6 +130,8 @@ export function FleetMapView() {
   const [liveRouteGeometries, setLiveRouteGeometries] = useState<
     Map<string, [number, number][]>
   >(new Map());
+  const [routeCongestions, setRouteCongestions] = useState<Map<string, string[]>>(new Map());
+  const routeFetchAttemptsRef = useRef<Map<string, number>>(new Map());
 
   const { data: initialLocations } = useQuery({
     queryKey: ['driver-locations'],
