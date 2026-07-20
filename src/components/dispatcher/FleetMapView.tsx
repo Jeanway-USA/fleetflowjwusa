@@ -32,6 +32,7 @@ import { geocodeLocationAsync, interpolatePosition, getProgressFromStatus } from
 import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
 import { WeatherForecastPanel } from './WeatherForecastPanel';
+import { snapPointToRoute } from '@/lib/geo/snapToRoute';
 
 const OVERLAY_STORAGE_KEY = 'fleet-map-overlays-v2';
 const RAINVIEWER_INDEX_URL = 'https://api.rainviewer.com/public/weather-maps.json';
