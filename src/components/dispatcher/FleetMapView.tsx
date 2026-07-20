@@ -805,7 +805,7 @@ export function FleetMapView() {
             className="data-[state=checked]:bg-primary"
           />
         </div>
-        {weatherEnabled && !rainviewerPath ? (
+        {weatherEnabled && radarLoading && !radarTileUrl ? (
           <p className="text-[10px] text-white/60 pt-1 border-t border-white/10">
             Loading radar frames…
           </p>
