@@ -653,12 +653,17 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
 
                             {/* Load bars starting on this day */}
                             {driverLoads.map((load, loadIdx) => {
-                              const pickup = parseDate(load.pickup_date);
+                              const isBeingResized = resizing?.loadId === load.id && !!previewDates;
+                              const pickup = isBeingResized
+                                ? previewDates!.pickup
+                                : parseDate(load.pickup_date);
                               if (!pickup) return null;
                               if (!isSameDay(pickup, day) && !(dayIdx === 0 && pickup < day)) return null;
                               if (dayIdx > 0 && pickup < day) return null;
 
-                              const delivery = parseDate(load.delivery_date) || pickup;
+                              const delivery = isBeingResized
+                                ? previewDates!.delivery
+                                : parseDate(load.delivery_date) || pickup;
                               const spanDays = Math.min(
                                 differenceInDays(delivery, day) + 1,
                                 WINDOW_DAYS - dayIdx
@@ -668,11 +673,37 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                               return (
                                 <div
                                   key={load.id}
-                                  className={`absolute inset-y-0.5 left-0.5 right-0.5 rounded text-[10px] px-1.5 py-0.5 truncate flex items-center font-medium z-10 ${getLoadColor(loadIdx)}`}
+                                  className={`group/bar absolute inset-y-0.5 left-0.5 right-0.5 rounded text-[10px] px-1.5 py-0.5 flex items-center font-medium z-10 ${getLoadColor(loadIdx)} ${
+                                    isBeingResized ? 'ring-2 ring-primary shadow-lg' : ''
+                                  }`}
                                   style={{ width: `calc(${widthPercent}% - 4px)`, minWidth: 'calc(100% - 4px)' }}
-                                  title={`${load.landstar_load_id || load.id.slice(0, 8)}: ${load.origin} → ${load.destination}`}
+                                  title={`${load.landstar_load_id || load.id.slice(0, 8)}: ${load.origin} → ${load.destination}${
+                                    load.booked_miles ? ` · ${load.booked_miles} mi` : ''
+                                  }`}
                                 >
-                                  {load.landstar_load_id || load.id.slice(0, 6)}
+                                  {/* Left resize handle */}
+                                  <div
+                                    role="button"
+                                    aria-label="Resize load start"
+                                    onMouseDown={(e) => startResize(load, driver.id, 'left', e)}
+                                    className="absolute left-0 top-0 bottom-0 w-1.5 cursor-w-resize flex items-center justify-center opacity-40 hover:opacity-100 group-hover/bar:opacity-70 transition-opacity"
+                                  >
+                                    <div className="h-3/5 w-0.5 rounded-full bg-current" />
+                                  </div>
+
+                                  <span className="truncate px-1 flex-1 pointer-events-none">
+                                    {load.landstar_load_id || load.id.slice(0, 6)}
+                                  </span>
+
+                                  {/* Right resize handle */}
+                                  <div
+                                    role="button"
+                                    aria-label="Resize load end"
+                                    onMouseDown={(e) => startResize(load, driver.id, 'right', e)}
+                                    className="absolute right-0 top-0 bottom-0 w-1.5 cursor-e-resize flex items-center justify-center opacity-40 hover:opacity-100 group-hover/bar:opacity-70 transition-opacity"
+                                  >
+                                    <div className="h-3/5 w-0.5 rounded-full bg-current" />
+                                  </div>
                                 </div>
                               );
                             })}
