@@ -242,15 +242,18 @@ export default function DispatcherDashboard() {
 
         {/* Dispatch Board */}
         <TabsContent value="dispatch-board" className="mt-6 space-y-6">
-          <div id="assign-driver" className="scroll-mt-20">
-            <ErrorBoundary compact>
-              <DriverAssignmentPanel />
-            </ErrorBoundary>
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-4">
+            <div className="lg:col-span-3">
+              <ErrorBoundary compact>
+                <FleetTimelineScheduler hideUnassignedTray />
+              </ErrorBoundary>
+            </div>
+            <div className="lg:col-span-1">
+              <ErrorBoundary compact>
+                <UnassignedLoadsDrawer />
+              </ErrorBoundary>
+            </div>
           </div>
-
-          <ErrorBoundary compact>
-            <FleetTimelineScheduler />
-          </ErrorBoundary>
 
           <div data-tour="active-loads">
             <ErrorBoundary compact>
