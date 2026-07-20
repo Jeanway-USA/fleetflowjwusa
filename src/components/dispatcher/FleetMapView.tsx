@@ -354,9 +354,75 @@ export function FleetMapView() {
         isLiveLocation,
         stopCoords,
         liveRouteGeometry: liveRouteGeometries.get(load.id) ?? null,
+        routeCongestion: routeCongestions.get(load.id) ?? null,
       } as LoadWithLocation;
     });
-  }, [rawLoads, driverLocations, geocodedCoords, loadStops, liveRouteGeometries]);
+  }, [rawLoads, driverLocations, geocodedCoords, loadStops, liveRouteGeometries, routeCongestions]);
+
+  // ---- Auto-fetch truck-friendly routes for loads that don't have one yet ----
+  useEffect(() => {
+    if (!rawLoads) return;
+    const attempts = routeFetchAttemptsRef.current;
+    const stale = 30 * 60 * 1000;
+    (async () => {
+      for (const load of rawLoads as any[]) {
+        const origin = geocodedCoords.get(load.origin);
+        const destination = geocodedCoords.get(load.destination);
+        if (!origin || !destination) continue;
+        // Skip if we already have geometry
+        if (liveRouteGeometries.has(load.id)) continue;
+        // Skip if the DB row is fresh (already fetched previously)
+        if (load.current_route_updated_at) {
+          const age = Date.now() - new Date(load.current_route_updated_at).getTime();
+          if (age < stale) continue;
+        }
+        const key = `${load.id}:${origin.lat.toFixed(3)},${origin.lng.toFixed(3)}->${destination.lat.toFixed(3)},${destination.lng.toFixed(3)}`;
+        const prev = attempts.get(key) ?? 0;
+        if (prev >= 2) continue;
+        attempts.set(key, prev + 1);
+        const stops = loadStops.get(load.id) ?? [];
+        const waypoints = stops
+          .map((s) => {
+            const c = geocodedCoords.get(s.address);
+            return c ? { lat: c.lat, lng: c.lng } : null;
+          })
+          .filter((c): c is { lat: number; lng: number } => !!c);
+        try {
+          const { data, error } = await supabase.functions.invoke('route-load', {
+            body: { origin, destination, waypoints },
+          });
+          if (error || !data?.geometry || !Array.isArray(data.geometry)) continue;
+          const geom = data.geometry as [number, number][];
+          const cong = (data.congestion as string[]) ?? [];
+          setLiveRouteGeometries((prev) => {
+            const next = new Map(prev);
+            next.set(load.id, geom);
+            return next;
+          });
+          setRouteCongestions((prev) => {
+            const next = new Map(prev);
+            next.set(load.id, cong);
+            return next;
+          });
+          // Background persist — non-blocking, ignore failure
+          supabase
+            .from('fleet_loads')
+            .update({
+              current_route_geometry: geom as any,
+              current_route_congestion: cong as any,
+              current_route_distance_m: data.distance_m ?? null,
+              current_route_duration_s: data.duration_s ?? null,
+              current_route_updated_at: new Date().toISOString(),
+            })
+            .eq('id', load.id)
+            .then(() => {});
+        } catch (err) {
+          console.warn('route-load failed for', load.id, err);
+        }
+      }
+    })();
+  }, [rawLoads, geocodedCoords, loadStops, liveRouteGeometries]);
+
 
   // ---- RainViewer radar tile URL template ----
   const [radarUrlTemplate, setRadarUrlTemplate] = useState<string | null>(null);
