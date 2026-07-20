@@ -1,87 +1,67 @@
-# Dispatch Board — Timeline + Unassigned Loads Drawer
+# Fleet Roster Tab — ELD Sync + HOS Clarity
 
-Rebuild the Dispatch Board tab so the 14-day Fleet Timeline is the focus and the "Quick Assign" concept becomes a dedicated Unassigned Loads panel with drag-and-drop into driver rows.
-
-## Layout
-
-```text
-Dispatch Board Tab
-┌──────────────────────────────────────────────────┬───────────────┐
-│                                                  │ Unassigned    │
-│   FleetTimelineScheduler (14-day grid)           │ Loads         │
-│   - Driver rows                                  │  ┌──────────┐ │
-│   - Colored load bars span pickup → delivery     │  │ Load #   │ │
-│   - Hometime stripes / outbound planning chips   │  │ Origin → │ │
-│   - Drop targets = driver day-cells              │  │ Dest     │ │
-│                                                  │  │ 📅 M/D   │ │
-│                                                  │  └──────────┘ │
-│                                                  │  ...          │
-└──────────────────────────────────────────────────┴───────────────┘
-        (lg: 3-col span)                             (lg: 1-col)
-
-On < lg screens: panel collapses into a bottom drawer/sheet
-toggled by a "Unassigned Loads (N)" button.
-```
-
-Below the timeline row, `ActiveLoadsBoard` continues to live in this tab (kept from prior step).
+Modernize the driver and truck status cards inside the existing Fleet Roster tab. The tab layout (Driver Status + Truck Status side-by-side on top, Driver Leaderboard full-width below) is already in place from the earlier tabbed refactor — this pass focuses on card content and clarity.
 
 ## Changes
 
-### 1. New: `src/components/dispatcher/UnassignedLoadsDrawer.tsx`
+### 1. `src/components/dispatcher/DriverStatusGrid.tsx`
 
-- Fetches unassigned loads with the same query key `['timeline-unassigned-loads']` so it stays in sync with the timeline's cache invalidations.
-- Renders each load as a draggable card showing: Load ID (or `landstar_load_id`), Origin, Destination, and expected Pickup Date (badge).
-- Cards use native HTML5 drag-and-drop: `onDragStart` sets `e.dataTransfer.setData('application/x-load-id', load.id)` plus a JSON blob with the full load (so the timeline can compute conflicts without a refetch round-trip).
-- Two render modes controlled by a `useIsMobile()` check:
-  - **Desktop (lg+)**: static right-hand side panel (`Card`, sticky, scrollable list, height matches timeline).
-  - **Mobile / tablet**: floating "Unassigned Loads (N)" button that opens a shadcn `Sheet` from the bottom containing the same list.
+**ELD Sync Indicator (new)**
+- Derive an ELD sync state from `drivers.hos_last_updated` (existing column, already fetched):
+  - `< 30 min` → **live** — solid green dot with a pinging halo (`animate-ping`) + "ELD live · <time> ago"
+  - `< 4 h` → **recent** — solid green dot, no pulse + "ELD synced <time> ago"
+  - `< 14 h` → **stale** — amber dot + "ELD stale · <time> ago"
+  - null / `>= 14 h` → **offline** — gray dot + "ELD offline"
+- Rendered as a compact row under the driver name, before the HOS badge row.
 
-### 2. Refactor: `src/components/dispatcher/FleetTimelineScheduler.tsx`
+**HOS badge clarity**
+- Rework `HOS_TONE_CLASSES` / `getHosState` so `No HOS` and `Pending Reset` use amber warning styling (`bg-warning/10 text-warning border-warning/20`) instead of muted gray, so they read as safety alerts.
+- Keep the amber "≤6h remaining" and red "≤2h remaining" tones (already correct).
+- Add an `AlertTriangle` icon inline with `No HOS` / `Pending Reset` to draw the eye.
 
-- Add optional prop `hideUnassignedTray?: boolean` (default false, preserves existing behavior for any other consumer).
-- When true, do not render the internal "Unassigned Loads Tray" at the bottom of the card.
-- Update drop handlers so that when `draggedLoad` local state is empty (drag originated outside the component), read `application/x-load-id` + JSON payload from `e.dataTransfer` and run the same `checkConflicts` + assignment flow.
-- No visual/behavior change to load bars, hometime cells, outbound planning chips, PM conflict checks — these already satisfy "colored block spanning estimated transit days".
+### 2. `src/components/dispatcher/TruckStatusGrid.tsx`
 
-### 3. Update: `src/pages/DispatcherDashboard.tsx` — Dispatch Board tab only
+**ELD Sync Indicator (new)**
+- Extend the query to also fetch `hos_last_updated` from the joined `current_driver`.
+- When a truck has an assigned driver, render the same ELD indicator (dot + relative timestamp) beneath the driver name.
+- When unassigned, render a neutral "No ELD paired" chip so the field never disappears silently.
 
-Replace the current stacked structure:
+### 3. Shared helper: `src/components/dispatcher/eldSync.ts` (new)
 
-```
-DriverAssignmentPanel
-FleetTimelineScheduler
-ActiveLoadsBoard
-```
+Single source of truth used by both cards:
 
-with:
-
-```tsx
-<div className="grid gap-6 grid-cols-1 lg:grid-cols-4">
-  <div className="lg:col-span-3">
-    <FleetTimelineScheduler hideUnassignedTray />
-  </div>
-  <div className="lg:col-span-1">
-    <UnassignedLoadsDrawer />
-  </div>
-</div>
-<ActiveLoadsBoard />
+```ts
+export type EldTone = 'live' | 'recent' | 'stale' | 'offline';
+export function getEldSyncState(lastUpdated: string | null): {
+  tone: EldTone;
+  label: string;     // "ELD live · 4m ago" etc.
+  dotClass: string;  // Tailwind classes
+  pulse: boolean;
+}
 ```
 
-- `DriverAssignmentPanel` is no longer rendered here (its role is fully absorbed by `UnassignedLoadsDrawer` + the timeline's driver-row drop targets). The component file remains in the repo, unused, so it can be re-instated later if desired.
-- The `#assign-driver` scroll anchor moves to the new drawer wrapper so command-palette navigation still works.
+Prevents drift between driver and truck cards.
 
-### 4. Cache invalidation
+### 4. Fleet Roster tab (`src/pages/DispatcherDashboard.tsx`)
 
-`UnassignedLoadsDrawer` shares the query key `timeline-unassigned-loads` used by `FleetTimelineScheduler`. After any drop, the timeline already invalidates `timeline-unassigned-loads` + `timeline-assigned-loads` + `dispatcher-stats` + `active-loads-dispatcher`, so both panels refresh automatically.
+Verify — no structural change needed. Current tab already renders:
+
+```
+grid grid-cols-1 md:grid-cols-2   → DriverStatusGrid | TruckStatusGrid
+full width                        → DriverLeaderboard
+```
+
+Only tweak: swap the wrapping div's `md:grid-cols-2` to keep the two cards balanced with `items-stretch` so ELD indicator rows don't cause height drift.
 
 ## Files Touched
 
-- **New**: `src/components/dispatcher/UnassignedLoadsDrawer.tsx`
-- **Edit**: `src/components/dispatcher/FleetTimelineScheduler.tsx` — add `hideUnassignedTray` prop + dataTransfer fallback in drop handler
-- **Edit**: `src/pages/DispatcherDashboard.tsx` — restructure Dispatch Board tab
+- **New**: `src/components/dispatcher/eldSync.ts`
+- **Edit**: `src/components/dispatcher/DriverStatusGrid.tsx` — ELD row, elevate No HOS / Pending Reset to warning tone
+- **Edit**: `src/components/dispatcher/TruckStatusGrid.tsx` — join `hos_last_updated`, render ELD row
+- **Edit**: `src/pages/DispatcherDashboard.tsx` — add `items-stretch` to the Fleet Roster grid (minor)
 
 ## Out of Scope
 
-- `DriverAssignmentPanel.tsx` is left untouched on disk (per "do not delete the existing child components").
-- No DB schema changes, no new npm packages (uses native HTML5 DnD already in use).
-- The visual "colored block spanning transit days" rendering is already implemented in `FleetTimelineScheduler` and is unchanged.
+- No new columns or schema changes; uses existing `drivers.hos_last_updated`.
+- No integration with an external ELD vendor API — the indicator reflects the freshness of the HOS data the system already stores.
+- No changes to the leaderboard beyond it already spanning full width.

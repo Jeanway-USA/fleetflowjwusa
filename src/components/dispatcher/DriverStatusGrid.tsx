@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Users, Phone, AlertTriangle, Package, CheckCircle, Clock, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { addDays, isBefore, formatDistanceToNow, format, parseISO, startOfDay } from 'date-fns';
+import { getEldSyncState } from './eldSync';
 
 interface Driver {
   id: string;
@@ -41,7 +42,7 @@ const HOS_TONE_CLASSES: Record<HosTone, string> = {
   red: 'bg-destructive/10 text-destructive border-destructive/20',
   yellow: 'bg-warning/10 text-warning border-warning/20',
   green: 'bg-success/10 text-success border-success/20',
-  muted: 'bg-muted text-muted-foreground border-border',
+  muted: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
 };
 
 function getHosState(hours: number | null, updatedAt: string | null) {
@@ -203,9 +204,11 @@ export function DriverStatusGrid() {
             {drivers.map((driver) => {
               const expiringCreds = getExpiringCredentials(driver);
               const hos = getHosState(driver.remaining_drive_hours, driver.hos_last_updated);
+              const eld = getEldSyncState(driver.hos_last_updated);
+              const isSafetyAlert = hos.tone === 'muted';
               const hosBadge = (
-                <Badge variant="outline" className={`${HOS_TONE_CLASSES[hos.tone]} shrink-0 gap-1`}>
-                  <Clock className="h-3 w-3" />
+                <Badge variant="outline" className={`${HOS_TONE_CLASSES[hos.tone]} shrink-0 gap-1 font-semibold`}>
+                  {isSafetyAlert ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                   {hos.label}
                 </Badge>
               );
@@ -259,6 +262,17 @@ export function DriverStatusGrid() {
                       </Badge>
                     )}
                   </div>
+
+                  <div className={`flex items-center gap-1.5 mt-2 text-[11px] ${eld.textClass}`}>
+                    <span className="relative flex h-2 w-2">
+                      {eld.pulse && (
+                        <span className={`absolute inline-flex h-full w-full rounded-full ${eld.dotClass} opacity-75 animate-ping`} />
+                      )}
+                      <span className={`relative inline-flex h-2 w-2 rounded-full ${eld.dotClass}`} />
+                    </span>
+                    <span className="truncate">{eld.label}</span>
+                  </div>
+
 
                   {driver.upcomingHometime && !driver.activeHometime && (
                     <div className="flex items-center gap-1 mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
