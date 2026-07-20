@@ -20,6 +20,7 @@ const FleetMapView = lazy(() =>
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { FleetTimelineScheduler } from '@/components/dispatcher/FleetTimelineScheduler';
 import { UnassignedLoadsDrawer } from '@/components/dispatcher/UnassignedLoadsDrawer';
+import { UpcomingPickups } from '@/components/dispatcher/UpcomingPickups';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
@@ -269,9 +270,15 @@ export default function DispatcherDashboard() {
                 <FleetTimelineScheduler hideUnassignedTray />
               </ErrorBoundary>
             </div>
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Planning &amp; Scheduling
+              </h3>
               <ErrorBoundary compact>
                 <UnassignedLoadsDrawer />
+              </ErrorBoundary>
+              <ErrorBoundary compact>
+                <UpcomingPickups />
               </ErrorBoundary>
             </div>
           </div>
