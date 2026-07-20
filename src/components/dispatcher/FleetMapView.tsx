@@ -16,16 +16,60 @@ import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseInterm
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
 
 const OVERLAY_STORAGE_KEY = 'fleet-map-overlays';
-// TODO: wire real providers when keys are configured
-//   - Weather: OpenWeatherMap tile URL requires VITE_OPENWEATHERMAP_API_KEY
-//     e.g. https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=KEY
-//   - Traffic: Google Maps traffic is only available via the Maps JS SDK
-//     (google.maps.TrafficLayer) — not a raster tile endpoint.
-const OPENWEATHER_API_KEY = (import.meta.env.VITE_OPENWEATHERMAP_API_KEY as string | undefined) || '';
-const WEATHER_TILE_URL = OPENWEATHER_API_KEY
-  ? `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${OPENWEATHER_API_KEY}`
-  : '';
-const TRAFFIC_TILE_URL = ''; // placeholder — Google Traffic requires JS SDK
+
+// RainViewer public API — no key required
+const RAINVIEWER_INDEX_URL = 'https://api.rainviewer.com/public/weather-maps.json';
+
+// Mocked interstate traffic segments (approximate polylines for major US corridors)
+type TrafficSeverity = 'heavy' | 'moderate' | 'light';
+const TRAFFIC_COLORS: Record<TrafficSeverity, string> = {
+  heavy: '#dc2626',
+  moderate: '#f59e0b',
+  light: '#16a34a',
+};
+const MOCK_TRAFFIC_SEGMENTS: {
+  id: string;
+  name: string;
+  severity: TrafficSeverity;
+  coords: [number, number][];
+}[] = [
+  {
+    id: 'i95-ne',
+    name: 'I-95 · New York → Philadelphia',
+    severity: 'heavy',
+    coords: [[40.7128, -74.0060], [40.4862, -74.4518], [40.2206, -74.7597], [39.9526, -75.1652]],
+  },
+  {
+    id: 'i10-tx',
+    name: 'I-10 · Houston → San Antonio',
+    severity: 'moderate',
+    coords: [[29.7604, -95.3698], [29.7030, -96.5406], [29.5844, -97.6800], [29.4241, -98.4936]],
+  },
+  {
+    id: 'i405-la',
+    name: 'I-405 · Los Angeles Loop',
+    severity: 'heavy',
+    coords: [[33.9416, -118.4085], [34.0195, -118.4912], [34.0736, -118.4400], [34.1478, -118.4700], [34.1808, -118.4700]],
+  },
+  {
+    id: 'i90-mw',
+    name: 'I-90 · Chicago → Cleveland',
+    severity: 'moderate',
+    coords: [[41.8781, -87.6298], [41.6764, -86.2520], [41.6528, -83.5379], [41.4993, -81.6944]],
+  },
+  {
+    id: 'i75-se',
+    name: 'I-75 · Atlanta → Chattanooga',
+    severity: 'light',
+    coords: [[33.7490, -84.3880], [34.2578, -84.9024], [34.7698, -85.2704], [35.0456, -85.3097]],
+  },
+  {
+    id: 'i5-pnw',
+    name: 'I-5 · Seattle → Portland',
+    severity: 'moderate',
+    coords: [[47.6062, -122.3321], [47.0379, -122.9007], [46.2087, -123.0]  as [number, number], [45.5152, -122.6784]],
+  },
+];
 
 
 
@@ -178,6 +222,36 @@ export function FleetMapView() {
       /* no-op */
     }
   }, [weatherEnabled, trafficEnabled]);
+
+  // RainViewer: fetch the most recent radar frame path when weather overlay is enabled
+  const [rainviewerPath, setRainviewerPath] = useState<string | null>(null);
+  useEffect(() => {
+    if (!weatherEnabled) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(RAINVIEWER_INDEX_URL, { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        const frames = json?.radar?.past;
+        const host = json?.host;
+        if (!Array.isArray(frames) || frames.length === 0 || !host) return;
+        const latest = frames[frames.length - 1];
+        if (latest?.path && !cancelled) {
+          setRainviewerPath(`${host}${latest.path}`);
+        }
+      } catch {
+        /* offline / blocked — silently ignore */
+      }
+    };
+    load();
+    const interval = setInterval(load, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [weatherEnabled]);
+
 
   // Fetch ALL driver locations (not just recent ones)
   const { data: initialLocations } = useQuery({
@@ -531,26 +605,39 @@ export function FleetMapView() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* Weather radar overlay (OpenWeatherMap precipitation) */}
-        {weatherEnabled && WEATHER_TILE_URL && (
+        {/* Weather radar overlay — RainViewer live tiles */}
+        {weatherEnabled && rainviewerPath && (
           <TileLayer
-            key="weather-overlay"
-            url={WEATHER_TILE_URL}
+            key={`weather-${rainviewerPath}`}
+            url={`https://tilecache.rainviewer.com${rainviewerPath}/256/{z}/{x}/{y}/2/1_1.png`}
             opacity={0.6}
             zIndex={400}
-            attribution='Weather &copy; OpenWeatherMap'
+            attribution='Weather &copy; <a href="https://www.rainviewer.com/">RainViewer</a>'
           />
         )}
 
-        {/* Traffic overlay placeholder — Google Traffic requires JS SDK integration */}
-        {trafficEnabled && TRAFFIC_TILE_URL && (
-          <TileLayer
-            key="traffic-overlay"
-            url={TRAFFIC_TILE_URL}
-            opacity={0.6}
-            zIndex={400}
-          />
-        )}
+        {/* Traffic overlay — mocked interstate polylines */}
+        {trafficEnabled && MOCK_TRAFFIC_SEGMENTS.map(seg => (
+          <Polyline
+            key={`traffic-${seg.id}`}
+            positions={seg.coords}
+            pathOptions={{
+              color: TRAFFIC_COLORS[seg.severity],
+              weight: 5,
+              opacity: 0.75,
+              lineCap: 'round',
+            }}
+          >
+            <Popup>
+              <div className="text-sm">
+                <p className="font-medium">{seg.name}</p>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {seg.severity} traffic
+                </p>
+              </div>
+            </Popup>
+          </Polyline>
+        ))}
 
         <FitBounds loads={loads} />
 
@@ -707,9 +794,9 @@ export function FleetMapView() {
             className="data-[state=checked]:bg-primary"
           />
         </div>
-        {(weatherEnabled && !WEATHER_TILE_URL) || (trafficEnabled && !TRAFFIC_TILE_URL) ? (
-          <p className="text-[10px] text-amber-300/90 pt-1 border-t border-white/10">
-            Demo mode — provider key not yet configured.
+        {weatherEnabled && !rainviewerPath ? (
+          <p className="text-[10px] text-white/60 pt-1 border-t border-white/10">
+            Loading radar frames…
           </p>
         ) : null}
       </div>
