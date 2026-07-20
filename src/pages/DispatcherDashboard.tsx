@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { addHours } from 'date-fns';
 import { ActiveLoadsBoard } from '@/components/dispatcher/ActiveLoadsBoard';
-import { UpcomingPickups } from '@/components/dispatcher/UpcomingPickups';
+
 import { DriverStatusGrid } from '@/components/dispatcher/DriverStatusGrid';
 import { TruckStatusGrid } from '@/components/dispatcher/TruckStatusGrid';
 import { DispatcherAlerts } from '@/components/dispatcher/DispatcherAlerts';
@@ -218,9 +218,9 @@ export default function DispatcherDashboard() {
 
         {/* Command Center */}
         <TabsContent value="command-center" className="mt-6 space-y-6">
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 items-stretch">
             {/* Map - 2/3 width on large screens */}
-            <div className="lg:col-span-2" data-tour="fleet-map">
+            <div className="lg:col-span-2 h-full flex flex-col" data-tour="fleet-map">
               <ErrorBoundary compact>
                 <Suspense fallback={<MapSkeleton height={360} />}>
                   <FleetMapView />
@@ -228,16 +228,37 @@ export default function DispatcherDashboard() {
               </ErrorBoundary>
             </div>
 
-            {/* Right column: Alerts on top, Upcoming Pickups below */}
-            <div className="space-y-6">
+            {/* Right column: Alerts stretched to Map height */}
+            <div className="h-full flex flex-col">
               <ErrorBoundary compact>
                 <DispatcherAlerts />
               </ErrorBoundary>
-              <ErrorBoundary compact>
-                <UpcomingPickups />
-              </ErrorBoundary>
             </div>
           </div>
+
+          {/* Quick Actions - full width beneath map/alerts */}
+          <Card className="card-elevated">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">Quick Actions:</span>
+                <Button variant="outline" size="sm" onClick={() => navigate('/fleet-loads')} className="gap-2">
+                  <Package className="h-4 w-4" />
+                  All Loads
+                  <ArrowRight className="h-3 w-3" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => navigate('/drivers')} className="gap-2">
+                  <Users className="h-4 w-4" />
+                  All Drivers
+                  <ArrowRight className="h-3 w-3" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => navigate('/trucks')} className="gap-2">
+                  <Truck className="h-4 w-4" />
+                  All Trucks
+                  <ArrowRight className="h-3 w-3" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Dispatch Board */}
@@ -274,30 +295,6 @@ export default function DispatcherDashboard() {
           </ErrorBoundary>
         </TabsContent>
       </Tabs>
-
-      {/* Quick Actions Footer */}
-      <Card className="card-elevated">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-muted-foreground">Quick Actions:</span>
-            <Button variant="outline" size="sm" onClick={() => navigate('/fleet-loads')} className="gap-2">
-              <Package className="h-4 w-4" />
-              All Loads
-              <ArrowRight className="h-3 w-3" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/drivers')} className="gap-2">
-              <Users className="h-4 w-4" />
-              All Drivers
-              <ArrowRight className="h-3 w-3" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/trucks')} className="gap-2">
-              <Truck className="h-4 w-4" />
-              All Trucks
-              <ArrowRight className="h-3 w-3" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

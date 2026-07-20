@@ -1,55 +1,25 @@
-# Dispatch Board — Auto-Snap Drop + Resizable Load Bars
+# Command Center Layout Fix
 
-Scope: `src/components/dispatcher/FleetTimelineScheduler.tsx` only (Dispatch Board tab). UnassignedLoadsDrawer already passes the full load JSON via `dataTransfer`, so no changes needed there.
+File: `src/pages/DispatcherDashboard.tsx` only.
 
-## 1. Auto-snap on drop
+## Changes
 
-When a load is dropped on a driver row:
+1. **Remove `UpcomingPickups` from the Command Center tab** — delete the `<ErrorBoundary>` wrapping `<UpcomingPickups />` inside the right column (lines ~236–238). Leave the import in place if unused elsewhere or drop it (will check on build; safe to remove).
 
-- Read `booked_miles` from the dropped load payload (already selected on unassigned queries; if missing, fall back to 1 day).
-- Compute `days = max(1, ceil(booked_miles / 500))`.
-- Compute dates:
-  - `pickup_date` = the calendar day the drop landed on (we can already resolve `dayIdx` from the drop target — add `dayIdx` param to `handleDrop`).
-  - `delivery_date` = `addDays(pickup, days - 1)`.
-- Run existing `checkConflicts` against the new dates before writing.
-- Update `fleet_loads` with `{ driver_id, status: 'assigned', pickup_date, delivery_date }` (was only `driver_id + status`).
+2. **Match Alerts height to Map**
+   - Add `items-stretch` to the map/alerts grid.
+   - Wrap the Map column and Alerts column with `h-full flex flex-col` and pass `className="h-full"` down where possible; the alerts `<ErrorBoundary>` gets `h-full` and its child `<DispatcherAlerts />` container/card already fills the wrapper (its root Card has no fixed height). Since `UpcomingPickups` is gone, Alerts is the only widget in the right column and will now stretch naturally when we drop the `space-y-6` wrapper and use `h-full`.
 
-Constants: `MILES_PER_DAY = 500` at module top so it's tweakable.
+3. **Move the Quick Actions bar into the Command Center tab**
+   - Cut the "Quick Actions Footer" Card (lines 278–300) out of the outer container.
+   - Re-insert it inside `TabsContent value="command-center"` as a full-width row **beneath** the map/alerts grid (still inside the `space-y-6` stack, so the existing gap is preserved).
+   - This removes the footer from Dispatch Board and Fleet Roster tabs; the user explicitly wants it scoped to the Command Center to eliminate the dead space below the map.
 
-## 2. Resizable load bars
+## Result
 
-Add two thin drag handles inside each rendered load bar (the block at lines ~496–505):
+```text
+[ In Transit Map        2/3 ] [ Alerts & Actions 1/3 ]   <- equal height row
+[ Quick Actions: All Loads · All Drivers · All Trucks ]  <- full-width
+```
 
-- Left handle: 4px wide, `cursor-w-resize`, textured with `GripVertical` at low opacity.
-- Right handle: mirror on the right edge, `cursor-e-resize`.
-- Handles use `onMouseDown` (not HTML5 drag, to avoid clashing with the row's drop target).
-
-Resize interaction (component-level state `resizing: { loadId, edge: 'left'|'right', originX, originPickup, originDelivery } | null`):
-
-1. `mousedown` on a handle: capture pointer, store origin state, `e.stopPropagation()` so the row drag doesn't fire.
-2. `window.mousemove`: compute `dxDays = round((clientX - originX) / dayCellWidthPx)`. Measure `dayCellWidthPx` from a ref on any day header cell so it stays accurate at all viewport sizes.
-   - Left edge → new `pickup = originPickup + dxDays`, clamped to `≤ delivery` and inside the 14-day window.
-   - Right edge → new `delivery = originDelivery + dxDays`, clamped to `≥ pickup`.
-   - Update a local `previewDates` state so the bar re-renders live without touching the DB.
-3. `window.mouseup`: if dates changed, run `checkConflicts` with the preview dates; on pass, `UPDATE fleet_loads SET pickup_date/delivery_date`. On conflict, toast + revert. Invalidate the same query keys the drop handler uses.
-
-Bar width already derives from `pickup_date`/`delivery_date` — feeding `previewDates` through the same path automatically stretches/compresses the block. No new geometry math.
-
-## 3. Floating date tooltip during resize
-
-- While `resizing` is active, render a fixed-position pill (portal-less, `position: fixed`, follows `mousemove`) styled like existing toasts (`bg-popover text-popover-foreground border rounded px-2 py-1 text-xs shadow-md`).
-- Content: `Pickup: Mon, Jan 15` when dragging the left edge, `Delivery: Wed, Jan 17` when dragging the right edge (uses `format(date, 'EEE, MMM d')`).
-- Hide on mouseup.
-
-## 4. Edge cases
-
-- Dropping on a day where existing loads already occupy the auto-span window → conflict toast fires (existing logic), no assignment.
-- Resizing across hometime days → `checkConflicts` already flags it; revert on release.
-- Resize past window edges → clamp visually; no DB write for that edge.
-- Touch: handles work with mouse for now; touch resize is out of scope (existing drag-drop is also mouse-only).
-
-## Technical notes
-
-- Files touched: `src/components/dispatcher/FleetTimelineScheduler.tsx` (only).
-- No schema change — `booked_miles`, `pickup_date`, `delivery_date` all exist on `fleet_loads`.
-- No new dependencies.
+No new components, no other tab changes, no CSS files touched.
