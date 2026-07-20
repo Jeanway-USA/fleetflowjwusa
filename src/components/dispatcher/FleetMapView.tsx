@@ -617,11 +617,11 @@ export function FleetMapView() {
         />
 
         {/* Weather radar overlay — RainViewer live tiles */}
-        {weatherEnabled && rainviewerPath && (
+        {weatherEnabled && radarTileUrl && (
           <TileLayer
-            key={`weather-${rainviewerPath}`}
-            url={`https://tilecache.rainviewer.com${rainviewerPath}/256/{z}/{x}/{y}/2/1_1.png`}
-            opacity={0.6}
+            key={`weather-${radarTileUrl}`}
+            url={radarTileUrl}
+            opacity={0.5}
             zIndex={400}
             attribution='Weather &copy; <a href="https://www.rainviewer.com/">RainViewer</a>'
           />
