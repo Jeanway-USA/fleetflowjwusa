@@ -452,7 +452,7 @@ export function FleetMapView() {
         const host = data.host;
         const latestFrame = data.radar?.past?.[data.radar.past.length - 1];
         if (!host || !latestFrame?.path) throw new Error('Malformed RainViewer response');
-        if (!cancelled) setRadarUrlTemplate(`${host}${latestFrame.path}/256/{z}/{x}/{y}/2/1_1.png`);
+        if (!cancelled) setRadarUrlTemplate(`${host}${latestFrame.path}/256/{z}/{x}/{y}/4/1_1.png`);
       } catch (err) {
         if (!cancelled) {
           setRadarUrlTemplate(null);
