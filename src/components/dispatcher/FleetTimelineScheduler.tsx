@@ -330,11 +330,33 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
     return match || null;
   };
 
-  const handleDrop = async (driverId: string, e: React.DragEvent) => {
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['timeline-assigned-loads'] });
+    queryClient.invalidateQueries({ queryKey: ['timeline-unassigned-loads'] });
+    queryClient.invalidateQueries({ queryKey: ['dispatcher-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
+    queryClient.invalidateQueries({ queryKey: ['upcoming-pickups-dispatcher'] });
+  };
+
+  const handleDrop = async (driverId: string, dayIdx: number, e: React.DragEvent) => {
     const load = resolveDroppedLoad(e);
     if (!load) return;
 
-    const { hasConflict, message } = checkConflicts(driverId, load);
+    // Auto-snap: derive span from booked miles (baseline 500 mi/day).
+    const miles = load.booked_miles ?? 0;
+    const spanDays = Math.max(1, Math.ceil(miles / MILES_PER_DAY));
+    const pickup = addDays(windowStart, dayIdx);
+    const delivery = addDays(pickup, spanDays - 1);
+    const pickupIso = format(pickup, 'yyyy-MM-dd');
+    const deliveryIso = format(delivery, 'yyyy-MM-dd');
+
+    const snapped: TimelineLoad = {
+      ...load,
+      pickup_date: pickupIso,
+      delivery_date: deliveryIso,
+    };
+
+    const { hasConflict, message } = checkConflicts(driverId, snapped);
     if (hasConflict) {
       toast.warning('Schedule Conflict', { description: message, icon: <AlertTriangle className="h-4 w-4" /> });
       setDraggedLoad(null);
@@ -345,19 +367,23 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
     try {
       const { error } = await supabase
         .from('fleet_loads')
-        .update({ driver_id: driverId, status: 'assigned' })
+        .update({
+          driver_id: driverId,
+          status: 'assigned',
+          pickup_date: pickupIso,
+          delivery_date: deliveryIso,
+        })
         .eq('id', load.id);
 
       if (error) throw error;
 
       const driver = drivers?.find(d => d.id === driverId);
-      toast.success(`Assigned to ${driver?.first_name} ${driver?.last_name}`);
+      toast.success(
+        `Assigned to ${driver?.first_name} ${driver?.last_name}`,
+        { description: `${format(pickup, 'MMM d')} → ${format(delivery, 'MMM d')} · ${spanDays} day${spanDays > 1 ? 's' : ''} @ ${MILES_PER_DAY} mi/day` }
+      );
 
-      queryClient.invalidateQueries({ queryKey: ['timeline-assigned-loads'] });
-      queryClient.invalidateQueries({ queryKey: ['timeline-unassigned-loads'] });
-      queryClient.invalidateQueries({ queryKey: ['dispatcher-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
-      queryClient.invalidateQueries({ queryKey: ['upcoming-pickups-dispatcher'] });
+      invalidateAll();
     } catch {
       toast.error('Failed to assign load');
     } finally {
@@ -365,6 +391,134 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
       setDraggedLoad(null);
     }
   };
+
+  // ------- Resize handlers -------
+  const startResize = (
+    load: TimelineLoad,
+    driverId: string,
+    edge: 'left' | 'right',
+    e: React.MouseEvent
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const pickup = parseDate(load.pickup_date);
+    const delivery = parseDate(load.delivery_date) || pickup;
+    if (!pickup || !delivery) return;
+    setResizing({
+      loadId: load.id,
+      driverId,
+      edge,
+      originX: e.clientX,
+      originPickup: pickup,
+      originDelivery: delivery,
+    });
+    setPreviewDates({ pickup, delivery });
+    setTooltipPos({ x: e.clientX, y: e.clientY });
+  };
+
+  useEffect(() => {
+    if (!resizing) return;
+
+    const dayWidth = dayCellRef.current?.getBoundingClientRect().width || 56;
+
+    const onMove = (ev: MouseEvent) => {
+      const dxDays = Math.round((ev.clientX - resizing.originX) / dayWidth);
+      let pickup = resizing.originPickup;
+      let delivery = resizing.originDelivery;
+
+      if (resizing.edge === 'left') {
+        pickup = addDays(resizing.originPickup, dxDays);
+        if (pickup > delivery) pickup = delivery;
+        if (pickup < windowStart) pickup = windowStart;
+      } else {
+        delivery = addDays(resizing.originDelivery, dxDays);
+        if (delivery < pickup) delivery = pickup;
+        if (delivery > windowEnd) delivery = windowEnd;
+      }
+
+      setPreviewDates({ pickup, delivery });
+      setTooltipPos({ x: ev.clientX, y: ev.clientY });
+    };
+
+    const onUp = async () => {
+      const current = resizing;
+      const preview = previewDatesRef.current;
+      setResizing(null);
+      setTooltipPos(null);
+
+      if (!current || !preview) {
+        setPreviewDates(null);
+        return;
+      }
+
+      const pickupChanged = !isSameDay(preview.pickup, current.originPickup);
+      const deliveryChanged = !isSameDay(preview.delivery, current.originDelivery);
+      if (!pickupChanged && !deliveryChanged) {
+        setPreviewDates(null);
+        return;
+      }
+
+      const pickupIso = format(preview.pickup, 'yyyy-MM-dd');
+      const deliveryIso = format(preview.delivery, 'yyyy-MM-dd');
+      const trial: TimelineLoad = {
+        id: current.loadId,
+        landstar_load_id: null,
+        origin: '',
+        destination: '',
+        status: 'assigned',
+        pickup_date: pickupIso,
+        delivery_date: deliveryIso,
+        driver_id: current.driverId,
+        booked_miles: null,
+      };
+
+      // Temporarily exclude the load being resized so it doesn't self-conflict.
+      const originalLoads = assignedLoads;
+      const filteredLoads = (originalLoads || []).filter(l => l.id !== current.loadId);
+      // Swap into query cache for the conflict check window.
+      queryClient.setQueryData(['timeline-assigned-loads', windowStartIso, windowEndIso], filteredLoads);
+      const { hasConflict, message } = checkConflicts(current.driverId, trial);
+      queryClient.setQueryData(['timeline-assigned-loads', windowStartIso, windowEndIso], originalLoads);
+
+      if (hasConflict) {
+        toast.warning('Resize blocked', { description: message, icon: <AlertTriangle className="h-4 w-4" /> });
+        setPreviewDates(null);
+        return;
+      }
+
+      try {
+        const { error } = await supabase
+          .from('fleet_loads')
+          .update({ pickup_date: pickupIso, delivery_date: deliveryIso })
+          .eq('id', current.loadId);
+        if (error) throw error;
+        toast.success('Load rescheduled', {
+          description: `${format(preview.pickup, 'MMM d')} → ${format(preview.delivery, 'MMM d')}`,
+        });
+        invalidateAll();
+      } catch {
+        toast.error('Failed to reschedule load');
+      } finally {
+        setPreviewDates(null);
+      }
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resizing]);
+
+  // Keep a ref of the latest preview dates so the mouseup handler (bound once per resize) sees fresh values.
+  const previewDatesRef = useRef(previewDates);
+  useEffect(() => {
+    previewDatesRef.current = previewDates;
+  }, [previewDates]);
+
+
 
   const isLoading = driversLoading;
 
