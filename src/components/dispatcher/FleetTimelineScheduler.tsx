@@ -581,9 +581,10 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
               >
                 {/* Header row */}
                 <div className="p-2 text-xs font-medium text-muted-foreground border-b border-border">Driver</div>
-                {days.map(day => (
+                {days.map((day, idx) => (
                   <div
                     key={day.toISOString()}
+                    ref={idx === 0 ? dayCellRef : undefined}
                     className={`p-2 text-center text-xs font-medium border-b border-border ${
                       isSameDay(day, new Date()) ? 'bg-primary/10 text-primary' : 'text-muted-foreground'
                     }`}
