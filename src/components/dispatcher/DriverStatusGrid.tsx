@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Users, Phone, AlertTriangle, Package, CheckCircle, Clock, Home } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { addDays, isBefore, formatDistanceToNow, format, parseISO, startOfDay } from 'date-fns';
+import { getEldSyncState } from './eldSync';
 
 interface Driver {
   id: string;
