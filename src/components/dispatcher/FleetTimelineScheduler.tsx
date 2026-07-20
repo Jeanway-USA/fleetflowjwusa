@@ -80,6 +80,21 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
   const [draggedLoad, setDraggedLoad] = useState<TimelineLoad | null>(null);
   const [assigningLoad, setAssigningLoad] = useState<string | null>(null);
 
+  // Ref to a day header cell — used to measure day-column pixel width for resize math.
+  const dayCellRef = useRef<HTMLDivElement | null>(null);
+
+  // Live resize state — while active, previewDates override the DB values for that load.
+  const [resizing, setResizing] = useState<{
+    loadId: string;
+    driverId: string;
+    edge: 'left' | 'right';
+    originX: number;
+    originPickup: Date;
+    originDelivery: Date;
+  } | null>(null);
+  const [previewDates, setPreviewDates] = useState<{ pickup: Date; delivery: Date } | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+
   const windowStart = useMemo(
     () => startOfDay(addDays(new Date(), weekOffset * 7)),
     [weekOffset]
