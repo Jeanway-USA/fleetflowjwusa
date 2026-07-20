@@ -603,11 +603,11 @@ function MapboxCanvas({
           return;
         }
         if (!isFallback && !fallbackStyleUsedRef.current) {
-          const fallbackStyle = getMapboxFallbackStyle(isDark);
+          const fallbackStyle = getMapboxFallbackStyleKey(isDark);
           fallbackStyleUsedRef.current = true;
           styleUrlRef.current = fallbackStyle;
           setStyleReady(false);
-          map.setStyle(fallbackStyle);
+          map.setStyle(buildMapboxRasterStyle(fallbackStyle));
           armStyleReadyFallback(map, fallbackStyle, true);
           return;
         }
@@ -624,11 +624,11 @@ function MapboxCanvas({
     if (!containerRef.current || mapRef.current) return;
     try {
       mapboxgl.accessToken = MAPBOX_TOKEN as string;
-      const initialStyle = getMapboxStyle(isDark);
+      const initialStyle = getMapboxStyleKey(isDark);
       styleUrlRef.current = initialStyle;
       const map = new mapboxgl.Map({
         container: containerRef.current,
-        style: initialStyle,
+        style: buildMapboxRasterStyle(initialStyle),
         center: [-98.5795, 39.8283],
         zoom: 3.4,
         projection: { name: 'mercator' },
@@ -644,11 +644,11 @@ function MapboxCanvas({
         if (msg.includes('tilecache.rainviewer.com')) return;
         if (msg.includes('applyProjectionUpdate')) return;
         if (msg.includes('Failed to load style') && !fallbackStyleUsedRef.current) {
-          const fallbackStyle = getMapboxFallbackStyle(isDark);
+          const fallbackStyle = getMapboxFallbackStyleKey(isDark);
           fallbackStyleUsedRef.current = true;
           styleUrlRef.current = fallbackStyle;
           setStyleReady(false);
-          map.setStyle(fallbackStyle);
+          map.setStyle(buildMapboxRasterStyle(fallbackStyle));
           armStyleReadyFallback(map, fallbackStyle, true);
           return;
         }
@@ -698,13 +698,13 @@ function MapboxCanvas({
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const nextStyle = getMapboxStyle(isDark);
+    const nextStyle = getMapboxStyleKey(isDark);
     if (styleUrlRef.current === nextStyle) return;
     fallbackStyleUsedRef.current = false;
     setStyleReady(false);
     setMapError(null);
     styleUrlRef.current = nextStyle;
-    map.setStyle(nextStyle);
+    map.setStyle(buildMapboxRasterStyle(nextStyle));
     armStyleReadyFallback(map, nextStyle);
   }, [armStyleReadyFallback, isDark]);
 
