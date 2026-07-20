@@ -295,30 +295,6 @@ export default function DispatcherDashboard() {
           </ErrorBoundary>
         </TabsContent>
       </Tabs>
-
-      {/* Quick Actions Footer */}
-      <Card className="card-elevated">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-muted-foreground">Quick Actions:</span>
-            <Button variant="outline" size="sm" onClick={() => navigate('/fleet-loads')} className="gap-2">
-              <Package className="h-4 w-4" />
-              All Loads
-              <ArrowRight className="h-3 w-3" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/drivers')} className="gap-2">
-              <Users className="h-4 w-4" />
-              All Drivers
-              <ArrowRight className="h-3 w-3" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/trucks')} className="gap-2">
-              <Truck className="h-4 w-4" />
-              All Trucks
-              <ArrowRight className="h-3 w-3" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
