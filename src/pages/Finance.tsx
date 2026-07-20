@@ -134,7 +134,7 @@ export default function Finance() {
   const { data: drivers = [] } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('drivers').select('*');
+      const { data, error } = await supabase.from('drivers').select('*').is('deleted_at', null);
       if (error) throw error;
       return data;
     },
