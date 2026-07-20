@@ -453,7 +453,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                           <div
                             key={day.toISOString()}
                             onDragOver={onHometime ? undefined : handleDragOver}
-                            onDrop={onHometime ? undefined : () => handleDrop(driver.id)}
+                            onDrop={onHometime ? undefined : (e) => handleDrop(driver.id, e)}
                             className={[
                               'relative border-b border-l border-border min-h-[44px] transition-colors',
                               onHometime
