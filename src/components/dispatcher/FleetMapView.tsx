@@ -522,16 +522,39 @@ const LOAD_STATUS_COLOR = '#22c55e';
 const LIVE_ROUTE_COLOR = '#16a34a';
 const MAPBOX_STYLE_READY_TIMEOUT_MS = 6_000;
 
-function getMapboxStyle(isDark: boolean) {
-  return isDark
-    ? 'mapbox://styles/mapbox/navigation-night-v1'
-    : 'mapbox://styles/mapbox/navigation-day-v1';
+function getMapboxStyleKey(isDark: boolean) {
+  return isDark ? 'navigation-night-v1' : 'navigation-day-v1';
 }
 
-function getMapboxFallbackStyle(isDark: boolean) {
-  return isDark
-    ? 'mapbox://styles/mapbox/dark-v11'
-    : 'mapbox://styles/mapbox/light-v11';
+function getMapboxFallbackStyleKey(isDark: boolean) {
+  return isDark ? 'dark-v11' : 'light-v11';
+}
+
+function buildMapboxRasterStyle(styleKey: string): mapboxgl.StyleSpecification {
+  const token = MAPBOX_TOKEN ?? '';
+  return {
+    version: 8,
+    glyphs: 'mapbox://fonts/mapbox/{fontstack}/{range}.pbf',
+    sources: {
+      'mapbox-base': {
+        type: 'raster',
+        tiles: [
+          `https://api.mapbox.com/styles/v1/mapbox/${styleKey}/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
+        ],
+        tileSize: 512,
+        attribution: '© Mapbox © OpenStreetMap',
+      },
+    },
+    layers: [
+      {
+        id: 'mapbox-base',
+        type: 'raster',
+        source: 'mapbox-base',
+        minzoom: 0,
+        maxzoom: 22,
+      },
+    ],
+  };
 }
 
 function MapboxCanvas({
