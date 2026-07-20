@@ -125,7 +125,7 @@ export default function Finance() {
   const { data: trucks = [] } = useQuery({
     queryKey: ['trucks'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('trucks').select('*');
+      const { data, error } = await supabase.from('trucks').select('*').is('deleted_at', null);
       if (error) throw error;
       return data;
     },
