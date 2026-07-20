@@ -519,41 +519,43 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
               </div>
             </div>
 
-            {/* Unassigned Loads Tray */}
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">
-                Unassigned Loads — drag onto a driver row ({unassignedLoads?.length || 0})
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {unassignedLoads && unassignedLoads.length > 0 ? (
-                  unassignedLoads.map(load => (
-                    <div
-                      key={load.id}
-                      draggable
-                      onDragStart={() => handleDragStart(load)}
-                      onDragEnd={handleDragEnd}
-                      className={`flex items-center gap-1.5 p-2 rounded-md border border-border bg-muted/30 cursor-grab active:cursor-grabbing hover:bg-muted/50 transition-colors text-xs ${
-                        draggedLoad?.id === load.id ? 'opacity-50 ring-2 ring-primary' : ''
-                      } ${assigningLoad === load.id ? 'opacity-50 pointer-events-none' : ''}`}
-                    >
-                      <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <Package className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <span className="font-medium">{load.landstar_load_id || load.id.slice(0, 8)}</span>
-                      <span className="text-muted-foreground hidden sm:inline">
-                        <MapPin className="h-2.5 w-2.5 inline" /> {load.origin?.split(',')[0]} → {load.destination?.split(',')[0]}
-                      </span>
-                      {load.pickup_date && (
-                        <Badge variant="outline" className="text-[10px] h-4 px-1">
-                          {format(parseISO(load.pickup_date), 'M/d')}
-                        </Badge>
-                      )}
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-muted-foreground py-2">No unassigned loads</p>
-                )}
+            {/* Unassigned Loads Tray (hidden when external drawer is used) */}
+            {!hideUnassignedTray && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">
+                  Unassigned Loads — drag onto a driver row ({unassignedLoads?.length || 0})
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {unassignedLoads && unassignedLoads.length > 0 ? (
+                    unassignedLoads.map(load => (
+                      <div
+                        key={load.id}
+                        draggable
+                        onDragStart={() => handleDragStart(load)}
+                        onDragEnd={handleDragEnd}
+                        className={`flex items-center gap-1.5 p-2 rounded-md border border-border bg-muted/30 cursor-grab active:cursor-grabbing hover:bg-muted/50 transition-colors text-xs ${
+                          draggedLoad?.id === load.id ? 'opacity-50 ring-2 ring-primary' : ''
+                        } ${assigningLoad === load.id ? 'opacity-50 pointer-events-none' : ''}`}
+                      >
+                        <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <Package className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="font-medium">{load.landstar_load_id || load.id.slice(0, 8)}</span>
+                        <span className="text-muted-foreground hidden sm:inline">
+                          <MapPin className="h-2.5 w-2.5 inline" /> {load.origin?.split(',')[0]} → {load.destination?.split(',')[0]}
+                        </span>
+                        {load.pickup_date && (
+                          <Badge variant="outline" className="text-[10px] h-4 px-1">
+                            {format(parseISO(load.pickup_date), 'M/d')}
+                          </Badge>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground py-2">No unassigned loads</p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </CardContent>
