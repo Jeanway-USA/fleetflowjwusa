@@ -948,17 +948,45 @@ function MapboxCanvas({
       'case', ['get', 'live'], LIVE_ROUTE_COLOR, LOAD_STATUS_COLOR,
     ];
     const colorExpr = overlays.traffic ? congestionColor : plainColor;
+    const selId = selectedLoadId ?? '';
     const widthExpr: any = [
-      'case',
-      ['==', ['get', 'loadId'], selectedLoadId ?? ''],
-      6,
-      3.5,
+      'interpolate', ['linear'], ['zoom'],
+      3,  ['case', ['==', ['get', 'loadId'], selId], 4, 2.5],
+      6,  ['case', ['==', ['get', 'loadId'], selId], 6, 4],
+      10, ['case', ['==', ['get', 'loadId'], selId], 9, 6],
+      14, ['case', ['==', ['get', 'loadId'], selId], 12, 8],
     ];
+    const casingWidthExpr: any = [
+      'interpolate', ['linear'], ['zoom'],
+      3,  ['case', ['==', ['get', 'loadId'], selId], 7, 5],
+      6,  ['case', ['==', ['get', 'loadId'], selId], 9, 7],
+      10, ['case', ['==', ['get', 'loadId'], selId], 13, 10],
+      14, ['case', ['==', ['get', 'loadId'], selId], 16, 12],
+    ];
+    const CASING_LYR = 'load-routes-casing-lyr';
+
+    // Insert route layers beneath the first symbol layer so labels stay on top
+    let beforeId: string | undefined;
+    try {
+      const layers = map.getStyle()?.layers ?? [];
+      beforeId = layers.find((l: any) => l.type === 'symbol')?.id;
+    } catch {}
 
     try {
       const src = map.getSource(SRC) as mapboxgl.GeoJSONSource | undefined;
       if (!src) {
         map.addSource(SRC, { type: 'geojson', data: routeFC });
+        map.addLayer({
+          id: CASING_LYR,
+          type: 'line',
+          source: SRC,
+          layout: { 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': '#0b1220',
+            'line-width': casingWidthExpr,
+            'line-opacity': 0.65,
+          },
+        }, beforeId);
         map.addLayer({
           id: LYR,
           type: 'line',
@@ -967,11 +995,14 @@ function MapboxCanvas({
           paint: {
             'line-color': colorExpr,
             'line-width': widthExpr,
-            'line-opacity': 0.9,
+            'line-opacity': 1,
           },
-        });
+        }, beforeId);
       } else {
         src.setData(routeFC);
+        if (map.getLayer(CASING_LYR)) {
+          map.setPaintProperty(CASING_LYR, 'line-width', casingWidthExpr);
+        }
         map.setPaintProperty(LYR, 'line-color', colorExpr);
         map.setPaintProperty(LYR, 'line-width', widthExpr);
       }
@@ -979,6 +1010,7 @@ function MapboxCanvas({
       console.warn('Routes layer error:', err);
     }
   }, [routeFC, styleReady, selectedLoadId, overlays.traffic]);
+
 
 
   // ---- Origin/destination/stop symbol sources ----
