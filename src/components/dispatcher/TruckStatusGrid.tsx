@@ -7,13 +7,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Truck, User, AlertTriangle, Wrench, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { addDays, isBefore } from 'date-fns';
+import { getEldSyncState } from './eldSync';
 
 interface TruckData {
   id: string;
   unit_number: string;
   status: string;
   next_inspection_date: string | null;
-  current_driver: { first_name: string; last_name: string } | null;
+  current_driver: { first_name: string; last_name: string; hos_last_updated: string | null } | null;
 }
 
 const statusConfig: Record<string, { label: string; className: string; icon: typeof CheckCircle }> = {
