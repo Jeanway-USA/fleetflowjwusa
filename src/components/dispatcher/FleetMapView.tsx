@@ -66,6 +66,7 @@ interface LoadWithLocation {
   isLiveLocation: boolean;
   stopCoords: { lat: number; lng: number; stop: IntermediateStop }[];
   liveRouteGeometry: [number, number][] | null;
+  routeCongestion: string[] | null;
 }
 
 function isLocationLive(loc: DriverLocation): boolean {
