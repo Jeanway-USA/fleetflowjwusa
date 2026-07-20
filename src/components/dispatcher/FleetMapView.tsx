@@ -591,7 +591,9 @@ function MapboxCanvas({
         ? 'mapbox://styles/mapbox/navigation-night-v1'
         : 'mapbox://styles/mapbox/navigation-day-v1',
     );
-    map.once('style.load', () => setStyleReady(true));
+    map.once('style.load', () => {
+      map.once('idle', () => setStyleReady(true));
+    });
   }, [isDark]);
 
   // ---- Traffic layer (Mapbox mapbox-traffic-v1) ----
