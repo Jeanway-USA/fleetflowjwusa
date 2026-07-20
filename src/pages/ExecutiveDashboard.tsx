@@ -180,7 +180,7 @@ export default function ExecutiveDashboard() {
         .gte('delivery_date', formatDate(dateRange.start))
         .lte('delivery_date', formatDate(dateRange.end));
 
-      const { data: trucks } = await supabase.from('trucks').select('id, status');
+      const { data: trucks } = await supabase.from('trucks').select('id, status').is('deleted_at', null);
       const { data: activeLoads } = await supabase
         .from('fleet_loads')
         .select('truck_id')
@@ -244,7 +244,7 @@ export default function ExecutiveDashboard() {
   const { data: fleetStatus, isLoading: fleetLoading } = useQuery({
     queryKey: ['executive-fleet-status'],
     queryFn: async () => {
-      const { data: trucks } = await supabase.from('trucks').select('id, status');
+      const { data: trucks } = await supabase.from('trucks').select('id, status').is('deleted_at', null);
       const { data: activeLoads } = await supabase
         .from('fleet_loads')
         .select('truck_id')
@@ -272,7 +272,7 @@ export default function ExecutiveDashboard() {
   const { data: driverAvailability, isLoading: driverLoading } = useQuery({
     queryKey: ['executive-driver-availability'],
     queryFn: async () => {
-      const { data: drivers } = await supabase.from('drivers').select('id, status, license_expiry, medical_card_expiry');
+      const { data: drivers } = await supabase.from('drivers').select('id, status, license_expiry, medical_card_expiry').is('deleted_at', null);
       const { data: activeLoads } = await supabase
         .from('fleet_loads')
         .select('driver_id')
@@ -313,7 +313,7 @@ export default function ExecutiveDashboard() {
       const now = new Date();
 
       // Check for trucks in maintenance/out of service
-      const { data: trucks } = await supabase.from('trucks').select('status');
+      const { data: trucks } = await supabase.from('trucks').select('status').is('deleted_at', null);
       const maintenanceTrucks = trucks?.filter(t => t.status === 'maintenance').length || 0;
       const outOfServiceTrucks = trucks?.filter(t => t.status === 'out_of_service').length || 0;
 
@@ -336,7 +336,7 @@ export default function ExecutiveDashboard() {
       }
 
       // Check for drivers with expired credentials
-      const { data: drivers } = await supabase.from('drivers').select('license_expiry, medical_card_expiry');
+      const { data: drivers } = await supabase.from('drivers').select('license_expiry, medical_card_expiry').is('deleted_at', null);
       const expiredCredentials = drivers?.filter(d => {
         const licenseExpiry = d.license_expiry ? new Date(d.license_expiry) : null;
         const medicalExpiry = d.medical_card_expiry ? new Date(d.medical_card_expiry) : null;
@@ -407,7 +407,7 @@ export default function ExecutiveDashboard() {
 
 
       // Expiring credentials (within 30 days)
-      const { data: drivers } = await supabase.from('drivers').select('license_expiry, medical_card_expiry');
+      const { data: drivers } = await supabase.from('drivers').select('license_expiry, medical_card_expiry').is('deleted_at', null);
       const expiringCredentials = drivers?.filter(d => {
         const licenseExpiry = d.license_expiry ? new Date(d.license_expiry) : null;
         const medicalExpiry = d.medical_card_expiry ? new Date(d.medical_card_expiry) : null;
