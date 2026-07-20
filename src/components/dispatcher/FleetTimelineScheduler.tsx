@@ -68,7 +68,11 @@ function destinationRegion(destination: string | null | undefined) {
   return parts[parts.length - 1] || destination;
 }
 
-export function FleetTimelineScheduler() {
+interface FleetTimelineSchedulerProps {
+  hideUnassignedTray?: boolean;
+}
+
+export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTimelineSchedulerProps = {}) {
   const queryClient = useQueryClient();
   const [weekOffset, setWeekOffset] = useState(0);
   const [draggedLoad, setDraggedLoad] = useState<TimelineLoad | null>(null);
