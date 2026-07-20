@@ -520,6 +520,42 @@ interface MapboxCanvasProps {
 
 const LOAD_STATUS_COLOR = '#22c55e';
 const LIVE_ROUTE_COLOR = '#16a34a';
+const MAPBOX_STYLE_READY_TIMEOUT_MS = 6_000;
+
+function getMapboxStyleKey(isDark: boolean) {
+  return isDark ? 'navigation-night-v1' : 'navigation-day-v1';
+}
+
+function getMapboxFallbackStyleKey(isDark: boolean) {
+  return isDark ? 'dark-v11' : 'light-v11';
+}
+
+function buildMapboxRasterStyle(styleKey: string): mapboxgl.StyleSpecification {
+  const token = MAPBOX_TOKEN ?? '';
+  return {
+    version: 8,
+    glyphs: 'mapbox://fonts/mapbox/{fontstack}/{range}.pbf',
+    sources: {
+      'mapbox-base': {
+        type: 'raster',
+        tiles: [
+          `https://api.mapbox.com/styles/v1/mapbox/${styleKey}/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`,
+        ],
+        tileSize: 512,
+        attribution: '© Mapbox © OpenStreetMap',
+      },
+    },
+    layers: [
+      {
+        id: 'mapbox-base',
+        type: 'raster',
+        source: 'mapbox-base',
+        minzoom: 0,
+        maxzoom: 22,
+      },
+    ],
+  };
+}
 
 function MapboxCanvas({
   isExpanded,
@@ -536,37 +572,94 @@ function MapboxCanvas({
   const [styleReady, setStyleReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const truckPopupRef = useRef<mapboxgl.Popup | null>(null);
+  const styleUrlRef = useRef<string | null>(null);
+  const fallbackStyleUsedRef = useRef(false);
+  const styleReadyTimerRef = useRef<number | null>(null);
+
+  const clearStyleReadyTimer = useCallback(() => {
+    if (styleReadyTimerRef.current) {
+      window.clearTimeout(styleReadyTimerRef.current);
+      styleReadyTimerRef.current = null;
+    }
+  }, []);
+
+  const markStyleReady = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!map.loaded() && !map.isStyleLoaded()) return;
+    clearStyleReadyTimer();
+    setMapError(null);
+    setStyleReady(true);
+    requestAnimationFrame(() => map.resize());
+  }, [clearStyleReadyTimer]);
+
+  const armStyleReadyFallback = useCallback(
+    (map: mapboxgl.Map, nextStyleUrl: string, isFallback = false) => {
+      clearStyleReadyTimer();
+      styleReadyTimerRef.current = window.setTimeout(() => {
+        if (!mapRef.current || mapRef.current !== map) return;
+        if (map.isStyleLoaded() || map.loaded()) {
+          markStyleReady();
+          return;
+        }
+        if (!isFallback && !fallbackStyleUsedRef.current) {
+          const fallbackStyle = getMapboxFallbackStyleKey(isDark);
+          fallbackStyleUsedRef.current = true;
+          styleUrlRef.current = fallbackStyle;
+          setStyleReady(false);
+          map.setStyle(buildMapboxRasterStyle(fallbackStyle));
+          armStyleReadyFallback(map, fallbackStyle, true);
+          return;
+        }
+        setMapError('The map style is taking too long to load.');
+      }, MAPBOX_STYLE_READY_TIMEOUT_MS);
+
+      styleUrlRef.current = nextStyleUrl;
+    },
+    [clearStyleReadyTimer, isDark, markStyleReady],
+  );
 
   // Init map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     try {
       mapboxgl.accessToken = MAPBOX_TOKEN as string;
+      const initialStyle = getMapboxStyleKey(isDark);
+      styleUrlRef.current = initialStyle;
       const map = new mapboxgl.Map({
         container: containerRef.current,
-        style: isDark
-          ? 'mapbox://styles/mapbox/navigation-night-v1'
-          : 'mapbox://styles/mapbox/navigation-day-v1',
+        style: buildMapboxRasterStyle(initialStyle),
         center: [-98.5795, 39.8283],
         zoom: 3.4,
         projection: { name: 'mercator' },
         attributionControl: true,
       });
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
-      const markReady = () => {
-        // Wait one idle tick so sprite images finish loading before addLayer calls.
-        map.once('idle', () => setStyleReady(true));
-      };
-      if (map.isStyleLoaded()) markReady();
-      else map.once('style.load', markReady);
+      map.on('load', markStyleReady);
+      map.on('style.load', markStyleReady);
+      map.on('idle', markStyleReady);
       map.on('error', (e) => {
         const msg = e?.error?.message || '';
         // Silence expected RainViewer tile 404s at world zoom levels.
         if (msg.includes('tilecache.rainviewer.com')) return;
         if (msg.includes('applyProjectionUpdate')) return;
+        if (msg.includes('Failed to load style') && !fallbackStyleUsedRef.current) {
+          const fallbackStyle = getMapboxFallbackStyleKey(isDark);
+          fallbackStyleUsedRef.current = true;
+          styleUrlRef.current = fallbackStyle;
+          setStyleReady(false);
+          map.setStyle(buildMapboxRasterStyle(fallbackStyle));
+          armStyleReadyFallback(map, fallbackStyle, true);
+          return;
+        }
         console.warn('Mapbox error', msg || e);
       });
       mapRef.current = map;
+      armStyleReadyFallback(map, initialStyle);
+      requestAnimationFrame(() => {
+        map.resize();
+        window.setTimeout(() => map.resize(), 250);
+      });
     } catch (err: any) {
       console.error(err);
       setMapError(err?.message || 'Failed to initialize map');
@@ -574,6 +667,7 @@ function MapboxCanvas({
     return () => {
       truckPopupRef.current?.remove();
       truckPopupRef.current = null;
+      clearStyleReadyTimer();
       mapRef.current?.remove();
       mapRef.current = null;
       setStyleReady(false);
@@ -581,20 +675,38 @@ function MapboxCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep Mapbox sized to the rendered card/dialog dimensions.
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!map || !container) return;
+
+    const resizeMap = () => requestAnimationFrame(() => map.resize());
+    resizeMap();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', resizeMap);
+      return () => window.removeEventListener('resize', resizeMap);
+    }
+
+    const observer = new ResizeObserver(resizeMap);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isExpanded, styleReady]);
+
   // Swap style on theme change
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    const nextStyle = getMapboxStyleKey(isDark);
+    if (styleUrlRef.current === nextStyle) return;
+    fallbackStyleUsedRef.current = false;
     setStyleReady(false);
-    map.setStyle(
-      isDark
-        ? 'mapbox://styles/mapbox/navigation-night-v1'
-        : 'mapbox://styles/mapbox/navigation-day-v1',
-    );
-    map.once('style.load', () => {
-      map.once('idle', () => setStyleReady(true));
-    });
-  }, [isDark]);
+    setMapError(null);
+    styleUrlRef.current = nextStyle;
+    map.setStyle(buildMapboxRasterStyle(nextStyle));
+    armStyleReadyFallback(map, nextStyle);
+  }, [armStyleReadyFallback, isDark]);
 
   // ---- Traffic layer (Mapbox mapbox-traffic-v1) ----
   useEffect(() => {
@@ -1062,10 +1174,12 @@ function MapboxCanvas({
       className={
         isExpanded
           ? 'relative w-full h-full overflow-hidden'
-          : 'relative aspect-square rounded-lg overflow-hidden border border-border'
+          : 'relative h-[360px] min-h-[360px] w-full rounded-lg overflow-hidden border border-border sm:h-[420px] xl:h-[520px]'
       }
     >
-      <div ref={containerRef} className="absolute inset-0" />
+      <div className="absolute inset-0">
+        <div ref={containerRef} className="h-full w-full" />
+      </div>
 
       {!styleReady && !mapError && (
         <div className="absolute inset-0 z-[5] flex items-center justify-center bg-background/70">
