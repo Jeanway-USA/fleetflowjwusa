@@ -298,22 +298,38 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
   const handleDragEnd = () => setDraggedLoad(null);
   const handleDragOver = (e: React.DragEvent) => e.preventDefault();
 
-  const handleDrop = async (driverId: string) => {
-    if (!draggedLoad) return;
+  const resolveDroppedLoad = (e: React.DragEvent): TimelineLoad | null => {
+    if (draggedLoad) return draggedLoad;
+    // External drag (from UnassignedLoadsDrawer)
+    try {
+      const json = e.dataTransfer.getData('application/x-load-json');
+      if (json) return JSON.parse(json) as TimelineLoad;
+    } catch {
+      /* fall through */
+    }
+    const id = e.dataTransfer.getData('application/x-load-id');
+    if (!id) return null;
+    const match = unassignedLoads?.find(l => l.id === id);
+    return match || null;
+  };
 
-    const { hasConflict, message } = checkConflicts(driverId, draggedLoad);
+  const handleDrop = async (driverId: string, e: React.DragEvent) => {
+    const load = resolveDroppedLoad(e);
+    if (!load) return;
+
+    const { hasConflict, message } = checkConflicts(driverId, load);
     if (hasConflict) {
       toast.warning('Schedule Conflict', { description: message, icon: <AlertTriangle className="h-4 w-4" /> });
       setDraggedLoad(null);
       return;
     }
 
-    setAssigningLoad(draggedLoad.id);
+    setAssigningLoad(load.id);
     try {
       const { error } = await supabase
         .from('fleet_loads')
         .update({ driver_id: driverId, status: 'assigned' })
-        .eq('id', draggedLoad.id);
+        .eq('id', load.id);
 
       if (error) throw error;
 
@@ -324,6 +340,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
       queryClient.invalidateQueries({ queryKey: ['timeline-unassigned-loads'] });
       queryClient.invalidateQueries({ queryKey: ['dispatcher-stats'] });
       queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
+      queryClient.invalidateQueries({ queryKey: ['upcoming-pickups-dispatcher'] });
     } catch {
       toast.error('Failed to assign load');
     } finally {
