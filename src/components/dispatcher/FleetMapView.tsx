@@ -1174,10 +1174,12 @@ function MapboxCanvas({
       className={
         isExpanded
           ? 'relative w-full h-full overflow-hidden'
-          : 'relative aspect-square rounded-lg overflow-hidden border border-border'
+          : 'relative h-[360px] min-h-[360px] w-full rounded-lg overflow-hidden border border-border sm:h-[420px] xl:h-[520px]'
       }
     >
-      <div ref={containerRef} className="absolute inset-0" />
+      <div className="absolute inset-0">
+        <div ref={containerRef} className="h-full w-full" />
+      </div>
 
       {!styleReady && !mapError && (
         <div className="absolute inset-0 z-[5] flex items-center justify-center bg-background/70">
