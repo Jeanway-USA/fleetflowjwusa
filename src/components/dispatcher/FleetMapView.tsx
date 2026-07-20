@@ -593,7 +593,7 @@ function MapboxCanvas({
 
       styleUrlRef.current = nextStyleUrl;
     },
-    [armStyleReadyFallback, clearStyleReadyTimer, isDark, markStyleReady],
+    [clearStyleReadyTimer, isDark, markStyleReady],
   );
 
   // Init map once
