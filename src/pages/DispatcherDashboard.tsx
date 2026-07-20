@@ -20,6 +20,7 @@ const FleetMapView = lazy(() =>
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
 import { FleetTimelineScheduler } from '@/components/dispatcher/FleetTimelineScheduler';
 import { UnassignedLoadsDrawer } from '@/components/dispatcher/UnassignedLoadsDrawer';
+import { UpcomingPickups } from '@/components/dispatcher/UpcomingPickups';
 import { DriverLeaderboard } from '@/components/shared/DriverLeaderboard';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
