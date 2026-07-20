@@ -605,26 +605,39 @@ export function FleetMapView() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* Weather radar overlay (OpenWeatherMap precipitation) */}
-        {weatherEnabled && WEATHER_TILE_URL && (
+        {/* Weather radar overlay — RainViewer live tiles */}
+        {weatherEnabled && rainviewerPath && (
           <TileLayer
-            key="weather-overlay"
-            url={WEATHER_TILE_URL}
+            key={`weather-${rainviewerPath}`}
+            url={`https://tilecache.rainviewer.com${rainviewerPath}/256/{z}/{x}/{y}/2/1_1.png`}
             opacity={0.6}
             zIndex={400}
-            attribution='Weather &copy; OpenWeatherMap'
+            attribution='Weather &copy; <a href="https://www.rainviewer.com/">RainViewer</a>'
           />
         )}
 
-        {/* Traffic overlay placeholder — Google Traffic requires JS SDK integration */}
-        {trafficEnabled && TRAFFIC_TILE_URL && (
-          <TileLayer
-            key="traffic-overlay"
-            url={TRAFFIC_TILE_URL}
-            opacity={0.6}
-            zIndex={400}
-          />
-        )}
+        {/* Traffic overlay — mocked interstate polylines */}
+        {trafficEnabled && MOCK_TRAFFIC_SEGMENTS.map(seg => (
+          <Polyline
+            key={`traffic-${seg.id}`}
+            positions={seg.coords}
+            pathOptions={{
+              color: TRAFFIC_COLORS[seg.severity],
+              weight: 5,
+              opacity: 0.75,
+              lineCap: 'round',
+            }}
+          >
+            <Popup>
+              <div className="text-sm">
+                <p className="font-medium">{seg.name}</p>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {seg.severity} traffic
+                </p>
+              </div>
+            </Popup>
+          </Polyline>
+        ))}
 
         <FitBounds loads={loads} />
 
