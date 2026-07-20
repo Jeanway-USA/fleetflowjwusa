@@ -514,7 +514,7 @@ export function FleetMapView() {
   }
 
   const renderMapContent = ({ isExpanded }: { isExpanded: boolean }) => (
-    <div className={isExpanded ? 'w-full h-full' : 'aspect-square rounded-lg overflow-hidden border border-border relative'}>
+    <div className={isExpanded ? 'relative w-full h-full overflow-hidden' : 'relative aspect-square rounded-lg overflow-hidden border border-border'}>
       <MapContainer
         center={[39.8283, -98.5795]}
         zoom={4}
