@@ -514,7 +514,7 @@ export function FleetMapView() {
   }
 
   const renderMapContent = ({ isExpanded }: { isExpanded: boolean }) => (
-    <div className={isExpanded ? 'w-full h-full' : 'aspect-square rounded-lg overflow-hidden border border-border relative'}>
+    <div className={isExpanded ? 'relative w-full h-full overflow-hidden' : 'relative aspect-square rounded-lg overflow-hidden border border-border'}>
       <MapContainer
         center={[39.8283, -98.5795]}
         zoom={4}
@@ -672,7 +672,7 @@ export function FleetMapView() {
 
       {/* Overlay control panel */}
       <div
-        className={`absolute top-2 ${isExpanded ? 'right-2' : 'right-12'} z-[500] bg-gray-900/80 backdrop-blur-sm text-white border border-white/10 rounded-lg shadow-lg p-3 space-y-2 min-w-[180px]`}
+        className={`absolute top-4 ${isExpanded ? 'right-4' : 'right-12'} z-10 bg-gray-900/80 backdrop-blur-sm text-white border border-white/10 rounded-lg shadow-lg p-3 space-y-2 min-w-[180px]`}
       >
         <p className="text-[10px] uppercase tracking-wider text-white/60 font-semibold mb-1">
           Map Overlays
