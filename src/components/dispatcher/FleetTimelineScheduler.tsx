@@ -762,6 +762,17 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
           </>
         )}
       </CardContent>
+
+      {/* Floating resize tooltip */}
+      {resizing && previewDates && tooltipPos && (
+        <div
+          className="pointer-events-none fixed z-[9999] bg-popover text-popover-foreground border rounded px-2 py-1 text-xs shadow-md font-medium"
+          style={{ left: tooltipPos.x + 12, top: tooltipPos.y + 12 }}
+        >
+          {resizing.edge === 'left' ? 'Pickup: ' : 'Delivery: '}
+          {format(resizing.edge === 'left' ? previewDates.pickup : previewDates.delivery, 'EEE, MMM d')}
+        </div>
+      )}
     </Card>
   );
 }
