@@ -263,6 +263,17 @@ export function DriverStatusGrid() {
                     )}
                   </div>
 
+                  <div className={`flex items-center gap-1.5 mt-2 text-[11px] ${eld.textClass}`}>
+                    <span className="relative flex h-2 w-2">
+                      {eld.pulse && (
+                        <span className={`absolute inline-flex h-full w-full rounded-full ${eld.dotClass} opacity-75 animate-ping`} />
+                      )}
+                      <span className={`relative inline-flex h-2 w-2 rounded-full ${eld.dotClass}`} />
+                    </span>
+                    <span className="truncate">{eld.label}</span>
+                  </div>
+
+
                   {driver.upcomingHometime && !driver.activeHometime && (
                     <div className="flex items-center gap-1 mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
                       <Home className="h-3 w-3" />
