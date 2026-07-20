@@ -853,58 +853,78 @@ function MapboxCanvas({
     }
   }, [styleReady, overlays.traffic, overlays.trafficOpacity]);
 
-  // ---- Radar raster layer ----
+  // ---- Radar raster layer. Re-attach on style swaps (styledata fires after fallback style loads). ----
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !styleReady) return;
+    if (!map) return;
     const SRC = 'rainviewer-src';
     const LYR = 'rainviewer-lyr';
-    try {
-      // Remove first to allow url template refresh
-      if (map.getLayer(LYR)) map.removeLayer(LYR);
-      if (map.getSource(SRC)) map.removeSource(SRC);
-      if (overlays.weather && radarUrlTemplate) {
+
+    const applyRadar = () => {
+      if (!map.isStyleLoaded()) return;
+      try {
+        if (map.getLayer(LYR)) map.removeLayer(LYR);
+        if (map.getSource(SRC)) map.removeSource(SRC);
+        if (!overlays.weather || !radarUrlTemplate) return;
         map.addSource(SRC, {
           type: 'raster',
           tiles: [radarUrlTemplate],
           tileSize: 256,
         });
-        map.addLayer({
-          id: LYR,
-          type: 'raster',
-          source: SRC,
-          paint: { 'raster-opacity': overlays.radarOpacity / 100 },
-        });
+        // Insert beneath route/point/truck layers so those stay visible above radar
+        const beforeId = ['load-routes-lyr', 'load-points-circle', 'trucks-point']
+          .find((id) => map.getLayer(id));
+        map.addLayer(
+          {
+            id: LYR,
+            type: 'raster',
+            source: SRC,
+            paint: { 'raster-opacity': overlays.radarOpacity / 100 },
+          },
+          beforeId,
+        );
+      } catch (err) {
+        console.warn('Radar layer error:', err);
       }
-    } catch (err) {
-      console.warn('Radar layer error:', err);
-    }
+    };
+
+    applyRadar();
+    map.on('styledata', applyRadar);
+    return () => {
+      map.off('styledata', applyRadar);
+    };
   }, [styleReady, overlays.weather, radarUrlTemplate, overlays.radarOpacity]);
 
-  // ---- Route lines source/layer ----
+  // ---- Route lines source/layer (per-segment features carrying congestion) ----
   const routeFC = useMemo(() => {
     const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
     loads.forEach((load) => {
       let coords: [number, number][] | null = null;
+      let congestion: string[] | null = null;
       if (load.liveRouteGeometry && load.liveRouteGeometry.length >= 2) {
         // liveRouteGeometry is [lat, lng]; Mapbox wants [lng, lat]
         coords = load.liveRouteGeometry.map(([la, ln]) => [ln, la] as [number, number]);
+        congestion = load.routeCongestion ?? null;
       } else if (load.originCoords && load.destCoords) {
         coords = [
           [load.originCoords.lng, load.originCoords.lat],
           [load.destCoords.lng, load.destCoords.lat],
         ];
       }
-      if (!coords) return;
-      features.push({
-        type: 'Feature',
-        id: loadFeatureId(load.id),
-        properties: {
-          id: load.id,
-          live: !!load.liveRouteGeometry,
-        },
-        geometry: { type: 'LineString', coordinates: coords },
-      });
+      if (!coords || coords.length < 2) return;
+      const live = !!load.liveRouteGeometry;
+      for (let i = 0; i < coords.length - 1; i++) {
+        const cong = congestion && congestion[i] ? congestion[i] : 'unknown';
+        features.push({
+          type: 'Feature',
+          properties: {
+            loadId: load.id,
+            live,
+            congestion: cong,
+          },
+          geometry: { type: 'LineString', coordinates: [coords[i], coords[i + 1]] },
+        });
+      }
     });
     return { type: 'FeatureCollection', features } as GeoJSON.FeatureCollection<GeoJSON.LineString>;
   }, [loads]);
@@ -914,7 +934,27 @@ function MapboxCanvas({
     if (!map || !styleReady) return;
     const SRC = 'load-routes';
     const LYR = 'load-routes-lyr';
-    const LYR_SEL = 'load-routes-selected';
+
+    const congestionColor: any = [
+      'match',
+      ['get', 'congestion'],
+      'low', '#22c55e',
+      'moderate', '#eab308',
+      'heavy', '#f97316',
+      'severe', '#dc2626',
+      /* unknown / other */ ['case', ['get', 'live'], LIVE_ROUTE_COLOR, LOAD_STATUS_COLOR],
+    ];
+    const plainColor: any = [
+      'case', ['get', 'live'], LIVE_ROUTE_COLOR, LOAD_STATUS_COLOR,
+    ];
+    const colorExpr = overlays.traffic ? congestionColor : plainColor;
+    const widthExpr: any = [
+      'case',
+      ['==', ['get', 'loadId'], selectedLoadId ?? ''],
+      6,
+      3.5,
+    ];
+
     try {
       const src = map.getSource(SRC) as mapboxgl.GeoJSONSource | undefined;
       if (!src) {
@@ -925,34 +965,21 @@ function MapboxCanvas({
           source: SRC,
           layout: { 'line-cap': 'round', 'line-join': 'round' },
           paint: {
-            'line-color': [
-              'case',
-              ['get', 'live'],
-              LIVE_ROUTE_COLOR,
-              LOAD_STATUS_COLOR,
-            ],
-            'line-width': [
-              'case',
-              ['==', ['get', 'id'], selectedLoadId ?? ''],
-              6,
-              3.5,
-            ],
-            'line-opacity': 0.85,
+            'line-color': colorExpr,
+            'line-width': widthExpr,
+            'line-opacity': 0.9,
           },
         });
       } else {
         src.setData(routeFC);
-        map.setPaintProperty(LYR, 'line-width', [
-          'case',
-          ['==', ['get', 'id'], selectedLoadId ?? ''],
-          6,
-          3.5,
-        ]);
+        map.setPaintProperty(LYR, 'line-color', colorExpr);
+        map.setPaintProperty(LYR, 'line-width', widthExpr);
       }
     } catch (err) {
       console.warn('Routes layer error:', err);
     }
-  }, [routeFC, styleReady, selectedLoadId]);
+  }, [routeFC, styleReady, selectedLoadId, overlays.traffic]);
+
 
   // ---- Origin/destination/stop symbol sources ----
   const pointFC = useMemo(() => {
