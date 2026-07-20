@@ -794,9 +794,9 @@ export function FleetMapView() {
             className="data-[state=checked]:bg-primary"
           />
         </div>
-        {(weatherEnabled && !WEATHER_TILE_URL) || (trafficEnabled && !TRAFFIC_TILE_URL) ? (
-          <p className="text-[10px] text-amber-300/90 pt-1 border-t border-white/10">
-            Demo mode — provider key not yet configured.
+        {weatherEnabled && !rainviewerPath ? (
+          <p className="text-[10px] text-white/60 pt-1 border-t border-white/10">
+            Loading radar frames…
           </p>
         ) : null}
       </div>
