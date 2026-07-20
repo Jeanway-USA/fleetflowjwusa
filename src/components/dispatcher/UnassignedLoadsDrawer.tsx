@@ -19,6 +19,7 @@ interface UnassignedLoad {
   pickup_date: string | null;
   delivery_date: string | null;
   driver_id: string | null;
+  booked_miles: number | null;
 }
 
 function LoadCard({ load }: { load: UnassignedLoad }) {
