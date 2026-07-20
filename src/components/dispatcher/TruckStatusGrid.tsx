@@ -37,7 +37,7 @@ export function TruckStatusGrid() {
           unit_number,
           status,
           next_inspection_date,
-          current_driver:drivers!trucks_current_driver_id_fkey(first_name, last_name)
+          current_driver:drivers!trucks_current_driver_id_fkey(first_name, last_name, hos_last_updated)
         `)
         .order('unit_number');
       
