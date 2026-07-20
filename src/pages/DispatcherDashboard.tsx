@@ -270,9 +270,15 @@ export default function DispatcherDashboard() {
                 <FleetTimelineScheduler hideUnassignedTray />
               </ErrorBoundary>
             </div>
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Planning &amp; Scheduling
+              </h3>
               <ErrorBoundary compact>
                 <UnassignedLoadsDrawer />
+              </ErrorBoundary>
+              <ErrorBoundary compact>
+                <UpcomingPickups />
               </ErrorBoundary>
             </div>
           </div>
