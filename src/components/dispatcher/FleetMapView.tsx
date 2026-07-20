@@ -530,8 +530,31 @@ export function FleetMapView() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        
+
+        {/* Weather radar overlay (OpenWeatherMap precipitation) */}
+        {weatherEnabled && WEATHER_TILE_URL && (
+          <TileLayer
+            key="weather-overlay"
+            url={WEATHER_TILE_URL}
+            opacity={0.6}
+            zIndex={400}
+            attribution='Weather &copy; OpenWeatherMap'
+          />
+        )}
+
+        {/* Traffic overlay placeholder — Google Traffic requires JS SDK integration */}
+        {trafficEnabled && TRAFFIC_TILE_URL && (
+          <TileLayer
+            key="traffic-overlay"
+            url={TRAFFIC_TILE_URL}
+            opacity={0.6}
+            zIndex={400}
+          />
+        )}
+
         <FitBounds loads={loads} />
+
+
 
         {loads.map(load => (
           <div key={load.id}>
