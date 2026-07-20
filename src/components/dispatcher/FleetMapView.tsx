@@ -612,11 +612,9 @@ function MapboxCanvas({
         attributionControl: true,
       });
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
-      const scheduleResize = () => requestAnimationFrame(() => map.resize());
       map.on('load', markStyleReady);
       map.on('style.load', markStyleReady);
       map.on('idle', markStyleReady);
-      map.on('resize', scheduleResize);
       map.on('error', (e) => {
         const msg = e?.error?.message || '';
         // Silence expected RainViewer tile 404s at world zoom levels.
