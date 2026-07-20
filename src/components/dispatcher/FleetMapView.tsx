@@ -247,7 +247,18 @@ export function FleetMapView() {
       });
       return next;
     });
+    setRouteCongestions((prev) => {
+      const next = new Map(prev);
+      rawLoads.forEach((load: any) => {
+        const raw = load.current_route_congestion;
+        if (Array.isArray(raw) && raw.length > 0) {
+          next.set(load.id, raw.map((c: any) => (typeof c === 'string' ? c : 'unknown')));
+        }
+      });
+      return next;
+    });
   }, [rawLoads]);
+
 
   useEffect(() => {
     const ids = (rawLoads ?? []).map((l: any) => l.id).filter(Boolean);
