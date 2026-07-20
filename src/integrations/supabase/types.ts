@@ -5600,7 +5600,22 @@ export type Database = {
           tax_year?: number
           uploaded_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tax_documents_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tax_documents_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tax_filing_completions: {
         Row: {
@@ -6760,10 +6775,19 @@ export type Database = {
           tin_type: string
         }[]
       }
-      get_public_load_by_tracking: {
-        Args: { _tracking_id: string }
-        Returns: Json
-      }
+      get_public_load_by_tracking:
+        | {
+            Args: { _tracking_id: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.get_public_load_by_tracking(_tracking_id => text), public.get_public_load_by_tracking(_tracking_id => uuid). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+        | {
+            Args: { _tracking_id: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.get_public_load_by_tracking(_tracking_id => text), public.get_public_load_by_tracking(_tracking_id => uuid). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       get_user_role: { Args: { _user_id: string }; Returns: string }
       get_w2_totals: {
