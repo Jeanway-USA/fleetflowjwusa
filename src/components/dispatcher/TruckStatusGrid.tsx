@@ -98,7 +98,10 @@ export function TruckStatusGrid() {
             {trucks.map((truck) => {
               const config = statusConfig[truck.status] || statusConfig.active;
               const inspectionWarning = hasInspectionWarning(truck);
-              
+              const eld = truck.current_driver
+                ? getEldSyncState(truck.current_driver.hos_last_updated)
+                : null;
+
               return (
                 <div
                   key={truck.id}
@@ -122,7 +125,24 @@ export function TruckStatusGrid() {
                       {config.label}
                     </Badge>
                   </div>
-                  
+
+                  {eld ? (
+                    <div className={`flex items-center gap-1.5 mt-2 text-[11px] ${eld.textClass}`}>
+                      <span className="relative flex h-2 w-2">
+                        {eld.pulse && (
+                          <span className={`absolute inline-flex h-full w-full rounded-full ${eld.dotClass} opacity-75 animate-ping`} />
+                        )}
+                        <span className={`relative inline-flex h-2 w-2 rounded-full ${eld.dotClass}`} />
+                      </span>
+                      <span className="truncate">{eld.label}</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 mt-2 text-[11px] text-muted-foreground">
+                      <span className="inline-flex h-2 w-2 rounded-full bg-muted-foreground/40" />
+                      <span>No ELD paired</span>
+                    </div>
+                  )}
+
                   {inspectionWarning && (
                     <div className="flex items-center gap-1 mt-2 text-xs text-warning">
                       <AlertTriangle className="h-3 w-3" />
@@ -130,6 +150,7 @@ export function TruckStatusGrid() {
                     </div>
                   )}
                 </div>
+
               );
             })}
           </div>
