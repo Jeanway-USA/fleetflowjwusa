@@ -217,6 +217,7 @@ export function FleetMapView() {
           notes,
           current_route_geometry,
           current_route_updated_at,
+          current_route_congestion,
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
           truck:trucks!fleet_loads_truck_id_fkey(unit_number)
         `)
