@@ -1,9 +1,10 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, lazy, Suspense, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Package, Users, Truck, Calendar, Plus, ArrowRight } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Package, Users, Truck, Clock, Plus, ArrowRight } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -51,7 +52,7 @@ export default function DispatcherDashboard() {
         .select('first_name, last_name')
         .eq('user_id', user.id)
         .single();
-      
+
       if (error) return null;
       return data;
     },
@@ -65,13 +66,11 @@ export default function DispatcherDashboard() {
       const now = new Date();
       const in48Hours = addHours(now, 48);
 
-      // Active loads
       const { count: activeLoads } = await supabase
         .from('fleet_loads')
         .select('*', { count: 'exact', head: true })
         .in('status', ['assigned', 'loading', 'in_transit', 'unloading']);
 
-      // Available drivers (active drivers not on a load)
       const { data: drivers } = await supabase
         .from('drivers_public_view')
         .select('id')
@@ -85,13 +84,11 @@ export default function DispatcherDashboard() {
       const assignedDriverIds = new Set(assignedLoads?.map(l => l.driver_id).filter(Boolean));
       const availableDrivers = drivers?.filter(d => !assignedDriverIds.has(d.id)).length || 0;
 
-      // Available trucks
       const { count: activeTrucks } = await supabase
         .from('trucks')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'active');
 
-      // Upcoming pickups in next 48 hours
       const { count: upcomingPickups } = await supabase
         .from('fleet_loads')
         .select('*', { count: 'exact', head: true })
@@ -144,126 +141,160 @@ export default function DispatcherDashboard() {
     return 'Good evening';
   };
 
-  // Get display name - prefer first name from profile, fallback to email
   const displayName = profile?.first_name || user?.email?.split('@')[0] || 'Dispatcher';
 
+  const timezone = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+    } catch {
+      return 'Local';
+    }
+  }, []);
+
   const statCards = [
-    { label: 'Active Loads', value: stats?.activeLoads || 0, icon: Package, color: 'text-blue-500' },
-    { label: 'Available Drivers', value: stats?.availableDrivers || 0, icon: Users, color: 'text-green-500' },
-    { label: 'Active Trucks', value: stats?.activeTrucks || 0, icon: Truck, color: 'text-amber-500' },
-    { label: 'Upcoming Pickups', value: stats?.upcomingPickups || 0, icon: Calendar, color: 'text-purple-500' },
+    { label: 'Active Loads', value: stats?.activeLoads ?? 0, icon: Package, color: 'text-blue-500' },
+    { label: 'Available Drivers', value: stats?.availableDrivers ?? 0, icon: Users, color: 'text-green-500' },
+    { label: 'Active Trucks', value: stats?.activeTrucks ?? 0, icon: Truck, color: 'text-amber-500' },
+    { label: 'Timezone', value: timezone, icon: Clock, color: 'text-purple-500' },
   ];
 
   return (
-    <>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {getGreeting()}, <span className="text-gradient-gold">{displayName}</span>
-            </h1>
-            <p className="text-muted-foreground mt-1">Dispatcher Operations Center</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={() => navigate('/fleet-loads')} className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Load
-            </Button>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {getGreeting()}, <span className="text-gradient-gold">{displayName}</span>
+          </h1>
+          <p className="text-muted-foreground mt-1">Dispatcher Operations Center</p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => navigate('/fleet-loads')} className="gap-2">
+            <Plus className="h-4 w-4" />
+            New Load
+          </Button>
+        </div>
+      </div>
 
-        {/* Stats Grid */}
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          {statCards.map((stat) => (
-            <Card key={stat.label} className="card-elevated">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{stat.label}</p>
-                    <p className="text-2xl font-bold mt-1">{stat.value}</p>
-                  </div>
-                  <stat.icon className={`h-8 w-8 ${stat.color} opacity-80`} />
+      {/* Pinned KPI Grid */}
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {statCards.map((stat) => (
+          <Card key={stat.label} className="card-elevated">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">{stat.label}</p>
+                  <p className="text-2xl font-bold mt-1 truncate">{stat.value}</p>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                <stat.icon className={`h-8 w-8 ${stat.color} opacity-80 shrink-0`} />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-        {/* Map + Assignment Panel Row */}
-        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {/* Map - Square, takes 1 column */}
-          <div data-tour="fleet-map">
-            <ErrorBoundary compact>
-              <Suspense fallback={<MapSkeleton height={360} />}>
-                <FleetMapView />
-              </Suspense>
-            </ErrorBoundary>
+      {/* Tabbed Interface */}
+      <Tabs defaultValue="command-center" className="w-full">
+        <TabsList className="w-full justify-start bg-transparent p-0 h-auto border-b border-border rounded-none gap-1">
+          <TabsTrigger
+            value="command-center"
+            className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
+          >
+            Command Center
+          </TabsTrigger>
+          <TabsTrigger
+            value="dispatch-board"
+            className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
+          >
+            Dispatch Board
+          </TabsTrigger>
+          <TabsTrigger
+            value="fleet-roster"
+            className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
+          >
+            Fleet Roster
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Command Center */}
+        <TabsContent value="command-center" className="mt-6 space-y-6">
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+            {/* Map - 2/3 width on large screens */}
+            <div className="lg:col-span-2" data-tour="fleet-map">
+              <ErrorBoundary compact>
+                <Suspense fallback={<MapSkeleton height={360} />}>
+                  <FleetMapView />
+                </Suspense>
+              </ErrorBoundary>
+            </div>
+
+            {/* Right column: Alerts on top, Upcoming Pickups below */}
+            <div className="space-y-6">
+              <ErrorBoundary compact>
+                <DispatcherAlerts />
+              </ErrorBoundary>
+              <ErrorBoundary compact>
+                <UpcomingPickups />
+              </ErrorBoundary>
+            </div>
           </div>
+        </TabsContent>
 
-          {/* Driver Assignment Panel */}
+        {/* Dispatch Board */}
+        <TabsContent value="dispatch-board" className="mt-6 space-y-6">
           <div id="assign-driver" className="scroll-mt-20">
             <ErrorBoundary compact>
               <DriverAssignmentPanel />
             </ErrorBoundary>
           </div>
 
-          {/* Alerts */}
-          <div>
-            <DispatcherAlerts />
-          </div>
-        </div>
-
-        {/* Fleet Timeline Scheduler */}
-        <ErrorBoundary compact>
-          <FleetTimelineScheduler />
-        </ErrorBoundary>
-
-        {/* Driver Leaderboard */}
-        <ErrorBoundary compact>
-          <DriverLeaderboard />
-        </ErrorBoundary>
-
-        {/* Active Loads - Full Width */}
-        <div data-tour="active-loads">
           <ErrorBoundary compact>
-            <ActiveLoadsBoard />
+            <FleetTimelineScheduler />
           </ErrorBoundary>
-        </div>
 
-        {/* Upcoming Pickups - Full Width */}
-        <UpcomingPickups />
+          <div data-tour="active-loads">
+            <ErrorBoundary compact>
+              <ActiveLoadsBoard />
+            </ErrorBoundary>
+          </div>
+        </TabsContent>
 
-        {/* Fleet Status Grid */}
-        <div data-tour="driver-status" className="grid gap-6 grid-cols-1 md:grid-cols-2">
-          <DriverStatusGrid />
-          <TruckStatusGrid />
-        </div>
+        {/* Fleet Roster */}
+        <TabsContent value="fleet-roster" className="mt-6 space-y-6">
+          <div data-tour="driver-status" className="grid gap-6 grid-cols-1 md:grid-cols-2">
+            <DriverStatusGrid />
+            <TruckStatusGrid />
+          </div>
 
-        {/* Quick Actions Footer */}
-        <Card className="card-elevated">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-medium text-muted-foreground">Quick Actions:</span>
-              <Button variant="outline" size="sm" onClick={() => navigate('/fleet-loads')} className="gap-2">
-                <Package className="h-4 w-4" />
-                All Loads
-                <ArrowRight className="h-3 w-3" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate('/drivers')} className="gap-2">
-                <Users className="h-4 w-4" />
-                All Drivers
-                <ArrowRight className="h-3 w-3" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate('/trucks')} className="gap-2">
-                <Truck className="h-4 w-4" />
-                All Trucks
-                <ArrowRight className="h-3 w-3" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </>
+          <ErrorBoundary compact>
+            <DriverLeaderboard />
+          </ErrorBoundary>
+        </TabsContent>
+      </Tabs>
+
+      {/* Quick Actions Footer */}
+      <Card className="card-elevated">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-muted-foreground">Quick Actions:</span>
+            <Button variant="outline" size="sm" onClick={() => navigate('/fleet-loads')} className="gap-2">
+              <Package className="h-4 w-4" />
+              All Loads
+              <ArrowRight className="h-3 w-3" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/drivers')} className="gap-2">
+              <Users className="h-4 w-4" />
+              All Drivers
+              <ArrowRight className="h-3 w-3" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/trucks')} className="gap-2">
+              <Truck className="h-4 w-4" />
+              All Trucks
+              <ArrowRight className="h-3 w-3" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

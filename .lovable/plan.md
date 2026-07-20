@@ -1,32 +1,69 @@
-## Fleet Loads Action Bar
+# Dispatcher Dashboard — Tabbed Reorganization
 
-Insert a new Action Bar row directly between the KPI grid and the loads `DataTable` in `src/pages/FleetLoads.tsx`, replacing the existing inline search + month filter row.
+Restructure `src/pages/DispatcherDashboard.tsx` only. No child components will be deleted, renamed, or have their internal logic changed — they will simply be repositioned into the new layout.
 
-### Layout
-- Flex container: `flex flex-col md:flex-row md:items-center md:justify-between gap-3` — full width, stacks vertically on mobile, splits into left/right groups on `md+`.
-- **Left cluster** (`flex-1 flex flex-col sm:flex-row gap-3`):
-  - Existing `Input` with `Search` left icon + clear-`X` right icon, placeholder updated to "Search loads by ID or destination…".
-  - Existing month `Select` (kept for parity with current filtering).
-- **Right cluster** (`flex items-center gap-2`):
-  - Primary solid `Button` — "Add Load Manually" with `Plus` icon (reuses the current `openCreate()` handler, moved out of the page header).
-  - Outlined secondary `Button variant="outline"` — "Bulk Upload" with `Upload` icon; triggers a hidden `<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">` via ref.
+## Structure
 
-The old "Add Load" button in the page header is removed so the action bar becomes the single source for those actions.
+```text
+┌─ Greeting header + "New Load" button ────────────────────┐
+├─ KPI Grid (PINNED — always visible above tabs) ──────────┤
+│  Active Loads │ Available Drivers │ Active Trucks │ TZ   │
+├─ Tab Bar: [Command Center] [Dispatch Board] [Fleet Roster]
+├─ Tab Content ────────────────────────────────────────────┤
+│                                                          │
+│  Command Center (default):                               │
+│  ┌──────────────────────┬───────────────────────┐        │
+│  │                      │  DispatcherAlerts     │        │
+│  │   FleetMapView       │                       │        │
+│  │   (2/3 width)        ├───────────────────────┤        │
+│  │                      │  UpcomingPickups      │        │
+│  │                      │  (1/3 width column)   │        │
+│  └──────────────────────┴───────────────────────┘        │
+│                                                          │
+│  Dispatch Board:                                         │
+│    DriverAssignmentPanel                                 │
+│    FleetTimelineScheduler                                │
+│    ActiveLoadsBoard                                      │
+│                                                          │
+│  Fleet Roster:                                           │
+│    DriverStatusGrid │ TruckStatusGrid  (2-col)           │
+│    DriverLeaderboard                                     │
+└──────────────────────────────────────────────────────────┘
+```
 
-### Bulk Upload (XLSX only)
-- Hidden file input `ref={bulkInputRef}` with `accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"` — no CSV formats accepted.
-- On change:
-  1. Reject anything whose filename doesn't end in `.xlsx` or whose MIME isn't the Excel spreadsheet type → `notify.error("Only .xlsx files are supported")`.
-  2. Read the file as `ArrayBuffer` and parse with the already-installed `xlsx` package (`XLSX.read(buf, { type: 'array' })`, `sheet_to_json`).
-  3. Map recognized columns (Landstar Load ID, Origin City/State/Zip, Destination City/State/Zip, Pickup Date, Delivery Date, Gross Revenue, Commodity, Weight, Agency Code) to `fleet_loads` insert rows, defaulting missing fields to null.
-  4. Insert via existing `supabase.from('fleet_loads').insert(rows)` with `org_id` from context; on success show `notify.success("Imported N loads")` and refresh the query. On per-row failure, surface count of skipped rows.
-- No CSV code path, no CSV MIME accepted, and no fallback parser — strictly `.xlsx`.
+## Changes
 
-### Technical notes
-- New state: `bulkInputRef = useRef<HTMLInputElement>(null)`, `bulkImporting` boolean for button spinner.
-- Reuses existing `notify` helper, `queryClient.invalidateQueries` pattern, and the current `openCreate` flow.
-- No schema changes; `xlsx` is already a dependency (used by `parse-landstar-xlsx.ts`).
-- Purely presentation + import wiring — no changes to load business logic, KPI math, or table columns.
+### 1. Pinned KPI Header
+- The 4 KPI cards (Active Loads, Available Drivers, Active Trucks, Upcoming Pickups) render outside the tabs so they persist across tab switches.
+- Rename the 4th card from "Upcoming Pickups" to "Timezone" per the request. It will display the browser's local IANA timezone (e.g. `America/Chicago`) via `Intl.DateTimeFormat().resolvedOptions().timeZone`, with a `Clock` icon. The existing `upcomingPickups` stat is still surfaced inside the Command Center via the `UpcomingPickups` component, so no data is lost.
 
-### Files touched
-- `src/pages/FleetLoads.tsx` — remove header "Add Load" button, replace inline search row with the new Action Bar, add bulk upload handler.
+### 2. Tab Navigation
+- Use the existing shadcn `Tabs` component (`@/components/ui/tabs`) already in the project.
+- Style `TabsList` to look like a horizontal underline nav: transparent background, and active tab styled with a colored bottom border (`data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:text-foreground`) rather than the default filled pill.
+- Default tab: `command-center`.
+
+### 3. Command Center tab
+- Two-column grid: `grid-cols-1 lg:grid-cols-3 gap-6`.
+- Left (spans 2 cols on lg): `FleetMapView` wrapped in existing `ErrorBoundary` + `Suspense` + `MapSkeleton` (unchanged).
+- Right (1 col): vertical stack — `DispatcherAlerts` on top, `UpcomingPickups` below it.
+- `data-tour="fleet-map"` and the `#assign-driver` scroll-mt anchor are preserved (anchor moves to Dispatch Board where `DriverAssignmentPanel` now lives).
+
+### 4. Dispatch Board tab
+- Stacked full-width sections in order: `DriverAssignmentPanel` (keeps `id="assign-driver"`), `FleetTimelineScheduler`, `ActiveLoadsBoard` (keeps `data-tour="active-loads"`).
+
+### 5. Fleet Roster tab
+- Top row: 2-column grid with `DriverStatusGrid` and `TruckStatusGrid` (keeps `data-tour="driver-status"` wrapper).
+- Below: `DriverLeaderboard`.
+
+### 6. Quick Actions Footer
+- Kept as-is, rendered below the tab content so it's always visible.
+
+## Files Touched
+
+- `src/pages/DispatcherDashboard.tsx` — sole file modified. All imports, queries, realtime subscription, hash-scroll effect, and child component usages are retained.
+
+## Out of Scope
+
+- No changes to any child component (`FleetMapView`, `DispatcherAlerts`, `UpcomingPickups`, `DriverAssignmentPanel`, `FleetTimelineScheduler`, `ActiveLoadsBoard`, `DriverStatusGrid`, `TruckStatusGrid`, `DriverLeaderboard`).
+- No data model, query, or backend changes.
+- No routing changes; tabs are local component state (not URL-synced) unless you'd like that added.
