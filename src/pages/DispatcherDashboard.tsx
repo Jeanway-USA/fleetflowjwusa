@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { addHours } from 'date-fns';
 import { ActiveLoadsBoard } from '@/components/dispatcher/ActiveLoadsBoard';
-import { UpcomingPickups } from '@/components/dispatcher/UpcomingPickups';
+
 import { DriverStatusGrid } from '@/components/dispatcher/DriverStatusGrid';
 import { TruckStatusGrid } from '@/components/dispatcher/TruckStatusGrid';
 import { DispatcherAlerts } from '@/components/dispatcher/DispatcherAlerts';
