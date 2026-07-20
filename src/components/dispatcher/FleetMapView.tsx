@@ -149,6 +149,36 @@ export function FleetMapView() {
   // Live, driver-GPS-derived route geometry per load (overrides static OSRM result when present)
   const [liveRouteGeometries, setLiveRouteGeometries] = useState<Map<string, [number, number][]>>(new Map());
 
+  // Environmental overlay toggles (persisted)
+  const [weatherEnabled, setWeatherEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = window.localStorage.getItem(OVERLAY_STORAGE_KEY);
+      return raw ? !!JSON.parse(raw).weather : false;
+    } catch {
+      return false;
+    }
+  });
+  const [trafficEnabled, setTrafficEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const raw = window.localStorage.getItem(OVERLAY_STORAGE_KEY);
+      return raw ? !!JSON.parse(raw).traffic : false;
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        OVERLAY_STORAGE_KEY,
+        JSON.stringify({ weather: weatherEnabled, traffic: trafficEnabled }),
+      );
+    } catch {
+      /* no-op */
+    }
+  }, [weatherEnabled, trafficEnabled]);
+
   // Fetch ALL driver locations (not just recent ones)
   const { data: initialLocations } = useQuery({
     queryKey: ['driver-locations'],
