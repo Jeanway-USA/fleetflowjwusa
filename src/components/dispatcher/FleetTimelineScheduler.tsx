@@ -43,6 +43,7 @@ interface HometimeWindow {
 }
 
 const WINDOW_DAYS = 14;
+const MILES_PER_DAY = 500;
 
 const LOAD_COLORS = [
   'bg-primary/80 text-primary-foreground',
