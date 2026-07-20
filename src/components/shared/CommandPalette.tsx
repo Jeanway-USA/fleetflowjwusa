@@ -138,26 +138,31 @@ export function CommandPalette() {
         supabase.from('fleet_loads')
           .select('id, landstar_load_id, agency_code, origin, destination, status, invoice_number, pickup_number, tracking_id')
           .eq('org_id', orgId!)
+          .is('deleted_at', null)
           .or(`landstar_load_id.ilike.${like},agency_code.ilike.${like},origin.ilike.${like},destination.ilike.${like},invoice_number.ilike.${like},pickup_number.ilike.${like},tracking_id.ilike.${like}`)
           .limit(6),
         supabase.from('drivers')
           .select('id, first_name, last_name, email, phone, license_number')
           .eq('org_id', orgId!)
+          .is('deleted_at', null)
           .or(`first_name.ilike.${like},last_name.ilike.${like},email.ilike.${like},phone.ilike.${like},license_number.ilike.${like}`)
           .limit(6),
         supabase.from('trucks')
           .select('id, unit_number, make, model, vin, license_plate')
           .eq('org_id', orgId!)
+          .is('deleted_at', null)
           .or(`unit_number.ilike.${like},vin.ilike.${like},license_plate.ilike.${like},make.ilike.${like},model.ilike.${like}`)
           .limit(6),
         supabase.from('trailers')
           .select('id, unit_number, make, model, vin, license_plate')
           .eq('org_id', orgId!)
+          .is('deleted_at', null)
           .or(`unit_number.ilike.${like},vin.ilike.${like},license_plate.ilike.${like},make.ilike.${like},model.ilike.${like}`)
           .limit(6),
         supabase.from('crm_contacts')
           .select('id, company_name, agent_code, contact_type')
           .eq('org_id', orgId!)
+          .is('deleted_at', null)
           .or(`company_name.ilike.${like},agent_code.ilike.${like}`)
           .limit(6),
       ]);

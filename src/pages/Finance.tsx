@@ -98,7 +98,7 @@ export default function Finance() {
   const { data: loads = [] } = useQuery({
     queryKey: ['fleet_loads'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('fleet_loads').select('*').order('pickup_date', { ascending: false });
+      const { data, error } = await supabase.from('fleet_loads').select('*').is('deleted_at', null).order('pickup_date', { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -125,7 +125,7 @@ export default function Finance() {
   const { data: trucks = [] } = useQuery({
     queryKey: ['trucks'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('trucks').select('*');
+      const { data, error } = await supabase.from('trucks').select('*').is('deleted_at', null);
       if (error) throw error;
       return data;
     },
@@ -134,7 +134,7 @@ export default function Finance() {
   const { data: drivers = [] } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('drivers').select('*');
+      const { data, error } = await supabase.from('drivers').select('*').is('deleted_at', null);
       if (error) throw error;
       return data;
     },
