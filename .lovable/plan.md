@@ -1,22 +1,55 @@
-## Goal
-Add a sleek overlay control menu to the In Transit map in the Command Center with two toggle switches — "Weather Radar" and "Traffic Conditions" — wired to placeholder Leaflet layer logic ready for future third-party API keys.
+# Dispatch Board — Auto-Snap Drop + Resizable Load Bars
 
-## Changes
+Scope: `src/components/dispatcher/FleetTimelineScheduler.tsx` only (Dispatch Board tab). UnassignedLoadsDrawer already passes the full load JSON via `dataTransfer`, so no changes needed there.
 
-### `src/components/dispatcher/FleetMapView.tsx`
-1. Import shadcn `Switch` (`@/components/ui/switch`), `Label`, and `Cloud` / `TrafficCone` icons from lucide-react.
-2. Add two React state flags: `weatherEnabled`, `trafficEnabled` (both default `false`). Persist to `localStorage` (`fleet-map-overlays`) so preferences survive reload.
-3. Inside `renderMapContent`, next to the existing `MapContainer`, render a floating control card absolutely positioned at `top-2 right-2` (right-12 on non-expanded views to avoid overlapping the existing Expand button from `ExpandableMap`). Styling:
-   - `bg-gray-900/80 backdrop-blur-sm text-white border border-white/10 rounded-lg shadow-lg p-3`
-   - `z-[500]` so it sits above tiles but below Leaflet popups.
-   - Two rows: icon + label + `Switch`. Switch uses accent color via `data-[state=checked]:bg-primary` (amber gold, matches design system).
-4. Add two conditional `TileLayer` components inside `MapContainer`:
-   - Weather: OpenWeatherMap precipitation URL pattern `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${key}` behind a `weatherEnabled && apiKey` guard. Since no key is configured yet, render a placeholder OSM-styled overlay using a transparent tile stub (leave URL variable + `TODO` comment) so the toggle visibly no-ops without breaking. Also show a small "Demo mode" hint in the popover when enabled without key.
-   - Traffic: Google Maps traffic requires the JS SDK, not a raster tile URL — leave a `TODO` comment + stub tile layer. Toggle state is preserved for when the SDK is wired later.
-5. Both overlay layers use `opacity={0.6}` and `zIndex={400}` so they sit above base tiles but under markers/polylines.
-6. Control menu stays visible in both inline and expanded modes.
+## 1. Auto-snap on drop
 
-### Notes
-- No new dependencies; `Switch` already exists in the shadcn library.
-- No backend/env changes. Actual OpenWeatherMap/Google Traffic wiring is deferred until the user provides keys — the plan explicitly leaves placeholder hooks.
-- No changes to routing, geocoding, or marker logic.
+When a load is dropped on a driver row:
+
+- Read `booked_miles` from the dropped load payload (already selected on unassigned queries; if missing, fall back to 1 day).
+- Compute `days = max(1, ceil(booked_miles / 500))`.
+- Compute dates:
+  - `pickup_date` = the calendar day the drop landed on (we can already resolve `dayIdx` from the drop target — add `dayIdx` param to `handleDrop`).
+  - `delivery_date` = `addDays(pickup, days - 1)`.
+- Run existing `checkConflicts` against the new dates before writing.
+- Update `fleet_loads` with `{ driver_id, status: 'assigned', pickup_date, delivery_date }` (was only `driver_id + status`).
+
+Constants: `MILES_PER_DAY = 500` at module top so it's tweakable.
+
+## 2. Resizable load bars
+
+Add two thin drag handles inside each rendered load bar (the block at lines ~496–505):
+
+- Left handle: 4px wide, `cursor-w-resize`, textured with `GripVertical` at low opacity.
+- Right handle: mirror on the right edge, `cursor-e-resize`.
+- Handles use `onMouseDown` (not HTML5 drag, to avoid clashing with the row's drop target).
+
+Resize interaction (component-level state `resizing: { loadId, edge: 'left'|'right', originX, originPickup, originDelivery } | null`):
+
+1. `mousedown` on a handle: capture pointer, store origin state, `e.stopPropagation()` so the row drag doesn't fire.
+2. `window.mousemove`: compute `dxDays = round((clientX - originX) / dayCellWidthPx)`. Measure `dayCellWidthPx` from a ref on any day header cell so it stays accurate at all viewport sizes.
+   - Left edge → new `pickup = originPickup + dxDays`, clamped to `≤ delivery` and inside the 14-day window.
+   - Right edge → new `delivery = originDelivery + dxDays`, clamped to `≥ pickup`.
+   - Update a local `previewDates` state so the bar re-renders live without touching the DB.
+3. `window.mouseup`: if dates changed, run `checkConflicts` with the preview dates; on pass, `UPDATE fleet_loads SET pickup_date/delivery_date`. On conflict, toast + revert. Invalidate the same query keys the drop handler uses.
+
+Bar width already derives from `pickup_date`/`delivery_date` — feeding `previewDates` through the same path automatically stretches/compresses the block. No new geometry math.
+
+## 3. Floating date tooltip during resize
+
+- While `resizing` is active, render a fixed-position pill (portal-less, `position: fixed`, follows `mousemove`) styled like existing toasts (`bg-popover text-popover-foreground border rounded px-2 py-1 text-xs shadow-md`).
+- Content: `Pickup: Mon, Jan 15` when dragging the left edge, `Delivery: Wed, Jan 17` when dragging the right edge (uses `format(date, 'EEE, MMM d')`).
+- Hide on mouseup.
+
+## 4. Edge cases
+
+- Dropping on a day where existing loads already occupy the auto-span window → conflict toast fires (existing logic), no assignment.
+- Resizing across hometime days → `checkConflicts` already flags it; revert on release.
+- Resize past window edges → clamp visually; no DB write for that edge.
+- Touch: handles work with mouse for now; touch resize is out of scope (existing drag-drop is also mouse-only).
+
+## Technical notes
+
+- Files touched: `src/components/dispatcher/FleetTimelineScheduler.tsx` (only).
+- No schema change — `booked_miles`, `pickup_date`, `delivery_date` all exist on `fleet_loads`.
+- No new dependencies.

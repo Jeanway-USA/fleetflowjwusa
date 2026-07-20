@@ -19,6 +19,7 @@ interface UnassignedLoad {
   pickup_date: string | null;
   delivery_date: string | null;
   driver_id: string | null;
+  booked_miles: number | null;
 }
 
 function LoadCard({ load }: { load: UnassignedLoad }) {
@@ -116,7 +117,7 @@ export function UnassignedLoadsDrawer() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('fleet_loads')
-        .select('id, landstar_load_id, origin, destination, status, pickup_date, delivery_date, driver_id')
+        .select('id, landstar_load_id, origin, destination, status, pickup_date, delivery_date, driver_id, booked_miles')
         .is('driver_id', null)
         .in('status', ['pending', 'booked'])
         .order('pickup_date', { ascending: true })

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +25,7 @@ interface TimelineLoad {
   pickup_date: string | null;
   delivery_date: string | null;
   driver_id: string | null;
+  booked_miles: number | null;
 }
 
 interface ServiceSchedule {
@@ -42,6 +43,7 @@ interface HometimeWindow {
 }
 
 const WINDOW_DAYS = 14;
+const MILES_PER_DAY = 500;
 
 const LOAD_COLORS = [
   'bg-primary/80 text-primary-foreground',
@@ -77,6 +79,21 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
   const [weekOffset, setWeekOffset] = useState(0);
   const [draggedLoad, setDraggedLoad] = useState<TimelineLoad | null>(null);
   const [assigningLoad, setAssigningLoad] = useState<string | null>(null);
+
+  // Ref to a day header cell — used to measure day-column pixel width for resize math.
+  const dayCellRef = useRef<HTMLDivElement | null>(null);
+
+  // Live resize state — while active, previewDates override the DB values for that load.
+  const [resizing, setResizing] = useState<{
+    loadId: string;
+    driverId: string;
+    edge: 'left' | 'right';
+    originX: number;
+    originPickup: Date;
+    originDelivery: Date;
+  } | null>(null);
+  const [previewDates, setPreviewDates] = useState<{ pickup: Date; delivery: Date } | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
   const windowStart = useMemo(
     () => startOfDay(addDays(new Date(), weekOffset * 7)),
@@ -122,7 +139,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
     queryFn: async () => {
       const { data } = await supabase
         .from('fleet_loads')
-        .select('id, landstar_load_id, origin, destination, status, pickup_date, delivery_date, driver_id')
+        .select('id, landstar_load_id, origin, destination, status, pickup_date, delivery_date, driver_id, booked_miles')
         .not('driver_id', 'is', null)
         .in('status', ['assigned', 'loading', 'in_transit', 'unloading', 'booked'])
         .or(`pickup_date.lte.${windowEndIso},delivery_date.gte.${windowStartIso},and(pickup_date.gte.${windowStartIso},pickup_date.lte.${windowEndIso})`);
@@ -138,7 +155,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
     queryFn: async () => {
       const { data } = await supabase
         .from('fleet_loads')
-        .select('id, landstar_load_id, origin, destination, status, pickup_date, delivery_date, driver_id')
+        .select('id, landstar_load_id, origin, destination, status, pickup_date, delivery_date, driver_id, booked_miles')
         .is('driver_id', null)
         .in('status', ['pending', 'booked'])
         .order('pickup_date', { ascending: true })
@@ -313,11 +330,33 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
     return match || null;
   };
 
-  const handleDrop = async (driverId: string, e: React.DragEvent) => {
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['timeline-assigned-loads'] });
+    queryClient.invalidateQueries({ queryKey: ['timeline-unassigned-loads'] });
+    queryClient.invalidateQueries({ queryKey: ['dispatcher-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
+    queryClient.invalidateQueries({ queryKey: ['upcoming-pickups-dispatcher'] });
+  };
+
+  const handleDrop = async (driverId: string, dayIdx: number, e: React.DragEvent) => {
     const load = resolveDroppedLoad(e);
     if (!load) return;
 
-    const { hasConflict, message } = checkConflicts(driverId, load);
+    // Auto-snap: derive span from booked miles (baseline 500 mi/day).
+    const miles = load.booked_miles ?? 0;
+    const spanDays = Math.max(1, Math.ceil(miles / MILES_PER_DAY));
+    const pickup = addDays(windowStart, dayIdx);
+    const delivery = addDays(pickup, spanDays - 1);
+    const pickupIso = format(pickup, 'yyyy-MM-dd');
+    const deliveryIso = format(delivery, 'yyyy-MM-dd');
+
+    const snapped: TimelineLoad = {
+      ...load,
+      pickup_date: pickupIso,
+      delivery_date: deliveryIso,
+    };
+
+    const { hasConflict, message } = checkConflicts(driverId, snapped);
     if (hasConflict) {
       toast.warning('Schedule Conflict', { description: message, icon: <AlertTriangle className="h-4 w-4" /> });
       setDraggedLoad(null);
@@ -328,19 +367,23 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
     try {
       const { error } = await supabase
         .from('fleet_loads')
-        .update({ driver_id: driverId, status: 'assigned' })
+        .update({
+          driver_id: driverId,
+          status: 'assigned',
+          pickup_date: pickupIso,
+          delivery_date: deliveryIso,
+        })
         .eq('id', load.id);
 
       if (error) throw error;
 
       const driver = drivers?.find(d => d.id === driverId);
-      toast.success(`Assigned to ${driver?.first_name} ${driver?.last_name}`);
+      toast.success(
+        `Assigned to ${driver?.first_name} ${driver?.last_name}`,
+        { description: `${format(pickup, 'MMM d')} → ${format(delivery, 'MMM d')} · ${spanDays} day${spanDays > 1 ? 's' : ''} @ ${MILES_PER_DAY} mi/day` }
+      );
 
-      queryClient.invalidateQueries({ queryKey: ['timeline-assigned-loads'] });
-      queryClient.invalidateQueries({ queryKey: ['timeline-unassigned-loads'] });
-      queryClient.invalidateQueries({ queryKey: ['dispatcher-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
-      queryClient.invalidateQueries({ queryKey: ['upcoming-pickups-dispatcher'] });
+      invalidateAll();
     } catch {
       toast.error('Failed to assign load');
     } finally {
@@ -348,6 +391,134 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
       setDraggedLoad(null);
     }
   };
+
+  // ------- Resize handlers -------
+  const startResize = (
+    load: TimelineLoad,
+    driverId: string,
+    edge: 'left' | 'right',
+    e: React.MouseEvent
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const pickup = parseDate(load.pickup_date);
+    const delivery = parseDate(load.delivery_date) || pickup;
+    if (!pickup || !delivery) return;
+    setResizing({
+      loadId: load.id,
+      driverId,
+      edge,
+      originX: e.clientX,
+      originPickup: pickup,
+      originDelivery: delivery,
+    });
+    setPreviewDates({ pickup, delivery });
+    setTooltipPos({ x: e.clientX, y: e.clientY });
+  };
+
+  useEffect(() => {
+    if (!resizing) return;
+
+    const dayWidth = dayCellRef.current?.getBoundingClientRect().width || 56;
+
+    const onMove = (ev: MouseEvent) => {
+      const dxDays = Math.round((ev.clientX - resizing.originX) / dayWidth);
+      let pickup = resizing.originPickup;
+      let delivery = resizing.originDelivery;
+
+      if (resizing.edge === 'left') {
+        pickup = addDays(resizing.originPickup, dxDays);
+        if (pickup > delivery) pickup = delivery;
+        if (pickup < windowStart) pickup = windowStart;
+      } else {
+        delivery = addDays(resizing.originDelivery, dxDays);
+        if (delivery < pickup) delivery = pickup;
+        if (delivery > windowEnd) delivery = windowEnd;
+      }
+
+      setPreviewDates({ pickup, delivery });
+      setTooltipPos({ x: ev.clientX, y: ev.clientY });
+    };
+
+    const onUp = async () => {
+      const current = resizing;
+      const preview = previewDatesRef.current;
+      setResizing(null);
+      setTooltipPos(null);
+
+      if (!current || !preview) {
+        setPreviewDates(null);
+        return;
+      }
+
+      const pickupChanged = !isSameDay(preview.pickup, current.originPickup);
+      const deliveryChanged = !isSameDay(preview.delivery, current.originDelivery);
+      if (!pickupChanged && !deliveryChanged) {
+        setPreviewDates(null);
+        return;
+      }
+
+      const pickupIso = format(preview.pickup, 'yyyy-MM-dd');
+      const deliveryIso = format(preview.delivery, 'yyyy-MM-dd');
+      const trial: TimelineLoad = {
+        id: current.loadId,
+        landstar_load_id: null,
+        origin: '',
+        destination: '',
+        status: 'assigned',
+        pickup_date: pickupIso,
+        delivery_date: deliveryIso,
+        driver_id: current.driverId,
+        booked_miles: null,
+      };
+
+      // Temporarily exclude the load being resized so it doesn't self-conflict.
+      const originalLoads = assignedLoads;
+      const filteredLoads = (originalLoads || []).filter(l => l.id !== current.loadId);
+      // Swap into query cache for the conflict check window.
+      queryClient.setQueryData(['timeline-assigned-loads', windowStartIso, windowEndIso], filteredLoads);
+      const { hasConflict, message } = checkConflicts(current.driverId, trial);
+      queryClient.setQueryData(['timeline-assigned-loads', windowStartIso, windowEndIso], originalLoads);
+
+      if (hasConflict) {
+        toast.warning('Resize blocked', { description: message, icon: <AlertTriangle className="h-4 w-4" /> });
+        setPreviewDates(null);
+        return;
+      }
+
+      try {
+        const { error } = await supabase
+          .from('fleet_loads')
+          .update({ pickup_date: pickupIso, delivery_date: deliveryIso })
+          .eq('id', current.loadId);
+        if (error) throw error;
+        toast.success('Load rescheduled', {
+          description: `${format(preview.pickup, 'MMM d')} → ${format(preview.delivery, 'MMM d')}`,
+        });
+        invalidateAll();
+      } catch {
+        toast.error('Failed to reschedule load');
+      } finally {
+        setPreviewDates(null);
+      }
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resizing]);
+
+  // Keep a ref of the latest preview dates so the mouseup handler (bound once per resize) sees fresh values.
+  const previewDatesRef = useRef(previewDates);
+  useEffect(() => {
+    previewDatesRef.current = previewDates;
+  }, [previewDates]);
+
+
 
   const isLoading = driversLoading;
 
@@ -410,9 +581,10 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
               >
                 {/* Header row */}
                 <div className="p-2 text-xs font-medium text-muted-foreground border-b border-border">Driver</div>
-                {days.map(day => (
+                {days.map((day, idx) => (
                   <div
                     key={day.toISOString()}
+                    ref={idx === 0 ? dayCellRef : undefined}
                     className={`p-2 text-center text-xs font-medium border-b border-border ${
                       isSameDay(day, new Date()) ? 'bg-primary/10 text-primary' : 'text-muted-foreground'
                     }`}
@@ -453,7 +625,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                           <div
                             key={day.toISOString()}
                             onDragOver={onHometime ? undefined : handleDragOver}
-                            onDrop={onHometime ? undefined : (e) => handleDrop(driver.id, e)}
+                            onDrop={onHometime ? undefined : (e) => handleDrop(driver.id, dayIdx, e)}
                             className={[
                               'relative border-b border-l border-border min-h-[44px] transition-colors',
                               onHometime
@@ -481,12 +653,17 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
 
                             {/* Load bars starting on this day */}
                             {driverLoads.map((load, loadIdx) => {
-                              const pickup = parseDate(load.pickup_date);
+                              const isBeingResized = resizing?.loadId === load.id && !!previewDates;
+                              const pickup = isBeingResized
+                                ? previewDates!.pickup
+                                : parseDate(load.pickup_date);
                               if (!pickup) return null;
                               if (!isSameDay(pickup, day) && !(dayIdx === 0 && pickup < day)) return null;
                               if (dayIdx > 0 && pickup < day) return null;
 
-                              const delivery = parseDate(load.delivery_date) || pickup;
+                              const delivery = isBeingResized
+                                ? previewDates!.delivery
+                                : parseDate(load.delivery_date) || pickup;
                               const spanDays = Math.min(
                                 differenceInDays(delivery, day) + 1,
                                 WINDOW_DAYS - dayIdx
@@ -496,11 +673,37 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
                               return (
                                 <div
                                   key={load.id}
-                                  className={`absolute inset-y-0.5 left-0.5 right-0.5 rounded text-[10px] px-1.5 py-0.5 truncate flex items-center font-medium z-10 ${getLoadColor(loadIdx)}`}
+                                  className={`group/bar absolute inset-y-0.5 left-0.5 right-0.5 rounded text-[10px] px-1.5 py-0.5 flex items-center font-medium z-10 ${getLoadColor(loadIdx)} ${
+                                    isBeingResized ? 'ring-2 ring-primary shadow-lg' : ''
+                                  }`}
                                   style={{ width: `calc(${widthPercent}% - 4px)`, minWidth: 'calc(100% - 4px)' }}
-                                  title={`${load.landstar_load_id || load.id.slice(0, 8)}: ${load.origin} → ${load.destination}`}
+                                  title={`${load.landstar_load_id || load.id.slice(0, 8)}: ${load.origin} → ${load.destination}${
+                                    load.booked_miles ? ` · ${load.booked_miles} mi` : ''
+                                  }`}
                                 >
-                                  {load.landstar_load_id || load.id.slice(0, 6)}
+                                  {/* Left resize handle */}
+                                  <div
+                                    role="button"
+                                    aria-label="Resize load start"
+                                    onMouseDown={(e) => startResize(load, driver.id, 'left', e)}
+                                    className="absolute left-0 top-0 bottom-0 w-1.5 cursor-w-resize flex items-center justify-center opacity-40 hover:opacity-100 group-hover/bar:opacity-70 transition-opacity"
+                                  >
+                                    <div className="h-3/5 w-0.5 rounded-full bg-current" />
+                                  </div>
+
+                                  <span className="truncate px-1 flex-1 pointer-events-none">
+                                    {load.landstar_load_id || load.id.slice(0, 6)}
+                                  </span>
+
+                                  {/* Right resize handle */}
+                                  <div
+                                    role="button"
+                                    aria-label="Resize load end"
+                                    onMouseDown={(e) => startResize(load, driver.id, 'right', e)}
+                                    className="absolute right-0 top-0 bottom-0 w-1.5 cursor-e-resize flex items-center justify-center opacity-40 hover:opacity-100 group-hover/bar:opacity-70 transition-opacity"
+                                  >
+                                    <div className="h-3/5 w-0.5 rounded-full bg-current" />
+                                  </div>
                                 </div>
                               );
                             })}
@@ -559,6 +762,17 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
           </>
         )}
       </CardContent>
+
+      {/* Floating resize tooltip */}
+      {resizing && previewDates && tooltipPos && (
+        <div
+          className="pointer-events-none fixed z-[9999] bg-popover text-popover-foreground border rounded px-2 py-1 text-xs shadow-md font-medium"
+          style={{ left: tooltipPos.x + 12, top: tooltipPos.y + 12 }}
+        >
+          {resizing.edge === 'left' ? 'Pickup: ' : 'Delivery: '}
+          {format(resizing.edge === 'left' ? previewDates.pickup : previewDates.delivery, 'EEE, MMM d')}
+        </div>
+      )}
     </Card>
   );
 }
