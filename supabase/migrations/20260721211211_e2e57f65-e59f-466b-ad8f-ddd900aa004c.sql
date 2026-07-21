@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.get_public_load_by_tracking(uuid);
