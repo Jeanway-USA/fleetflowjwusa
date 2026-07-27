@@ -136,7 +136,7 @@ export function UpcomingPickups() {
                     ? 'border-destructive/50 bg-destructive/5'
                     : 'border-border bg-muted/30'
                 }`}
-                onClick={() => navigate('/fleet-loads')}
+                onClick={() => navigate(`/fleet-loads?loadId=${load.id}`)}
               >
                 {/* Line 1: load number + relative time */}
                 <div className="flex items-center justify-between gap-2 min-w-0">
