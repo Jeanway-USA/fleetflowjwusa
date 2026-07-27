@@ -1,11 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar, MapPin, AlertTriangle, Clock, User, Truck } from 'lucide-react';
-import { format, formatDistanceToNow, addHours, isBefore } from 'date-fns';
+import { formatDistanceToNow, addHours, isBefore } from 'date-fns';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { StopTime } from '@/components/shared/StopTime';
 import { useNavigate } from 'react-router-dom';
