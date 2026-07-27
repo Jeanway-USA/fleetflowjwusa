@@ -164,7 +164,7 @@ export function UnassignedLoadsDrawer() {
   }
 
   return (
-    <Card id="assign-driver" className="card-elevated scroll-mt-20 lg:sticky lg:top-4">
+    <Card id="assign-driver" className="card-elevated scroll-mt-20">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Inbox className="h-4 w-4 text-primary" />
