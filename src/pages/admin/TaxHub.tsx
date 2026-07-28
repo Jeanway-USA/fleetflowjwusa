@@ -399,7 +399,8 @@ function W2Tab({ year }: { year: number }) {
       });
 
 
-      const path = `${orgId}/${year}/w2/${row.driver_id}.pdf`;
+      // Path must be driver-first: the tax-documents bucket policies key on folder[1] = drivers.id
+      const path = `${row.driver_id}/${year}/w2.pdf`;
       const { error: upErr } = await supabase.storage.from('tax-documents')
         .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
       if (upErr) throw upErr;
