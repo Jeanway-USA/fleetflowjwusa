@@ -170,6 +170,13 @@ function StateDetailSheet({
   );
 }
 
+/** Nested embeds come back as an array (1:N) or a single object (1:1) — normalize. */
+function asArray<T>(value: unknown): T[] {
+  if (value == null) return [];
+  return (Array.isArray(value) ? value : [value]) as T[];
+}
+
+
 // -----------------------------------------------------------
 // Multi-state overview
 // -----------------------------------------------------------
