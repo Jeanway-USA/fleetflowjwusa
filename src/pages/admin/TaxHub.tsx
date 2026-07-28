@@ -193,7 +193,7 @@ function MultiStateTab({ year }: { year: number }) {
       const { data, error } = await supabase
         .from('drivers')
         .select(`id, tax_state, employment_type, status,
-                 internal_payroll_ledger!inner(id, status, period_end,
+                 internal_payroll_ledger(id, status, period_end,
                    gross_taxable_pay, one_time_bonus, one_time_deduction,
                    tax_withholding_ledger(state_suta, state_sit, state_code))`)
         .eq('org_id', orgId!)
