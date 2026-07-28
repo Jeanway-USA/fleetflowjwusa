@@ -1,15 +1,16 @@
 ## Problem
 
-The State Filing Deadlines card lists every state because it builds its state list from the union of (a) states where drivers are assigned and (b) every row in the org's state tax configuration table — and that table is seeded with all states, so all 50 show up.
+The Multi-State Overview only shows FL because its query uses an inner join on the payroll ledger — drivers without any finalized payroll run are dropped entirely, so their states never appear. States with no tax obligation or no payroll activity are invisible.
 
 ## Fix
 
-In `src/components/finance/inhouse-payroll/StateFilingRegistry.tsx`:
+In `src/pages/admin/TaxHub.tsx` (Multi-State tab):
 
-- Build the state list **only** from active (non-terminated) drivers' tax states.
-- Keep using the state tax configuration rows purely as a lookup for whether each of those states has state income tax (SIT), not as a source of states.
-- Empty state stays as-is: "No W-2 employees with a tax state assigned yet."
+- Change the drivers query from an inner join to a left join on `internal_payroll_ledger`, so every active (non-terminated) driver is returned whether or not payroll exists.
+- Build the state rows from all active drivers' `tax_state` values; states with no finalized payroll simply show $0.00 for YTD wages, SUTA, and SIT while still showing the employee count, SUTA rate, SIT status, registration badge, and Configure action.
+- Keep the existing aggregation rules: only finalized ledger rows for the selected year contribute to dollar amounts.
+- Update the card description to say it lists every state where you have workers assigned, regardless of tax obligation.
 
 ## Technical detail
 
-Replace the `states` memo's `new Set([...driverStates, ...cfgMap.keys()])` union with `driverStates` alone, sorted, mapping each code to `hasStateIncomeTax: cfgMap.get(code) ?? false`. No database or schema changes needed.
+Replace `internal_payroll_ledger!inner(...)` with the plain embedded relation `internal_payroll_ledger(...)`. The existing `asArray()` normalization and dedupe-by-driver employee count logic already handle drivers with zero ledger rows, so the memo needs no structural change beyond initializing a state record for every driver with a `tax_state`. No database or schema changes needed.

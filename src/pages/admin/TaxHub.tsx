@@ -193,7 +193,7 @@ function MultiStateTab({ year }: { year: number }) {
       const { data, error } = await supabase
         .from('drivers')
         .select(`id, tax_state, employment_type, status,
-                 internal_payroll_ledger!inner(id, status, period_end,
+                 internal_payroll_ledger(id, status, period_end,
                    gross_taxable_pay, one_time_bonus, one_time_deduction,
                    tax_withholding_ledger(state_suta, state_sit, state_code))`)
         .eq('org_id', orgId!)
@@ -245,8 +245,8 @@ function MultiStateTab({ year }: { year: number }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Landmark className="h-5 w-5" /> Multi-State Overview — {year}</CardTitle>
         <CardDescription>
-          Every state where you employ W-2 workers, with YTD wages, employer-side SUTA accrued, and employee-side SIT withheld.
-          Click any state to update its rate, wage base, or agency account number.
+          Every state where you have workers assigned — regardless of tax obligation — with YTD wages, employer-side SUTA
+          accrued, and employee-side SIT withheld. Click any state to update its rate, wage base, or agency account number.
         </CardDescription>
       </CardHeader>
       <CardContent>
