@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format, startOfMonth, subMonths } from 'date-fns';
+import { endOfMonth, format, startOfMonth, subMonths } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -72,12 +72,20 @@ export function SafetyBonusPayouts() {
   const queryClient = useQueryClient();
 
   const monthOptions = useMemo(() => buildMonthOptions(), []);
-  // Default to previous month once we're past the 1st, otherwise current.
-  const [periodStart, setPeriodStart] = useState<string>(() => {
-    const now = new Date();
-    const target = now.getDate() > 1 ? startOfMonth(subMonths(now, 1)) : startOfMonth(now);
-    return format(target, 'yyyy-MM-dd');
-  });
+  // Default to the current calendar month — matches the driver dashboard bonus widget.
+  const [periodStart, setPeriodStart] = useState<string>(() =>
+    format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+  );
+
+  const periodDate = useMemo(() => new Date(`${periodStart}T00:00:00`), [periodStart]);
+  const periodEndDate = useMemo(() => endOfMonth(periodDate), [periodDate]);
+  const isCurrentMonth = useMemo(
+    () => format(startOfMonth(new Date()), 'yyyy-MM-dd') === periodStart,
+    [periodStart],
+  );
+  const periodLabel = format(periodDate, 'MMMM yyyy');
+  const periodRange = `${format(periodDate, 'MMM d')} – ${format(periodEndDate, 'MMM d, yyyy')}`;
+
 
   const payoutsQuery = useQuery({
     queryKey: ['safety-bonus-payouts', orgId, periodStart],
@@ -97,17 +105,25 @@ export function SafetyBonusPayouts() {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('generate_safety_bonus_payouts', {
+      const { data, error } = await supabase.rpc('generate_safety_bonus_payouts', {
         _period_start: periodStart,
       });
       if (error) throw error;
+      return (data ?? []) as Array<{ earned_amount: number | string }>;
     },
-    onSuccess: () => {
-      toast.success('Payouts generated');
+    onSuccess: (rows) => {
+      toast.success(`Payouts generated for ${periodLabel}`);
+      const allZero = rows.length > 0 && rows.every((r) => Number(r.earned_amount ?? 0) === 0);
+      if (allZero) {
+        toast.info(
+          `No driver earned a bonus in ${periodLabel}. If you expected one, check another month — activity may fall outside this period.`,
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['safety-bonus-payouts', orgId, periodStart] });
     },
     onError: (e: any) => toast.error(e.message ?? 'Failed to generate payouts'),
   });
+
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -145,29 +161,35 @@ export function SafetyBonusPayouts() {
               earned amount, then mark payouts approved or paid.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Select value={periodStart} onValueChange={setPeriodStart}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={() => generateMutation.mutate()}
-              disabled={generateMutation.isPending}
-              variant="outline"
-            >
-              <RefreshCw
-                className={`h-4 w-4 mr-1 ${generateMutation.isPending ? 'animate-spin' : ''}`}
-              />
-              {generateMutation.isPending ? 'Generating…' : 'Generate for month'}
-            </Button>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={periodStart} onValueChange={setPeriodStart}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => generateMutation.mutate()}
+                disabled={generateMutation.isPending}
+                variant="outline"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 mr-1 ${generateMutation.isPending ? 'animate-spin' : ''}`}
+                />
+                {generateMutation.isPending ? 'Generating…' : `Generate for ${periodLabel}`}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Period: {periodRange}
+              {isCurrentMonth && ' · Month in progress — totals will change'}
+            </p>
           </div>
         </div>
       </CardHeader>
@@ -182,7 +204,7 @@ export function SafetyBonusPayouts() {
         ) : payouts.length === 0 ? (
           <div className="rounded-md border border-dashed border-border p-8 text-center">
             <p className="text-sm text-muted-foreground mb-3">
-              No payouts recorded for this month yet.
+              No payouts recorded for {periodLabel} yet.
             </p>
             <Button
               onClick={() => generateMutation.mutate()}
@@ -192,6 +214,7 @@ export function SafetyBonusPayouts() {
               Generate payouts
             </Button>
           </div>
+
         ) : (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
