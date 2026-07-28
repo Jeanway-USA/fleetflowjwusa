@@ -1,27 +1,34 @@
 ## Problem
 
-The Multi-State tab of the Tax Hub crashes with `object is not iterable (cannot read property Symbol(Symbol.iterator))`. The stack points at the `useMemo` aggregation in `MultiStateTab` (`src/pages/admin/TaxHub.tsx`, ~lines 202-233).
+Generating a W-2 from the Tax Hub fails with `new row violates row-level security policy`. The failure is on the **storage upload**, not the database row.
 
-That block does:
+The storage policies on the `tax-documents` bucket require the **first folder in the path to be the driver's ID**:
 
 ```
-for (const l of d.internal_payroll_ledger ?? []) { ... }
-for (const w of l.tax_withholding_ledger ?? []) { ... }
+(storage.foldername(name))[1] = drivers.id  AND drivers.org_id = get_user_org_id(auth.uid())
 ```
 
-Nested embeds from the data API return an **array** for one-to-many relations but a **single object** (or `null`) when the relation is detected as one-to-one (e.g. a unique/PK foreign key). `?? []` only guards `null`/`undefined`, not an object — so a `for...of` over the object throws exactly this error. `tax_withholding_ledger` is the likely culprit; `internal_payroll_ledger` can hit it too.
+But `src/pages/admin/TaxHub.tsx` uploads to an **org-first** path:
+
+- W-2: `${orgId}/${year}/w2/${driverId}.pdf` (line ~402)
+- 1099: `${orgId}/${year}/1099/${driverId}.pdf` (line ~568)
+
+Since folder[1] is the org ID, no matching driver row exists and the insert is rejected. The existing driver-side uploader (`src/hooks/useDriverTaxDocuments.ts`) already uses the correct `${driverId}/${taxYear}/...` shape, which is why that path works.
 
 ## Fix
 
-In `src/pages/admin/TaxHub.tsx`:
+In `src/pages/admin/TaxHub.tsx`, change both generated document paths to be driver-first so they satisfy the bucket policy and stay consistent with the driver uploader:
 
-1. Add a tiny local helper that coerces an embed to an array:
-   - `null`/`undefined` → `[]`
-   - array → itself
-   - single object → `[obj]`
-2. Use it for both `d.internal_payroll_ledger` and `l.tax_withholding_ledger` in the aggregation loop.
-3. Scan the rest of the file for other `for...of` / `.map()` over nested embeds (the Federal, W-2 and 1099 tabs) and apply the same coercion where a nested relation is iterated, so the same crash can't reappear on a sibling tab.
+- W-2 → `${driverId}/${year}/w2.pdf`
+- 1099-NEC → `${driverId}/${year}/1099_nec.pdf`
+
+Apply the same change in the "Generate All W-2s" bulk mutation if it builds its own path.
+
+Notes:
+- Uploads already use `upsert: true`, so regenerating overwrites cleanly.
+- The `tax_documents` upsert keeps `onConflict: 'driver_id,tax_year,file_path'`, which matches the existing unique index; with a stable per-year path, regenerating updates the same row instead of creating duplicates.
+- The `tax_documents` insert policy itself is fine (admin + same-org driver), so no migration is needed.
 
 ## Verification
 
-Load `/admin/tax-hub`, open the Multi-State tab, confirm it renders the per-state table with no error boundary, and check the console is clean.
+From the Tax Hub W-2 tab, generate a W-2 for a driver: the PDF should download, a success toast should appear, and no RLS error. Then confirm a `tax_documents` row exists with the new driver-first `file_path`, and repeat for the 1099 tab.
