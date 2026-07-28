@@ -170,6 +170,13 @@ function StateDetailSheet({
   );
 }
 
+/** Nested embeds come back as an array (1:N) or a single object (1:1) — normalize. */
+function asArray<T>(value: unknown): T[] {
+  if (value == null) return [];
+  return (Array.isArray(value) ? value : [value]) as T[];
+}
+
+
 // -----------------------------------------------------------
 // Multi-state overview
 // -----------------------------------------------------------
@@ -206,12 +213,12 @@ function MultiStateTab({ year }: { year: number }) {
       if (!state) continue;
       const rec = map.get(state) ?? { state, employees: 0, wages: 0, suta: 0, sit: 0 };
       rec.employees += 1;
-      for (const l of d.internal_payroll_ledger ?? []) {
+      for (const l of asArray<any>(d.internal_payroll_ledger)) {
         if (l.status !== 'finalized') continue;
         if (new Date(l.period_end).getFullYear() !== year) continue;
         rec.wages += (Number(l.gross_taxable_pay) || 0)
           + (Number(l.one_time_bonus) || 0) - (Number(l.one_time_deduction) || 0);
-        for (const w of l.tax_withholding_ledger ?? []) {
+        for (const w of asArray<any>(l.tax_withholding_ledger)) {
           rec.suta += Number(w.state_suta) || 0;
           rec.sit += Number(w.state_sit) || 0;
         }
