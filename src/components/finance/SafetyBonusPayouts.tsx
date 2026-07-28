@@ -161,29 +161,35 @@ export function SafetyBonusPayouts() {
               earned amount, then mark payouts approved or paid.
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Select value={periodStart} onValueChange={setPeriodStart}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={() => generateMutation.mutate()}
-              disabled={generateMutation.isPending}
-              variant="outline"
-            >
-              <RefreshCw
-                className={`h-4 w-4 mr-1 ${generateMutation.isPending ? 'animate-spin' : ''}`}
-              />
-              {generateMutation.isPending ? 'Generating…' : 'Generate for month'}
-            </Button>
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={periodStart} onValueChange={setPeriodStart}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => generateMutation.mutate()}
+                disabled={generateMutation.isPending}
+                variant="outline"
+              >
+                <RefreshCw
+                  className={`h-4 w-4 mr-1 ${generateMutation.isPending ? 'animate-spin' : ''}`}
+                />
+                {generateMutation.isPending ? 'Generating…' : `Generate for ${periodLabel}`}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Period: {periodRange}
+              {isCurrentMonth && ' · Month in progress — totals will change'}
+            </p>
           </div>
         </div>
       </CardHeader>
@@ -198,7 +204,7 @@ export function SafetyBonusPayouts() {
         ) : payouts.length === 0 ? (
           <div className="rounded-md border border-dashed border-border p-8 text-center">
             <p className="text-sm text-muted-foreground mb-3">
-              No payouts recorded for this month yet.
+              No payouts recorded for {periodLabel} yet.
             </p>
             <Button
               onClick={() => generateMutation.mutate()}
@@ -208,6 +214,7 @@ export function SafetyBonusPayouts() {
               Generate payouts
             </Button>
           </div>
+
         ) : (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
