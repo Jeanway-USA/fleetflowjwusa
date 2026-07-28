@@ -105,17 +105,25 @@ export function SafetyBonusPayouts() {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('generate_safety_bonus_payouts', {
+      const { data, error } = await supabase.rpc('generate_safety_bonus_payouts', {
         _period_start: periodStart,
       });
       if (error) throw error;
+      return (data ?? []) as Array<{ earned_amount: number | string }>;
     },
-    onSuccess: () => {
-      toast.success('Payouts generated');
+    onSuccess: (rows) => {
+      toast.success(`Payouts generated for ${periodLabel}`);
+      const allZero = rows.length > 0 && rows.every((r) => Number(r.earned_amount ?? 0) === 0);
+      if (allZero) {
+        toast.info(
+          `No driver earned a bonus in ${periodLabel}. If you expected one, check another month — activity may fall outside this period.`,
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['safety-bonus-payouts', orgId, periodStart] });
     },
     onError: (e: any) => toast.error(e.message ?? 'Failed to generate payouts'),
   });
+
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
