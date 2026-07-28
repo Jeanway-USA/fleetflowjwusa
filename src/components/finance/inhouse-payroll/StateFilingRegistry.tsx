@@ -59,8 +59,8 @@ export function StateFilingRegistry() {
     for (const c of stateConfigs) {
       cfgMap.set(String(c.state_code).toUpperCase(), !!c.has_state_income_tax);
     }
-    // Union of driver-tax-states and configured states
-    const all = new Set<string>([...driverStates, ...cfgMap.keys()]);
+    // Only states where we actually have active drivers
+    const all = new Set<string>(driverStates);
     return Array.from(all).sort().map((code) => ({
       code,
       hasStateIncomeTax: cfgMap.get(code) ?? false,
