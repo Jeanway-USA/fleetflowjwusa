@@ -1,34 +1,32 @@
 ## Problem
 
-Generating a W-2 from the Tax Hub fails with `new row violates row-level security policy`. The failure is on the **storage upload**, not the database row.
+Generating safety bonus payouts fails with `column reference "status" is ambiguous`.
 
-The storage policies on the `tax-documents` bucket require the **first folder in the path to be the driver's ID**:
+The database function `generate_safety_bonus_payouts(date)` declares `RETURNS TABLE(driver_id uuid, safe_miles integer, earned_amount numeric, status text)`. Those output names become variables inside the function body, so unqualified column references in its internal queries collide with them:
 
-```
-(storage.foldername(name))[1] = drivers.id  AND drivers.org_id = get_user_org_id(auth.uid())
-```
+- `WHERE ... status = 'delivered'` and `status IN ('late','service_failure')` on `fleet_loads`
+- `WHERE driver_id = v_driver.id` on `fleet_loads` / `incidents` (same latent conflict with the `driver_id` output)
+- the `ON CONFLICT ... DO UPDATE SET status = ...` clause
 
-But `src/pages/admin/TaxHub.tsx` uploads to an **org-first** path:
-
-- W-2: `${orgId}/${year}/w2/${driverId}.pdf` (line ~402)
-- 1099: `${orgId}/${year}/1099/${driverId}.pdf` (line ~568)
-
-Since folder[1] is the org ID, no matching driver row exists and the insert is rejected. The existing driver-side uploader (`src/hooks/useDriverTaxDocuments.ts`) already uses the correct `${driverId}/${taxYear}/...` shape, which is why that path works.
+Postgres can't tell whether `status` means the table column or the output variable, so it aborts.
 
 ## Fix
 
-In `src/pages/admin/TaxHub.tsx`, change both generated document paths to be driver-first so they satisfy the bucket policy and stay consistent with the driver uploader:
+One migration that replaces the function with a corrected version. No frontend changes needed.
 
-- W-2 → `${driverId}/${year}/w2.pdf`
-- 1099-NEC → `${driverId}/${year}/1099_nec.pdf`
+1. Rename the output columns to non-colliding names internally by declaring them as `out_driver_id`, `out_safe_miles`, `out_earned_amount`, `out_status`, keeping the same column order and types so the client-side result shape is unchanged (callers read by position/alias — if any code reads `status`, keep the returned column names identical by instead aliasing in a wrapping `RETURN QUERY`; the simpler, safer route below is preferred).
 
-Apply the same change in the "Generate All W-2s" bulk mutation if it builds its own path.
+   Preferred approach: keep the exact same `RETURNS TABLE(driver_id, safe_miles, earned_amount, status)` signature, but fully table-qualify every column reference inside the body:
+   - `fleet_loads.status`, `fleet_loads.driver_id`, `fleet_loads.delivery_date`
+   - `incidents.driver_id`, `incidents.incident_type`, `incidents.severity`, `incidents.citation_issued`, `incidents.incident_date`
+   - `drivers.status`, `drivers.org_id`
+   - the `ON CONFLICT DO UPDATE SET` target list (left-hand `status =` is unambiguous, but the `CASE` reads already use the qualified `public.safety_bonus_payouts.status` and stay as-is)
 
-Notes:
-- Uploads already use `upsert: true`, so regenerating overwrites cleanly.
-- The `tax_documents` upsert keeps `onConflict: 'driver_id,tax_year,file_path'`, which matches the existing unique index; with a stable per-year path, regenerating updates the same row instead of creating duplicates.
-- The `tax_documents` insert policy itself is fine (admin + same-org driver), so no migration is needed.
+   This preserves the returned column names so no UI code changes.
 
-## Verification
+2. Verify by calling the function for the current month and confirming rows come back and are persisted in `safety_bonus_payouts`.
 
-From the Tax Hub W-2 tab, generate a W-2 for a driver: the PDF should download, a success toast should appear, and no RLS error. Then confirm a `tax_documents` row exists with the new driver-first `file_path`, and repeat for the 1099 tab.
+## Technical notes
+
+- The function stays `SECURITY DEFINER` with `search_path = public` and the existing owner/payroll_admin authorization check.
+- Business logic (marginal tier math, eligibility disqualifiers, max bonus cap, paid/approved status preservation on conflict) is unchanged — this is purely a name-resolution fix.
