@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format, startOfMonth, subMonths } from 'date-fns';
+import { endOfMonth, format, startOfMonth, subMonths } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -72,12 +72,20 @@ export function SafetyBonusPayouts() {
   const queryClient = useQueryClient();
 
   const monthOptions = useMemo(() => buildMonthOptions(), []);
-  // Default to previous month once we're past the 1st, otherwise current.
-  const [periodStart, setPeriodStart] = useState<string>(() => {
-    const now = new Date();
-    const target = now.getDate() > 1 ? startOfMonth(subMonths(now, 1)) : startOfMonth(now);
-    return format(target, 'yyyy-MM-dd');
-  });
+  // Default to the current calendar month — matches the driver dashboard bonus widget.
+  const [periodStart, setPeriodStart] = useState<string>(() =>
+    format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+  );
+
+  const periodDate = useMemo(() => new Date(`${periodStart}T00:00:00`), [periodStart]);
+  const periodEndDate = useMemo(() => endOfMonth(periodDate), [periodDate]);
+  const isCurrentMonth = useMemo(
+    () => format(startOfMonth(new Date()), 'yyyy-MM-dd') === periodStart,
+    [periodStart],
+  );
+  const periodLabel = format(periodDate, 'MMMM yyyy');
+  const periodRange = `${format(periodDate, 'MMM d')} – ${format(periodEndDate, 'MMM d, yyyy')}`;
+
 
   const payoutsQuery = useQuery({
     queryKey: ['safety-bonus-payouts', orgId, periodStart],
