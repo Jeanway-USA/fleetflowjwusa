@@ -368,6 +368,7 @@ export function FleetMapView() {
         originCoords,
         destCoords,
         truckCoords,
+        truckUpdatedAt,
         isLiveLocation,
         stopCoords,
         liveRouteGeometry: liveRouteGeometries.get(load.id) ?? null,
