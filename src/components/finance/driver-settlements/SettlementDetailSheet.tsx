@@ -111,11 +111,19 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
   const currentGross = Number(settlement?.gross_pay ?? 0);
   const currentReimb = Number(settlement?.reimbursements ?? 0);
   const currentDed = Number(settlement?.deductions ?? 0);
-  const currentNet = currentGross + currentReimb - currentDed;
+  const currentWithholding = Number((settlement as any)?.tax_withholding ?? 0);
+  const currentNet =
+    settlement?.net_pay != null
+      ? Number(settlement.net_pay)
+      : currentGross + currentReimb - currentDed - currentWithholding;
   const ytdGross = Number(settlement?.ytd_gross ?? 0);
   const ytdReimb = Number(settlement?.ytd_reimbursements ?? 0);
   const ytdDed = Number(settlement?.ytd_deductions ?? 0);
-  const ytdNet = ytdGross + ytdReimb - ytdDed;
+  const ytdNet =
+    settlement?.ytd_net != null
+      ? Number(settlement.ytd_net)
+      : ytdGross + ytdReimb - ytdDed;
+
 
 
 
