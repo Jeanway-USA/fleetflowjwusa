@@ -253,6 +253,12 @@ export function ActiveBatchTab() {
   );
 
 
+  const { data: profiles = new Map<string, PayeeTaxProfile>() } = useQuery({
+    queryKey: ['payroll_tax_profiles', orgId],
+    enabled: !!orgId,
+    queryFn: () => resolveDriverTaxProfiles(orgId!),
+  });
+
   const driverMap = useMemo(() => {
     const m = new Map<string, (typeof drivers)[number]>();
     drivers.forEach((d) => m.set(d.id, d));
@@ -535,16 +541,17 @@ export function ActiveBatchTab() {
       const erSS = Number(wh.er_social_security) || 0;
       const erMed = Number(wh.employer_medicare) || 0;
       const stSuta = (Number(wh.state_suta) || 0) || ((Number(wh.tx_twc_unemployment) || 0) + (Number(wh.fl_reemployment) || 0));
-      eeFica += eeSS + eeMed;
+      const stSit = Number(wh.state_sit) || 0;
+      const addlMed = Number(wh.additional_medicare) || 0;
+      eeFica += eeSS + eeMed + addlMed;
       erFica += erSS + erMed;
       suta += stSuta;
-      // SIT is stored as part of federal_withholding? No — we included in totalEE inside engine
-      // For the summary, recompute SIT via ledger.state config isn't available client-side;
-      // simplest: derive SIT = ledger.federal_withholding_override represents FIT only.
-      // We approximated by keeping SIT out of tax_withholding_ledger. Show 0 here.
+      sit += stSit;
       const oneTimeDed = Number(r.one_time_deduction) || 0;
-      net += Math.max(0, g - (eeSS + eeMed + Number(wh.federal_income_withholding)) - oneTimeDed);
-    }
+      net += Math.max(
+        0,
+        g - (eeSS + eeMed + addlMed + stSit + (Number(wh.federal_income_withholding) || 0)) - oneTimeDed,
+      );
     return { count, gross, fit, eeFica, erFica, suta, sit, net };
   }, [ledgers, whMap]);
 
@@ -656,10 +663,11 @@ export function ActiveBatchTab() {
                   const state = driver?.tax_state || driver?.license_state || config?.defaultTaxState || '—';
                   const gross = Number(r.gross_taxable_pay) || 0;
                   const fit = Number(wh?.federal_income_withholding) || 0;
-                  const eeFica = (Number(wh?.ee_social_security) || 0) + (Number(wh?.ee_medicare) || 0);
+                  const eeFica = (Number(wh?.ee_social_security) || 0) + (Number(wh?.ee_medicare) || 0) + (Number(wh?.additional_medicare) || 0);
+                  const sit = Number(wh?.state_sit) || 0;
                   const suta = (Number(wh?.state_suta) || 0) || ((Number(wh?.tx_twc_unemployment) || 0) + (Number(wh?.fl_reemployment) || 0));
                   const oneTimeDed = Number(r.one_time_deduction) || 0;
-                  const net = Math.max(0, gross - eeFica - fit - oneTimeDed);
+                  const net = Math.max(0, gross - eeFica - fit - sit - oneTimeDed);
                   const locked = r.status === 'finalized' || r.status === 'voided';
 
                   return (
@@ -680,7 +688,7 @@ export function ActiveBatchTab() {
                       </TableCell>
 
                       <TableCell className="capitalize text-xs">
-                        {w4.filing_status.replace('_', ' ')}
+                        {String(w4.filing_status).replace('_', ' ')}
                       </TableCell>
                       <TableCell>{state}</TableCell>
                       <TableCell className="text-right font-mono">{formatCurrency(Number(r.base_salary) || 0)}</TableCell>
