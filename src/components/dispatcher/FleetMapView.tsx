@@ -69,12 +69,17 @@ interface LoadWithLocation {
   routeCongestion: string[] | null;
 }
 
+// Drivers write a GPS fix roughly every 10 minutes while sharing, so allow a
+// generous window before we call the fix stale.
+const LIVE_WINDOW_MIN = 20;
+
 function isLocationLive(loc: DriverLocation): boolean {
   if (!loc.is_sharing) return false;
   const updatedAt = new Date(loc.updated_at);
   const minutesAgo = (Date.now() - updatedAt.getTime()) / (1000 * 60);
-  return minutesAgo < 10;
+  return minutesAgo < LIVE_WINDOW_MIN;
 }
+
 
 function loadFeatureId(loadId: string) {
   // Numeric feature id (Mapbox setFeatureState needs number|string). String is fine.
