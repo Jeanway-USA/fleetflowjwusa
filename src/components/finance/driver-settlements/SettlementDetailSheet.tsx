@@ -111,11 +111,19 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
   const currentGross = Number(settlement?.gross_pay ?? 0);
   const currentReimb = Number(settlement?.reimbursements ?? 0);
   const currentDed = Number(settlement?.deductions ?? 0);
-  const currentNet = currentGross + currentReimb - currentDed;
+  const currentWithholding = Number((settlement as any)?.tax_withholding ?? 0);
+  const currentNet =
+    settlement?.net_pay != null
+      ? Number(settlement.net_pay)
+      : currentGross + currentReimb - currentDed - currentWithholding;
   const ytdGross = Number(settlement?.ytd_gross ?? 0);
   const ytdReimb = Number(settlement?.ytd_reimbursements ?? 0);
   const ytdDed = Number(settlement?.ytd_deductions ?? 0);
-  const ytdNet = ytdGross + ytdReimb - ytdDed;
+  const ytdNet =
+    settlement?.ytd_net != null
+      ? Number(settlement.ytd_net)
+      : ytdGross + ytdReimb - ytdDed;
+
 
 
 
@@ -198,12 +206,14 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
 
         {settlement && (
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <SummaryStat label="Gross Pay" value={currentGross} />
               <SummaryStat label="Reimbursements" value={currentReimb} />
               <SummaryStat label="Deductions" value={-Math.abs(currentDed)} negative />
+              <SummaryStat label="Tax Withholding" value={-Math.abs(currentWithholding)} negative />
               <SummaryStat label="Net Pay" value={currentNet} primary />
             </div>
+
 
             {hasBlockingDiscrepancy && (
               <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm font-medium text-destructive">
@@ -245,7 +255,8 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                   </div>
                 </div>
                 <p className="text-[11px] italic text-muted-foreground mt-3">
-                  Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions
+                  Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions − Tax Withholding
+
                 </p>
               </CardContent>
             </Card>
