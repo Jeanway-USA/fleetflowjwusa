@@ -1212,22 +1212,24 @@ function MapboxCanvas({
   const truckFC = useMemo(() => {
     const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
     loads.forEach((load) => {
-      if (!load.truckCoords) return;
-      // Snap live trucks to the drawn route so the marker rides along it
+      if (!load.truckCoords || !load.isLiveLocation) return;
+      // Snap to the drawn route only when the driver is genuinely on it. If they
+      // are further out, plot the true GPS fix — accuracy beats a tidy line.
       let coord = { lat: load.truckCoords.lat, lng: load.truckCoords.lng };
-      if (load.isLiveLocation && load.liveRouteGeometry && load.liveRouteGeometry.length >= 2) {
-        const snapped = snapPointToRoute(coord, load.liveRouteGeometry);
-        if (snapped) coord = snapped;
+      if (load.liveRouteGeometry && load.liveRouteGeometry.length >= 2) {
+        const near = nearestPointOnRoute(coord, load.liveRouteGeometry);
+        if (near && near.miles <= OFF_ROUTE_MI) coord = { lat: near.lat, lng: near.lng };
       }
       features.push({
         type: 'Feature',
         properties: {
           loadId: load.id,
-          live: load.isLiveLocation,
+          live: true,
           unit: load.truck?.unit_number ?? '',
           driver: load.driver
             ? `${load.driver.first_name} ${load.driver.last_name}`
             : '',
+          updatedAt: load.truckUpdatedAt ?? '',
           origin: load.origin,
           destination: load.destination,
         },
@@ -1237,6 +1239,7 @@ function MapboxCanvas({
         },
       });
     });
+
     return {
       type: 'FeatureCollection',
       features,
