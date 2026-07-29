@@ -255,7 +255,8 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
                   </div>
                 </div>
                 <p className="text-[11px] italic text-muted-foreground mt-3">
-                  Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions
+                  Calculation Note: Net Pay = Gross Pay + Reimbursements − Deductions − Tax Withholding
+
                 </p>
               </CardContent>
             </Card>
