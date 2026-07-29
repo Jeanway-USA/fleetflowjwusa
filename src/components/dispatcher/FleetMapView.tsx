@@ -63,6 +63,7 @@ interface LoadWithLocation {
   originCoords: { lat: number; lng: number } | null;
   destCoords: { lat: number; lng: number } | null;
   truckCoords: { lat: number; lng: number } | null;
+  truckUpdatedAt: string | null;
   isLiveLocation: boolean;
   stopCoords: { lat: number; lng: number; stop: IntermediateStop }[];
   liveRouteGeometry: [number, number][] | null;
