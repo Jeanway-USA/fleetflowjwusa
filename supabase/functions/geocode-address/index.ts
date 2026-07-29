@@ -102,11 +102,14 @@ function coordsOf(feature: any): { lat: number; lng: number } | null {
 }
 
 // A street match in the wrong city is worse than a city centroid.
+// Note: a correct address can legitimately report place "unmatched" when Mapbox
+// uses a neighborhood name (e.g. "East Boston" for a Boston address), so only
+// reject when neither the city nor the ZIP corroborate the match.
 function isTrustworthyAddressMatch(feature: any): boolean {
   const mc = feature?.properties?.match_code;
   if (!mc) return true; // no match metadata (e.g. place results) -> nothing to reject on
   if (mc.confidence === 'low') return false;
-  if (mc.place === 'unmatched') return false;
+  if (mc.place === 'unmatched' && mc.postcode !== 'matched') return false;
   return true;
 }
 
