@@ -66,7 +66,10 @@ type WithholdingRow = {
   tx_twc_unemployment: number;
   fl_reemployment: number;
   state_suta: number;
+  state_sit: number;
+  additional_medicare: number;
 };
+
 
 function defaultPeriod(freq: string, ref = new Date()) {
   if (freq === 'monthly') {
