@@ -376,15 +376,45 @@ export function FleetMapView() {
     if (!rawLoads) return;
     const attempts = routeFetchAttemptsRef.current;
     const stale = 30 * 60 * 1000;
+
+    // Rough miles between two lat/lng points
+    const milesBetween = (
+      a: { lat: number; lng: number },
+      b: { lat: number; lng: number },
+    ) => {
+      const dLat = (a.lat - b.lat) * 69;
+      const dLng = (a.lng - b.lng) * 69 * Math.cos((a.lat * Math.PI) / 180);
+      return Math.sqrt(dLat * dLat + dLng * dLng);
+    };
+    const DRIFT_MI = 0.5;
+
     (async () => {
       for (const load of rawLoads as any[]) {
         const origin = geocodedCoords.get(load.origin);
         const destination = geocodedCoords.get(load.destination);
         if (!origin || !destination) continue;
-        // Skip if we already have geometry
-        if (liveRouteGeometries.has(load.id)) continue;
-        // Skip if the DB row is fresh (already fetched previously)
-        if (load.current_route_updated_at) {
+
+        // Existing geometry may have been built from city centroids before precise
+        // address geocoding — treat it as stale when its endpoints drifted.
+        const existingGeom =
+          liveRouteGeometries.get(load.id) ??
+          (Array.isArray(load.current_route_geometry) ? (load.current_route_geometry as any[]) : null);
+        let endpointsDrifted = false;
+        if (existingGeom && existingGeom.length >= 2) {
+          const first = existingGeom[0];
+          const last = existingGeom[existingGeom.length - 1];
+          if (Array.isArray(first) && Array.isArray(last)) {
+            const startPt = { lat: Number(first[0]), lng: Number(first[1]) };
+            const endPt = { lat: Number(last[0]), lng: Number(last[1]) };
+            endpointsDrifted =
+              milesBetween(startPt, origin) > DRIFT_MI || milesBetween(endPt, destination) > DRIFT_MI;
+          }
+        }
+
+        // Skip if we already have geometry that still matches the geocoded endpoints
+        if (liveRouteGeometries.has(load.id) && !endpointsDrifted) continue;
+        // Skip if the DB row is fresh (already fetched previously) and endpoints still match
+        if (load.current_route_updated_at && !endpointsDrifted) {
           const age = Date.now() - new Date(load.current_route_updated_at).getTime();
           if (age < stale) continue;
         }
@@ -392,6 +422,7 @@ export function FleetMapView() {
         const prev = attempts.get(key) ?? 0;
         if (prev >= 2) continue;
         attempts.set(key, prev + 1);
+
         const stops = loadStops.get(load.id) ?? [];
         const waypoints = stops
           .map((s) => {
