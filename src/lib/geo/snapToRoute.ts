@@ -26,6 +26,20 @@ export function snapPointToRoute(
   route: LatLng[],
   maxDegrees = 1.5, // ~100mi guard — beyond this, don't snap
 ): { lat: number; lng: number } | null {
+  const r = nearestPointOnRoute(point, route);
+  if (!r) return null;
+  if (r.degrees > maxDegrees) return null;
+  return { lat: r.lat, lng: r.lng };
+}
+
+/**
+ * Nearest point on the route plus how far off-route the input point is.
+ * `miles` is an approximation adequate for corridor checks.
+ */
+export function nearestPointOnRoute(
+  point: { lat: number; lng: number },
+  route: LatLng[],
+): { lat: number; lng: number; degrees: number; miles: number } | null {
   if (!route || route.length < 2) return null;
   const p = toXY([point.lat, point.lng]);
   let best: { pt: [number, number]; d2: number; idx: number } | null = null;
@@ -36,9 +50,15 @@ export function snapPointToRoute(
     if (!best || r.d2 < best.d2) best = { pt: r.pt, d2: r.d2, idx: i };
   }
   if (!best) return null;
-  if (Math.sqrt(best.d2) > maxDegrees) return null;
   // Unproject: we projected lng by cos(lat). Use midpoint latitude for inverse.
   const midLat = (route[best.idx][0] + route[best.idx + 1][0]) / 2;
   const cos = Math.cos((midLat * Math.PI) / 180) || 1;
-  return { lat: best.pt[1], lng: best.pt[0] / cos };
+  const degrees = Math.sqrt(best.d2);
+  return {
+    lat: best.pt[1],
+    lng: best.pt[0] / cos,
+    degrees,
+    miles: degrees * 69,
+  };
 }
+
