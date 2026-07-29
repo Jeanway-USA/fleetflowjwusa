@@ -121,14 +121,25 @@ export function GenerateSettlementsDialog({
     },
     onSuccess: (rows) => {
       const total = rows.reduce((s, r: any) => s + Number(r.net_pay ?? 0), 0);
-      toast.success(
-        rows.length === 0
-          ? 'No drivers had activity in this period.'
-          : `Generated ${rows.length} settlement${rows.length === 1 ? '' : 's'} (Net ${formatCurrency(total)}).`,
-      );
+      const requested = allSelected ? drivers.length : selected.size;
+      const skipped = Math.max(0, requested - rows.length);
+      const skipNote =
+        skipped > 0
+          ? ` ${skipped} driver${skipped === 1 ? '' : 's'} skipped (no activity, or an approved/paid statement already exists for this period).`
+          : '';
+      if (rows.length === 0) {
+        toast.info(
+          'No settlements generated. Drivers had no activity, or already have an approved/paid statement for this period.',
+        );
+      } else {
+        toast.success(
+          `Generated ${rows.length} settlement${rows.length === 1 ? '' : 's'} (Net ${formatCurrency(total)}).${skipNote}`,
+        );
+      }
       onGenerated();
       onOpenChange(false);
     },
+
     onError: (e: any) => toast.error(e.message ?? 'Failed to generate settlements'),
   });
 
