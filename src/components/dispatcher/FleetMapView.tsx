@@ -894,7 +894,12 @@ function MapboxCanvas({
     const LYR = 'rainviewer-lyr';
 
     const applyRadar = () => {
-      if (!map.isStyleLoaded()) return;
+      // Style not ready yet (common on first paint when the toggle was already
+      // on): retry once the map goes idle rather than silently giving up.
+      if (!map.isStyleLoaded()) {
+        map.once('idle', applyRadar);
+        return;
+      }
       try {
         if (map.getLayer(LYR)) map.removeLayer(LYR);
         if (map.getSource(SRC)) map.removeSource(SRC);
@@ -923,10 +928,13 @@ function MapboxCanvas({
 
     applyRadar();
     map.on('styledata', applyRadar);
+    map.on('idle', applyRadar);
     return () => {
       map.off('styledata', applyRadar);
+      map.off('idle', applyRadar);
     };
   }, [styleReady, overlays.weather, radarUrlTemplate, overlays.radarOpacity]);
+
 
   // ---- Route lines source/layer (contiguous runs carrying congestion) ----
   const routeFC = useMemo(() => {
