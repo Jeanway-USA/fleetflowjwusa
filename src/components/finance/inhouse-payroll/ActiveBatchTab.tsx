@@ -270,11 +270,30 @@ export function ActiveBatchTab() {
   ) => {
     if (!orgId || !config) return;
     const driver = driverMap.get(driverId);
-    const w4 = w4Map.get(driverId) ?? DEFAULT_W4;
-    const state = driver?.tax_state || driver?.license_state || config.defaultTaxState;
+    const profile: PayeeTaxProfile =
+      profiles.get(driverId) ?? {
+        payeeId: driverId,
+        payeeType: 'driver',
+        name: `${driver?.first_name ?? ''} ${driver?.last_name ?? ''}`.trim(),
+        employmentClass: 'w2',
+        filingStatus: 'single',
+        multipleJobs: false,
+        dependentsAmount: 0,
+        otherIncome: 0,
+        deductions: 0,
+        extraWithholding: 0,
+        workState: driver?.tax_state ?? null,
+        residenceState: driver?.tax_state ?? null,
+        stateExempt: false,
+        stateAllowances: 0,
+        stateAdditionalWithholding: 0,
+        usedDefaults: true,
+      };
+    const state =
+      profile.workState || driver?.tax_state || driver?.license_state || config.defaultTaxState;
     const stateCfg = config.statesByCode.get((state || '').toUpperCase()) ?? null;
 
-    // YTD from finalized rows earlier in year for this driver
+    // YTD from finalized rows earlier in the tax year for this driver.
     const { data: ytdRows } = await supabase
       .from('internal_payroll_ledger')
       .select('gross_taxable_pay, status, id')
@@ -294,19 +313,26 @@ export function ActiveBatchTab() {
       holidayPay: 0,
     });
 
-    const stateW4 = stateW4Map.get(driverId) ?? null;
-    const result = calculateW2Payroll({
+    const result = calculatePayrollTaxes({
       grossTaxablePay: grossTaxable,
-      ytdGrossTaxablePay: ytdGross,
-      ytdMedicareWages: ytdGross,
-      w4,
-      federal: config.federal,
+      otherDeductions: oneTimeDeduction,
+      profile: { ...profile, employmentClass: 'w2' },
+      config: config.config,
       state: stateCfg,
-      stateW4,
+      ytd: {
+        ...EMPTY_YTD,
+        gross: ytdGross,
+        socialSecurityWages: ytdGross,
+        medicareWages: ytdGross,
+      },
+      payFrequency: freq,
     });
+    const amount = (key: string) =>
+      result.employeeLines.find((l) => l.key === key)?.amount ??
+      result.employerLines.find((l) => l.key === key)?.amount ??
+      0;
 
-
-    const netPayout = Math.max(0, result.netPay - oneTimeDeduction);
+    const netPayout = Math.max(0, result.netPay);
 
     const payload = {
       pay_model: 'salary',
@@ -320,7 +346,8 @@ export function ActiveBatchTab() {
       gross_line_haul: 0,
       pass_through_fsc: 0,
       total_miles: 0,
-      federal_withholding_override: result.fit,
+      federal_withholding_override: amount('federal_income_tax'),
+      tax_calculation: result.audit as unknown as Record<string, unknown>,
     };
 
     let ledgerId = existingId;
@@ -352,17 +379,17 @@ export function ActiveBatchTab() {
       {
         org_id: orgId,
         ledger_id: ledgerId!,
-        ee_social_security: result.eeSocialSecurity,
-        er_social_security: result.erSocialSecurity,
-        ee_medicare: result.eeMedicare,
-        employer_medicare: result.erMedicare,
-        additional_medicare: result.addlMedicare,
-        federal_income_withholding: result.fit,
+        ee_social_security: amount('social_security'),
+        er_social_security: amount('employer_social_security'),
+        ee_medicare: amount('medicare'),
+        employer_medicare: amount('employer_medicare'),
+        additional_medicare: amount('additional_medicare'),
+        federal_income_withholding: amount('federal_income_tax'),
         state_code: stateCode,
-        state_suta: result.sutaEmployer,
-        state_sit: result.sitEmployee ?? 0,
-        tx_twc_unemployment: stateCode === 'TX' ? result.sutaEmployer : 0,
-        fl_reemployment: stateCode === 'FL' ? result.sutaEmployer : 0,
+        state_suta: amount('suta'),
+        state_sit: amount('state_income_tax'),
+        tx_twc_unemployment: stateCode === 'TX' ? amount('suta') : 0,
+        fl_reemployment: stateCode === 'FL' ? amount('suta') : 0,
       },
       { onConflict: 'ledger_id' },
     );
