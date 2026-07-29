@@ -453,10 +453,12 @@ export function FleetMapView() {
             .update({
               current_route_geometry: geom as any,
               current_route_congestion: cong as any,
+              current_route_origin: { origin, destination } as any,
               current_route_distance_m: data.distance_m ?? null,
               current_route_duration_s: data.duration_s ?? null,
               current_route_updated_at: new Date().toISOString(),
             })
+
             .eq('id', load.id)
             .then(() => {});
         } catch (err) {
