@@ -487,6 +487,74 @@ export function FleetMapView() {
     })();
   }, [rawLoads, geocodedCoords, loadStops, liveRouteGeometries]);
 
+  // ---- Re-anchor the drawn route to the driver when they're off it ----
+  // If a live driver has drifted more than OFF_ROUTE_MI from the drawn line
+  // (detour, reroute, wrong direction), redraw the route from where they
+  // actually are to the destination. Display-only — the planned route stored on
+  // the load is left untouched.
+  const reanchorRef = useRef<Map<string, { at: number; lat: number; lng: number }>>(new Map());
+  useEffect(() => {
+    const REANCHOR_COOLDOWN_MS = 5 * 60 * 1000;
+    const MOVED_MI = 5;
+    const milesBetween = (
+      a: { lat: number; lng: number },
+      b: { lat: number; lng: number },
+    ) => {
+      const dLat = (a.lat - b.lat) * 69;
+      const dLng = (a.lng - b.lng) * 69 * Math.cos((a.lat * Math.PI) / 180);
+      return Math.sqrt(dLat * dLat + dLng * dLng);
+    };
+
+    (async () => {
+      for (const load of loads) {
+        if (!load.isLiveLocation || !load.truckCoords) continue;
+        const geom = load.liveRouteGeometry;
+        if (!geom || geom.length < 2) continue;
+        const destination = load.destCoords;
+        if (!destination) continue;
+
+        const near = nearestPointOnRoute(load.truckCoords, geom);
+        if (!near || near.miles <= OFF_ROUTE_MI) continue;
+
+        const last = reanchorRef.current.get(load.id);
+        if (last) {
+          const movedEnough = milesBetween(last, load.truckCoords) >= MOVED_MI;
+          const cooledDown = Date.now() - last.at >= REANCHOR_COOLDOWN_MS;
+          if (!movedEnough && !cooledDown) continue;
+        }
+        reanchorRef.current.set(load.id, {
+          at: Date.now(),
+          lat: load.truckCoords.lat,
+          lng: load.truckCoords.lng,
+        });
+
+        // Keep only the stops the driver hasn't obviously passed yet.
+        const waypoints = (load.stopCoords ?? [])
+          .map((sc) => ({ lat: sc.lat, lng: sc.lng }))
+          .filter((c) => milesBetween(c, destination) < milesBetween(load.truckCoords!, destination));
+
+        try {
+          const { data, error } = await supabase.functions.invoke('route-load', {
+            body: { origin: load.truckCoords, destination, waypoints },
+          });
+          if (error || !data?.geometry || !Array.isArray(data.geometry)) continue;
+          setLiveRouteGeometries((prev) => {
+            const next = new Map(prev);
+            next.set(load.id, data.geometry as [number, number][]);
+            return next;
+          });
+          setRouteCongestions((prev) => {
+            const next = new Map(prev);
+            next.set(load.id, (data.congestion as string[]) ?? []);
+            return next;
+          });
+        } catch (err) {
+          console.warn('route re-anchor failed for', load.id, err);
+        }
+      }
+    })();
+  }, [loads]);
+
 
   // ---- RainViewer radar tile URL template ----
   const [radarUrlTemplate, setRadarUrlTemplate] = useState<string | null>(null);
