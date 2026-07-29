@@ -1477,6 +1477,9 @@ export type Database = {
           status: string
           stub_generated_at: string | null
           stub_pdf_path: string | null
+          tax_calculation: Json | null
+          tax_override_by: string | null
+          tax_override_reason: string | null
           tax_state: string | null
           updated_at: string
           w4_dependents_amount: number | null
@@ -1513,6 +1516,9 @@ export type Database = {
           status?: string
           stub_generated_at?: string | null
           stub_pdf_path?: string | null
+          tax_calculation?: Json | null
+          tax_override_by?: string | null
+          tax_override_reason?: string | null
           tax_state?: string | null
           updated_at?: string
           w4_dependents_amount?: number | null
@@ -1549,6 +1555,9 @@ export type Database = {
           status?: string
           stub_generated_at?: string | null
           stub_pdf_path?: string | null
+          tax_calculation?: Json | null
+          tax_override_by?: string | null
+          tax_override_reason?: string | null
           tax_state?: string | null
           updated_at?: string
           w4_dependents_amount?: number | null
@@ -1964,6 +1973,9 @@ export type Database = {
           period_start: string
           reimbursements: number
           status: string
+          tax_calculation: Json | null
+          tax_override_by: string | null
+          tax_override_reason: string | null
           tax_withholding: number
           updated_at: string
           ytd_deductions: number
@@ -1993,6 +2005,9 @@ export type Database = {
           period_start: string
           reimbursements?: number
           status?: string
+          tax_calculation?: Json | null
+          tax_override_by?: string | null
+          tax_override_reason?: string | null
           tax_withholding?: number
           updated_at?: string
           ytd_deductions?: number
@@ -2022,6 +2037,9 @@ export type Database = {
           period_start?: string
           reimbursements?: number
           status?: string
+          tax_calculation?: Json | null
+          tax_override_by?: string | null
+          tax_override_reason?: string | null
           tax_withholding?: number
           updated_at?: string
           ytd_deductions?: number
@@ -3586,6 +3604,9 @@ export type Database = {
           period_end: string
           period_start: string
           status: string
+          tax_calculation: Json | null
+          tax_override_by: string | null
+          tax_override_reason: string | null
           total_miles: number
           updated_at: string
           voided_at: string | null
@@ -3612,6 +3633,9 @@ export type Database = {
           period_end: string
           period_start: string
           status?: string
+          tax_calculation?: Json | null
+          tax_override_by?: string | null
+          tax_override_reason?: string | null
           total_miles?: number
           updated_at?: string
           voided_at?: string | null
@@ -3638,6 +3662,9 @@ export type Database = {
           period_end?: string
           period_start?: string
           status?: string
+          tax_calculation?: Json | null
+          tax_override_by?: string | null
+          tax_override_reason?: string | null
           total_miles?: number
           updated_at?: string
           voided_at?: string | null
@@ -5468,6 +5495,7 @@ export type Database = {
           suta_account_number: string | null
           suta_rate: number
           suta_wage_base: number
+          tax_year: number
           updated_at: string
         }
         Insert: {
@@ -5483,6 +5511,7 @@ export type Database = {
           suta_account_number?: string | null
           suta_rate?: number
           suta_wage_base?: number
+          tax_year?: number
           updated_at?: string
         }
         Update: {
@@ -5498,6 +5527,7 @@ export type Database = {
           suta_account_number?: string | null
           suta_rate?: number
           suta_wage_base?: number
+          tax_year?: number
           updated_at?: string
         }
         Relationships: [
@@ -5726,6 +5756,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tax_year_configs: {
+        Row: {
+          additional_medicare_rate: number
+          additional_medicare_threshold: number
+          created_at: string
+          dependent_credit_other: number
+          dependent_credit_qualifying_child: number
+          fit_tables: Json
+          fit_tables_multiple_jobs: Json
+          futa_rate: number
+          futa_wage_base: number
+          id: string
+          is_locked: boolean
+          medicare_rate: number
+          org_id: string
+          social_security_rate: number
+          social_security_wage_base: number
+          standard_deduction: Json
+          tax_year: number
+          updated_at: string
+        }
+        Insert: {
+          additional_medicare_rate?: number
+          additional_medicare_threshold?: number
+          created_at?: string
+          dependent_credit_other?: number
+          dependent_credit_qualifying_child?: number
+          fit_tables?: Json
+          fit_tables_multiple_jobs?: Json
+          futa_rate?: number
+          futa_wage_base?: number
+          id?: string
+          is_locked?: boolean
+          medicare_rate?: number
+          org_id: string
+          social_security_rate?: number
+          social_security_wage_base?: number
+          standard_deduction?: Json
+          tax_year: number
+          updated_at?: string
+        }
+        Update: {
+          additional_medicare_rate?: number
+          additional_medicare_threshold?: number
+          created_at?: string
+          dependent_credit_other?: number
+          dependent_credit_qualifying_child?: number
+          fit_tables?: Json
+          fit_tables_multiple_jobs?: Json
+          futa_rate?: number
+          futa_wage_base?: number
+          id?: string
+          is_locked?: boolean
+          medicare_rate?: number
+          org_id?: string
+          social_security_rate?: number
+          social_security_wage_base?: number
+          standard_deduction?: Json
+          tax_year?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       trailer_assignments: {
         Row: {
@@ -6723,6 +6816,9 @@ export type Database = {
           period_start: string
           reimbursements: number
           status: string
+          tax_calculation: Json | null
+          tax_override_by: string | null
+          tax_override_reason: string | null
           tax_withholding: number
           updated_at: string
           ytd_deductions: number
@@ -6875,6 +6971,9 @@ export type Database = {
           period_start: string
           reimbursements: number
           status: string
+          tax_calculation: Json | null
+          tax_override_by: string | null
+          tax_override_reason: string | null
           tax_withholding: number
           updated_at: string
           ytd_deductions: number
