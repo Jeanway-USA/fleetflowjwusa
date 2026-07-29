@@ -552,7 +552,9 @@ export function ActiveBatchTab() {
         0,
         g - (eeSS + eeMed + addlMed + stSit + (Number(wh.federal_income_withholding) || 0)) - oneTimeDed,
       );
+    }
     return { count, gross, fit, eeFica, erFica, suta, sit, net };
+
   }, [ledgers, whMap]);
 
   const canFinalize = ledgers.some((r) => r.status === 'draft');
