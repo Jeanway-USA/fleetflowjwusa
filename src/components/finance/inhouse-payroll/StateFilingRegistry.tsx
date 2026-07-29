@@ -97,8 +97,7 @@ export function StateFilingRegistry() {
           <Landmark className="h-5 w-5" /> State Filing Deadlines
         </CardTitle>
         <CardDescription>
-          SUTA and state income-tax deadlines, grouped by state. Only states with active W-2 drivers or an existing tax
-          configuration are shown.
+          SUTA and state income-tax deadlines, grouped by state. Only states with active W-2 drivers are shown.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
