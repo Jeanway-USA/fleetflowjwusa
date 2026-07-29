@@ -68,10 +68,15 @@ export function ReopenDocumentDialog({ open, onOpenChange, instance, onReopened 
       if (ids.length === 0) return [] as OrgUserRow[];
       const { data: profs, error: pErr } = await supabase
         .from('profiles')
-        .select('id, full_name')
-        .in('id', ids);
+        .select('user_id, first_name, last_name')
+        .in('user_id', ids);
       if (pErr) throw pErr;
-      const nameById = new Map((profs ?? []).map((p: any) => [p.id, p.full_name]));
+      const nameById = new Map(
+        (profs ?? []).map((p: any) => [
+          p.user_id,
+          [p.first_name, p.last_name].filter(Boolean).join(' ').trim() || null,
+        ]),
+      );
       return (roleRows ?? []).map((r) => ({
         user_id: r.user_id,
         role: r.role,
