@@ -57,10 +57,10 @@ export function TaxSettingsTab({ taxYear = CURRENT_TAX_YEAR }: { taxYear?: numbe
       if (error) throw error;
     },
     onSuccess: () => {
-      notify.success('Tax rates updated', 'New pay runs will use these values.');
+      notify.success('Tax rates updated', { description: 'New pay runs will use these values.' });
       qc.invalidateQueries({ queryKey: ['tax_year_config'] });
     },
-    onError: (e: any) => notify.error('Could not save tax rates', e.message),
+    onError: (e: any) => notify.error('Could not save tax rates', { description: e.message }),
   });
 
   const states = useMemo(
