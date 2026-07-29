@@ -1,48 +1,42 @@
-## Problem
+## Problem (verified)
 
-Loads already store full street addresses in `fleet_loads.origin` / `destination` (e.g. `Set Epes Yard, 4455 Lansing Dr, Winston Salem, NC 27105-2924`), but `src/lib/geocoding.ts` throws the street away before geocoding: `geocodeWithNominatim()` calls `extractCityState(address)` and queries Nominatim with only `"Winston Salem, NC"`. Every pin and route endpoint therefore lands on the city centroid.
+The load `4 Yawkey Way, Boston, MA 02215-3409` has a stored route destination of `41.2627, -70.06219` — Nantucket.
 
-Every map surface shares this one function — the dispatcher Mapbox map, the driver `LoadRouteMap`, and the public tracker — so fixing it centrally fixes all of them.
+I reproduced the cause against Mapbox directly. Our `geocode-address` function sends the whole address as a single free-text `q` string. Mapbox returns:
+
+```text
+"4 Yawkey Way, Nantucket, Massachusetts 02554"
+match_code: { street: matched, postcode: unmatched, place: unmatched, confidence: medium }
+```
+
+It matched the street name but ignored the city and ZIP — and we accept it blindly because we only look at `feature_type` for precision, never at whether the city/ZIP actually matched.
+
+Sending the same address as *structured* fields returns the correct result:
+
+```text
+address_line1=4 Yawkey Way & place=Boston & region=MA & postcode=02215
+-> "4 Yawkey Way, Boston, Massachusetts 02115" @ 42.345899, -71.098794  (Fenway Park, confidence: high)
+```
 
 ## Fix
 
-### 1. Precise geocoding via a Mapbox edge function
-Mapbox Geocoding handles US street addresses and POI names far better than Nominatim, and the project already holds a Mapbox **secret** token used by `supabase/functions/route-load`.
+### 1. Structured geocoding in the edge function (`supabase/functions/geocode-address/index.ts`)
+- Parse each incoming address into `address_line1` (street), `place` (city), `region` (state), `postcode` (5-digit), dropping any leading business-name segment like `Fenway Park,` / `Set Epes Yard,`.
+- When street + city + state are all present, call Mapbox with those structured params instead of `q`.
+- Fall back to the current free-text `q` call only when the address can't be parsed.
 
-Add `supabase/functions/geocode-address/index.ts`:
-- Requires a valid JWT (same pattern as the hardened `route-load` function).
-- Accepts `{ addresses: string[] }` (batched, capped at ~25 per call).
-- Calls Mapbox Geocoding v6 `/search/geocode/v6/forward` through the connector gateway with the secret token, `country=us`, `limit=1`, `types=address,poi,place`.
-- Returns `{ results: { query, lat, lng, accuracy }[] }`, where `accuracy` reflects whether Mapbox matched a rooftop/street point or fell back to a place centroid.
-- Surfaces provider status/body on non-OK responses.
+### 2. Validate the match before trusting it
+- Read `properties.match_code`. Reject a result as address-precision when `place` is `unmatched` **or** `confidence` is `low`.
+- On rejection, retry once at city level (`q = "City, ST"`, `types=place`) and return that with `precision: 'city'` — a city centroid is wrong-by-a-few-miles, never wrong-by-a-different-island.
+- Include the matched `full_address` in the response so the client can log/compare what was actually resolved.
 
-### 2. Rework `src/lib/geocoding.ts` into a precision-first cascade
-Keep the existing exported API (`geocodeLocationAsync`, `geocodeLocation`, `geocodeBatch`, `interpolatePosition`, `getProgressFromStatus`) so no call site changes shape. Internally:
+### 3. Self-healing of already-stored bad coordinates
+No data migration needed: `FleetMapView` already re-fetches a route whose stored endpoints drift more than half a mile from freshly geocoded coordinates. Once geocoding returns Boston, this load's Nantucket geometry is replaced automatically on next view. I'll confirm this by loading the dispatcher map after the fix.
 
-1. Session cache (unchanged, keyed on normalized full address).
-2. **Mapbox edge function on the full address** — the new primary path.
-3. **Nominatim on the full address** (structured query with street/city/state/postcode parsed out) — fallback when Mapbox is unavailable or returns nothing.
-4. **Nominatim on `extractCityState(...)`** — existing behavior, now last resort only.
-5. Hardcoded `cityFallbacks` — unchanged final fallback.
-
-`extractCityState` stays but is demoted to step 4. Results carry a `precision` flag (`'address' | 'city'`) so callers can tell a real address hit from a centroid; the cache stores it too.
-
-### 3. Re-route loads whose stored geometry was built from centroids
-`FleetMapView`'s auto-fetch skips any load that already has `current_route_geometry`, so existing loads would keep their old city-to-city lines. Use the existing `current_route_origin` jsonb column: when the freshly geocoded origin/destination differs from the stored route origin by more than ~0.5 mi, treat the stored route as stale and re-request `route-load`. Same staleness check applies to the driver-side route fetch.
-
-### 4. Marker positions
-No component changes needed beyond the staleness check — `originCoords` / `destCoords` / stop coords all flow from `geocodeLocationAsync`, so pins move to the exact address automatically once the geocoder is precise.
-
-## Files touched
-
-- `supabase/functions/geocode-address/index.ts` (new)
-- `src/lib/geocoding.ts` (cascade rewrite, same exports)
-- `src/components/dispatcher/FleetMapView.tsx` (stale-route detection against `current_route_origin`)
+### 4. Client parser cleanup (`src/lib/geocoding.ts`)
+`parseAddressParts` already extracts street/city/state/postal but only for the Nominatim fallback. I'll reuse that same parsing on the Mapbox path (share it via the edge function payload) so both tiers agree on what the street and city are, and keep the existing cascade order otherwise unchanged.
 
 ## Verification
-
-Pick a live load with a specific street address (e.g. the Winston Salem yard), load the dispatcher dashboard headless, and confirm the origin pin and route endpoint sit on the street address rather than downtown — plus check the driver load map and public tracker for the same load.
-
-## Note
-
-Mapbox Geocoding bills per request. The session cache plus the existing DB-persisted route geometry keeps repeat lookups off the API, but every distinct new address costs one geocoding call.
+- Re-run the Mapbox call for this load through the deployed function and confirm `42.3459, -71.0988`.
+- Spot-check the other stored addresses (FedEx Boston Harborside Dr, JFK BLDG 262, Winston Salem) for correct placement.
+- Open the dispatcher map and confirm the route ends at Fenway Park rather than Nantucket.
