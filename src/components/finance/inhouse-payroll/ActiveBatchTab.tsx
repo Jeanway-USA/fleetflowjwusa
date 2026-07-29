@@ -23,16 +23,16 @@ import {
   Lock, Loader2, RefreshCw, CheckCircle2, Pencil, Trash2, Ban, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
-import { usePayrollConfig } from '@/hooks/usePayrollConfig';
+import { useTaxYearConfig } from '@/hooks/useTaxYearConfig';
 import {
-  calculateGrossTaxablePay,
-  calculateW2Payroll,
-  DEFAULT_W4,
+  calculatePayrollTaxes,
+  resolveDriverTaxProfiles,
   PAY_PERIODS_PER_YEAR,
-  type W2W4,
-  type FilingStatus,
-  type StateW4Snapshot,
-} from '@/utils/payCalculations';
+  EMPTY_YTD,
+  type PayeeTaxProfile,
+} from '@/lib/payroll';
+import { calculateGrossTaxablePay } from '@/utils/payCalculations';
+
 
 import {
   format, startOfWeek, endOfWeek, addWeeks, addDays,
