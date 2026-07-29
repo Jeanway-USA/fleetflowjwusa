@@ -206,12 +206,14 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
 
         {settlement && (
           <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <SummaryStat label="Gross Pay" value={currentGross} />
               <SummaryStat label="Reimbursements" value={currentReimb} />
               <SummaryStat label="Deductions" value={-Math.abs(currentDed)} negative />
+              <SummaryStat label="Tax Withholding" value={-Math.abs(currentWithholding)} negative />
               <SummaryStat label="Net Pay" value={currentNet} primary />
             </div>
+
 
             {hasBlockingDiscrepancy && (
               <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm font-medium text-destructive">
