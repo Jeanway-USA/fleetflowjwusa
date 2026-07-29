@@ -142,6 +142,7 @@ export function FleetMapView() {
   >(new Map());
   const [routeCongestions, setRouteCongestions] = useState<Map<string, string[]>>(new Map());
   const routeFetchAttemptsRef = useRef<Map<string, number>>(new Map());
+  const reanchorRef = useRef<Map<string, { at: number; lat: number; lng: number }>>(new Map());
 
   const { data: initialLocations } = useQuery({
     queryKey: ['driver-locations'],
@@ -496,7 +497,6 @@ export function FleetMapView() {
   // (detour, reroute, wrong direction), redraw the route from where they
   // actually are to the destination. Display-only — the planned route stored on
   // the load is left untouched.
-  const reanchorRef = useRef<Map<string, { at: number; lat: number; lng: number }>>(new Map());
   useEffect(() => {
     const REANCHOR_COOLDOWN_MS = 5 * 60 * 1000;
     const MOVED_MI = 5;
