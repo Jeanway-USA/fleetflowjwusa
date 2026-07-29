@@ -914,7 +914,13 @@ function MapboxCanvas({
           type: 'raster',
           tiles: [wanted],
           tileSize: 256,
+          // RainViewer only serves real radar imagery up to z7; deeper requests
+          // return a "Zoom Level Not Supported" placeholder tile. Capping maxzoom
+          // makes Mapbox overzoom the z7 tile instead of fetching those.
+          minzoom: 0,
+          maxzoom: 7,
         });
+
         // Insert beneath route/point/truck layers so those stay visible above radar
         const beforeId = ['load-routes-lyr', 'load-points-circle', 'trucks-point']
           .find((id) => map.getLayer(id));
