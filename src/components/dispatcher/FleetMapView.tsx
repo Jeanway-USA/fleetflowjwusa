@@ -895,7 +895,7 @@ function MapboxCanvas({
     };
   }, [styleReady, overlays.weather, radarUrlTemplate, overlays.radarOpacity]);
 
-  // ---- Route lines source/layer (per-segment features carrying congestion) ----
+  // ---- Route lines source/layer (contiguous runs carrying congestion) ----
   const routeFC = useMemo(() => {
     const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
     loads.forEach((load) => {
@@ -913,27 +913,45 @@ function MapboxCanvas({
       }
       if (!coords || coords.length < 2) return;
       const live = !!load.liveRouteGeometry;
-      for (let i = 0; i < coords.length - 1; i++) {
-        const cong = congestion && congestion[i] ? congestion[i] : 'unknown';
+
+      const push = (line: [number, number][], cong: string) => {
+        if (line.length < 2) return;
         features.push({
           type: 'Feature',
-          properties: {
-            loadId: load.id,
-            live,
-            congestion: cong,
-          },
-          geometry: { type: 'LineString', coordinates: [coords[i], coords[i + 1]] },
+          properties: { loadId: load.id, live, congestion: cong },
+          geometry: { type: 'LineString', coordinates: line },
         });
+      };
+
+      // Traffic off (or no congestion data): one continuous line per load
+      if (!overlays.traffic || !congestion || congestion.length === 0) {
+        push(coords, 'unknown');
+        return;
       }
+
+      // Traffic on: emit one feature per contiguous run of identical congestion,
+      // repeating the boundary coordinate so runs visually connect.
+      let runStart = 0;
+      let runCong = congestion[0] || 'unknown';
+      for (let i = 1; i < coords.length - 1; i++) {
+        const cong = congestion[i] || 'unknown';
+        if (cong !== runCong) {
+          push(coords.slice(runStart, i + 1), runCong);
+          runStart = i;
+          runCong = cong;
+        }
+      }
+      push(coords.slice(runStart), runCong);
     });
     return { type: 'FeatureCollection', features } as GeoJSON.FeatureCollection<GeoJSON.LineString>;
-  }, [loads]);
+  }, [loads, overlays.traffic]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !styleReady) return;
     const SRC = 'load-routes';
     const LYR = 'load-routes-lyr';
+    const CASING_LYR = 'load-routes-casing-lyr';
 
     const congestionColor: any = [
       'match',
@@ -949,21 +967,23 @@ function MapboxCanvas({
     ];
     const colorExpr = overlays.traffic ? congestionColor : plainColor;
     const selId = selectedLoadId ?? '';
+    const sel = (a: number, b: number): any => ['case', ['==', ['get', 'loadId'], selId], a, b];
     const widthExpr: any = [
       'interpolate', ['linear'], ['zoom'],
-      3,  ['case', ['==', ['get', 'loadId'], selId], 4, 2.5],
-      6,  ['case', ['==', ['get', 'loadId'], selId], 6, 4],
-      10, ['case', ['==', ['get', 'loadId'], selId], 9, 6],
-      14, ['case', ['==', ['get', 'loadId'], selId], 12, 8],
+      0,  sel(4, 2.5),
+      3,  sel(5, 3.5),
+      6,  sel(7, 5),
+      10, sel(10, 7),
+      14, sel(13, 9),
     ];
     const casingWidthExpr: any = [
       'interpolate', ['linear'], ['zoom'],
-      3,  ['case', ['==', ['get', 'loadId'], selId], 7, 5],
-      6,  ['case', ['==', ['get', 'loadId'], selId], 9, 7],
-      10, ['case', ['==', ['get', 'loadId'], selId], 13, 10],
-      14, ['case', ['==', ['get', 'loadId'], selId], 16, 12],
+      0,  sel(7, 5.5),
+      3,  sel(8, 6.5),
+      6,  sel(10, 8),
+      10, sel(13, 10),
+      14, sel(16, 12),
     ];
-    const CASING_LYR = 'load-routes-casing-lyr';
 
     // Insert route layers beneath the first symbol layer so labels stay on top
     let beforeId: string | undefined;
@@ -973,9 +993,25 @@ function MapboxCanvas({
     } catch {}
 
     try {
-      const src = map.getSource(SRC) as mapboxgl.GeoJSONSource | undefined;
+      const existing = map.getSource(SRC) as any;
+      // Source options (tolerance/buffer) can't be mutated after creation — if an
+      // older source without them is present, tear it down and rebuild.
+      const needsRebuild = existing && existing.tolerance !== 0;
+      if (needsRebuild) {
+        if (map.getLayer(LYR)) map.removeLayer(LYR);
+        if (map.getLayer(CASING_LYR)) map.removeLayer(CASING_LYR);
+        map.removeSource(SRC);
+      }
+
+      const src = needsRebuild ? undefined : (existing as mapboxgl.GeoJSONSource | undefined);
       if (!src) {
-        map.addSource(SRC, { type: 'geojson', data: routeFC });
+        map.addSource(SRC, {
+          type: 'geojson',
+          data: routeFC,
+          tolerance: 0,
+          buffer: 128,
+          maxzoom: 16,
+        });
         map.addLayer({
           id: CASING_LYR,
           type: 'line',
@@ -1010,6 +1046,7 @@ function MapboxCanvas({
       console.warn('Routes layer error:', err);
     }
   }, [routeFC, styleReady, selectedLoadId, overlays.traffic]);
+
 
 
 
