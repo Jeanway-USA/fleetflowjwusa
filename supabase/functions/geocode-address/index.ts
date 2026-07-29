@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
         q: query,
         country: 'us',
         limit: '1',
-        types: 'address,street,place,poi',
+        types: 'address,street,secondary_address,block,place',
         autocomplete: 'false',
       });
       const url = `${GATEWAY_URL}/search/geocode/v6/forward?${params.toString()}`;
