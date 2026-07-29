@@ -356,7 +356,7 @@ export function ActiveBatchTab() {
       pass_through_fsc: 0,
       total_miles: 0,
       federal_withholding_override: amount('federal_income_tax'),
-      tax_calculation: result.audit as unknown as Record<string, unknown>,
+      tax_calculation: JSON.parse(JSON.stringify(result.audit)) as never,
     };
 
     let ledgerId = existingId;
