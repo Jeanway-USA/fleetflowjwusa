@@ -30,7 +30,7 @@ export async function resolveDriverTaxProfiles(
 ): Promise<Map<string, PayeeTaxProfile>> {
   let driverQuery = supabase
     .from('drivers')
-    .select('id, first_name, last_name, employment_type, tax_state, state')
+    .select('id, first_name, last_name, employment_type, tax_state')
     .eq('org_id', orgId)
     .is('deleted_at', null);
   if (driverIds?.length) driverQuery = driverQuery.in('id', driverIds);
@@ -61,8 +61,8 @@ export async function resolveDriverTaxProfiles(
       otherIncome: Number(w4?.other_income) || 0,
       deductions: Number(w4?.deductions) || 0,
       extraWithholding: Number(w4?.extra_withholding) || 0,
-      workState: (st?.work_state ?? d.tax_state ?? d.state ?? null) || null,
-      residenceState: (st?.residence_state ?? d.state ?? null) || null,
+      workState: (st?.work_state ?? d.tax_state ?? null) || null,
+      residenceState: (st?.residence_state ?? d.tax_state ?? null) || null,
       stateExempt: !!st?.exempt,
       stateAllowances: Number(st?.allowances) || 0,
       stateAdditionalWithholding: Number(st?.additional_withholding) || 0,
