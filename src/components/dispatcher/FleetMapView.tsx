@@ -28,11 +28,15 @@ import {
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useTheme } from '@/contexts/ThemeContext';
-import { geocodeLocationAsync, interpolatePosition, getProgressFromStatus } from '@/lib/geocoding';
+import { geocodeLocationAsync } from '@/lib/geocoding';
 import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
 import { WeatherForecastPanel } from './WeatherForecastPanel';
-import { snapPointToRoute } from '@/lib/geo/snapToRoute';
+import { nearestPointOnRoute } from '@/lib/geo/snapToRoute';
+
+// How far a live driver can be from the drawn route before we stop snapping the
+// marker to it and instead re-anchor the route to where the driver actually is.
+const OFF_ROUTE_MI = 10;
 
 const OVERLAY_STORAGE_KEY = 'fleet-map-overlays-v2';
 const RAINVIEWER_INDEX_URL = 'https://api.rainviewer.com/public/weather-maps.json';
@@ -63,18 +67,24 @@ interface LoadWithLocation {
   originCoords: { lat: number; lng: number } | null;
   destCoords: { lat: number; lng: number } | null;
   truckCoords: { lat: number; lng: number } | null;
+  truckUpdatedAt: string | null;
   isLiveLocation: boolean;
   stopCoords: { lat: number; lng: number; stop: IntermediateStop }[];
   liveRouteGeometry: [number, number][] | null;
   routeCongestion: string[] | null;
 }
 
+// Drivers write a GPS fix roughly every 10 minutes while sharing, so allow a
+// generous window before we call the fix stale.
+const LIVE_WINDOW_MIN = 20;
+
 function isLocationLive(loc: DriverLocation): boolean {
   if (!loc.is_sharing) return false;
   const updatedAt = new Date(loc.updated_at);
   const minutesAgo = (Date.now() - updatedAt.getTime()) / (1000 * 60);
-  return minutesAgo < 10;
+  return minutesAgo < LIVE_WINDOW_MIN;
 }
+
 
 function loadFeatureId(loadId: string) {
   // Numeric feature id (Mapbox setFeatureState needs number|string). String is fine.
@@ -132,14 +142,17 @@ export function FleetMapView() {
   >(new Map());
   const [routeCongestions, setRouteCongestions] = useState<Map<string, string[]>>(new Map());
   const routeFetchAttemptsRef = useRef<Map<string, number>>(new Map());
+  const reanchorRef = useRef<Map<string, { at: number; lat: number; lng: number }>>(new Map());
 
   const { data: initialLocations } = useQuery({
     queryKey: ['driver-locations'],
     staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('driver_locations')
-        .select('driver_id, latitude, longitude, speed, heading, updated_at, is_sharing');
+        .select('driver_id, latitude, longitude, speed, heading, updated_at, is_sharing')
+        .eq('is_sharing', true);
       if (error) throw error;
       return data as DriverLocation[];
     },
@@ -150,8 +163,9 @@ export function FleetMapView() {
     const locMap = new Map<string, DriverLocation>();
     let live = 0;
     initialLocations.forEach((loc) => {
+      if (!isLocationLive(loc)) return;
       locMap.set(loc.driver_id, loc);
-      if (isLocationLive(loc)) live++;
+      live++;
     });
     setDriverLocations(locMap);
     setLiveCount(live);
@@ -166,28 +180,32 @@ export function FleetMapView() {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'driver_locations' },
           (payload) => {
+            const applyLiveCount = (next: Map<string, DriverLocation>) => {
+              let live = 0;
+              next.forEach((l) => {
+                if (isLocationLive(l)) live++;
+              });
+              setLiveCount(live);
+              return next;
+            };
             if (payload.eventType === 'DELETE') {
               setDriverLocations((prev) => {
                 const next = new Map(prev);
                 next.delete((payload.old as any).driver_id);
-                let live = 0;
-                next.forEach((l) => {
-                  if (isLocationLive(l)) live++;
-                });
-                setLiveCount(live);
-                return next;
+                return applyLiveCount(next);
               });
             } else {
               const newLoc = payload.new as DriverLocation;
               setDriverLocations((prev) => {
                 const next = new Map(prev);
-                next.set(newLoc.driver_id, newLoc);
-                let live = 0;
-                next.forEach((l) => {
-                  if (isLocationLive(l)) live++;
-                });
-                setLiveCount(live);
-                return next;
+                // A driver who turned sharing off (or whose fix went stale) must
+                // disappear immediately rather than linger at their last spot.
+                if (isLocationLive(newLoc)) {
+                  next.set(newLoc.driver_id, newLoc);
+                } else {
+                  next.delete(newLoc.driver_id);
+                }
+                return applyLiveCount(next);
               });
             }
           },
@@ -196,6 +214,7 @@ export function FleetMapView() {
     } catch (err) {
       console.warn('Realtime unavailable:', err);
     }
+
     return () => {
       if (channel) supabase.removeChannel(channel);
     };
@@ -337,18 +356,18 @@ export function FleetMapView() {
       const originCoords = geocodedCoords.get(load.origin) || null;
       const destCoords = geocodedCoords.get(load.destination) || null;
       const locationRecord = load.driver_id ? driverLocations.get(load.driver_id) : null;
-      let truckCoords: { lat: number; lng: number } | null = null;
-      let isLiveLocation = false;
-      if (locationRecord) {
-        truckCoords = {
-          lat: Number(locationRecord.latitude),
-          lng: Number(locationRecord.longitude),
-        };
-        isLiveLocation = isLocationLive(locationRecord);
-      } else if (originCoords && destCoords) {
-        const progress = getProgressFromStatus(load.status);
-        truckCoords = interpolatePosition(originCoords, destCoords, progress);
-      }
+      // Only real, currently-shared driver GPS is ever plotted. No synthetic /
+      // interpolated positions and no stale rows from a previous trip.
+      const isLiveLocation = !!locationRecord && isLocationLive(locationRecord);
+      const truckCoords =
+        isLiveLocation && locationRecord
+          ? {
+              lat: Number(locationRecord.latitude),
+              lng: Number(locationRecord.longitude),
+            }
+          : null;
+      const truckUpdatedAt = isLiveLocation && locationRecord ? locationRecord.updated_at : null;
+
       const stops = loadStops.get(load.id) || [];
       const stopCoords = stops
         .map((stop) => {
@@ -363,6 +382,7 @@ export function FleetMapView() {
         originCoords,
         destCoords,
         truckCoords,
+        truckUpdatedAt,
         isLiveLocation,
         stopCoords,
         liveRouteGeometry: liveRouteGeometries.get(load.id) ?? null,
@@ -393,6 +413,10 @@ export function FleetMapView() {
         const origin = geocodedCoords.get(load.origin);
         const destination = geocodedCoords.get(load.destination);
         if (!origin || !destination) continue;
+
+        // A route that was deliberately re-anchored to the driver's live position
+        // starts away from the load origin on purpose — never "correct" it back.
+        if (reanchorRef.current.has(load.id)) continue;
 
         // Existing geometry may have been built from city centroids before precise
         // address geocoding — treat it as stale when its endpoints drifted.
@@ -467,6 +491,73 @@ export function FleetMapView() {
       }
     })();
   }, [rawLoads, geocodedCoords, loadStops, liveRouteGeometries]);
+
+  // ---- Re-anchor the drawn route to the driver when they're off it ----
+  // If a live driver has drifted more than OFF_ROUTE_MI from the drawn line
+  // (detour, reroute, wrong direction), redraw the route from where they
+  // actually are to the destination. Display-only — the planned route stored on
+  // the load is left untouched.
+  useEffect(() => {
+    const REANCHOR_COOLDOWN_MS = 5 * 60 * 1000;
+    const MOVED_MI = 5;
+    const milesBetween = (
+      a: { lat: number; lng: number },
+      b: { lat: number; lng: number },
+    ) => {
+      const dLat = (a.lat - b.lat) * 69;
+      const dLng = (a.lng - b.lng) * 69 * Math.cos((a.lat * Math.PI) / 180);
+      return Math.sqrt(dLat * dLat + dLng * dLng);
+    };
+
+    (async () => {
+      for (const load of loads) {
+        if (!load.isLiveLocation || !load.truckCoords) continue;
+        const geom = load.liveRouteGeometry;
+        if (!geom || geom.length < 2) continue;
+        const destination = load.destCoords;
+        if (!destination) continue;
+
+        const near = nearestPointOnRoute(load.truckCoords, geom);
+        if (!near || near.miles <= OFF_ROUTE_MI) continue;
+
+        const last = reanchorRef.current.get(load.id);
+        if (last) {
+          const movedEnough = milesBetween(last, load.truckCoords) >= MOVED_MI;
+          const cooledDown = Date.now() - last.at >= REANCHOR_COOLDOWN_MS;
+          if (!movedEnough && !cooledDown) continue;
+        }
+        reanchorRef.current.set(load.id, {
+          at: Date.now(),
+          lat: load.truckCoords.lat,
+          lng: load.truckCoords.lng,
+        });
+
+        // Keep only the stops the driver hasn't obviously passed yet.
+        const waypoints = (load.stopCoords ?? [])
+          .map((sc) => ({ lat: sc.lat, lng: sc.lng }))
+          .filter((c) => milesBetween(c, destination) < milesBetween(load.truckCoords!, destination));
+
+        try {
+          const { data, error } = await supabase.functions.invoke('route-load', {
+            body: { origin: load.truckCoords, destination, waypoints },
+          });
+          if (error || !data?.geometry || !Array.isArray(data.geometry)) continue;
+          setLiveRouteGeometries((prev) => {
+            const next = new Map(prev);
+            next.set(load.id, data.geometry as [number, number][]);
+            return next;
+          });
+          setRouteCongestions((prev) => {
+            const next = new Map(prev);
+            next.set(load.id, (data.congestion as string[]) ?? []);
+            return next;
+          });
+        } catch (err) {
+          console.warn('route re-anchor failed for', load.id, err);
+        }
+      }
+    })();
+  }, [loads]);
 
 
   // ---- RainViewer radar tile URL template ----
@@ -1197,22 +1288,24 @@ function MapboxCanvas({
   const truckFC = useMemo(() => {
     const features: GeoJSON.Feature<GeoJSON.Point>[] = [];
     loads.forEach((load) => {
-      if (!load.truckCoords) return;
-      // Snap live trucks to the drawn route so the marker rides along it
+      if (!load.truckCoords || !load.isLiveLocation) return;
+      // Snap to the drawn route only when the driver is genuinely on it. If they
+      // are further out, plot the true GPS fix — accuracy beats a tidy line.
       let coord = { lat: load.truckCoords.lat, lng: load.truckCoords.lng };
-      if (load.isLiveLocation && load.liveRouteGeometry && load.liveRouteGeometry.length >= 2) {
-        const snapped = snapPointToRoute(coord, load.liveRouteGeometry);
-        if (snapped) coord = snapped;
+      if (load.liveRouteGeometry && load.liveRouteGeometry.length >= 2) {
+        const near = nearestPointOnRoute(coord, load.liveRouteGeometry);
+        if (near && near.miles <= OFF_ROUTE_MI) coord = { lat: near.lat, lng: near.lng };
       }
       features.push({
         type: 'Feature',
         properties: {
           loadId: load.id,
-          live: load.isLiveLocation,
+          live: true,
           unit: load.truck?.unit_number ?? '',
           driver: load.driver
             ? `${load.driver.first_name} ${load.driver.last_name}`
             : '',
+          updatedAt: load.truckUpdatedAt ?? '',
           origin: load.origin,
           destination: load.destination,
         },
@@ -1222,6 +1315,7 @@ function MapboxCanvas({
         },
       });
     });
+
     return {
       type: 'FeatureCollection',
       features,
@@ -1301,16 +1395,28 @@ function MapboxCanvas({
           if (loadId) onSelectLoad(loadId);
           const coords = (feat.geometry as GeoJSON.Point).coordinates as [number, number];
           truckPopupRef.current?.remove();
+          const updatedAgo = props.updatedAt
+            ? Math.max(
+                0,
+                Math.round((Date.now() - new Date(props.updatedAt).getTime()) / 60000),
+              )
+            : null;
           truckPopupRef.current = new mapboxgl.Popup({ offset: 12, closeButton: true })
             .setLngLat(coords)
             .setHTML(
               `<div style="font-size:12px;min-width:150px">
                  <div style="font-weight:600">Unit ${props.unit ?? ''}</div>
                  ${props.driver ? `<div style="color:#6b7280">${props.driver}</div>` : ''}
+                 ${
+                   updatedAgo !== null
+                     ? `<div style="margin-top:4px;color:#16a34a">Live GPS • updated ${updatedAgo === 0 ? 'just now' : `${updatedAgo} min ago`}</div>`
+                     : ''
+                 }
                  <div style="margin-top:6px;color:#6b7280">${props.origin} → ${props.destination}</div>
                </div>`,
             )
             .addTo(map);
+
         });
         map.on('mouseenter', 'trucks-point', () => {
           map.getCanvas().style.cursor = 'pointer';
