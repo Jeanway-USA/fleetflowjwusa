@@ -9,6 +9,7 @@ import {
 import type { PayFrequency, StateTaxConfig } from '@/lib/payroll/types';
 
 export interface TaxYearContext {
+  orgId: string;
   config: TaxYearConfig;
   configId: string | null;
   statesByCode: Map<string, StateTaxConfig>;
@@ -90,6 +91,7 @@ export function useTaxYearConfig(taxYear: number = CURRENT_TAX_YEAR) {
       }
 
       return {
+        orgId: orgId!,
         config,
         configId: row.id ?? null,
         statesByCode,
