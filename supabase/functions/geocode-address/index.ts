@@ -156,51 +156,97 @@ Deno.serve(async (req) => {
     }
 
     const results: GeocodeResult[] = [];
+    let fatal: { status: number; text: string } | null = null;
 
     for (const query of addresses) {
-      const params = new URLSearchParams({
-        q: query,
-        country: 'us',
-        limit: '1',
-        types: 'address,place',
-        autocomplete: 'false',
-      });
-      const url = `${GATEWAY_URL}/search/geocode/v6/forward?${params.toString()}`;
-      const upstream = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          'X-Connection-Api-Key': MAPBOX_API_KEY,
-        },
-      });
+      const { street, city, state, postal } = parseAddressParts(query);
 
-      if (!upstream.ok) {
-        const text = await upstream.text();
-        console.error(`Mapbox geocoding failed [${upstream.status}] for "${query}": ${text}`);
-        // A hard auth/config failure should surface; per-query misses should not.
-        if (upstream.status === 401 || upstream.status === 402 || upstream.status === 403) {
-          return new Response(
-            JSON.stringify({ error: 'Geocoding request failed', status: upstream.status, details: text }),
-            { status: upstream.status, headers: jsonHeaders },
-          );
+      // 1. Structured lookup — keeps Mapbox from matching a same-named street
+      //    in a different city (e.g. "4 Yawkey Way" resolving to Nantucket).
+      let feature: any = null;
+      if (street && city && state) {
+        const res = await mapboxForward(
+          {
+            address_line1: street,
+            place: city,
+            region: state,
+            ...(postal ? { postcode: postal } : {}),
+          },
+          LOVABLE_API_KEY,
+          MAPBOX_API_KEY,
+        );
+        if (!res.ok) {
+          console.error(`Mapbox structured geocoding failed [${res.status}] for "${query}": ${res.text}`);
+          if (res.status === 401 || res.status === 402 || res.status === 403) fatal = res;
+        } else {
+          const f = res.data?.features?.[0];
+          if (f && coordsOf(f) && isTrustworthyAddressMatch(f)) feature = f;
+          else if (f) {
+            console.warn(`Rejected low-confidence match for "${query}": ${f?.properties?.full_address}`);
+          }
         }
-        results.push({ query, lat: null, lng: null, precision: null });
-        continue;
       }
 
-      const data = await upstream.json();
-      const feature = data?.features?.[0];
-      const coords = feature?.geometry?.coordinates;
-      if (Array.isArray(coords) && coords.length >= 2 && Number.isFinite(coords[0]) && Number.isFinite(coords[1])) {
+      // 2. Free-text fallback when the address could not be parsed.
+      if (!feature && !fatal && !(street && city && state)) {
+        const res = await mapboxForward(
+          { q: query, types: 'address,place' },
+          LOVABLE_API_KEY,
+          MAPBOX_API_KEY,
+        );
+        if (!res.ok) {
+          console.error(`Mapbox geocoding failed [${res.status}] for "${query}": ${res.text}`);
+          if (res.status === 401 || res.status === 402 || res.status === 403) fatal = res;
+        } else {
+          const f = res.data?.features?.[0];
+          if (f && coordsOf(f) && isTrustworthyAddressMatch(f)) feature = f;
+        }
+      }
+
+      // 3. City centroid — wrong by a few miles beats wrong by an island.
+      if (!feature && !fatal && city && state) {
+        const res = await mapboxForward(
+          { q: `${city}, ${state}`, types: 'place' },
+          LOVABLE_API_KEY,
+          MAPBOX_API_KEY,
+        );
+        if (res.ok) {
+          const f = res.data?.features?.[0];
+          if (f && coordsOf(f)) {
+            const c = coordsOf(f)!;
+            results.push({
+              query,
+              lat: c.lat,
+              lng: c.lng,
+              precision: 'city',
+              matched: f?.properties?.full_address ?? null,
+            });
+            continue;
+          }
+        }
+      }
+
+      if (fatal) {
+        return new Response(
+          JSON.stringify({ error: 'Geocoding request failed', status: fatal.status, details: fatal.text }),
+          { status: fatal.status, headers: jsonHeaders },
+        );
+      }
+
+      const coords = feature ? coordsOf(feature) : null;
+      if (coords) {
         results.push({
           query,
-          lng: Number(coords[0]),
-          lat: Number(coords[1]),
+          lat: coords.lat,
+          lng: coords.lng,
           precision: precisionFor(feature?.properties?.feature_type),
+          matched: feature?.properties?.full_address ?? null,
         });
       } else {
-        results.push({ query, lat: null, lng: null, precision: null });
+        results.push({ query, lat: null, lng: null, precision: null, matched: null });
       }
     }
+
 
     return new Response(JSON.stringify({ results }), { status: 200, headers: jsonHeaders });
   } catch (err: any) {
