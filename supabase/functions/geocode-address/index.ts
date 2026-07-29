@@ -9,6 +9,7 @@ interface GeocodeResult {
   lat: number | null;
   lng: number | null;
   precision: 'address' | 'city' | null;
+  matched?: string | null;
 }
 
 // Mapbox v6 "feature type" -> our coarse precision flag
@@ -23,6 +24,92 @@ function precisionFor(featureType: string | undefined): 'address' | 'city' {
       return 'city';
   }
 }
+
+// Split "Fenway Park, 4 Yawkey Way, Boston, MA 02215-3409" into structured pieces.
+// A leading business-name segment (no house number) is dropped.
+function parseAddressParts(address: string): {
+  street?: string;
+  city?: string;
+  state?: string;
+  postal?: string;
+} {
+  const parts = address.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return {};
+
+  let state: string | undefined;
+  let postal: string | undefined;
+  let stateIdx = -1;
+
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const m = parts[i].match(/^([A-Za-z]{2})(?:\s+(\d{5})(?:-\d{4})?)?$/);
+    if (m) {
+      state = m[1].toUpperCase();
+      postal = m[2];
+      stateIdx = i;
+      break;
+    }
+    const m2 = parts[i].match(/^(.+?)\s+([A-Za-z]{2})(?:\s+(\d{5})(?:-\d{4})?)?$/);
+    if (m2) {
+      state = m2[2].toUpperCase();
+      postal = m2[3];
+      stateIdx = i;
+      break;
+    }
+  }
+
+  if (stateIdx === -1) return {};
+
+  const city = stateIdx > 0 ? parts[stateIdx - 1] : undefined;
+  // The street is the part before the city that starts with a house number.
+  let street: string | undefined;
+  for (let i = stateIdx - 2; i >= 0; i--) {
+    if (/^\d/.test(parts[i])) {
+      street = parts[i];
+      break;
+    }
+  }
+  // No numbered street found: use the segment right before the city if it isn't
+  // obviously a business name only (single token names are usually POIs).
+  if (!street && stateIdx - 2 >= 0) street = parts[stateIdx - 2];
+
+  return { street, city, state, postal };
+}
+
+async function mapboxForward(
+  params: Record<string, string>,
+  lovableKey: string,
+  mapboxKey: string,
+): Promise<{ ok: true; data: any } | { ok: false; status: number; text: string }> {
+  const qs = new URLSearchParams({ country: 'us', limit: '1', autocomplete: 'false', ...params });
+  const upstream = await fetch(`${GATEWAY_URL}/search/geocode/v6/forward?${qs.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${lovableKey}`,
+      'X-Connection-Api-Key': mapboxKey,
+    },
+  });
+  if (!upstream.ok) {
+    return { ok: false, status: upstream.status, text: await upstream.text() };
+  }
+  return { ok: true, data: await upstream.json() };
+}
+
+function coordsOf(feature: any): { lat: number; lng: number } | null {
+  const c = feature?.geometry?.coordinates;
+  if (Array.isArray(c) && c.length >= 2 && Number.isFinite(c[0]) && Number.isFinite(c[1])) {
+    return { lat: Number(c[1]), lng: Number(c[0]) };
+  }
+  return null;
+}
+
+// A street match in the wrong city is worse than a city centroid.
+function isTrustworthyAddressMatch(feature: any): boolean {
+  const mc = feature?.properties?.match_code;
+  if (!mc) return true; // no match metadata (e.g. place results) -> nothing to reject on
+  if (mc.confidence === 'low') return false;
+  if (mc.place === 'unmatched') return false;
+  return true;
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
