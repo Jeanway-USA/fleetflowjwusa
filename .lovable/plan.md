@@ -1,42 +1,48 @@
 ## Problem
 
-In `src/components/dispatcher/FleetMapView.tsx`, each route is exploded into one GeoJSON feature **per coordinate pair** (`for i in coords.length - 1` → thousands of 2-point LineStrings). This is the cause of both symptoms:
+Loads already store full street addresses in `fleet_loads.origin` / `destination` (e.g. `Set Epes Yard, 4455 Lansing Dr, Winston Salem, NC 27105-2924`), but `src/lib/geocoding.ts` throws the street away before geocoding: `geocodeWithNominatim()` calls `extractCityState(address)` and queries Nominatim with only `"Winston Salem, NC"`. Every pin and route endpoint therefore lands on the city centroid.
 
-- **Disappears when zoomed out**: Mapbox tiles each GeoJSON source and applies simplification (default `tolerance: 0.375`). Individual 2-point segments a few hundred meters long collapse below the simplification threshold at low zoom and get dropped entirely.
-- **Patchy / dots when zoomed in**: separate features with `line-cap: round` render as detached capsules rather than one continuous stroke, and there is no `line-join` continuity between features.
+Every map surface shares this one function — the dispatcher Mapbox map, the driver `LoadRouteMap`, and the public tracker — so fixing it centrally fixes all of them.
 
 ## Fix
 
-### 1. Stop exploding routes into per-point segments
-Rebuild `routeFC` so it emits **runs of consecutive coordinates that share the same congestion class**, not one feature per pair:
+### 1. Precise geocoding via a Mapbox edge function
+Mapbox Geocoding handles US street addresses and POI names far better than Nominatim, and the project already holds a Mapbox **secret** token used by `supabase/functions/route-load`.
 
-- Traffic overlay **off** → one single LineString feature per load (whole route, `congestion: 'unknown'`).
-- Traffic overlay **on** → walk the congestion array and emit one feature per contiguous run, with each run's last coordinate repeated as the next run's first so there are no visual gaps.
+Add `supabase/functions/geocode-address/index.ts`:
+- Requires a valid JWT (same pattern as the hardened `route-load` function).
+- Accepts `{ addresses: string[] }` (batched, capped at ~25 per call).
+- Calls Mapbox Geocoding v6 `/search/geocode/v6/forward` through the connector gateway with the secret token, `country=us`, `limit=1`, `types=address,poi,place`.
+- Returns `{ results: { query, lat, lng, accuracy }[] }`, where `accuracy` reflects whether Mapbox matched a rooftop/street point or fell back to a place centroid.
+- Surfaces provider status/body on non-OK responses.
 
-This cuts features from thousands to a handful and restores continuous strokes.
+### 2. Rework `src/lib/geocoding.ts` into a precision-first cascade
+Keep the existing exported API (`geocodeLocationAsync`, `geocodeLocation`, `geocodeBatch`, `interpolatePosition`, `getProgressFromStatus`) so no call site changes shape. Internally:
 
-### 2. Make the source render faithfully
-When adding the `load-routes` source, pass:
-- `tolerance: 0` — no geometry simplification, so the line survives at low zoom
-- `buffer: 128` — prevents clipping artifacts at tile edges
-- `maxzoom: 16`
+1. Session cache (unchanged, keyed on normalized full address).
+2. **Mapbox edge function on the full address** — the new primary path.
+3. **Nominatim on the full address** (structured query with street/city/state/postcode parsed out) — fallback when Mapbox is unavailable or returns nothing.
+4. **Nominatim on `extractCityState(...)`** — existing behavior, now last resort only.
+5. Hardcoded `cityFallbacks` — unchanged final fallback.
 
-Because source options can't be changed after creation, the effect should recreate the source (remove layers + source, re-add) if the options are missing, rather than only calling `setData`.
+`extractCityState` stays but is demoted to step 4. Results carry a `precision` flag (`'address' | 'city'`) so callers can tell a real address hit from a centroid; the cache stores it too.
 
-### 3. Thicken and floor the widths
-Raise the low-zoom end of `widthExpr` / `casingWidthExpr` so routes read at national zoom:
-- zoom 0 → 2.5 (unselected) / 4 (selected), zoom 3 → 3.5 / 5, zoom 6 → 5 / 7, zoom 10 → 7 / 10, zoom 14 → 9 / 13
-- casing consistently ~3px wider than the fill
+### 3. Re-route loads whose stored geometry was built from centroids
+`FleetMapView`'s auto-fetch skips any load that already has `current_route_geometry`, so existing loads would keep their old city-to-city lines. Use the existing `current_route_origin` jsonb column: when the freshly geocoded origin/destination differs from the stored route origin by more than ~0.5 mi, treat the stored route as stale and re-request `route-load`. Same staleness check applies to the driver-side route fetch.
 
-Also make the traffic-off route depend on `routeFC` being keyed to `overlays.traffic` (the memo needs `overlays.traffic` in its dependency list since feature grouping now depends on it).
-
-### 4. Keep layer ordering intact
-No change to the `beforeId` symbol-layer insertion, the casing layer, or the live-truck snapping logic that reads route geometry.
+### 4. Marker positions
+No component changes needed beyond the staleness check — `originCoords` / `destCoords` / stop coords all flow from `geocodeLocationAsync`, so pins move to the exact address automatically once the geocoder is precise.
 
 ## Files touched
 
-- `src/components/dispatcher/FleetMapView.tsx` (route memo + route layer effect only)
+- `supabase/functions/geocode-address/index.ts` (new)
+- `src/lib/geocoding.ts` (cascade rewrite, same exports)
+- `src/components/dispatcher/FleetMapView.tsx` (stale-route detection against `current_route_origin`)
 
 ## Verification
 
-Load the dispatcher dashboard in a headless browser, screenshot the Command Center map at continental zoom and at a zoomed-in city level, and confirm the route renders as one continuous colored line at both levels with the Traffic toggle both on and off.
+Pick a live load with a specific street address (e.g. the Winston Salem yard), load the dispatcher dashboard headless, and confirm the origin pin and route endpoint sit on the street address rather than downtown — plus check the driver load map and public tracker for the same load.
+
+## Note
+
+Mapbox Geocoding bills per request. The session cache plus the existing DB-persisted route geometry keeps repeat lookups off the API, but every distinct new address costs one geocoding call.
