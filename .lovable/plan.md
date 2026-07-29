@@ -1,24 +1,22 @@
-## Root cause (reproduced)
+## Problem
 
-I loaded the dispatcher map with the radar toggle on and captured the browser console. Every radar tile is blocked:
+RainViewer's public radar tiles only exist up to zoom level 7. I verified this directly against the live tile API: at z2–z7 the tiles return real radar imagery (4–16 KB PNGs), while at z8 and above every request returns the same 1,370-byte placeholder image that reads "Zoom Level Not Supported".
 
-```text
-Refused to connect to 'https://tilecache.rainviewer.com/v2/radar/e6394e8720de/256/4/3/5/4/1_1.png'
-because it violates the following Content Security Policy directive: "connect-src 'self' ..."
-Fetch API cannot load ... Refused to connect because it violates the document's Content Security Policy.
-```
-
-Zero tiles reach the network (0 responses from `tilecache.rainviewer.com`), so the radar layer is added but renders nothing.
-
-Why: the CSP in `index.html` lists `https://tilecache.rainviewer.com` under **`img-src`** only. That was correct with the old Leaflet map, which loaded tiles as `<img>` elements. Mapbox GL JS fetches raster tiles with the **Fetch API** instead, so the tile host must also be in **`connect-src`** — where it is missing. The index call (`api.rainviewer.com`) is already allowed in `connect-src`, which is why the frame list loads fine and no "temporarily unavailable" toast appears; only the tiles fail.
+The map's radar raster source in `src/components/dispatcher/FleetMapView.tsx` is added with no zoom bounds, so when the dispatcher zooms past z7 Mapbox keeps requesting deeper tiles and paints those placeholder graphics across the map — exactly what the screenshot shows.
 
 ## Fix
 
-**`index.html`** — add `https://tilecache.rainviewer.com` to the `connect-src` directive (keeping it in `img-src` for any non-Mapbox usage). No other directive changes.
+In the radar layer effect in `FleetMapView.tsx`, add zoom bounds to the raster source when it is created:
 
-That is the entire functional fix; the existing `applyRadar` layer logic in `FleetMapView.tsx` already works once tiles are permitted.
+- `minzoom: 0`, `maxzoom: 7` on the `rainviewer-src` raster source.
+
+With `maxzoom` set, Mapbox stops requesting tiles beyond z7 and instead stretches (overzooms) the last real radar tile, so the precipitation layer stays visible and correctly positioned at any zoom level, just progressively softer as you zoom in — the standard behavior for low-resolution weather overlays.
+
+## Details
+
+- Only the source definition changes; the layer, opacity handling, `beforeId` ordering, and the idle/styledata re-attach logic stay as they are.
+- No CSP, edge function, or database changes needed.
 
 ## Verification
 
-- Reload the dispatcher dashboard with Weather Radar on and confirm `tilecache.rainviewer.com` tiles return HTTP 200 with no CSP console errors.
-- Screenshot the map to confirm the radar raster renders beneath the route and truck layers at the configured opacity.
+Load the Dispatcher Dashboard with Weather Radar on, zoom in past the northeast route to z10+, and confirm: no "Zoom Level Not Supported" blocks, radar coverage still drawn, and no radar tile requests above z7 in the network log.
