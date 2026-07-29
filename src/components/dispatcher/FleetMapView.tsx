@@ -1323,16 +1323,28 @@ function MapboxCanvas({
           if (loadId) onSelectLoad(loadId);
           const coords = (feat.geometry as GeoJSON.Point).coordinates as [number, number];
           truckPopupRef.current?.remove();
+          const updatedAgo = props.updatedAt
+            ? Math.max(
+                0,
+                Math.round((Date.now() - new Date(props.updatedAt).getTime()) / 60000),
+              )
+            : null;
           truckPopupRef.current = new mapboxgl.Popup({ offset: 12, closeButton: true })
             .setLngLat(coords)
             .setHTML(
               `<div style="font-size:12px;min-width:150px">
                  <div style="font-weight:600">Unit ${props.unit ?? ''}</div>
                  ${props.driver ? `<div style="color:#6b7280">${props.driver}</div>` : ''}
+                 ${
+                   updatedAgo !== null
+                     ? `<div style="margin-top:4px;color:#16a34a">Live GPS • updated ${updatedAgo === 0 ? 'just now' : `${updatedAgo} min ago`}</div>`
+                     : ''
+                 }
                  <div style="margin-top:6px;color:#6b7280">${props.origin} → ${props.destination}</div>
                </div>`,
             )
             .addTo(map);
+
         });
         map.on('mouseenter', 'trucks-point', () => {
           map.getCanvas().style.cursor = 'pointer';
