@@ -32,7 +32,11 @@ import { geocodeLocationAsync } from '@/lib/geocoding';
 import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
 import { WeatherForecastPanel } from './WeatherForecastPanel';
-import { snapPointToRoute } from '@/lib/geo/snapToRoute';
+import { nearestPointOnRoute } from '@/lib/geo/snapToRoute';
+
+// How far a live driver can be from the drawn route before we stop snapping the
+// marker to it and instead re-anchor the route to where the driver actually is.
+const OFF_ROUTE_MI = 10;
 
 const OVERLAY_STORAGE_KEY = 'fleet-map-overlays-v2';
 const RAINVIEWER_INDEX_URL = 'https://api.rainviewer.com/public/weather-maps.json';
