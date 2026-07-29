@@ -133,9 +133,9 @@ function shiftPeriod(freq: string, start: Date, dir: 1 | -1) {
 export function ActiveBatchTab() {
   const qc = useQueryClient();
   const { orgId, user } = useAuth();
-  const { data: config, isLoading: configLoading } = usePayrollConfig();
+  const { data: config, isLoading: configLoading } = useTaxYearConfig();
 
-  const freq = config?.federal.pay_frequency ?? 'weekly';
+  const freq = config?.payFrequency ?? 'weekly';
   const [period, setPeriod] = useState(() => defaultPeriod('weekly'));
   const periodStart = format(period.start, 'yyyy-MM-dd');
   const periodEnd = format(period.end, 'yyyy-MM-dd');
@@ -204,16 +204,10 @@ export function ActiveBatchTab() {
     },
   });
   const w4Map = useMemo(() => {
-    const m = new Map<string, W2W4>();
+    const m = new Map<string, { filing_status: string }>();
     for (const r of w4s as any[]) {
       m.set(r.driver_id, {
-        filing_status: (r.filing_status ?? 'single') as FilingStatus,
-        multiple_jobs: !!r.multiple_jobs,
-        step_2c_checkbox: !!r.step_2c_checkbox,
-        dependents_amount: Number(r.dependents_amount) || 0,
-        other_income: Number(r.other_income) || 0,
-        deductions: Number(r.deductions) || 0,
-        extra_withholding: Number(r.extra_withholding) || 0,
+        filing_status: String(r.filing_status ?? 'single'),
       });
     }
     return m;
@@ -232,13 +226,10 @@ export function ActiveBatchTab() {
     },
   });
   const stateW4Map = useMemo(() => {
-    const m = new Map<string, StateW4Snapshot>();
+    const m = new Map<string, { exempt: boolean }>();
     for (const r of stateTaxes as any[]) {
       m.set(r.driver_id, {
         exempt: !!r.exempt,
-        filing_status: (r.filing_status ?? 'single') as FilingStatus,
-        allowances: Number(r.allowances) || 0,
-        additional_withholding: Number(r.additional_withholding) || 0,
       });
     }
     return m;
@@ -626,7 +617,7 @@ export function ActiveBatchTab() {
                   const name = driver
                     ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim()
                     : r.driver_id.slice(0, 8);
-                  const w4 = w4Map.get(r.driver_id) ?? DEFAULT_W4;
+                  const w4 = w4Map.get(r.driver_id) ?? { filing_status: 'single' };
                   const hasW4 = w4Map.has(r.driver_id);
                   const hasStateTax = stateW4Map.has(r.driver_id);
                   const hasI9 = i9Set.has(r.driver_id);
