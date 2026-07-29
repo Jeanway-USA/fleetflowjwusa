@@ -893,15 +893,26 @@ function MapboxCanvas({
     const SRC = 'rainviewer-src';
     const LYR = 'rainviewer-lyr';
 
+    const wanted = overlays.weather && radarUrlTemplate ? radarUrlTemplate : null;
+
     const applyRadar = () => {
+      // Style not ready yet (common on first paint when the toggle was already
+      // persisted on) — retry once the map settles instead of giving up.
       if (!map.isStyleLoaded()) return;
       try {
+        const existing = map.getLayer(LYR) ? map.getSource(SRC) : null;
+        // Idempotent: bail out when the desired state is already applied so the
+        // 'idle'/'styledata' retries can't loop by re-adding tiles forever.
+        if (wanted && existing) {
+          map.setPaintProperty(LYR, 'raster-opacity', overlays.radarOpacity / 100);
+          return;
+        }
         if (map.getLayer(LYR)) map.removeLayer(LYR);
         if (map.getSource(SRC)) map.removeSource(SRC);
-        if (!overlays.weather || !radarUrlTemplate) return;
+        if (!wanted) return;
         map.addSource(SRC, {
           type: 'raster',
-          tiles: [radarUrlTemplate],
+          tiles: [wanted],
           tileSize: 256,
         });
         // Insert beneath route/point/truck layers so those stay visible above radar
@@ -923,10 +934,14 @@ function MapboxCanvas({
 
     applyRadar();
     map.on('styledata', applyRadar);
+    map.on('idle', applyRadar);
     return () => {
       map.off('styledata', applyRadar);
+      map.off('idle', applyRadar);
     };
   }, [styleReady, overlays.weather, radarUrlTemplate, overlays.radarOpacity]);
+
+
 
   // ---- Route lines source/layer (contiguous runs carrying congestion) ----
   const routeFC = useMemo(() => {
