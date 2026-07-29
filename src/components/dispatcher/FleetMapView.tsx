@@ -142,10 +142,12 @@ export function FleetMapView() {
   const { data: initialLocations } = useQuery({
     queryKey: ['driver-locations'],
     staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('driver_locations')
-        .select('driver_id, latitude, longitude, speed, heading, updated_at, is_sharing');
+        .select('driver_id, latitude, longitude, speed, heading, updated_at, is_sharing')
+        .eq('is_sharing', true);
       if (error) throw error;
       return data as DriverLocation[];
     },
@@ -156,8 +158,9 @@ export function FleetMapView() {
     const locMap = new Map<string, DriverLocation>();
     let live = 0;
     initialLocations.forEach((loc) => {
+      if (!isLocationLive(loc)) return;
       locMap.set(loc.driver_id, loc);
-      if (isLocationLive(loc)) live++;
+      live++;
     });
     setDriverLocations(locMap);
     setLiveCount(live);
@@ -172,28 +175,32 @@ export function FleetMapView() {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'driver_locations' },
           (payload) => {
+            const applyLiveCount = (next: Map<string, DriverLocation>) => {
+              let live = 0;
+              next.forEach((l) => {
+                if (isLocationLive(l)) live++;
+              });
+              setLiveCount(live);
+              return next;
+            };
             if (payload.eventType === 'DELETE') {
               setDriverLocations((prev) => {
                 const next = new Map(prev);
                 next.delete((payload.old as any).driver_id);
-                let live = 0;
-                next.forEach((l) => {
-                  if (isLocationLive(l)) live++;
-                });
-                setLiveCount(live);
-                return next;
+                return applyLiveCount(next);
               });
             } else {
               const newLoc = payload.new as DriverLocation;
               setDriverLocations((prev) => {
                 const next = new Map(prev);
-                next.set(newLoc.driver_id, newLoc);
-                let live = 0;
-                next.forEach((l) => {
-                  if (isLocationLive(l)) live++;
-                });
-                setLiveCount(live);
-                return next;
+                // A driver who turned sharing off (or whose fix went stale) must
+                // disappear immediately rather than linger at their last spot.
+                if (isLocationLive(newLoc)) {
+                  next.set(newLoc.driver_id, newLoc);
+                } else {
+                  next.delete(newLoc.driver_id);
+                }
+                return applyLiveCount(next);
               });
             }
           },
@@ -202,6 +209,7 @@ export function FleetMapView() {
     } catch (err) {
       console.warn('Realtime unavailable:', err);
     }
+
     return () => {
       if (channel) supabase.removeChannel(channel);
     };
