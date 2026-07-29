@@ -28,7 +28,7 @@ import {
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useTheme } from '@/contexts/ThemeContext';
-import { geocodeLocationAsync, interpolatePosition, getProgressFromStatus } from '@/lib/geocoding';
+import { geocodeLocationAsync } from '@/lib/geocoding';
 import { parseIntermediateStops, type IntermediateStop } from '@/lib/parseIntermediateStops';
 import { ExpandableMap } from '@/components/shared/ExpandableMap';
 import { WeatherForecastPanel } from './WeatherForecastPanel';
