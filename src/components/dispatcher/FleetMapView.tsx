@@ -413,6 +413,10 @@ export function FleetMapView() {
         const destination = geocodedCoords.get(load.destination);
         if (!origin || !destination) continue;
 
+        // A route that was deliberately re-anchored to the driver's live position
+        // starts away from the load origin on purpose — never "correct" it back.
+        if (reanchorRef.current.has(load.id)) continue;
+
         // Existing geometry may have been built from city centroids before precise
         // address geocoding — treat it as stale when its endpoints drifted.
         const existingGeom =
