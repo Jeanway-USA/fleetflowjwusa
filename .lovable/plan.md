@@ -1,38 +1,60 @@
-## What's wrong
+## Goal
 
-Generating the Jul 10–16 settlement for Timothy Ames fails with:
-`duplicate key value violates unique constraint "uq_driver_settlements_org_driver_period_end"`
+Make W-2 withholding accurate and automatic using official IRS Publication 15-T percentage-method tables, back both settlements and in-house payroll with one shared tax engine and one YTD source, and consolidate Finance/Payroll/Tax Hub into a single, cleaner Finance section.
 
-Verified in the database:
-- The only row for period_end 2026-07-16 is Timothy Ames' settlement, and it is **soft-deleted** (`deleted_at = 2026-07-29 20:49`).
-- The uniqueness rule `uq_driver_settlements_org_driver_period_end (org_id, driver_id, period_end)` has no `deleted_at` condition, so archived settlements still block a new one for the same driver and period.
-- `generate_driver_settlements` does a plain `INSERT` with no conflict handling, so any collision surfaces as a raw Postgres error instead of a useful message.
+## 1. Tax tables and configuration (per tax year, admin-editable)
 
-## Fix
+New table `tax_year_configs` (org-scoped, one row per tax year):
+- Federal: Pub 15-T percentage-method brackets for each filing status, both the standard and the "Step 2 checkbox" (multiple jobs) table sets, standard deduction amounts, dependent credit amounts.
+- FICA: Social Security rate 6.2% + wage base, Medicare 1.45%, additional Medicare 0.9% + threshold, employer-side mirrors.
+- FUTA rate/wage base.
+- Effective/locked flags so a closed year's numbers can never shift retroactively.
 
-**1. Make the uniqueness rule ignore archived rows**
+Seed 2026 federal values. State rules stay in the existing `state_tax_configurations` table, extended with a `tax_year` column so state rates version the same way.
 
-Replace the index with a partial one:
-```sql
-DROP INDEX IF EXISTS public.uq_driver_settlements_org_driver_period_end;
-CREATE UNIQUE INDEX uq_driver_settlements_org_driver_period_end
-  ON public.driver_settlements (org_id, driver_id, period_end)
-  WHERE deleted_at IS NULL;
-```
-Archived settlements no longer block regeneration; live ones still can't duplicate.
+An admin editor lives under Finance → Payroll & Taxes → Settings, with a "duplicate last year" action for rolling forward.
 
-**2. Handle a live existing settlement gracefully in `generate_driver_settlements`**
+## 2. Shared calculation engine
 
-Before inserting, look for a non-deleted settlement for the same (org, driver, period_end):
-- If it exists and is `draft` — delete its line items and the row, then generate fresh (regeneration is the expected behavior for a draft).
-- If it exists and is `approved` or `paid` — skip that driver instead of erroring, so a bulk run for several drivers doesn't fail wholesale.
+Rewrite `src/utils/payCalculations.ts`'s W-2 section into a dedicated module `src/lib/payroll/`:
+- `taxEngine.ts` — pure functions implementing Pub 15-T Worksheet 1: annualize wages by pay frequency, apply W-4 Step 2/3/4 adjustments, look up the bracket, de-annualize, add extra withholding; FICA with wage-base and YTD caps; state income tax; employer SS/Medicare/FUTA/SUTA.
+- `profiles.ts` — one resolver that assembles an employee tax profile (employment class, filing status, dependents, extra withholding, work/residence state, exemptions) from `driver_w4_info` + `driver_state_tax_info` + `drivers`, with an employee-agnostic shape so non-driver staff plug in later with no engine change.
+- `ytd.ts` — a single YTD source that unions `driver_payroll` and `driver_settlements` for the tax year, so wage-base caps and stubs never disagree.
+- Unit tests against published IRS worksheet examples for each filing status, plus wage-base crossover and additional-Medicare cases.
 
-**3. Report skips in the UI**
+The engine returns a full, auditable breakdown: gross, each tax line with the rate and table row used, other deductions, net.
 
-`GenerateSettlementsDialog` currently reports only the rows returned. Add a note when fewer settlements come back than drivers selected, e.g. "Generated 2 settlements. 1 driver skipped (already has an approved/paid settlement for this period)."
+## 3. Auto withholding at generation time
+
+- W-2 pay runs (In-House Payroll) call the engine and persist every line into `tax_withholding_ledger` — currently only federal is stored there, so state income tax and the employer-side amounts get their own columns instead of being dropped. The active-batch totals then read straight from stored rows (today the state column is hardcoded to 0).
+- Settlement generation: contractors and lease drivers are unchanged, no withholding. If a W-2 driver is included, the settlement pulls the same engine result and stores the total in `tax_withholding` plus a per-line JSON snapshot, so the list view and detail sheet always agree.
+- Every calculation stores an immutable snapshot: tax year, config version, profile values, and each rate applied.
+- Manual overrides are allowed only for owner/payroll_admin, require a reason, and write an `audit_logs` row recording the computed value vs the override.
+
+## 4. Statements and stubs
+
+- Settlement detail, printable statement, and the W-2 pay stub all render one shared `Gross → Taxes (itemized) → Other deductions → Net` block driven by the stored snapshot.
+- Pay stubs remain downloadable by the employee from the driver dashboard, now showing period and YTD columns for every tax line.
+
+## 5. Employer liability reporting
+
+Inside Payroll & Taxes:
+- Employer tax summary by quarter: 941 lines (federal income tax withheld, SS wages/tax, Medicare wages/tax, additional Medicare), plus FUTA and per-state SUTA/SIT deposits.
+- Existing federal and state filing registries move here unchanged.
+
+## 6. Finance consolidation
+
+One sidebar item, "Finance", with four tabs:
+1. **Overview** — P&L summary, KPIs.
+2. **Revenue & Loads** — revenue, load profitability, invoicing, factoring, commissions (secondary items become sub-sections, not top-level tabs).
+3. **Settlements & Pay Runs** — driver settlements plus the in-house payroll batch, split by contractor vs W-2.
+4. **Payroll & Taxes** — employee tax profiles, YTD, employer liabilities, filing registries, and everything currently in Tax Hub (W-2/1099 prep, multi-state overview).
+
+`/admin/tax-hub` and `/finance/inhouse-payroll` redirect into the matching Finance tab so existing links keep working. Rarely used controls (tax table editor, compensation settings, safety-bonus settings, reconciliation tools) move behind a "Settings" panel within their tab. Dark theme and existing component language are unchanged.
 
 ## Technical notes
 
-- Files: new migration for the index + function; `src/components/finance/driver-settlements/GenerateSettlementsDialog.tsx` for the messaging.
-- The function keeps `SECURITY DEFINER` and the existing owner/payroll_admin authorization check.
-- No change to pay math, net pay generation, or YTD logic.
+- Migrations: `tax_year_configs` (+ GRANTs and org-scoped RLS), `tax_year` on `state_tax_configurations`, extra withholding columns on `tax_withholding_ledger`, and a JSON calculation snapshot column on `driver_payroll` and `driver_settlements`.
+- `generate_driver_settlements` gains a W-2 branch that fills `tax_withholding`; the generated `net_pay` column already subtracts it.
+- Non-driver employees: the profile resolver and engine key off a generic `payee` shape, so a future `employees` table needs only a new resolver — no engine, ledger, or reporting changes. No employee UI in this pass.
+- Sequencing: tax tables and engine + tests first, then persistence and generation, then statements/reporting, then the navigation consolidation last so the refactor lands on stable logic.

@@ -25,6 +25,8 @@ import {
 } from '@/components/ui/command';
 import { LoadingButton } from '@/components/shared/LoadingButton';
 import { toast } from 'sonner';
+import { useTaxYearConfig } from '@/hooks/useTaxYearConfig';
+import { applyW2WithholdingToSettlements } from '@/lib/payroll/applySettlementWithholding';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import { addDays, format } from 'date-fns';
@@ -98,6 +100,8 @@ export function GenerateSettlementsDialog({
     });
   };
 
+  const { data: taxConfig } = useTaxYearConfig();
+
   const generate = useMutation({
     mutationFn: async () => {
       if (selected.size === 0) {
@@ -117,9 +121,22 @@ export function GenerateSettlementsDialog({
         _payment_date: format(paymentDate, 'yyyy-MM-dd'),
       });
       if (error) throw error;
-      return (data ?? []) as any[];
+      const rows = (data ?? []) as any[];
+
+      // Auto-apply W-2 withholding (contractors are left untouched).
+      let withheld = { w2Count: 0, totalWithheld: 0 };
+      if (taxConfig?.orgId && rows.length) {
+        withheld = await applyW2WithholdingToSettlements(rows, {
+          orgId: taxConfig.orgId,
+          config: taxConfig.config,
+          statesByCode: taxConfig.statesByCode,
+          payFrequency: taxConfig.payFrequency,
+          defaultTaxState: taxConfig.defaultTaxState,
+        });
+      }
+      return { rows, withheld };
     },
-    onSuccess: (rows) => {
+    onSuccess: ({ rows, withheld }) => {
       const total = rows.reduce((s, r: any) => s + Number(r.net_pay ?? 0), 0);
       const requested = allSelected ? drivers.length : selected.size;
       const skipped = Math.max(0, requested - rows.length);
@@ -133,7 +150,11 @@ export function GenerateSettlementsDialog({
         );
       } else {
         toast.success(
-          `Generated ${rows.length} settlement${rows.length === 1 ? '' : 's'} (Net ${formatCurrency(total)}).${skipNote}`,
+          `Generated ${rows.length} settlement${rows.length === 1 ? '' : 's'} (Net ${formatCurrency(total)}).${
+            withheld.w2Count > 0
+              ? ` Withheld ${formatCurrency(withheld.totalWithheld)} in taxes for ${withheld.w2Count} W-2 employee${withheld.w2Count === 1 ? '' : 's'}.`
+              : ''
+          }${skipNote}`,
         );
       }
       onGenerated();

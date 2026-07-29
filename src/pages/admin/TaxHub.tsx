@@ -30,6 +30,8 @@ import {
   Calculator, Users, Receipt, Loader2,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
+import { EmployerLiabilityTab } from '@/components/finance/payroll/EmployerLiabilityTab';
+import { TaxSettingsTab } from '@/components/finance/payroll/TaxSettingsTab';
 
 // -----------------------------------------------------------
 // State detail sheet
@@ -837,16 +839,20 @@ export default function TaxHub() {
       <EmployerCard />
 
       <Tabs defaultValue="states">
-        <TabsList className="grid grid-cols-4 gap-2 p-1 bg-muted rounded-lg h-auto w-full max-w-3xl">
+        <TabsList className="grid grid-cols-3 lg:grid-cols-6 gap-2 p-1 bg-muted rounded-lg h-auto w-full max-w-4xl">
           <TabsTrigger value="states" className="h-10 data-[state=active]:bg-background">Multi-State</TabsTrigger>
           <TabsTrigger value="federal" className="h-10 data-[state=active]:bg-background">Federal</TabsTrigger>
           <TabsTrigger value="w2" className="h-10 data-[state=active]:bg-background">W-2 Forms</TabsTrigger>
           <TabsTrigger value="1099" className="h-10 data-[state=active]:bg-background">1099 Forms</TabsTrigger>
+          <TabsTrigger value="liability" className="h-10 data-[state=active]:bg-background">Employer Liability</TabsTrigger>
+          <TabsTrigger value="settings" className="h-10 data-[state=active]:bg-background">Tax Setup</TabsTrigger>
         </TabsList>
         <TabsContent value="states" className="mt-4"><MultiStateTab year={year} /></TabsContent>
         <TabsContent value="federal" className="mt-4"><FederalTab year={year} /></TabsContent>
         <TabsContent value="w2" className="mt-4"><W2Tab year={year} /></TabsContent>
         <TabsContent value="1099" className="mt-4"><Form1099Tab year={year} /></TabsContent>
+        <TabsContent value="liability" className="mt-4"><EmployerLiabilityTab taxYear={year} /></TabsContent>
+        <TabsContent value="settings" className="mt-4"><TaxSettingsTab taxYear={year} /></TabsContent>
       </Tabs>
     </div>
   );

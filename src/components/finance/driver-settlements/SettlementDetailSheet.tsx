@@ -30,6 +30,8 @@ import { generateSettlementPdf } from '@/lib/pdf/generateSettlementPdf';
 import { fetchPayBreakdown, type PayBreakdown } from '@/lib/settlement-pay-breakdown';
 import { useSettlementDiscrepancies } from '@/hooks/useSettlementDiscrepancies';
 import { StatementDiscrepancyPanel } from '@/components/finance/StatementDiscrepancyPanel';
+import { PayBreakdown as PayBreakdownPanel } from '@/components/finance/payroll/PayBreakdown';
+import type { TaxAuditSnapshot } from '@/lib/payroll/types';
 
 
 interface Driver {
@@ -108,6 +110,7 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
 
 
 
+  const taxAudit = ((settlement as any)?.tax_calculation ?? null) as TaxAuditSnapshot | null;
   const currentGross = Number(settlement?.gross_pay ?? 0);
   const currentReimb = Number(settlement?.reimbursements ?? 0);
   const currentDed = Number(settlement?.deductions ?? 0);
@@ -213,6 +216,19 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
               <SummaryStat label="Tax Withholding" value={-Math.abs(currentWithholding)} negative />
               <SummaryStat label="Net Pay" value={currentNet} primary />
             </div>
+
+            {taxAudit && (
+              <PayBreakdownPanel
+                gross={currentGross}
+                reimbursements={currentReimb}
+                otherDeductions={currentDed}
+                netPay={currentNet}
+                audit={taxAudit}
+                showEmployer
+              />
+            )}
+
+
 
 
             {hasBlockingDiscrepancy && (

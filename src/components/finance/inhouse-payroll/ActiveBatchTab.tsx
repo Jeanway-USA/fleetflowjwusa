@@ -23,16 +23,16 @@ import {
   Lock, Loader2, RefreshCw, CheckCircle2, Pencil, Trash2, Ban, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
-import { usePayrollConfig } from '@/hooks/usePayrollConfig';
+import { useTaxYearConfig } from '@/hooks/useTaxYearConfig';
 import {
-  calculateGrossTaxablePay,
-  calculateW2Payroll,
-  DEFAULT_W4,
+  calculatePayrollTaxes,
+  resolveDriverTaxProfiles,
   PAY_PERIODS_PER_YEAR,
-  type W2W4,
-  type FilingStatus,
-  type StateW4Snapshot,
-} from '@/utils/payCalculations';
+  EMPTY_YTD,
+  type PayeeTaxProfile,
+} from '@/lib/payroll';
+import { calculateGrossTaxablePay } from '@/utils/payCalculations';
+
 
 import {
   format, startOfWeek, endOfWeek, addWeeks, addDays,
@@ -66,7 +66,10 @@ type WithholdingRow = {
   tx_twc_unemployment: number;
   fl_reemployment: number;
   state_suta: number;
+  state_sit: number;
+  additional_medicare: number;
 };
+
 
 function defaultPeriod(freq: string, ref = new Date()) {
   if (freq === 'monthly') {
@@ -133,9 +136,9 @@ function shiftPeriod(freq: string, start: Date, dir: 1 | -1) {
 export function ActiveBatchTab() {
   const qc = useQueryClient();
   const { orgId, user } = useAuth();
-  const { data: config, isLoading: configLoading } = usePayrollConfig();
+  const { data: config, isLoading: configLoading } = useTaxYearConfig();
 
-  const freq = config?.federal.pay_frequency ?? 'weekly';
+  const freq = config?.payFrequency ?? 'weekly';
   const [period, setPeriod] = useState(() => defaultPeriod('weekly'));
   const periodStart = format(period.start, 'yyyy-MM-dd');
   const periodEnd = format(period.end, 'yyyy-MM-dd');
@@ -204,16 +207,10 @@ export function ActiveBatchTab() {
     },
   });
   const w4Map = useMemo(() => {
-    const m = new Map<string, W2W4>();
+    const m = new Map<string, { filing_status: string }>();
     for (const r of w4s as any[]) {
       m.set(r.driver_id, {
-        filing_status: (r.filing_status ?? 'single') as FilingStatus,
-        multiple_jobs: !!r.multiple_jobs,
-        step_2c_checkbox: !!r.step_2c_checkbox,
-        dependents_amount: Number(r.dependents_amount) || 0,
-        other_income: Number(r.other_income) || 0,
-        deductions: Number(r.deductions) || 0,
-        extra_withholding: Number(r.extra_withholding) || 0,
+        filing_status: String(r.filing_status ?? 'single'),
       });
     }
     return m;
@@ -232,13 +229,10 @@ export function ActiveBatchTab() {
     },
   });
   const stateW4Map = useMemo(() => {
-    const m = new Map<string, StateW4Snapshot>();
+    const m = new Map<string, { exempt: boolean }>();
     for (const r of stateTaxes as any[]) {
       m.set(r.driver_id, {
         exempt: !!r.exempt,
-        filing_status: (r.filing_status ?? 'single') as FilingStatus,
-        allowances: Number(r.allowances) || 0,
-        additional_withholding: Number(r.additional_withholding) || 0,
       });
     }
     return m;
@@ -262,6 +256,12 @@ export function ActiveBatchTab() {
   );
 
 
+  const { data: profiles = new Map<string, PayeeTaxProfile>() } = useQuery({
+    queryKey: ['payroll_tax_profiles', orgId],
+    enabled: !!orgId,
+    queryFn: () => resolveDriverTaxProfiles(orgId!),
+  });
+
   const driverMap = useMemo(() => {
     const m = new Map<string, (typeof drivers)[number]>();
     drivers.forEach((d) => m.set(d.id, d));
@@ -279,11 +279,30 @@ export function ActiveBatchTab() {
   ) => {
     if (!orgId || !config) return;
     const driver = driverMap.get(driverId);
-    const w4 = w4Map.get(driverId) ?? DEFAULT_W4;
-    const state = driver?.tax_state || driver?.license_state || config.defaultTaxState;
+    const profile: PayeeTaxProfile =
+      profiles.get(driverId) ?? {
+        payeeId: driverId,
+        payeeType: 'driver',
+        name: `${driver?.first_name ?? ''} ${driver?.last_name ?? ''}`.trim(),
+        employmentClass: 'w2',
+        filingStatus: 'single',
+        multipleJobs: false,
+        dependentsAmount: 0,
+        otherIncome: 0,
+        deductions: 0,
+        extraWithholding: 0,
+        workState: driver?.tax_state ?? null,
+        residenceState: driver?.tax_state ?? null,
+        stateExempt: false,
+        stateAllowances: 0,
+        stateAdditionalWithholding: 0,
+        usedDefaults: true,
+      };
+    const state =
+      profile.workState || driver?.tax_state || driver?.license_state || config.defaultTaxState;
     const stateCfg = config.statesByCode.get((state || '').toUpperCase()) ?? null;
 
-    // YTD from finalized rows earlier in year for this driver
+    // YTD from finalized rows earlier in the tax year for this driver.
     const { data: ytdRows } = await supabase
       .from('internal_payroll_ledger')
       .select('gross_taxable_pay, status, id')
@@ -303,19 +322,26 @@ export function ActiveBatchTab() {
       holidayPay: 0,
     });
 
-    const stateW4 = stateW4Map.get(driverId) ?? null;
-    const result = calculateW2Payroll({
+    const result = calculatePayrollTaxes({
       grossTaxablePay: grossTaxable,
-      ytdGrossTaxablePay: ytdGross,
-      ytdMedicareWages: ytdGross,
-      w4,
-      federal: config.federal,
+      otherDeductions: oneTimeDeduction,
+      profile: { ...profile, employmentClass: 'w2' },
+      config: config.config,
       state: stateCfg,
-      stateW4,
+      ytd: {
+        ...EMPTY_YTD,
+        gross: ytdGross,
+        socialSecurityWages: ytdGross,
+        medicareWages: ytdGross,
+      },
+      payFrequency: freq,
     });
+    const amount = (key: string) =>
+      result.employeeLines.find((l) => l.key === key)?.amount ??
+      result.employerLines.find((l) => l.key === key)?.amount ??
+      0;
 
-
-    const netPayout = Math.max(0, result.netPay - oneTimeDeduction);
+    const netPayout = Math.max(0, result.netPay);
 
     const payload = {
       pay_model: 'salary',
@@ -329,7 +355,8 @@ export function ActiveBatchTab() {
       gross_line_haul: 0,
       pass_through_fsc: 0,
       total_miles: 0,
-      federal_withholding_override: result.fit,
+      federal_withholding_override: amount('federal_income_tax'),
+      tax_calculation: JSON.parse(JSON.stringify(result.audit)) as never,
     };
 
     let ledgerId = existingId;
@@ -361,17 +388,17 @@ export function ActiveBatchTab() {
       {
         org_id: orgId,
         ledger_id: ledgerId!,
-        ee_social_security: result.eeSocialSecurity,
-        er_social_security: result.erSocialSecurity,
-        ee_medicare: result.eeMedicare,
-        employer_medicare: result.erMedicare,
-        additional_medicare: result.addlMedicare,
-        federal_income_withholding: result.fit,
+        ee_social_security: amount('social_security'),
+        er_social_security: amount('employer_social_security'),
+        ee_medicare: amount('medicare'),
+        employer_medicare: amount('employer_medicare'),
+        additional_medicare: amount('additional_medicare'),
+        federal_income_withholding: amount('federal_income_tax'),
         state_code: stateCode,
-        state_suta: result.sutaEmployer,
-        state_sit: result.sitEmployee ?? 0,
-        tx_twc_unemployment: stateCode === 'TX' ? result.sutaEmployer : 0,
-        fl_reemployment: stateCode === 'FL' ? result.sutaEmployer : 0,
+        state_suta: amount('suta'),
+        state_sit: amount('state_income_tax'),
+        tx_twc_unemployment: stateCode === 'TX' ? amount('suta') : 0,
+        fl_reemployment: stateCode === 'FL' ? amount('suta') : 0,
       },
       { onConflict: 'ledger_id' },
     );
@@ -517,17 +544,20 @@ export function ActiveBatchTab() {
       const erSS = Number(wh.er_social_security) || 0;
       const erMed = Number(wh.employer_medicare) || 0;
       const stSuta = (Number(wh.state_suta) || 0) || ((Number(wh.tx_twc_unemployment) || 0) + (Number(wh.fl_reemployment) || 0));
-      eeFica += eeSS + eeMed;
+      const stSit = Number(wh.state_sit) || 0;
+      const addlMed = Number(wh.additional_medicare) || 0;
+      eeFica += eeSS + eeMed + addlMed;
       erFica += erSS + erMed;
       suta += stSuta;
-      // SIT is stored as part of federal_withholding? No — we included in totalEE inside engine
-      // For the summary, recompute SIT via ledger.state config isn't available client-side;
-      // simplest: derive SIT = ledger.federal_withholding_override represents FIT only.
-      // We approximated by keeping SIT out of tax_withholding_ledger. Show 0 here.
+      sit += stSit;
       const oneTimeDed = Number(r.one_time_deduction) || 0;
-      net += Math.max(0, g - (eeSS + eeMed + Number(wh.federal_income_withholding)) - oneTimeDed);
+      net += Math.max(
+        0,
+        g - (eeSS + eeMed + addlMed + stSit + (Number(wh.federal_income_withholding) || 0)) - oneTimeDed,
+      );
     }
     return { count, gross, fit, eeFica, erFica, suta, sit, net };
+
   }, [ledgers, whMap]);
 
   const canFinalize = ledgers.some((r) => r.status === 'draft');
@@ -626,7 +656,7 @@ export function ActiveBatchTab() {
                   const name = driver
                     ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim()
                     : r.driver_id.slice(0, 8);
-                  const w4 = w4Map.get(r.driver_id) ?? DEFAULT_W4;
+                  const w4 = w4Map.get(r.driver_id) ?? { filing_status: 'single' };
                   const hasW4 = w4Map.has(r.driver_id);
                   const hasStateTax = stateW4Map.has(r.driver_id);
                   const hasI9 = i9Set.has(r.driver_id);
@@ -638,10 +668,11 @@ export function ActiveBatchTab() {
                   const state = driver?.tax_state || driver?.license_state || config?.defaultTaxState || '—';
                   const gross = Number(r.gross_taxable_pay) || 0;
                   const fit = Number(wh?.federal_income_withholding) || 0;
-                  const eeFica = (Number(wh?.ee_social_security) || 0) + (Number(wh?.ee_medicare) || 0);
+                  const eeFica = (Number(wh?.ee_social_security) || 0) + (Number(wh?.ee_medicare) || 0) + (Number(wh?.additional_medicare) || 0);
+                  const sit = Number(wh?.state_sit) || 0;
                   const suta = (Number(wh?.state_suta) || 0) || ((Number(wh?.tx_twc_unemployment) || 0) + (Number(wh?.fl_reemployment) || 0));
                   const oneTimeDed = Number(r.one_time_deduction) || 0;
-                  const net = Math.max(0, gross - eeFica - fit - oneTimeDed);
+                  const net = Math.max(0, gross - eeFica - fit - sit - oneTimeDed);
                   const locked = r.status === 'finalized' || r.status === 'voided';
 
                   return (
@@ -662,7 +693,7 @@ export function ActiveBatchTab() {
                       </TableCell>
 
                       <TableCell className="capitalize text-xs">
-                        {w4.filing_status.replace('_', ' ')}
+                        {String(w4.filing_status).replace('_', ' ')}
                       </TableCell>
                       <TableCell>{state}</TableCell>
                       <TableCell className="text-right font-mono">{formatCurrency(Number(r.base_salary) || 0)}</TableCell>
