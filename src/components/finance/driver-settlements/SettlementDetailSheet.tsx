@@ -214,6 +214,19 @@ export function SettlementDetailSheet({ settlementId, onClose, driverMap }: Prop
               <SummaryStat label="Net Pay" value={currentNet} primary />
             </div>
 
+            {taxAudit && (
+              <PayBreakdown
+                gross={currentGross}
+                reimbursements={currentReimb}
+                otherDeductions={currentDed}
+                netPay={currentNet}
+                audit={taxAudit}
+                showEmployer
+              />
+            )}
+
+
+
 
             {hasBlockingDiscrepancy && (
               <div className="rounded-lg border-2 border-destructive bg-destructive/10 p-3 text-sm font-medium text-destructive">
