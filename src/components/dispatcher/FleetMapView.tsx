@@ -342,18 +342,18 @@ export function FleetMapView() {
       const originCoords = geocodedCoords.get(load.origin) || null;
       const destCoords = geocodedCoords.get(load.destination) || null;
       const locationRecord = load.driver_id ? driverLocations.get(load.driver_id) : null;
-      let truckCoords: { lat: number; lng: number } | null = null;
-      let isLiveLocation = false;
-      if (locationRecord) {
-        truckCoords = {
-          lat: Number(locationRecord.latitude),
-          lng: Number(locationRecord.longitude),
-        };
-        isLiveLocation = isLocationLive(locationRecord);
-      } else if (originCoords && destCoords) {
-        const progress = getProgressFromStatus(load.status);
-        truckCoords = interpolatePosition(originCoords, destCoords, progress);
-      }
+      // Only real, currently-shared driver GPS is ever plotted. No synthetic /
+      // interpolated positions and no stale rows from a previous trip.
+      const isLiveLocation = !!locationRecord && isLocationLive(locationRecord);
+      const truckCoords =
+        isLiveLocation && locationRecord
+          ? {
+              lat: Number(locationRecord.latitude),
+              lng: Number(locationRecord.longitude),
+            }
+          : null;
+      const truckUpdatedAt = isLiveLocation && locationRecord ? locationRecord.updated_at : null;
+
       const stops = loadStops.get(load.id) || [];
       const stopCoords = stops
         .map((stop) => {
