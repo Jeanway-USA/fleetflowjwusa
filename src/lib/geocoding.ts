@@ -1,17 +1,27 @@
-// Geocoding utility using Nominatim (OpenStreetMap) API
-// Includes caching to minimize API calls and respect rate limits
+// Geocoding utility.
+// Precision-first cascade: Mapbox (full street address, via edge function)
+// -> Nominatim structured full address -> Nominatim city/state -> hardcoded city.
+// Includes caching to minimize API calls and respect rate limits.
+
+import { supabase } from '@/integrations/supabase/client';
 
 interface Coordinates {
   lat: number;
   lng: number;
 }
 
+export type GeocodePrecision = 'address' | 'city';
+
 // Cache for geocoded addresses (persists during session)
 const geocodeCache = new Map<string, Coordinates | null>();
+const precisionCache = new Map<string, GeocodePrecision>();
+// De-dupe concurrent lookups for the same address
+const inflight = new Map<string, Promise<Coordinates | null>>();
 
 // Queue for rate limiting (Nominatim allows 1 request per second)
 let lastRequestTime = 0;
 const MIN_REQUEST_INTERVAL = 1100; // 1.1 seconds between requests
+
 
 // Fallback coordinates for common cities (used if API fails or for quick lookups)
 const cityFallbacks: Record<string, Coordinates> = {
