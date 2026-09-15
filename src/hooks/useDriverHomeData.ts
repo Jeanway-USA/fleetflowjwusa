@@ -45,6 +45,7 @@ export function useDriverHomeData({
         .select('*, trucks(*), load_accessorials(*)')
         .eq('driver_id', resolvedDriverId!)
         .in('status', ['assigned', 'loading', 'in_transit', 'pending'])
+        .is('deleted_at', null)
         .order('pickup_date', { ascending: true });
       if (error) throw error;
       return data ?? [];

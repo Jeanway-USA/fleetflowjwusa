@@ -129,6 +129,7 @@ export default function DriverStats() {
         .select('*, load_accessorials(*)')
         .eq('driver_id', driver?.id)
         .eq('status', 'delivered')
+        .is('deleted_at', null)
         .gte('delivery_date', dateRange.start)
         .lte('delivery_date', dateRange.end);
       if (error) throw error;
