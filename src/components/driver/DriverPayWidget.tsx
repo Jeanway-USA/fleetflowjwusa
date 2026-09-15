@@ -50,7 +50,8 @@ export function DriverPayWidget({ driverId, payRate, payType }: DriverPayWidgetP
         .eq('driver_id', driverId)
         .gte('delivery_date', weekStart.toISOString().split('T')[0])
         .lte('delivery_date', weekEnd.toISOString().split('T')[0])
-        .eq('status', 'delivered');
+        .eq('status', 'delivered')
+        .is('deleted_at', null);
       if (error) throw error;
       return data;
     },

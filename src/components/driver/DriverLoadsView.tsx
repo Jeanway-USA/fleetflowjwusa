@@ -485,7 +485,8 @@ export default function DriverLoadsView() {
       const { data, error } = await supabase
         .from('fleet_loads')
         .select('*')
-        .eq('driver_id', driverRecord.id);
+        .eq('driver_id', driverRecord.id)
+        .is('deleted_at', null);
       if (error) throw error;
       const rows = (data || []) as unknown as Load[];
 

@@ -62,7 +62,7 @@ export function DriverLeaderboard({ readOnly }: DriverLeaderboardProps) {
     queryFn: async () => {
       const [{ data: drivers }, { data: loads }] = await Promise.all([
         supabase.from('drivers_public_view').select('id, first_name, last_name').eq('status', 'active'),
-        supabase.from('fleet_loads').select('driver_id, actual_miles').eq('status', 'delivered').gte('delivery_date', monthStart).lte('delivery_date', monthEnd),
+        supabase.from('fleet_loads').select('driver_id, actual_miles').eq('status', 'delivered').is('deleted_at', null).gte('delivery_date', monthStart).lte('delivery_date', monthEnd),
       ]);
 
       if (!drivers?.length) return [];
