@@ -278,17 +278,20 @@ export default function Finance() {
     if (selectedPeriod === 'all') return filtered;
     const [year, period] = selectedPeriod.split('-');
     const yearNum = parseInt(year);
+    // Revenue is recognized on delivery (that's when Landstar pays), matching the
+    // Executive Dashboard. Loads without a delivery date fall back to pickup.
+    const periodDate = (l: any) => l.delivery_date || l.pickup_date;
+    const inPeriod = (start: Date, end: Date) => (l: any) =>
+      !!periodDate(l) && isWithinInterval(parseISO(periodDate(l)), { start, end });
     if (period.startsWith('Q')) {
       const quarter = parseInt(period.substring(1));
       const startMonth = (quarter - 1) * 3;
       const start = new Date(yearNum, startMonth, 1);
-      const end = endOfQuarter(start);
-      return filtered.filter((l: any) => l.pickup_date && isWithinInterval(parseISO(l.pickup_date), { start, end }));
+      return filtered.filter(inPeriod(start, endOfQuarter(start)));
     } else {
       const month = parseInt(period) - 1;
       const start = new Date(yearNum, month, 1);
-      const end = endOfMonth(start);
-      return filtered.filter((l: any) => l.pickup_date && isWithinInterval(parseISO(l.pickup_date), { start, end }));
+      return filtered.filter(inPeriod(start, endOfMonth(start)));
     }
   };
 

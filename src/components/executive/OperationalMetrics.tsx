@@ -7,7 +7,7 @@ interface OperationalData {
   totalMiles: number;
   revenuePerMile: number;
   fleetUtilization: number;
-  onTimeRate: number;
+  onTimeRate: number | null;
   totalEmptyMiles?: number;
   emptyMilesRatio?: number;
 }
@@ -74,7 +74,7 @@ export function OperationalMetrics({ data, isLoading }: OperationalMetricsProps)
         <MetricRow icon={MapPin} label="Miles Driven" value={formatNumber(data?.totalMiles ?? 0)} suffix=" mi" />
         <MetricRow icon={DollarSign} label="Revenue per Mile" value={formatCurrency(data?.revenuePerMile ?? 0)} />
         <MetricRow icon={Truck} label="Fleet Utilization" value={formatPercent(data?.fleetUtilization ?? 0)} />
-        <MetricRow icon={Clock} label="On-Time Delivery" value={formatPercent(data?.onTimeRate ?? 0)} />
+        <MetricRow icon={Clock} label="On-Time Delivery" value={data?.onTimeRate == null ? '—' : formatPercent(data.onTimeRate)} />
         <MetricRow icon={MapPin} label="Empty Miles" value={formatNumber(data?.totalEmptyMiles ?? 0)} suffix=" mi" />
         <MetricRow icon={Truck} label="Empty Miles Ratio" value={formatPercent(data?.emptyMilesRatio ?? 0)} />
       </CardContent>

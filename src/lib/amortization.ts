@@ -49,6 +49,24 @@ const balanceAfter = (P: number, r: number, M: number, n: number): number => {
   return P * growth - M * ((growth - 1) / r);
 };
 
+/**
+ * Months to pay off balance B at payment M and monthly rate r:
+ *   n = −ln(1 − rB/M) / ln(1 + r)
+ * Returns null when the payment never covers the interest.
+ */
+const estimatePayoffDate = (B: number, r: number, M: number, from: Date): Date | null => {
+  if (B <= 0) return from;
+  if (M <= 0) return null;
+  let n: number;
+  if (r <= 0) {
+    n = B / M;
+  } else {
+    if (M <= r * B) return null;
+    n = -Math.log(1 - (r * B) / M) / Math.log(1 + r);
+  }
+  return new Date(from.getFullYear(), from.getMonth() + Math.ceil(n), from.getDate());
+};
+
 export function computeAmortization(inputs: AmortizationInputs): AmortizationResult {
   const {
     principal,
@@ -68,19 +86,18 @@ export function computeAmortization(inputs: AmortizationInputs): AmortizationRes
     : 0;
   const scheduledPaidToDate = scheduledPaymentsElapsed * (monthlyPayment || 0);
 
-  // Use actual payments as effective n (in payment-units) so extra/short payments
-  // move the remaining balance realistically.
-  const effectiveN = monthlyPayment > 0 ? actualPaidToDate / monthlyPayment : 0;
-  const rawRemaining = balanceAfter(principal || 0, monthlyRate, monthlyPayment || 0, effectiveN);
-  const remainingPrincipal = Math.max(0, rawRemaining);
+  // Balance on schedule, then adjust for the difference between what was actually
+  // paid and what was scheduled. Overpayments go straight to principal; shortfalls
+  // stay on the balance. (Approximation: ignores interest on the timing of the gap.)
+  const scheduledBalance = balanceAfter(principal || 0, monthlyRate, monthlyPayment || 0, scheduledPaymentsElapsed);
+  const paymentGap = (actualPaidToDate || 0) - scheduledPaidToDate;
+  const remainingPrincipal = Math.max(0, scheduledBalance - paymentGap);
 
   const payoffProgressPct = principal > 0
     ? Math.min(100, Math.max(0, (1 - remainingPrincipal / principal) * 100))
     : 0;
 
-  const estimatedPayoffDate = start && termMonths
-    ? new Date(start.getFullYear(), start.getMonth() + termMonths, start.getDate())
-    : null;
+  const estimatedPayoffDate = estimatePayoffDate(remainingPrincipal, monthlyRate, monthlyPayment || 0, today);
 
   return {
     scheduledPaymentsElapsed,

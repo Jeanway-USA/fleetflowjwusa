@@ -1,6 +1,7 @@
 import { useState, useMemo, lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, subWeeks, subMonths, subQuarters, subYears, addDays } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { supabase } from '@/integrations/supabase/client';
 import { FileText } from 'lucide-react';
 
@@ -28,7 +29,23 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { PrintableExecutiveSummary } from '@/components/executive/PrintableExecutiveSummary';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
+/**
+ * Current period plus the same elapsed slice of the prior period, so
+ * "Oct 1–3" is compared with "Sep 1–3" rather than all of September.
+ */
+// Statuses that mean a truck and driver are committed to a load (matches dispatcher views).
+const ACTIVE_LOAD_STATUSES = ['assigned', 'loading', 'at_pickup', 'in_transit', 'at_delivery', 'unloading'];
+// Arrival timestamps are UTC; convert to a US calendar day before comparing to the scheduled date.
+const ARRIVAL_TZ = 'America/Chicago';
+
 function getDateRange(period: TimePeriod) {
+  const range = getFullPeriodRange(period);
+  const elapsed = Date.now() - range.start.getTime();
+  const toDatePrevEnd = new Date(Math.min(range.prevStart.getTime() + elapsed, range.prevEnd.getTime()));
+  return { ...range, prevEnd: toDatePrevEnd };
+}
+
+function getFullPeriodRange(period: TimePeriod) {
   const now = new Date();
   switch (period) {
     case 'week':
@@ -80,20 +97,25 @@ export default function ExecutiveDashboard() {
       const formatDate = (d: Date) => format(d, 'yyyy-MM-dd');
 
       // Current period loads - only delivered
-      const { data: currentLoads } = await supabase
-        .from('fleet_loads')
-        .select('gross_revenue, net_revenue')
-        .eq('status', 'delivered')
-        .gte('delivery_date', formatDate(dateRange.start))
-        .lte('delivery_date', formatDate(dateRange.end));
-
-      // Previous period loads - only delivered
-      const { data: prevLoads } = await supabase
-        .from('fleet_loads')
-        .select('gross_revenue, net_revenue')
-        .eq('status', 'delivered')
-        .gte('delivery_date', formatDate(dateRange.prevStart))
-        .lte('delivery_date', formatDate(dateRange.prevEnd));
+      const [{ data: currentLoads }, { data: prevLoads }] = await Promise.all([
+        supabase
+          .from('fleet_loads')
+          .select('gross_revenue, net_revenue, actual_miles, booked_miles')
+          .eq('status', 'delivered')
+          .is('deleted_at', null)
+          .gte('delivery_date', formatDate(dateRange.start))
+          .lte('delivery_date', formatDate(dateRange.end)),
+        // Previous period loads (same elapsed slice) - only delivered
+        supabase
+          .from('fleet_loads')
+          .select('gross_revenue, net_revenue, actual_miles, booked_miles')
+          .eq('status', 'delivered')
+          .is('deleted_at', null)
+          .gte('delivery_date', formatDate(dateRange.prevStart))
+          .lte('delivery_date', formatDate(dateRange.prevEnd)),
+      ]);
+      const sumMiles = (rows: typeof currentLoads) =>
+        rows?.reduce((sum, l) => sum + (l.actual_miles || l.booked_miles || 0), 0) || 0;
 
       const deliveredLoadCount = currentLoads?.length || 0;
       const grossRevenue = currentLoads?.reduce((sum, l) => sum + (l.gross_revenue || 0), 0) || 0;
@@ -120,6 +142,8 @@ export default function ExecutiveDashboard() {
         prevProfitMargin,
         deliveredLoadCount,
         prevDeliveredLoadCount,
+        totalMiles: sumMiles(currentLoads),
+        prevTotalMiles: sumMiles(prevLoads),
       };
     },
   });
@@ -173,18 +197,21 @@ export default function ExecutiveDashboard() {
     queryFn: async () => {
       const formatDate = (d: Date) => format(d, 'yyyy-MM-dd');
 
-      const { data: loads } = await supabase
-        .from('fleet_loads')
-        .select('actual_miles, booked_miles, net_revenue')
-        .eq('status', 'delivered')
-        .gte('delivery_date', formatDate(dateRange.start))
-        .lte('delivery_date', formatDate(dateRange.end));
-
-      const { data: trucks } = await supabase.from('trucks').select('id, status').is('deleted_at', null);
-      const { data: activeLoads } = await supabase
-        .from('fleet_loads')
-        .select('truck_id')
-        .in('status', ['in_transit', 'at_pickup', 'at_delivery']);
+      const [{ data: loads }, { data: trucks }, { data: activeLoads }] = await Promise.all([
+        supabase
+          .from('fleet_loads')
+          .select('id, delivery_date, actual_miles, booked_miles, empty_miles, net_revenue')
+          .eq('status', 'delivered')
+          .is('deleted_at', null)
+          .gte('delivery_date', formatDate(dateRange.start))
+          .lte('delivery_date', formatDate(dateRange.end)),
+        supabase.from('trucks').select('id, status').is('deleted_at', null),
+        supabase
+          .from('fleet_loads')
+          .select('truck_id')
+          .is('deleted_at', null)
+          .in('status', ACTIVE_LOAD_STATUSES),
+      ]);
 
       const totalLoads = loads?.length || 0;
       const totalMiles = loads?.reduce((sum, l) => sum + (l.actual_miles || l.booked_miles || 0), 0) || 0;
@@ -195,38 +222,33 @@ export default function ExecutiveDashboard() {
       const trucksWithLoads = new Set(activeLoads?.map((l) => l.truck_id)).size;
       const fleetUtilization = activeTrucks > 0 ? (trucksWithLoads / activeTrucks) * 100 : 0;
 
-      // Calculate actual on-time rate from delivered loads with delivery dates
-      const { data: deliveredLoads } = await supabase
-        .from('fleet_loads')
-        .select('delivery_date, pickup_date')
-        .eq('status', 'delivered')
-        .not('delivery_date', 'is', null)
-        .gte('delivery_date', formatDate(dateRange.start))
-        .lte('delivery_date', formatDate(dateRange.end));
-
-      // Get the corresponding status logs to check actual delivery timing
-      let onTimeRate = 0;
-      if (deliveredLoads && deliveredLoads.length > 0) {
-        // If we have loads with both pickup and delivery dates, we can estimate on-time performance
-        // For now, count loads that were delivered (have a delivery_date) as a proxy
-        // A load is "on-time" if it has a delivery_date (meaning it was tracked to completion)
-        const loadsWithSchedule = deliveredLoads.filter(l => l.delivery_date && l.pickup_date);
-        onTimeRate = loadsWithSchedule.length > 0 ? (loadsWithSchedule.length / deliveredLoads.length) * 100 : 0;
-        // Clamp to reasonable values
-        onTimeRate = Math.min(onTimeRate, 100);
+      // On-time = truck reached the receiver on or before the scheduled delivery
+      // date. Measured by day because appointment times are stored without a
+      // timezone; arrival is the first unloading/at_delivery/delivered log entry.
+      let onTimeRate: number | null = null;
+      const loadIds = (loads ?? []).map((l) => l.id);
+      if (loadIds.length > 0) {
+        const { data: arrivals } = await supabase
+          .from('load_status_logs')
+          .select('load_id, changed_at')
+          .in('load_id', loadIds)
+          .in('new_status', ['unloading', 'at_delivery', 'delivered'])
+          .order('changed_at', { ascending: true });
+        const firstArrival = new Map<string, string>();
+        arrivals?.forEach((a) => {
+          if (!firstArrival.has(a.load_id)) firstArrival.set(a.load_id, a.changed_at);
+        });
+        const measured = (loads ?? []).filter((l) => l.delivery_date && firstArrival.has(l.id));
+        if (measured.length > 0) {
+          const onTime = measured.filter(
+            (l) => formatInTimeZone(firstArrival.get(l.id)!, ARRIVAL_TZ, 'yyyy-MM-dd') <= l.delivery_date!,
+          ).length;
+          onTimeRate = (onTime / measured.length) * 100;
+        }
       }
 
-      // Calculate empty miles ratio
-      const { data: emptyMilesLoads } = await supabase
-        .from('fleet_loads')
-        .select('empty_miles, actual_miles, booked_miles')
-        .eq('status', 'delivered')
-        .gte('delivery_date', formatDate(dateRange.start))
-        .lte('delivery_date', formatDate(dateRange.end));
-      
-      const totalEmptyMiles = emptyMilesLoads?.reduce((sum, l) => sum + (l.empty_miles || 0), 0) || 0;
-      const totalLoadedMiles = emptyMilesLoads?.reduce((sum, l) => sum + (l.actual_miles || l.booked_miles || 0), 0) || 0;
-      const emptyMilesRatio = totalLoadedMiles > 0 ? (totalEmptyMiles / (totalLoadedMiles + totalEmptyMiles)) * 100 : 0;
+      const totalEmptyMiles = loads?.reduce((sum, l) => sum + (l.empty_miles || 0), 0) || 0;
+      const emptyMilesRatio = totalMiles + totalEmptyMiles > 0 ? (totalEmptyMiles / (totalMiles + totalEmptyMiles)) * 100 : 0;
 
       return {
         totalLoads,
@@ -248,7 +270,7 @@ export default function ExecutiveDashboard() {
       const { data: activeLoads } = await supabase
         .from('fleet_loads')
         .select('truck_id')
-        .in('status', ['in_transit', 'at_pickup', 'at_delivery']);
+        .in('status', ACTIVE_LOAD_STATUSES);
 
       const trucksOnLoads = new Set(activeLoads?.map((l) => l.truck_id));
       const truckList = trucks || [];
@@ -276,7 +298,7 @@ export default function ExecutiveDashboard() {
       const { data: activeLoads } = await supabase
         .from('fleet_loads')
         .select('driver_id')
-        .in('status', ['in_transit', 'at_pickup', 'at_delivery']);
+        .in('status', ACTIVE_LOAD_STATUSES);
 
       const driversOnLoads = new Set(activeLoads?.map((l) => l.driver_id));
       const driverList = drivers || [];

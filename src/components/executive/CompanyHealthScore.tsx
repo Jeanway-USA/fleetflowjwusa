@@ -5,7 +5,7 @@ import { Activity } from 'lucide-react';
 interface HealthData {
   profitMargin: number;
   fleetUtilization: number;
-  onTimeRate: number;
+  onTimeRate: number | null;
   revenueGrowth: number; // percentage change from previous period
 }
 
@@ -24,12 +24,16 @@ function calculateHealthScore(data: HealthData): number {
   const utilizationScore = data.fleetUtilization;
   
   // On-Time Rate: Target 95%+, score based on 80-100% range
-  const onTimeScore = Math.min(100, Math.max(0, ((data.onTimeRate - 80) / 20) * 100));
-  
+  // When on-time can't be measured yet, the other three metrics share the weight.
+  const onTimeScore = data.onTimeRate == null
+    ? null
+    : Math.min(100, Math.max(0, ((data.onTimeRate - 80) / 20) * 100));
+
   // Revenue Growth: Positive is good, scale -20% to +20% to 0-100
   const growthScore = Math.min(100, Math.max(0, ((data.revenueGrowth + 20) / 40) * 100));
-  
-  return Math.round((retentionScore * 0.25) + (utilizationScore * 0.25) + (onTimeScore * 0.25) + (growthScore * 0.25));
+
+  const scores = [retentionScore, utilizationScore, growthScore, onTimeScore].filter((s): s is number => s != null);
+  return Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length);
 }
 
 function getHealthStatus(score: number): { label: string; color: string; bgColor: string } {
@@ -127,7 +131,7 @@ export function CompanyHealthScore({ data, isLoading }: CompanyHealthScoreProps)
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">On-Time</span>
-            <span className="font-medium">{data.onTimeRate.toFixed(0)}%</span>
+            <span className="font-medium">{data.onTimeRate == null ? '—' : `${data.onTimeRate.toFixed(0)}%`}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Growth</span>

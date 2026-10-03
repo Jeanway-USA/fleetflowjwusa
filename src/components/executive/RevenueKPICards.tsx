@@ -41,7 +41,7 @@ function formatCurrency(amount: number) {
 
 function calculateChange(current: number, previous: number): { value: number; isPositive: boolean } {
   if (previous === 0) return { value: 0, isPositive: true };
-  const change = ((current - previous) / previous) * 100;
+  const change = ((current - previous) / Math.abs(previous)) * 100;
   return { value: Math.abs(change), isPositive: change >= 0 };
 }
 
@@ -109,11 +109,13 @@ function KPICard({
 export function RevenueKPICards({ data, isLoading }: RevenueKPICardsProps) {
   const { costPerMile, calculateTrueProfit } = useOperationalCPM();
 
-  const totalMiles = data?.totalMiles || data?.deliveredLoadCount ? (data?.totalMiles || (data?.deliveredLoadCount || 0) * 350) : 0;
-  const prevTotalMiles = data?.prevTotalMiles || data?.prevDeliveredLoadCount ? (data?.prevTotalMiles || (data?.prevDeliveredLoadCount || 0) * 350) : 0;
+  // Operating cost is charged against the truck's share (net revenue), never
+  // against gross — Landstar's split is money the company never receives.
+  const totalMiles = data?.totalMiles ?? 0;
+  const prevTotalMiles = data?.prevTotalMiles ?? 0;
 
-  const trueProfit = calculateTrueProfit(data?.grossRevenue ?? 0, totalMiles);
-  const prevTrueProfit = calculateTrueProfit(data?.prevGrossRevenue ?? 0, prevTotalMiles);
+  const trueProfit = calculateTrueProfit(data?.netRevenue ?? 0, totalMiles);
+  const prevTrueProfit = calculateTrueProfit(data?.prevNetRevenue ?? 0, prevTotalMiles);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
@@ -134,21 +136,21 @@ export function RevenueKPICards({ data, isLoading }: RevenueKPICardsProps) {
         subtitle="After Landstar split"
       />
       <KPICard
-        title="Total Profit"
-        value={data?.operatingProfit ?? 0}
-        previousValue={data?.prevOperatingProfit ?? 0}
+        title="Est. Operating Profit"
+        value={trueProfit.trueProfit}
+        previousValue={prevTrueProfit.trueProfit}
         icon={PiggyBank}
         isLoading={isLoading}
-        subtitle="Company earnings"
+        subtitle={`${totalMiles.toLocaleString()} mi × $${costPerMile.toFixed(2)} CPM`}
       />
       <KPICard
-        title="True Profit Margin"
+        title="Operating Margin"
         value={trueProfit.margin}
         previousValue={prevTrueProfit.margin}
         icon={Target}
         format="percent"
         isLoading={isLoading}
-        subtitle={`CPM: $${costPerMile.toFixed(2)} · ${formatCurrency(trueProfit.trueProfit)} net`}
+        subtitle="Profit ÷ company revenue"
       />
       <KPICard
         title="Retention Rate"

@@ -444,8 +444,12 @@ export function reconcileRevenue(
   // Pass 2: period total fallback
   let period: RevenuePeriodCheck | null = null;
   if (periodStart && periodEnd) {
+    // A load belongs to this statement if Landstar paid it here (its trip number is
+    // on the statement) or it delivered inside the window. Using the window alone
+    // flags false discrepancies for loads delivered just before/after the period.
     const inWindow = loads.filter(l =>
-      l.delivery_date && l.delivery_date >= periodStart && l.delivery_date <= periodEnd,
+      revenueByTrip.has(normalizeTrip(l.landstar_load_id))
+      || (l.delivery_date && l.delivery_date >= periodStart && l.delivery_date <= periodEnd),
     );
     const expectedGrossTotal = inWindow.reduce((s, l) => s + (Number(l.rate) || 0), 0);
     const expectedTotal = applySplit(expectedGrossTotal);

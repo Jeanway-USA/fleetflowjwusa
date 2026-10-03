@@ -36,7 +36,7 @@ interface OperationalData {
   totalMiles: number;
   revenuePerMile: number;
   fleetUtilization: number;
-  onTimeRate: number;
+  onTimeRate: number | null;
   totalEmptyMiles?: number;
   emptyMilesRatio?: number;
 }
@@ -191,7 +191,7 @@ export function PrintableExecutiveSummary({
               { label: 'Miles Driven', value: `${fmtNumber(operationalData?.totalMiles ?? 0)} mi` },
               { label: 'Revenue / Mile', value: `$${(operationalData?.revenuePerMile ?? 0).toFixed(2)}` },
               { label: 'Fleet Utilization', value: fmtPct(operationalData?.fleetUtilization ?? 0) },
-              { label: 'On-Time Delivery', value: fmtPct(operationalData?.onTimeRate ?? 0) },
+              { label: 'On-Time Delivery', value: operationalData?.onTimeRate == null ? '—' : fmtPct(operationalData.onTimeRate) },
               { label: 'Empty Miles Ratio', value: fmtPct(operationalData?.emptyMilesRatio ?? 0) },
             ].map((item) => (
               <div key={item.label} className="border border-gray-300 rounded p-2 text-center">

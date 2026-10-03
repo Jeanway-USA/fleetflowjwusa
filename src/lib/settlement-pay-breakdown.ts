@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { payableMiles } from '@/utils/payCalculations';
 
 export type SettlementPayType = 'flat' | 'per_mile' | 'percentage' | 'other';
 
@@ -100,10 +101,7 @@ export async function fetchPayBreakdown(
     return da.localeCompare(db);
   });
 
-  const totalLoadedMiles = loads.reduce(
-    (s, l) => s + Number(l.booked_miles ?? l.actual_miles ?? 0),
-    0,
-  );
+  const totalLoadedMiles = loads.reduce((s, l) => s + payableMiles(l), 0);
   const totalLinehaul = loads.reduce((s, l) => s + Number(l.rate ?? 0), 0);
   const totalAfterSplit = totalLinehaul * split;
   const basePay = Number(settlement.gross_pay ?? 0);
@@ -116,10 +114,10 @@ export async function fetchPayBreakdown(
     formulaLabel = `Flat Rate Base Pay = ${fmtMoney(payRate)}`;
   } else if (payType === 'per_mile') {
     methodLabel = `Cost Per Mile @ $${payRate.toFixed(2)}/mi`;
-    formulaLabel = `${fmtMiles(totalLoadedMiles)} loaded mi × $${payRate.toFixed(2)}/mi = ${fmtMoney(basePay)}`;
+    formulaLabel = `${fmtMiles(totalLoadedMiles)} loaded mi × $${payRate.toFixed(2)}/mi = ${fmtMoney(totalLoadedMiles * payRate)}`;
   } else if (payType === 'percentage') {
     methodLabel = `Percentage @ ${payRate}%`;
-    formulaLabel = `${fmtMoney(totalAfterSplit)} (after ${(split * 100).toFixed(0)}% truck split) × ${payRate}% = ${fmtMoney(basePay)}`;
+    formulaLabel = `${fmtMoney(totalAfterSplit)} (after ${(split * 100).toFixed(0)}% truck split) × ${payRate}% = ${fmtMoney((totalAfterSplit * payRate) / 100)}`;
   } else {
     methodLabel = 'Custom';
     formulaLabel = `Base Pay = ${fmtMoney(basePay)}`;
