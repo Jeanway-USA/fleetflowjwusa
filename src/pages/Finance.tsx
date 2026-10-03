@@ -131,6 +131,20 @@ export default function Finance() {
     },
   });
 
+  // Truck loan payments are a real operating cost. The loan ledger (Trucks page)
+  // is the source of truth; any auto-posted 'Truck Loan' expense rows mirror it
+  // and are excluded below so a payment is never counted twice.
+  const { data: truckLoanPayments = [] } = useQuery({
+    queryKey: ['truck_loan_payments'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('truck_loan_payments')
+        .select('id, truck_id, payment_date, amount');
+      if (error) throw error;
+      return (data ?? []) as Array<{ id: string; truck_id: string; payment_date: string; amount: number }>;
+    },
+  });
+
   const { data: drivers = [] } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
@@ -432,7 +446,11 @@ export default function Finance() {
     operatingTotal: acc.operatingTotal + (exp.operating_total || 0),
   }), { fuelCost: 0, truckPayment: 0, operatingTotal: 0 });
 
-  const standaloneExpenses = filteredExpenses.filter((e: Expense) => !e.load_id);
+  const TRUCK_LOAN_TYPE = 'Truck Loan';
+  const filteredTruckPayments = filterByPeriod(truckLoanPayments, 'payment_date');
+  const truckPaymentsTotal = filteredTruckPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+  const standaloneExpenses = filteredExpenses.filter((e: Expense) => !e.load_id && e.expense_type !== TRUCK_LOAN_TYPE);
   const loadLinkedExpenses = filteredExpenses.filter((e: Expense) => e.load_id && loadIds.includes(e.load_id));
 
   // Split into actual / advance / credit buckets
@@ -472,8 +490,8 @@ export default function Finance() {
     amount: acc.amount + (c.commission_amount || 0),
   }), { count: 0, amount: 0 });
 
-  const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total - creditsTotal;
-  const grossExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total;
+  const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total + truckPaymentsTotal - creditsTotal;
+  const grossExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total + truckPaymentsTotal;
   const totalPayroll = payrollTotals.netPay;
   const totalRevenueWithCommissions = revenueTotals.netRevenue + commissionTotals.amount;
   const netProfit = totalRevenueWithCommissions - totalExpenses - totalPayroll;
@@ -603,14 +621,14 @@ export default function Finance() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-4 mb-6">
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">{formatCurrency(revenueTotals.netRevenue)}</div>
+            <div className="text-lg sm:text-2xl font-bold tabular-nums text-success">{formatCurrency(revenueTotals.netRevenue)}</div>
             <p className="text-xs text-muted-foreground">{revenueTotals.loadCount} loads · Gross: {formatCurrency(revenueTotals.grossRevenue)}</p>
           </CardContent>
         </Card>
@@ -620,9 +638,10 @@ export default function Finance() {
             <TrendingDown className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{formatCurrency(totalExpenses + totalPayroll)}</div>
+            <div className="text-lg sm:text-2xl font-bold tabular-nums text-destructive">{formatCurrency(totalExpenses + totalPayroll)}</div>
             <p className="text-xs text-muted-foreground">
-              Operating + Payroll {creditsTotal > 0 && <span className="text-success">· Credits: -{formatCurrency(creditsTotal)}</span>}
+              {truckPaymentsTotal > 0 ? `Incl. ${formatCurrency(truckPaymentsTotal)} truck payments` : 'Operating + payroll'}
+              {creditsTotal > 0 && <span className="text-success"> · Credits: -{formatCurrency(creditsTotal)}</span>}
             </p>
             {advancesTotal > 0 && (
               <p className="text-xs text-amber-500 mt-1 flex items-center gap-1">
@@ -637,7 +656,7 @@ export default function Finance() {
             <PiggyBank className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(netProfit)}</div>
+            <div className={`text-lg sm:text-2xl font-bold tabular-nums ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(netProfit)}</div>
             <p className="text-xs text-muted-foreground">Margin: {profitMargin.toFixed(1)}%</p>
           </CardContent>
         </Card>
@@ -652,8 +671,8 @@ export default function Finance() {
               const totalMonthly = activeLoanTrucks.reduce((sum: number, t: any) => sum + (t.monthly_payment || 0), 0);
               return (
                 <>
-                  <div className="text-2xl font-bold">{formatCurrency(totalMonthly)}</div>
-                  <p className="text-xs text-muted-foreground">{activeLoanTrucks.length} truck{activeLoanTrucks.length !== 1 ? 's' : ''} with active loans · /mo</p>
+                  <div className="text-lg sm:text-2xl font-bold tabular-nums">{formatCurrency(totalMonthly)}</div>
+                  <p className="text-xs text-muted-foreground">Per month · {activeLoanTrucks.length} truck{activeLoanTrucks.length !== 1 ? 's' : ''} financed</p>
                 </>
               );
             })()}
@@ -670,15 +689,16 @@ export default function Finance() {
         }}
         className="w-full"
       >
-        <TabsList className="grid grid-cols-3 gap-2 p-1 bg-muted rounded-lg h-auto w-full max-w-2xl mx-auto mb-6">
-          <TabsTrigger value="payouts" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
-            1. Run Payouts
+        <TabsList className="grid grid-cols-3 gap-1 sm:gap-2 p-1 bg-muted rounded-lg h-auto w-full max-w-2xl mx-auto mb-6">
+          <TabsTrigger value="payouts" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium text-xs sm:text-sm px-2">
+            Payouts
           </TabsTrigger>
-          <TabsTrigger value="compliance" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
-            2. Expenses
+          <TabsTrigger value="compliance" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium text-xs sm:text-sm px-2">
+            Expenses
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium">
-            3. Analytics & Audit Logs
+          <TabsTrigger value="analytics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium text-xs sm:text-sm px-2">
+            <span className="sm:hidden">Analytics</span>
+            <span className="hidden sm:inline">Analytics & Audit</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1040,7 +1060,7 @@ export default function Finance() {
             <StatementUpload
               existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, delivery_date: l.delivery_date }))}
               trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
-              existingExpenses={expenses.map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id }))}
+              existingExpenses={expenses.filter((e: any) => !e.deleted_at).map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id, description: e.description }))}
               onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setUploadDialogOpen(false); }}
               orgId={orgId}
             />

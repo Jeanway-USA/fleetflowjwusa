@@ -96,6 +96,8 @@ function getStorageKey(tableId: string) {
 
 type FilterValue = string | { from?: string; to?: string };
 
+const MOBILE_PAGE_SIZE = 25;
+
 export function DataTable<T extends { id: string }>({ 
   columns, 
   data, 
@@ -168,6 +170,7 @@ export function DataTable<T extends { id: string }>({
   const showSelection = selectable && onSelectionChange;
   const hasAnyFilter = useMemo(() => columns.some(c => c.filter), [columns]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mobileLimit, setMobileLimit] = useState(MOBILE_PAGE_SIZE);
   const [filterValues, setFilterValues] = useState<Record<string, FilterValue>>({});
 
   const activeFilterCount = useMemo(() => {
@@ -375,7 +378,7 @@ export function DataTable<T extends { id: string }>({
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         {hasAnyFilter && (
           <Button
             variant={filtersOpen || activeFilterCount > 0 ? 'secondary' : 'outline'}
@@ -389,7 +392,7 @@ export function DataTable<T extends { id: string }>({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant={density === 'compact' ? 'secondary' : 'outline'} size="sm" onClick={toggleDensity}>
+              <Button variant={density === 'compact' ? 'secondary' : 'outline'} size="sm" onClick={toggleDensity} className={cn(renderMobileCard && "hidden md:inline-flex")}>
                 {density === 'compact' ? <Rows3 className="h-4 w-4" /> : <AlignJustify className="h-4 w-4" />}
               </Button>
             </TooltipTrigger>
@@ -399,7 +402,7 @@ export function DataTable<T extends { id: string }>({
         {tableId && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className={cn(renderMobileCard && "hidden md:inline-flex")}>
                 <SlidersHorizontal className="mr-2 h-4 w-4" />
                 View
               </Button>
@@ -489,13 +492,15 @@ export function DataTable<T extends { id: string }>({
 
       <div className="relative">
         {renderMobileCard && (
-          <div className="md:hidden space-y-2 max-h-[600px] overflow-y-auto pr-1">
+          // Cards flow with the page on phones — no nested scroll box. Rendered in
+          // pages of MOBILE_PAGE_SIZE so long lists stay fast on older phones.
+          <div className="md:hidden space-y-2">
             {sortedData.length === 0 ? (
               <div className="rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
                 No rows match the current filters.
               </div>
             ) : (
-              sortedData.map((item) => {
+              sortedData.slice(0, mobileLimit).map((item) => {
                 const isSelected = showSelection && safeSelectedIds.has(item.id);
                 const isExpanded = expandable && renderExpanded && expandedIds.has(item.id);
                 const canRowToggle = expandable && renderExpanded && !onRowClick;
@@ -549,6 +554,16 @@ export function DataTable<T extends { id: string }>({
                   </div>
                 );
               })
+            )}
+            {sortedData.length > mobileLimit && (
+              <Button
+                variant="outline"
+                className="w-full h-11"
+                onClick={() => setMobileLimit((n) => n + MOBILE_PAGE_SIZE)}
+              >
+                Show {Math.min(MOBILE_PAGE_SIZE, sortedData.length - mobileLimit)} more
+                <span className="ml-1 text-muted-foreground">({mobileLimit} of {sortedData.length})</span>
+              </Button>
             )}
           </div>
         )}

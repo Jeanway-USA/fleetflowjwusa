@@ -1,3 +1,5 @@
+import { isSameCharge, daysBetween } from '@/lib/expense-matching';
+
 // Settlement Reconciliation Engine
 // Cross-references and deduplicates expenses from multiple Landstar document types
 
@@ -79,6 +81,14 @@ export interface ReconciliationResult {
   periodEnd: string | null;
   unitNumber: string | null;
   revenue: RevenueReconciliation;
+  /**
+   * Set when some lines had no date of their own: 'statement' = dated with the
+   * uploaded statement's period end; 'latest_week' = no document carried a date,
+   * so the most recent Wednesday (Landstar period end) was assumed.
+   */
+  datesInferred: 'statement' | 'latest_week' | null;
+  /** Contractor PDF vs XLSX line check; null when both weren't uploaded. */
+  crossCheck: { addedFromXlsx: number; mismatches: CrossCheckMismatch[] } | null;
 }
 
 // Tolerances for revenue reconciliation
@@ -106,23 +116,11 @@ const REVENUE_IGNORE_PATTERNS: RegExp[] = [
   /\bTRACTOR\s*LEASE\b/i,
 ];
 
-// Recurring expense types that should not be aggressively deduped
-const RECURRING_EXPENSE_TYPES = new Set([
-  'Licensing/Permits',
-  'Card Fee',
-  'Direct Deposit Fee',
-  'CPP/Benefits',
-  'LCN/Satellite',
-  'Truck Warranty',
-  'PrePass/Scale',
-  'Trip Scanning',
-  'Insurance',
-]);
-
 // Fallback advance detection patterns — only Pre-Trip patterns (contractor statement is authoritative)
 const ADVANCE_FALLBACK_PATTERNS: RegExp[] = [
   /\bCARD\s*PRE-TRIP\b/i,
   /\bPRE-TRIP\b/i,
+  /\bPARTIAL\s*FINAL\s*S(ETT|T)\b/i,
 ];
 
 /**
@@ -166,36 +164,78 @@ export function reconcileDocuments(
   stagedFiles: StagedFile[],
   loadsForRevenue: RevenueReconcileLoad[] = [],
   landstarSplit: number = 0.65,
+  today: Date = new Date(),
 ): ReconciliationResult {
-  const allExpenses: (ExtractedExpense & { source: string; sourceType: StagedFile['type'] })[] = [];
+  type SourcedExpense = ExtractedExpense & { source: string; sourceType: StagedFile['type'] };
+  const allExpenses: SourcedExpense[] = [];
+  const xlsxLines: SourcedExpense[] = [];
   let periodStart: string | null = null;
   let periodEnd: string | null = null;
   let unitNumber: string | null = null;
 
-  for (const sf of stagedFiles) {
-    if (sf.status !== 'parsed' || !sf.data) continue;
+  const parsedFiles = stagedFiles.filter((sf) => sf.status === 'parsed' && sf.data);
+  // The contractor statement PDF itemizes every settlement charge with its date
+  // and installment balance. The Settlement/Freight Bill XLSX exports list the
+  // same charges summed per description/trip and (Settlement Details) undated,
+  // so when the PDF is present it is the source of truth and the XLSX lines are
+  // used only to cross-check it.
+  const hasContractorPdf = parsedFiles.some((sf) => sf.type === 'contractor_pdf');
+
+  for (const sf of parsedFiles) {
+    const data = sf.data!;
     const sourceLabel = getFileTypeLabel(sf.type);
 
     // Track period and unit
-    if (sf.data.period_start) {
-      if (!periodStart || sf.data.period_start < periodStart) periodStart = sf.data.period_start;
+    if (data.period_start) {
+      if (!periodStart || data.period_start < periodStart) periodStart = data.period_start;
     }
-    if (sf.data.period_end) {
-      if (!periodEnd || sf.data.period_end > periodEnd) periodEnd = sf.data.period_end;
+    if (data.period_end) {
+      if (!periodEnd || data.period_end > periodEnd) periodEnd = data.period_end;
     }
-    if (sf.data.unit_number && !unitNumber) {
-      unitNumber = sf.data.unit_number;
+    if (data.unit_number && !unitNumber) {
+      unitNumber = data.unit_number;
     }
 
-    for (const exp of sf.data.expenses) {
-      // Skip revenue lines from contractor PDFs
-      if (sf.type === 'contractor_pdf' && !exp.is_reimbursement && !exp.is_advance && !exp.is_discount) {
-        if (REVENUE_IGNORE_PATTERNS.some(p => p.test(exp.description))) continue;
-        // Also skip positive amounts that aren't credits/advances/reimbursements
-        if (exp.amount > 0) continue;
-      }
-      allExpenses.push({ ...exp, source: sourceLabel, sourceType: sf.type });
+    const isXlsx = sf.type === 'settlement_xlsx' || sf.type === 'freight_bill_xlsx';
+    for (const exp of data.expenses) {
+      if (sf.type === 'contractor_pdf' && !isContractorCharge(exp)) continue;
+      const line = { ...exp, source: sourceLabel, sourceType: sf.type };
+      if (isXlsx && hasContractorPdf) xlsxLines.push(line);
+      else allExpenses.push(line);
     }
+  }
+
+  // Landstar settles weekly (periods end on Wednesday). The PDF parser sometimes
+  // reports the whole month as the period, which would drag a month of loads into
+  // the revenue check, so clamp to one week.
+  if (periodEnd && (!periodStart || daysBetween(periodStart, periodEnd) > 7)) {
+    periodStart = addDays(periodEnd, -6);
+  }
+
+  // Undated lines (Settlement Details "Latest Week" exports) take the statement's
+  // period end, or the most recent Wednesday when nothing else in the upload has a
+  // date. Never the upload day — that scattered old charges onto import dates.
+  let datesInferred: ReconciliationResult['datesInferred'] = null;
+  const fallbackDate = periodEnd ?? latestSettlementWednesday(today);
+  for (const item of [...allExpenses, ...xlsxLines]) {
+    if (!item.date) {
+      item.date = fallbackDate;
+      datesInferred = periodEnd ? 'statement' : 'latest_week';
+    }
+  }
+  if (!periodEnd && datesInferred) {
+    periodEnd = fallbackDate;
+    periodStart = addDays(fallbackDate, -6);
+  }
+
+  // Line-by-line cross-check of the PDF against the XLSX exports. XLSX lines the
+  // PDF parser missed are added (so nothing is lost); amount disagreements are
+  // surfaced for review.
+  const crossCheck = hasContractorPdf && xlsxLines.length > 0
+    ? crossCheckStatement(allExpenses.filter((e) => e.sourceType === 'contractor_pdf'), xlsxLines)
+    : null;
+  if (crossCheck) {
+    for (const missing of crossCheck.missingFromPdf) allExpenses.push(missing as SourcedExpense);
   }
 
   // Fallback: apply advance detection for items missing the flag (e.g. from PDF sources)
@@ -205,45 +245,33 @@ export function reconcileDocuments(
     }
   }
 
-  // Assign unique keys per source: same-source duplicates get counter suffixes
-  const taggedExpenses: (typeof allExpenses[number] & { dedupKey: string })[] = [];
-  const sourceGroups = new Map<string, typeof allExpenses>();
+  // Cross-document merge for uploads without a contractor PDF (e.g. both XLSX
+  // exports, which repeat per-trip charges). Each merged line absorbs at most one
+  // line per other source, so repeated charges within one document (weekly
+  // installments, several card fees in a day) are never collapsed.
+  const deduped: ReconciledExpense[] = [];
+
   for (const item of allExpenses) {
-    const group = sourceGroups.get(item.source) || [];
-    group.push(item);
-    sourceGroups.set(item.source, group);
-  }
-
-  for (const [, items] of sourceGroups) {
-    const counters = new Map<string, number>();
-    for (const item of items) {
-      const baseKey = `${item.date}_${item.expense_type}_${Math.abs(item.amount).toFixed(2)}`;
-      const count = (counters.get(baseKey) || 0) + 1;
-      counters.set(baseKey, count);
-      // For recurring types, include source in key so cross-document items don't merge
-      const sourceSegment = RECURRING_EXPENSE_TYPES.has(item.expense_type) ? `_${item.source}` : '';
-      const dedupKey = `${baseKey}${sourceSegment}_${count}`;
-      taggedExpenses.push({ ...item, dedupKey });
-    }
-  }
-
-  // Deduplicate: only items with the exact same dedupKey merge (cross-document non-recurring)
-  const deduped = new Map<string, ReconciledExpense>();
-
-  for (const item of taggedExpenses) {
-    const existing = deduped.get(item.dedupKey);
-
-    if (existing) {
-      if (!existing.sources.includes(item.source)) {
-        existing.sources.push(item.source);
+    let best: ReconciledExpense | null = null;
+    let bestGap = Number.POSITIVE_INFINITY;
+    for (const candidate of deduped) {
+      if (candidate.sources.includes(item.source) || !isSameCharge(candidate, item)) continue;
+      const gap = daysBetween(candidate.date, item.date);
+      if (gap < bestGap) {
+        best = candidate;
+        bestGap = gap;
       }
-      existing.merged = true;
-      if (!existing.vendor && item.vendor) existing.vendor = item.vendor;
-      if (!existing.gallons && item.gallons) existing.gallons = item.gallons;
-      if (!existing.trip_number && item.trip_number) existing.trip_number = item.trip_number;
-      if (!existing.description && item.description) existing.description = item.description;
+    }
+
+    if (best) {
+      best.sources.push(item.source);
+      best.merged = true;
+      if (!best.vendor && item.vendor) best.vendor = item.vendor;
+      if (!best.gallons && item.gallons) best.gallons = item.gallons;
+      if (!best.trip_number && item.trip_number) best.trip_number = item.trip_number;
+      if (!best.description && item.description) best.description = item.description;
     } else {
-      deduped.set(item.dedupKey, {
+      deduped.push({
         ...item,
         merged: false,
         sources: [item.source],
@@ -252,24 +280,26 @@ export function reconcileDocuments(
     }
   }
 
-  // Pre-Trip pattern for advance qualification
-  const PRE_TRIP_PATTERN = /\bPRE-TRIP\b/i;
+  // Trip advances: card pre-trips and "partial final settlement" loads. These are
+  // the money Landstar fronted against a trip; card-activity cash advances and
+  // deposits are spending of that same money, so they are not counted again.
+  const TRIP_ADVANCE_PATTERN = /\b(PRE-TRIP|PARTIAL\s*FINAL\s*S(ETT|T))\b/i;
+  const advanceSources = hasContractorPdf
+    ? [FILE_TYPE_LABELS.contractor_pdf]
+    : [FILE_TYPE_LABELS.settlement_xlsx, FILE_TYPE_LABELS.freight_bill_xlsx];
 
   // Split into 3 buckets
   const expenses: ReconciledExpense[] = [];
   const advances: ReconciledExpense[] = [];
   const credits: ReconciledExpense[] = [];
 
-  for (const item of deduped.values()) {
+  for (const item of deduped) {
     if (item.is_advance) {
-      // Only keep advances from contractor PDF that match Pre-Trip AND have a trip number
-      const isContractor = (item as any).sourceType === 'contractor_pdf';
-      const isPreTrip = PRE_TRIP_PATTERN.test(item.description);
-      const hasTrip = !!item.trip_number;
-      if (isContractor && isPreTrip && hasTrip) {
+      // Merged lines keep the first source's type, so check every contributing source.
+      const fromStatement = item.sources.some((s) => advanceSources.includes(s));
+      if (fromStatement && TRIP_ADVANCE_PATTERN.test(item.description) && item.trip_number) {
         advances.push(item);
       }
-      // All other advances are dropped (duplicates of contractor statement)
     } else if (item.is_reimbursement || item.is_discount) {
       credits.push(item);
     } else {
@@ -287,7 +317,117 @@ export function reconcileDocuments(
     periodEnd,
     unitNumber,
     revenue,
+    datesInferred,
+    crossCheck: crossCheck
+      ? { addedFromXlsx: crossCheck.missingFromPdf.length, mismatches: crossCheck.mismatches }
+      : null,
   };
+}
+
+// --------------------------------------------------------------------------
+// Statement helpers
+// --------------------------------------------------------------------------
+
+const DAY_MS = 86_400_000;
+
+function addDays(isoDate: string, days: number): string {
+  const d = new Date(Date.parse(`${isoDate}T00:00:00Z`) + days * DAY_MS);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Most recent Wednesday on or before `today` (local calendar), as YYYY-MM-DD. */
+export function latestSettlementWednesday(today: Date): string {
+  const d = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const back = (d.getDay() - 3 + 7) % 7; // 3 = Wednesday
+  d.setDate(d.getDate() - back);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Trip-level lines on a contractor statement that are charges (vs. revenue,
+// accessorial pay, or their reversals such as "Just In Time" or "Update Detention").
+const TRIP_CHARGE_PATTERN = /\b(CARD|FEE|TRKSTP|SCN|PRE-TRIP|PARTIAL|ADV|ADVANCE|FUEL\s+PURCHASE|DEF|TOLL|SCALE|PERMIT|LUMPER|CHARGE|DEDUCT|ESCROW)\b/i;
+const CONTRACTOR_REVENUE_PATTERNS: RegExp[] = [
+  ...REVENUE_IGNORE_PATTERNS,
+  /\bFUEL\s*SURCHARGE\b/i,
+  /\bTRIP%?\s*ESCROW\b/i,
+];
+
+/**
+ * Which contractor-PDF lines are costs. The statement lists deductions as
+ * positive amounts in the "Deductions & Charges" column, so sign can't be used;
+ * instead drop revenue descriptions, and on trip lines keep only recognizable
+ * charges (accessorial revenue like "Just In Time" also carries a trip number).
+ */
+function isContractorCharge(exp: ExtractedExpense): boolean {
+  if (exp.is_reimbursement || exp.is_discount || exp.is_advance) return true;
+  if (CONTRACTOR_REVENUE_PATTERNS.some((p) => p.test(exp.description))) return false;
+  if (exp.trip_number && (!exp.expense_type || exp.expense_type === 'Misc')) {
+    return TRIP_CHARGE_PATTERN.test(exp.description);
+  }
+  return true;
+}
+
+export interface CrossCheckMismatch {
+  description: string;
+  trip_number: string | null;
+  xlsxAmount: number;
+  pdfAmount: number;
+}
+
+/**
+ * Compare itemized contractor-PDF lines against XLSX lines, which Landstar sums
+ * per description + trip (e.g. two warranty plans 75.47 + 12.47 = 87.94).
+ */
+function crossCheckStatement<T extends ExtractedExpense>(pdfLines: T[], xlsxLines: T[]) {
+  const claimed = new Set<number>();
+  const missingFromPdf: T[] = [];
+  const mismatches: CrossCheckMismatch[] = [];
+  const cents = (v: number) => Math.round(Math.abs(v) * 100);
+  const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
+  const trip = (t: string | null) => (t ?? '').replace(/\D/g, '');
+
+  // Settlement Details and Freight Bill repeat per-trip charges; check each charge once.
+  const seen = new Set<string>();
+  const uniqueXlsx = xlsxLines.filter((l) => {
+    const key = `${norm(l.description)}|${trip(l.trip_number)}|${cents(l.amount)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  for (const x of uniqueXlsx) {
+    const xDesc = norm(x.description);
+    const group = pdfLines
+      .map((p, i) => ({ p, i }))
+      .filter(({ p, i }) => {
+        if (claimed.has(i)) return false;
+        if (trip(x.trip_number) && trip(p.trip_number) && trip(x.trip_number) !== trip(p.trip_number)) return false;
+        const pDesc = norm(p.description);
+        return ` ${pDesc} `.includes(` ${xDesc} `) || ` ${xDesc} `.includes(` ${pDesc} `);
+      });
+
+    if (group.length === 0) {
+      // Fall back to a same-trip, same-amount line under different wording.
+      const i = pdfLines.findIndex((p, idx) =>
+        !claimed.has(idx) && cents(p.amount) === cents(x.amount) && trip(p.trip_number) === trip(x.trip_number));
+      if (i >= 0) claimed.add(i);
+      else missingFromPdf.push(x);
+      continue;
+    }
+
+    const sum = group.reduce((s, { p }) => s + cents(p.amount), 0);
+    group.forEach(({ i }) => claimed.add(i));
+    if (sum !== cents(x.amount)) {
+      mismatches.push({
+        description: x.description,
+        trip_number: x.trip_number,
+        xlsxAmount: cents(x.amount) / 100,
+        pdfAmount: sum / 100,
+      });
+    }
+  }
+
+  return { missingFromPdf, mismatches };
 }
 
 // --------------------------------------------------------------------------

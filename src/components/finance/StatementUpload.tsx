@@ -36,6 +36,7 @@ interface ExistingExpense {
   expense_type: string;
   amount: number;
   load_id: string | null;
+  description?: string | null;
 }
 
 interface StatementUploadProps {

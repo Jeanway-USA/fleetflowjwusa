@@ -4,12 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PercentageInput } from '@/components/ui/numeric-input';
+import { CurrencyInput, PercentageInput } from '@/components/ui/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Calculator, RefreshCw } from 'lucide-react';
 import { calculateRevenue, type RevenueSettings } from '@/lib/revenue-calculator';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CompensationSettingsTabProps {
   getSetting: (key: string, defaultValue?: string) => string;
@@ -17,20 +18,31 @@ interface CompensationSettingsTabProps {
 
 export function CompensationSettingsTab({ getSetting }: CompensationSettingsTabProps) {
   const queryClient = useQueryClient();
+  const { orgId } = useAuth();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<any>({});
   const [recalculating, setRecalculating] = useState(false);
 
   const updateMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('company_settings')
         .update({ setting_value: value })
-        .eq('setting_key', key);
+        .eq('setting_key', key)
+        .select('setting_key');
       if (error) throw error;
+      // Settings that were never seeded (e.g. operational_cpm) have no row to update.
+      if (!updated || updated.length === 0) {
+        if (!orgId) throw new Error('No organization context — reload and try again');
+        const { error: insertError } = await supabase
+          .from('company_settings')
+          .insert({ setting_key: key, setting_value: value, org_id: orgId } as any);
+        if (insertError) throw insertError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['company_settings'] });
+      queryClient.invalidateQueries({ queryKey: ['operational-cpm'] });
       toast.success('Settings updated');
     },
     onError: (error: any) => toast.error(error.message),
@@ -41,14 +53,22 @@ export function CompensationSettingsTab({ getSetting }: CompensationSettingsTabP
       gross_percentage: getSetting('gross_percentage', '100'),
       truck_percentage: getSetting('truck_percentage', '65'),
       trailer_percentage: getSetting('trailer_percentage', '7'),
-      power_only_percentage: getSetting('power_only_percentage', '5'),
+      power_only_percentage: getSetting('power_only_percentage', '70'),
       advance_percentage: getSetting('advance_percentage', '30'),
       owns_trailer: getSetting('owns_trailer', 'false'),
+      operational_cpm: getSetting('operational_cpm', '1.75'),
     });
     setEditing(true);
   };
 
   const handleSave = () => {
+    // Trailer % is added on top of truck % (e.g. 65 + 7 = 72 for a BCO pulling
+    // their own trailer), so the combined share can never exceed 100%.
+    const combined = parseFloat(form.truck_percentage) + (form.owns_trailer === 'true' ? parseFloat(form.trailer_percentage) : 0);
+    if (combined > 100) {
+      toast.error(`Truck + trailer share is ${combined}% of linehaul. Trailer % is added on top of truck % — for 72% total, enter 7.`);
+      return;
+    }
     Object.entries(form).forEach(([key, value]) => {
       if (value !== getSetting(key)) {
         updateMutation.mutate({ key, value: String(value) });
@@ -65,6 +85,7 @@ export function CompensationSettingsTab({ getSetting }: CompensationSettingsTabP
         trailerPct: parseFloat(getSetting('trailer_percentage', '7')) / 100,
         advancePct: parseFloat(getSetting('advance_percentage', '30')) / 100,
         ownsTrailer: getSetting('owns_trailer', 'false') === 'true',
+        powerOnlyPct: parseFloat(getSetting('power_only_percentage', '70')) / 100,
       };
 
       // Fetch all loads
@@ -167,6 +188,11 @@ export function CompensationSettingsTab({ getSetting }: CompensationSettingsTabP
                   <PercentageInput value={form.advance_percentage ?? ''} onChange={(v) => setForm({ ...form, advance_percentage: v })} />
                 </div>
                 <div className="space-y-2">
+                  <Label>Operating Cost per Mile</Label>
+                  <CurrencyInput value={form.operational_cpm ?? ''} onChange={(v) => setForm({ ...form, operational_cpm: v })} />
+                  <p className="text-xs text-muted-foreground">Fuel, insurance, maintenance, truck payment — all-in. Used for estimated profit on the dashboard.</p>
+                </div>
+                <div className="space-y-2">
                   <Label>Owns Trailer</Label>
                   <Select value={form.owns_trailer || 'false'} onValueChange={(v) => setForm({ ...form, owns_trailer: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -199,11 +225,15 @@ export function CompensationSettingsTab({ getSetting }: CompensationSettingsTabP
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">Power Only</p>
-                  <p className="text-2xl font-bold">{getSetting('power_only_percentage', '5')}%</p>
+                  <p className="text-2xl font-bold">{getSetting('power_only_percentage', '70')}%</p>
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">Advance Rate</p>
                   <p className="text-2xl font-bold">{getSetting('advance_percentage', '30')}%</p>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Cost per Mile</p>
+                  <p className="text-2xl font-bold tabular-nums">${Number(getSetting('operational_cpm', '1.75')).toFixed(2)}</p>
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="text-sm text-muted-foreground">Owns Trailer</p>

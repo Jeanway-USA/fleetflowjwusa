@@ -179,7 +179,7 @@ function DashboardLayoutInner({ children, isDemoMode, signOut, simulatedOrgId, s
   return (
     <div className="min-h-screen flex w-full bg-background">
       <AppSidebar />
-      <main className="flex-1 flex flex-col min-h-screen">
+      <main className="flex-1 flex flex-col min-h-screen min-w-0">
         {simulatedOrgId && (
           <div
             role="button"

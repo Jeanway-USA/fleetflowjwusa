@@ -35,6 +35,7 @@ const REVENUE_IGNORE_PATTERNS: RegExp[] = [
   /\bLINEHAUL\b/i,
   /\bTRACTOR\s*LEASE\b/i,
   /\bTRIP%?\s*ESCROW/i,
+  /\bFUEL\s*SURCHARGE\b/i,
 ];
 
 // Advance patterns (non-P&L)
@@ -42,6 +43,7 @@ const ADVANCE_PATTERNS: RegExp[] = [
   /\bADVANCE\b/i,
   /\bCARD PRE-TRIP\b/i,
   /\bCARD CONT\.?\s*SPEC\s*ADV\b/i,
+  /\bPARTIAL\s*FINAL\s*S(ETT|T)\b/i,
 ];
 
 const EXPENSE_TYPE_MAP: [RegExp, string][] = [
@@ -53,7 +55,8 @@ const EXPENSE_TYPE_MAP: [RegExp, string][] = [
   [/\bDD FEE\b/i, 'Direct Deposit Fee'],
   [/\bPERMIT/i, 'Licensing/Permits'],
   [/\bPLATE\b/i, 'Registration/Plates'],
-  [/\bBP\s+(OTA|NTTA|E470)\b/i, 'Tolls'],
+  // Bill-by-plate tolls: "BP <agency> <MM/DD/YY>" (OTA, NTTA, E470, FDOT, DelDOT, DRBA…)
+  [/^BP\s+[A-Z0-9]+\s+\d{2}\/\d{2}\/\d{2}\b/i, 'Tolls'],
   [/\bPREPASS\b/i, 'PrePass/Scale'],
   [/\bLCN\s*FEES?\b/i, 'LCN/Satellite'],
   [/\bNTP\s*TRUCK\s*WARRANTY\b/i, 'Truck Warranty'],
@@ -105,6 +108,19 @@ function parseDate(raw: unknown, xlsx: XLSXModule): string | null {
   return null;
 }
 
+function findFooterSettlementDate(rows: Record<string, unknown>[]): string | null {
+  for (const row of rows) {
+    for (const value of Object.values(row)) {
+      const m = String(value ?? '').match(/Settlement Date is (\d{1,2})\/(\d{1,2})\/(\d{2,4})/i);
+      if (m) {
+        const year = m[3].length === 2 ? 2000 + parseInt(m[3]) : parseInt(m[3]);
+        return `${year}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;
+      }
+    }
+  }
+  return null;
+}
+
 export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStatement> {
   const xlsx = await loadXLSX();
   const workbook = xlsx.read(buffer, { type: 'array' });
@@ -117,6 +133,12 @@ export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStat
 
   const headers = Object.keys(rows[0]);
   const isFreightBill = headers.some(h => /settlement\s*date/i.test(h));
+  const hasCodeColumn = headers.includes('Code');
+
+  // Settlement Details has no date column. When exported for a specific week its
+  // footer reads "Settlement Date is 07/15/26"; "Latest Week" exports carry no date
+  // and are dated during reconciliation instead.
+  const footerDate = findFooterSettlementDate(rows);
 
   let unitNumber: string | null = null;
   let periodStart: string | null = null;
@@ -128,6 +150,12 @@ export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStat
       row['Settlement Description'] || row['Description'] || ''
     ).trim();
     if (!description) continue;
+    if (/^total$/i.test(description) || /^applied filters/i.test(description)) continue;
+
+    // Freight Bill Details codes: B = charge, V = advance, C = escrow,
+    // 1/3 = linehaul/FSC/accessorial revenue, X = reversal. Only B and V are costs.
+    const code = hasCodeColumn ? String(row['Code'] ?? '').trim().toUpperCase() : '';
+    if (hasCodeColumn && code !== 'B' && code !== 'V') continue;
 
     // Skip general revenue/income lines entirely
     if (REVENUE_IGNORE_PATTERNS.some(p => p.test(description))) continue;
@@ -136,7 +164,7 @@ export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStat
     const amount = parseAmount(rawAmount);
 
     const isReimb = /REIMB/i.test(description);
-    const isAdvance = ADVANCE_PATTERNS.some(p => p.test(description));
+    const isAdvance = code === 'V' || ADVANCE_PATTERNS.some(p => p.test(description));
     const isDiscount = /\bNATS\s*DISCOUNT\b/i.test(description) || /\bDISCOUNT\b/i.test(description);
 
     // Skip revenue rows (positive amount, not a reimbursement/advance/discount)
@@ -151,13 +179,7 @@ export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStat
     if (isFreightBill) {
       date = parseDate(row['Settlement Date'], xlsx);
     }
-    // Fallback: try any date-looking column
-    if (!date) {
-      for (const key of ['Settlement Date', 'Pickup Date', 'Delivery Date']) {
-        date = parseDate(row[key], xlsx);
-        if (date) break;
-      }
-    }
+    if (!date) date = footerDate;
 
     // Extract unit number from first row that has it
     if (!unitNumber && isFreightBill) {
@@ -174,7 +196,8 @@ export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStat
     const expenseType = mapExpenseType(description);
 
     expenses.push({
-      date: date || new Date().toISOString().slice(0, 10),
+      // Undated rows are filled with the statement period end during reconciliation.
+      date: date || '',
       expense_type: isAdvance ? 'Advance' : (isReimb ? 'Reimbursement' : expenseType),
       amount: Math.abs(amount),
       trip_number: tripNumber,

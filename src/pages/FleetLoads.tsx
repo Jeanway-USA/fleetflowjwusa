@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search, Archive, CheckCircle2, Upload } from 'lucide-react';
@@ -586,6 +587,7 @@ export default function FleetLoads() {
         trailerPct: parseFloat(getSetting('trailer_percentage', '7')) / 100,
         advancePct: parseFloat(getSetting('advance_percentage', '30')) / 100,
         ownsTrailer: getSetting('owns_trailer', 'false') === 'true',
+        powerOnlyPct: parseFloat(getSetting('power_only_percentage', '70')) / 100,
       }
     );
 
@@ -699,10 +701,11 @@ export default function FleetLoads() {
     return { city: parts[0], state: '', zip: '', full: address };
   };
 
-  // Filter loads by month
+  // Filter loads by month of delivery (falls back to pickup for undelivered loads),
+  // so monthly income here matches the Finance hub and Executive Dashboard.
   const monthFilteredLoads = selectedMonth === 'all'
     ? loads
-    : loads.filter((l: any) => l.pickup_date && l.pickup_date.startsWith(selectedMonth));
+    : loads.filter((l: any) => (l.delivery_date || l.pickup_date || '').startsWith(selectedMonth));
 
   // Enrich with driver_name + truck_unit so columns, sort, and filter all use the same field
   const enrichedAll = monthFilteredLoads.map((l: any) => {
@@ -749,14 +752,16 @@ export default function FleetLoads() {
     }), { loads: 0, rate: 0, fuelSurcharge: 0, accessorials: 0, grossRevenue: 0, netRevenue: 0, settlement: 0, bookedMiles: 0, actualMiles: 0 });
 
   // KPI-specific aggregates
-  const PENDING_STATUSES = new Set(['in_transit', 'dispatched', 'at_pickup', 'at_delivery', 'assigned', 'pending']);
+  const PENDING_STATUSES = new Set(['pending', 'assigned', 'dispatched', 'at_pickup', 'loading', 'in_transit', 'at_delivery', 'unloading']);
   const pendingIncome = filteredLoads
     .filter((l: any) => PENDING_STATUSES.has(l.status))
     .reduce((sum: number, l: any) => sum + (l.gross_revenue || 0), 0);
   const pendingCount = filteredLoads.filter((l: any) => PENDING_STATUSES.has(l.status)).length;
   const completedCount = filteredLoads.filter((l: any) => l.status === 'delivered').length;
 
-  const timeframeLabel = selectedMonth === 'all'
+  const timeframeLabel = isLoading
+    ? 'Loading loads…'
+    : selectedMonth === 'all'
     ? `Showing all loads · ${totals.loads} total`
     : (() => {
         try {
@@ -922,15 +927,21 @@ export default function FleetLoads() {
       </div>
 
       {/* KPI Summary Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-6 flex items-start justify-between">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-6">
+        <div className="col-span-2 md:col-span-1 bg-card border border-border/60 rounded-xl shadow-sm p-4 md:p-6 flex items-start justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-muted-foreground">Total Gross Income</p>
-            <p className="text-2xl font-bold mt-2 truncate">{formatCurrency(totals.grossRevenue)}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {totals.actualMiles > 0
-                ? `${formatCurrency(totals.grossRevenue / totals.actualMiles)}/mi · ${totals.actualMiles.toLocaleString()} mi`
-                : 'Rate + FSC + Accessorials'}
+            <p className="text-sm font-medium text-muted-foreground">Gross Income</p>
+            {isLoading ? (
+              <Skeleton className="h-8 w-40 mt-2" />
+            ) : (
+              <p className="text-2xl font-bold mt-2 truncate tabular-nums">{formatCurrency(totals.grossRevenue)}</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+              {isLoading
+                ? ' '
+                : totals.actualMiles > 0
+                  ? `${formatCurrency(totals.grossRevenue / totals.actualMiles)}/mi · ${totals.actualMiles.toLocaleString()} mi`
+                  : 'Rate + FSC + Accessorials'}
             </p>
           </div>
           <div className="h-10 w-10 rounded-full flex items-center justify-center bg-emerald-500/10 shrink-0">
@@ -938,26 +949,36 @@ export default function FleetLoads() {
           </div>
         </div>
 
-        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-6 flex items-start justify-between">
+        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-4 md:p-6 flex items-start justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-muted-foreground">Pending Income (In Transit)</p>
-            <p className="text-2xl font-bold mt-2 truncate">{formatCurrency(pendingIncome)}</p>
+            <p className="text-sm font-medium text-muted-foreground">Pending</p>
+            {isLoading ? (
+              <Skeleton className="h-7 w-24 mt-2" />
+            ) : (
+              <p className="text-lg md:text-2xl font-bold mt-2 truncate tabular-nums">{formatCurrency(pendingIncome)}</p>
+            )}
             <p className="text-xs text-muted-foreground mt-1">
-              {pendingCount} load{pendingCount === 1 ? '' : 's'} in transit
+              {isLoading ? ' ' : `${pendingCount} not yet delivered`}
             </p>
           </div>
-          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-amber-500/10 shrink-0">
+          <div className="hidden md:flex h-10 w-10 rounded-full items-center justify-center bg-amber-500/10 shrink-0">
             <Truck className="h-5 w-5 text-amber-600" />
           </div>
         </div>
 
-        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-6 flex items-start justify-between">
+        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-4 md:p-6 flex items-start justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-muted-foreground">Completed Loads</p>
-            <p className="text-2xl font-bold mt-2 truncate">{completedCount.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground mt-1">Delivered this period</p>
+            <p className="text-sm font-medium text-muted-foreground">Delivered</p>
+            {isLoading ? (
+              <Skeleton className="h-7 w-12 mt-2" />
+            ) : (
+              <p className="text-lg md:text-2xl font-bold mt-2 truncate tabular-nums">{completedCount.toLocaleString()}</p>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">
+              {selectedMonth === 'all' ? 'All time' : 'This month'}
+            </p>
           </div>
-          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-blue-500/10 shrink-0">
+          <div className="hidden md:flex h-10 w-10 rounded-full items-center justify-center bg-blue-500/10 shrink-0">
             <CheckCircle2 className="h-5 w-5 text-blue-600" />
           </div>
         </div>
