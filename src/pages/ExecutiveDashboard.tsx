@@ -5,9 +5,10 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { supabase } from '@/integrations/supabase/client';
 import { FileText } from 'lucide-react';
 
-import { PageHeader } from '@/components/shared/PageHeader';
 import { PeriodSelector, TimePeriod } from '@/components/executive/PeriodSelector';
-import { RevenueKPICards } from '@/components/executive/RevenueKPICards';
+import { SETTLEMENT_WEEK_START } from '@/lib/settlement-week';
+import { LogbookWeek } from '@/components/executive/LogbookWeek';
+import { MoneyLines } from '@/components/executive/MoneyLines';
 import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
 const RevenueTrendsChart = lazy(() =>
   import('@/components/executive/RevenueTrendsChart').then(m => ({ default: m.RevenueTrendsChart })),
@@ -18,7 +19,6 @@ const CostBreakdownChart = lazy(() =>
 );
 import { TopPerformerCards } from '@/components/executive/TopPerformerCards';
 import { QuickInsights, Insight } from '@/components/executive/QuickInsights';
-import { CompanyHealthScore } from '@/components/executive/CompanyHealthScore';
 import { FleetStatusCard } from '@/components/executive/FleetStatusCard';
 import { DriverAvailabilityCard } from '@/components/executive/DriverAvailabilityCard';
 import { CriticalAlertsBar, CriticalAlert } from '@/components/executive/CriticalAlertsBar';
@@ -29,15 +29,22 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { PrintableExecutiveSummary } from '@/components/executive/PrintableExecutiveSummary';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
-/**
- * Current period plus the same elapsed slice of the prior period, so
- * "Oct 1–3" is compared with "Sep 1–3" rather than all of September.
- */
 // Statuses that mean a truck and driver are committed to a load (matches dispatcher views).
 const ACTIVE_LOAD_STATUSES = ['assigned', 'loading', 'at_pickup', 'in_transit', 'at_delivery', 'unloading'];
 // Arrival timestamps are UTC; convert to a US calendar day before comparing to the scheduled date.
 const ARRIVAL_TZ = 'America/Chicago';
 
+const PERIOD_LABEL: Record<TimePeriod, string> = {
+  week: 'settlement week',
+  month: 'month to date',
+  quarter: 'quarter to date',
+  ytd: 'year to date',
+};
+
+/**
+ * Current period plus the same elapsed slice of the prior period, so
+ * "Oct 1-3" is compared with "Sep 1-3" rather than all of September.
+ */
 function getDateRange(period: TimePeriod) {
   const range = getFullPeriodRange(period);
   const elapsed = Date.now() - range.start.getTime();
@@ -49,11 +56,12 @@ function getFullPeriodRange(period: TimePeriod) {
   const now = new Date();
   switch (period) {
     case 'week':
+      // Landstar settlement week: Thursday through the period-ending Wednesday.
       return {
-        start: startOfWeek(now, { weekStartsOn: 1 }),
-        end: endOfWeek(now, { weekStartsOn: 1 }),
-        prevStart: startOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }),
-        prevEnd: endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 }),
+        start: startOfWeek(now, { weekStartsOn: SETTLEMENT_WEEK_START }),
+        end: endOfWeek(now, { weekStartsOn: SETTLEMENT_WEEK_START }),
+        prevStart: startOfWeek(subWeeks(now, 1), { weekStartsOn: SETTLEMENT_WEEK_START }),
+        prevEnd: endOfWeek(subWeeks(now, 1), { weekStartsOn: SETTLEMENT_WEEK_START }),
       };
     case 'month':
       return {
@@ -80,7 +88,8 @@ function getFullPeriodRange(period: TimePeriod) {
 }
 
 export default function ExecutiveDashboard() {
-  const [period, setPeriod] = useState<TimePeriod>('month');
+  // Defaults to the settlement week so the money matches the logbook above it.
+  const [period, setPeriod] = useState<TimePeriod>('week');
   const [showReport, setShowReport] = useState(false);
   const dateRange = useMemo(() => getDateRange(period), [period]);
 
@@ -158,7 +167,8 @@ export default function ExecutiveDashboard() {
       for (let i = 5; i >= 0; i--) {
         const monthStart = startOfMonth(subMonths(now, i));
         const monthEnd = endOfMonth(subMonths(now, i));
-        months.push({ start: monthStart, end: monthEnd, label: format(monthStart, 'MMM') });
+        // The current month is partial; label it so a short month doesn't read as a collapse.
+        months.push({ start: monthStart, end: monthEnd, label: i === 0 ? `${format(monthStart, 'MMM')} MTD` : format(monthStart, 'MMM') });
       }
 
       const results = await Promise.all(
@@ -498,13 +508,13 @@ export default function ExecutiveDashboard() {
         return acc;
       }, {});
 
-      // Muted, professional color palette
+      // Logbook palette: green, ballpoint blue, carbon ochre, slate, pencil
       const categoryColors: Record<string, string> = {
-        'Fuel & DEF': 'hsl(35 50% 55%)',       // Warm tan
-        'Operations': 'hsl(210 40% 55%)',      // Soft blue
-        'Insurance & Benefits': 'hsl(160 35% 50%)',  // Sage green
-        'Payments & Advances': 'hsl(280 30% 55%)',   // Muted purple
-        'Other': 'hsl(220 20% 50%)',           // Slate gray
+        'Fuel & DEF': 'hsl(var(--primary))',     // Logbook green
+        'Operations': 'hsl(205 45% 42%)',      // Ballpoint blue
+        'Insurance & Benefits': 'hsl(40 80% 48%)',  // Carbon ochre
+        'Payments & Advances': 'hsl(165 22% 38%)',   // Slate green
+        'Other': 'hsl(var(--muted-foreground))', // Pencil gray
       };
 
       const entries = Object.entries(grouped).filter(([_, value]) => value !== 0);
@@ -600,21 +610,6 @@ export default function ExecutiveDashboard() {
     },
   });
 
-  // Calculate health score data
-  const healthData = useMemo(() => {
-    if (!kpiData || !operationalData) return undefined;
-
-    const revenueGrowth = kpiData.prevGrossRevenue > 0
-      ? ((kpiData.grossRevenue - kpiData.prevGrossRevenue) / kpiData.prevGrossRevenue) * 100
-      : 0;
-
-    return {
-      profitMargin: kpiData.profitMargin,
-      fleetUtilization: operationalData.fleetUtilization,
-      onTimeRate: operationalData.onTimeRate,
-      revenueGrowth,
-    };
-  }, [kpiData, operationalData]);
 
   // Generate insights
   const insights: Insight[] = useMemo(() => {
@@ -629,30 +624,19 @@ export default function ExecutiveDashboard() {
         result.push({
           id: '1',
           type: 'success',
-          message: `Revenue is up ${revenueChange.toFixed(0)}% compared to the prior period`,
+          message: `Gross is up ${revenueChange.toFixed(0)}% on the same point last period`,
         });
       } else if (revenueChange < -10) {
         result.push({
           id: '2',
           type: 'alert',
-          message: `Revenue is down ${Math.abs(revenueChange).toFixed(0)}% compared to the prior period`,
+          message: `Gross is down ${Math.abs(revenueChange).toFixed(0)}% on the same point last period`,
         });
       }
 
-      // Profit margin insight
-      if (kpiData.profitMargin > 30) {
-        result.push({
-          id: '3',
-          type: 'success',
-          message: `Healthy profit margin of ${kpiData.profitMargin.toFixed(1)}%`,
-        });
-      } else if (kpiData.profitMargin < 15) {
-        result.push({
-          id: '4',
-          type: 'warning',
-          message: `Profit margin is below target at ${kpiData.profitMargin.toFixed(1)}%`,
-        });
-      }
+      // No "profit margin" note here: kpiData.profitMargin is the share of gross
+      // kept after Landstar's split (fixed by contract), not profit. Estimated
+      // operating profit and margin live in the Money lines.
     }
 
     if (operationalData) {
@@ -660,24 +644,19 @@ export default function ExecutiveDashboard() {
         result.push({
           id: '5',
           type: 'warning',
-          message: `Fleet utilization at ${operationalData.fleetUtilization.toFixed(0)}% - consider optimizing dispatch`,
+          message: `Only ${operationalData.fleetUtilization.toFixed(0)}% of trucks are on a load right now`,
         });
       } else if (operationalData.fleetUtilization > 90) {
         result.push({
           id: '6',
           type: 'success',
-          message: `Excellent fleet utilization at ${operationalData.fleetUtilization.toFixed(0)}%`,
+          message: `${operationalData.fleetUtilization.toFixed(0)}% of trucks are on a load right now`,
         });
       }
     }
 
-    if (topPerformers?.topDriver) {
-      result.push({
-        id: '7',
-        type: 'info',
-        message: `${topPerformers.topDriver.name} is your top performer with ${topPerformers.topDriver.loads} loads`,
-      });
-    }
+    // Top performers already have their own block; no note repeats them.
+
 
     return result.slice(0, 5);
   }, [kpiData, operationalData, topPerformers]);
@@ -686,43 +665,45 @@ export default function ExecutiveDashboard() {
 
   return (
     <>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <PageHeader
-            title="Executive Dashboard"
-            description="Financial and operational health at a glance"
-          />
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowReport(true)} className="gap-2">
-              <FileText className="h-4 w-4" /> Generate EOW Report
-            </Button>
-            <PeriodSelector value={period} onChange={setPeriod} />
+      <div className="space-y-4 lg:space-y-6">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h1 className="font-condensed text-[28px] font-bold leading-tight sm:text-[32px]">Today</h1>
+            <p className="text-[15px] text-muted-foreground">{format(new Date(), 'EEEE, MMMM d')}</p>
+          </div>
+          <Button variant="outline" onClick={() => setShowReport(true)} className="h-11 gap-2 sm:h-10">
+            <FileText className="h-4 w-4" />
+            EOW report
+          </Button>
+        </div>
+
+        {/* The week on a log page, and the period's money as statement lines */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-6" data-tour="revenue-kpi">
+          <div className="lg:col-span-3">
+            <ErrorBoundary compact>
+              <LogbookWeek />
+            </ErrorBoundary>
+          </div>
+          <div className="lg:col-span-2">
+            <MoneyLines
+              data={kpiData}
+              isLoading={kpiLoading}
+              periodLabel={PERIOD_LABEL[period]}
+              controls={<PeriodSelector value={period} onChange={setPeriod} />}
+            />
           </div>
         </div>
 
-        {/* Morning Briefing */}
-        <ErrorBoundary compact>
-          <MorningBriefingWidget />
-        </ErrorBoundary>
-
-        {/* Row 1: Critical Alerts Banner */}
         <ErrorBoundary compact>
           <CriticalAlertsBar alerts={criticalAlerts} isLoading={alertsLoading} />
         </ErrorBoundary>
 
-        {/* Row 2: Health Score + KPI Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6" data-tour="revenue-kpi">
-          <div className="lg:col-span-1">
-            <CompanyHealthScore data={healthData} isLoading={kpiLoading || operationalLoading} />
-          </div>
-          <div className="lg:col-span-4">
-            <RevenueKPICards data={kpiData} isLoading={kpiLoading} />
-          </div>
-        </div>
+        <ErrorBoundary compact>
+          <MorningBriefingWidget />
+        </ErrorBoundary>
 
         {/* Row 3: Fleet & Driver Status */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
           <ErrorBoundary compact>
             <FleetStatusCard data={fleetStatus} isLoading={fleetLoading} />
           </ErrorBoundary>
@@ -739,7 +720,7 @@ export default function ExecutiveDashboard() {
         </ErrorBoundary>
 
         {/* Row 5: Operations + Costs */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           <ErrorBoundary compact>
             <OperationalMetrics data={operationalData} isLoading={operationalLoading} />
           </ErrorBoundary>
@@ -751,7 +732,7 @@ export default function ExecutiveDashboard() {
         </div>
 
         {/* Row 6: Actions + Performers + Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           <PendingActionsCard actions={pendingActions} isLoading={actionsLoading} />
           <TopPerformerCards
             topDriver={topPerformers?.topDriver}

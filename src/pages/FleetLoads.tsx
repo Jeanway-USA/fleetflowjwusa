@@ -28,10 +28,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+import { StateMark } from '@/components/shared/StateMark';
+import { useHighlightRow } from '@/hooks/useHighlightRow';
+import { cityState } from '@/lib/formatters';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search, Archive, CheckCircle2, Upload } from 'lucide-react';
-import { NotificationCenter } from '@/components/shared/NotificationCenter';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 
@@ -69,6 +72,8 @@ interface Accessorial {
 import { format, parseISO } from 'date-fns';
 
 export default function FleetLoads() {
+  // Opening /fleet-loads?highlight=<id> (e.g. from the Today logbook) flashes that load.
+  useHighlightRow();
   const { hasRole, isAdmin, orgId } = useAuth();
   const { isIndependent, isLandstar } = useOrganizationMode();
   const isDriverOnly = hasRole('driver') && !isAdmin;
@@ -78,6 +83,7 @@ export default function FleetLoads() {
   const [editingLoad, setEditingLoad] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [showRateConUpload, setShowRateConUpload] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSetSearch = useDebouncedCallback((v: string) => setSearchTerm(v.trim().toLowerCase()), 300);
@@ -701,6 +707,13 @@ export default function FleetLoads() {
     return { city: parts[0], state: '', zip: '', full: address };
   };
 
+  const wholeDollars = (v: number) => v.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+  // Months that actually have loads, newest first (by delivery, else pickup).
+  const loadMonths = Array.from(
+    new Set(loads.map((l: any) => (l.delivery_date || l.pickup_date || '').slice(0, 7)).filter(Boolean)),
+  ).sort().reverse() as string[];
+
   // Filter loads by month of delivery (falls back to pickup for undelivered loads),
   // so monthly income here matches the Finance hub and Executive Dashboard.
   const monthFilteredLoads = selectedMonth === 'all'
@@ -883,18 +896,10 @@ export default function FleetLoads() {
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Fleet Loads</h1>
-          <p className="text-sm text-muted-foreground mt-1">{timeframeLabel}</p>
-        </div>
-        <div className="flex w-full sm:w-auto items-center gap-2">
-          <NotificationCenter />
-        </div>
-      </div>
+      <PageHeader title="Loads" description={timeframeLabel} />
 
-      {/* Rate Confirmation Upload */}
-      <div className="mb-6">
+      {/* Rate Confirmation Upload: always on desktop, behind the "Rate con" button on phones */}
+      <div className={cn('mb-4', !showRateConUpload && 'hidden md:block')}>
         {isIndependent ? (
           <SmartLoadCreator
             onDataExtracted={handleRateConfirmationData}
@@ -926,67 +931,26 @@ export default function FleetLoads() {
         )}
       </div>
 
-      {/* KPI Summary Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-6">
-        <div className="col-span-2 md:col-span-1 bg-card border border-border/60 rounded-xl shadow-sm p-4 md:p-6 flex items-start justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-muted-foreground">Gross Income</p>
-            {isLoading ? (
-              <Skeleton className="h-8 w-40 mt-2" />
-            ) : (
-              <p className="text-2xl font-bold mt-2 truncate tabular-nums">{formatCurrency(totals.grossRevenue)}</p>
-            )}
-            <p className="text-xs text-muted-foreground mt-1 tabular-nums">
-              {isLoading
-                ? ' '
-                : totals.actualMiles > 0
-                  ? `${formatCurrency(totals.grossRevenue / totals.actualMiles)}/mi · ${totals.actualMiles.toLocaleString()} mi`
-                  : 'Rate + FSC + Accessorials'}
-            </p>
+      {/* Summary as one statement strip */}
+      <dl className="mb-4 grid grid-cols-3 divide-x rounded-lg border bg-card">
+        {[
+          { label: 'Gross', value: wholeDollars(totals.grossRevenue), note: totals.actualMiles > 0 ? `${formatCurrency(totals.grossRevenue / totals.actualMiles)}/mi` : 'Rate + FSC + acc.' },
+          { label: 'On the books', value: wholeDollars(pendingIncome), note: `${pendingCount} not delivered` },
+          { label: 'Delivered', value: completedCount.toLocaleString(), note: selectedMonth === 'all' ? 'All time' : 'This month' },
+        ].map((cell) => (
+          <div key={cell.label} className="min-w-0 px-3 py-2 md:px-5 md:py-3">
+            <dt className="text-[13px] text-muted-foreground">{cell.label}</dt>
+            <dd className="figure truncate text-xl font-bold leading-tight md:text-2xl">
+              {isLoading ? <Skeleton className="h-6 w-16 my-0.5" /> : cell.value}
+            </dd>
+            <dd className="truncate text-xs text-muted-foreground tabular-nums">{isLoading ? ' ' : cell.note}</dd>
           </div>
-          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-emerald-500/10 shrink-0">
-            <DollarSign className="h-5 w-5 text-emerald-600" />
-          </div>
-        </div>
-
-        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-4 md:p-6 flex items-start justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-muted-foreground">Pending</p>
-            {isLoading ? (
-              <Skeleton className="h-7 w-24 mt-2" />
-            ) : (
-              <p className="text-lg md:text-2xl font-bold mt-2 truncate tabular-nums">{formatCurrency(pendingIncome)}</p>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">
-              {isLoading ? ' ' : `${pendingCount} not yet delivered`}
-            </p>
-          </div>
-          <div className="hidden md:flex h-10 w-10 rounded-full items-center justify-center bg-amber-500/10 shrink-0">
-            <Truck className="h-5 w-5 text-amber-600" />
-          </div>
-        </div>
-
-        <div className="bg-card border border-border/60 rounded-xl shadow-sm p-4 md:p-6 flex items-start justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-muted-foreground">Delivered</p>
-            {isLoading ? (
-              <Skeleton className="h-7 w-12 mt-2" />
-            ) : (
-              <p className="text-lg md:text-2xl font-bold mt-2 truncate tabular-nums">{completedCount.toLocaleString()}</p>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">
-              {selectedMonth === 'all' ? 'All time' : 'This month'}
-            </p>
-          </div>
-          <div className="hidden md:flex h-10 w-10 rounded-full items-center justify-center bg-blue-500/10 shrink-0">
-            <CheckCircle2 className="h-5 w-5 text-blue-600" />
-          </div>
-        </div>
-      </div>
+        ))}
+      </dl>
 
       {/* Action Bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-        <div className="flex-1 flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 mb-4">
+        <div className="flex-1 flex flex-col sm:flex-row gap-2 md:gap-3">
           <div className="flex-1">
             <Input
               leftIcon={<Search className="h-4 w-4" />}
@@ -1008,27 +972,34 @@ export default function FleetLoads() {
             />
           </div>
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="h-11 md:h-10 w-full sm:w-48" aria-label="Month">
               <SelectValue placeholder="Filter by month" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Loads</SelectItem>
-              <SelectItem value="2026-01">January 2026</SelectItem>
-              <SelectItem value="2026-02">February 2026</SelectItem>
-              <SelectItem value="2026-03">March 2026</SelectItem>
+              <SelectItem value="all">All loads</SelectItem>
+              {loadMonths.map((m) => (
+                <SelectItem key={m} value={m}>{format(parseISO(`${m}-01`), 'MMMM yyyy')}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            onClick={() => openDialog()}
-            className="gradient-gold text-primary-foreground"
-          >
+          <Button onClick={() => openDialog()} className="h-11 md:h-10 flex-1 md:flex-none">
             <Plus className="h-4 w-4 mr-2" />
-            Add Load Manually
+            Add load
           </Button>
           <Button
             variant="outline"
+            className="h-11 flex-1 md:hidden"
+            onClick={() => setShowRateConUpload((v) => !v)}
+            aria-expanded={showRateConUpload}
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Rate con
+          </Button>
+          <Button
+            variant="outline"
+            className="hidden md:inline-flex"
             onClick={() => bulkInputRef.current?.click()}
             disabled={bulkImporting}
           >
@@ -1047,8 +1018,8 @@ export default function FleetLoads() {
 
 
       {/* Loads Table */}
-      <Card className="card-elevated">
-        <CardContent className="pt-6">
+      <Card className="card-elevated max-md:border-0 max-md:bg-transparent max-md:shadow-none">
+        <CardContent className="p-0 md:p-6">
           {searchTerm && filteredLoads.length === 0 ? (
             <EmptyState
               icon={Search}
@@ -1187,7 +1158,7 @@ export default function FleetLoads() {
               const detail = (label: string, value: React.ReactNode) => (
                 <div className="flex flex-col gap-0.5">
                   <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
-                  <span className="text-sm break-words">{value ?? <span className="text-muted-foreground">—</span>}</span>
+                  <span className="text-sm break-words">{value ?? <span className="text-muted-foreground">Not set</span>}</span>
                 </div>
               );
               return (
@@ -1213,25 +1184,28 @@ export default function FleetLoads() {
               );
             }}
             renderMobileCard={(load: any) => {
-              const originAddr = formatAddressDisplay(load.origin);
-              const destAddr = formatAddressDisplay(load.destination);
-              const originShort = typeof originAddr === 'string' ? originAddr : `${originAddr.city}${originAddr.state ? `, ${originAddr.state}` : ''}`;
-              const destShort = typeof destAddr === 'string' ? destAddr : `${destAddr.city}${destAddr.state ? `, ${destAddr.state}` : ''}`;
-              const loadId = load.landstar_load_id || load.load_reference || (load.id ? `#${String(load.id).slice(0, 8)}` : '—');
+              const loadId = load.landstar_load_id || load.load_reference || (load.id ? `#${String(load.id).slice(0, 8)}` : 'No trip #');
               const miles = (load.actual_miles && load.actual_miles > 0)
                 ? load.actual_miles.toLocaleString()
-                : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : null);
+                : (load.booked_miles ? `${load.booked_miles.toLocaleString()} booked` : null);
+              const day = (d: string | null) => (d ? format(parseISO(d), 'EEE MMM d') : 'Not set');
               return (
-                <div className="space-y-2.5">
+                <div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="font-mono font-semibold text-sm break-all">{loadId}</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <StatusBadge status={load.status} />
+                    <div className="min-w-0">
+                      <div className="figure text-xl font-bold leading-tight">{loadId}</div>
+                      <StateMark status={load.status} className="mt-0.5" />
+                    </div>
+                    <div className="flex items-start gap-1 shrink-0">
+                      <div className="text-right">
+                        <div className="figure text-xl font-bold leading-tight">{formatCurrency(load.net_revenue ?? load.rate)}</div>
+                        <div className="text-xs text-muted-foreground">truck share</div>
+                      </div>
                       <div onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <MoreHorizontal className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" className="h-11 w-11 -mr-2.5 -mt-1.5" aria-label={`Actions for load ${loadId}`}>
+                              <MoreHorizontal className="h-5 w-5" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -1247,28 +1221,13 @@ export default function FleetLoads() {
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 text-sm">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground pt-0.5">From</span>
-                    <div className="min-w-0 break-words">
-                      <div className="font-medium leading-tight">{originShort}</div>
-                      {typeof originAddr !== 'string' && originAddr.zip && (
-                        <div className="text-xs text-muted-foreground">{originAddr.zip}</div>
-                      )}
-                    </div>
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground pt-0.5">To</span>
-                    <div className="min-w-0 break-words">
-                      <div className="font-medium leading-tight">{destShort}</div>
-                      {typeof destAddr !== 'string' && destAddr.zip && (
-                        <div className="text-xs text-muted-foreground">{destAddr.zip}</div>
-                      )}
-                    </div>
+                  <div className="mt-2 text-[15px] font-medium leading-snug">
+                    {cityState(load.origin) || 'Origin not set'} <span className="text-muted-foreground">to</span> {cityState(load.destination) || 'Destination not set'}
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs pt-1 border-t border-border/60">
-                    <span className="font-semibold text-success">{formatCurrency(load.net_revenue ?? load.rate)}</span>
-                    {miles && <span className="text-muted-foreground">{miles} mi</span>}
-                    <span className="text-muted-foreground truncate">
-                      {load.driver_id ? load.driver_name : <em className="not-italic">Unassigned</em>}
-                    </span>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground tabular-nums">
+                    <span>{day(load.pickup_date)} to {day(load.delivery_date)}</span>
+                    {miles && <span>{miles} mi</span>}
+                    <span className="truncate">{load.driver_id ? load.driver_name : 'Unassigned'}</span>
                   </div>
                 </div>
               );
@@ -1324,14 +1283,21 @@ export default function FleetLoads() {
             ]}
           />
           {filteredLoads.length > 0 && (
-            <div className="flex items-center gap-4 px-4 py-3 mt-2 rounded-lg bg-muted/50 text-sm font-medium border border-border">
-              <span>Totals ({totals.loads} loads)</span>
-              <span className="ml-auto">Rate: {formatCurrency(totals.rate)}</span>
-              <span>FSC: {formatCurrency(totals.fuelSurcharge)}</span>
-              <span>Acc: {formatCurrency(totals.accessorials)}</span>
-              <span className="text-success">Net: {formatCurrency(totals.netRevenue)}</span>
-              <span>{totals.actualMiles.toLocaleString()} mi</span>
-            </div>
+            <dl className="mt-3 grid grid-cols-2 gap-x-6 rounded-lg border bg-card px-4 py-2 text-[15px] sm:grid-cols-3 lg:grid-cols-6">
+              {[
+                ['Loads', totals.loads.toLocaleString()],
+                ['Linehaul', formatCurrency(totals.rate)],
+                ['Fuel surcharge', formatCurrency(totals.fuelSurcharge)],
+                ['Accessorials', formatCurrency(totals.accessorials)],
+                ['Miles', totals.actualMiles.toLocaleString()],
+                ['Truck share', formatCurrency(totals.netRevenue)],
+              ].map(([label, value]) => (
+                <div key={label} className="flex items-baseline justify-between gap-2 border-b py-2 lg:flex-col lg:items-start lg:border-b-0">
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd className="figure text-lg font-semibold">{value}</dd>
+                </div>
+              ))}
+            </dl>
           )}
         </CardContent>
       </Card>

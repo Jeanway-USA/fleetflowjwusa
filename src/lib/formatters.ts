@@ -128,3 +128,19 @@ function chunkToWords(n: number): string {
   }
   return parts.join(' ');
 }
+
+/**
+ * "Rheem Manufacturing, 3900 S Zero St, Fort Smith, AR 72908-6919" -> "Fort Smith, AR".
+ * Loads store full stop addresses; lists and the logbook show only city and state.
+ * Falls back to the original text when it doesn't end in "City, ST ZIP".
+ */
+export function cityState(address: string | null | undefined): string {
+  if (!address) return '';
+  const m = address.trim().match(/([^,]+),\s*([A-Za-z]{2})(?:\s+\d{5}(?:-\d{4})?)?\s*$/);
+  if (!m) return address.trim();
+  const rawCity = m[1].trim();
+  const city = rawCity === rawCity.toUpperCase()
+    ? rawCity.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+    : rawCity;
+  return `${city}, ${m[2].toUpperCase()}`;
+}

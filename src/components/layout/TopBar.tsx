@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Search, Sparkles } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,19 +18,19 @@ import { NotificationCenter } from '@/components/shared/NotificationCenter';
 import { DriverMessages } from '@/components/driver/DriverMessages';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSubscriptionTier } from '@/hooks/useSubscriptionTier';
 import { UserMenu } from './UserMenu';
+import jwBanner from '@/assets/JW_Banner.png';
 
 const ROUTE_LABELS: Record<string, string> = {
-  '/executive-dashboard': 'Executive Dashboard',
+  '/executive-dashboard': 'Today',
   '/dispatcher-dashboard': 'Dispatcher Dashboard',
   '/driver-dashboard': 'Driver Dashboard',
   '/trucks': 'Trucks',
   '/trailers': 'Trailers',
   '/drivers': 'Drivers',
-  '/fleet-loads': 'Fleet Loads',
+  '/fleet-loads': 'Loads',
   '/agency-loads': 'Agency Loads',
-  '/finance': 'Finance & P/L',
+  '/finance': 'Money',
   '/insights': 'Company Insights',
   '/ifta': 'IFTA Reporting',
   '/crm': 'CRM',
@@ -53,9 +53,9 @@ const ROUTE_GROUPS: Record<string, { label: string; path: string }> = {
   '/drivers': { label: 'Fleet', path: '/drivers' },
   '/fleet-loads': { label: 'Loads', path: '/fleet-loads' },
   '/agency-loads': { label: 'Loads', path: '/fleet-loads' },
-  '/finance': { label: 'Finance', path: '/finance' },
-  '/insights': { label: 'Finance', path: '/finance' },
-  '/ifta': { label: 'Finance', path: '/finance' },
+  '/finance': { label: 'Money', path: '/finance' },
+  '/insights': { label: 'Money', path: '/finance' },
+  '/ifta': { label: 'Money', path: '/finance' },
   '/crm': { label: 'Operations', path: '/crm' },
   '/maintenance': { label: 'Operations', path: '/maintenance' },
   '/documents': { label: 'Operations', path: '/documents' },
@@ -72,7 +72,6 @@ interface TopBarProps {
 export function TopBar({ onReplayTour, hasTour }: TopBarProps) {
   const location = useLocation();
   const { hasRole } = useAuth();
-  const { tier } = useSubscriptionTier();
   const isDriverRole = hasRole('driver') && !hasRole('owner') && !hasRole('dispatcher');
 
   const pathSegment = '/' + location.pathname.split('/')[1];
@@ -83,12 +82,20 @@ export function TopBar({ onReplayTour, hasTour }: TopBarProps) {
     window.dispatchEvent(new CustomEvent('open-command-palette'));
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-12 sm:h-14 items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6">
-        <SidebarTrigger className="h-9 w-9 shrink-0" />
+    // Scoped to the dark token set so every control reads correctly on the
+    // logbook-green shell in both themes; portaled menus keep the page theme.
+    <header
+      className="dark sticky top-0 z-40 border-b border-shell-border bg-shell text-shell-foreground"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
+      <div className="flex h-14 items-center gap-1.5 sm:gap-3 px-3 sm:px-4 lg:px-6">
+        <SidebarTrigger className="hidden md:inline-flex h-9 w-9 shrink-0 text-shell-muted hover:text-shell-foreground" />
+        <Link to="/" className="md:hidden flex items-center shrink-0" aria-label="JeanWay USA home">
+          <img src={jwBanner} alt="JeanWay USA" className="h-7 w-auto" />
+        </Link>
 
         {pageLabel && (
-          <Breadcrumb className="hidden sm:block min-w-0">
+          <Breadcrumb className="hidden md:block min-w-0 [&_a]:text-shell-muted [&_a:hover]:text-shell-foreground [&_li]:text-shell-muted">
             <BreadcrumbList>
               {group && (
                 <>
@@ -101,7 +108,7 @@ export function TopBar({ onReplayTour, hasTour }: TopBarProps) {
                 </>
               )}
               <BreadcrumbItem>
-                <BreadcrumbPage className="truncate">{pageLabel}</BreadcrumbPage>
+                <BreadcrumbPage className="truncate font-condensed text-base font-semibold text-shell-foreground">{pageLabel}</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
@@ -110,14 +117,6 @@ export function TopBar({ onReplayTour, hasTour }: TopBarProps) {
         <OfflineIndicator />
         <DocumentSyncBootstrap />
 
-        {tier === 'open_beta' && (
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/15 to-yellow-500/15 border border-amber-500/30">
-            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-            <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-              Beta Member
-            </span>
-          </div>
-        )}
 
         <div className="flex-1" />
 
@@ -126,7 +125,7 @@ export function TopBar({ onReplayTour, hasTour }: TopBarProps) {
           type="button"
           onClick={openSearch}
           aria-label="Search everything"
-          className="hidden md:inline-flex items-center gap-2 h-9 w-64 lg:w-80 px-3 rounded-md border border-input bg-muted/40 hover:bg-muted transition-colors text-sm text-muted-foreground"
+          className="hidden md:inline-flex items-center gap-2 h-9 w-64 lg:w-80 px-3 rounded-md border border-shell-border bg-shell-active/60 hover:bg-shell-active transition-colors text-sm text-shell-muted"
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="flex-1 text-left">Search drivers, trucks, loads…</span>
@@ -137,15 +136,15 @@ export function TopBar({ onReplayTour, hasTour }: TopBarProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden h-9 w-9"
+          className="md:hidden h-10 w-10"
           onClick={openSearch}
           aria-label="Search"
         >
           <Search className="h-4 w-4" />
         </Button>
 
-        <TimeDisplayToggle />
-        <ThemeToggle />
+        <div className="hidden lg:block"><TimeDisplayToggle /></div>
+        <ThemeToggle className="h-10 w-10 md:h-9 md:w-9" />
 
         {isDriverRole ? (
           <ErrorBoundary compact>

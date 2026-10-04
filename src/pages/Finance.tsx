@@ -38,7 +38,8 @@ import { ActiveBatchTab } from '@/components/finance/inhouse-payroll/ActiveBatch
 import { CompensationSettingsTab } from '@/components/finance/CompensationSettingsTab';
 import { SafetyBonusSettings } from '@/components/finance/SafetyBonusSettings';
 import { SafetyBonusPayouts } from '@/components/finance/SafetyBonusPayouts';
-import { format, parseISO, endOfMonth, endOfQuarter, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
+import { format, parseISO, endOfMonth, endOfQuarter, endOfDay, isWithinInterval, startOfMonth, startOfQuarter, subMonths, addMonths } from 'date-fns';
+import { settlementWeek } from '@/lib/settlement-week';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { InvoicingTab } from '@/components/finance/InvoicingTab';
 import { FactoringTab } from '@/components/finance/FactoringTab';
@@ -62,8 +63,8 @@ export default function Finance() {
   const canManagePayroll = hasRole('owner') || hasRole('payroll_admin');
   const { isIndependent } = useOrganizationMode();
   // Default to current month
-  const now = new Date();
-  const defaultPeriod = `${now.getFullYear()}-${now.getMonth() + 1}`;
+  // Opens on the current Landstar settlement week: "this week's settlement" is a top phone job.
+  const defaultPeriod = 'week';
   const [selectedPeriod, setSelectedPeriod] = useState<string>(defaultPeriod);
   const [selectedTruck, setSelectedTruck] = useState<string>('all');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -256,114 +257,54 @@ export default function Finance() {
   };
 
   // ===== PERIOD FILTERING =====
+  // One place that turns the period picker into a date range.
+  // 'week' is the current Landstar settlement week (Thu to the period-ending Wed).
+  const periodInterval = (): { start: Date; end: Date } | null => {
+    if (selectedPeriod === 'all') return null;
+    if (selectedPeriod === 'week') {
+      const w = settlementWeek(new Date());
+      return { start: w.start, end: endOfDay(w.end) };
+    }
+    const [year, period] = selectedPeriod.split('-');
+    const yearNum = parseInt(year);
+    if (period.startsWith('Q')) {
+      const start = new Date(yearNum, (parseInt(period.substring(1)) - 1) * 3, 1);
+      return { start, end: endOfQuarter(start) };
+    }
+    const start = new Date(yearNum, parseInt(period) - 1, 1);
+    return { start, end: endOfMonth(start) };
+  };
+  const inPeriod = (date: string | null | undefined) => {
+    const range = periodInterval();
+    if (!range) return true;
+    return !!date && isWithinInterval(parseISO(date), range);
+  };
+
   const filterByPeriod = <T extends Record<string, any>>(items: T[], dateField: string): T[] => {
     let filtered = items;
     if (selectedTruck !== 'all' && 'truck_id' in (filtered[0] || {})) {
       filtered = filtered.filter((item) => (item as any).truck_id === selectedTruck);
     }
-    if (selectedPeriod === 'all') return filtered;
-    const [year, period] = selectedPeriod.split('-');
-    const yearNum = parseInt(year);
-    if (period.startsWith('Q')) {
-      const quarter = parseInt(period.substring(1));
-      const startMonth = (quarter - 1) * 3;
-      const start = new Date(yearNum, startMonth, 1);
-      const end = endOfQuarter(start);
-      return filtered.filter((item) => {
-        if (!item[dateField]) return false;
-        const date = parseISO(item[dateField]);
-        return isWithinInterval(date, { start, end });
-      });
-    } else {
-      const month = parseInt(period) - 1;
-      const start = new Date(yearNum, month, 1);
-      const end = endOfMonth(start);
-      return filtered.filter((item) => {
-        if (!item[dateField]) return false;
-        const date = parseISO(item[dateField]);
-        return isWithinInterval(date, { start, end });
-      });
-    }
+    return filtered.filter((item) => inPeriod(item[dateField]));
   };
 
   const getFilteredLoads = () => {
     let filtered = loads;
     if (selectedTruck !== 'all') filtered = filtered.filter((l: any) => l.truck_id === selectedTruck);
-    if (selectedPeriod === 'all') return filtered;
-    const [year, period] = selectedPeriod.split('-');
-    const yearNum = parseInt(year);
     // Revenue is recognized on delivery (that's when Landstar pays), matching the
     // Executive Dashboard. Loads without a delivery date fall back to pickup.
-    const periodDate = (l: any) => l.delivery_date || l.pickup_date;
-    const inPeriod = (start: Date, end: Date) => (l: any) =>
-      !!periodDate(l) && isWithinInterval(parseISO(periodDate(l)), { start, end });
-    if (period.startsWith('Q')) {
-      const quarter = parseInt(period.substring(1));
-      const startMonth = (quarter - 1) * 3;
-      const start = new Date(yearNum, startMonth, 1);
-      return filtered.filter(inPeriod(start, endOfQuarter(start)));
-    } else {
-      const month = parseInt(period) - 1;
-      const start = new Date(yearNum, month, 1);
-      return filtered.filter(inPeriod(start, endOfMonth(start)));
-    }
+    return filtered.filter((l: any) => inPeriod(l.delivery_date || l.pickup_date));
   };
 
   const getFilteredExpenses = () => {
     let filtered = expenses;
     if (selectedTruck !== 'all') filtered = filtered.filter((e: Expense) => e.truck_id === selectedTruck);
-    if (selectedPeriod === 'all') return filtered;
-    const [year, period] = selectedPeriod.split('-');
-    const yearNum = parseInt(year);
-    if (period.startsWith('Q')) {
-      const quarter = parseInt(period.substring(1));
-      const startMonth = (quarter - 1) * 3;
-      const start = new Date(yearNum, startMonth, 1);
-      const end = endOfQuarter(start);
-      return filtered.filter((e: Expense) => e.expense_date && isWithinInterval(parseISO(e.expense_date), { start, end }));
-    } else {
-      const month = parseInt(period) - 1;
-      const start = new Date(yearNum, month, 1);
-      const end = endOfMonth(start);
-      return filtered.filter((e: Expense) => e.expense_date && isWithinInterval(parseISO(e.expense_date), { start, end }));
-    }
+    return filtered.filter((e: Expense) => inPeriod(e.expense_date));
   };
 
-  const getFilteredPayrolls = () => {
-    if (selectedPeriod === 'all') return payrolls;
-    const [year, period] = selectedPeriod.split('-');
-    const yearNum = parseInt(year);
-    if (period.startsWith('Q')) {
-      const quarter = parseInt(period.substring(1));
-      const startMonth = (quarter - 1) * 3;
-      const start = new Date(yearNum, startMonth, 1);
-      const end = endOfQuarter(start);
-      return payrolls.filter((p: DriverPayroll) => p.period_end && isWithinInterval(parseISO(p.period_end), { start, end }));
-    } else {
-      const month = parseInt(period) - 1;
-      const start = new Date(yearNum, month, 1);
-      const end = endOfMonth(start);
-      return payrolls.filter((p: DriverPayroll) => p.period_end && isWithinInterval(parseISO(p.period_end), { start, end }));
-    }
-  };
+  const getFilteredPayrolls = () => payrolls.filter((p: DriverPayroll) => inPeriod(p.period_end));
 
-  const getFilteredCommissions = () => {
-    if (selectedPeriod === 'all') return commissions;
-    const [year, period] = selectedPeriod.split('-');
-    const yearNum = parseInt(year);
-    if (period.startsWith('Q')) {
-      const quarter = parseInt(period.substring(1));
-      const startMonth = (quarter - 1) * 3;
-      const start = new Date(yearNum, startMonth, 1);
-      const end = endOfQuarter(start);
-      return commissions.filter((c: AgentCommission) => c.payout_date && isWithinInterval(parseISO(c.payout_date), { start, end }));
-    } else {
-      const month = parseInt(period) - 1;
-      const start = new Date(yearNum, month, 1);
-      const end = endOfMonth(start);
-      return commissions.filter((c: AgentCommission) => c.payout_date && isWithinInterval(parseISO(c.payout_date), { start, end }));
-    }
-  };
+  const getFilteredCommissions = () => commissions.filter((c: AgentCommission) => inPeriod(c.payout_date));
 
   const filteredLoads = getFilteredLoads();
   const deliveredLoads = filteredLoads.filter((l: any) => l.status === 'delivered');
@@ -560,12 +501,13 @@ export default function Finance() {
   return (
     <>
       <PageHeader
-        title="Financial Hub"
-        description="Revenue, expenses, profitability, and payouts in one place"
+        title="Money"
+        description="Revenue, expenses, and Landstar settlements"
       >
         <Button
+          variant="outline"
           onClick={() => setUploadDialogOpen(true)}
-          className="w-full sm:w-auto gradient-gold text-primary-foreground"
+          className="h-11 sm:h-10 w-full sm:w-auto"
         >
           <Upload className="h-4 w-4 mr-2" />
           Upload Statement
@@ -573,11 +515,12 @@ export default function Finance() {
       </PageHeader>
 
       {/* Period and Truck Selector */}
-      <div className="flex flex-wrap gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-2 mb-4 sm:flex sm:flex-wrap sm:gap-3">
         <Select value={selectedPeriod} onValueChange={(v) => { setSelectedPeriod(v); setExpensePage(0); }}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Select period" /></SelectTrigger>
+          <SelectTrigger className="h-11 sm:h-10 sm:w-48" aria-label="Period"><SelectValue placeholder="Select period" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="week">This settlement week</SelectItem>
+            <SelectItem value="all">All time</SelectItem>
             {(() => {
               // Dynamically generate periods from data
               const dates: Date[] = [];
@@ -607,7 +550,7 @@ export default function Finance() {
           </SelectContent>
         </Select>
         <Select value={selectedTruck} onValueChange={setSelectedTruck}>
-          <SelectTrigger className="w-56">
+          <SelectTrigger className="h-11 sm:h-10 sm:w-56" aria-label="Truck">
             <TruckIcon className="h-4 w-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Select truck" />
           </SelectTrigger>
@@ -620,65 +563,44 @@ export default function Finance() {
         </Select>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-3 md:gap-4 md:grid-cols-4 mb-6">
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Net Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg sm:text-2xl font-bold tabular-nums text-success">{formatCurrency(revenueTotals.netRevenue)}</div>
-            <p className="text-xs text-muted-foreground">{revenueTotals.loadCount} loads · Gross: {formatCurrency(revenueTotals.grossRevenue)}</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Net Expenses</CardTitle>
-            <TrendingDown className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg sm:text-2xl font-bold tabular-nums text-destructive">{formatCurrency(totalExpenses + totalPayroll)}</div>
-            <p className="text-xs text-muted-foreground">
-              {truckPaymentsTotal > 0 ? `Incl. ${formatCurrency(truckPaymentsTotal)} truck payments` : 'Operating + payroll'}
-              {creditsTotal > 0 && <span className="text-success"> · Credits: -{formatCurrency(creditsTotal)}</span>}
+      {/* The period's money as statement lines (same vocabulary as Today) */}
+      {(() => {
+        const activeLoanTrucks = trucks.filter((t: any) => t.status === 'active' && t.monthly_payment != null && t.monthly_payment > 0);
+        const monthlyTruckPayment = activeLoanTrucks.reduce((sum: number, t: any) => sum + (t.monthly_payment || 0), 0);
+        const costs = totalExpenses + totalPayroll;
+        const row = (label: string, value: string, opts: { note?: React.ReactNode; strong?: boolean; muted?: boolean; rule?: 'single' | 'double' } = {}) => (
+          <div className={`flex items-baseline gap-3 py-2.5 ${opts.rule === 'single' ? 'border-t' : ''} ${opts.rule === 'double' ? 'border-t-[3px] border-double border-foreground/70' : ''}`}>
+            <div className="min-w-0 flex-1">
+              <div className={`text-[15px] ${opts.strong ? 'font-semibold' : ''}`}>{label}</div>
+              {opts.note && <div className="text-[13px] text-muted-foreground">{opts.note}</div>}
+            </div>
+            <div className={`figure shrink-0 text-right ${opts.strong ? 'text-2xl font-bold' : 'text-lg font-semibold'} ${opts.muted ? 'text-muted-foreground' : ''}`}>{value}</div>
+          </div>
+        );
+        return (
+          <section aria-label="Money for the selected period" className="mb-5 rounded-lg border bg-card px-4 pt-1 pb-2 md:max-w-2xl">
+            {row('Truck revenue', formatCurrency(revenueTotals.netRevenue), {
+              note: `${revenueTotals.loadCount} load${revenueTotals.loadCount === 1 ? '' : 's'} delivered, ${formatCurrency(revenueTotals.grossRevenue)} gross`,
+            })}
+            {row('Recorded expenses', costs > 0 ? `−${formatCurrency(costs)}` : 'None yet', {
+              muted: true,
+              note: costs > 0
+                ? <>{truckPaymentsTotal > 0 ? `Includes ${formatCurrency(truckPaymentsTotal)} in truck payments` : 'Operating and payroll'}{creditsTotal > 0 ? `, after ${formatCurrency(creditsTotal)} in credits` : ''}</>
+                : 'Nothing entered or imported for this period',
+            })}
+            {row('Profit, recorded costs', formatCurrency(netProfit), {
+              strong: true,
+              rule: 'double',
+              note: costs > 0 ? `${profitMargin.toFixed(1)}% of truck revenue` : 'Will drop as expenses are recorded',
+            })}
+            <p className="border-t pt-2 pb-1 text-[13px] text-muted-foreground tabular-nums">
+              Truck payment {formatCurrency(monthlyTruckPayment)} a month, {activeLoanTrucks.length} truck{activeLoanTrucks.length === 1 ? '' : 's'} financed.
+              {advancesTotal > 0 && <> Advances {formatCurrency(advancesTotal)} are not counted as expenses.</>}
+              {' '}Today's estimate uses your cost per mile instead.
             </p>
-            {advancesTotal > 0 && (
-              <p className="text-xs text-amber-500 mt-1 flex items-center gap-1">
-                <Banknote className="h-3 w-3" /> Advances: {formatCurrency(advancesTotal)} (non-P&L)
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-            <PiggyBank className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-lg sm:text-2xl font-bold tabular-nums ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>{formatCurrency(netProfit)}</div>
-            <p className="text-xs text-muted-foreground">Margin: {profitMargin.toFixed(1)}%</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Equipment Debt</CardTitle>
-            <Landmark className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const activeLoanTrucks = trucks.filter((t: any) => t.status === 'active' && t.monthly_payment != null && t.monthly_payment > 0);
-              const totalMonthly = activeLoanTrucks.reduce((sum: number, t: any) => sum + (t.monthly_payment || 0), 0);
-              return (
-                <>
-                  <div className="text-lg sm:text-2xl font-bold tabular-nums">{formatCurrency(totalMonthly)}</div>
-                  <p className="text-xs text-muted-foreground">Per month · {activeLoanTrucks.length} truck{activeLoanTrucks.length !== 1 ? 's' : ''} financed</p>
-                </>
-              );
-            })()}
-          </CardContent>
-        </Card>
-      </div>
+          </section>
+        );
+      })()}
 
       <Tabs
         value={(searchParams.get('view') as 'payouts' | 'compliance' | 'analytics') || 'payouts'}
@@ -706,14 +628,7 @@ export default function Finance() {
         <TabsContent value="payouts">
           <div className="space-y-8 animate-in fade-in-50">
             {canManagePayroll && (
-              <section className="space-y-2">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" /> W-2 Active Payroll Batch
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Automatic tax-ready W-2 payroll — FIT via IRS Pub 15-T, FICA, additional Medicare,
-                  and per-state SUTA/SIT computed from each driver's W-4 and tax state.
-                </p>
+              <section>
                 <ActiveBatchTab />
               </section>
             )}

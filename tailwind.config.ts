@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['"DM Sans"', "Inter", "system-ui", "sans-serif"],
-        heading: ['"Space Grotesk"', "Inter", "system-ui", "sans-serif"],
+        sans: ["Barlow", "system-ui", "sans-serif"],
+        heading: ['"Barlow Condensed"', "Barlow", "system-ui", "sans-serif"],
+        condensed: ['"Barlow Condensed"', "Barlow", "system-ui", "sans-serif"],
         mono: ['"JetBrains Mono"', "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       colors: {
@@ -59,6 +60,17 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        carbon: {
+          DEFAULT: "hsl(var(--carbon))",
+          foreground: "hsl(var(--carbon-foreground))",
+        },
+        shell: {
+          DEFAULT: "hsl(var(--shell))",
+          foreground: "hsl(var(--shell-foreground))",
+          muted: "hsl(var(--shell-muted))",
+          border: "hsl(var(--shell-border))",
+          active: "hsl(var(--shell-active))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

@@ -98,7 +98,7 @@ export function BriefingLoadsDialog({ type, open, onOpenChange }: BriefingLoadsD
             <TableBody>
               {loads.map((load: any) => {
                 const driver = load.drivers;
-                const driverName = driver ? `${driver.first_name} ${driver.last_name}` : '—';
+                const driverName = driver ? `${driver.first_name} ${driver.last_name}` : 'Unassigned';
                 const dateVal = type === 'pickup-today' ? load.pickup_date : load.delivery_date;
 
                 return (
@@ -111,7 +111,7 @@ export function BriefingLoadsDialog({ type, open, onOpenChange }: BriefingLoadsD
                     </TableCell>
                     <TableCell className="text-sm">{driverName}</TableCell>
                     <TableCell className="text-sm">
-                      {dateVal ? format(new Date(dateVal + 'T00:00:00'), 'MMM d') : '—'}
+                      {dateVal ? format(new Date(dateVal + 'T00:00:00'), 'MMM d') : 'Not set'}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize text-xs">

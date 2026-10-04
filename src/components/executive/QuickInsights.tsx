@@ -1,6 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Lightbulb, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface Insight {
@@ -14,74 +12,35 @@ interface QuickInsightsProps {
   isLoading: boolean;
 }
 
-function getInsightIcon(type: Insight['type']) {
-  switch (type) {
-    case 'success':
-      return <TrendingUp className="h-4 w-4 text-green-500" />;
-    case 'warning':
-      return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-    case 'alert':
-      return <TrendingDown className="h-4 w-4 text-destructive" />;
-    default:
-      return <Info className="h-4 w-4 text-blue-500" />;
-  }
-}
-
-function getInsightStyles(type: Insight['type']) {
-  switch (type) {
-    case 'success':
-      return 'bg-green-500/10 border-green-500/20';
-    case 'warning':
-      return 'bg-yellow-500/10 border-yellow-500/20';
-    case 'alert':
-      return 'bg-destructive/10 border-destructive/20';
-    default:
-      return 'bg-blue-500/10 border-blue-500/20';
-  }
-}
-
+/** Plain sentences, marked only by color when they need attention. */
 export function QuickInsights({ insights, isLoading }: QuickInsightsProps) {
-  if (isLoading) {
-    return (
-      <Card className="border-border">
-        <CardHeader>
-          <Skeleton className="h-6 w-32" />
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full" />
-          ))}
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <Card className="border-border">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold flex items-center gap-2">
-          <Lightbulb className="h-5 w-5 text-primary" />
-          Quick Insights
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {insights.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No insights available at this time.</p>
-        ) : (
-          insights.map((insight) => (
-            <div
+    <section aria-labelledby="notes-title" className="h-full rounded-lg border bg-card px-4 pt-3 pb-2">
+      <h2 id="notes-title" className="font-condensed text-xl font-bold">Notes</h2>
+      {isLoading ? (
+        <div className="space-y-3 py-3">
+          {[0, 1, 2].map(i => <Skeleton key={i} className="h-5 w-full" />)}
+        </div>
+      ) : insights.length === 0 ? (
+        <p className="py-6 text-[15px] text-muted-foreground">Nothing unusual this period.</p>
+      ) : (
+        <ul className="mt-1 divide-y">
+          {insights.map(insight => (
+            <li
               key={insight.id}
               className={cn(
-                'flex items-start gap-3 p-3 rounded-lg border',
-                getInsightStyles(insight.type)
+                'py-2.5 text-[15px] leading-snug',
+                insight.type === 'alert' && 'font-semibold text-destructive',
+                insight.type === 'warning' && 'font-semibold',
+                insight.type === 'success' && 'text-foreground',
+                insight.type === 'info' && 'text-muted-foreground',
               )}
             >
-              <div className="mt-0.5">{getInsightIcon(insight.type)}</div>
-              <span className="text-sm">{insight.message}</span>
-            </div>
-          ))
-        )}
-      </CardContent>
-    </Card>
+              {insight.message}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

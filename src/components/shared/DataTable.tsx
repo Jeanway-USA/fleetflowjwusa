@@ -515,34 +515,13 @@ export function DataTable<T extends { id: string }>({
                     onDoubleClick={() => onRowDoubleClick?.(item)}
                     onTouchEnd={() => handleTouchEnd(item)}
                     className={cn(
-                      "rounded-lg border border-border bg-card p-3 space-y-2 transition-colors",
+                      "rounded-lg border border-border bg-card p-3 space-y-2 transition-colors overflow-hidden",
                       (onRowClick || onRowDoubleClick || canRowToggle) && "cursor-pointer active:bg-muted/50",
                       isSelected && "bg-primary/5 border-primary/40",
                       isExpanded && "bg-muted/30"
                     )}
                   >
-                    {(showSelection || (expandable && renderExpanded)) && (
-                      <div className="flex items-center justify-between gap-2 -mt-1" onClick={(e) => e.stopPropagation()}>
-                        {showSelection ? (
-                          <Checkbox
-                            checked={safeSelectedIds.has(item.id)}
-                            onCheckedChange={() => toggleRow(item.id)}
-                            aria-label="Select row"
-                          />
-                        ) : <span />}
-                        {expandable && renderExpanded && (
-                          <button
-                            type="button"
-                            className="flex h-7 w-7 items-center justify-center rounded hover:bg-muted text-muted-foreground"
-                            onClick={() => toggleExpand(item.id)}
-                            aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                            aria-expanded={isExpanded ? true : false}
-                          >
-                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          </button>
-                        )}
-                      </div>
-                    )}
+                    {/* Bulk selection is desk work; phone cards stay clean. */}
                     <div className="min-w-0 break-words">
                       {renderMobileCard(item)}
                     </div>
@@ -550,6 +529,17 @@ export function DataTable<T extends { id: string }>({
                       <div className="border-t border-border pt-2 mt-2">
                         {renderExpanded!(item)}
                       </div>
+                    )}
+                    {expandable && renderExpanded && (
+                      <button
+                        type="button"
+                        className="-mx-3 -mb-3 mt-1 flex h-11 w-[calc(100%+1.5rem)] items-center justify-center gap-1.5 border-t border-border text-sm font-semibold text-primary"
+                        onClick={(e) => { e.stopPropagation(); toggleExpand(item.id); }}
+                        aria-expanded={isExpanded ? true : false}
+                      >
+                        {isExpanded ? 'Hide details' : 'Show details'}
+                        {isExpanded ? <ChevronDown className="h-4 w-4 rotate-180" /> : <ChevronDown className="h-4 w-4" />}
+                      </button>
                     )}
                   </div>
                 );

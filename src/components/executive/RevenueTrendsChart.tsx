@@ -23,16 +23,16 @@ interface RevenueTrendsChartProps {
 
 const chartConfig = {
   grossRevenue: {
-    label: 'Gross Revenue',
-    color: 'hsl(45 80% 50%)',
+    label: 'Gross',
+    color: 'hsl(var(--foreground))',
   },
   netRevenue: {
-    label: 'Net Revenue',
-    color: 'hsl(142 70% 45%)',
+    label: 'Truck revenue',
+    color: 'hsl(var(--primary))',
   },
   operatingCosts: {
-    label: 'Operating Costs',
-    color: 'hsl(0 70% 50%)',
+    label: 'Expenses',
+    color: 'hsl(var(--destructive))',
   },
 };
 
@@ -53,26 +53,12 @@ export function RevenueTrendsChart({ data, isLoading }: RevenueTrendsChartProps)
   return (
     <Card className="border-border">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold">Revenue Trends</CardTitle>
+        <CardTitle className="text-xl font-bold">Last six months</CardTitle>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="h-[300px] w-full">
           <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="grossRevenueGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(45 80% 50%)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(45 80% 50%)" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="netRevenueGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(142 70% 45%)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(142 70% 45%)" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="operatingCostsGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(0 70% 50%)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(0 70% 50%)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <CartesianGrid vertical={false} className="stroke-border" />
             <XAxis
               dataKey="period"
               tick={{ fontSize: 12 }}
@@ -102,25 +88,31 @@ export function RevenueTrendsChart({ data, isLoading }: RevenueTrendsChartProps)
             />
             <ChartLegend content={<ChartLegendContent />} />
             <Area
-              type="monotone"
+              type="linear"
               dataKey="grossRevenue"
-              stroke="hsl(45 80% 50%)"
+              stroke="hsl(var(--foreground))"
               strokeWidth={2}
-              fill="url(#grossRevenueGradient)"
+              dot={{ r: 3, strokeWidth: 0, fill: "hsl(var(--foreground))" }}
+              activeDot={{ r: 4 }}
+              fill="none"
             />
             <Area
-              type="monotone"
+              type="linear"
               dataKey="netRevenue"
-              stroke="hsl(142 70% 45%)"
+              stroke="hsl(var(--primary))"
               strokeWidth={2}
-              fill="url(#netRevenueGradient)"
+              dot={{ r: 3, strokeWidth: 0, fill: "hsl(var(--primary))" }}
+              activeDot={{ r: 4 }}
+              fill="none"
             />
             <Area
-              type="monotone"
+              type="linear"
               dataKey="operatingCosts"
-              stroke="hsl(0 70% 50%)"
+              stroke="hsl(var(--destructive))"
               strokeWidth={2}
-              fill="url(#operatingCostsGradient)"
+              dot={{ r: 3, strokeWidth: 0, fill: "hsl(var(--destructive))" }}
+              activeDot={{ r: 4 }}
+              fill="none"
             />
           </AreaChart>
         </ChartContainer>
