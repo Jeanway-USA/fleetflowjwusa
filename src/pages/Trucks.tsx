@@ -719,9 +719,9 @@ export default function Trucks() {
                 {viewingTruck.monthly_payment ? (
                   <div className="flex items-center justify-between rounded-md border p-3">
                     <div className="text-sm">
-                      <p className="font-medium">Post this month's payment to Finance</p>
+                      <p className="font-medium">Loan payments post automatically</p>
                       <p className="text-xs text-muted-foreground">
-                        Adds {formatCurrency(Number(viewingTruck.monthly_payment))} to the P&amp;L as a "Truck Loan" expense and to the loan ledger. Skips if already posted for this month.
+                        {formatCurrency(Number(viewingTruck.monthly_payment))} is added to the loan ledger and Finance on each due date. Use Catch Up to post anything due that's missing.
                       </p>
                     </div>
                     <Button
@@ -729,21 +729,21 @@ export default function Trucks() {
                       size="sm"
                       variant="outline"
                       onClick={async () => {
-                        const { data, error } = await supabase.functions.invoke('post-truck-loan-payments', {
-                          body: { truck_id: viewingTruck.id },
+                        const { data, error } = await (supabase as any).rpc('post_due_truck_loan_payments', {
+                          p_truck_id: viewingTruck.id,
                         });
                         if (error) {
                           toast.error(error.message);
                           return;
                         }
-                        const action = (data as any)?.results?.[0]?.action ?? 'posted';
-                        toast.success(action === 'already_posted' ? 'Already posted this month' : 'Monthly payment posted');
+                        const posted = Array.isArray(data) ? data.length : 0;
+                        toast.success(posted === 0 ? 'All due payments are already posted' : `Posted ${posted} payment${posted === 1 ? '' : 's'}`);
                         queryClient.invalidateQueries({ queryKey: ['trucks'] });
                         queryClient.invalidateQueries({ queryKey: ['truck_loan_payments', viewingTruck.id] });
                         queryClient.invalidateQueries({ queryKey: ['truck_loan_payments_sum', viewingTruck.id] });
                       }}
                     >
-                      Post Now
+                      Catch Up
                     </Button>
                   </div>
                 ) : null}

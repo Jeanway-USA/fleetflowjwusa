@@ -1,7 +1,7 @@
-// Posts monthly truck loan payments to public.expenses and public.truck_loan_payments.
-// Idempotent per (truck_id, expense_type='Truck Loan', expense_date=<first-of-month>).
-// Invoked monthly by pg_cron (with x-cron-secret header) or manually from the truck
-// detail UI by an authenticated owner/payroll_admin.
+// Posts due truck loan installments to public.truck_loan_payments.
+// Delegates to public.post_due_truck_loan_payments(); idempotent per truck and month.
+// pg_cron calls the SQL function directly (daily); this endpoint remains for external
+// callers (x-cron-secret) and authenticated owners/payroll admins.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -11,23 +11,7 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
-type Truck = {
-  id: string;
-  org_id: string;
-  unit_number: string;
-  status: string;
-  lender_name: string | null;
-  monthly_payment: number | null;
-  loan_start_date: string | null;
-  loan_term_months: number | null;
-  loan_balance: number | null;
-};
 
-const firstOfMonth = (d: Date): string => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}-01`;
-};
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), {
@@ -83,76 +67,26 @@ Deno.serve(async (req) => {
     }
     // ---------------------------------------------------------------------
 
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-      auth: { persistSession: false },
-    });
-
-    let body: { truck_id?: string; expense_date?: string } = {};
+    // Posting logic lives in public.post_due_truck_loan_payments() (also run daily
+    // by pg_cron), so every path posts on the loan's due day and never twice.
+    let body: { truck_id?: string } = {};
     if (req.method === 'POST') {
       try { body = await req.json(); } catch { /* empty body ok */ }
     }
 
-    const targetDate = body.expense_date ?? firstOfMonth(new Date());
+    const client = isCron
+      ? createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
+      : createClient(SUPABASE_URL, ANON_KEY, {
+          global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+          auth: { persistSession: false },
+        });
 
-    let q = admin
-      .from('trucks')
-      .select('id, org_id, unit_number, status, lender_name, monthly_payment, loan_start_date, loan_term_months, loan_balance')
-      .not('monthly_payment', 'is', null)
-      .gt('monthly_payment', 0);
-    if (body.truck_id) q = q.eq('id', body.truck_id);
-    if (!isCron && callerOrgId) q = q.eq('org_id', callerOrgId);
+    const { data, error } = await client.rpc('post_due_truck_loan_payments', {
+      p_truck_id: body.truck_id ?? null,
+    });
+    if (error) throw error;
 
-    const { data: trucks, error: tErr } = await q;
-    if (tErr) throw tErr;
-
-    const results: Array<{ truck_id: string; unit_number: string; action: string }> = [];
-
-    for (const t of (trucks ?? []) as Truck[]) {
-      if (t.status === 'out_of_service') continue;
-      if ((t.loan_balance ?? 0) <= 0 && t.loan_balance !== null) {
-        results.push({ truck_id: t.id, unit_number: t.unit_number, action: 'skipped_paid_off' });
-        continue;
-      }
-
-      const { data: existing } = await admin
-        .from('expenses')
-        .select('id')
-        .eq('truck_id', t.id)
-        .eq('expense_type', 'Truck Loan')
-        .eq('expense_date', targetDate)
-        .maybeSingle();
-      if (existing) {
-        results.push({ truck_id: t.id, unit_number: t.unit_number, action: 'already_posted' });
-        continue;
-      }
-
-      const amount = Number(t.monthly_payment);
-
-      const { error: eErr } = await admin.from('expenses').insert({
-        org_id: t.org_id,
-        truck_id: t.id,
-        expense_type: 'Truck Loan',
-        amount,
-        expense_date: targetDate,
-        vendor: t.lender_name ?? 'Lender',
-        description: `Auto: monthly loan payment for Unit ${t.unit_number}`,
-        is_approved: false,
-      });
-      if (eErr) throw eErr;
-
-      const { error: lErr } = await admin.from('truck_loan_payments').insert({
-        org_id: t.org_id,
-        truck_id: t.id,
-        payment_date: targetDate,
-        amount,
-        note: 'Auto-posted monthly payment',
-      });
-      if (lErr) throw lErr;
-
-      results.push({ truck_id: t.id, unit_number: t.unit_number, action: 'posted' });
-    }
-
-    return json(200, { ok: true, date: targetDate, results });
+    return json(200, { ok: true, posted: data ?? [], org_id: callerOrgId });
   } catch (err) {
     return json(500, { ok: false, error: err instanceof Error ? err.message : String(err) });
   }
