@@ -81,19 +81,19 @@ export function PMScheduleFilters({
             <DropdownMenuRadioItem value="all">All Statuses</DropdownMenuRadioItem>
             <DropdownMenuRadioItem value="overdue">
               <span className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-red-500" />
+                <span className="h-2 w-2 rounded-full bg-destructive" />
                 Overdue
               </span>
             </DropdownMenuRadioItem>
             <DropdownMenuRadioItem value="due-soon">
               <span className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                <span className="h-2 w-2 rounded-full bg-warning" />
                 Due Soon
               </span>
             </DropdownMenuRadioItem>
             <DropdownMenuRadioItem value="on-track">
               <span className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="h-2 w-2 rounded-full bg-success" />
                 On Track
               </span>
             </DropdownMenuRadioItem>

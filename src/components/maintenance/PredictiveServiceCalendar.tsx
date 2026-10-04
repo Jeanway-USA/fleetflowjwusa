@@ -180,8 +180,8 @@ export function PredictiveServiceCalendar() {
   const getUrgencyStyle = (urgency: ProjectedService['urgency']) => {
     switch (urgency) {
       case 'overdue': return 'bg-destructive/10 text-destructive border-destructive/30';
-      case 'soon': return 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-700';
-      case 'upcoming': return 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-700';
+      case 'soon': return 'bg-warning/10 text-foreground border-warning/50 dark:bg-warning/15 dark:text-warning dark:border-warning/50';
+      case 'upcoming': return 'bg-primary/10 text-foreground border-primary/40 dark:bg-primary/10 dark:text-primary dark:border-primary/40';
       default: return 'bg-muted text-muted-foreground border-border';
     }
   };
@@ -198,7 +198,7 @@ export function PredictiveServiceCalendar() {
   const getConfidenceBadge = (confidence: string) => {
     switch (confidence) {
       case 'high': return <Badge variant="outline" className="text-[10px] px-1">High</Badge>;
-      case 'medium': return <Badge variant="outline" className="text-[10px] px-1 border-amber-300 text-amber-600">Med</Badge>;
+      case 'medium': return <Badge variant="outline" className="text-[10px] px-1 border-warning/50 text-warning">Med</Badge>;
       default: return <Badge variant="outline" className="text-[10px] px-1 border-muted text-muted-foreground">Low</Badge>;
     }
   };
@@ -233,7 +233,7 @@ export function PredictiveServiceCalendar() {
             <Badge variant="destructive" className="text-xs">{overdueCount} overdue</Badge>
           )}
           {soonCount > 0 && (
-            <Badge className="bg-amber-500 text-xs">{soonCount} due soon</Badge>
+            <Badge className="bg-warning text-xs">{soonCount} due soon</Badge>
           )}
           <div className="flex border rounded-md">
             <Button
@@ -257,9 +257,8 @@ export function PredictiveServiceCalendar() {
       </div>
 
       {filteredServices.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <CheckCircle className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium">No Upcoming Services Projected</h3>
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <h3 className="text-[15px] font-semibold">No Upcoming Services Projected</h3>
           <p className="text-sm text-muted-foreground">
             All services are well within their intervals, or no schedule data is available.
           </p>
@@ -329,7 +328,7 @@ export function PredictiveServiceCalendar() {
                           'min-h-[52px] rounded-md border p-1 text-xs',
                           isToday && 'ring-2 ring-primary/50',
                           dayServices.some(s => s.urgency === 'overdue') && 'bg-destructive/5',
-                          dayServices.some(s => s.urgency === 'soon') && !dayServices.some(s => s.urgency === 'overdue') && 'bg-amber-50/50 dark:bg-amber-950/10'
+                          dayServices.some(s => s.urgency === 'soon') && !dayServices.some(s => s.urgency === 'overdue') && 'bg-warning/10 dark:bg-warning/15'
                         )}
                       >
                         <div className="text-[10px] text-muted-foreground mb-0.5">
@@ -347,7 +346,7 @@ export function PredictiveServiceCalendar() {
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-[220px]">
-                                <p className="font-medium">{svc.unitNumber} — {svc.serviceName}</p>
+                                <p className="font-medium">Unit {svc.unitNumber}: {svc.serviceName}</p>
                                 <p className="text-xs">{svc.remainingMiles.toLocaleString()} mi remaining</p>
                                 <p className="text-xs">{svc.avgDailyMiles} mi/day avg • {svc.confidence} confidence</p>
                               </TooltipContent>

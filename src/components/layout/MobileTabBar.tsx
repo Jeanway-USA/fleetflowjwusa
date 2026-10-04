@@ -1,5 +1,5 @@
-import { Link, useLocation } from 'react-router-dom';
-import { CalendarDays, Package, Wallet, Menu, Receipt, LucideIcon } from 'lucide-react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { CalendarDays, Package, Wallet, Menu, Receipt, Gauge, Wrench, CalendarClock, Truck, LucideIcon } from 'lucide-react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { getRoleHomePath } from '@/lib/role-home';
@@ -11,21 +11,35 @@ interface Tab {
   path: string;
   /** Other routes that count as this tab being active. */
   match?: string[];
+  /** For pages with in-page tabs (?tab=), the values that belong to this tab; null = no ?tab. */
+  tabs?: (string | null)[];
 }
 
 /**
  * Phone navigation: the owner's three jobs (what we made, where loads stand,
- * this week's settlement) one tap away, everything else under More.
+ * this week's settlement) one tap away, everything else under More. The shop
+ * gets its own set: in the maintenance section, or for a maintenance login.
  */
 export function MobileTabBar() {
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { setOpenMobile, openMobile } = useSidebar();
   const { roles, hasRole, subscriptionTier } = useAuth();
 
   const isDriverOnly = hasRole('driver') && !hasRole('owner') && !hasRole('dispatcher');
+  // hasRole('owner') is false while the owner is "viewing as" maintenance.
+  const isMaintenanceOnly = hasRole('maintenance') && !hasRole('owner') && !hasRole('dispatcher');
+  const inShopSection = location.pathname === '/maintenance' || location.pathname.startsWith('/maintenance-');
   const home = getRoleHomePath(roles, subscriptionTier);
 
-  const tabs: Tab[] = isDriverOnly
+  const tabs: Tab[] = isMaintenanceOnly || inShopSection
+    ? [
+        { label: 'Shop', icon: Gauge, path: '/maintenance-home' },
+        { label: 'Work orders', icon: Wrench, path: '/maintenance', tabs: [null, 'active', 'history'] },
+        { label: 'PM', icon: CalendarClock, path: '/maintenance?tab=pm', match: ['/maintenance'], tabs: ['pm', 'predictive'] },
+        { label: 'Trucks', icon: Truck, path: '/trucks', match: ['/trailers'] },
+      ]
+    : isDriverOnly
     ? [
         { label: 'Today', icon: CalendarDays, path: '/driver-dashboard' },
         { label: 'Loads', icon: Package, path: '/driver/loads' },
@@ -37,10 +51,14 @@ export function MobileTabBar() {
         { label: 'Money', icon: Wallet, path: '/finance', match: ['/admin/tax-hub', '/ifta', '/insights'] },
       ];
 
-  const isActive = (tab: Tab) =>
-    [tab.path, ...(tab.match ?? [])].some(
+  const isActive = (tab: Tab) => {
+    const basePath = tab.path.split('?')[0];
+    const onRoute = [basePath, ...(tab.match ?? [])].some(
       (p) => location.pathname === p || location.pathname.startsWith(p + '/'),
     );
+    if (!onRoute) return false;
+    return !tab.tabs || tab.tabs.includes(searchParams.get('tab'));
+  };
   const anyTabActive = tabs.some(isActive);
 
   const itemClass = (active: boolean) =>
@@ -49,7 +67,7 @@ export function MobileTabBar() {
       active ? 'text-shell-foreground' : 'text-shell-muted active:text-shell-foreground',
     );
 
-  // Carbon-yellow tick over the current tab, like the day marked on a log page.
+  // Gold tick over the current tab, like the day marked on a log page.
   const tick = <span aria-hidden className="absolute top-0 left-1/2 h-[3px] w-8 -translate-x-1/2 rounded-b bg-carbon" />;
 
   return (

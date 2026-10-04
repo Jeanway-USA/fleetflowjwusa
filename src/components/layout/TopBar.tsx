@@ -35,6 +35,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/ifta': 'IFTA Reporting',
   '/crm': 'CRM',
   '/maintenance': 'Maintenance',
+  '/maintenance-home': 'Shop',
   '/documents': 'Documents',
   '/safety': 'Safety',
   '/incidents': 'Incidents',
@@ -57,7 +58,7 @@ const ROUTE_GROUPS: Record<string, { label: string; path: string }> = {
   '/insights': { label: 'Money', path: '/finance' },
   '/ifta': { label: 'Money', path: '/finance' },
   '/crm': { label: 'Operations', path: '/crm' },
-  '/maintenance': { label: 'Operations', path: '/maintenance' },
+  '/maintenance': { label: 'Shop', path: '/maintenance-home' },
   '/documents': { label: 'Operations', path: '/documents' },
   '/safety': { label: 'Operations', path: '/safety' },
   '/incidents': { label: 'Operations', path: '/incidents' },
@@ -83,7 +84,7 @@ export function TopBar({ onReplayTour, hasTour }: TopBarProps) {
 
   return (
     // Scoped to the dark token set so every control reads correctly on the
-    // logbook-green shell in both themes; portaled menus keep the page theme.
+    // black brand shell in both themes; portaled menus keep the page theme.
     <header
       className="dark sticky top-0 z-40 border-b border-shell-border bg-shell text-shell-foreground"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}

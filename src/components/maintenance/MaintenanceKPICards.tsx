@@ -1,193 +1,65 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  useFleetAvailability, 
-  useMaintenanceCostMTD, 
-  useCostPerMile, 
-  useComplianceAlerts 
+import { StatStrip } from '@/components/shared/StatStrip';
+import {
+  useFleetAvailability,
+  useMaintenanceCostMTD,
+  useCostPerMile,
+  useComplianceAlerts,
 } from '@/hooks/useMaintenanceData';
-import { Truck, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
-import { cn } from '@/lib/utils';
 
+/** Shop figures as one ruled strip; inspection problems listed in red pen below it. */
 export function MaintenanceKPICards() {
+  const fleet = useFleetAvailability();
+  const cost = useMaintenanceCostMTD();
+  const cpm = useCostPerMile();
+  const compliance = useComplianceAlerts();
+
+  const alerts = compliance.data?.count || 0;
+  const trucks = compliance.data?.trucks ?? [];
+
   return (
-    <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-      <FleetAvailabilityCard />
-      <MaintenanceCostCard />
-      <CostPerMileCard />
-      <ComplianceAlertCard />
+    <div className="space-y-2">
+      <StatStrip
+        isLoading={fleet.isLoading || cost.isLoading || cpm.isLoading || compliance.isLoading}
+        cells={[
+          {
+            label: 'Trucks ready',
+            value: `${fleet.data?.available || 0} of ${fleet.data?.total || 0}`,
+            note: `${fleet.data?.inShop || 0} in the shop`,
+            problem: (fleet.data?.inShop || 0) > 0,
+          },
+          {
+            label: 'Shop cost this month',
+            value: `$${(cost.data || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            note: 'Month to date',
+          },
+          {
+            label: 'Maintenance per mile',
+            value: `$${(cpm.data || 0).toFixed(3)}`,
+            note: 'Shop cost / miles driven',
+          },
+          {
+            label: '120-day inspections',
+            value: alerts,
+            note: alerts > 0 ? 'Due soon or overdue' : 'All up to date',
+            problem: alerts > 0,
+          },
+        ]}
+      />
+      {alerts > 0 && trucks.length > 0 && (
+        <p className="px-1 text-sm font-semibold text-destructive tabular-nums">
+          {trucks
+            .map((t) =>
+              `Unit ${t.unitNumber}: ${
+                t.neverInspected
+                  ? 'never inspected'
+                  : t.daysRemaining !== null && t.daysRemaining < 0
+                    ? `overdue ${Math.abs(t.daysRemaining)}d`
+                    : `${t.daysRemaining}d left`
+              }`,
+            )
+            .join(', ')}
+        </p>
+      )}
     </div>
-  );
-}
-
-function FleetAvailabilityCard() {
-  const { data, isLoading } = useFleetAvailability();
-
-  const chartData = data ? [
-    { name: 'Available', value: data.available, color: 'hsl(var(--chart-2))' },
-    { name: 'In Shop', value: data.inShop, color: 'hsl(var(--chart-1))' },
-  ] : [];
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Fleet Availability</CardTitle>
-        <Truck className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <Skeleton className="h-[100px] w-full" />
-        ) : (
-          <div className="flex items-center gap-4">
-            <div className="h-[80px] w-[80px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={20}
-                    outerRadius={35}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="text-sm">Available: <strong>{data?.available || 0}</strong></span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-amber-500" />
-                <span className="text-sm">In Shop: <strong>{data?.inShop || 0}</strong></span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Total: {data?.total || 0} trucks
-              </p>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function MaintenanceCostCard() {
-  const { data, isLoading } = useMaintenanceCostMTD();
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Maintenance Cost (MTD)</CardTitle>
-        <DollarSign className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <Skeleton className="h-8 w-[120px]" />
-        ) : (
-          <>
-            <div className="text-xl sm:text-2xl font-bold truncate">
-              ${(data || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Current month total
-            </p>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function CostPerMileCard() {
-  const { data, isLoading } = useCostPerMile();
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Cost Per Mile (CPM)</CardTitle>
-        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <Skeleton className="h-8 w-[80px]" />
-        ) : (
-          <>
-            <div className="text-xl sm:text-2xl font-bold truncate">
-              ${(data || 0).toFixed(3)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Per mile driven
-            </p>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ComplianceAlertCard() {
-  const { data, isLoading } = useComplianceAlerts();
-  const hasAlerts = (data?.count || 0) > 0;
-
-  return (
-    <Card className={cn(
-      hasAlerts && 'border-red-300 bg-red-50/50 dark:bg-red-950/20'
-    )}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Compliance Alerts</CardTitle>
-        <AlertTriangle className={cn(
-          'h-4 w-4',
-          hasAlerts ? 'text-red-500' : 'text-muted-foreground'
-        )} />
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <Skeleton className="h-8 w-[40px]" />
-        ) : (
-          <>
-            <div className={cn(
-              'text-xl sm:text-2xl font-bold truncate',
-              hasAlerts && 'text-red-600'
-            )}>
-              {data?.count || 0}
-            </div>
-            <p className={cn(
-              'text-xs',
-              hasAlerts ? 'text-red-600' : 'text-muted-foreground'
-            )}>
-              {hasAlerts 
-                ? '120-Day inspections due soon' 
-                : 'All inspections up to date'}
-            </p>
-            {hasAlerts && data?.trucks && (
-              <div className="mt-2 space-y-1">
-                {data.trucks.slice(0, 3).map(truck => (
-                  <p key={truck.truckId} className="text-xs text-red-600">
-                    {truck.unitNumber}: {truck.neverInspected 
-                      ? 'Never Inspected'
-                      : truck.daysRemaining !== null && truck.daysRemaining < 0 
-                        ? `Overdue ${Math.abs(truck.daysRemaining)}d` 
-                        : `${truck.daysRemaining}d left`}
-                  </p>
-                ))}
-                {data.trucks.length > 3 && (
-                  <p className="text-xs text-red-600">
-                    +{data.trucks.length - 3} more
-                  </p>
-                )}
-              </div>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
   );
 }

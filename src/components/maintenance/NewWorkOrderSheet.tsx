@@ -599,10 +599,10 @@ export function NewWorkOrderSheet({ open, onOpenChange, initialData }: NewWorkOr
             </div>
 
             {/* Reimbursable Toggle */}
-            <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800 p-4">
+            <div className="flex items-center justify-between rounded-lg border border-warning/50 bg-warning/10 dark:bg-warning/15 dark:border-warning/50 p-4">
               <div className="space-y-0.5">
                 <Label htmlFor="reimbursable" className="text-sm font-medium flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-amber-600" />
+                  <DollarSign className="h-4 w-4 text-warning" />
                   Reimbursable / Warranty
                 </Label>
                 <p className="text-xs text-muted-foreground">

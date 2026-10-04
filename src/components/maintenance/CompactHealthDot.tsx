@@ -36,15 +36,15 @@ export function CompactHealthDot({
   const isWarning = remaining >= 0 && remaining <= warningThreshold;
 
   const getDotColor = () => {
-    if (isOverdue) return 'bg-red-500';
-    if (isWarning) return 'bg-amber-500';
-    return 'bg-emerald-500';
+    if (isOverdue) return 'bg-destructive';
+    if (isWarning) return 'bg-warning';
+    return 'bg-success';
   };
 
   const getTextColor = () => {
-    if (isOverdue) return 'text-red-600';
-    if (isWarning) return 'text-amber-600';
-    return 'text-emerald-600';
+    if (isOverdue) return 'text-destructive';
+    if (isWarning) return 'text-warning';
+    return 'text-success';
   };
 
   const formatRemainingLine = () => {
@@ -127,9 +127,9 @@ export function CompactInspectionDot({
   const isWarning = daysRemaining > 7 && daysRemaining <= 14;
 
   const getDotColor = () => {
-    if (isOverdue || isCritical) return 'bg-red-500';
-    if (isWarning) return 'bg-amber-500';
-    return 'bg-emerald-500';
+    if (isOverdue || isCritical) return 'bg-destructive';
+    if (isWarning) return 'bg-warning';
+    return 'bg-success';
   };
 
   return (
@@ -153,7 +153,7 @@ export function CompactInspectionDot({
               {!lastDate ? (
                 'Never Inspected'
               ) : isOverdue ? (
-                <span className="text-red-600">Overdue by {Math.abs(daysRemaining)} days</span>
+                <span className="text-destructive">Overdue by {Math.abs(daysRemaining)} days</span>
               ) : (
                 <span>{daysRemaining} days remaining</span>
               )}

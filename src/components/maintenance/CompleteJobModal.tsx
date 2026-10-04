@@ -99,7 +99,7 @@ export function CompleteJobModal({ workOrder, open, onOpenChange }: CompleteJobM
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-emerald-500" />
+            <CheckCircle className="h-5 w-5 text-success" />
             Complete Work Order
           </DialogTitle>
           <DialogDescription>

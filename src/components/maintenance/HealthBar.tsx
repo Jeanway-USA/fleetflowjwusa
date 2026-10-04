@@ -40,15 +40,15 @@ export function HealthBar({
   const isGood = remaining > warningThreshold;
 
   const getBarColor = () => {
-    if (isOverdue) return 'bg-red-500';
-    if (isWarning) return 'bg-amber-500';
-    return 'bg-emerald-500';
+    if (isOverdue) return 'bg-destructive';
+    if (isWarning) return 'bg-warning';
+    return 'bg-success';
   };
 
   const getTextColor = () => {
-    if (isOverdue) return 'text-red-600';
-    if (isWarning) return 'text-amber-600';
-    return 'text-emerald-600';
+    if (isOverdue) return 'text-destructive';
+    if (isWarning) return 'text-warning';
+    return 'text-success';
   };
 
   const formatPrimaryLine = () => {
@@ -76,11 +76,11 @@ export function HealthBar({
           <div className={cn('w-full min-w-[120px]', className)}>
             <div className="flex items-center gap-1 mb-1">
               {isOverdue ? (
-                <AlertTriangle className="h-3 w-3 text-red-500" />
+                <AlertTriangle className="h-3 w-3 text-destructive" />
               ) : isWarning ? (
-                <AlertTriangle className="h-3 w-3 text-amber-500" />
+                <AlertTriangle className="h-3 w-3 text-warning" />
               ) : (
-                <CheckCircle className="h-3 w-3 text-emerald-500" />
+                <CheckCircle className="h-3 w-3 text-success" />
               )}
               <span className={cn('text-xs font-medium', getTextColor())}>
                 {serviceName}
@@ -159,9 +159,9 @@ export function InspectionCountdown({
   const isGood = daysRemaining > 14;
 
   const getContainerClasses = () => {
-    if (isOverdue || isCritical) return 'bg-red-100 border-red-300 text-red-800';
-    if (isWarning) return 'bg-amber-100 border-amber-300 text-amber-800';
-    return 'bg-emerald-100 border-emerald-300 text-emerald-800';
+    if (isOverdue || isCritical) return 'bg-destructive/10 border-destructive/40 text-destructive';
+    if (isWarning) return 'bg-warning/15 border-warning/50 text-foreground';
+    return 'bg-success/15 border-success/40 text-success';
   };
 
   return (

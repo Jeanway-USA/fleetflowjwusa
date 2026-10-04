@@ -508,13 +508,13 @@ export default function ExecutiveDashboard() {
         return acc;
       }, {});
 
-      // Logbook palette: green, ballpoint blue, carbon ochre, slate, pencil
+      // Brand palette: dark gold, black, gold, gray
       const categoryColors: Record<string, string> = {
-        'Fuel & DEF': 'hsl(var(--primary))',     // Logbook green
-        'Operations': 'hsl(205 45% 42%)',      // Ballpoint blue
-        'Insurance & Benefits': 'hsl(40 80% 48%)',  // Carbon ochre
-        'Payments & Advances': 'hsl(165 22% 38%)',   // Slate green
-        'Other': 'hsl(var(--muted-foreground))', // Pencil gray
+        'Fuel & DEF': 'hsl(var(--chart-1))',     // Dark gold
+        'Operations': 'hsl(var(--chart-2))',     // Black
+        'Insurance & Benefits': 'hsl(var(--chart-3))', // Gold
+        'Payments & Advances': 'hsl(var(--chart-4))',  // Brand gray
+        'Other': 'hsl(var(--chart-4) / 0.5)',  // Light gray
       };
 
       const entries = Object.entries(grouped).filter(([_, value]) => value !== 0);

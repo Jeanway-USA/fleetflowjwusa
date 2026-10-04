@@ -33,10 +33,10 @@ export function PMFleetHealthSummary({
         onClick={() => onFilterClick(activeFilter === 'overdue' ? 'all' : 'overdue')}
         className={cn(
           'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-          'hover:bg-red-100 dark:hover:bg-red-900/30',
+          'hover:bg-destructive/10 dark:hover:bg-destructive/10',
           activeFilter === 'overdue' 
-            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' 
-            : 'text-red-600 dark:text-red-400'
+            ? 'bg-destructive/10 dark:bg-destructive/10 text-destructive dark:text-destructive' 
+            : 'text-destructive dark:text-destructive'
         )}
       >
         <AlertTriangle className="h-3.5 w-3.5" />
@@ -49,10 +49,10 @@ export function PMFleetHealthSummary({
         onClick={() => onFilterClick(activeFilter === 'due-soon' ? 'all' : 'due-soon')}
         className={cn(
           'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-          'hover:bg-amber-100 dark:hover:bg-amber-900/30',
+          'hover:bg-warning/15 dark:hover:bg-warning/15',
           activeFilter === 'due-soon' 
-            ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' 
-            : 'text-amber-600 dark:text-amber-400'
+            ? 'bg-warning/15 dark:bg-warning/15 text-foreground dark:text-warning' 
+            : 'text-warning dark:text-warning'
         )}
       >
         <Clock className="h-3.5 w-3.5" />
@@ -65,10 +65,10 @@ export function PMFleetHealthSummary({
         onClick={() => onFilterClick(activeFilter === 'on-track' ? 'all' : 'on-track')}
         className={cn(
           'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-          'hover:bg-emerald-100 dark:hover:bg-emerald-900/30',
+          'hover:bg-success/15 dark:hover:bg-success/15',
           activeFilter === 'on-track' 
-            ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' 
-            : 'text-emerald-600 dark:text-emerald-400'
+            ? 'bg-success/15 dark:bg-success/15 text-success dark:text-success' 
+            : 'text-success dark:text-success'
         )}
       >
         <CheckCircle className="h-3.5 w-3.5" />
@@ -84,7 +84,7 @@ export function PMFleetHealthSummary({
                 <div
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium cursor-help',
-                    'bg-amber-100/70 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                    'bg-warning/15 dark:bg-warning/15 text-foreground dark:text-warning'
                   )}
                 >
                   <ShieldAlert className="h-3.5 w-3.5" />

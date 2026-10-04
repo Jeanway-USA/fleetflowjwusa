@@ -23,14 +23,14 @@ interface TruckHistoryDrawerProps {
 }
 
 function getHealthColor(pct: number) {
-  if (pct > 50) return 'bg-green-500';
-  if (pct > 20) return 'bg-amber-500';
+  if (pct > 50) return 'bg-success';
+  if (pct > 20) return 'bg-warning';
   return 'bg-destructive';
 }
 
 function getHealthTextColor(pct: number) {
-  if (pct > 50) return 'text-green-600 dark:text-green-400';
-  if (pct > 20) return 'text-amber-600 dark:text-amber-400';
+  if (pct > 50) return 'text-success dark:text-success';
+  if (pct > 20) return 'text-warning dark:text-warning';
   return 'text-destructive';
 }
 
@@ -63,7 +63,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
               <TooltipProvider>
                 <UITooltip>
                   <TooltipTrigger asChild>
-                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900/40 dark:text-amber-300 gap-1 cursor-help">
+                    <Badge className="bg-warning/15 text-foreground hover:bg-warning/15 dark:bg-warning/15 dark:text-warning gap-1 cursor-help">
                       <ShieldAlert className="h-3 w-3" />
                       High Vulnerability Index
                     </Badge>
@@ -77,11 +77,11 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                     </p>
                     <ul className="text-xs space-y-1">
                       {data.chronic.entries.map(e => (
-                        <li key={`${e.source}-${e.id}`} className="border-l-2 border-amber-500 pl-2">
+                        <li key={`${e.source}-${e.id}`} className="border-l-2 border-warning/50 pl-2">
                           <span className="font-mono opacity-70">
                             {format(new Date(e.date + 'T00:00:00'), 'MMM d')}
                           </span>{' '}
-                          · {e.category} — {e.description}
+                          · {e.category}: {e.description}
                         </li>
                       ))}
                     </ul>
@@ -169,12 +169,12 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                     >
                       {data.stats.avgDailyRevenue > 0
                         ? formatCurrency(data.stats.opportunityRevenueLost)
-                        : '—'}
+                        : 'n/a'}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-1">
                       {data.stats.totalDaysDown}d down
                       {data.stats.liveDaysDown > 0 && (
-                        <> · <span className="text-amber-600 dark:text-amber-400">{data.stats.liveDaysDown}d live</span></>
+                        <> · <span className="text-warning dark:text-warning">{data.stats.liveDaysDown}d live</span></>
                       )}
                       {data.stats.avgDailyRevenue > 0
                         ? <> · ${data.stats.avgDailyRevenue.toLocaleString()}/day target</>
@@ -244,7 +244,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                   <div className="space-y-3">
                     {data.workOrders.map(wo => (
                       <Card key={wo.id} className={cn(
-                        wo.is_reimbursable && 'border-amber-200 bg-amber-50/30 dark:bg-amber-950/20'
+                        wo.is_reimbursable && 'border-warning/50 bg-warning/10 dark:bg-warning/15'
                       )}>
                         <CardContent className="p-3">
                           <div className="flex items-start justify-between gap-2">
@@ -257,13 +257,13 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                                   variant={wo.status === 'completed' ? 'default' : 'secondary'}
                                   className={cn(
                                     'text-xs',
-                                    wo.status === 'completed' && 'bg-emerald-500'
+                                    wo.status === 'completed' && 'bg-success'
                                   )}
                                 >
                                   {wo.status}
                                 </Badge>
                                 {wo.is_reimbursable && (
-                                  <Badge className="bg-amber-100 text-amber-800 text-xs">
+                                  <Badge className="bg-warning/15 text-foreground text-xs">
                                     Reimbursable
                                   </Badge>
                                 )}
@@ -352,7 +352,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                               <TrendingUp className="h-4 w-4" />
                               <span className="text-xs">90-Day Gross Revenue</span>
                             </div>
-                            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                            <p className="text-2xl font-bold text-success dark:text-success">
                               ${profitability.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </p>
                           </CardContent>
@@ -379,7 +379,7 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
                             <p className={cn(
                               "text-2xl font-bold",
                               profitability.profitMargin >= 0 
-                                ? "text-emerald-600 dark:text-emerald-400" 
+                                ? "text-success dark:text-success" 
                                 : "text-rose-600 dark:text-rose-400"
                             )}>
                               {profitability.profitMargin.toFixed(1)}%
@@ -393,10 +393,10 @@ export function TruckHistoryDrawer({ truckId, open, onOpenChange }: TruckHistory
 
                       {/* True Cost of Maintenance */}
                       {(profitability.totalMaintenanceCost > 0 || profitability.totalDaysDown > 0) && (
-                        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-950/20">
+                        <Card className="border-warning/50 dark:border-warning/50 bg-warning/10 dark:bg-warning/15">
                           <CardHeader className="pb-2">
                             <CardTitle className="text-sm flex items-center gap-2">
-                              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                              <AlertTriangle className="h-4 w-4 text-warning dark:text-warning" />
                               True Cost of Maintenance (90 Days)
                             </CardTitle>
                           </CardHeader>

@@ -2,20 +2,10 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { LoadingButton } from '@/components/shared/LoadingButton';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { Panel } from '@/components/shared/Panel';
+import { StatStrip } from '@/components/shared/StatStrip';
 import { NewWorkOrderSheet } from '@/components/maintenance/NewWorkOrderSheet';
 import { LogPartsUsageDialog } from '@/components/maintenance/LogPartsUsageDialog';
 import { MessageDriverDialog } from '@/components/maintenance/MessageDriverDialog';
@@ -31,84 +21,12 @@ import {
   type TodaysWorkOrder,
   type PartInventoryItem,
 } from '@/hooks/useMaintenanceData';
-import { useDriverFaultReports, type DriverFaultReport } from '@/hooks/useDriverFaultReports';
+import { useDriverFaultReports } from '@/hooks/useDriverFaultReports';
 import { usePMNotifications, type PMNotification } from '@/hooks/usePMNotifications';
 import { useToast } from '@/hooks/use-toast';
-import {
-  Truck,
-  Wrench,
-  AlertTriangle,
-  Clock,
-  ArrowUp,
-  ArrowDown,
-  ArrowRight,
-  CheckCircle2,
-  PlayCircle,
-  Calendar,
-  Zap,
-  Plus,
-  Package,
-  MessageSquare,
-} from 'lucide-react';
+import { Truck, ChevronRight, PlayCircle, Plus, Package, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { subDays, addDays, format, formatDistanceToNow } from 'date-fns';
-
-
-type Trend = {
-  direction: 'up' | 'down' | 'flat';
-  label: string;
-  positive: boolean;
-};
-
-interface KPICardProps {
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  value: string;
-  helper: string;
-  trend?: Trend;
-  loading?: boolean;
-  accentClass?: string;
-}
-
-function KPICard({ title, icon: Icon, value, helper, trend, loading, accentClass }: KPICardProps) {
-  return (
-    <Card className={cn(accentClass)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <Skeleton className="h-8 w-[100px]" />
-        ) : (
-          <>
-            <div className="text-2xl sm:text-3xl font-bold truncate">{value}</div>
-            <div className="mt-1 flex items-center gap-1 text-xs">
-              {trend && trend.direction !== 'flat' && (
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-0.5 font-medium',
-                    trend.positive ? 'text-emerald-600' : 'text-red-600',
-                  )}
-                >
-                  {trend.direction === 'up' ? (
-                    <ArrowUp className="h-3 w-3" />
-                  ) : (
-                    <ArrowDown className="h-3 w-3" />
-                  )}
-                  {trend.label}
-                </span>
-              )}
-              <span className="text-muted-foreground">
-                {trend && trend.direction !== 'flat' ? '·' : ''} {helper}
-              </span>
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
 function useAvgRepairTurnaround() {
   return useQuery({
@@ -146,305 +64,6 @@ function useAvgRepairTurnaround() {
       return { currentHours: avgHours(current), priorHours: avgHours(prior), count: current.length };
     },
   });
-}
-
-function FleetUptimeCard() {
-  const { data, isLoading } = useFleetAvailability();
-  const total = data?.total || 0;
-  const available = data?.available || 0;
-  const uptime = total > 0 ? (available / total) * 100 : 0;
-  const meetsTarget = uptime >= 95;
-
-  return (
-    <KPICard
-      title="Fleet Uptime"
-      icon={Truck}
-      loading={isLoading}
-      value={`${uptime.toFixed(1)}%`}
-      helper={`${available}/${total} trucks available`}
-      trend={{
-        direction: meetsTarget ? 'up' : 'down',
-        label: meetsTarget ? 'On target' : `${(95 - uptime).toFixed(1)}% below`,
-        positive: meetsTarget,
-      }}
-      accentClass={!meetsTarget ? 'border-red-300 bg-red-50/50 dark:bg-red-950/20' : undefined}
-    />
-  );
-}
-
-function OpenWorkOrdersCard() {
-  const { data, isLoading } = useActiveWorkOrders();
-  const sevenDaysAgo = subDays(new Date(), 7);
-  const recent = (data || []).filter(wo => new Date(wo.entry_date + 'T00:00:00') >= sevenDaysAgo).length;
-  const total = data?.length || 0;
-  const direction: Trend['direction'] = recent === 0 ? 'flat' : 'up';
-
-  return (
-    <KPICard
-      title="Open Work Orders"
-      icon={Wrench}
-      loading={isLoading}
-      value={String(total)}
-      helper="Active right now"
-      trend={{
-        direction,
-        label: `${recent} new (7d)`,
-        positive: recent === 0,
-      }}
-    />
-  );
-}
-
-function CriticalDriverReportsCard() {
-  const { data, isLoading } = useDriverFaultReports();
-  const critical = (data || []).filter(r => r.priority === 'critical' || r.priority === 'high').length;
-  const hasCritical = critical > 0;
-
-  return (
-    <KPICard
-      title="Critical Driver Reports"
-      icon={AlertTriangle}
-      loading={isLoading}
-      value={String(critical)}
-      helper={hasCritical ? 'Needs immediate action' : 'All clear'}
-      trend={{
-        direction: hasCritical ? 'up' : 'flat',
-        label: hasCritical ? 'Urgent' : 'No alerts',
-        positive: !hasCritical,
-      }}
-      accentClass={hasCritical ? 'border-red-300 bg-red-50/50 dark:bg-red-950/20' : undefined}
-    />
-  );
-}
-
-function AvgRepairTurnaroundCard() {
-  const { data, isLoading } = useAvgRepairTurnaround();
-  const hours = data?.currentHours || 0;
-  const prior = data?.priorHours || 0;
-
-  const formatTime = (h: number) => {
-    if (h <= 0) return '—';
-    if (h < 48) return `${h.toFixed(1)}h`;
-    return `${(h / 24).toFixed(1)}d`;
-  };
-
-  const delta = prior > 0 ? hours - prior : 0;
-  const improving = delta < 0;
-  const direction: Trend['direction'] = prior === 0 || Math.abs(delta) < 0.5 ? 'flat' : improving ? 'down' : 'up';
-
-  return (
-    <KPICard
-      title="Avg. Repair Turnaround"
-      icon={Clock}
-      loading={isLoading}
-      value={formatTime(hours)}
-      helper={`Last 30d · ${data?.count || 0} jobs`}
-      trend={{
-        direction,
-        label: prior > 0 ? `${Math.abs(delta).toFixed(1)}h vs prior` : 'No prior data',
-        positive: improving,
-      }}
-    />
-  );
-}
-
-function UrgencyBadge({ urgency }: { urgency: TodayUrgency }) {
-  if (urgency === 'high') return <Badge variant="destructive">High</Badge>;
-  if (urgency === 'medium')
-    return (
-      <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400">
-        Medium
-      </Badge>
-    );
-  return <Badge variant="secondary">Low</Badge>;
-}
-
-function TodaysPrioritiesCard() {
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { data, isLoading } = useTodaysWorkOrders();
-  const startMutation = useStartWorkOrder();
-
-  const items = data || [];
-
-  const handleStart = (e: React.MouseEvent, wo: TodaysWorkOrder) => {
-    e.stopPropagation();
-    startMutation.mutate(wo.id, {
-      onSuccess: () => toast({ title: 'Work started', description: `Truck ${wo.trucks?.unit_number ?? ''} is now in progress.` }),
-      onError: (err: any) => toast({ title: 'Failed to start', description: err?.message ?? 'Try again', variant: 'destructive' }),
-    });
-  };
-
-  return (
-    <Card className="lg:col-span-2">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base font-semibold">Today's Priorities</CardTitle>
-          {!isLoading && (
-            <Badge variant="secondary" className="ml-1">{items.length}</Badge>
-          )}
-        </div>
-        <Button asChild variant="ghost" size="sm" className="gap-1 text-xs">
-          <Link to="/maintenance">
-            View all <ArrowRight className="h-3 w-3" />
-          </Link>
-        </Button>
-      </CardHeader>
-      <CardContent className="p-0">
-        {isLoading ? (
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : items.length === 0 ? (
-          <div className="px-6 py-10 text-center">
-            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
-            <p className="text-sm text-muted-foreground">No work orders scheduled for today.</p>
-            <Button asChild variant="link" size="sm" className="mt-1">
-              <Link to="/maintenance">Schedule one →</Link>
-            </Button>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[110px]">Truck</TableHead>
-                <TableHead>Issue</TableHead>
-                <TableHead className="w-[110px]">Urgency</TableHead>
-                <TableHead className="w-[130px] text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map(wo => {
-                const isInProgress = wo.status === 'in_progress';
-                const issue = wo.description || wo.service_type || '—';
-                return (
-                  <TableRow
-                    key={wo.id}
-                    onClick={() => navigate('/maintenance')}
-                    className="cursor-pointer transition-colors hover:bg-muted/50"
-                  >
-                    <TableCell className="font-medium">
-                      {wo.trucks?.unit_number ?? '—'}
-                    </TableCell>
-                    <TableCell className="max-w-[320px]">
-                      <span className="line-clamp-1 text-sm">{issue}</span>
-                    </TableCell>
-                    <TableCell>
-                      <UrgencyBadge urgency={wo.urgency} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <LoadingButton
-                        size="sm"
-                        variant={isInProgress ? 'secondary' : 'default'}
-                        disabled={isInProgress}
-                        loading={startMutation.isPending && startMutation.variables === wo.id}
-                        onClick={(e) => handleStart(e, wo)}
-                        className="gap-1"
-                      >
-                        <PlayCircle className="h-3.5 w-3.5" />
-                        {isInProgress ? 'In Progress' : 'Start Work'}
-                      </LoadingButton>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function priorityBadge(priority: DriverFaultReport['priority']) {
-  if (priority === 'critical' || priority === 'high')
-    return <Badge variant="destructive" className="capitalize">{priority}</Badge>;
-  if (priority === 'medium')
-    return (
-      <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400 capitalize">
-        {priority}
-      </Badge>
-    );
-  return <Badge variant="secondary" className="capitalize">{priority}</Badge>;
-}
-
-function LiveDriverAlertsCard() {
-  const navigate = useNavigate();
-  const { data, isLoading } = useDriverFaultReports();
-  const alerts = (data || []).filter(r => r.status === 'submitted').slice(0, 6);
-
-  return (
-    <Card className="border-destructive/40">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-destructive/20 bg-destructive/5">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive" />
-          <div>
-            <CardTitle className="text-base font-semibold">Live Driver Alerts</CardTitle>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Unverified — needs triage
-            </p>
-          </div>
-        </div>
-        {!isLoading && alerts.length > 0 && (
-          <Badge variant="destructive">{alerts.length}</Badge>
-        )}
-      </CardHeader>
-      <CardContent className="p-0">
-        {isLoading ? (
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-14 w-full" />
-            <Skeleton className="h-14 w-full" />
-            <Skeleton className="h-14 w-full" />
-          </div>
-        ) : alerts.length === 0 ? (
-          <div className="px-6 py-10 text-center">
-            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
-            <p className="text-sm text-muted-foreground">No new driver alerts.</p>
-          </div>
-        ) : (
-          <ul className="divide-y">
-            {alerts.map(r => {
-              const driver = `${r.drivers?.first_name ?? ''} ${r.drivers?.last_name ?? ''}`.trim() || 'Driver';
-              return (
-                <li
-                  key={r.id}
-                  onClick={() => navigate('/maintenance')}
-                  className="cursor-pointer px-4 py-3 transition-colors hover:bg-destructive/5"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-1">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {priorityBadge(r.priority)}
-                      <span className="text-sm font-medium truncate">
-                        {r.trucks?.unit_number ?? '—'} · {driver}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                      {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    <span className="capitalize font-medium text-foreground/80">{r.issue_type}</span>
-                    {' — '}
-                    {r.description}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <div className="border-t px-4 py-2 text-right">
-          <Button asChild variant="ghost" size="sm" className="gap-1 text-xs">
-            <Link to="/maintenance">
-              View all driver reports <ArrowRight className="h-3 w-3" />
-            </Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
 }
 
 interface UpcomingPMItem {
@@ -503,194 +122,223 @@ function buildUpcomingItems(list: PMNotification[]): UpcomingPMItem[] {
   return items.sort((a, b) => a.sortKey - b.sortKey);
 }
 
-function UpcomingPMCard() {
+function formatTurnaround(h: number) {
+  if (h <= 0) return 'n/a';
+  if (h < 48) return `${h.toFixed(1)}h`;
+  return `${(h / 24).toFixed(1)}d`;
+}
+
+/** The shop's headline numbers in one ruled strip. */
+function ShopStatus() {
+  const fleet = useFleetAvailability();
+  const open = useActiveWorkOrders();
+  const reports = useDriverFaultReports();
+  const turnaround = useAvgRepairTurnaround();
+
+  const total = fleet.data?.total || 0;
+  const available = fleet.data?.available || 0;
+  const uptime = total > 0 ? (available / total) * 100 : 0;
+
+  const sevenDaysAgo = subDays(new Date(), 7);
+  const openCount = open.data?.length || 0;
+  const newThisWeek = (open.data || []).filter(wo => new Date(wo.entry_date + 'T00:00:00') >= sevenDaysAgo).length;
+
+  const urgentReports = (reports.data || []).filter(r => r.priority === 'critical' || r.priority === 'high').length;
+
+  const hours = turnaround.data?.currentHours || 0;
+  const prior = turnaround.data?.priorHours || 0;
+  const delta = prior > 0 ? hours - prior : 0;
+
+  return (
+    <StatStrip
+      isLoading={fleet.isLoading || open.isLoading || reports.isLoading || turnaround.isLoading}
+      cells={[
+        {
+          label: 'Trucks ready',
+          value: `${available} of ${total}`,
+          note: `${uptime.toFixed(0)}% uptime${uptime < 95 && total > 0 ? ', below 95% target' : ''}`,
+          problem: total > 0 && uptime < 95,
+        },
+        {
+          label: 'Open work orders',
+          value: openCount,
+          note: newThisWeek > 0 ? `${newThisWeek} new this week` : 'None new this week',
+        },
+        {
+          label: 'Urgent driver reports',
+          value: urgentReports,
+          note: urgentReports > 0 ? 'Needs triage now' : 'All clear',
+          problem: urgentReports > 0,
+        },
+        {
+          label: 'Avg repair time',
+          value: formatTurnaround(hours),
+          // Only compare when both periods actually finished jobs; zero jobs is not "faster".
+          note: hours <= 0
+            ? 'No jobs finished in 30 days'
+            : prior > 0 && Math.abs(delta) >= 0.5
+              ? `${delta < 0 ? 'Faster' : 'Slower'} by ${Math.abs(delta).toFixed(1)}h than last month`
+              : `${turnaround.data?.count || 0} jobs, last 30 days`,
+        },
+      ]}
+    />
+  );
+}
+
+function urgencyText(urgency: TodayUrgency) {
+  if (urgency === 'high') return <span className="font-semibold text-destructive">High</span>;
+  if (urgency === 'medium') return <span className="font-semibold">Medium</span>;
+  return <span className="text-muted-foreground">Low</span>;
+}
+
+function TodaysJobs() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { data, isLoading } = useTodaysWorkOrders();
+  const startMutation = useStartWorkOrder();
+  const items = data || [];
+
+  const handleStart = (e: React.MouseEvent, wo: TodaysWorkOrder) => {
+    e.stopPropagation();
+    startMutation.mutate(wo.id, {
+      onSuccess: () => toast({ title: 'Work started', description: `Truck ${wo.trucks?.unit_number ?? ''} is now in progress.` }),
+      onError: (err: any) => toast({ title: 'Failed to start', description: err?.message ?? 'Try again', variant: 'destructive' }),
+    });
+  };
+
+  return (
+    <Panel
+      title="Today's jobs"
+      aside={items.length > 0 ? `${items.length} scheduled` : undefined}
+      link={{ to: '/maintenance', label: 'All work orders' }}
+      isLoading={isLoading}
+      isEmpty={items.length === 0}
+      empty={<>Nothing scheduled for today. <Link to="/maintenance?action=new-work-order" className="font-semibold text-primary underline">Schedule a job</Link></>}
+      className="lg:col-span-2"
+    >
+      <ul className="divide-y border-t">
+        {items.map(wo => {
+          const inProgress = wo.status === 'in_progress';
+          return (
+            <li
+              key={wo.id}
+              onClick={() => navigate('/maintenance')}
+              className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-secondary/50"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="figure text-[17px] font-bold">Unit {wo.trucks?.unit_number ?? '?'}</span>
+                  <span className="text-[13px]">{urgencyText(wo.urgency)}</span>
+                </div>
+                <p className="truncate text-[15px] text-muted-foreground">{wo.description || wo.service_type || 'No description'}</p>
+              </div>
+              <LoadingButton
+                variant={inProgress ? 'secondary' : 'default'}
+                disabled={inProgress}
+                loading={startMutation.isPending && startMutation.variables === wo.id}
+                onClick={(e) => handleStart(e, wo)}
+                className="h-11 shrink-0 gap-1.5 sm:h-10"
+              >
+                <PlayCircle className="h-4 w-4" />
+                {inProgress ? 'In progress' : 'Start work'}
+              </LoadingButton>
+            </li>
+          );
+        })}
+      </ul>
+    </Panel>
+  );
+}
+
+function DriverReports() {
+  const navigate = useNavigate();
+  const { data, isLoading } = useDriverFaultReports();
+  const alerts = (data || []).filter(r => r.status === 'submitted').slice(0, 6);
+  const urgent = alerts.filter(r => r.priority === 'critical' || r.priority === 'high').length;
+
+  return (
+    <Panel
+      title="Driver reports"
+      aside={alerts.length > 0 ? (urgent > 0 ? `${urgent} urgent` : `${alerts.length} to triage`) : undefined}
+      asideProblem={urgent > 0}
+      link={{ to: '/maintenance', label: 'All reports' }}
+      isLoading={isLoading}
+      isEmpty={alerts.length === 0}
+      empty="No new reports from drivers."
+    >
+      <ul className="divide-y border-t">
+        {alerts.map(r => {
+          const driver = `${r.drivers?.first_name ?? ''} ${r.drivers?.last_name ?? ''}`.trim() || 'Driver';
+          const isUrgent = r.priority === 'critical' || r.priority === 'high';
+          return (
+            <li key={r.id} onClick={() => navigate('/maintenance')} className="cursor-pointer px-4 py-2.5 hover:bg-secondary/50">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="truncate text-[15px] font-semibold">
+                  Unit {r.trucks?.unit_number ?? '?'}, {driver}
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
+                </span>
+              </div>
+              <p className="line-clamp-2 text-sm text-muted-foreground">
+                <span className={cn('font-semibold capitalize', isUrgent ? 'text-destructive' : 'text-foreground')}>
+                  {r.priority}, {r.issue_type}:
+                </span>{' '}
+                {r.description}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+    </Panel>
+  );
+}
+
+function PMDueSoon() {
   const navigate = useNavigate();
   const { data, isLoading } = usePMNotifications();
   const items = buildUpcomingItems(data || []);
+  const overdue = items.filter(i => i.isOverdue).length;
 
   return (
-    <Card className="lg:col-span-2">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <div>
-            <CardTitle className="text-base font-semibold">Upcoming Preventive Maintenance</CardTitle>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Next 7 days</p>
-          </div>
-          {!isLoading && (
-            <Badge variant="secondary" className="ml-1">{items.length}</Badge>
-          )}
-        </div>
-        <Button asChild variant="ghost" size="sm" className="gap-1 text-xs">
-          <Link to="/maintenance?tab=predictive">
-            Calendar <ArrowRight className="h-3 w-3" />
-          </Link>
-        </Button>
-      </CardHeader>
-      <CardContent className="p-0">
-        {isLoading ? (
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        ) : items.length === 0 ? (
-          <div className="px-6 py-10 text-center">
-            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
-            <p className="text-sm text-muted-foreground">
-              No preventive maintenance due in the next 7 days.
-            </p>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[110px]">Truck</TableHead>
-                <TableHead>Service Type</TableHead>
-                <TableHead className="w-[180px]">Due Date</TableHead>
-                <TableHead className="w-[130px] text-right">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map(item => (
-                <TableRow
-                  key={item.id}
-                  onClick={() => navigate('/maintenance?tab=predictive')}
-                  className="cursor-pointer transition-colors hover:bg-muted/50"
-                >
-                  <TableCell className="font-medium">{item.truckLabel}</TableCell>
-                  <TableCell>
-                    <span className="text-sm">{item.serviceName}</span>
-                    {item.notification.service_code && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        ({item.notification.service_code})
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-1.5 text-sm',
-                        item.isOverdue
-                          ? 'text-red-600 dark:text-red-400 font-medium'
-                          : item.isImminent
-                          ? 'text-amber-600 dark:text-amber-400 font-medium'
-                          : 'text-muted-foreground',
-                      )}
-                    >
-                      {item.isOverdue ? (
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                      ) : item.isImminent ? (
-                        <Clock className="h-3.5 w-3.5" />
-                      ) : (
-                        <Calendar className="h-3.5 w-3.5" />
-                      )}
-                      {item.dueLabel}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {item.isOverdue ? (
-                      <Badge variant="destructive">Overdue</Badge>
-                    ) : item.isImminent ? (
-                      <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400">
-                        Due soon
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary">Upcoming</Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-interface QuickActionsCardProps {
-  onCreateWorkOrder: () => void;
-  onLogParts: () => void;
-  onMessageDriver: () => void;
-  onUpdateTruck: () => void;
-}
-
-function QuickActionsCard({
-  onCreateWorkOrder,
-  onLogParts,
-  onMessageDriver,
-  onUpdateTruck,
-}: QuickActionsCardProps) {
-  const actions = [
-    {
-      key: 'create-wo',
-      label: 'Create New Work Order',
-      helper: 'Open a new repair or PM job',
-      icon: Plus,
-      variant: 'default' as const,
-      onClick: onCreateWorkOrder,
-    },
-    {
-      key: 'log-parts',
-      label: 'Log Parts Usage',
-      helper: 'Add parts & costs to a work order',
-      icon: Package,
-      variant: 'secondary' as const,
-      onClick: onLogParts,
-    },
-    {
-      key: 'message-driver',
-      label: 'Message a Driver',
-      helper: 'Open driver fault report threads',
-      icon: MessageSquare,
-      variant: 'secondary' as const,
-      onClick: onMessageDriver,
-    },
-    {
-      key: 'truck-status',
-      label: 'Update Truck Status',
-      helper: 'Mark trucks active, in-shop or down',
-      icon: Truck,
-      variant: 'outline' as const,
-      onClick: onUpdateTruck,
-    },
-  ];
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center gap-2 space-y-0">
-        <Zap className="h-4 w-4 text-primary" />
-        <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          {actions.map(a => (
-            <Button
-              key={a.key}
-              variant={a.variant}
-              onClick={a.onClick}
-              className="w-full h-auto min-h-[60px] flex flex-row items-center justify-center gap-3 py-3 px-4"
+    <Panel
+      title="PM due in 7 days"
+      aside={items.length > 0 ? (overdue > 0 ? `${overdue} overdue` : `${items.length} due`) : undefined}
+      asideProblem={overdue > 0}
+      link={{ to: '/maintenance?tab=pm', label: 'PM schedule' }}
+      isLoading={isLoading}
+      isEmpty={items.length === 0}
+      empty="No preventive maintenance due in the next 7 days."
+      className="lg:col-span-2"
+    >
+      <ul className="divide-y border-t">
+        {items.map(item => (
+          <li
+            key={item.id}
+            onClick={() => navigate('/maintenance?tab=pm')}
+            className="flex cursor-pointer items-baseline gap-3 px-4 py-2.5 hover:bg-secondary/50"
+          >
+            <span className="figure w-24 shrink-0 text-[17px] font-bold">Unit {item.truckLabel}</span>
+            <span className="min-w-0 flex-1 truncate text-[15px]">
+              {item.serviceName}
+              {item.notification.service_code && <span className="text-muted-foreground"> ({item.notification.service_code})</span>}
+            </span>
+            <span
+              className={cn(
+                'shrink-0 text-sm tabular-nums',
+                item.isOverdue ? 'font-semibold text-destructive' : item.isImminent ? 'font-semibold' : 'text-muted-foreground',
+              )}
             >
-              <a.icon className="h-5 w-5 shrink-0" />
-              <span className="flex flex-col items-start justify-center text-left min-w-0">
-                <span className="text-sm font-semibold leading-tight">{a.label}</span>
-                <span className={cn(
-                  'text-[11px] font-normal mt-0.5 leading-tight',
-                  a.variant === 'default' ? 'text-primary-foreground/80' : 'text-muted-foreground',
-                )}>
-                  {a.helper}
-                </span>
-              </span>
-            </Button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+              {item.dueLabel}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Panel>
   );
 }
 
-function InventoryAlertsCard() {
+function LowStock() {
   const { toast } = useToast();
   const { data, isLoading } = useLowStockParts();
   const reorder = useRequestReorder();
@@ -698,126 +346,91 @@ function InventoryAlertsCard() {
 
   const handleReorder = (part: PartInventoryItem) => {
     reorder.mutate(part.id, {
-      onSuccess: () =>
-        toast({
-          title: 'Reorder requested',
-          description: `${part.part_name} flagged for purchasing.`,
-        }),
-      onError: (err: any) =>
-        toast({
-          title: 'Reorder failed',
-          description: err?.message ?? 'Try again',
-          variant: 'destructive',
-        }),
+      onSuccess: () => toast({ title: 'Reorder requested', description: `${part.part_name} flagged for purchasing.` }),
+      onError: (err: any) => toast({ title: 'Reorder failed', description: err?.message ?? 'Try again', variant: 'destructive' }),
     });
   };
 
-  const isRecentlyRequested = (iso: string | null) => {
-    if (!iso) return false;
-    return Date.now() - new Date(iso).getTime() < 1000 * 60 * 60 * 24 * 7;
-  };
+  const isRecentlyRequested = (iso: string | null) =>
+    !!iso && Date.now() - new Date(iso).getTime() < 1000 * 60 * 60 * 24 * 7;
 
   return (
-    <Card className="border-destructive/40">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-destructive/20 bg-destructive/5">
-        <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-destructive" />
-          <div>
-            <CardTitle className="text-base font-semibold">Inventory Alerts</CardTitle>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Below minimum threshold
-            </p>
-          </div>
-        </div>
-        {!isLoading && parts.length > 0 && (
-          <Badge variant="destructive">{parts.length}</Badge>
-        )}
-      </CardHeader>
-      <CardContent className="p-0">
-        {isLoading ? (
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-        ) : parts.length === 0 ? (
-          <div className="px-6 py-10 text-center">
-            <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 mb-2" />
-            <p className="text-sm text-muted-foreground">All parts stocked above threshold.</p>
-          </div>
-        ) : (
-          <ul className="divide-y">
-            {parts.map(p => {
-              const qty = Number(p.quantity_on_hand);
-              const threshold = Number(p.min_threshold);
-              const out = qty <= 0;
-              const recentlyRequested = isRecentlyRequested(p.reorder_requested_at);
-              return (
-                <li key={p.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium truncate">{p.part_name}</span>
-                      {p.part_number && (
-                        <span className="text-[11px] text-muted-foreground truncate">
-                          {p.part_number}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2 text-xs">
-                      {p.category && (
-                        <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
-                          {p.category}
-                        </Badge>
-                      )}
-                      <span
-                        className={cn(
-                          'font-medium',
-                          out
-                            ? 'text-red-700 dark:text-red-400'
-                            : 'text-red-600 dark:text-red-400',
-                        )}
-                      >
-                        {qty} / {threshold} {p.unit}
-                      </span>
-                    </div>
-                    {(p.vendor_name || p.last_restocked) && (
-                      <div className="mt-0.5 text-[11px] text-muted-foreground truncate">
-                        {p.vendor_name ?? 'Vendor TBD'}
-                        {p.last_restocked
-                          ? ` · Restocked ${formatDistanceToNow(new Date(p.last_restocked), { addSuffix: true })}`
-                          : ' · Not restocked yet'}
-                      </div>
-                    )}
-                  </div>
-                  {recentlyRequested ? (
-                    <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                      Requested
-                    </span>
-                  ) : (
-                    <LoadingButton
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive hover:text-destructive/80"
-                      loading={reorder.isPending && reorder.variables === p.id}
-                      onClick={() => handleReorder(p)}
-                    >
-                      Reorder
-                    </LoadingButton>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <div className="border-t px-4 py-2 text-right">
-          <Button asChild variant="ghost" size="sm" className="gap-1 text-xs">
-            <Link to="/maintenance?tab=inventory">
-              Manage inventory <ArrowRight className="h-3 w-3" />
-            </Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <Panel
+      title="Low stock"
+      aside={parts.length > 0 ? `${parts.length} below minimum` : undefined}
+      asideProblem={parts.length > 0}
+      link={{ to: '/maintenance?tab=inventory', label: 'Inventory' }}
+      isLoading={isLoading}
+      isEmpty={parts.length === 0}
+      empty="Every part is above its minimum."
+    >
+      <ul className="divide-y border-t">
+        {parts.map(p => {
+          const qty = Number(p.quantity_on_hand);
+          const threshold = Number(p.min_threshold);
+          const requested = isRecentlyRequested(p.reorder_requested_at);
+          return (
+            <li key={p.id} className="flex items-center gap-3 px-4 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[15px] font-semibold">
+                  {p.part_name}
+                  {p.part_number && <span className="font-normal text-muted-foreground"> {p.part_number}</span>}
+                </div>
+                <div className="text-sm tabular-nums">
+                  <span className="font-semibold text-destructive">{qty} of {threshold} {p.unit}</span>
+                  <span className="text-muted-foreground">
+                    {p.vendor_name ? `, ${p.vendor_name}` : ''}
+                    {p.last_restocked ? `, restocked ${formatDistanceToNow(new Date(p.last_restocked), { addSuffix: true })}` : ''}
+                  </span>
+                </div>
+              </div>
+              {requested ? (
+                <span className="shrink-0 text-sm text-muted-foreground">Requested</span>
+              ) : (
+                <LoadingButton
+                  variant="outline"
+                  className="h-11 shrink-0 sm:h-10"
+                  loading={reorder.isPending && reorder.variables === p.id}
+                  onClick={() => handleReorder(p)}
+                >
+                  Reorder
+                </LoadingButton>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Panel>
+  );
+}
+
+function ShopActions({ onLogParts, onMessageDriver, onUpdateTruck }: {
+  onLogParts: () => void;
+  onMessageDriver: () => void;
+  onUpdateTruck: () => void;
+}) {
+  const actions = [
+    { label: 'Log parts used', helper: 'Add parts and cost to a work order', icon: Package, onClick: onLogParts },
+    { label: 'Message a driver', helper: 'Reply on a fault report thread', icon: MessageSquare, onClick: onMessageDriver },
+    { label: 'Change truck status', helper: 'Mark a truck ready, in the shop, or down', icon: Truck, onClick: onUpdateTruck },
+  ];
+  return (
+    <Panel title="Shop actions">
+      <ul className="divide-y border-t">
+        {actions.map(a => (
+          <li key={a.label}>
+            <button type="button" onClick={a.onClick} className="flex min-h-[56px] w-full items-center gap-3 px-4 py-2 text-left hover:bg-secondary/50">
+              <a.icon className="h-5 w-5 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold">{a.label}</span>
+                <span className="block text-[13px] text-muted-foreground">{a.helper}</span>
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Panel>
   );
 }
 
@@ -829,43 +442,31 @@ export default function MaintenanceDashboardHome() {
 
   return (
     <>
-      <PageHeader
-        title="Maintenance Dashboard"
-        description="Performance & status overview for your fleet maintenance operations"
-      >
-        <Button asChild variant="outline" className="gap-2">
-          <Link to="/maintenance">
-            Open Maintenance Management
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+      <div className="mb-4 flex items-end justify-between gap-3">
+        <div>
+          <h1 className="font-condensed text-[28px] font-bold leading-tight sm:text-[32px]">Shop</h1>
+          <p className="text-[15px] text-muted-foreground">{format(new Date(), 'EEEE, MMMM d')}</p>
+        </div>
+        <Button onClick={() => setWoOpen(true)} className="h-11 gap-2 sm:h-10">
+          <Plus className="h-4 w-4" />
+          New work order
         </Button>
-      </PageHeader>
+      </div>
 
-      <div className="space-y-4 sm:space-y-6">
-        <section>
-          <h2 className="text-lg font-semibold tracking-tight mb-3">
-            Performance & Status Overview
-          </h2>
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-            <FleetUptimeCard />
-            <OpenWorkOrdersCard />
-            <CriticalDriverReportsCard />
-            <AvgRepairTurnaroundCard />
-          </div>
-        </section>
+      <div className="space-y-4 lg:space-y-6">
+        <ShopStatus />
 
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
-          <TodaysPrioritiesCard />
-          <LiveDriverAlertsCard />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
+          <TodaysJobs />
+          <DriverReports />
         </div>
 
-        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
-          <UpcomingPMCard />
-          <InventoryAlertsCard />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
+          <PMDueSoon />
+          <LowStock />
         </div>
 
-        <QuickActionsCard
-          onCreateWorkOrder={() => setWoOpen(true)}
+        <ShopActions
           onLogParts={() => setPartsOpen(true)}
           onMessageDriver={() => setMessageOpen(true)}
           onUpdateTruck={() => setTruckOpen(true)}
@@ -879,6 +480,3 @@ export default function MaintenanceDashboardHome() {
     </>
   );
 }
-
-
-

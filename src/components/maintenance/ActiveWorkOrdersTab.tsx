@@ -28,14 +28,14 @@ type StatusFilter = 'all' | 'open' | 'parts_ordered' | 'in_progress';
 type ServiceTypeFilter = 'all' | 'pm' | 'repair' | 'tire' | 'inspection' | 'other' | 'M1' | 'PM_A' | 'M2' | 'M3';
 
 const SERVICE_TYPE_COLORS: Record<string, string> = {
-  M1: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
-  PM_A: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
+  M1: 'bg-primary/10 text-foreground border-primary/40 dark:bg-primary/10 dark:text-primary dark:border-primary/40',
+  PM_A: 'bg-success/15 text-success border-success/40 dark:bg-success/15 dark:text-success dark:border-success/40',
   M2: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700',
-  M3: 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700',
-  pm: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
-  repair: 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700',
+  M3: 'bg-warning/15 text-foreground border-warning/50 dark:bg-warning/15 dark:text-warning dark:border-warning/50',
+  pm: 'bg-success/15 text-success border-success/40 dark:bg-success/15 dark:text-success dark:border-success/40',
+  repair: 'bg-destructive/10 text-destructive border-destructive/40 dark:bg-destructive/10 dark:text-destructive dark:border-destructive/40',
   tire: 'bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-900/30 dark:text-slate-300 dark:border-slate-700',
-  inspection: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
+  inspection: 'bg-primary/10 text-foreground border-primary/40 dark:bg-primary/10 dark:text-primary dark:border-primary/40',
   other: 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/30 dark:text-gray-300 dark:border-gray-700',
 };
 
@@ -143,9 +143,9 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
       case 'open':
         return <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Open</Badge>;
       case 'parts_ordered':
-        return <Badge className="bg-amber-500 hover:bg-amber-600 gap-1"><Package className="h-3 w-3" />Parts Ordered</Badge>;
+        return <Badge className="bg-warning hover:bg-warning gap-1"><Package className="h-3 w-3" />Parts Ordered</Badge>;
       case 'in_progress':
-        return <Badge className="bg-blue-500 hover:bg-blue-600 gap-1"><Wrench className="h-3 w-3" />In Progress</Badge>;
+        return <Badge className="bg-primary hover:bg-primary gap-1"><Wrench className="h-3 w-3" />In Progress</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -194,9 +194,8 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
     return (
       <div className="space-y-4">
         <DriverFaultReportsPanel onViewTruck={onViewTruck} />
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Wrench className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium">No Active Work Orders</h3>
+        <div className="rounded-lg border bg-card px-4 py-3">
+          <h3 className="text-[15px] font-semibold">No Active Work Orders</h3>
           <p className="text-sm text-muted-foreground">
             All trucks are currently available. Create a new work order to get started.
           </p>
@@ -238,10 +237,10 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
             onClick={() => setStatusFilter(statusFilter === 'parts_ordered' ? 'all' : 'parts_ordered')}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-              'hover:bg-amber-100 dark:hover:bg-amber-900/30',
+              'hover:bg-warning/15 dark:hover:bg-warning/15',
               statusFilter === 'parts_ordered'
-                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-                : 'text-amber-600 dark:text-amber-400'
+                ? 'bg-warning/15 dark:bg-warning/15 text-foreground dark:text-warning'
+                : 'text-warning dark:text-warning'
             )}
           >
             <Package className="h-3.5 w-3.5" />
@@ -254,10 +253,10 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
             onClick={() => setStatusFilter(statusFilter === 'in_progress' ? 'all' : 'in_progress')}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-              'hover:bg-blue-100 dark:hover:bg-blue-900/30',
+              'hover:bg-primary/10 dark:hover:bg-primary/10',
               statusFilter === 'in_progress'
-                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                : 'text-blue-600 dark:text-blue-400'
+                ? 'bg-primary/10 dark:bg-primary/10 text-foreground dark:text-primary'
+                : 'text-primary dark:text-primary'
             )}
           >
             <Wrench className="h-3.5 w-3.5" />
@@ -303,13 +302,13 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="parts_ordered">
                   <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-amber-500" />
+                    <span className="h-2 w-2 rounded-full bg-warning" />
                     Parts Ordered
                   </span>
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="in_progress">
                   <span className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-blue-500" />
+                    <span className="h-2 w-2 rounded-full bg-primary" />
                     In Progress
                   </span>
                 </DropdownMenuRadioItem>
@@ -346,9 +345,8 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
 
         {/* Data container */}
         {filteredWorkOrders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center border rounded-lg">
-            <Wrench className="h-10 w-10 text-muted-foreground mb-3" />
-            <h3 className="text-base font-medium">No matching work orders</h3>
+          <div className="rounded-lg border bg-card px-4 py-3">
+            <h3 className="text-[15px] font-semibold">No matching work orders</h3>
             <p className="text-sm text-muted-foreground">
               Try adjusting your filters or search query.
             </p>
@@ -374,7 +372,7 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
                     key={wo.id}
                     className={cn(
                       'cursor-pointer',
-                      wo.is_reimbursable && 'bg-amber-50/50 hover:bg-amber-100/50 dark:bg-amber-950/20 dark:hover:bg-amber-950/30'
+                      wo.is_reimbursable && 'bg-warning/10 hover:bg-warning/15 dark:bg-warning/15 dark:hover:bg-warning/15'
                     )}
                     onClick={() => onViewTruck(wo.truck_id)}
                   >
@@ -382,7 +380,7 @@ export function ActiveWorkOrdersTab({ onViewTruck }: ActiveWorkOrdersTabProps) {
                       <div className="flex items-center gap-2">
                         {wo.trucks?.unit_number || 'Unknown'}
                         {wo.is_reimbursable && (
-                          <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[10px] px-1">
+                          <Badge className="bg-warning/15 text-foreground border-warning/50 text-[10px] px-1">
                             <DollarSign className="h-2.5 w-2.5 mr-0.5" />
                             Reimbursable
                           </Badge>

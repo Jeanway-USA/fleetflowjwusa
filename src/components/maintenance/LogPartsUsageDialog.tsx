@@ -155,7 +155,7 @@ export function LogPartsUsageDialog({ open, onOpenChange }: Props) {
                   {(trucks || []).map((t: any) => (
                     <SelectItem key={t.id} value={t.id}>
                       Unit {t.unit_number}
-                      {t.make ? ` — ${t.make}${t.model ? ` ${t.model}` : ''}` : ''}
+                      {t.make ? `, ${t.make}${t.model ? ` ${t.model}` : ''}` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -173,7 +173,7 @@ export function LogPartsUsageDialog({ open, onOpenChange }: Props) {
                 <SelectContent>
                   {(workOrders || []).map((wo: any) => (
                     <SelectItem key={wo.id} value={wo.id}>
-                      {wo.trucks?.unit_number ? `Unit ${wo.trucks.unit_number} — ` : ''}
+                      {wo.trucks?.unit_number ? `Unit ${wo.trucks.unit_number}: ` : ''}
                       {wo.service_type}
                       {wo.description ? ` · ${wo.description.slice(0, 40)}` : ''}
                     </SelectItem>

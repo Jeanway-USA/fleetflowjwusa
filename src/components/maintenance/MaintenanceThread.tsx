@@ -59,7 +59,7 @@ function MessageBubble({
   if (isRecommendation) {
     return (
       <div className="w-full">
-        <div className="rounded-lg border border-primary/30 bg-primary/5 border-l-4 border-l-primary px-3 py-2.5">
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
           <div className="flex flex-wrap items-center gap-2 mb-1.5">
             <Wrench className="h-3.5 w-3.5 text-primary" />
             <Badge

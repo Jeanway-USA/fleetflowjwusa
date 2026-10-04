@@ -109,7 +109,7 @@ function statusBadge(p: PartInventoryItem) {
     );
   }
   return (
-    <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20">
+    <Badge className="bg-success/15 text-success dark:text-success border border-success/40 hover:bg-success/20">
       In Stock
     </Badge>
   );
@@ -364,7 +364,7 @@ function ReceiveShipmentDialog({
           <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
             Current: <strong>{currentQty}</strong> {part.unit}
             <span className="mx-2 text-muted-foreground">→</span>
-            New: <strong className="text-emerald-600 dark:text-emerald-400">{projected}</strong> {part.unit}
+            New: <strong className="text-success dark:text-success">{projected}</strong> {part.unit}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -500,8 +500,7 @@ export function InventoryManagementTab() {
               ))
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-16 text-center">
-                  <Package className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                <TableCell colSpan={6} className="py-6 text-center">
                   <p className="text-sm text-muted-foreground">
                     {parts.length === 0
                       ? 'No inventory yet. Click "Add New Part" to get started.'
@@ -525,13 +524,13 @@ export function InventoryManagementTab() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm">{p.vendor_name ?? '—'}</span>
+                      <span className="text-sm">{p.vendor_name ?? 'No vendor'}</span>
                     </TableCell>
                     <TableCell
                       className={cn(
                         'text-right font-medium tabular-nums',
-                        low && 'text-amber-600 dark:text-amber-400',
-                        qty <= 0 && 'text-red-600 dark:text-red-400',
+                        low && 'text-warning dark:text-warning',
+                        qty <= 0 && 'text-destructive dark:text-destructive',
                       )}
                     >
                       {qty} {p.unit}

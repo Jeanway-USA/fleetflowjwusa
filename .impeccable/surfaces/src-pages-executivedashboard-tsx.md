@@ -7,7 +7,7 @@ related_targets: ["src/pages/FleetLoads.tsx","src/pages/Finance.tsx","src/compon
 
 # App shell, Today, Loads, Money
 
-Scope: the authenticated app shell plus the owner's three phone jobs: Today (Executive Dashboard, `/executive-dashboard`), Loads (`/fleet-loads`), Money (`/finance`). Visitor mode: Operate.
+Scope: the authenticated app shell plus the owner's three phone jobs: Today (Executive Dashboard, `/executive-dashboard`), Loads (`/fleet-loads`), Money (`/finance`); and the shop: Shop (`/maintenance-home`) and Maintenance (`/maintenance`, tabs Work orders / PM schedule / Forecast / History / Inventory), which get their own phone tab set (Shop, Work orders, PM, Trucks, More). Visitor mode: Operate.
 
 Audience and job: the JeanWay owner on his phone in a truck cab, day and night, checking what the business made, where loads stand, and this week's Landstar settlement. Secondary: the office user at a desk doing imports and edits.
 
@@ -17,7 +17,7 @@ Constraints: keep every route, feature, and data flow; React + Tailwind + shadcn
 
 THESIS: The settlement week drawn the way drivers have always drawn their day: one ruled grid with loads as lines across it. Refuses the category default of a row of icon-bubble KPI cards over a chart.
 
-OWN-WORLD: Deep logbook-green shell (header, bottom tab bar, desktop rail) over cool white stock; grid ink green hairlines at one weight; carbon-copy yellow marks the current item and selection; red-pen marks problems. Barlow for UI, Barlow Condensed for labels and figures, tabular numerals everywhere money appears. Square-ish 6px corners, no shadows beyond one tint, no gradients, no glows.
+OWN-WORLD: JeanWay brand palette (brand guide, user decision 2026-10-03, replacing the original logbook green): brand-black shell (header, phone tab bar, desktop rail) carrying the gold-and-white JW mark; white and warm-neutral page stock; dark gold #AC7524 (deepened for AA) for actions and links; gold #FFD34D marks the current item, today and selection, with light gold as its tint; brand gray #6D6E70 for secondary text; one hairline grid weight; red pen for problems, green only as a delivered-state signal. Dark theme: near-black page a step above the shell, gold for actions. Barlow for UI, Barlow Condensed for labels and figures, tabular numerals wherever money appears. 6px corners, no gradients, no glows.
 
 STORY: Open the app, see this week's net and where every load sits in the Wed-Tue period, then tap into a load or the money lines. Trust comes from figures that add up visibly.
 

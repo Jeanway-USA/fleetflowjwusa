@@ -42,7 +42,8 @@ Built around how Landstar actually pays a BCO: the 65% truck share of linehaul, 
 ## Brand Commitments
 
 - Company name **JeanWay USA**; tagline "Gets You There". The JeanWay "JW" logo (gold gradient mark, `src/assets/JW_*.png`) must be kept.
-- Colors are open; the existing gold-heavy scheme is not binding.
+- **Brand colors are binding** (JeanWay brand guide, `Brand guide style.pdf`): light gold #FDED6F, gold #FFD34D, dark gold #AC7524, black #000000, white #FFFFFF; secondary gray #6D6E70 is the only secondary color. Gold and white text sit on black; the logo prefers white or neutral backgrounds; no other colors represent the brand (functional status colors such as delivered green and problem red are allowed as signals). Gold is used as a marker and action color, never as gradients or glows.
+- Brand fonts are Adero (primary) and Mazzard (secondary); they are licensed faces not yet in the project, so the app uses Barlow / Barlow Condensed until licenses are confirmed. Guide asks for uppercase headers and sentence-case body text in documents.
 - The product name "FleetFlow" may remain as the system's name but JeanWay is the identity users see.
 
 ## Evidence on Hand

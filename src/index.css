@@ -4,10 +4,11 @@
 
 /*
  * Fleet Flow, JeanWay USA.
- * Visual world: the driver's paper logbook. Deep logbook-green shell over cool
- * white stock, grid ink at one hairline weight, carbon-copy yellow for the
- * current item, red pen for problems. Barlow for UI, Barlow Condensed for
- * labels and figures.
+ * Colors from the JeanWay brand guide: black shell carrying gold and white,
+ * white pages, dark gold for actions, gold for the current item, brand gray
+ * for secondary text. Layout vocabulary from the driver's logbook: one hairline
+ * grid weight, ruled statement lines, state marks. Barlow for UI, Barlow
+ * Condensed for labels and figures.
  */
 
 @font-face {
@@ -62,121 +63,141 @@
 
 @layer base {
   :root {
+    /* Brand palette (JeanWay brand guide):
+       light gold #FDED6F, gold #FFD34D, dark gold #AC7524, black, white,
+       secondary gray #6D6E70. Gold and white sit on black; pages are white. */
+
     /* Stock and ink */
-    --background: 150 14% 96%;
-    --foreground: 162 34% 10%;
+    --background: 40 10% 97%;
+    --foreground: 0 0% 7%;
 
-    --card: 140 20% 99%;
-    --card-foreground: 162 34% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 7%;
 
-    --popover: 140 20% 99%;
-    --popover-foreground: 162 34% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 7%;
 
-    /* Logbook green: actions, links, active nav */
-    --primary: 156 51% 25%;
-    --primary-foreground: 140 30% 98%;
+    /* Dark gold (#AC7524, deepened slightly so white text on it passes AA):
+       actions, links, active states */
+    --primary: 36 66% 34%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 150 16% 91%;
-    --secondary-foreground: 162 34% 12%;
+    --secondary: 40 8% 92%;
+    --secondary-foreground: 0 0% 9%;
 
-    --muted: 150 14% 92%;
-    --muted-foreground: 160 12% 34%;
+    --muted: 40 6% 93%;
+    /* Brand secondary gray #6D6E70 */
+    --muted-foreground: 220 1% 43%;
 
-    /* Pale carbon tint for hovers and menu highlights */
-    --accent: 46 70% 90%;
-    --accent-foreground: 162 40% 9%;
+    /* Pale light-gold tint for hovers and menu highlights */
+    --accent: 52 96% 92%;
+    --accent-foreground: 0 0% 7%;
 
-    /* Carbon-copy yellow: the current item, selection, today */
-    --carbon: 45 88% 60%;
-    --carbon-foreground: 162 40% 9%;
+    /* Gold #FFD34D: the current item, selection, today */
+    --carbon: 45 100% 65%;
+    --carbon-foreground: 0 0% 5%;
 
-    /* Red pen: problems and destructive actions */
-    --destructive: 6 62% 47%;
-    --destructive-foreground: 0 0% 99%;
+    /* Functional status colors; not brand colors */
+    --destructive: 4 64% 46%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 152 58% 30%;
-    --success-foreground: 140 30% 98%;
+    --success: 146 44% 31%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 36 92% 44%;
-    --warning-foreground: 162 40% 9%;
+    --warning: 36 66% 40%;
+    --warning-foreground: 0 0% 100%;
 
-    /* Grid ink: one hairline weight everywhere */
-    --border: 152 14% 84%;
-    --input: 152 14% 80%;
-    --ring: 156 51% 32%;
+    /* One hairline weight everywhere */
+    --border: 40 6% 86%;
+    --input: 40 6% 80%;
+    --ring: 36 66% 40%;
 
     --radius: 0.375rem;
 
-    /* Shell: header, phone tab bar, desktop rail */
-    --shell: 161 47% 12%;
-    --shell-foreground: 140 22% 95%;
-    --shell-muted: 152 16% 70%;
-    --shell-border: 160 34% 20%;
-    --shell-active: 160 38% 19%;
+    /* Chart series: dark gold, black, gold, brand gray, red */
+    --chart-1: 36 66% 38%;
+    --chart-2: 0 0% 12%;
+    --chart-3: 45 100% 58%;
+    --chart-4: 220 1% 47%;
+    --chart-5: 4 64% 46%;
 
-    --sidebar-background: 161 47% 12%;
-    --sidebar-foreground: 140 22% 92%;
-    --sidebar-primary: 45 88% 62%;
-    --sidebar-primary-foreground: 162 40% 9%;
-    --sidebar-accent: 160 38% 19%;
-    --sidebar-accent-foreground: 140 22% 98%;
-    --sidebar-border: 160 34% 20%;
-    --sidebar-ring: 45 88% 62%;
+    /* Shell: brand black in both themes, with gold and white on it */
+    --shell: 0 0% 4%;
+    --shell-foreground: 0 0% 98%;
+    --shell-muted: 40 6% 66%;
+    --shell-border: 0 0% 15%;
+    --shell-active: 0 0% 12%;
+
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 0 0% 92%;
+    --sidebar-primary: 45 100% 65%;
+    --sidebar-primary-foreground: 0 0% 5%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 45 100% 65%;
   }
 
   .dark {
-    --background: 162 32% 6%;
-    --foreground: 140 16% 92%;
+    /* A step above the brand-black shell so the header and tab bar stay distinct. */
+    --background: 0 0% 7%;
+    --foreground: 40 10% 94%;
 
-    --card: 162 28% 9%;
-    --card-foreground: 140 16% 92%;
+    --card: 0 0% 10%;
+    --card-foreground: 40 10% 94%;
 
-    --popover: 162 28% 10%;
-    --popover-foreground: 140 16% 92%;
+    --popover: 0 0% 11%;
+    --popover-foreground: 40 10% 94%;
 
-    --primary: 152 44% 54%;
-    --primary-foreground: 162 40% 7%;
+    /* Gold carries actions on black */
+    --primary: 45 100% 65%;
+    --primary-foreground: 0 0% 5%;
 
-    --secondary: 160 22% 15%;
-    --secondary-foreground: 140 16% 92%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 40 10% 94%;
 
-    --muted: 160 22% 14%;
-    --muted-foreground: 150 10% 64%;
+    --muted: 0 0% 13%;
+    --muted-foreground: 40 4% 64%;
 
-    --accent: 160 22% 17%;
-    --accent-foreground: 140 16% 96%;
+    --accent: 40 20% 16%;
+    --accent-foreground: 40 10% 96%;
 
-    --carbon: 45 90% 60%;
-    --carbon-foreground: 162 40% 7%;
+    --carbon: 45 100% 65%;
+    --carbon-foreground: 0 0% 5%;
 
-    --destructive: 6 72% 58%;
-    --destructive-foreground: 0 0% 99%;
+    --destructive: 4 70% 60%;
+    --destructive-foreground: 0 0% 5%;
 
-    --success: 150 50% 50%;
-    --success-foreground: 162 40% 7%;
+    --success: 146 40% 52%;
+    --success-foreground: 0 0% 5%;
 
-    --warning: 38 92% 56%;
-    --warning-foreground: 162 40% 7%;
+    --warning: 42 90% 60%;
+    --warning-foreground: 0 0% 5%;
 
-    --border: 160 20% 18%;
-    --input: 160 20% 22%;
-    --ring: 152 44% 54%;
+    --border: 0 0% 17%;
+    --input: 0 0% 21%;
+    --ring: 45 100% 65%;
 
-    /* The shell keeps the same logbook green in both themes. */
-    --shell: 161 47% 12%;
-    --shell-foreground: 140 22% 95%;
-    --shell-muted: 152 16% 70%;
-    --shell-border: 160 34% 20%;
-    --shell-active: 160 38% 19%;
+    --chart-1: 45 100% 65%;
+    --chart-2: 40 10% 88%;
+    --chart-3: 36 66% 52%;
+    --chart-4: 220 2% 62%;
+    --chart-5: 4 70% 62%;
 
-    --sidebar-background: 161 47% 12%;
-    --sidebar-foreground: 140 22% 92%;
-    --sidebar-primary: 45 90% 60%;
-    --sidebar-primary-foreground: 162 40% 7%;
-    --sidebar-accent: 160 38% 19%;
-    --sidebar-accent-foreground: 140 22% 98%;
-    --sidebar-border: 160 34% 20%;
-    --sidebar-ring: 45 90% 60%;
+    --shell: 0 0% 4%;
+    --shell-foreground: 0 0% 98%;
+    --shell-muted: 40 6% 66%;
+    --shell-border: 0 0% 15%;
+    --shell-active: 0 0% 12%;
+
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 0 0% 92%;
+    --sidebar-primary: 45 100% 65%;
+    --sidebar-primary-foreground: 0 0% 5%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 45 100% 65%;
   }
 }
 
@@ -261,7 +282,7 @@
   /*
    * Legacy class names kept so every existing screen adopts the new world.
    * The gold gradients and glows are retired: primary actions are solid
-   * logbook green, emphasis comes from weight, not effects.
+   * brand dark gold, emphasis comes from weight, not effects.
    */
   .gradient-gold {
     background: hsl(var(--primary));

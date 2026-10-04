@@ -228,7 +228,7 @@ export function AppSidebar() {
     { title: 'Today', icon: Crown, path: '/executive-dashboard', roles: ['owner'] },
     { title: 'Dispatcher View', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['owner'] },
     { title: 'Driver View', icon: Truck, path: '/driver-dashboard', roles: ['owner'] },
-    { title: 'Maintenance View', icon: Wrench, path: '/maintenance-home', roles: ['owner'], feature: 'maintenance_full' },
+    { title: 'Shop View', icon: Wrench, path: '/maintenance-home', roles: ['owner'], feature: 'maintenance_full' },
   ] : [
     { title: 'My Dashboard', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['dispatcher'] },
     { title: 'My Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['driver'] },

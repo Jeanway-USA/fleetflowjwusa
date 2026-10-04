@@ -37,13 +37,13 @@ const PRIORITY_STYLES: Record<string, { badge: string; dot: string; label: strin
     label: 'Critical',
   },
   high: {
-    badge: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',
-    dot: 'bg-amber-500',
+    badge: 'bg-warning/15 text-foreground border-warning/50 dark:bg-warning/15 dark:text-warning dark:border-warning/50',
+    dot: 'bg-warning',
     label: 'High',
   },
   medium: {
-    badge: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
-    dot: 'bg-blue-500',
+    badge: 'bg-primary/10 text-foreground border-primary/40 dark:bg-primary/10 dark:text-primary dark:border-primary/40',
+    dot: 'bg-primary',
     label: 'Medium',
   },
   low: {
@@ -108,7 +108,7 @@ function ReportRow({ report, onViewTruck }: { report: DriverFaultReport; onViewT
               className="inline-flex items-center gap-1 font-semibold hover:underline"
             >
               <Truck className="h-3.5 w-3.5" />
-              Unit #{report.trucks?.unit_number ?? '—'}
+              Unit #{report.trucks?.unit_number ?? '?'}
             </button>
             <span className="text-muted-foreground">·</span>
             <span className="text-foreground">{DriverName(report)}</span>
@@ -134,7 +134,7 @@ function ReportRow({ report, onViewTruck }: { report: DriverFaultReport; onViewT
               </Badge>
             )}
             {linkedToWO && (
-              <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-emerald-500/40 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10">
+              <Badge variant="outline" className="text-[10px] uppercase tracking-wide border-success/40 text-success dark:text-success bg-success/10">
                 Linked WO
               </Badge>
             )}
@@ -254,19 +254,16 @@ export function DriverFaultReportsPanel({ onViewTruck }: DriverFaultReportsPanel
   return (
     <div
       className={cn(
-        'rounded-lg border bg-card overflow-hidden border-l-4',
-        hasCritical
-          ? 'border-l-destructive'
-          : hasHigh
-          ? 'border-l-amber-500'
-          : 'border-l-primary'
+        'rounded-lg border bg-card overflow-hidden',
+        // Red pen around the whole panel only when something is critical.
+        hasCritical ? 'border-destructive/60' : hasHigh ? 'border-warning/60' : 'border-border'
       )}
     >
       <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b bg-muted/30">
         <AlertTriangle
           className={cn(
             'h-4 w-4',
-            hasCritical ? 'text-destructive' : hasHigh ? 'text-amber-500' : 'text-primary'
+            hasCritical ? 'text-destructive' : hasHigh ? 'text-warning' : 'text-primary'
           )}
         />
         <h3 className="text-sm font-semibold">Incoming Driver Fault Reports</h3>
