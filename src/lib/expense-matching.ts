@@ -154,3 +154,57 @@ export function matchOneToOne(
     return best;
   });
 }
+
+// --------------------------------------------------------------------------
+// Per-trip totals: itemized lines against summed lines
+// --------------------------------------------------------------------------
+
+/** Charges that Landstar posts per trip, and that different exports split differently. */
+const TRIP_TOTAL_TYPES = new Set(['Advance', 'Card Fee']);
+
+/**
+ * The Freight Bill export sums a trip's card fees and pre-trip advances into one line each
+ * ($3.50, $1,900), dated by settlement; the contractor PDF itemizes them ($1.75 + $1.75,
+ * $1,500 + $400), dated by pickup. One-to-one matching cannot see that these are the same
+ * money, so a later upload filed it a second time.
+ *
+ * After normal matching, this pairs the leftovers: for each trip and type, if the incoming
+ * lines that found no match add up (to the cent) to the saved rows nothing else claimed,
+ * they are the same charges. All of those incoming lines point at the first saved row.
+ * Totals that differ are left alone, so a genuinely new charge is never swallowed.
+ *
+ * `matches` is the result of matchOneToOne; a new array is returned.
+ */
+export function matchTripTotals(
+  incoming: MatchableExpense[],
+  matches: number[],
+  candidates: MatchableExpense[],
+): number[] {
+  const result = [...matches];
+  const claimed = new Set(matches.filter((m) => m >= 0));
+  const groupKey = (e: MatchableExpense) => {
+    const trip = normTrip(e.trip_number);
+    return trip && e.expense_type && TRIP_TOTAL_TYPES.has(e.expense_type) ? `${trip}|${e.expense_type}` : null;
+  };
+
+  const incomingGroups = new Map<string, number[]>();
+  incoming.forEach((e, i) => {
+    const key = groupKey(e);
+    if (key && result[i] < 0) incomingGroups.set(key, [...(incomingGroups.get(key) ?? []), i]);
+  });
+  const candidateGroups = new Map<string, number[]>();
+  candidates.forEach((c, i) => {
+    const key = groupKey(c);
+    if (key && !claimed.has(i)) candidateGroups.set(key, [...(candidateGroups.get(key) ?? []), i]);
+  });
+
+  for (const [key, incomingIdx] of incomingGroups) {
+    const candidateIdx = candidateGroups.get(key);
+    if (!candidateIdx?.length) continue;
+    const incomingTotal = incomingIdx.reduce((s, i) => s + cents(incoming[i].amount), 0);
+    const candidateTotal = candidateIdx.reduce((s, i) => s + cents(candidates[i].amount), 0);
+    if (incomingTotal !== candidateTotal) continue;
+    incomingIdx.forEach((i) => { result[i] = candidateIdx[0]; });
+  }
+  return result;
+}

@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { extractJurisdictionFromVendor } from '@/lib/us-states';
 import type { ReconciliationResult, ReconciledExpense, RevenueTripMismatch } from '@/lib/settlement-reconciliation';
-import { matchOneToOne } from '@/lib/expense-matching';
+import { matchOneToOne, matchTripTotals } from '@/lib/expense-matching';
 
 interface FleetLoad {
   id: string;
@@ -60,15 +60,20 @@ interface ExpenseRow extends ReconciledExpense {
 function findDuplicateIds(
   buckets: ReconciledExpense[][],
   existingExpenses: ExistingExpense[],
+  existingLoads: FleetLoad[],
 ): string[][] {
   const flat = buckets.flat();
+  // A saved expense knows its trip only through its load.
+  const tripByLoadId = new Map(existingLoads.map((l) => [l.id, l.landstar_load_id]));
   const candidates = existingExpenses.map((e) => ({
     date: e.expense_date,
     expense_type: e.expense_type,
     amount: e.amount,
     description: e.description,
+    trip_number: e.load_id ? tripByLoadId.get(e.load_id) ?? null : null,
   }));
-  const matches = matchOneToOne(flat, candidates);
+  // Line by line first, then trip totals: a summed saved line against itemized incoming lines.
+  const matches = matchTripTotals(flat, matchOneToOne(flat, candidates), candidates);
   const ids = matches.map((i) => (i >= 0 ? existingExpenses[i].id : ''));
   const out: string[][] = [];
   let offset = 0;
@@ -132,7 +137,7 @@ export function ReconciliationPreview({
   const [editingIndex, setEditingIndex] = useState<{ tab: string; index: number } | null>(null);
 
   const [initialDupIds] = useState(() =>
-    findDuplicateIds([result.expenses, result.advances, result.credits], existingExpenses)
+    findDuplicateIds([result.expenses, result.advances, result.credits], existingExpenses, existingLoads)
   );
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>(() =>
     buildRows(result.expenses, existingLoads, trucks, initialDupIds[0], result.unitNumber)
