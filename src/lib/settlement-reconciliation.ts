@@ -581,9 +581,12 @@ export function reconcileRevenue(
     }
   }
 
-  // Pass 2: period total fallback
+  // Pass 2: period total fallback. Only meaningful when the upload carries statement revenue;
+  // an export with no revenue lines (Freight Bill Details, a year-to-date Settlement Details)
+  // has nothing to compare, and a zero statement total would be a false discrepancy.
+  const hasStatementRevenue = revenueByTrip.size > 0 || revenueWithoutTripTotal > 0;
   let period: RevenuePeriodCheck | null = null;
-  if (periodStart && periodEnd) {
+  if (periodStart && periodEnd && hasStatementRevenue) {
     // A load belongs to this statement if Landstar paid it here (its trip number is
     // on the statement) or it delivered inside the window. Using the window alone
     // flags false discrepancies for loads delivered just before/after the period.

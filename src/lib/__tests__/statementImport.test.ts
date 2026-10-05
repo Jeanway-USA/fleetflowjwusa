@@ -200,6 +200,39 @@ describe('reconcileDocuments — XLSX only', () => {
   });
 });
 
+describe('reconcileDocuments — revenue check needs statement revenue to compare', () => {
+  const loads = [
+    { id: 'l1', landstar_load_id: '9904275', origin: 'Lawton, OK', destination: 'Newnan, GA', rate: 2203.32, delivery_date: '2026-09-27' },
+    { id: 'l2', landstar_load_id: '1121039', origin: 'Morrow, GA', destination: 'Rockville, MD', rate: 2430.3, delivery_date: '2026-09-29' },
+  ];
+
+  it('a Freight Bill export (no revenue lines) raises no discrepancy against loads delivered that week', async () => {
+    // Freight Bill Details carries charges but no revenue, so there is nothing to compare loads against.
+    const fb = await parseLandstarXlsx(workbook([
+      { 'Settlement Date': 46295, 'Freight Bill #': '9904275', Description: 'CARD FEE', 'Transaction Amt': -1.75, Code: 'B' },
+      { 'Settlement Date': 46295, 'Freight Bill #': '9904275', Description: 'CARD PRE-TRIP', 'Transaction Amt': -1591.27, Code: 'V' },
+    ]));
+    const r = reconcileDocuments([staged('freight_bill_xlsx', fb.expenses, [fb.period_start, fb.period_end])], loads);
+    expect(r.revenue.period).toBeNull();
+    expect(r.revenue.tripMismatches).toEqual([]);
+    expect(r.revenue.hasBlockingDiscrepancy).toBe(false);
+  });
+
+  it('still compares against loads when the upload does carry statement revenue', () => {
+    const pdf: StagedFile = {
+      file: {} as File,
+      type: 'contractor_pdf',
+      status: 'parsed',
+      data: {
+        statement_type: 'contractor', period_start: '2026-09-24', period_end: '2026-09-30', unit_number: null, expenses: [],
+        revenue: [{ date: '2026-09-27', trip_number: '9904275', flat_rate: 1432.16, reimbursement_total: 0, description: 'TRACTOR L/H' }],
+      },
+    };
+    const r = reconcileDocuments([pdf], loads);
+    expect(r.revenue.period).not.toBeNull();
+  });
+});
+
 describe('latestSettlementWednesday', () => {
   it('finds the period-ending Wednesday', () => {
     expect(latestSettlementWednesday(new Date(2026, 9, 3))).toBe('2026-09-30'); // Sat
