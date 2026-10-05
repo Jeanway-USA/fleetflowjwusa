@@ -73,7 +73,7 @@ export function DriverRequestForm({
     }
 
     if (requestType === 'maintenance' && !truckId) {
-      toast.error('No truck assigned — cannot report a maintenance issue');
+      toast.error('No truck assigned, so a maintenance issue cannot be reported');
       return;
     }
 

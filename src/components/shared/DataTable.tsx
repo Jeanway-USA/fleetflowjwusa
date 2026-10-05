@@ -248,6 +248,16 @@ export function DataTable<T extends { id: string }>({
     return visibleColumns.map(col => col.width || defaultWidth);
   }, [visibleColumns]);
 
+  // Fixed layout splits leftover width equally, which crushes wide tables. Give every column
+  // a floor so the container scrolls sideways instead of overlapping headers and breaking words.
+  const tableMinWidth = useMemo(() => {
+    const columnsWidth = visibleColumns.reduce((sum, col) => {
+      const px = col.width && /px$/.test(col.width) ? parseInt(col.width, 10) : NaN;
+      return sum + (Number.isNaN(px) ? 130 : px);
+    }, 0);
+    return Math.max(640, columnsWidth + 80);
+  }, [visibleColumns]);
+
   const rowVirtualizer = useVirtualizer({
     count: sortedData.length,
     getScrollElement: () => scrollRef.current,
@@ -336,7 +346,7 @@ export function DataTable<T extends { id: string }>({
           </TooltipProvider>
         </div>
         <div className="rounded-lg border border-border">
-          <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
+          <table className="w-full caption-bottom" style={{ tableLayout: 'fixed', minWidth: tableMinWidth }}>
             <thead className="[&_tr]:border-b">
               <tr className="border-b transition-colors bg-muted/50">
                 {showSelection && <th className={cn(thClass, "w-10")} />}
@@ -567,7 +577,7 @@ export function DataTable<T extends { id: string }>({
           style={{ maxHeight: 600 }}
         >
           {useStaticLayout ? (
-            <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
+            <table className="w-full caption-bottom" style={{ tableLayout: 'fixed', minWidth: tableMinWidth }}>
               <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background">
                 <tr className="border-b border-border bg-transparent">
                   {showSelection && (
@@ -706,7 +716,7 @@ export function DataTable<T extends { id: string }>({
               </tbody>
             </table>
           ) : (
-          <table className="w-full caption-bottom min-w-[640px]" style={{ tableLayout: 'fixed' }}>
+          <table className="w-full caption-bottom" style={{ tableLayout: 'fixed', minWidth: tableMinWidth }}>
             <thead className="[&_tr]:border-b sticky top-0 z-10 bg-background" style={{ display: 'block' }}>
               <tr className="border-b transition-colors bg-muted/50" style={{ display: 'table', tableLayout: 'fixed', width: '100%' }}>
                 {showSelection && (

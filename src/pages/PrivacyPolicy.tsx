@@ -25,7 +25,7 @@ export default function PrivacyPolicy() {
           </Button>
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
             <img src={logoIcon} alt="" className="h-7 w-auto" />
-            <img src={textLogo} alt="FleetFlow TMS" className="h-7 w-auto" />
+            <img src={textLogo} alt="FleetFlow TMS" className="h-7 w-auto brightness-0 dark:brightness-100" />
           </div>
         </div>
       </header>

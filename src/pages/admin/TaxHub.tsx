@@ -245,7 +245,7 @@ function MultiStateTab({ year }: { year: number }) {
     <div className="space-y-4">
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Landmark className="h-5 w-5" /> Multi-State Overview — {year}</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Landmark className="h-5 w-5" /> Multi-State Overview, {year}</CardTitle>
         <CardDescription>
           Every state where you have workers assigned — regardless of tax obligation — with YTD wages, employer-side SUTA
           accrued, and employee-side SIT withheld. Click any state to update its rate, wage base, or agency account number.

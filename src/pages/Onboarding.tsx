@@ -246,7 +246,7 @@ export default function Onboarding() {
           <div className="w-20" />
           <div className="flex items-center gap-2">
             <img src={logoIcon} alt="" className="h-8 w-auto" />
-            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-8 w-auto" />
+            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-8 w-auto brightness-0 dark:brightness-100" />
           </div>
           <div className="w-20 flex justify-end">
             <Button

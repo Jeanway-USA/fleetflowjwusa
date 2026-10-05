@@ -516,7 +516,7 @@ export default function Drivers() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name, email, phone, CDL, Landstar ID…"
-                className="pl-9 pr-9"
+                className="pl-9 pr-9 sm:pl-9 sm:pr-9"
               />
               {search && (
                 <button

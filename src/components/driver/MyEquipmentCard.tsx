@@ -118,7 +118,7 @@ export function MyEquipmentCard({ driverId, assignedTruck }: MyEquipmentCardProp
             ) : (
               <div className="flex items-center gap-2 text-sm text-warning">
                 <AlertTriangle className="h-4 w-4" />
-                <span className="font-medium">No truck assigned — contact dispatch</span>
+                <span className="font-medium">No truck assigned. Contact dispatch</span>
               </div>
             )}
           </div>

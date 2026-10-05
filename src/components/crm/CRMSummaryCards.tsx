@@ -7,11 +7,11 @@ interface CRMSummaryCardsProps {
 }
 
 const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  broker: { label: 'Brokers', icon: Building2, color: 'text-blue-500' },
-  agent: { label: 'Agents', icon: Users, color: 'text-amber-500' },
-  shipper: { label: 'Shippers', icon: Warehouse, color: 'text-green-500' },
-  receiver: { label: 'Receivers', icon: Truck, color: 'text-purple-500' },
-  vendor: { label: 'Vendors', icon: Wrench, color: 'text-red-500' },
+  broker: { label: 'Brokers', icon: Building2, color: 'text-primary' },
+  agent: { label: 'Agents', icon: Users, color: 'text-primary' },
+  shipper: { label: 'Shippers', icon: Warehouse, color: 'text-primary' },
+  receiver: { label: 'Receivers', icon: Truck, color: 'text-primary' },
+  vendor: { label: 'Vendors', icon: Wrench, color: 'text-primary' },
 };
 
 export function CRMSummaryCards({ contacts }: CRMSummaryCardsProps) {

@@ -23,7 +23,7 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
       </Helmet>
       <div className="flex items-center justify-center gap-2 mb-8">
         <img src={logoIcon} alt="" className="h-10 w-auto" />
-        <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
+        <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto brightness-0 dark:brightness-100" />
       </div>
       {children}
     </div>

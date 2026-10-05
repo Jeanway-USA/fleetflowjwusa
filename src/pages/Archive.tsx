@@ -336,7 +336,7 @@ function ArchiveTab({ table }: { table: ArchivableTable }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={`Search archived ${label.plural.toLowerCase()}...`}
-          className="pl-9"
+          className="pl-9 sm:pl-9"
         />
       </div>
 

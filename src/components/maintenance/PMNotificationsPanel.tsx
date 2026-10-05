@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { forwardRef, useState, type ComponentPropsWithoutRef } from 'react';
 import { usePMNotifications, useMarkPMNotificationRead, useDismissPMNotification, useMarkAllPMNotificationsRead, PMNotification } from '@/hooks/usePMNotifications';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -201,7 +201,7 @@ export function PMNotificationsPanel({ onViewTruck }: PMNotificationsPanelProps)
 }
 
 // Compact bell icon with badge for use in headers
-export function PMNotificationsBell({ onClick }: { onClick?: () => void }) {
+export const PMNotificationsBell = forwardRef<HTMLButtonElement, ComponentPropsWithoutRef<typeof Button>>(function PMNotificationsBell(props, ref) {
   const { data: notifications } = usePMNotifications();
   
   const overdueCount = notifications?.filter(n => n.notification_type === 'overdue' && !n.is_read).length || 0;
@@ -210,10 +210,11 @@ export function PMNotificationsBell({ onClick }: { onClick?: () => void }) {
 
   return (
     <Button
+      ref={ref}
       variant="ghost"
       size="icon"
-      className="relative"
-      onClick={onClick}
+      {...props}
+      className={cn('relative', props.className)}
     >
       <Bell className={cn(
         'h-5 w-5',
@@ -232,4 +233,4 @@ export function PMNotificationsBell({ onClick }: { onClick?: () => void }) {
       )}
     </Button>
   );
-}
+});

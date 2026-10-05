@@ -1030,8 +1030,8 @@ export default function FleetLoads() {
           ) : (
           <DataTable
             columns={[
-              { key: 'pickup_date', header: 'Date', render: (load: any) => (load.pickup_at || load.pickup_date) ? <StopTime utcIso={load.pickup_at} tz={load.pickup_tz} legacyDate={load.pickup_date} legacyTime={load.pickup_time} dateOnly /> : '-' },
-              { key: 'landstar_load_id', header: isLandstar ? 'Landstar ID' : 'Load ID', hiddenOnMobile: true, render: (load: any) => (
+              { key: 'pickup_date', width: '100px', header: 'Date', render: (load: any) => (load.pickup_at || load.pickup_date) ? <StopTime utcIso={load.pickup_at} tz={load.pickup_tz} legacyDate={load.pickup_date} legacyTime={load.pickup_time} dateOnly /> : '-' },
+              { key: 'landstar_load_id', width: '130px', header: isLandstar ? 'Landstar ID' : 'Load ID', hiddenOnMobile: true, render: (load: any) => (
                 <div className="flex items-center gap-1.5">
                   <span className="font-mono">{load.landstar_load_id || '-'}</span>
                   {load.is_in_bond && (
@@ -1041,7 +1041,7 @@ export default function FleetLoads() {
                   )}
                 </div>
               ) },
-              { key: 'tracking_id', header: 'Tracking ID', hiddenOnMobile: true, render: (load: any) => 
+              { key: 'tracking_id', width: '120px', header: 'Tracking ID', hiddenOnMobile: true, render: (load: any) => 
                 load.tracking_id ? (
                   <span 
                     className="font-mono text-xs cursor-pointer hover:text-primary truncate max-w-[120px] inline-block"
@@ -1056,8 +1056,8 @@ export default function FleetLoads() {
                   </span>
                 ) : <span className="text-muted-foreground">-</span>
               },
-              { key: 'agency_code', header: 'Agent', hiddenOnMobile: true, render: (load: any) => <span className="font-mono text-xs">{load.agency_code || '-'}</span> },
-              { key: 'origin', header: 'Origin', wrap: true, render: (load: any) => {
+              { key: 'agency_code', width: '80px', header: 'Agent', hiddenOnMobile: true, render: (load: any) => <span className="font-mono text-xs">{load.agency_code || '-'}</span> },
+              { key: 'origin', width: '160px', header: 'Origin', wrap: true, render: (load: any) => {
                 const addr = formatAddressDisplay(load.origin);
                 if (typeof addr === 'string') return addr;
                 return (
@@ -1067,7 +1067,7 @@ export default function FleetLoads() {
                   </div>
                 );
               }},
-              { key: 'destination', header: 'Destination', wrap: true, render: (load: any) => {
+              { key: 'destination', width: '160px', header: 'Destination', wrap: true, render: (load: any) => {
                 const addr = formatAddressDisplay(load.destination);
                 if (typeof addr === 'string') return addr;
                 return (
@@ -1077,18 +1077,18 @@ export default function FleetLoads() {
                   </div>
                 );
               }},
-              { key: 'rate', header: 'Rate', render: (load: any) => <span className="text-right">{formatCurrency(load.rate)}</span> },
-              { key: 'fuel_surcharge', header: 'FSC', hiddenOnMobile: true, render: (load: any) => formatCurrency(load.fuel_surcharge) },
-              { key: 'accessorials_total', header: 'Accessorials', hiddenOnMobile: true, render: (load: any) => formatCurrency(getLoadAccessorialsTotal(load.id)) },
-              { key: 'net_revenue', header: 'Net Revenue', render: (load: any) => <span className="font-medium text-success">{formatCurrency(load.net_revenue)}</span> },
-              { key: 'miles', header: 'Miles', render: (load: any) => 
+              { key: 'rate', width: '100px', header: 'Rate', render: (load: any) => <span className="text-right">{formatCurrency(load.rate)}</span> },
+              { key: 'fuel_surcharge', width: '90px', header: 'FSC', hiddenOnMobile: true, render: (load: any) => formatCurrency(load.fuel_surcharge) },
+              { key: 'accessorials_total', width: '120px', header: 'Accessorials', hiddenOnMobile: true, render: (load: any) => formatCurrency(getLoadAccessorialsTotal(load.id)) },
+              { key: 'net_revenue', width: '120px', header: 'Net Revenue', render: (load: any) => <span className="font-medium text-success">{formatCurrency(load.net_revenue)}</span> },
+              { key: 'miles', width: '80px', header: 'Miles', render: (load: any) => 
                 (load.actual_miles && load.actual_miles > 0) 
                   ? load.actual_miles.toLocaleString() 
                   : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : '-')
               },
-              { key: 'status', header: 'Status', render: (load: any) => <StatusBadge status={load.status} /> },
+              { key: 'status', width: '130px', header: 'Status', render: (load: any) => <StatusBadge status={load.status} /> },
               {
-                key: 'driver_name',
+                key: 'driver_name', width: '150px',
                 header: 'Driver',
                 sortable: true,
                 filter: { type: 'text', accessor: (l: any) => l.driver_name },
@@ -1099,7 +1099,7 @@ export default function FleetLoads() {
                 ),
               },
               {
-                key: 'truck_unit',
+                key: 'truck_unit', width: '100px',
                 header: 'Truck #',
                 sortable: true,
                 filter: { type: 'text', accessor: (l: any) => l.truck_unit },
@@ -1109,7 +1109,7 @@ export default function FleetLoads() {
                     : <span className="text-muted-foreground italic">Unassigned</span>
                 ),
               },
-              { key: 'actions', header: '', render: (load: any) => (
+              { key: 'actions', width: '56px', header: '', render: (load: any) => (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>

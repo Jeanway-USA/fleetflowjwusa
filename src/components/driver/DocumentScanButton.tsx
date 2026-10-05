@@ -210,7 +210,7 @@ export function DocumentScanButton({ driverId }: DocumentScanButtonProps) {
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="h-16 flex-col gap-1 w-full">
+        <Button variant="outline" className="h-auto min-h-16 flex-col gap-1 py-3 w-full">
           <Camera className="h-5 w-5" />
           <span className="text-xs">Scan Doc</span>
         </Button>

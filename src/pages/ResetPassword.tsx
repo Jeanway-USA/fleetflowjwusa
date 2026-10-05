@@ -82,7 +82,7 @@ export default function ResetPassword() {
         <div className="w-full max-w-md">
           <div className="flex items-center justify-center gap-2 mb-8">
             <img src={logoIcon} alt="" className="h-10 w-auto" />
-            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
+            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto brightness-0 dark:brightness-100" />
           </div>
 
           <Card className="border-border bg-card">
@@ -113,7 +113,7 @@ export default function ResetPassword() {
         <div className="w-full max-w-md">
           <div className="flex items-center justify-center gap-2 mb-8">
             <img src={logoIcon} alt="" className="h-10 w-auto" />
-            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
+            <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto brightness-0 dark:brightness-100" />
           </div>
 
           <Card className="border-border bg-card">
@@ -144,7 +144,7 @@ export default function ResetPassword() {
         </Helmet>
         <div className="flex items-center justify-center gap-2 mb-8">
           <img src={logoIcon} alt="" className="h-10 w-auto" />
-          <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto" />
+          <img src={textLogo} alt="FleetFlow TMS by JeanWay USA" className="h-10 w-auto brightness-0 dark:brightness-100" />
         </div>
 
         <Card className="border-border bg-card">

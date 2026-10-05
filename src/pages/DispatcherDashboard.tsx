@@ -153,10 +153,10 @@ export default function DispatcherDashboard() {
   }, []);
 
   const statCards = [
-    { label: 'Active Loads', value: stats?.activeLoads ?? 0, icon: Package, color: 'text-blue-500' },
-    { label: 'Available Drivers', value: stats?.availableDrivers ?? 0, icon: Users, color: 'text-green-500' },
-    { label: 'Active Trucks', value: stats?.activeTrucks ?? 0, icon: Truck, color: 'text-amber-500' },
-    { label: 'Timezone', value: timezone, icon: Clock, color: 'text-purple-500' },
+    { label: 'Active Loads', value: stats?.activeLoads ?? 0, icon: Package, color: 'text-primary' },
+    { label: 'Available Drivers', value: stats?.availableDrivers ?? 0, icon: Users, color: 'text-primary' },
+    { label: 'Active Trucks', value: stats?.activeTrucks ?? 0, icon: Truck, color: 'text-primary' },
+    { label: 'Timezone', value: timezone.split('/').pop()?.replace(/_/g, ' ') ?? timezone, title: timezone, icon: Clock, color: 'text-primary' },
   ];
 
   return (
@@ -185,7 +185,7 @@ export default function DispatcherDashboard() {
               <div className="flex items-center justify-between">
                 <div className="min-w-0">
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold mt-1 truncate">{stat.value}</p>
+                  <p className="text-2xl font-bold mt-1 truncate" title={(stat as { title?: string }).title}>{stat.value}</p>
                 </div>
                 <stat.icon className={`h-8 w-8 ${stat.color} opacity-80 shrink-0`} />
               </div>
