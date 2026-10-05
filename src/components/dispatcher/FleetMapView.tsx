@@ -118,6 +118,36 @@ function readOverlays(): OverlayState {
   }
 }
 
+/** Douglas-Peucker line simplification. Tolerance is in degrees (0.0003 is roughly 30 m). */
+function simplifyLine(points: [number, number][], tolerance: number): [number, number][] {
+  if (points.length <= 2) return points;
+  const keep = new Uint8Array(points.length);
+  keep[0] = 1;
+  keep[points.length - 1] = 1;
+  const stack: [number, number][] = [[0, points.length - 1]];
+  while (stack.length) {
+    const [first, last] = stack.pop()!;
+    const [ax, ay] = points[first];
+    const [bx, by] = points[last];
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lenSq = dx * dx + dy * dy;
+    let maxDist = 0;
+    let index = -1;
+    for (let i = first + 1; i < last; i++) {
+      const [px, py] = points[i];
+      const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+      const dist = Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+      if (dist > maxDist) { maxDist = dist; index = i; }
+    }
+    if (index !== -1 && maxDist > tolerance) {
+      keep[index] = 1;
+      stack.push([first, index], [index, last]);
+    }
+  }
+  return points.filter((_, i) => keep[i] === 1);
+}
+
 export function FleetMapView() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -1070,7 +1100,8 @@ function MapboxCanvas({
 
       // Traffic off (or no congestion data): one continuous line per load
       if (!overlays.traffic || !congestion || congestion.length === 0) {
-        push(coords, 'unknown');
+        // Dense road geometry overflows Mapbox's per-bucket vertex limit; simplify while no congestion colors are needed.
+        push(simplifyLine(coords, 0.0003), 'unknown');
         return;
       }
 

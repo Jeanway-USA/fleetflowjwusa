@@ -72,7 +72,7 @@ export default function Settings() {
       )}
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="mb-6 flex-wrap">
+        <TabsList className="mb-6 w-full justify-start overflow-x-auto">
           <TabsTrigger value="general" className="flex items-center gap-2">
             <SettingsIcon className="h-4 w-4" />
             General
@@ -85,7 +85,7 @@ export default function Settings() {
 
         <TabsContent value="general" className="w-full">
           <Tabs defaultValue="users" className="w-full">
-            <TabsList className="mb-6 flex-wrap">
+            <TabsList className="mb-6 w-full justify-start overflow-x-auto">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 Team

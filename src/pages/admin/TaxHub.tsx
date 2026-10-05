@@ -1,3 +1,4 @@
+import { PageHeader } from '@/components/shared/PageHeader';
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -817,14 +818,12 @@ export default function TaxHub() {
   }, [now]);
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Tax Hub</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Multi-state employer tax tracking and IRS-accurate W-2 / 1099-NEC generation for every driver and contractor.
-          </p>
-        </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Tax Hub"
+        description="Multi-state employer tax tracking and IRS-accurate W-2 / 1099-NEC generation for every driver and contractor."
+        hideNotifications
+      >
         <div className="flex items-center gap-2">
           <Label className="text-sm">Tax year</Label>
           <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
@@ -834,7 +833,7 @@ export default function TaxHub() {
             </SelectContent>
           </Select>
         </div>
-      </div>
+      </PageHeader>
 
       <EmployerCard />
 

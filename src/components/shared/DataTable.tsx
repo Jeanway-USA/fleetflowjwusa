@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LucideIcon } from 'lucide-react';
 
@@ -243,20 +244,27 @@ export function DataTable<T extends { id: string }>({
     });
   }, []);
 
+  // Columns marked hiddenOnMobile are display:none on phones, so they must not claim width there.
+  const isMobile = useIsMobile();
+  const displayedColumns = useMemo(
+    () => (isMobile ? visibleColumns.filter(col => !col.hiddenOnMobile) : visibleColumns),
+    [visibleColumns, isMobile],
+  );
+
   const computedWidths = useMemo(() => {
-    const defaultWidth = `${100 / visibleColumns.length}%`;
+    const defaultWidth = `${100 / displayedColumns.length}%`;
     return visibleColumns.map(col => col.width || defaultWidth);
-  }, [visibleColumns]);
+  }, [visibleColumns, displayedColumns]);
 
   // Fixed layout splits leftover width equally, which crushes wide tables. Give every column
   // a floor so the container scrolls sideways instead of overlapping headers and breaking words.
   const tableMinWidth = useMemo(() => {
-    const columnsWidth = visibleColumns.reduce((sum, col) => {
+    const columnsWidth = displayedColumns.reduce((sum, col) => {
       const px = col.width && /px$/.test(col.width) ? parseInt(col.width, 10) : NaN;
       return sum + (Number.isNaN(px) ? 130 : px);
     }, 0);
     return Math.max(640, columnsWidth + 80);
-  }, [visibleColumns]);
+  }, [displayedColumns]);
 
   const rowVirtualizer = useVirtualizer({
     count: sortedData.length,

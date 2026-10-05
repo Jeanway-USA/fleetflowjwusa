@@ -196,22 +196,22 @@ export default function DispatcherDashboard() {
 
       {/* Tabbed Interface */}
       <Tabs defaultValue="command-center" className="w-full">
-        <TabsList className="w-full justify-start bg-transparent p-0 h-auto border-b border-border rounded-none gap-1">
+        <TabsList className="w-full justify-start overflow-x-auto bg-transparent p-0 h-auto border-b border-border rounded-none gap-1">
           <TabsTrigger
             value="command-center"
-            className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
+            className="rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
           >
             Command Center
           </TabsTrigger>
           <TabsTrigger
             value="dispatch-board"
-            className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
+            className="rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
           >
             Dispatch Board
           </TabsTrigger>
           <TabsTrigger
             value="fleet-roster"
-            className="rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
+            className="rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
           >
             Fleet Roster
           </TabsTrigger>

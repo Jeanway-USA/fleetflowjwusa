@@ -265,19 +265,19 @@ export default function Incidents() {
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Critical/Major</CardTitle>
-            <Car className="h-4 w-4 text-destructive" />
+            <Car className={`h-4 w-4 ${stats.critical > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{stats.critical}</div>
+            <div className={`text-2xl font-bold ${stats.critical > 0 ? 'text-destructive' : ''}`}>{stats.critical}</div>
           </CardContent>
         </Card>
         <Card className="card-elevated">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">With Injuries</CardTitle>
-            <Users className="h-4 w-4 text-destructive" />
+            <Users className={`h-4 w-4 ${stats.withInjuries > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{stats.withInjuries}</div>
+            <div className={`text-2xl font-bold ${stats.withInjuries > 0 ? 'text-destructive' : ''}`}>{stats.withInjuries}</div>
           </CardContent>
         </Card>
       </div>

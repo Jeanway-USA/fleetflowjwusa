@@ -828,7 +828,7 @@ export default function IFTA() {
             <DollarSign className="h-4 w-4 text-warning" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${summary.taxOwed >= 0 ? 'text-destructive' : 'text-success'}`}>
+            <div className={`text-2xl font-bold ${summary.taxOwed > 0 ? 'text-destructive' : summary.taxOwed < 0 ? 'text-success' : ''}`}>
               {formatCurrency(Math.abs(summary.taxOwed))}
             </div>
             <p className="text-xs text-muted-foreground">{summary.taxOwed >= 0 ? 'Owed' : 'Credit'}</p>
@@ -858,7 +858,7 @@ export default function IFTA() {
       )}
 
       <Tabs defaultValue="fuel" className="w-full">
-        <TabsList>
+        <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="fuel" className="gap-1.5">
             Fuel Purchases
             {filteredFuelPurchases.length > 0 && (
@@ -885,12 +885,12 @@ export default function IFTA() {
 
         <TabsContent value="fuel" className="mt-6">
           <Card className="card-elevated">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <CardTitle>Fuel Purchases</CardTitle>
                 <CardDescription>Track all fuel purchases with jurisdiction</CardDescription>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   onClick={syncFuelFromExpenses}
                   disabled={isSyncing}

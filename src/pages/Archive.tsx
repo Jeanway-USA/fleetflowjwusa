@@ -420,7 +420,7 @@ export default function Archive() {
         onValueChange={(v) => setTab(v as ArchivableTable)}
         className="space-y-4"
       >
-        <TabsList className="flex-wrap h-auto">
+        <TabsList className="h-auto w-full justify-start overflow-x-auto">
           {accessibleTables.map((t) => (
             <TabsTrigger key={t} value={t}>
               {TABLE_LABELS[t].plural}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShieldCheck } from 'lucide-react';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { MetricsSnapshot } from '@/components/audit/MetricsSnapshot';
 import { AuditFilters } from '@/components/audit/AuditFilters';
 import { LiveActivityFeed } from '@/components/audit/LiveActivityFeed';
@@ -12,18 +12,12 @@ export default function AuditTrail() {
   const { data: rows = [], isLoading } = useAuditLogs(filters);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-10">
-      <div className="flex items-center gap-3">
-        <div className="bg-primary/10 p-2 rounded-md">
-          <ShieldCheck className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold">Audit Trail</h1>
-          <p className="text-sm text-muted-foreground">
-            Immutable, append-only record of every change across fleet, drivers, and settlements.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6 pb-10">
+      <PageHeader
+        title="Audit Trail"
+        description="Immutable, append-only record of every change across fleet, drivers, and settlements."
+        hideNotifications
+      />
 
       <MetricsSnapshot />
 

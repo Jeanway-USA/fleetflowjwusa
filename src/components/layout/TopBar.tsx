@@ -46,6 +46,8 @@ const ROUTE_LABELS: Record<string, string> = {
   '/driver-settings': 'My Settings',
   '/super-admin': 'Super Admin',
   '/archive': 'Archive',
+  '/audit-trail': 'Audit Trail',
+  '/admin/tax-hub': 'Tax Hub',
 };
 
 const ROUTE_GROUPS: Record<string, { label: string; path: string }> = {
@@ -58,6 +60,7 @@ const ROUTE_GROUPS: Record<string, { label: string; path: string }> = {
   '/insights': { label: 'Money', path: '/finance' },
   '/ifta': { label: 'Money', path: '/finance' },
   '/crm': { label: 'Operations', path: '/crm' },
+  '/admin/tax-hub': { label: 'Money', path: '/finance' },
   '/maintenance': { label: 'Shop', path: '/maintenance-home' },
   '/documents': { label: 'Operations', path: '/documents' },
   '/safety': { label: 'Operations', path: '/safety' },
@@ -77,7 +80,7 @@ export function TopBar({ onReplayTour, hasTour }: TopBarProps) {
 
   const pathSegment = '/' + location.pathname.split('/')[1];
   const pageLabel = ROUTE_LABELS[pathSegment] || ROUTE_LABELS[location.pathname];
-  const group = ROUTE_GROUPS[pathSegment];
+  const group = ROUTE_GROUPS[pathSegment] || ROUTE_GROUPS[location.pathname];
 
   const openSearch = () =>
     window.dispatchEvent(new CustomEvent('open-command-palette'));
