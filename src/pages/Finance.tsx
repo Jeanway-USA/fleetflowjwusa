@@ -28,6 +28,7 @@ import { AuditReconciliation } from '@/components/finance/AuditReconciliation';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
 import { SettlementStatementTab } from '@/components/finance/SettlementStatementTab';
+import { fuelStats } from '@/lib/pl-metrics';
 const RevenueTab = lazy(() =>
   import('@/components/finance/RevenueTab').then(m => ({ default: m.RevenueTab })),
 );
@@ -550,46 +551,6 @@ export default function Finance() {
       </div>
   );
 
-  const summarySection = (
-      (() => {
-        const activeLoanTrucks = trucks.filter((t: any) => t.status === 'active' && t.monthly_payment != null && t.monthly_payment > 0);
-        const monthlyTruckPayment = activeLoanTrucks.reduce((sum: number, t: any) => sum + (t.monthly_payment || 0), 0);
-        const costs = totalExpenses + totalPayroll;
-        const row = (label: string, value: string, opts: { note?: React.ReactNode; strong?: boolean; muted?: boolean; rule?: 'single' | 'double' } = {}) => (
-          <div className={`flex items-baseline gap-3 py-2.5 ${opts.rule === 'single' ? 'border-t' : ''} ${opts.rule === 'double' ? 'border-t-[3px] border-double border-foreground/70' : ''}`}>
-            <div className="min-w-0 flex-1">
-              <div className={`text-[15px] ${opts.strong ? 'font-semibold' : ''}`}>{label}</div>
-              {opts.note && <div className="text-[13px] text-muted-foreground">{opts.note}</div>}
-            </div>
-            <div className={`figure shrink-0 text-right ${opts.strong ? 'text-2xl font-bold' : 'text-lg font-semibold'} ${opts.muted ? 'text-muted-foreground' : ''}`}>{value}</div>
-          </div>
-        );
-        return (
-          <section aria-label="Money for the selected period" className="mb-5 rounded-lg border bg-card px-4 pt-1 pb-2 md:max-w-2xl">
-            {row('Truck revenue', formatCurrency(revenueTotals.netRevenue), {
-              note: `${revenueTotals.loadCount} load${revenueTotals.loadCount === 1 ? '' : 's'} delivered, ${formatCurrency(revenueTotals.grossRevenue)} gross`,
-            })}
-            {row('Recorded expenses', costs > 0 ? `−${formatCurrency(costs)}` : 'None yet', {
-              muted: true,
-              note: costs > 0
-                ? <>{truckPaymentsTotal > 0 ? `Includes ${formatCurrency(truckPaymentsTotal)} in truck payments` : 'Operating and payroll'}{creditsTotal > 0 ? `, after ${formatCurrency(creditsTotal)} in credits` : ''}</>
-                : 'Nothing entered or imported for this period',
-            })}
-            {row('Profit, recorded costs', formatCurrency(netProfit), {
-              strong: true,
-              rule: 'double',
-              note: costs > 0 ? `${profitMargin.toFixed(1)}% of truck revenue` : 'Will drop as expenses are recorded',
-            })}
-            <p className="border-t pt-2 pb-1 text-[13px] text-muted-foreground tabular-nums">
-              Truck payment {formatCurrency(monthlyTruckPayment)} a month, {activeLoanTrucks.length} truck{activeLoanTrucks.length === 1 ? '' : 's'} financed.
-              {advancesTotal > 0 && <> Advances {formatCurrency(advancesTotal)} are not counted as expenses.</>}
-              {' '}Today's estimate uses your cost per mile instead.
-            </p>
-          </section>
-        );
-      })()
-  );
-
   const VIEWS = ['settlement', 'pnl', 'expenses', 'payroll', 'settings'];
   // Old links used these names; keep them working.
   const VIEW_ALIASES: Record<string, string> = { payouts: 'payroll', compliance: 'expenses', analytics: 'pnl', settlements: 'settlement', 'inhouse-payroll': 'payroll' };
@@ -668,10 +629,7 @@ export default function Finance() {
         {/* ===== PROFIT & LOSS ===== */}
         <TabsContent value="pnl">
           <div className="space-y-8 animate-in fade-in-50">
-            <div>
-              {renderFilters()}
-              {summarySection}
-            </div>
+            {renderFilters()}
             <PLSummaryTab
               revenueTotals={revenueTotals}
               loadExpenseTotals={loadExpenseTotals}
@@ -686,6 +644,10 @@ export default function Finance() {
               profitMargin={profitMargin}
               totalExpenses={totalExpenses}
               totalRevenueWithCommissions={totalRevenueWithCommissions}
+              fuel={fuelStats(filteredExpenses)}
+              truckPaymentsTotal={truckPaymentsTotal}
+              advancesTotal={advancesTotal}
+              creditsTotal={creditsTotal}
               getSetting={getSetting}
             />
             <Suspense fallback={<ChartSkeleton height={320} />}>
