@@ -409,7 +409,7 @@ export function ReconciliationPreview({
               <TableCell className="text-sm max-w-40 truncate" title={row.description}>
                 {row.vendor || row.description}
                 {row.gallons && (
-                  <span className="text-xs text-muted-foreground ml-1">({row.gallons.toFixed(1)} gal)</span>
+                  <span className="text-xs text-muted-foreground ml-1">({row.gallons.toFixed(2)} gal)</span>
                 )}
               </TableCell>
               <TableCell className={cn('text-right font-mono text-sm font-medium', colorClass)}>

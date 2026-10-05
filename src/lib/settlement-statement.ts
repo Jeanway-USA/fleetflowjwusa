@@ -132,7 +132,8 @@ function isCashToBank(e: StatementExpense): boolean {
 /** Fuel, DEF, discounts and scale tickets paid with the card. */
 function isCardPurchase(e: StatementExpense): boolean {
   if (CARD_USE_TYPES.has(e.expense_type)) return true;
-  return e.expense_type === 'PrePass/Scale' && /cat scale/i.test(e.description ?? '');
+  // Scale tickets paid with the card, whichever type the importer filed them under.
+  return /cat scale/i.test(e.description ?? '');
 }
 
 export interface BuildStatementOptions {

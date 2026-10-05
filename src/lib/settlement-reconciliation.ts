@@ -155,6 +155,37 @@ export function detectFileType(file: File): StagedFile['type'] {
   return 'unknown';
 }
 
+/** True when a PDF's filename says which statement it is, so a same-type file can safely replace it. */
+function pdfNameSaysType(name: string): boolean {
+  return /card[s_-]*activity|contractor|bco|statement/i.test(name);
+}
+
+/**
+ * Add newly chosen files to the staged list. A file replaces an earlier file of the same
+ * detected type, except PDFs whose names do not say what they are (Landstar's downloads are
+ * named like Batch#DO0000014J): both would be guessed as the same type and the second would
+ * silently replace the first. Their real type is read from the parsed statement.
+ */
+export function mergeStagedFiles(prev: StagedFile[], added: StagedFile[]): StagedFile[] {
+  const updated = [...prev];
+  for (const ns of added) {
+    const ambiguousPdf = ns.file.name.toLowerCase().endsWith('.pdf') && !pdfNameSaysType(ns.file.name);
+    const existingIdx = updated.findIndex((s) =>
+      ambiguousPdf ? s.file.name === ns.file.name : s.type === ns.type,
+    );
+    if (existingIdx >= 0) updated[existingIdx] = ns;
+    else updated.push(ns);
+  }
+  return updated;
+}
+
+/** What the parser says a PDF is, which beats guessing from its filename. */
+export function typeFromParsedPdf(statementType: unknown, guessed: StagedFile['type']): StagedFile['type'] {
+  if (statementType === 'card_activity') return 'card_activity_pdf';
+  if (statementType === 'contractor') return 'contractor_pdf';
+  return guessed;
+}
+
 /**
  * Main reconciliation engine.
  * Takes parsed results from multiple documents and merges/deduplicates them.
@@ -199,7 +230,9 @@ export function reconcileDocuments(
     const isXlsx = sf.type === 'settlement_xlsx' || sf.type === 'freight_bill_xlsx';
     for (const exp of data.expenses) {
       if (sf.type === 'contractor_pdf' && !isContractorCharge(exp)) continue;
-      const line = { ...exp, source: sourceLabel, sourceType: sf.type };
+      // The parser files card scale tickets under Misc; they are scale charges like PrePass.
+      const expense_type = exp.expense_type === 'Misc' && /\bcat\s*scale\b/i.test(exp.description) ? 'PrePass/Scale' : exp.expense_type;
+      const line = { ...exp, expense_type, source: sourceLabel, sourceType: sf.type };
       if (isXlsx && hasContractorPdf) xlsxLines.push(line);
       else allExpenses.push(line);
     }

@@ -4,6 +4,8 @@ import { parseLandstarXlsx } from '@/lib/parse-landstar-xlsx';
 import {
   reconcileDocuments,
   latestSettlementWednesday,
+  mergeStagedFiles,
+  typeFromParsedPdf,
   type StagedFile,
   type ExtractedExpense,
 } from '@/lib/settlement-reconciliation';
@@ -230,6 +232,49 @@ describe('reconcileDocuments — revenue check needs statement revenue to compar
     };
     const r = reconcileDocuments([pdf], loads);
     expect(r.revenue.period).not.toBeNull();
+  });
+});
+
+describe('card scale tickets', () => {
+  it('files a CAT Scale line the parser called Misc under PrePass/Scale', () => {
+    const card = staged('card_activity_pdf', [exp({ date: '2026-09-23', amount: 15.25, description: 'CAT Scale MOCKSVILLE NC' })]);
+    const r = reconcileDocuments([card]);
+    expect(r.expenses.find((e) => /CAT Scale/.test(e.description))?.expense_type).toBe('PrePass/Scale');
+  });
+});
+
+describe('staging statement files', () => {
+  const file = (name: string, type: StagedFile['type']): StagedFile => ({ file: { name } as File, type, status: 'pending' });
+
+  it('keeps both of Landstar\'s unnamed Batch# PDFs instead of letting the second replace the first', () => {
+    const merged = mergeStagedFiles([], [
+      file('Batch#DO0000014J.pdf', 'contractor_pdf'),
+      file('Batch#DO0000014J (1).pdf', 'contractor_pdf'),
+    ]);
+    expect(merged).toHaveLength(2);
+  });
+
+  it('still lets a clearly named statement replace an older one of the same type', () => {
+    const merged = mergeStagedFiles(
+      [file('Card Activity Statement 9-23.pdf', 'card_activity_pdf')],
+      [file('Card Activity Statement 9-30.pdf', 'card_activity_pdf')],
+    );
+    expect(merged).toHaveLength(1);
+    expect(merged[0].file.name).toBe('Card Activity Statement 9-30.pdf');
+  });
+
+  it('replaces a spreadsheet of the same type', () => {
+    const merged = mergeStagedFiles(
+      [file('Settlement Details.xlsx', 'settlement_xlsx')],
+      [file('Settlement Details (1).xlsx', 'settlement_xlsx')],
+    );
+    expect(merged.map((m) => m.file.name)).toEqual(['Settlement Details (1).xlsx']);
+  });
+
+  it('takes a PDF\'s type from the parser, not its filename', () => {
+    expect(typeFromParsedPdf('card_activity', 'contractor_pdf')).toBe('card_activity_pdf');
+    expect(typeFromParsedPdf('contractor', 'card_activity_pdf')).toBe('contractor_pdf');
+    expect(typeFromParsedPdf(undefined, 'contractor_pdf')).toBe('contractor_pdf');
   });
 });
 
