@@ -91,15 +91,26 @@ export function SafetyBonusPayouts() {
     queryKey: ['safety-bonus-payouts', orgId, periodStart],
     enabled: !!orgId,
     queryFn: async () => {
+      // No foreign key links payouts to drivers in the database, so a joined select is rejected
+      // (400). Load the payouts, then attach each driver's name here.
       const { data, error } = await supabase
         .from('safety_bonus_payouts')
-        .select('*, drivers:driver_id ( first_name, last_name )')
+        .select('*')
         .eq('org_id', orgId!)
         .eq('period_start', periodStart)
         .is('deleted_at', null)
         .order('earned_amount', { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      const rows = data ?? [];
+      const driverIds = [...new Set(rows.map((r) => r.driver_id).filter(Boolean))] as string[];
+      if (driverIds.length === 0) return rows.map((r) => ({ ...r, drivers: null as { first_name: string; last_name: string } | null }));
+      const { data: driverRows, error: driversError } = await supabase
+        .from('drivers')
+        .select('id, first_name, last_name')
+        .in('id', driverIds);
+      if (driversError) throw driversError;
+      const byId = new Map((driverRows ?? []).map((d) => [d.id, { first_name: d.first_name, last_name: d.last_name }]));
+      return rows.map((r) => ({ ...r, drivers: byId.get(r.driver_id) ?? null }));
     },
   });
 

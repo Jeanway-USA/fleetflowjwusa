@@ -79,7 +79,7 @@ export function CostBreakdownChart({ data, isLoading }: CostBreakdownChartProps)
         <h2 className="font-condensed text-xl font-bold">Where the money went</h2>
         <p className="mt-1 text-[15px] text-muted-foreground">
           No expenses recorded for this period yet.{' '}
-          <Link to="/finance?view=compliance" className="font-semibold text-primary underline">Add or import expenses</Link>
+          <Link to="/finance?view=expenses" className="font-semibold text-primary underline">Add or import expenses</Link>
         </p>
       </section>
     );

@@ -113,7 +113,7 @@ export function MoneyLines({ data, isLoading, periodLabel, controls }: MoneyLine
           note={
             <>
               {miles.toLocaleString()} mi at {usd(costPerMile, true)}/mi.{' '}
-              <Link to="/finance?view=analytics" className="underline">Change rate</Link>
+              <Link to="/finance?view=settings" className="underline">Change rate</Link>
             </>
           }
           value={operatingCost}

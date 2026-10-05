@@ -413,7 +413,7 @@ export default function ExecutiveDashboard() {
           title: 'Settlements Pending Approval',
           count: pendingSettlements.length,
           priority: 'medium',
-          link: '/finance?tab=settlements',
+          link: '/finance?view=settlement',
         });
       }
 

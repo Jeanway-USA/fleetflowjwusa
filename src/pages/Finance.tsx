@@ -27,6 +27,7 @@ import { ChartSkeleton, DialogSkeleton } from '@/components/shared/LazyFallbacks
 import { AuditReconciliation } from '@/components/finance/AuditReconciliation';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
+import { SettlementStatementTab } from '@/components/finance/SettlementStatementTab';
 const RevenueTab = lazy(() =>
   import('@/components/finance/RevenueTab').then(m => ({ default: m.RevenueTab })),
 );
@@ -96,7 +97,7 @@ export default function Finance() {
     },
   });
 
-  const { data: loads = [] } = useQuery({
+  const { data: loads = [], isLoading: loadsLoading } = useQuery({
     queryKey: ['fleet_loads'],
     queryFn: async () => {
       const { data, error } = await supabase.from('fleet_loads').select('*').is('deleted_at', null).order('pickup_date', { ascending: false });
@@ -114,7 +115,7 @@ export default function Finance() {
     },
   });
 
-  const { data: expenses = [] } = useQuery({
+  const { data: expenses = [], isLoading: expensesLoading } = useQuery({
     queryKey: ['expenses'],
     queryFn: async () => {
       const { data, error } = await supabase.from('expenses').select('*').order('expense_date', { ascending: false });
@@ -498,23 +499,8 @@ export default function Finance() {
   };
 
 
-  return (
-    <>
-      <PageHeader
-        title="Money"
-        description="Revenue, expenses, and Landstar settlements"
-      >
-        <Button
-          variant="outline"
-          onClick={() => setUploadDialogOpen(true)}
-          className="h-11 sm:h-10 w-full sm:w-auto"
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          Upload Statement
-        </Button>
-      </PageHeader>
-
-      {/* Period and Truck Selector */}
+  // Period and truck pickers. The period applies to Profit & loss and Expenses; the settlement tab has its own week.
+  const renderFilters = () => (
       <div className="grid grid-cols-2 gap-2 mb-4 sm:flex sm:flex-wrap sm:gap-3">
         <Select value={selectedPeriod} onValueChange={(v) => { setSelectedPeriod(v); setExpensePage(0); }}>
           <SelectTrigger className="h-11 sm:h-10 sm:w-48" aria-label="Period"><SelectValue placeholder="Select period" /></SelectTrigger>
@@ -562,9 +548,10 @@ export default function Finance() {
           </SelectContent>
         </Select>
       </div>
+  );
 
-      {/* The period's money as statement lines (same vocabulary as Today) */}
-      {(() => {
+  const summarySection = (
+      (() => {
         const activeLoanTrucks = trucks.filter((t: any) => t.status === 'active' && t.monthly_payment != null && t.monthly_payment > 0);
         const monthlyTruckPayment = activeLoanTrucks.reduce((sum: number, t: any) => sum + (t.monthly_payment || 0), 0);
         const costs = totalExpenses + totalPayroll;
@@ -600,62 +587,129 @@ export default function Finance() {
             </p>
           </section>
         );
-      })()}
+      })()
+  );
+
+  const VIEWS = ['settlement', 'pnl', 'expenses', 'payroll', 'settings'];
+  // Old links used these names; keep them working.
+  const VIEW_ALIASES: Record<string, string> = { payouts: 'payroll', compliance: 'expenses', analytics: 'pnl', settlements: 'settlement', 'inhouse-payroll': 'payroll' };
+  const rawView = searchParams.get('view') ?? searchParams.get('tab') ?? 'settlement';
+  const view = VIEWS.includes(rawView) ? rawView : (VIEW_ALIASES[rawView] ?? 'settlement');
+
+  return (
+    <>
+      <PageHeader
+        title="Money"
+        description="Revenue, expenses, and Landstar settlements"
+      >
+        <Button
+          variant="outline"
+          onClick={() => setUploadDialogOpen(true)}
+          className="h-11 sm:h-10 w-full sm:w-auto"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Upload Statement
+        </Button>
+      </PageHeader>
 
       <Tabs
-        value={(searchParams.get('view') as 'payouts' | 'compliance' | 'analytics') || 'payouts'}
+        value={view}
         onValueChange={(v) => {
           const next = new URLSearchParams(searchParams);
+          next.delete('tab');
           next.set('view', v);
           setSearchParams(next, { replace: true });
         }}
         className="w-full"
       >
-        <TabsList className="grid grid-cols-3 gap-1 sm:gap-2 p-1 bg-muted rounded-lg h-auto w-full max-w-2xl mx-auto mb-6">
-          <TabsTrigger value="payouts" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium text-xs sm:text-sm px-2">
-            Payouts
-          </TabsTrigger>
-          <TabsTrigger value="compliance" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium text-xs sm:text-sm px-2">
-            Expenses
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm h-11 font-medium text-xs sm:text-sm px-2">
-            <span className="sm:hidden">Analytics</span>
-            <span className="hidden sm:inline">Analytics & Audit</span>
-          </TabsTrigger>
+        <TabsList className="mb-5 h-auto w-full justify-start gap-1 overflow-x-auto bg-muted p-1">
+          {([
+            ['settlement', 'Settlement'],
+            ['pnl', 'Profit & loss'],
+            ['expenses', 'Expenses'],
+            ['payroll', 'Payroll'],
+            ['settings', 'Settings'],
+          ] as const).map(([value, label]) => (
+            <TabsTrigger key={value} value={value} className="h-11 shrink-0 px-4 text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              {label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        {/* ===== VIEW 1 — RUN PAYOUTS ===== */}
-        <TabsContent value="payouts">
-          <div className="space-y-8 animate-in fade-in-50">
-            {canManagePayroll && (
-              <section>
-                <ActiveBatchTab />
-              </section>
+        {/* ===== SETTLEMENT: the weekly Landstar statement ===== */}
+        <TabsContent value="settlement">
+          <div className="animate-in fade-in-50">
+            {trucks.length > 1 && (
+              <div className="mb-4">
+                <Select value={selectedTruck} onValueChange={setSelectedTruck}>
+                  <SelectTrigger className="h-11 sm:h-10 sm:w-56" aria-label="Truck">
+                    <TruckIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <SelectValue placeholder="Select truck" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Units (Company)</SelectItem>
+                    {trucks.map((truck: any) => (
+                      <SelectItem key={truck.id} value={truck.id}>Unit #{truck.unit_number}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
-
-
-            <section className="space-y-2">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-primary" /> Contractor Settlements (1099)
-              </h3>
-              <DriverSettlementsTab />
-            </section>
-
-            <section className="space-y-2">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Percent className="h-5 w-5 text-primary" /> Agent Commissions
-              </h3>
-              <CommissionsTab
-                filteredCommissions={filteredCommissions}
-                commissionTotals={commissionTotals}
-                commissionsLoading={commissionsLoading}
-              />
-            </section>
+            <SettlementStatementTab
+              loads={loads as any}
+              expenses={expenses as any}
+              truckId={selectedTruck}
+              isLoading={loadsLoading || expensesLoading}
+              onUpload={() => setUploadDialogOpen(true)}
+            />
           </div>
         </TabsContent>
 
-        {/* ===== VIEW 2 — TAX & COMPLIANCE ===== */}
-        <TabsContent value="compliance">
+        {/* ===== PROFIT & LOSS ===== */}
+        <TabsContent value="pnl">
+          <div className="space-y-8 animate-in fade-in-50">
+            <div>
+              {renderFilters()}
+              {summarySection}
+            </div>
+            <PLSummaryTab
+              revenueTotals={revenueTotals}
+              loadExpenseTotals={loadExpenseTotals}
+              standaloneExpenseTotals={standaloneExpenseTotals}
+              loadLinkedExpenseTotals={loadLinkedExpenseTotals}
+              payrollTotals={payrollTotals}
+              commissionTotals={commissionTotals}
+              deadheadMiles={deadheadMiles}
+              totalEmptyMiles={totalEmptyMiles}
+              totalActualMilesWithDeadhead={totalActualMilesWithDeadhead}
+              netProfit={netProfit}
+              profitMargin={profitMargin}
+              totalExpenses={totalExpenses}
+              totalRevenueWithCommissions={totalRevenueWithCommissions}
+              getSetting={getSetting}
+            />
+            <Suspense fallback={<ChartSkeleton height={320} />}>
+              <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
+            </Suspense>
+            <Suspense fallback={<ChartSkeleton height={320} />}>
+              <LoadProfitabilityTab
+                deliveredLoads={deliveredLoads}
+                loadExpenses={loadExpenses}
+                drivers={drivers}
+                expenses={filteredExpenses}
+                totalExpenses={totalExpenses}
+                totalPayroll={totalPayroll}
+                revenueTotals={revenueTotals}
+                allLoads={loads}
+                isIndependent={isIndependent}
+              />
+            </Suspense>
+          </div>
+        </TabsContent>
+
+        {/* ===== EXPENSES ===== */}
+        <TabsContent value="expenses">
+          {renderFilters()}
           <div className="space-y-8 animate-in fade-in-50">
             <Card className="card-elevated">
               <CardHeader className="flex flex-row items-center justify-between">
@@ -911,55 +965,49 @@ export default function Finance() {
           </div>
         </TabsContent>
 
-        {/* ===== VIEW 3 — ANALYTICS & AUDIT LOGS ===== */}
-        <TabsContent value="analytics">
+        {/* ===== PAYROLL: W-2 batch, contractor settlements, agent commissions, safety bonuses ===== */}
+        <TabsContent value="payroll">
           <div className="space-y-8 animate-in fade-in-50">
-            <PLSummaryTab
-              revenueTotals={revenueTotals}
-              loadExpenseTotals={loadExpenseTotals}
-              standaloneExpenseTotals={standaloneExpenseTotals}
-              loadLinkedExpenseTotals={loadLinkedExpenseTotals}
-              payrollTotals={payrollTotals}
-              commissionTotals={commissionTotals}
-              deadheadMiles={deadheadMiles}
-              totalEmptyMiles={totalEmptyMiles}
-              totalActualMilesWithDeadhead={totalActualMilesWithDeadhead}
-              netProfit={netProfit}
-              profitMargin={profitMargin}
-              totalExpenses={totalExpenses}
-              totalRevenueWithCommissions={totalRevenueWithCommissions}
-              getSetting={getSetting}
-            />
-            <Suspense fallback={<ChartSkeleton height={320} />}>
-              <RevenueTab filteredLoads={filteredLoads} revenueTotals={revenueTotals} />
-            </Suspense>
-            <Suspense fallback={<ChartSkeleton height={320} />}>
-              <LoadProfitabilityTab
-                deliveredLoads={deliveredLoads}
-                loadExpenses={loadExpenses}
-                drivers={drivers}
-                expenses={filteredExpenses}
-                totalExpenses={totalExpenses}
-                totalPayroll={totalPayroll}
-                revenueTotals={revenueTotals}
-                allLoads={loads}
-                isIndependent={isIndependent}
+            {canManagePayroll && (
+              <section>
+                <ActiveBatchTab />
+              </section>
+            )}
+
+            <section className="space-y-2">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-primary" /> Contractor Settlements (1099)
+              </h3>
+              <DriverSettlementsTab />
+            </section>
+
+            <section className="space-y-2">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Percent className="h-5 w-5 text-primary" /> Agent Commissions
+              </h3>
+              <CommissionsTab
+                filteredCommissions={filteredCommissions}
+                commissionTotals={commissionTotals}
+                commissionsLoading={commissionsLoading}
               />
-            </Suspense>
+            </section>
+
+            <SafetyBonusPayouts />
+          </div>
+        </TabsContent>
+
+        {/* ===== SETTINGS: pay rules, audit, invoicing ===== */}
+        <TabsContent value="settings">
+          <div className="space-y-8 animate-in fade-in-50">
+            <CompensationSettingsTab getSetting={getSetting} />
             <AuditReconciliation loads={loads} />
-
-
-
             {isIndependent && (
               <>
                 <InvoicingTab />
                 <FactoringTab />
               </>
             )}
-
-            <CompensationSettingsTab getSetting={getSetting} />
             <SafetyBonusSettings />
-            <SafetyBonusPayouts />
           </div>
         </TabsContent>
       </Tabs>
