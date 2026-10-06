@@ -5,7 +5,10 @@ import { useHighlightRow } from '@/hooks/useHighlightRow';
 
 
 import { PageHeader } from '@/components/shared/PageHeader';
-import { DataTable } from '@/components/shared/DataTable';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { Panel, StatementLine } from '@/components/finance/statement-ui';
+import { Roster, RosterToolbar, RosterBulkBar, downloadCsv, type RosterEntry, type RosterFact } from '@/components/fleet/Roster';
+import { formatCurrency } from '@/lib/formatters';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { LoadingButton } from '@/components/shared/LoadingButton';
@@ -16,9 +19,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, User, AlertTriangle, CheckCircle, Clock, History, Container, MoreHorizontal, Archive } from 'lucide-react';
+import { Pencil, FileText, User, History, Container, MoreHorizontal, Archive, Download } from 'lucide-react';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { BulkStatusEditDialog } from '@/components/shared/BulkStatusEditDialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -107,6 +110,8 @@ export default function Trailers() {
   const [massDeleteOpen, setMassDeleteOpen] = useState(false);
   const [massEditOpen, setMassEditOpen] = useState(false);
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const { data: trailers = [], isLoading } = useQuery({
     queryKey: ['trailers'],
@@ -252,123 +257,136 @@ export default function Trailers() {
     }
   };
 
-  const columns = [
-    { key: 'unit_number', header: 'Unit #' },
-    { key: 'trailer_type', header: 'Type' },
-    { key: 'make', header: 'Make', hiddenOnMobile: true },
-    { key: 'year', header: 'Year', hiddenOnMobile: true },
-    { key: 'year', header: 'Year' },
-    { key: 'status', header: 'Status', render: (trailer: TrailerWithDriver) => <StatusBadge status={trailer.status} /> },
-    { 
-      key: 'next_inspection', 
-      header: 'Annual Inspection',
-      render: (trailer: TrailerWithDriver) => {
-        const inspection = inspectionStatusMap.get(trailer.id);
-        if (!inspection) {
-          return <span className="text-muted-foreground">-</span>;
-        }
-        
-        if (inspection.status === 'never') {
-          return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1 text-muted-foreground cursor-help">
-                  <Clock className="h-4 w-4" />
-                  <span className="text-xs">Not Set</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>No inspection date set</p>
-              </TooltipContent>
-            </Tooltip>
-          );
-        }
-        
-        const statusConfig = {
-          ok: { color: 'text-green-600', icon: CheckCircle },
-          warning: { color: 'text-yellow-600', icon: AlertTriangle },
-          overdue: { color: 'text-red-600', icon: AlertTriangle },
-        };
-        
-        const config = statusConfig[inspection.status];
-        const Icon = config.icon;
-        
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className={`flex items-center gap-1 ${config.color} cursor-help`}>
-                <Icon className="h-4 w-4" />
-                <span className="text-xs">
-                  {inspection.daysRemaining !== null && inspection.daysRemaining < 0 
-                    ? `Overdue ${Math.abs(inspection.daysRemaining)}d`
-                    : `${inspection.daysRemaining}d left`}
-                </span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Due: {trailer.next_inspection_date}</p>
-            </TooltipContent>
-          </Tooltip>
-        );
-      }
-    },
-    {
-      key: 'actions',
-      header: '',
-      render: (trailer: TrailerWithDriver) => (
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const driverName = (id: string | null) => {
+    const d = (drivers as any[]).find((x) => x.id === id);
+    return d ? `${d.first_name} ${d.last_name}` : null;
+  };
+
+  const filteredTrailers = trailers.filter((t) => {
+    if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return [t.unit_number, t.trailer_type, t.make, t.model, t.year, t.vin, t.license_plate, driverName(t.current_driver_id)].filter(Boolean).join(' ').toLowerCase().includes(q);
+  });
+  const inService = trailers.filter((t) => t.status === 'active').length;
+  const inspectionsDue = trailers.filter((t) => {
+    const i = inspectionStatusMap.get(t.id);
+    return !!i && i.status !== 'ok' && i.status !== 'never';
+  }).length;
+  const leasedMonthly = trailers.reduce((sum, t) => sum + (t.owned_or_leased === 'leased' ? Number(t.monthly_payment ?? 0) : 0), 0);
+
+  const entries: RosterEntry[] = filteredTrailers.map((trailer) => {
+    const inspection = inspectionStatusMap.get(trailer.id);
+    let inspectionFact: RosterFact;
+    if (!inspection || inspection.status === 'never') {
+      inspectionFact = { label: 'Annual inspection', value: <span className="font-normal text-muted-foreground">No date set</span> };
+    } else {
+      const days = inspection.daysRemaining ?? 0;
+      inspectionFact = days < 0
+        ? { label: 'Annual inspection', value: `Overdue ${Math.abs(days)} ${Math.abs(days) === 1 ? 'day' : 'days'}`, tone: 'bad' }
+        : { label: 'Annual inspection', value: `Due in ${days} ${days === 1 ? 'day' : 'days'}`, tone: days <= 30 ? 'warn' : undefined };
+    }
+    const leased = trailer.owned_or_leased === 'leased';
+    const assigned = driverName(trailer.current_driver_id);
+    return {
+      id: trailer.id,
+      title: `Unit ${trailer.unit_number}`,
+      onOpen: () => setViewingTrailer(trailer),
+      chips: <StatusBadge status={trailer.status} />,
+      subtitle: [trailer.trailer_type, [trailer.year, trailer.make, trailer.model].filter(Boolean).join(' '), trailer.license_plate ? `Plate ${trailer.license_plate}${trailer.license_plate_state ? ` (${trailer.license_plate_state})` : ''}` : null].filter(Boolean).join(', ') || undefined,
+      facts: [
+        { label: 'Driver', value: assigned ?? <span className="font-normal text-muted-foreground">Unassigned</span> },
+        { label: 'Ownership', value: leased ? `Leased${trailer.monthly_payment ? `, ${formatCurrency(Number(trailer.monthly_payment))} a month` : ''}` : 'Owned' },
+        inspectionFact,
+      ],
+      menu: (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Actions for unit ${trailer.unit_number}`}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setViewingTrailer(trailer)}>
-              <FileText className="mr-2 h-4 w-4" /> View Details
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => openDialog(trailer)}>
-              <Pencil className="mr-2 h-4 w-4" /> Edit
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setViewingTrailer(trailer)}><FileText className="mr-2 h-4 w-4" /> View details</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openDialog(trailer)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(trailer)}>
-              <Archive className="mr-2 h-4 w-4" /> Archive
-            </DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(trailer)}><Archive className="mr-2 h-4 w-4" /> Archive</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),
-    },
-  ];
+    };
+  });
+
+  const exportCsv = () =>
+    downloadCsv(
+      'trailers',
+      ['Unit', 'Type', 'Year', 'Make', 'Model', 'Driver', 'Status', 'Ownership', 'Monthly payment', 'Plate'],
+      filteredTrailers.map((t) => [t.unit_number, t.trailer_type, t.year, t.make, t.model, driverName(t.current_driver_id), t.status, t.owned_or_leased, t.monthly_payment, t.license_plate]),
+    );
 
   return (
     <>
       <PageHeader title="Trailers" description="Manage your fleet trailers" action={{ label: 'Add Trailer', onClick: () => openDialog() }} />
-      <DataTable
-        columns={columns}
-        data={trailers}
-        loading={isLoading}
-        emptyMessage="No trailers registered yet"
-        emptyDescription="Add your first trailer to manage your trailer fleet."
-        emptyIcon={Container}
-        emptyAction={{ label: 'Add First Trailer', onClick: () => openDialog() }}
-        tableId="trailers"
-        exportFilename="trailers"
-        highlightRowId={highlightId}
+      {isLoading ? (
+        <div className="py-12 text-center text-muted-foreground">Loading...</div>
+      ) : trailers.length === 0 ? (
+        <EmptyState
+          icon={Container}
+          title="No trailers registered yet"
+          description="Add your first trailer to manage your trailer fleet."
+          action={{ label: 'Add First Trailer', onClick: () => openDialog() }}
+        />
+      ) : (
+        <>
+          <Panel title="Your trailers" className="mb-5">
+            <StatementLine label="Trailers in service" note={`${trailers.length} on file`} value={inService} />
+            <StatementLine
+              label="Inspections due within 30 days"
+              note={inspectionsDue === 0 ? 'Nothing due or overdue.' : 'Includes overdue trailers.'}
+              value={inspectionsDue}
+              rule="single"
+              tone={inspectionsDue > 0 ? 'bad' : undefined}
+            />
+            {leasedMonthly > 0 && <StatementLine label="Leased trailers cost" note="Monthly, across leased trailers" value={formatCurrency(leasedMonthly)} rule="single" />}
+          </Panel>
 
-        onRowDoubleClick={(trailer) => openDialog(trailer)}
-        selectable
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-        bulkActions={(ids) => (
-          <>
-            <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
-              <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
+          <RosterToolbar search={search} onSearch={setSearch} placeholder="Search by unit, type, make, VIN, plate, driver">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-11 w-full sm:w-[170px]" aria-label="Filter by status">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="in_shop">In shop</SelectItem>
+                <SelectItem value="out_of_service">Out of service</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" className="h-11" onClick={exportCsv}>
+              <Download className="h-4 w-4 mr-2" /> Export CSV
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
-              <Archive className="mr-1 h-3 w-3" /> Archive ({ids.size})
+          </RosterToolbar>
+
+          <RosterBulkBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+            <Button variant="outline" className="h-11" onClick={() => setMassEditOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" /> Change status
             </Button>
-          </>
-        )}
-      />
+            <Button variant="outline" className="h-11 text-destructive" onClick={() => setMassDeleteOpen(true)}>
+              <Archive className="mr-2 h-4 w-4" /> Archive
+            </Button>
+          </RosterBulkBar>
+
+          <Roster entries={entries} selectedIds={selectedIds} onToggle={toggleSelect} empty="No trailers match your filters." />
+        </>
+      )}
       <ConfirmDeleteDialog
         open={massDeleteOpen}
         onOpenChange={setMassDeleteOpen}
@@ -559,39 +577,15 @@ export default function Trailers() {
               </TabsList>
 
               <TabsContent value="details" className="space-y-4 pt-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Make/Model:</span>
-                    <p className="font-medium">{viewingTrailer.make || '-'} {viewingTrailer.model || ''}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Year:</span>
-                    <p className="font-medium">{viewingTrailer.year || '-'}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">VIN:</span>
-                    <p className="font-medium font-mono text-xs">{viewingTrailer.vin || '-'}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">License Plate:</span>
-                    <p className="font-medium">{viewingTrailer.license_plate || '-'} {viewingTrailer.license_plate_state || ''}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Ownership:</span>
-                    <p className="font-medium capitalize">{viewingTrailer.owned_or_leased || '-'}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Monthly Payment:</span>
-                    <p className="font-medium">{viewingTrailer.monthly_payment ? `$${viewingTrailer.monthly_payment.toFixed(2)}` : '-'}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Next Inspection:</span>
-                    <p className="font-medium">{viewingTrailer.next_inspection_date || '-'}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Status:</span>
-                    <StatusBadge status={viewingTrailer.status} />
-                  </div>
+                <div className="divide-y">
+                  <StatementLine label="Make and model" value={<span className="text-base font-medium">{[viewingTrailer.make, viewingTrailer.model].filter(Boolean).join(' ') || 'Not set'}</span>} />
+                  <StatementLine label="Year" value={<span className="text-base font-medium">{viewingTrailer.year || 'Not set'}</span>} />
+                  <StatementLine label="VIN" value={<span className="font-mono text-sm font-medium">{viewingTrailer.vin || 'Not set'}</span>} />
+                  <StatementLine label="License plate" value={<span className="text-base font-medium">{viewingTrailer.license_plate ? `${viewingTrailer.license_plate}${viewingTrailer.license_plate_state ? ` (${viewingTrailer.license_plate_state})` : ''}` : 'Not set'}</span>} />
+                  <StatementLine label="Ownership" value={<span className="text-base font-medium capitalize">{viewingTrailer.owned_or_leased || 'Not set'}</span>} />
+                  {viewingTrailer.monthly_payment ? <StatementLine label="Monthly payment" value={formatCurrency(Number(viewingTrailer.monthly_payment))} /> : null}
+                  <StatementLine label="Next inspection" value={<span className="text-base font-medium">{viewingTrailer.next_inspection_date || 'Not set'}</span>} />
+                  <StatementLine label="Status" value={<StatusBadge status={viewingTrailer.status} />} />
                 </div>
                 {viewingTrailer.notes && (
                   <div>

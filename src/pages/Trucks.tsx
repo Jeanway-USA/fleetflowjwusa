@@ -5,7 +5,9 @@ import { useHighlightRow } from '@/hooks/useHighlightRow';
 
 
 import { PageHeader } from '@/components/shared/PageHeader';
-import { DataTable } from '@/components/shared/DataTable';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { Panel, StatementLine } from '@/components/finance/statement-ui';
+import { Roster, RosterToolbar, RosterBulkBar, downloadCsv, type RosterEntry, type RosterFact, type FactTone } from '@/components/fleet/Roster';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { DocumentUpload } from '@/components/shared/DocumentUpload';
 import { ExpensesList } from '@/components/shared/ExpensesList';
@@ -17,9 +19,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 import { toast } from 'sonner';
-import { Pencil, Trash2, FileText, DollarSign, User, AlertTriangle, CheckCircle, Clock, Truck as TruckIcon, MoreHorizontal, FileSpreadsheet, Landmark, Archive } from 'lucide-react';
+import { Pencil, FileText, DollarSign, User, Truck as TruckIcon, MoreHorizontal, FileSpreadsheet, Landmark, Archive, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -33,8 +35,6 @@ import type { Database } from '@/integrations/supabase/types';
 import { TruckLoanPaymentsSection } from '@/components/trucks/TruckLoanPaymentsSection';
 import { AmortizationCard } from '@/components/trucks/AmortizationCard';
 import { DriverAssignmentSelect } from '@/components/trucks/DriverAssignmentSelect';
-
-
 
 
 type Truck = Database['public']['Tables']['trucks']['Row'];
@@ -106,6 +106,8 @@ export default function Trucks() {
   const [formData, setFormData] = useState<Partial<TruckInsert>>({});
   
   const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
 
   const truckFields = [
@@ -264,143 +266,26 @@ export default function Trucks() {
   };
 
 
-  const columns = [
-    { key: 'unit_number', header: 'Unit #' },
-    { key: 'make', header: 'Make', hiddenOnMobile: true },
-    { key: 'model', header: 'Model', hiddenOnMobile: true },
-    { key: 'year', header: 'Year', hiddenOnMobile: true },
-    { 
-      key: 'current_driver', 
-      header: 'Current Driver',
-      render: (truck: any) => {
-        const driver = truck.drivers;
-        return driver ? `${driver.first_name} ${driver.last_name}` : <span className="text-muted-foreground">Unassigned</span>;
-      }
-    },
-    { key: 'status', header: 'Status', render: (truck: TruckWithDriver) => <StatusBadge status={truck.status} /> },
-    {
-      key: 'lender_name',
-      header: 'Lender',
-      hiddenOnMobile: true,
-      render: (truck: TruckWithDriver) =>
-        truck.lender_name ? (
-          <span className="text-sm">{truck.lender_name}</span>
-        ) : (
-          <span className="text-muted-foreground text-xs">—</span>
-        ),
-    },
+  const loanText = (truck: TruckWithDriver): { text: string; tone?: FactTone } => {
+    const rawBalance = truck.loan_balance;
+    const original = Number((truck as any).original_loan_amount ?? 0);
+    const balance = Number(rawBalance ?? 0);
+    // Only "Paid off" when the balance was recorded and reached zero.
+    if (rawBalance != null && balance <= 0 && original > 0) return { text: 'Paid off', tone: 'good' };
+    if (rawBalance == null && original > 0) return { text: `${formatCurrency(original, { maximumFractionDigits: 0 })} remaining` };
+    if (balance <= 0) return { text: 'No loan' };
+    return { text: `${formatCurrency(balance, { maximumFractionDigits: 0 })} remaining` };
+  };
 
-    {
-      key: 'loan',
-      header: 'Loan Balance',
-      hiddenOnMobile: true,
-      render: (truck: TruckWithDriver) => {
-        const rawBalance = truck.loan_balance;
-        const original = Number((truck as any).original_loan_amount ?? 0);
-        const balance = Number(rawBalance ?? 0);
-        // Only "Paid Off" when balance was explicitly recorded and reached zero.
-        if (rawBalance != null && balance <= 0 && original > 0) {
-          return (
-            <Badge className="bg-green-600/10 text-green-700 border border-green-600/20 hover:bg-green-600/10 text-xs">
-              Paid Off
-            </Badge>
-          );
-        }
-        if (rawBalance == null && original > 0) {
-          return (
-            <Badge variant="secondary" className="text-xs font-mono">
-              {formatCurrency(original, { maximumFractionDigits: 0 })} Remaining
-            </Badge>
-          );
-        }
-        if (balance <= 0) return <span className="text-muted-foreground">—</span>;
-        return (
-          <Badge variant="secondary" className="text-xs font-mono">
-            {formatCurrency(balance, { maximumFractionDigits: 0 })} Remaining
-          </Badge>
-        );
-      },
-    },
-
-    { 
-      key: 'next_120_inspection', 
-      header: '120-Day Inspection',
-      render: (truck: TruckWithDriver) => {
-        const inspection = inspectionStatusMap.get(truck.id);
-        if (!inspection) {
-          return <span className="text-muted-foreground">-</span>;
-        }
-        
-        if (inspection.status === 'never') {
-          return (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1 text-muted-foreground cursor-help">
-                  <Clock className="h-4 w-4" />
-                  <span className="text-xs">Never Inspected</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p>No 120-Day Inspection on record</p>
-              </TooltipContent>
-            </Tooltip>
-          );
-        }
-        
-        const statusConfig = {
-          ok: { color: 'text-green-600', icon: CheckCircle },
-          warning: { color: 'text-yellow-600', icon: AlertTriangle },
-          overdue: { color: 'text-red-600', icon: AlertTriangle },
-        };
-        
-        const config = statusConfig[inspection.status];
-        const Icon = config.icon;
-        
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className={`flex items-center gap-1 ${config.color} cursor-help`}>
-                <Icon className="h-4 w-4" />
-                <span className="text-xs">
-                  {inspection.daysRemaining !== null && inspection.daysRemaining < 0 
-                    ? `Overdue ${Math.abs(inspection.daysRemaining)}d`
-                    : `${inspection.daysRemaining}d left`}
-                </span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>Due: {inspection.nextInspectionDate}</p>
-            </TooltipContent>
-          </Tooltip>
-        );
-      }
-    },
-    {
-      key: 'actions',
-      header: '',
-      render: (truck: TruckWithDriver) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setViewingTruck(truck)}>
-              <FileText className="mr-2 h-4 w-4" /> View Details
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => openDialog(truck)}>
-              <Pencil className="mr-2 h-4 w-4" /> Edit
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(truck)}>
-              <Archive className="mr-2 h-4 w-4" /> Archive
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
+  const inspectionFact = (truck: TruckWithDriver): RosterFact | null => {
+    const inspection = inspectionStatusMap.get(truck.id);
+    if (!inspection) return null;
+    const label = '120-day inspection';
+    if (inspection.status === 'never') return { label, value: 'Never inspected', tone: 'warn' };
+    const days = inspection.daysRemaining ?? 0;
+    if (days < 0) return { label, value: `Overdue ${Math.abs(days)} ${Math.abs(days) === 1 ? 'day' : 'days'}`, tone: 'bad' };
+    return { label, value: `Due in ${days} ${days === 1 ? 'day' : 'days'}`, tone: days <= 30 ? 'warn' : undefined };
+  };
 
   const [viewingTruckState, setViewingTruck] = useState<TruckWithDriver | null>(null);
   // Keep the viewed truck fresh from the ['trucks'] query so mutations (e.g. loan payments) reflect immediately.
@@ -441,40 +326,128 @@ export default function Trucks() {
     finally { setBulkUpdating(false); }
   };
 
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const allTrucks = trucks as TruckWithDriver[];
+  const filteredTrucks = allTrucks.filter((t) => {
+    if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const driver = t.drivers ? `${t.drivers.first_name} ${t.drivers.last_name}` : '';
+    return [t.unit_number, t.make, t.model, t.year, t.vin, t.license_plate, driver].filter(Boolean).join(' ').toLowerCase().includes(q);
+  });
+  const inService = allTrucks.filter((t) => t.status === 'active').length;
+  const loanTotal = allTrucks.reduce((sum, t) => sum + (t.loan_balance != null ? Number(t.loan_balance) : Number((t as any).original_loan_amount ?? 0)), 0);
+  const inspectionsDue = allTrucks.filter((t) => {
+    const i = inspectionStatusMap.get(t.id);
+    return !!i && (i.status === 'never' || i.status === 'overdue' || i.status === 'warning');
+  }).length;
+
+  const entries: RosterEntry[] = filteredTrucks.map((truck) => {
+    const loan = loanText(truck);
+    const inspection = inspectionFact(truck);
+    const description = [truck.year, truck.make, truck.model].filter(Boolean).join(' ');
+    return {
+      id: truck.id,
+      title: `Unit ${truck.unit_number}`,
+      onOpen: () => setViewingTruck(truck),
+      chips: <StatusBadge status={truck.status} />,
+      subtitle: [description, truck.license_plate ? `Plate ${truck.license_plate}${truck.license_plate_state ? ` (${truck.license_plate_state})` : ''}` : null].filter(Boolean).join(', ') || undefined,
+      facts: [
+        { label: 'Driver', value: truck.drivers ? `${truck.drivers.first_name} ${truck.drivers.last_name}` : <span className="font-normal text-muted-foreground">Unassigned</span> },
+        { label: truck.lender_name ? `Loan, ${truck.lender_name}` : 'Loan', value: loan.text, tone: loan.tone },
+        ...(inspection ? [inspection] : []),
+      ],
+      menu: (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Actions for unit ${truck.unit_number}`}>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setViewingTruck(truck)}><FileText className="mr-2 h-4 w-4" /> View details</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openDialog(truck)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={() => deleteWithUndo(truck)}><Archive className="mr-2 h-4 w-4" /> Archive</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    };
+  });
+
+  const exportCsv = () =>
+    downloadCsv(
+      'trucks',
+      ['Unit', 'Year', 'Make', 'Model', 'Driver', 'Status', 'Lender', 'Loan balance', 'Plate'],
+      filteredTrucks.map((t) => [t.unit_number, t.year, t.make, t.model, t.drivers ? `${t.drivers.first_name} ${t.drivers.last_name}` : '', t.status, t.lender_name, t.loan_balance, t.license_plate]),
+    );
+
   return (
     <>
       <PageHeader title="Trucks" description="Manage your fleet vehicles" action={{ label: 'Add Truck', onClick: () => openDialog() }}>
-        <Button variant="outline" onClick={() => setCsvImportOpen(true)}>
+        <Button variant="outline" className="h-11 sm:h-10" onClick={() => setCsvImportOpen(true)}>
           <FileSpreadsheet className="h-4 w-4 mr-2" /> Import CSV
         </Button>
       </PageHeader>
-      <DataTable
-        columns={columns}
-        data={trucks}
-        loading={isLoading}
-        emptyMessage="No trucks registered yet"
-        emptyDescription="Add your first truck to start managing your fleet."
-        emptyIcon={TruckIcon}
-        emptyAction={{ label: 'Add First Truck', onClick: () => openDialog() }}
-        tableId="trucks"
-        exportFilename="trucks"
-        highlightRowId={highlightId}
-        onRowDoubleClick={(truck) => openDialog(truck)}
-        selectable
+      {isLoading ? (
+        <div className="py-12 text-center text-muted-foreground">Loading...</div>
+      ) : (trucks as TruckWithDriver[]).length === 0 ? (
+        <EmptyState
+          icon={TruckIcon}
+          title="No trucks registered yet"
+          description="Add your first truck to start managing your fleet."
+          action={{ label: 'Add First Truck', onClick: () => openDialog() }}
+        />
+      ) : (
+        <>
+          <Panel title="Your trucks" className="mb-5">
+            <StatementLine label="Trucks in service" note={`${(trucks as TruckWithDriver[]).length} on file`} value={inService} />
+            <StatementLine label="Loan balance remaining" note="Across every truck with a loan" value={formatCurrency(loanTotal, { maximumFractionDigits: 0 })} rule="single" />
+            <StatementLine
+              label="Inspections due within 30 days"
+              note={inspectionsDue === 0 ? 'Nothing due or overdue.' : 'Includes overdue and never-inspected trucks.'}
+              value={inspectionsDue}
+              rule="single"
+              tone={inspectionsDue > 0 ? 'bad' : undefined}
+            />
+          </Panel>
 
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-        bulkActions={(ids) => (
-          <>
-            <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
-              <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
+          <RosterToolbar search={search} onSearch={setSearch} placeholder="Search by unit, make, model, VIN, plate, driver">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-11 w-full sm:w-[170px]" aria-label="Filter by status">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="down">Down</SelectItem>
+                <SelectItem value="out_of_service">Out of service</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" className="h-11" onClick={exportCsv}>
+              <Download className="h-4 w-4 mr-2" /> Export CSV
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
-              <Archive className="mr-1 h-3 w-3" /> Archive ({ids.size})
+          </RosterToolbar>
+
+          <RosterBulkBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+            <Button variant="outline" className="h-11" onClick={() => setMassEditOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" /> Change status
             </Button>
-          </>
-        )}
-      />
+            <Button variant="outline" className="h-11 text-destructive" onClick={() => setMassDeleteOpen(true)}>
+              <Archive className="mr-2 h-4 w-4" /> Archive
+            </Button>
+          </RosterBulkBar>
+
+          <Roster entries={entries} selectedIds={selectedIds} onToggle={toggleSelect} empty="No trucks match your filters." />
+        </>
+      )}
       <ConfirmDeleteDialog
         open={massDeleteOpen}
         onOpenChange={setMassDeleteOpen}
@@ -682,8 +655,11 @@ export default function Trucks() {
             <DialogTitle>Truck {viewingTruck?.unit_number} - {viewingTruck?.make} {viewingTruck?.model}</DialogTitle>
           </DialogHeader>
           {viewingTruck && (
-            <Tabs defaultValue="expenses" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="overview" className="flex items-center gap-2">
+                  <TruckIcon className="h-4 w-4" /> Overview
+                </TabsTrigger>
                 <TabsTrigger value="expenses" className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4" /> Expenses
                 </TabsTrigger>
@@ -694,6 +670,25 @@ export default function Trucks() {
                   <Landmark className="h-4 w-4" /> Financing
                 </TabsTrigger>
               </TabsList>
+              <TabsContent value="overview" className="mt-4">
+                {(() => {
+                  const loan = loanText(viewingTruck);
+                  const inspection = inspectionFact(viewingTruck);
+                  const small = (text: React.ReactNode) => <span className="text-base font-medium">{text}</span>;
+                  return (
+                    <div className="divide-y">
+                      <StatementLine label="Driver" value={small(viewingTruck.drivers ? `${viewingTruck.drivers.first_name} ${viewingTruck.drivers.last_name}` : 'Unassigned')} />
+                      <StatementLine label="Status" value={<StatusBadge status={viewingTruck.status} />} />
+                      <StatementLine label="VIN" value={small(<span className="font-mono text-sm">{viewingTruck.vin || 'Not set'}</span>)} />
+                      <StatementLine label="License plate" value={small(viewingTruck.license_plate ? `${viewingTruck.license_plate}${viewingTruck.license_plate_state ? ` (${viewingTruck.license_plate_state})` : ''}` : 'Not set')} />
+                      <StatementLine label="Mileage when bought" value={small(viewingTruck.purchase_mileage != null ? Number(viewingTruck.purchase_mileage).toLocaleString() : 'Not set')} />
+                      {inspection && <StatementLine label="120-day inspection" value={small(inspection.value)} tone={inspection.tone === 'bad' ? 'bad' : undefined} />}
+                      <StatementLine label="Loan" note={viewingTruck.lender_name ?? undefined} value={small(loan.text)} tone={loan.tone === 'good' ? 'good' : undefined} />
+                      {viewingTruck.monthly_payment ? <StatementLine label="Monthly payment" value={formatCurrency(Number(viewingTruck.monthly_payment))} /> : null}
+                    </div>
+                  );
+                })()}
+              </TabsContent>
               <TabsContent value="expenses" className="mt-4">
                 <ExpensesList
                   relatedType="truck"
