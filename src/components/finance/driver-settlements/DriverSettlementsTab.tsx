@@ -1,17 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Panel } from '@/components/finance/statement-ui';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,7 +14,6 @@ import { StatusBadge } from '@/components/shared/StatusBadge';
 import { toast } from 'sonner';
 import { archiveWithUndo } from '@/lib/soft-delete';
 import {
-  FileText,
   MoreHorizontal,
   CheckCircle2,
   DollarSign,
@@ -174,217 +164,169 @@ export function DriverSettlementsTab() {
     }
   };
 
+  const payMethod = (drv?: Driver | null) => {
+    const pt = (drv?.pay_type ?? '').toLowerCase();
+    const rate = Number(drv?.pay_rate ?? 0);
+    if (pt === 'flat') return `Flat ${formatCurrency(rate)}`;
+    if (pt === 'per_mile' || pt === 'cpm') return `$${rate.toFixed(2)}/mi`;
+    if (pt === 'percentage') return `${rate}% split`;
+    return '';
+  };
+  const periodLabel = (st: any) =>
+    `${format(parseISO(`${st.period_start}T00:00:00`), 'MMM d')} to ${format(parseISO(`${st.period_end}T00:00:00`), 'MMM d, yyyy')}`;
+
+  const actions = (st: any) => {
+    const isDownloading = downloadingId === st.id;
+    return (
+      <div className="flex items-center justify-end gap-0.5">
+        <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => handleDownload(st.id)} disabled={isDownloading} aria-label="Download PDF">
+          <Download className="h-4 w-4" />
+        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="More actions">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setViewSettlementId(st.id)}>
+              <Eye className="mr-2 h-4 w-4" /> View details
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleDownload(st.id)} disabled={isDownloading}>
+              <Download className="mr-2 h-4 w-4" /> Download PDF
+            </DropdownMenuItem>
+            {st.status === 'draft' && (
+              <DropdownMenuItem onClick={() => updateStatus.mutate({ id: st.id, status: 'approved' })}>
+                <CheckCircle2 className="mr-2 h-4 w-4" /> Approve
+              </DropdownMenuItem>
+            )}
+            {st.status === 'approved' && (
+              <DropdownMenuItem onClick={() => updateStatus.mutate({ id: st.id, status: 'paid' })}>
+                <DollarSign className="mr-2 h-4 w-4" /> Mark paid
+              </DropdownMenuItem>
+            )}
+            {st.status !== 'draft' && (
+              <DropdownMenuItem onClick={() => updateStatus.mutate({ id: st.id, status: 'draft' })}>
+                Revert to draft
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => {
+                if (confirm('Delete this settlement statement? This cannot be undone.')) {
+                  deleteSettlement.mutate(st.id);
+                }
+              }}
+            >
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  };
+
+  const chip = (active: boolean, label: string, onClick: () => void) => (
+    <Button key={label} variant={active ? 'default' : 'outline'} className="h-11 rounded-full px-4 capitalize" aria-pressed={active} onClick={onClick}>
+      {label}
+    </Button>
+  );
+
   return (
     <div className="space-y-6">
-
-
-      <Card className="card-elevated">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" /> Settlement Statements
-            </CardTitle>
-            <CardDescription>
-              Generate paystubs on demand. Pick drivers, pay period end, and payment date.
-            </CardDescription>
-          </div>
-          <Button
-            size="lg"
-            className="gradient-gold text-primary-foreground"
-            onClick={() => setGenerateOpen(true)}
-          >
-            <Receipt className="h-4 w-4 mr-2" /> Generate Settlements
+      <Panel
+        title="Driver settlements"
+        description="Paystubs for your drivers, every pay period. Approved and paid statements count as driver pay on the Profit & loss tab."
+        flush
+        aside={
+          <Button className="h-11 gap-2" onClick={() => setGenerateOpen(true)}>
+            <Receipt className="h-4 w-4" /> Generate settlements
           </Button>
-        </CardHeader>
-      </Card>
-
-      <Card className="card-elevated">
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" /> Generated Statements
-            </CardTitle>
-            <CardDescription>
-              All settlement statements across drivers and pay periods.
-            </CardDescription>
+        }
+      >
+        <div className="space-y-2 px-4 pb-3">
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by status">
+            {STATUS_OPTIONS.map((st) => chip(statusFilter === st, st, () => setStatusFilter(st)))}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {STATUS_OPTIONS.map((s) => (
-              <Button
-                key={s}
-                size="sm"
-                variant={statusFilter === s ? 'default' : 'outline'}
-                onClick={() => setStatusFilter(s)}
-                className="capitalize"
-              >
-                {s}
-              </Button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by driver type">
+            {TYPE_OPTIONS.map((opt) => chip(typeFilter === opt.value, opt.label, () => setTypeFilter(opt.value)))}
           </div>
-        </CardHeader>
-        <div className="px-6 pb-3 flex items-center gap-2 flex-wrap border-b">
-          <span className="text-[11px] uppercase tracking-wide text-muted-foreground mr-1">Driver Type:</span>
-          {TYPE_OPTIONS.map((opt) => (
-            <Button
-              key={opt.value}
-              size="sm"
-              variant={typeFilter === opt.value ? 'default' : 'outline'}
-              onClick={() => setTypeFilter(opt.value)}
-              className="rounded-full"
-            >
-              {opt.label}
-            </Button>
-          ))}
         </div>
-        <CardContent>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Driver</TableHead>
-                  <TableHead>Pay Period</TableHead>
-                  <TableHead className="text-right">Gross Pay</TableHead>
-                  <TableHead className="text-right">Reimbursements</TableHead>
-                  <TableHead className="text-right">Net Pay</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
-                      Loading…
-                    </TableCell>
-                  </TableRow>
-                ) : filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No settlement statements yet. Click "Generate Settlements" to create one.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((s: any) => {
-                    const isDownloading = downloadingId === s.id;
-                    const drv = driverMap.get(s.driver_id);
-                    const pt = (drv?.pay_type ?? '').toLowerCase();
-                    const rate = Number(drv?.pay_rate ?? 0);
-                    let method = '';
-                    if (pt === 'flat') method = `Flat ${formatCurrency(rate)}`;
-                    else if (pt === 'per_mile' || pt === 'cpm')
-                      method = `$${rate.toFixed(2)}/mi`;
-                    else if (pt === 'percentage') method = `${rate}% split`;
+        {isLoading ? (
+          <p className="border-t px-4 py-4 text-sm text-muted-foreground">Loading settlements.</p>
+        ) : filtered.length === 0 ? (
+          <p className="border-t px-4 py-4 text-sm text-muted-foreground">
+            No settlement statements match. Use Generate settlements to create one.
+          </p>
+        ) : (
+          <>
+            {/* Phone: one card per statement */}
+            <ul className="divide-y border-t md:hidden">
+              {filtered.map((st: any) => {
+                const drv = driverMap.get(st.driver_id);
+                const method = payMethod(drv);
+                return (
+                  <li key={st.id} className="flex items-start gap-1 py-1 pl-4 pr-1">
+                    <div className="min-w-0 flex-1 py-2">
+                      <div className="flex items-baseline gap-2">
+                        <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{driverName(drv)}</span>
+                        <span className="figure text-lg font-bold">{formatCurrency(Number(st.net_pay ?? 0))}</span>
+                      </div>
+                      <div className="text-[13px] text-muted-foreground">{periodLabel(st)}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-foreground tabular-nums">
+                        <StatusBadge status={st.status} />
+                        <span>Gross {formatCurrency(Number(st.gross_pay ?? 0))}{method ? `, ${method}` : ''}</span>
+                        {Number(st.reimbursements ?? 0) > 0 && <span>Reimbursed {formatCurrency(Number(st.reimbursements))}</span>}
+                      </div>
+                    </div>
+                    {actions(st)}
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Desktop: the table */}
+            <div className="hidden overflow-x-auto border-t md:block">
+              <table className="w-full text-[15px]">
+                <caption className="sr-only">Driver settlement statements</caption>
+                <thead>
+                  <tr className="border-b text-left text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th scope="col" className="px-4 py-2">Driver</th>
+                    <th scope="col" className="py-2">Pay period</th>
+                    <th scope="col" className="py-2 text-right">Gross pay</th>
+                    <th scope="col" className="py-2 text-right">Reimbursements</th>
+                    <th scope="col" className="py-2 text-right">Net pay</th>
+                    <th scope="col" className="py-2 pl-6">Status</th>
+                    <th scope="col" className="w-28 py-2 pr-2"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {filtered.map((st: any) => {
+                    const drv = driverMap.get(st.driver_id);
+                    const method = payMethod(drv);
                     return (
-                      <TableRow key={s.id}>
-                        <TableCell className="font-medium">
-                          {driverName(drv)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {format(parseISO(`${s.period_start}T00:00:00`), 'MMM d')} –{' '}
-                          {format(parseISO(`${s.period_end}T00:00:00`), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div>{formatCurrency(Number(s.gross_pay ?? 0))}</div>
-                          {method && (
-                            <div className="text-xs text-muted-foreground font-normal">
-                              {method}
-                            </div>
-                          )}
-                        </TableCell>
-
-                        <TableCell className="text-right">
-                          {formatCurrency(Number(s.reimbursements ?? 0))}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-primary">
-                          {formatCurrency(Number(s.net_pay ?? 0))}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={s.status} />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDownload(s.id)}
-                              disabled={isDownloading}
-                              title="Download PDF"
-                            >
-                              <Download className="h-4 w-4" />
-                              <span className="sr-only">Download PDF</span>
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => setViewSettlementId(s.id)}>
-                                  <Eye className="mr-2 h-4 w-4" /> View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleDownload(s.id)}
-                                  disabled={isDownloading}
-                                >
-                                  <Download className="mr-2 h-4 w-4" /> Download PDF
-                                </DropdownMenuItem>
-                                {s.status === 'draft' && (
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      updateStatus.mutate({ id: s.id, status: 'approved' })
-                                    }
-                                  >
-                                    <CheckCircle2 className="mr-2 h-4 w-4" /> Approve
-                                  </DropdownMenuItem>
-                                )}
-                                {s.status === 'approved' && (
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      updateStatus.mutate({ id: s.id, status: 'paid' })
-                                    }
-                                  >
-                                    <DollarSign className="mr-2 h-4 w-4" /> Mark Paid
-                                  </DropdownMenuItem>
-                                )}
-                                {s.status !== 'draft' && (
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      updateStatus.mutate({ id: s.id, status: 'draft' })
-                                    }
-                                  >
-                                    Revert to Draft
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={() => {
-                                    if (
-                                      confirm(
-                                        'Delete this settlement statement? This cannot be undone.',
-                                      )
-                                    ) {
-                                      deleteSettlement.mutate(s.id);
-                                    }
-                                  }}
-                                >
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                      <tr key={st.id}>
+                        <td className="px-4 py-2 font-medium">{driverName(drv)}</td>
+                        <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">{periodLabel(st)}</td>
+                        <td className="py-2 text-right">
+                          <div className="figure">{formatCurrency(Number(st.gross_pay ?? 0))}</div>
+                          {method && <div className="text-[13px] text-muted-foreground">{method}</div>}
+                        </td>
+                        <td className="figure py-2 text-right">{formatCurrency(Number(st.reimbursements ?? 0))}</td>
+                        <td className="figure py-2 text-right text-lg font-bold">{formatCurrency(Number(st.net_pay ?? 0))}</td>
+                        <td className="py-2 pl-6"><StatusBadge status={st.status} /></td>
+                        <td className="py-1 pr-2">{actions(st)}</td>
+                      </tr>
                     );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </Panel>
 
       <GenerateSettlementsDialog
         open={generateOpen}

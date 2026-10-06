@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { driverPayEvents, driverPayTotals, driverSettlementCost, expenseCost, fuelStats, truckRevenueOf, workbookMetrics } from '@/lib/pl-metrics';
+import { driverPayEvents, driverPayTotals, driverSettlementCost, safetyBonusCost, expenseCost, fuelStats, truckRevenueOf, workbookMetrics } from '@/lib/pl-metrics';
 
 describe('truckRevenueOf', () => {
   it('counts what the truck earns, never the gross billed to the customer', () => {
@@ -124,5 +124,38 @@ describe('driverPayEvents', () => {
       [{ driver_id: 't', period_end: '2026-07-16', net_pay: 1531.88 }, { driver_id: 'o', period_end: '2026-07-23', net_pay: 500 }],
     );
     expect(events).toEqual([{ date: '2026-07-16', amount: 2000 }, { date: '2026-07-23', amount: 500 }]);
+  });
+});
+
+describe('safety bonuses as driver cost', () => {
+  const bonus = (o: Record<string, unknown> = {}) => ({ period_end: '2026-07-31', status: 'approved', earned_amount: 250, paid_in_settlement_id: null, ...o });
+
+  it('counts an approved or paid bonus at the amount earned', () => {
+    expect(safetyBonusCost(bonus())).toBe(250);
+    expect(safetyBonusCost(bonus({ status: 'paid' }))).toBe(250);
+  });
+
+  it('ignores pending and void bonuses', () => {
+    expect(safetyBonusCost(bonus({ status: 'pending' }))).toBe(0);
+    expect(safetyBonusCost(bonus({ status: 'void' }))).toBe(0);
+  });
+
+  it('skips a bonus already paid inside a settlement, which counts it in gross pay', () => {
+    expect(safetyBonusCost(bonus({ paid_in_settlement_id: 'abc' }))).toBe(0);
+  });
+
+  it('adds counted bonuses to driver pay and reports how many', () => {
+    const t = driverPayTotals(
+      [{ driver_id: 'd', period_end: '2026-07-16', status: 'paid', gross_pay: 2000, reimbursements: 0 }],
+      [],
+      [bonus(), bonus({ status: 'pending' }), bonus({ earned_amount: 100, status: 'paid' })],
+    );
+    expect(t.bonusCount).toBe(2);
+    expect(t.bonusPay).toBe(350);
+    expect(t.total).toBe(2350);
+  });
+
+  it('dates each counted bonus at the end of its month', () => {
+    expect(driverPayEvents([], [], [bonus(), bonus({ status: 'void' })])).toEqual([{ date: '2026-07-31', amount: 250 }]);
   });
 });

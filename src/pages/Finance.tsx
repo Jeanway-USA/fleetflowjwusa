@@ -31,6 +31,7 @@ import { SettlementStatementTab } from '@/components/finance/SettlementStatement
 import { PossibleDuplicates } from '@/components/finance/PossibleDuplicates';
 import { ExpenseSummary } from '@/components/finance/ExpenseSummary';
 import { ExpensesList } from '@/components/finance/ExpensesList';
+import { Panel, StatementLine } from '@/components/finance/statement-ui';
 import { driverPayTotals, fuelStats } from '@/lib/pl-metrics';
 const RevenueTab = lazy(() =>
   import('@/components/finance/RevenueTab').then(m => ({ default: m.RevenueTab })),
@@ -75,6 +76,7 @@ export default function Finance() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [showW2Batch, setShowW2Batch] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseFormData, setExpenseFormData] = useState<Partial<ExpenseInsert>>({});
   const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<string>>(new Set());
@@ -176,6 +178,19 @@ export default function Finance() {
       const { data, error } = await supabase
         .from('driver_settlements')
         .select('driver_id, period_end, status, gross_pay, reimbursements')
+        .is('deleted_at', null);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Approved or paid safety bonuses are driver pay too.
+  const { data: safetyBonuses = [] } = useQuery({
+    queryKey: ['safety_bonus_payouts_cost'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('safety_bonus_payouts')
+        .select('period_end, status, earned_amount, paid_in_settlement_id')
         .is('deleted_at', null);
       if (error) throw error;
       return data;
@@ -452,7 +467,11 @@ export default function Finance() {
   const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total + truckPaymentsTotal - creditsTotal;
   const grossExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total + truckPaymentsTotal;
   // Driver pay: approved or paid settlement statements (gross pay plus reimbursements) and W-2 payroll batches.
-  const driverPay = driverPayTotals(driverSettlements.filter((st: any) => inPeriod(st.period_end)), filteredPayrolls);
+  const driverPay = driverPayTotals(
+    driverSettlements.filter((st: any) => inPeriod(st.period_end)),
+    filteredPayrolls,
+    safetyBonuses.filter((b: any) => inPeriod(b.period_end)),
+  );
   const totalPayroll = driverPay.total;
   const totalRevenueWithCommissions = revenueTotals.netRevenue + commissionTotals.amount;
   const netProfit = totalRevenueWithCommissions - totalExpenses - totalPayroll;
@@ -519,7 +538,7 @@ export default function Finance() {
 
 
   // Period and truck pickers. The period applies to Profit & loss and Expenses; the settlement tab has its own week.
-  const renderFilters = () => (
+  const renderFilters = (showTruck = true) => (
       <div className="grid grid-cols-2 gap-2 mb-4 sm:flex sm:flex-wrap sm:gap-3">
         <Select value={selectedPeriod} onValueChange={(v) => { setSelectedPeriod(v); setExpensePage(0); }}>
           <SelectTrigger className="h-11 sm:h-10 sm:w-48" aria-label="Period"><SelectValue placeholder="Select period" /></SelectTrigger>
@@ -554,18 +573,20 @@ export default function Finance() {
             })()}
           </SelectContent>
         </Select>
-        <Select value={selectedTruck} onValueChange={setSelectedTruck}>
-          <SelectTrigger className="h-11 sm:h-10 sm:w-56" aria-label="Truck">
-            <TruckIcon className="h-4 w-4 mr-2 text-muted-foreground" />
-            <SelectValue placeholder="Select truck" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Units (Company)</SelectItem>
-            {trucks.map((truck: any) => (
-              <SelectItem key={truck.id} value={truck.id}>Unit #{truck.unit_number}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {showTruck && (
+          <Select value={selectedTruck} onValueChange={setSelectedTruck}>
+            <SelectTrigger className="h-11 sm:h-10 sm:w-56" aria-label="Truck">
+              <TruckIcon className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Select truck" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Units (Company)</SelectItem>
+              {trucks.map((truck: any) => (
+                <SelectItem key={truck.id} value={truck.id}>Unit #{truck.unit_number}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
   );
 
@@ -740,32 +761,62 @@ export default function Finance() {
 
         {/* ===== PAYROLL: W-2 batch, contractor settlements, agent commissions, safety bonuses ===== */}
         <TabsContent value="payroll">
-          <div className="space-y-8 animate-in fade-in-50">
-            {canManagePayroll && (
-              <section>
-                <ActiveBatchTab />
-              </section>
-            )}
+          <div className="animate-in fade-in-50 space-y-5">
+            {renderFilters(false)}
 
-            <section className="space-y-2">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-primary" /> Contractor Settlements (1099)
-              </h3>
-              <DriverSettlementsTab />
-            </section>
-
-            <section className="space-y-2">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Percent className="h-5 w-5 text-primary" /> Agent Commissions
-              </h3>
-              <CommissionsTab
-                filteredCommissions={filteredCommissions}
-                commissionTotals={commissionTotals}
-                commissionsLoading={commissionsLoading}
+            <Panel title="Payroll this period" description="What your drivers cost, and what you earn as the agency.">
+              <StatementLine
+                label="Driver pay"
+                note={
+                  driverPay.total > 0
+                    ? [
+                        driverPay.settlementCount > 0 ? `${driverPay.settlementCount} approved or paid settlement${driverPay.settlementCount === 1 ? '' : 's'}` : '',
+                        driverPay.batchCount > 0 ? `${driverPay.batchCount} payroll batch${driverPay.batchCount === 1 ? '' : 'es'}` : '',
+                        driverPay.bonusCount > 0 ? `${driverPay.bonusCount} safety bonus${driverPay.bonusCount === 1 ? '' : 'es'}` : '',
+                        revenueTotals.netRevenue > 0 ? `${Math.round((driverPay.total / revenueTotals.netRevenue) * 100)}% of your revenue` : '',
+                      ].filter(Boolean).join(', ')
+                    : 'No approved or paid settlements or bonuses in this period'
+                }
+                value={driverPay.total > 0 ? `−${formatCurrency(driverPay.total)}` : 'None yet'}
+                muted
               />
-            </section>
+              <StatementLine
+                label="Agent commissions"
+                note={commissionTotals.count > 0 ? `${commissionTotals.count} earned, counted as revenue` : 'None earned in this period'}
+                value={commissionTotals.count > 0 ? `+${formatCurrency(commissionTotals.amount)}` : 'None yet'}
+                rule="single"
+              />
+            </Panel>
+
+            <DriverSettlementsTab />
+
+            <CommissionsTab
+              filteredCommissions={filteredCommissions}
+              commissionTotals={commissionTotals}
+              commissionsLoading={commissionsLoading}
+            />
 
             <SafetyBonusPayouts />
+
+            {canManagePayroll && (
+              payrolls.length > 0 || showW2Batch ? (
+                <section>
+                  <ActiveBatchTab />
+                </section>
+              ) : (
+                <Panel
+                  title="W-2 payroll batch"
+                  description="Weekly payroll with tax withholding for W-2 employees."
+                  aside={
+                    <Button variant="outline" className="h-11" onClick={() => setShowW2Batch(true)}>Open batch tools</Button>
+                  }
+                >
+                  <p className="pb-2 text-sm text-muted-foreground">
+                    No W-2 payroll has been run yet, so there is nothing to show. Open the tools when you want to run a batch.
+                  </p>
+                </Panel>
+              )
+            )}
           </div>
         </TabsContent>
 

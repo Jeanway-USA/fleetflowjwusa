@@ -206,7 +206,7 @@ export function PLSummaryTab({
           {payroll > 0 && (
             <StatementLine
               label="Driver pay"
-              note={[driverPay.settlementCount > 0 ? `${driverPay.settlementCount} settlement${driverPay.settlementCount === 1 ? '' : 's'}, gross pay plus reimbursements` : '', driverPay.batchCount > 0 ? `${driverPay.batchCount} payroll batch${driverPay.batchCount === 1 ? '' : 'es'}` : ''].filter(Boolean).join(', ')}
+              note={[driverPay.settlementCount > 0 ? `${driverPay.settlementCount} settlement${driverPay.settlementCount === 1 ? '' : 's'}, gross pay plus reimbursements` : '', driverPay.batchCount > 0 ? `${driverPay.batchCount} payroll batch${driverPay.batchCount === 1 ? '' : 'es'}` : '', driverPay.bonusCount > 0 ? `${driverPay.bonusCount} safety bonus${driverPay.bonusCount === 1 ? '' : 'es'}` : ''].filter(Boolean).join(', ')}
               value={takeOff(payroll)}
               muted
             />

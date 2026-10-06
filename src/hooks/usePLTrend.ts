@@ -82,7 +82,7 @@ export function usePLTrend() {
       const trailing90Iso = format(trailing90Cutoff, 'yyyy-MM-dd');
 
       const earliestIso = horizonIso < trailing90Iso ? horizonIso : trailing90Iso;
-      const [loadsRes, expensesRes, payrollRes, commissionsRes, loanRes, settlementsRes] = await Promise.all([
+      const [loadsRes, expensesRes, payrollRes, commissionsRes, loanRes, settlementsRes, bonusesRes] = await Promise.all([
         supabase
           .from('fleet_loads')
           .select('delivery_date, gross_revenue, truck_revenue, net_revenue, actual_miles, booked_miles, status, truck_id')
@@ -108,13 +108,18 @@ export function usePLTrend() {
           .select('driver_id, period_end, status, gross_pay, reimbursements')
           .is('deleted_at', null)
           .gte('period_end', earliestIso),
+        supabase
+          .from('safety_bonus_payouts')
+          .select('period_end, status, earned_amount, paid_in_settlement_id')
+          .is('deleted_at', null)
+          .gte('period_end', earliestIso),
       ]);
 
       const loads = loadsRes.data ?? [];
       const expenses = expensesRes.data ?? [];
       const payroll = payrollRes.data ?? [];
       // Driver pay: approved or paid settlements (gross plus reimbursements) and payroll batches, never the same week twice.
-      const driverPay = driverPayEvents((settlementsRes.data ?? []) as any[], payroll as any[]);
+      const driverPay = driverPayEvents((settlementsRes.data ?? []) as any[], payroll as any[], (bonusesRes.data ?? []) as any[]);
       const commissions = commissionsRes.data ?? [];
       const loanPayments = (loanRes.data ?? []) as Array<{ payment_date: string; amount: number | string }>;
       // Loan payments come from the ledger; skip any mirrored expense rows so a payment never counts twice.

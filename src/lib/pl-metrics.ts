@@ -119,6 +119,14 @@ interface SettlementPayRow {
   reimbursements?: number | string | null;
 }
 
+interface SafetyBonusRow {
+  period_end?: string | null;
+  status?: string | null;
+  earned_amount?: number | string | null;
+  /** Set when the bonus was folded into a settlement, whose gross pay already counts it. */
+  paid_in_settlement_id?: string | null;
+}
+
 interface PayrollBatchRow {
   driver_id?: string | null;
   period_end?: string | null;
@@ -137,12 +145,24 @@ export function driverSettlementCost(settlement: SettlementPayRow): number {
   return (Number(settlement.gross_pay) || 0) + (Number(settlement.reimbursements) || 0);
 }
 
+/**
+ * What a safety bonus costs: the amount earned, once it is approved or paid. Pending bonuses are only
+ * generated, void ones were cancelled, and one already paid inside a settlement is in that settlement.
+ */
+export function safetyBonusCost(bonus: SafetyBonusRow): number {
+  if (bonus.paid_in_settlement_id) return 0;
+  if (!COUNTED_SETTLEMENT_STATUSES.has(String(bonus.status ?? '').toLowerCase())) return 0;
+  return Number(bonus.earned_amount) || 0;
+}
+
 export interface DriverPayTotals {
   total: number;
   settlementPay: number;
   batchPay: number;
+  bonusPay: number;
   settlementCount: number;
   batchCount: number;
+  bonusCount: number;
 }
 
 /**
@@ -150,23 +170,27 @@ export interface DriverPayTotals {
  * payroll batches. If a driver has both for the same period end, the settlement is the one
  * counted, so the same week is never charged twice.
  */
-export function driverPayTotals(settlements: SettlementPayRow[], batches: PayrollBatchRow[]): DriverPayTotals {
+export function driverPayTotals(settlements: SettlementPayRow[], batches: PayrollBatchRow[], bonuses: SafetyBonusRow[] = []): DriverPayTotals {
   const counted = settlements.filter((s) => driverSettlementCost(s) > 0);
   const settledKeys = new Set(counted.map((s) => `${s.driver_id ?? ''}|${s.period_end ?? ''}`));
   const batchRows = batches.filter((b) => !settledKeys.has(`${b.driver_id ?? ''}|${b.period_end ?? ''}`));
   const settlementPay = counted.reduce((sum, s) => sum + driverSettlementCost(s), 0);
   const batchPay = batchRows.reduce((sum, b) => sum + (Number(b.net_pay) || 0), 0);
+  const countedBonuses = bonuses.filter((b) => safetyBonusCost(b) > 0);
+  const bonusPay = countedBonuses.reduce((sum, b) => sum + safetyBonusCost(b), 0);
   return {
-    total: Math.round((settlementPay + batchPay) * 100) / 100,
+    total: Math.round((settlementPay + batchPay + bonusPay) * 100) / 100,
     settlementPay: Math.round(settlementPay * 100) / 100,
     batchPay: Math.round(batchPay * 100) / 100,
+    bonusPay: Math.round(bonusPay * 100) / 100,
     settlementCount: counted.length,
     batchCount: batchRows.length,
+    bonusCount: countedBonuses.length,
   };
 }
 
 /** Each driver payment as a dated cost, for charts that bucket by week. Same counting rules as driverPayTotals. */
-export function driverPayEvents(settlements: SettlementPayRow[], batches: PayrollBatchRow[]): Array<{ date: string; amount: number }> {
+export function driverPayEvents(settlements: SettlementPayRow[], batches: PayrollBatchRow[], bonuses: SafetyBonusRow[] = []): Array<{ date: string; amount: number }> {
   const counted = settlements.filter((s) => driverSettlementCost(s) > 0 && s.period_end);
   const settledKeys = new Set(counted.map((s) => `${s.driver_id ?? ''}|${s.period_end}`));
   return [
@@ -174,5 +198,8 @@ export function driverPayEvents(settlements: SettlementPayRow[], batches: Payrol
     ...batches
       .filter((b) => b.period_end && !settledKeys.has(`${b.driver_id ?? ''}|${b.period_end}`))
       .map((b) => ({ date: String(b.period_end), amount: Number(b.net_pay) || 0 })),
+    ...bonuses
+      .filter((b) => b.period_end && safetyBonusCost(b) > 0)
+      .map((b) => ({ date: String(b.period_end), amount: safetyBonusCost(b) })),
   ];
 }
