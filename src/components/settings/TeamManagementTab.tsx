@@ -6,7 +6,8 @@ import { invokeWithAuth } from '@/lib/invoke-with-auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
-import { DataTable } from '@/components/shared/DataTable';
+import { Roster, type RosterEntry } from '@/components/fleet/Roster';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { LoadingButton } from '@/components/shared/LoadingButton';
@@ -17,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
-import { UserPlus, Pencil, KeyRound, Trash2 } from 'lucide-react';
+import { UserPlus, Pencil, KeyRound, Trash2, MoreHorizontal } from 'lucide-react';
 import { useOnboardingDefaults, ONBOARDING_PREF_DEFAULTS } from '@/components/settings/OnboardingPreferencesCard';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -286,102 +287,64 @@ export function TeamManagementTab() {
     setEditDialogOpen(true);
   }, []);
 
-  // ── DataTable columns ──
-  const columns = useMemo(() => [
-    {
-      key: 'name' as const,
-      header: 'Name',
-      render: (row: UserWithRole) => {
-        const name = row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : null;
-        return <span className="font-medium text-foreground">{name || '—'}</span>;
-      },
-    },
-    {
-      key: 'email' as const,
-      header: 'Email',
-      render: (row: UserWithRole) => (
-        <span className="text-muted-foreground">{row.email}</span>
-      ),
-    },
-    {
-      key: 'role' as const,
-      header: 'Role',
-      width: '140px',
-      render: (row: UserWithRole) =>
-        row.role ? (
-          <Badge variant={roleBadgeVariant[row.role]}>{roleLabels[row.role]}</Badge>
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedUserId(row.user_id);
-              setAssignDialogOpen(true);
-            }}
-          >
-            Assign Role
-          </Button>
-        ),
-    },
-    {
-      key: 'status' as const,
-      header: 'Status',
-      width: '100px',
-      render: (row: UserWithRole) => {
-        const isActive = !!row.first_name;
-        return (
+  const entries: RosterEntry[] = usersWithRoles.map((row) => {
+    const isActive = !!row.first_name;
+    const name = row.first_name && row.last_name ? `${row.first_name} ${row.last_name}` : row.email;
+    return {
+      id: row.user_id,
+      title: name,
+      subtitle: row.email,
+      facts: [],
+      chips: (
+        <>
+          {row.role ? (
+            <Badge variant={roleBadgeVariant[row.role]}>{roleLabels[row.role]}</Badge>
+          ) : (
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setSelectedUserId(row.user_id); setAssignDialogOpen(true); }}>
+              Assign role
+            </Button>
+          )}
           <Badge variant={isActive ? 'default' : 'outline'} className={isActive ? 'bg-emerald-600/15 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-800' : ''}>
             {isActive ? 'Active' : 'Invited'}
           </Badge>
-        );
-      },
-    },
-    {
-      key: 'actions' as const,
-      header: 'Actions',
-      width: '120px',
-      render: (row: UserWithRole) => {
-        if (row.user_id === user?.id) return null;
-        return (
-          <div className="flex items-center gap-1">
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); openEditDialog(row); }}>
-              <Pencil className="h-3.5 w-3.5" />
+        </>
+      ),
+      menu: row.user_id === user?.id ? undefined : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Actions for ${name}`}>
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Force Password Reset" onClick={(e) => { e.stopPropagation(); setUserToResetPassword(row); setResetPasswordDialogOpen(true); }}>
-              <KeyRound className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setUserToDelete(row); setDeleteDialogOpen(true); }}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        );
-      },
-    },
-  ], [user?.id, openEditDialog]);
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openEditDialog(row)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => { setUserToResetPassword(row); setResetPasswordDialogOpen(true); }}><KeyRound className="mr-2 h-4 w-4" /> Force password reset</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={() => { setUserToDelete(row); setDeleteDialogOpen(true); }}><Trash2 className="mr-2 h-4 w-4" /> Remove</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    };
+  });
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-foreground">Team Members</h3>
-          <p className="text-sm text-muted-foreground">Manage your organization's users and their roles</p>
+          <h3 className="font-condensed text-xl font-bold leading-tight text-foreground">Team members</h3>
+          <p className="text-[13px] text-muted-foreground">Manage your organization's users and their roles</p>
         </div>
-        <Button onClick={() => setInviteOpen(true)} className="gradient-gold text-primary-foreground">
+        <Button onClick={() => setInviteOpen(true)} className="h-11 gradient-gold text-primary-foreground">
           <UserPlus className="h-4 w-4 mr-2" />
           Invite Member
         </Button>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={usersWithRoles}
-        loading={isLoading}
-        emptyMessage="No team members yet. Invite someone to get started."
-        tableId="team-members"
-        exportFilename="team-members"
-      />
+      {isLoading ? (
+        <div className="py-12 text-center text-muted-foreground">Loading...</div>
+      ) : (
+        <Roster entries={entries} empty="No team members yet. Invite someone to get started." />
+      )}
 
       {/* ── Invite Sheet ── */}
       <Sheet open={inviteOpen} onOpenChange={setInviteOpen}>

@@ -27,7 +27,7 @@ export interface RosterEntry {
   leading?: React.ReactNode;
   facts: RosterFact[];
   /** The row's actions menu. */
-  menu: React.ReactNode;
+  menu?: React.ReactNode;
   onOpen?: () => void;
 }
 
@@ -48,17 +48,19 @@ export function expiryFact(label: string, date: string | null | undefined, soonD
   return { label, value: shown };
 }
 
-export function Roster({ entries, selectedIds, onToggle, empty }: {
+export function Roster({ entries, selectedIds, onToggle, empty, bordered = true }: {
   entries: RosterEntry[];
+  /** Turn off the outer box when the roster sits inside a panel. */
+  bordered?: boolean;
   selectedIds?: Set<string>;
   onToggle?: (id: string) => void;
   empty?: React.ReactNode;
 }) {
   if (entries.length === 0) {
-    return <div className="rounded-lg border bg-card px-4 py-10 text-center text-sm text-muted-foreground">{empty}</div>;
+    return <div className={cn('px-4 py-10 text-center text-sm text-muted-foreground', bordered ? 'rounded-lg border bg-card' : 'border-t')}>{empty}</div>;
   }
   return (
-    <ul className="divide-y rounded-lg border bg-card">
+    <ul className={cn('divide-y', bordered ? 'rounded-lg border bg-card' : 'border-t')}>
       {entries.map((entry) => {
         const selected = selectedIds?.has(entry.id) ?? false;
         return (
@@ -96,7 +98,7 @@ export function Roster({ entries, selectedIds, onToggle, empty }: {
                 </dl>
               )}
             </div>
-            <div className="-mr-2 shrink-0">{entry.menu}</div>
+            {entry.menu && <div className="-mr-2 shrink-0">{entry.menu}</div>}
           </li>
         );
       })}

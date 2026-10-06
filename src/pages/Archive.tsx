@@ -3,14 +3,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
-import { Archive as ArchiveIcon, RotateCcw, Trash2, Search } from 'lucide-react';
+import { Archive as ArchiveIcon, RotateCcw, Trash2, MoreHorizontal } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
-import { DataTable } from '@/components/shared/DataTable';
+import { Roster, RosterToolbar, RosterBulkBar, type RosterEntry } from '@/components/fleet/Roster';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 
@@ -276,97 +276,58 @@ function ArchiveTab({ table }: { table: ArchivableTable }) {
     setBulkPurgeOpen(false);
   };
 
-  const columns = [
-    {
-      key: 'label',
-      header: label.singular,
-      render: (r: any) => <span className="font-medium">{config.label(r)}</span>,
-    },
-    {
-      key: 'meta',
-      header: 'Details',
-      render: (r: any) => (
-        <span className="text-muted-foreground text-sm">{config.meta?.(r) || '—'}</span>
+  const entries: RosterEntry[] = filtered.map((r: any) => {
+    const name = config.label(r);
+    return {
+      id: r.id,
+      title: name,
+      subtitle: [config.meta?.(r), r.deleted_at ? `Archived ${format(parseISO(r.deleted_at), 'MMM d, yyyy h:mm a')}` : null].filter(Boolean).join(', ') || undefined,
+      facts: [],
+      menu: (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Actions for ${name}`} disabled={isMutating}>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleRestore(r.id, name)}><RotateCcw className="mr-2 h-4 w-4" /> Restore</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={() => { setPurgeTarget({ id: r.id, name }); setPurgeOpen(true); }}>
+              <Trash2 className="mr-2 h-4 w-4" /> Delete permanently
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
-    },
-    {
-      key: 'deleted_at',
-      header: 'Archived',
-      render: (r: any) =>
-        r.deleted_at ? format(parseISO(r.deleted_at), 'MMM d, yyyy h:mm a') : '—',
-    },
-    {
-      key: 'actions',
-      header: '',
-      render: (r: any) => (
-        <div className="flex gap-2 justify-end">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRestore(r.id, config.label(r));
-            }}
-            disabled={isMutating}
-          >
-            <RotateCcw className="mr-1 h-3 w-3" /> Restore
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={(e) => {
-              e.stopPropagation();
-              setPurgeTarget({ id: r.id, name: config.label(r) });
-              setPurgeOpen(true);
-            }}
-            disabled={isMutating}
-          >
-            <Trash2 className="mr-1 h-3 w-3" /> Delete
-          </Button>
-        </div>
-      ),
-    },
-  ];
+    };
+  });
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   return (
     <div className="space-y-4">
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={`Search archived ${label.plural.toLowerCase()}...`}
-          className="pl-9 sm:pl-9"
-        />
-      </div>
+      <RosterToolbar search={search} onSearch={setSearch} placeholder={`Search archived ${label.plural.toLowerCase()}`} />
 
-      <DataTable
-        columns={columns as any}
-        data={filtered}
-        loading={isLoading}
-        emptyMessage={`No archived ${label.plural.toLowerCase()}`}
-        emptyDescription="Archived records will appear here."
-        emptyIcon={ArchiveIcon}
-        tableId={`archive-${table}`}
-        selectable
-        selectedIds={selectedIds}
-        onSelectionChange={setSelectedIds}
-        bulkActions={(ids) => (
-          <>
-            <Button size="sm" variant="outline" onClick={handleBulkRestore} disabled={isMutating}>
-              <RotateCcw className="mr-1 h-3 w-3" /> Restore ({ids.size})
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => setBulkPurgeOpen(true)}
-              disabled={isMutating}
-            >
-              <Trash2 className="mr-1 h-3 w-3" /> Delete ({ids.size})
-            </Button>
-          </>
-        )}
-      />
+      <RosterBulkBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+        <Button variant="outline" className="h-11" onClick={handleBulkRestore} disabled={isMutating}>
+          <RotateCcw className="mr-2 h-4 w-4" /> Restore
+        </Button>
+        <Button variant="outline" className="h-11 text-destructive" onClick={() => setBulkPurgeOpen(true)} disabled={isMutating}>
+          <Trash2 className="mr-2 h-4 w-4" /> Delete permanently
+        </Button>
+      </RosterBulkBar>
+
+      {isLoading ? (
+        <div className="py-12 text-center text-muted-foreground">Loading...</div>
+      ) : (
+        <Roster entries={entries} selectedIds={selectedIds} onToggle={toggleSelect} empty={`No archived ${label.plural.toLowerCase()}. Archived records will appear here.`} />
+      )}
 
       <ConfirmDeleteDialog
         open={purgeOpen}

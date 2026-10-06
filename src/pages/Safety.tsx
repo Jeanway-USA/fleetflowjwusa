@@ -3,13 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel, StatementLine } from '@/components/finance/statement-ui';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DriverComplianceHub } from '@/components/safety/DriverComplianceHub';
 import { NewWorkOrderSheet, WorkOrderInitialData } from '@/components/maintenance/NewWorkOrderSheet';
-import { AlertTriangle, CheckCircle, Clock, Truck, Shield, Flame, CreditCard, User, ClipboardCheck, FileWarning, TrendingUp } from 'lucide-react';
-import { format, addDays, isBefore, parseISO, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format, addDays, isBefore, parseISO, subMonths, startOfMonth, endOfMonth, differenceInCalendarDays } from 'date-fns';
 import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
 
 const IncidentTrendsChart = lazy(() =>
@@ -23,38 +21,6 @@ interface AlertItem {
   subtitle: string;
   date: string;
   isExpired: boolean;
-}
-
-function AlertList({ alerts, emptyMessage }: { alerts: AlertItem[]; emptyMessage: string }) {
-  if (alerts.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        <CheckCircle className="h-10 w-10 mx-auto mb-3 text-success" />
-        <p>{emptyMessage}</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {alerts.map(alert => (
-        <div key={alert.id} className={`flex items-center justify-between p-3 rounded-lg ${alert.isExpired ? 'bg-destructive/10' : 'bg-warning/10'}`}>
-          <div>
-            <p className="font-medium">{alert.name}</p>
-            <p className="text-sm text-muted-foreground">{alert.subtitle}</p>
-          </div>
-          <div className="text-right">
-            <p className={`text-sm font-medium ${alert.isExpired ? 'text-destructive' : 'text-warning'}`}>
-              {alert.isExpired ? 'EXPIRED' : 'Expiring'}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {format(parseISO(alert.date), 'MMM d, yyyy')}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 export default function Safety() {
@@ -181,188 +147,98 @@ export default function Safety() {
   const totalDriverAlerts = licenseAlerts.length + medicalAlerts.length + hazmatAlerts.length;
   const openIncidents = incidents.filter(i => i.status === 'reported' || i.status === 'under_review').length;
 
+  const trucksNeedingAttention = inspectionAlerts.length + downTrucks.length;
+  const anyExpired = [...licenseAlerts, ...medicalAlerts, ...hazmatAlerts].some((a) => a.isExpired);
+
+  // One list of everything due within 30 days, soonest first, in place of five tabs.
+  const attention = [
+    ...inspectionAlerts.map((a) => ({ ...a, what: 'Truck inspection', who: `Unit ${a.name}` })),
+    ...licenseAlerts.map((a) => ({ ...a, what: 'CDL', who: a.name })),
+    ...medicalAlerts.map((a) => ({ ...a, what: 'DOT medical card', who: a.name })),
+    ...hazmatAlerts.map((a) => ({ ...a, what: 'Hazmat certification', who: a.name })),
+  ].sort((a, b) => a.date.localeCompare(b.date));
+
   return (
     <>
-      <PageHeader title="Safety Dashboard" description="Monitor inspections, compliance, incidents, and alerts" />
+      <PageHeader title="Safety" description="Inspections, driver credentials, incidents and alerts" />
 
+      <Panel title="Needs attention" className="mb-5">
+        <StatementLine
+          label="Trucks"
+          note={`${inspectionAlerts.length} ${inspectionAlerts.length === 1 ? 'inspection' : 'inspections'} due within 30 days, ${downTrucks.length} down`}
+          value={trucksNeedingAttention}
+          tone={downTrucks.length > 0 ? 'bad' : undefined}
+        />
+        <StatementLine
+          label="Driver credentials to renew"
+          note="CDL, medical card and hazmat, due within 30 days"
+          value={totalDriverAlerts}
+          rule="single"
+          tone={anyExpired ? 'bad' : undefined}
+        />
+        <StatementLine
+          label="Open incidents"
+          note="Reported or under review"
+          value={openIncidents}
+          rule="single"
+          tone={openIncidents > 0 ? 'bad' : undefined}
+        />
+        <StatementLine
+          label="Trucks running"
+          note={downTrucks.length === 0 ? 'Every truck is operational.' : `${downTrucks.length} down or out of service`}
+          value={`${trucks.length - downTrucks.length} of ${trucks.length}`}
+          strong
+          rule="double"
+          tone={downTrucks.length === 0 ? 'good' : 'bad'}
+        />
+      </Panel>
 
+      <Panel title="Due within 30 days" description="Everything that is expired or about to be, soonest first." className="mb-5">
+        {attention.length === 0 && downTrucks.length === 0 ? (
+          <p className="border-t py-4 text-sm text-muted-foreground">Nothing needs attention. Inspections and credentials are current.</p>
+        ) : (
+          <div className="border-t">
+            {downTrucks.map((truck, i) => (
+              <StatementLine
+                key={`down-${truck.id}`}
+                label={`Unit ${truck.unit_number}`}
+                note={[truck.make, truck.model].filter(Boolean).join(' ') || 'Truck'}
+                value={<span className="text-base"><StatusBadge status={truck.status} /></span>}
+                rule={i > 0 ? 'single' : undefined}
+              />
+            ))}
+            {attention.map((item, i) => {
+              const days = differenceInCalendarDays(parseISO(item.date), today);
+              return (
+                <StatementLine
+                  key={item.id + item.what}
+                  label={item.who}
+                  note={`${item.what}, ${format(parseISO(item.date), 'MMM d, yyyy')}`}
+                  value={<span className="text-base">{item.isExpired ? `Expired ${Math.abs(days)} ${Math.abs(days) === 1 ? 'day' : 'days'} ago` : `In ${days} ${days === 1 ? 'day' : 'days'}`}</span>}
+                  tone={item.isExpired ? 'bad' : undefined}
+                  rule={i > 0 || downTrucks.length > 0 ? 'single' : undefined}
+                />
+              );
+            })}
+          </div>
+        )}
+      </Panel>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Truck Alerts</CardTitle>
-            <Truck className={`h-4 w-4 ${inspectionAlerts.length + downTrucks.length > 0 ? 'text-warning' : 'text-muted-foreground'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{inspectionAlerts.length + downTrucks.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {inspectionAlerts.length} inspections, {downTrucks.length} down
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Driver Alerts</CardTitle>
-            <User className={`h-4 w-4 ${totalDriverAlerts > 0 ? 'text-warning' : 'text-muted-foreground'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalDriverAlerts}</div>
-            <p className="text-xs text-muted-foreground">
-              License, Medical, HAZMAT
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Open Incidents</CardTitle>
-            <FileWarning className={`h-4 w-4 ${openIncidents > 0 ? 'text-destructive' : 'text-muted-foreground'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{openIncidents}</div>
-            <p className="text-xs text-muted-foreground">Reported or under review</p>
-          </CardContent>
-        </Card>
-        <Card className="card-elevated">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Fleet Status</CardTitle>
-            <CheckCircle className={`h-4 w-4 ${downTrucks.length === 0 ? 'text-success' : 'text-destructive'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{trucks.length - downTrucks.length}/{trucks.length}</div>
-            <p className="text-xs text-muted-foreground">Trucks operational</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Incident Trends Chart */}
-      {incidents.length > 0 && (
-        <Card className="card-elevated mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Incident Trends (6 Months)
-            </CardTitle>
-            <CardDescription>Monthly incident count breakdown</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<ChartSkeleton height={200} />}>
-              <IncidentTrendsChart data={incidentTrends} config={trendChartConfig} />
-            </Suspense>
-          </CardContent>
-        </Card>
-      )}
-
-
-      {/* Driver Compliance Hub */}
       <DriverComplianceHub />
 
-      {/* Compliance Alerts */}
-      <div className="mb-6">
+      {incidents.length > 0 && (
+        <Panel title="Incidents, last 6 months" description="Monthly count, with critical and major incidents shown separately." className="mb-5">
+          <Suspense fallback={<ChartSkeleton height={200} />}>
+            <IncidentTrendsChart data={incidentTrends} config={trendChartConfig} />
+          </Suspense>
+        </Panel>
+      )}
 
-
-        {/* Compliance Alerts */}
-        <Card className="card-elevated">
-          <CardHeader>
-            <CardTitle>Compliance Alerts</CardTitle>
-            <CardDescription>Items requiring attention within 30 days</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="inspections" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="inspections" className="flex gap-1">
-                  <Truck className="h-4 w-4" />
-                  <span className="hidden sm:inline">Insp</span>
-                  {inspectionAlerts.length > 0 && (
-                    <span className="ml-1 rounded-full bg-warning/20 px-1.5 py-0.5 text-xs font-medium text-warning">
-                      {inspectionAlerts.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="licenses" className="flex gap-1">
-                  <CreditCard className="h-4 w-4" />
-                  <span className="hidden sm:inline">CDL</span>
-                  {licenseAlerts.length > 0 && (
-                    <span className="ml-1 rounded-full bg-warning/20 px-1.5 py-0.5 text-xs font-medium text-warning">
-                      {licenseAlerts.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="medical" className="flex gap-1">
-                  <Shield className="h-4 w-4" />
-                  <span className="hidden sm:inline">Med</span>
-                  {medicalAlerts.length > 0 && (
-                    <span className="ml-1 rounded-full bg-warning/20 px-1.5 py-0.5 text-xs font-medium text-warning">
-                      {medicalAlerts.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="hazmat" className="flex gap-1">
-                  <Flame className="h-4 w-4" />
-                  <span className="hidden sm:inline">HAZ</span>
-                  {hazmatAlerts.length > 0 && (
-                    <span className="ml-1 rounded-full bg-warning/20 px-1.5 py-0.5 text-xs font-medium text-warning">
-                      {hazmatAlerts.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="down" className="flex gap-1">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span className="hidden sm:inline">Down</span>
-                  {downTrucks.length > 0 && (
-                    <span className="ml-1 rounded-full bg-destructive/20 px-1.5 py-0.5 text-xs font-medium text-destructive">
-                      {downTrucks.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="inspections" className="mt-4">
-                <AlertList alerts={inspectionAlerts} emptyMessage="All inspections are up to date" />
-              </TabsContent>
-
-              <TabsContent value="licenses" className="mt-4">
-                <AlertList alerts={licenseAlerts} emptyMessage="All licenses are current" />
-              </TabsContent>
-
-              <TabsContent value="medical" className="mt-4">
-                <AlertList alerts={medicalAlerts} emptyMessage="All medical cards are current" />
-              </TabsContent>
-
-              <TabsContent value="hazmat" className="mt-4">
-                <AlertList alerts={hazmatAlerts} emptyMessage="All HAZMAT certifications are current" />
-              </TabsContent>
-
-              <TabsContent value="down" className="mt-4">
-                {downTrucks.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <CheckCircle className="h-10 w-10 mx-auto mb-3 text-success" />
-                    <p>All trucks are operational</p>
-                  </div>
-                ) : (
-                  <div className="grid gap-3">
-                    {downTrucks.map(truck => (
-                      <div key={truck.id} className="flex items-center justify-between p-3 rounded-lg bg-destructive/10">
-                        <div>
-                          <p className="font-medium">{truck.unit_number}</p>
-                          <p className="text-sm text-muted-foreground">{truck.make} {truck.model}</p>
-                        </div>
-                        <StatusBadge status={truck.status} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </div>
       <NewWorkOrderSheet
         open={workOrderOpen}
         onOpenChange={setWorkOrderOpen}
         initialData={workOrderInitialData}
       />
-
     </>
   );
 }
