@@ -1,5 +1,5 @@
 import { format, parseISO } from 'date-fns';
-import { ArrowDown, ArrowUp, ChevronsUpDown, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronsUpDown, MoreHorizontal, Pencil, Plus, Archive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -66,7 +66,7 @@ function RowMenu({ expense, onEdit, onDelete }: { expense: Expense; onEdit: (e: 
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive" onClick={() => onDelete(expense.id)}>
-          <Trash2 className="mr-2 h-4 w-4" /> Delete
+          <Archive className="mr-2 h-4 w-4" /> Archive
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -126,7 +126,7 @@ export function ExpensesList(props: ExpensesListProps) {
           <span className="mr-auto text-[15px] font-medium tabular-nums">{selectedCount} selected</span>
           <Button variant="outline" className="h-11" onClick={onBulkEdit}>Edit {selectedCount} Selected</Button>
           <Button variant="destructive" className="h-11 gap-2" onClick={onBulkDelete}>
-            <Trash2 className="h-4 w-4" /> Delete {selectedCount} Selected
+            <Archive className="h-4 w-4" /> Archive {selectedCount} selected
           </Button>
         </div>
       )}

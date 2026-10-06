@@ -8,7 +8,8 @@ const loadXLSX = () => (xlsxPromise ??= import('xlsx'));
 function isoDate(raw: unknown, xlsx: XLSXModule): string | null {
   if (typeof raw === 'number') {
     const d = xlsx.SSF.parse_date_code(raw);
-    return d ? `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}` : null;
+    // Landstar leaves undelivered trips at 1/1/1901; that is no date.
+    return d && d.y >= 2000 ? `${d.y}-${String(d.m).padStart(2, '0')}-${String(d.d).padStart(2, '0')}` : null;
   }
   return null;
 }
@@ -34,6 +35,8 @@ export async function readSettlementLines(buffer: ArrayBuffer): Promise<Settleme
       code: String(row['Code'] ?? '').trim().toUpperCase(),
       amount,
       delivery: isoDate(row['Delivery Date'], xlsx),
+      settled: isoDate(row['Settlement Date'], xlsx),
+      pickup: isoDate(row['Pickup Date'], xlsx),
       lane: String(row['OD Lane'] ?? '').trim() || null,
     });
   }

@@ -4,7 +4,7 @@ import { classifyStatementLine } from '@/lib/expense-classifier';
 // Descriptions taken from the Misc expenses in the real data.
 describe('classifyStatementLine', () => {
   it('treats revised-freight-bill reversals and statement totals as not costs', () => {
-    for (const d of ['Updtd FB From Agency', 'FUEL SURCHARGE', 'Update Detention', 'STOP OFFS', 'STOP OFF', 'TOLL CHARGES', 'ADDITIONAL PT TO TRUCK', 'UNLOADING', 'NEW YORK ARBITRARY', 'DETENTION AT DESTINATION', 'TRACTOR PERCENT OVER CON', 'DEADHEAD', 'Total']) {
+    for (const d of ['Updtd FB From Agency', 'FUEL SURCHARGE', 'Update Detention', 'STOP OFFS', 'STOP OFF', 'ADDITIONAL PT TO TRUCK', 'UNLOADING', 'NEW YORK ARBITRARY', 'DETENTION AT DESTINATION', 'TRACTOR PERCENT OVER CON', 'DEADHEAD', 'Total']) {
       expect(classifyStatementLine(d)?.action, d).toBe('skip');
     }
   });
@@ -19,6 +19,7 @@ describe('classifyStatementLine', () => {
     const expected: Record<string, string> = {
       'BP NYSTA      02/20/26': 'Tolls',
       'MASSPIKE      03/01/26': 'Tolls',
+      'TOLL CHARGES': 'Tolls',
       'MAR FUEL TAX': 'IFTA',
       'EOBR - AIRTIME': 'LCN/Satellite',
       '2026 PLATES': 'Registration/Plates',

@@ -19,6 +19,8 @@ interface ConfirmDeleteDialogProps {
   description?: string;
   itemName?: string;
   isDeleting?: boolean;
+  /** The confirm button: "Archive" where the record can be restored, "Delete" where it cannot. */
+  confirmLabel?: string;
 }
 
 export function ConfirmDeleteDialog({
@@ -29,6 +31,7 @@ export function ConfirmDeleteDialog({
   description,
   itemName,
   isDeleting = false,
+  confirmLabel = 'Delete',
 }: ConfirmDeleteDialogProps) {
   const { isDemoMode, guard } = useDemoGuard();
 
@@ -65,10 +68,10 @@ export function ConfirmDeleteDialog({
             {isDeleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deleting...
+                {confirmLabel === 'Delete' ? 'Deleting...' : 'Working...'}
               </>
             ) : (
-              'Delete'
+              confirmLabel
             )}
           </AlertDialogAction>
         </AlertDialogFooter>

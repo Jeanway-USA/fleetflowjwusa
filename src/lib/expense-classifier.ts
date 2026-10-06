@@ -22,7 +22,6 @@ const REVENUE_LINE_PATTERNS: RegExp[] = [
   /^detention(\s+at\s+\w+)?$/i,
   /^layover$/i,
   /^additional\s*pt\s*to\s*truck$/i,
-  /^toll\s*charges$/i,
   /^unloading$/i,
   /^loading$/i,
   /^lumper\s*charge$/i,
@@ -36,7 +35,8 @@ const REVENUE_LINE_PATTERNS: RegExp[] = [
 
 const RULES: Array<{ pattern: RegExp; toType: string; group: 'advance' | 'cost'; reason: string }> = [
   { pattern: /cont\.?\s*spec\s*adv|partial\s*final\s*s(ett|t)|card\s*contractor\s*pay|card\s*pre-trip/i, toType: 'Advance', group: 'advance', reason: 'An advance: early access to your money, not a cost.' },
-  { pattern: /^bp\s+\S+|masspike|deldot|\be-?z\s*pass\b/i, toType: 'Tolls', group: 'cost', reason: 'A toll.' },
+  // Landstar's "TOLL CHARGES" are charges to you (code B), not reversed revenue: the weekly proof showed it.
+  { pattern: /^bp\s+\S+|masspike|deldot|\be-?z\s*pass\b|^toll\s*charges$/i, toType: 'Tolls', group: 'cost', reason: 'A toll.' },
   { pattern: /fuel\s*tax/i, toType: 'IFTA', group: 'cost', reason: 'Monthly fuel tax.' },
   { pattern: /eobr|airtime/i, toType: 'LCN/Satellite', group: 'cost', reason: 'ELD airtime.' },
   { pattern: /\bplates?\b/i, toType: 'Registration/Plates', group: 'cost', reason: 'Plates.' },

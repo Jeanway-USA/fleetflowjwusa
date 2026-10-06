@@ -26,6 +26,7 @@ const StatementUpload = lazy(() =>
 import { ChartSkeleton, DialogSkeleton } from '@/components/shared/LazyFallbacks';
 import { YearToDateCheck } from '@/components/finance/YearToDateCheck';
 import { TrueUpLoads } from '@/components/finance/TrueUpLoads';
+import { WeeklyProof } from '@/components/finance/WeeklyProof';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
 import { SettlementStatementTab } from '@/components/finance/SettlementStatementTab';
@@ -228,11 +229,11 @@ export default function Finance() {
   });
 
   const deleteExpenseMutation = useMutation({
+    // Archived, not erased: the Archive page can restore it, and the toast offers Undo.
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('expenses').delete().eq('id', id);
-      if (error) throw error;
+      const { archiveWithUndo } = await import('@/lib/soft-delete');
+      await archiveWithUndo({ table: 'expenses', id, queryClient, invalidateKeys: [['expenses']] });
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); toast.success('Expense deleted'); },
     onError: (error) => toast.error(error.message),
   });
 
@@ -255,14 +256,12 @@ export default function Finance() {
     setIsMassDeleting(true);
     try {
       const ids = Array.from(selectedExpenseIds);
-      const { error } = await supabase.from('expenses').delete().in('id', ids);
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      toast.success(`${ids.length} expenses deleted`);
+      const { archiveManyWithUndo } = await import('@/lib/soft-delete');
+      await archiveManyWithUndo({ table: 'expenses', ids, queryClient, invalidateKeys: [['expenses']] });
       setSelectedExpenseIds(new Set());
       setMassDeleteDialogOpen(false);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to delete expenses');
+      toast.error(error.message || 'Failed to archive expenses');
     } finally {
       setIsMassDeleting(false);
     }
@@ -670,6 +669,9 @@ export default function Finance() {
             <div className="mt-5">
               <TrueUpLoads getSetting={getSetting} />
             </div>
+            <div className="mt-5">
+              <WeeklyProof onTick={(ids) => setSelectedExpenseIds((prev) => new Set([...prev, ...ids]))} />
+            </div>
           </div>
         </TabsContent>
 
@@ -1011,9 +1013,10 @@ export default function Finance() {
         open={massDeleteDialogOpen}
         onOpenChange={setMassDeleteDialogOpen}
         onConfirm={handleMassDelete}
-        title={`Delete ${selectedExpenseIds.size} Expenses`}
-        description={`Are you sure you want to delete ${selectedExpenseIds.size} selected expenses? This action cannot be undone.`}
+        title={`Archive ${selectedExpenseIds.size} expenses`}
+        description={`Archive ${selectedExpenseIds.size} selected expenses? They leave your totals and can be restored from the Archive page.`}
         isDeleting={isMassDeleting}
+        confirmLabel="Archive"
       />
 
       {/* Single Delete Confirmation */}
@@ -1026,9 +1029,10 @@ export default function Finance() {
             setDeleteConfirmId(null);
           }
         }}
-        title="Delete Expense"
-        description="Are you sure you want to delete this expense? This action cannot be undone."
+        title="Archive expense"
+        description="Archive this expense? It leaves your totals and can be restored from the Archive page."
         isDeleting={deleteExpenseMutation.isPending}
+        confirmLabel="Archive"
       />
     </>
   );
