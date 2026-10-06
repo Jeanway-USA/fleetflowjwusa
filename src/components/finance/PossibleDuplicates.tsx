@@ -45,6 +45,8 @@ export function PossibleDuplicates({ expenses, loads, selectedIds, onSelect }: P
 
   const byId = useMemo(() => new Map(expenses.map((e) => [e.id, e])), [expenses]);
   const visible = groups.filter((g) => !dismissed.has(g.key));
+  // Only count choices that still match something; the rules change over time.
+  const dismissedCount = groups.length - visible.length;
   const suggested = visible.flatMap((g) => g.suggestRemove);
   const costOf = (ids: string[]) => ids.reduce((s, id) => s + expenseCost(byId.get(id) ?? { amount: 0 }), 0);
   const profitEffect = costOf(suggested);
@@ -64,10 +66,10 @@ export function PossibleDuplicates({ expenses, loads, selectedIds, onSelect }: P
     return (
       <p className="mb-4 text-[13px] text-muted-foreground" role="status">
         Duplicate check: nothing found.
-        {dismissed.size > 0 && (
+        {dismissedCount > 0 && (
           <>
             {' '}
-            <button type="button" className="underline" onClick={restoreDismissed}>Show the {dismissed.size} you marked as fine</button>
+            <button type="button" className="underline" onClick={restoreDismissed}>Show the {dismissedCount} you marked as fine</button>
           </>
         )}
       </p>

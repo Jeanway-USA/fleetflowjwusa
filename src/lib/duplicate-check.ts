@@ -4,13 +4,17 @@ import { normalizeDescription, referenceId } from '@/lib/expense-matching';
  * Finds expenses that look like the same charge filed twice, so they can be reviewed before they
  * skew a week. It only advises; nothing here changes data.
  *
- * Landstar repeats many charges legitimately (weekly insurance, two card fees on one trip when two
- * pre-trip loads were taken), so a rule only fires when the evidence points at a re-import:
+ * Landstar repeats many charges legitimately: weekly insurance, and a scan fee or card fee every time
+ * a document is scanned or the card is used, so the same small amount twice on one trip is normal. A
+ * rule only fires when the evidence points at a re-import:
  *
- *   reference   Two rows carry the same unique id (card "Ref-#", a trip scan) and amount.
- *   trip_total  One trip's card advances (or card fees) split into two groups with the same total,
- *               added at different times. Exports sum a trip into one line and the statement
- *               itemizes it, so $1,900 shows up again as $1,500 + $400.
+ *   reference   Two rows carry the same transaction id (a card purchase "Ref-#", a direct deposit) and
+ *               amount. Trip scan lines are not ids: each scanned document is its own charge.
+ *   trip_total  One trip's card advances (or card or scan fees) split into two groups with the same
+ *               total, added at different times. Exports sum a trip into one line and the statement
+ *               itemizes it, so $1,900 shows up again as $1,500 + $400, or $3.50 as $1.75 + $1.75.
+ *               Fees only count when one side is a summed line and the other is itemized: two single
+ *               $1.75 card fees are two uses of the card, not a repeat.
  *   same_day    An identical one-off charge (fuel, a toll) on the same day, added at different times.
  */
 
@@ -39,7 +43,11 @@ const SAME_UPLOAD_MINUTES = 3;
 /** Subset search is exponential; a trip never has more than a handful of advances or card fees. */
 const MAX_TRIP_ROWS = 12;
 
-const TRIP_TOTAL_TYPES = new Set(['Advance', 'Card Fee']);
+const TRIP_TOTAL_TYPES = new Set(['Advance', 'Card Fee', 'Trip Scanning']);
+/** Per-use fees: equal single rows on a trip are normal, so only a summed-versus-itemized split is suspicious. */
+const PER_USE_FEE_TYPES = new Set(['Card Fee', 'Trip Scanning']);
+/** Reference ids that name exactly one transaction. */
+const TRANSACTION_ID_PREFIXES = ['REF', 'DD'];
 /** One-off charges. Recurring weekly deductions (insurance, satellite, CPP) are never flagged. */
 const ONE_OFF_TYPES = new Set(['Fuel', 'DEF', 'Fuel Discount', 'Tolls', 'Maintenance', 'Parking', 'Reimbursement']);
 
@@ -65,7 +73,7 @@ export function findPossibleDuplicates(expenses: DuplicateCheckExpense[], option
   const byRef = new Map<string, DuplicateCheckExpense[]>();
   for (const e of expenses) {
     const ref = referenceId(e.description);
-    if (!ref) continue;
+    if (!ref || !TRANSACTION_ID_PREFIXES.some((prefix) => ref.startsWith(prefix))) continue;
     const key = `${ref}|${e.expense_type}|${cents(e.amount)}`;
     byRef.set(key, [...(byRef.get(key) ?? []), e]);
   }
@@ -104,12 +112,15 @@ export function findPossibleDuplicates(expenses: DuplicateCheckExpense[], option
       const newerTotal = newer.reduce((s, r) => s + cents(r.amount), 0);
       if (olderTotal !== newerTotal || !fresh(ordered)) continue;
       const [loadId, type] = key.split('|');
+      // Two equal single fees are two uses of the card or two scans. Only a summed line against
+      // itemized lines (one row against two or more) looks like the same fees filed twice.
+      if (PER_USE_FEE_TYPES.has(type) && older.length === newer.length) continue;
       const trip = options.tripOf?.(loadId);
       const itemized = (list: DuplicateCheckExpense[]) => (list.length > 1 ? ` (${list.map((r) => money(cents(r.amount))).join(' + ')})` : '');
       groups.push({
         key: `trip_total:${key}:${olderTotal}`,
         kind: 'trip_total',
-        title: `${trip ? `Trip ${trip}` : 'One trip'} has ${type === 'Advance' ? 'card advances' : 'card fees'} of ${money(olderTotal)} twice`,
+        title: `${trip ? `Trip ${trip}` : 'One trip'} has ${type === 'Advance' ? 'card advances' : type === 'Card Fee' ? 'card fees' : 'scan fees'} of ${money(olderTotal)} twice`,
         reason: `${money(olderTotal)}${itemized(older)} and ${money(newerTotal)}${itemized(newer)} were added at different times. One upload sums a trip into a single line and another lists each charge.`,
         rows: ordered,
         suggestRemove: newer.map((r) => r.id),

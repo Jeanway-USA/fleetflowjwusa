@@ -113,3 +113,29 @@ describe('findPossibleDuplicates: reference numbers and same-day charges', () =>
     expect(findPossibleDuplicates([toll(SECOND_UPLOAD), toll(SECOND_UPLOAD)])).toEqual([]);
   });
 });
+
+describe('findPossibleDuplicates: Landstar charges per scan and per card use', () => {
+  it('does not flag a trip scanned more than once, even from two uploads', () => {
+    // Each scanned document is its own $2.00 charge, and the description repeats the trip number.
+    const scan = (date: string, created: string) =>
+      row({ expense_type: 'Trip Scanning', amount: 2, expense_date: date, load_id: 'L1', description: 'TRKSTP SCN GAO 0017004', created_at: created });
+    expect(findPossibleDuplicates([scan('2026-03-18', FIRST_UPLOAD), scan('2026-04-04', SECOND_UPLOAD)])).toEqual([]);
+    expect(findPossibleDuplicates([scan('2026-03-18', FIRST_UPLOAD), scan('2026-04-04', FIRST_UPLOAD)])).toEqual([]);
+  });
+
+  it('does not flag two single $1.75 card fees on a trip, even from two uploads', () => {
+    const fee = (created: string) => row({ expense_type: 'Card Fee', amount: 1.75, load_id: 'L1', description: 'CARD FEE', created_at: created });
+    expect(findPossibleDuplicates([fee(FIRST_UPLOAD), fee(SECOND_UPLOAD)])).toEqual([]);
+  });
+
+  it('still flags a summed fee line against the same fees itemized', () => {
+    const rows = [
+      row({ expense_type: 'Trip Scanning', amount: 4, load_id: 'L1', description: 'TRKSTP SCN GAO 0017004', created_at: FIRST_UPLOAD }),
+      row({ expense_type: 'Trip Scanning', amount: 2, load_id: 'L1', description: 'TRKSTP SCN GAO 0017004', created_at: SECOND_UPLOAD }),
+      row({ expense_type: 'Trip Scanning', amount: 2, load_id: 'L1', description: 'TRKSTP SCN GAO 0017004', created_at: SECOND_UPLOAD }),
+    ];
+    const [g] = findPossibleDuplicates(rows);
+    expect(g.kind).toBe('trip_total');
+    expect(g.title).toContain('scan fees');
+  });
+});
