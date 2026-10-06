@@ -25,6 +25,7 @@ const StatementUpload = lazy(() =>
 );
 import { ChartSkeleton, DialogSkeleton } from '@/components/shared/LazyFallbacks';
 import { YearToDateCheck } from '@/components/finance/YearToDateCheck';
+import { TrueUpLoads } from '@/components/finance/TrueUpLoads';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
 import { SettlementStatementTab } from '@/components/finance/SettlementStatementTab';
@@ -664,6 +665,9 @@ export default function Finance() {
             />
             <div className="mt-5">
               <YearToDateCheck loads={loads as any} />
+            </div>
+            <div className="mt-5">
+              <TrueUpLoads getSetting={getSetting} />
             </div>
           </div>
         </TabsContent>
