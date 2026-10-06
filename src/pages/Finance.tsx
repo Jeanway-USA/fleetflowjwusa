@@ -30,6 +30,7 @@ import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
 import { SettlementStatementTab } from '@/components/finance/SettlementStatementTab';
 import { PossibleDuplicates } from '@/components/finance/PossibleDuplicates';
+import { ImportedLinesToCheck } from '@/components/finance/ImportedLinesToCheck';
 import { ExpenseSummary } from '@/components/finance/ExpenseSummary';
 import { ExpensesList } from '@/components/finance/ExpensesList';
 import { Panel, StatementLine } from '@/components/finance/statement-ui';
@@ -721,6 +722,11 @@ export default function Finance() {
           <PossibleDuplicates
             expenses={expenses}
             loads={loads}
+            selectedIds={selectedExpenseIds}
+            onSelect={(ids) => setSelectedExpenseIds((prev) => new Set([...prev, ...ids]))}
+          />
+          <ImportedLinesToCheck
+            expenses={expenses.filter((e: any) => !e.deleted_at)}
             selectedIds={selectedExpenseIds}
             onSelect={(ids) => setSelectedExpenseIds((prev) => new Set([...prev, ...ids]))}
           />

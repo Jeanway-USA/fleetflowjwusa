@@ -1,3 +1,4 @@
+import { classifyStatementLine } from '@/lib/expense-classifier';
 import { isSameCharge, daysBetween } from '@/lib/expense-matching';
 
 // Settlement Reconciliation Engine
@@ -231,8 +232,16 @@ export function reconcileDocuments(
     for (const exp of data.expenses) {
       if (sf.type === 'contractor_pdf' && !isContractorCharge(exp)) continue;
       // The parser files card scale tickets under Misc; they are scale charges like PrePass.
-      const expense_type = exp.expense_type === 'Misc' && /\bcat\s*scale\b/i.test(exp.description) ? 'PrePass/Scale' : exp.expense_type;
-      const line = { ...exp, expense_type, source: sourceLabel, sourceType: sf.type };
+      // Revised-bill reversals and statement totals are not costs; other known lines get their real type.
+      const verdict = classifyStatementLine(exp.description);
+      if (verdict?.action === 'skip') continue;
+      let expense_type = exp.expense_type === 'Misc' && /\bcat\s*scale\b/i.test(exp.description) ? 'PrePass/Scale' : exp.expense_type;
+      let is_advance = exp.is_advance;
+      if (verdict?.action === 'retype' && (!expense_type || expense_type === 'Misc')) {
+        expense_type = verdict.toType;
+        if (verdict.group === 'advance') is_advance = true;
+      }
+      const line = { ...exp, expense_type, is_advance, source: sourceLabel, sourceType: sf.type };
       if (isXlsx && hasContractorPdf) xlsxLines.push(line);
       else allExpenses.push(line);
     }

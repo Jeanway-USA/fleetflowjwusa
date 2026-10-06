@@ -7,7 +7,7 @@ export const EXPENSE_TYPES = [
   'Licensing/Permits', 'Registration/Plates', 'Insurance', 'LCN/Satellite', 'Maintenance',
   'Cell Phone', 'Trip Scanning', 'Card Load', 'Card Fee', 'Cash Advance', 'Direct Deposit Fee',
   'Advance', 'Direct Deposit',
-  'Truck Warranty', 'CPP/Benefits', 'IFTA', 'PrePass/Scale', 'Tolls', 'Parking', 'Misc'
+  'Truck Warranty', 'CPP/Benefits', 'IFTA', 'PrePass/Scale', 'Tolls', 'Parking', 'Taxes', 'Interest', 'Misc'
 ];
 
 export const GALLONS_EXPENSE_TYPES = ['Fuel', 'DEF'];
