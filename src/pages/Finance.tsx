@@ -28,6 +28,7 @@ import { AuditReconciliation } from '@/components/finance/AuditReconciliation';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
 import { SettlementStatementTab } from '@/components/finance/SettlementStatementTab';
+import { PossibleDuplicates } from '@/components/finance/PossibleDuplicates';
 import { fuelStats } from '@/lib/pl-metrics';
 const RevenueTab = lazy(() =>
   import('@/components/finance/RevenueTab').then(m => ({ default: m.RevenueTab })),
@@ -671,6 +672,12 @@ export default function Finance() {
 
         {/* ===== EXPENSES ===== */}
         <TabsContent value="expenses">
+          <PossibleDuplicates
+            expenses={expenses}
+            loads={loads}
+            selectedIds={selectedExpenseIds}
+            onSelect={(ids) => setSelectedExpenseIds((prev) => new Set([...prev, ...ids]))}
+          />
           {renderFilters()}
           <div className="space-y-8 animate-in fade-in-50">
             <Card className="card-elevated">
