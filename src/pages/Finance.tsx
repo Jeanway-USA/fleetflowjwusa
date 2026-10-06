@@ -31,7 +31,7 @@ import { SettlementStatementTab } from '@/components/finance/SettlementStatement
 import { PossibleDuplicates } from '@/components/finance/PossibleDuplicates';
 import { ExpenseSummary } from '@/components/finance/ExpenseSummary';
 import { ExpensesList } from '@/components/finance/ExpensesList';
-import { fuelStats } from '@/lib/pl-metrics';
+import { driverPayTotals, fuelStats } from '@/lib/pl-metrics';
 const RevenueTab = lazy(() =>
   import('@/components/finance/RevenueTab').then(m => ({ default: m.RevenueTab })),
 );
@@ -164,6 +164,19 @@ export default function Finance() {
     queryKey: ['driver_payroll'],
     queryFn: async () => {
       const { data, error } = await supabase.from('driver_payroll').select('*').is('deleted_at', null).order('period_end', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Driver pay lives in generated settlement statements as well as W-2 payroll batches.
+  const { data: driverSettlements = [] } = useQuery({
+    queryKey: ['driver_settlements_cost'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('driver_settlements')
+        .select('driver_id, period_end, status, gross_pay, reimbursements')
+        .is('deleted_at', null);
       if (error) throw error;
       return data;
     },
@@ -438,7 +451,9 @@ export default function Finance() {
 
   const totalExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total + truckPaymentsTotal - creditsTotal;
   const grossExpenses = loadExpenseTotals.operatingTotal + standaloneExpenseTotals.total + loadLinkedExpenseTotals.total + truckPaymentsTotal;
-  const totalPayroll = payrollTotals.netPay;
+  // Driver pay: approved or paid settlement statements (gross pay plus reimbursements) and W-2 payroll batches.
+  const driverPay = driverPayTotals(driverSettlements.filter((st: any) => inPeriod(st.period_end)), filteredPayrolls);
+  const totalPayroll = driverPay.total;
   const totalRevenueWithCommissions = revenueTotals.netRevenue + commissionTotals.amount;
   const netProfit = totalRevenueWithCommissions - totalExpenses - totalPayroll;
   const profitMargin = totalRevenueWithCommissions > 0 ? (netProfit / totalRevenueWithCommissions) * 100 : 0;
@@ -639,6 +654,7 @@ export default function Finance() {
               standaloneExpenseTotals={standaloneExpenseTotals}
               loadLinkedExpenseTotals={loadLinkedExpenseTotals}
               payrollTotals={payrollTotals}
+              driverPay={driverPay}
               commissionTotals={commissionTotals}
               deadheadMiles={deadheadMiles}
               totalEmptyMiles={totalEmptyMiles}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { expenseCost, fuelStats, truckRevenueOf, workbookMetrics } from '@/lib/pl-metrics';
+import { driverPayEvents, driverPayTotals, driverSettlementCost, expenseCost, fuelStats, truckRevenueOf, workbookMetrics } from '@/lib/pl-metrics';
 
 describe('truckRevenueOf', () => {
   it('counts what the truck earns, never the gross billed to the customer', () => {
@@ -74,5 +74,55 @@ describe('workbookMetrics (Landstar BCO workbook definitions)', () => {
   it('returns zeros when there is nothing to divide by', () => {
     const z = workbookMetrics({ loadCount: 0, revenue: 0, fuelSurcharge: 0, actualMiles: 0, fuel: { gallons: 0, cost: 0, discounts: 0, netCost: 0, costPerGallon: 0 } });
     expect(z).toEqual({ avgRevenuePerLoad: 0, avgRevenuePerLoadWithoutFsc: 0, fscShareOfRevenue: 0, avgMilesPerLoad: 0, milesPerGallon: 0, costPerGallonAfterFsc: 0 });
+  });
+});
+
+describe('driver pay (Timothy Ames, 6/26 to 7/30/26)', () => {
+  // The six real settlements: five paid, one approved.
+  const settlements = [
+    { driver_id: 't', period_end: '2026-06-26', status: 'paid', gross_pay: 1700, reimbursements: 18 },
+    { driver_id: 't', period_end: '2026-07-02', status: 'paid', gross_pay: 1700, reimbursements: 24.38 },
+    { driver_id: 't', period_end: '2026-07-09', status: 'paid', gross_pay: 0, reimbursements: 1360 },
+    { driver_id: 't', period_end: '2026-07-16', status: 'paid', gross_pay: 2000, reimbursements: 0 },
+    { driver_id: 't', period_end: '2026-07-23', status: 'paid', gross_pay: 2000, reimbursements: 100 },
+    { driver_id: 't', period_end: '2026-07-30', status: 'approved', gross_pay: 2000, reimbursements: 0 },
+  ];
+
+  it('costs a settlement as gross pay plus reimbursements, never net pay', () => {
+    expect(driverSettlementCost(settlements[1])).toBeCloseTo(1724.38, 2);
+  });
+
+  it('counts approved and paid settlements but not drafts', () => {
+    expect(driverSettlementCost({ ...settlements[0], status: 'draft' })).toBe(0);
+    expect(driverSettlementCost({ ...settlements[5] })).toBe(2000);
+  });
+
+  it('totals the whole run', () => {
+    const t = driverPayTotals(settlements, []);
+    expect(t.settlementCount).toBe(6);
+    expect(t.total).toBeCloseTo(10902.38, 2);
+  });
+
+  it('never charges a week twice when a payroll batch also exists for it', () => {
+    const t = driverPayTotals(settlements, [
+      { driver_id: 't', period_end: '2026-07-16', net_pay: 1531.88 },
+      { driver_id: 'other', period_end: '2026-07-16', net_pay: 500 },
+    ]);
+    expect(t.batchCount).toBe(1);
+    expect(t.total).toBeCloseTo(10902.38 + 500, 2);
+  });
+
+  it('is zero when there are no settlements or batches', () => {
+    expect(driverPayTotals([], []).total).toBe(0);
+  });
+});
+
+describe('driverPayEvents', () => {
+  it('dates each counted payment and skips a batch shadowed by a settlement', () => {
+    const events = driverPayEvents(
+      [{ driver_id: 't', period_end: '2026-07-16', status: 'paid', gross_pay: 2000, reimbursements: 0 }],
+      [{ driver_id: 't', period_end: '2026-07-16', net_pay: 1531.88 }, { driver_id: 'o', period_end: '2026-07-23', net_pay: 500 }],
+    );
+    expect(events).toEqual([{ date: '2026-07-16', amount: 2000 }, { date: '2026-07-23', amount: 500 }]);
   });
 });

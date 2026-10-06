@@ -106,3 +106,73 @@ export function workbookMetrics(input: {
     costPerGallonAfterFsc: fuel.costPerGallon > 0 ? fuel.costPerGallon - fscPerGallon : 0,
   };
 }
+
+// --------------------------------------------------------------------------
+// Driver pay
+// --------------------------------------------------------------------------
+
+interface SettlementPayRow {
+  driver_id?: string | null;
+  period_end?: string | null;
+  status?: string | null;
+  gross_pay?: number | string | null;
+  reimbursements?: number | string | null;
+}
+
+interface PayrollBatchRow {
+  driver_id?: string | null;
+  period_end?: string | null;
+  net_pay?: number | string | null;
+}
+
+/** Settlements that count as money owed or paid to the driver. A draft is only a preview. */
+const COUNTED_SETTLEMENT_STATUSES = new Set(['approved', 'paid']);
+
+/**
+ * What one driver settlement costs the company: the driver's gross pay plus reimbursements. Net pay
+ * is not used, because taxes and advances withheld are still company money going out.
+ */
+export function driverSettlementCost(settlement: SettlementPayRow): number {
+  if (!COUNTED_SETTLEMENT_STATUSES.has(String(settlement.status ?? '').toLowerCase())) return 0;
+  return (Number(settlement.gross_pay) || 0) + (Number(settlement.reimbursements) || 0);
+}
+
+export interface DriverPayTotals {
+  total: number;
+  settlementPay: number;
+  batchPay: number;
+  settlementCount: number;
+  batchCount: number;
+}
+
+/**
+ * Driver pay for a period from both places it can live: generated settlement statements and W-2
+ * payroll batches. If a driver has both for the same period end, the settlement is the one
+ * counted, so the same week is never charged twice.
+ */
+export function driverPayTotals(settlements: SettlementPayRow[], batches: PayrollBatchRow[]): DriverPayTotals {
+  const counted = settlements.filter((s) => driverSettlementCost(s) > 0);
+  const settledKeys = new Set(counted.map((s) => `${s.driver_id ?? ''}|${s.period_end ?? ''}`));
+  const batchRows = batches.filter((b) => !settledKeys.has(`${b.driver_id ?? ''}|${b.period_end ?? ''}`));
+  const settlementPay = counted.reduce((sum, s) => sum + driverSettlementCost(s), 0);
+  const batchPay = batchRows.reduce((sum, b) => sum + (Number(b.net_pay) || 0), 0);
+  return {
+    total: Math.round((settlementPay + batchPay) * 100) / 100,
+    settlementPay: Math.round(settlementPay * 100) / 100,
+    batchPay: Math.round(batchPay * 100) / 100,
+    settlementCount: counted.length,
+    batchCount: batchRows.length,
+  };
+}
+
+/** Each driver payment as a dated cost, for charts that bucket by week. Same counting rules as driverPayTotals. */
+export function driverPayEvents(settlements: SettlementPayRow[], batches: PayrollBatchRow[]): Array<{ date: string; amount: number }> {
+  const counted = settlements.filter((s) => driverSettlementCost(s) > 0 && s.period_end);
+  const settledKeys = new Set(counted.map((s) => `${s.driver_id ?? ''}|${s.period_end}`));
+  return [
+    ...counted.map((s) => ({ date: String(s.period_end), amount: driverSettlementCost(s) })),
+    ...batches
+      .filter((b) => b.period_end && !settledKeys.has(`${b.driver_id ?? ''}|${b.period_end}`))
+      .map((b) => ({ date: String(b.period_end), amount: Number(b.net_pay) || 0 })),
+  ];
+}

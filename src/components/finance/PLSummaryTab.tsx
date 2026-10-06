@@ -18,7 +18,7 @@ import {
 import { formatCurrency } from '@/lib/formatters';
 import { useOperationalCPM } from '@/hooks/useOperationalCPM';
 import { usePLTrend, type PeriodRollup, type RunwayMetrics } from '@/hooks/usePLTrend';
-import { workbookMetrics, type FuelStats } from '@/lib/pl-metrics';
+import { workbookMetrics, type DriverPayTotals, type FuelStats } from '@/lib/pl-metrics';
 
 interface PLSummaryTabProps {
   revenueTotals: any;
@@ -26,6 +26,7 @@ interface PLSummaryTabProps {
   standaloneExpenseTotals: any;
   loadLinkedExpenseTotals: any;
   payrollTotals: any;
+  driverPay: DriverPayTotals;
   commissionTotals: any;
   deadheadMiles: number;
   totalEmptyMiles: number;
@@ -112,7 +113,7 @@ function Panel({ title, description, children, className, aside }: {
 
 export function PLSummaryTab({
   revenueTotals,
-  payrollTotals,
+  driverPay,
   commissionTotals,
   deadheadMiles,
   totalEmptyMiles,
@@ -138,7 +139,7 @@ export function PLSummaryTab({
   const grossRevenue = Number(revenueTotals.grossRevenue) || 0;
   const yourRevenue = Number(revenueTotals.netRevenue) || 0;
   const landstarShare = Math.max(0, grossRevenue - yourRevenue);
-  const payroll = Number(payrollTotals.netPay) || 0;
+  const payroll = driverPay.total;
   const commissions = Number(commissionTotals.amount) || 0;
   const hasLoads = revenueTotals.loadCount > 0;
 
@@ -202,7 +203,14 @@ export function PLSummaryTab({
             value={totalExpenses > 0 ? takeOff(totalExpenses) : 'None yet'}
             muted
           />
-          {payroll > 0 && <StatementLine label="Driver payroll" value={takeOff(payroll)} muted />}
+          {payroll > 0 && (
+            <StatementLine
+              label="Driver pay"
+              note={[driverPay.settlementCount > 0 ? `${driverPay.settlementCount} settlement${driverPay.settlementCount === 1 ? '' : 's'}, gross pay plus reimbursements` : '', driverPay.batchCount > 0 ? `${driverPay.batchCount} payroll batch${driverPay.batchCount === 1 ? '' : 'es'}` : ''].filter(Boolean).join(', ')}
+              value={takeOff(payroll)}
+              muted
+            />
+          )}
           <StatementLine
             label={netProfit >= 0 ? 'Net profit' : 'Net loss'}
             note={totalExpenses > 0 || payroll > 0 ? `${profitMargin.toFixed(1)}% of ${commissions > 0 ? 'revenue with commissions' : 'your revenue'}` : 'Will drop as expenses are recorded'}

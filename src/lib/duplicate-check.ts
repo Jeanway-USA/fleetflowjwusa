@@ -16,6 +16,10 @@ import { normalizeDescription, referenceId } from '@/lib/expense-matching';
  *               Fees only count when one side is a summed line and the other is itemized: two single
  *               $1.75 card fees are two uses of the card, not a repeat.
  *   same_day    An identical one-off charge (fuel, a toll) on the same day, added at different times.
+ *   repeat_fee  A scan or card fee that appears twice from one import, where one copy is dated the day
+ *               it was imported. The importer uses that date for lines a file does not date, so the copy
+ *               may be the same fee arriving from a second file. Often it is simply two scans or two
+ *               card uses, so these are listed apart for review and never counted as likely duplicates.
  */
 
 export interface DuplicateCheckExpense {
@@ -30,7 +34,7 @@ export interface DuplicateCheckExpense {
 
 export interface DuplicateGroup {
   key: string;
-  kind: 'reference' | 'trip_total' | 'same_day';
+  kind: 'reference' | 'trip_total' | 'same_day' | 'repeat_fee';
   title: string;
   reason: string;
   rows: DuplicateCheckExpense[];
@@ -42,6 +46,8 @@ export interface DuplicateGroup {
 const SAME_UPLOAD_MINUTES = 3;
 /** Subset search is exponential; a trip never has more than a handful of advances or card fees. */
 const MAX_TRIP_ROWS = 12;
+/** One import can run in several passes a few minutes apart. */
+const SAME_IMPORT_MINUTES = 30;
 
 const TRIP_TOTAL_TYPES = new Set(['Advance', 'Card Fee', 'Trip Scanning']);
 /** Per-use fees: equal single rows on a trip are normal, so only a summed-versus-itemized split is suspicious. */
@@ -149,6 +155,42 @@ export function findPossibleDuplicates(expenses: DuplicateCheckExpense[], option
       reason: `Identical charge and description, added at different times.`,
       rows: ordered,
       suggestRemove: ordered.slice(1).map((r) => r.id),
+    });
+    claim(rows);
+  }
+
+  // --- repeat_fee: a per-use fee twice from one import, one copy dated the day it was imported ---
+  const importDay = (e: DuplicateCheckExpense) => (e.created_at ?? '').slice(0, 10);
+  const datedOnImportDay = (e: DuplicateCheckExpense) => {
+    const day = importDay(e);
+    if (!day) return false;
+    return Math.abs(Date.parse(`${e.expense_date}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) <= 86_400_000;
+  };
+  const byFee = new Map<string, DuplicateCheckExpense[]>();
+  for (const e of expenses) {
+    if (!PER_USE_FEE_TYPES.has(e.expense_type) || Number.isNaN(stamp(e))) continue;
+    // A scan names its trip; a card fee is only comparable within one trip.
+    if (e.expense_type === 'Card Fee' && !e.load_id) continue;
+    const key = `${e.expense_type}|${e.load_id ?? ''}|${cents(e.amount)}|${normalizeDescription(e.description)}`;
+    byFee.set(key, [...(byFee.get(key) ?? []), e]);
+  }
+  for (const [key, rows] of byFee) {
+    if (rows.length < 2 || !fresh(rows)) continue;
+    const ordered = [...rows].sort(byAddedTime);
+    if (minutesApart(stamp(ordered[0]), stamp(ordered[ordered.length - 1])) > SAME_IMPORT_MINUTES) continue;
+    const importDated = ordered.filter(datedOnImportDay);
+    const realDated = ordered.filter((r) => !datedOnImportDay(r));
+    if (importDated.length === 0 || realDated.length === 0) continue;
+    const copies = importDated.slice(0, realDated.length);
+    const sample = ordered[0];
+    const isScan = sample.expense_type === 'Trip Scanning';
+    groups.push({
+      key: `repeat_fee:${key}`,
+      kind: 'repeat_fee',
+      title: `${isScan ? 'Scan fee' : 'Card fee'} ${money(cents(sample.amount))} appears twice${isScan && sample.description ? ` for ${sample.description.replace(/^TRKSTP SCN\s*/i, '')}` : ''}`,
+      reason: `Both were added in the same import and one is dated the day it was imported, which is what the importer does for a line its file does not date. It may be one fee arriving from two files, or two real ${isScan ? 'scans' : 'card uses'}: Landstar bills each one. Check the statement.`,
+      rows: ordered,
+      suggestRemove: copies.map((r) => r.id),
     });
     claim(rows);
   }

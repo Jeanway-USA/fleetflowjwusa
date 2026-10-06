@@ -139,3 +139,35 @@ describe('findPossibleDuplicates: Landstar charges per scan and per card use', (
     expect(g.title).toContain('scan fees');
   });
 });
+
+describe('findPossibleDuplicates: repeated fees to check (one copy dated the import day)', () => {
+  // Real pair from the data: one scan with a real date and one dated the day it was imported.
+  const IMPORT = '2026-04-04T20:12:00Z';
+  const scan = (date: string, created = IMPORT) =>
+    row({ expense_type: 'Trip Scanning', amount: 2, expense_date: date, description: 'TRKSTP SCN GAO 0017004', created_at: created });
+
+  it('lists the import-dated copy for review, apart from likely duplicates', () => {
+    const real = scan('2026-03-18');
+    const copy = scan('2026-04-04');
+    const [g] = findPossibleDuplicates([real, copy]);
+    expect(g.kind).toBe('repeat_fee');
+    expect(g.title).toBe('Scan fee $2.00 appears twice for GAO 0017004');
+    expect(g.suggestRemove).toEqual([copy.id]);
+    expect(g.reason).toContain('Check the statement');
+  });
+
+  it('stays quiet when both scans carry real dates', () => {
+    expect(findPossibleDuplicates([scan('2026-03-18'), scan('2026-03-25')])).toEqual([]);
+  });
+
+  it('stays quiet when the pair came from different imports', () => {
+    expect(findPossibleDuplicates([scan('2026-03-18', '2026-03-19T10:00:00Z'), scan('2026-04-04')])).toEqual([]);
+  });
+
+  it('groups card fees only within one trip', () => {
+    const fee = (loadId: string | null, date: string) => row({ expense_type: 'Card Fee', amount: 1.75, expense_date: date, load_id: loadId, description: 'CARD FEE', created_at: IMPORT });
+    expect(findPossibleDuplicates([fee('L1', '2026-03-18'), fee('L2', '2026-04-04')])).toEqual([]);
+    expect(findPossibleDuplicates([fee(null, '2026-03-18'), fee(null, '2026-04-04')])).toEqual([]);
+    expect(findPossibleDuplicates([fee('L1', '2026-03-18'), fee('L1', '2026-04-04')])).toHaveLength(1);
+  });
+});
