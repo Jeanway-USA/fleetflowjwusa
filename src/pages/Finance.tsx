@@ -24,7 +24,7 @@ const StatementUpload = lazy(() =>
   import('@/components/finance/StatementUpload').then(m => ({ default: m.StatementUpload })),
 );
 import { ChartSkeleton, DialogSkeleton } from '@/components/shared/LazyFallbacks';
-import { AuditReconciliation } from '@/components/finance/AuditReconciliation';
+import { YearToDateCheck } from '@/components/finance/YearToDateCheck';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
 import { SettlementStatementTab } from '@/components/finance/SettlementStatementTab';
@@ -662,6 +662,9 @@ export default function Finance() {
               isLoading={loadsLoading || expensesLoading}
               onUpload={() => setUploadDialogOpen(true)}
             />
+            <div className="mt-5">
+              <YearToDateCheck loads={loads as any} />
+            </div>
           </div>
         </TabsContent>
 
@@ -824,7 +827,6 @@ export default function Finance() {
         <TabsContent value="settings">
           <div className="space-y-8 animate-in fade-in-50">
             <CompensationSettingsTab getSetting={getSetting} />
-            <AuditReconciliation loads={loads} />
             {isIndependent && (
               <>
                 <InvoicingTab />

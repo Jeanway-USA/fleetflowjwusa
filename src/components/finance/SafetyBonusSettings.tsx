@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel } from '@/components/finance/statement-ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput, IntegerInput } from '@/components/ui/numeric-input';
@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { ShieldCheck, Plus, Trash2, Undo2 } from 'lucide-react';
+import { Plus, Trash2, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 type TierRow = {
@@ -218,52 +218,33 @@ export function SafetyBonusSettings() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" />
-            Safety &amp; Performance Bonus Configuration
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <Panel title="Safety bonus rules">
+        <div className="space-y-3 pb-3">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-24 w-full" />
-        </CardContent>
-      </Card>
+        </div>
+      </Panel>
     );
   }
 
   const visibleTiers = tiers;
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-primary" />
-              Safety &amp; Performance Bonus Configuration
-            </CardTitle>
-            <CardDescription>
-              Reward drivers for safe, on-time driving with a tiered per-mile bonus.
-            </CardDescription>
-          </div>
-          <Button
-            onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending}
-            className="bg-gradient-to-r from-amber-500 to-yellow-600 text-white hover:opacity-90"
-          >
-            {saveMutation.isPending ? 'Saving…' : 'Save Changes'}
-          </Button>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-6">
+    <Panel
+      title="Safety bonus rules"
+      description="Pay drivers a per-mile bonus for safe, on-time driving. The tiers set the rate; the rules set who qualifies."
+      aside={
+        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="h-11">
+          {saveMutation.isPending ? 'Saving' : 'Save changes'}
+        </Button>
+      }
+    >
+      <div className="space-y-6 pb-3 pt-1">
         {/* Global Rules */}
         <section className="space-y-4">
           <div>
-            <h3 className="text-sm font-semibold">Global Rules</h3>
+            <h4 className="font-condensed text-lg font-bold leading-tight">Who qualifies</h4>
             <p className="text-xs text-muted-foreground">
               Limits and disqualifiers applied to every driver.
             </p>
@@ -319,7 +300,7 @@ export function SafetyBonusSettings() {
         <section className="space-y-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <h3 className="text-sm font-semibold">Mileage Tiers</h3>
+              <h4 className="font-condensed text-lg font-bold leading-tight">Rate per mile</h4>
               <p className="text-xs text-muted-foreground">
                 Drivers earn the rate from the tier matching their period miles. Leave Max Miles blank for the top tier.
               </p>
@@ -388,6 +369,7 @@ export function SafetyBonusSettings() {
                               type="button"
                               variant="ghost"
                               size="icon"
+                              className="h-11 w-11"
                               onClick={() => undoRemove(idx)}
                               aria-label="Undo remove"
                             >
@@ -399,6 +381,7 @@ export function SafetyBonusSettings() {
                             type="button"
                             variant="ghost"
                             size="icon"
+                            className="h-11 w-11"
                             onClick={() => removeTier(idx)}
                             aria-label="Remove tier"
                           >
@@ -416,8 +399,8 @@ export function SafetyBonusSettings() {
             </div>
           )}
         </section>
-      </CardContent>
-    </Card>
+      </div>
+    </Panel>
   );
 }
 
