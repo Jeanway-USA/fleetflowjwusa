@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -635,11 +636,18 @@ export default function Drivers() {
 
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{editingDriver ? 'Edit Driver' : 'Add New Driver'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 [&_input]:h-11 [&_button[role=combobox]]:h-11">
+            <Tabs defaultValue="contact" className="w-full">
+              <TabsList className="grid h-12 w-full grid-cols-3">
+                <TabsTrigger value="contact" className="h-10">Contact</TabsTrigger>
+                <TabsTrigger value="credentials" className="h-10">Credentials</TabsTrigger>
+                <TabsTrigger value="pay" className="h-10">Pay and type</TabsTrigger>
+              </TabsList>
+            <TabsContent value="contact" className="mt-4 space-y-4 focus-visible:outline-none">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="first_name">First Name *</Label>
@@ -662,7 +670,7 @@ export default function Drivers() {
             </div>
 
             <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">Emergency Contact</h4>
+              <h4 className="font-condensed text-lg font-bold mb-3">Emergency Contact</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="emergency_contact_name">Name</Label>
@@ -694,7 +702,7 @@ export default function Drivers() {
 
 
             <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">Link to User Account</h4>
+              <h4 className="font-condensed text-lg font-bold mb-3">Link to User Account</h4>
               <div className="space-y-2">
                 <Label htmlFor="user_id">User Account</Label>
                 <Select 
@@ -719,8 +727,10 @@ export default function Drivers() {
               </div>
             </div>
 
-            <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">License & Credentials</h4>
+            </TabsContent>
+            <TabsContent value="credentials" className="mt-4 space-y-4 focus-visible:outline-none">
+            <div>
+              <h4 className="font-condensed text-lg font-bold mb-3">License & Credentials</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="license_number">License Number</Label>
@@ -767,33 +777,11 @@ export default function Drivers() {
                   <Input id="mvr_expiry" type="date" value={(formData as any).mvr_expiry || ''} onChange={(e) => setFormData({ ...formData, mvr_expiry: e.target.value })} />
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="hire_date">Hire Date</Label>
-                  <Input id="hire_date" type="date" value={formData.hire_date || ''} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tax_state">Tax State (W-2 SUTA / SIT)</Label>
-                  <Select
-                    value={(formData as any).tax_state || ''}
-                    onValueChange={(v) => setFormData({ ...formData, tax_state: v })}
-                  >
-                    <SelectTrigger id="tax_state">
-                      <SelectValue placeholder="Use company default" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'].map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
             </div>
 
 
             <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">Endorsements & HAZMAT</h4>
+              <h4 className="font-condensed text-lg font-bold mb-3">Endorsements & HAZMAT</h4>
               <div className="grid grid-cols-2 gap-2 mb-4">
                 {endorsementOptions.map((opt) => (
                   <div key={opt.value} className="flex items-center space-x-2">
@@ -815,7 +803,7 @@ export default function Drivers() {
             </div>
 
             <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">TWIC Card</h4>
+              <h4 className="font-condensed text-lg font-bold mb-3">TWIC Card</h4>
               <div className="flex items-center space-x-2 mb-3">
                 <Checkbox
                   id="has_twic"
@@ -833,7 +821,7 @@ export default function Drivers() {
             </div>
 
             <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">Advanced Security & Border</h4>
+              <h4 className="font-condensed text-lg font-bold mb-3">Advanced Security & Border</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="fast_card_passport_expiry">FAST Card / Passport Expiry</Label>
@@ -861,9 +849,11 @@ export default function Drivers() {
               </div>
             </div>
 
-            <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">Classification</h4>
-              <div className="space-y-2">
+            </TabsContent>
+            <TabsContent value="pay" className="mt-4 space-y-4 focus-visible:outline-none">
+            <div>
+              <h4 className="font-condensed text-lg font-bold mb-3">Classification</h4>
+              <div className="flex flex-col items-start gap-2">
                 <Label>Worker Type</Label>
                 {formData.employment_type === 'lease_purchase' ? (
                   <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm space-y-2">
@@ -965,7 +955,7 @@ export default function Drivers() {
             </div>
 
             <div className="border-t pt-4">
-              <h4 className="font-medium mb-3">Pay Information</h4>
+              <h4 className="font-condensed text-lg font-bold mb-3">Pay Information</h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -1044,13 +1034,42 @@ export default function Drivers() {
               </div>
             </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={closeDialog} disabled={createMutation.isPending || updateMutation.isPending}>
+            <div className="border-t pt-4">
+              <h4 className="font-condensed text-lg font-bold mb-3">Employment</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="hire_date">Hire Date</Label>
+                  <Input id="hire_date" type="date" value={formData.hire_date || ''} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tax_state">Tax State (W-2 SUTA / SIT)</Label>
+                  <Select
+                    value={(formData as any).tax_state || ''}
+                    onValueChange={(v) => setFormData({ ...formData, tax_state: v })}
+                  >
+                    <SelectTrigger id="tax_state">
+                      <SelectValue placeholder="Use company default" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'].map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            </TabsContent>
+            </Tabs>
+
+            <DialogFooter className="sticky -bottom-4 -mx-4 -mb-4 flex-row justify-end gap-2 bg-background px-4 py-3 sm:-bottom-6 sm:-mx-6 sm:-mb-6 sm:px-6 sm:space-x-0">
+              <Button type="button" variant="outline" className="h-11" onClick={closeDialog} disabled={createMutation.isPending || updateMutation.isPending}>
                 Cancel
               </Button>
               <LoadingButton 
                 type="submit" 
-                className="gradient-gold text-primary-foreground"
+                className="gradient-gold text-primary-foreground h-11"
                 loading={createMutation.isPending || updateMutation.isPending}
                 loadingText={editingDriver ? 'Saving...' : 'Adding...'}
               >
