@@ -1108,9 +1108,9 @@ export default function FleetLoads() {
 
       {/* Add/Edit Load Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[92vh] w-[calc(100%-1rem)] max-w-3xl overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle>{editingLoad ? 'Edit Load' : 'Add New Load'}</DialogTitle>
+            <DialogTitle>{editingLoad ? `Edit load ${editingLoad.landstar_load_id || ''}`.trim() : 'Add a load'}</DialogTitle>
           </DialogHeader>
           {isIndependent && !editingLoad ? (
             <IndependentLoadBuilder
@@ -1164,801 +1164,484 @@ export default function FleetLoads() {
             />
           ) : (
           <form onSubmit={handleSubmit}>
-            <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-6">
-                <TabsTrigger value="details">Load Details</TabsTrigger>
-                <TabsTrigger value="revenue">Revenue</TabsTrigger>
-                <TabsTrigger value="miles">Miles</TabsTrigger>
-                <TabsTrigger value="expenses" className="flex items-center gap-1">
-                  <Receipt className="h-4 w-4" /> Expenses
-                </TabsTrigger>
-                <TabsTrigger value="pod" className="flex items-center gap-1">
-                  <FileCheck className="h-4 w-4" /> POD
-                </TabsTrigger>
-                <TabsTrigger value="history" className="flex items-center gap-1">
-                  <History className="h-4 w-4" /> History
-                </TabsTrigger>
-              </TabsList>
+            {(() => {
+              const editing = !!editingLoad?.id;
+              const revenuePreview = calculateRevenueLocal(formData);
+              const pickupType = (formData as any).pickup_time_type || 'appointment';
+              const deliveryType = (formData as any).delivery_time_type || 'appointment';
+              const timeLabel = (type: string) => (type === 'appointment' ? 'Appointment time' : type === 'fcfs' ? 'Opens at' : 'Window opens');
+              const milesForPreview = (Number(formData.actual_miles) > 0 ? Number(formData.actual_miles) : Number(formData.booked_miles)) || 0;
+              const dims = calcOverDimensionCharge({
+                height_inches: formData.height_inches,
+                width_inches: formData.width_inches,
+                length_inches: formData.length_inches,
+                miles: milesForPreview,
+                rules: overDimRules as OverDimRule[],
+              });
+              const anyDim = !!(formData.height_inches || formData.width_inches || formData.length_inches);
+              const { rate: detentionRate, cap: detentionCap } = getDetentionRuleForLoad(formData);
+              const detentionTrailer = trailers.find((t: any) => t.id === formData?.trailer_id);
+              const set = (patch: Record<string, any>) => setFormData({ ...formData, ...patch });
+              const appointmentOptions = (
+                <SelectContent>
+                  <SelectItem value="appointment">Appointment</SelectItem>
+                  <SelectItem value="fcfs">First come, first served</SelectItem>
+                  <SelectItem value="window">Open window</SelectItem>
+                </SelectContent>
+              );
 
-              <TabsContent value="details" className="space-y-4 mt-4">
-                {/* In-Bond (Rule 480) compliance flag */}
-                <div className="rounded-lg border border-border/60 p-3 bg-muted/20 space-y-3">
-                  <div className="flex items-start gap-2">
-                    <Checkbox
-                      id="is_in_bond"
-                      checked={!!formData.is_in_bond}
-                      onCheckedChange={(checked) =>
-                        setFormData((prev: any) => ({
-                          ...prev,
-                          is_in_bond: !!checked,
-                          cf_7512_number: checked ? prev.cf_7512_number ?? '' : null,
-                        }))
-                      }
-                      className="mt-1"
-                    />
-                    <div className="space-y-1">
-                      <Label htmlFor="is_in_bond" className="font-medium cursor-pointer">
-                        In-Bond / International Shipment (Rule 480)
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Adds a <strong>Company</strong> accessorial of ${parseFloat(getSetting('in_bond_fee', '100')).toFixed(2)} and warns the driver not to break the customs seal.
-                      </p>
-                    </div>
-                  </div>
-                  {formData.is_in_bond && (
-                    <div className="space-y-1 pl-6">
-                      <Label htmlFor="cf_7512_number" className="text-xs font-semibold">
-                        CF 7512 Number <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="cf_7512_number"
-                        value={formData.cf_7512_number ?? ''}
-                        onChange={(e) => setFormData({ ...formData, cf_7512_number: e.target.value })}
-                        placeholder="e.g. 123-45678901"
-                        maxLength={64}
-                        required
-                        className="pl-4 sm:pl-3 h-10 font-mono"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="landstar_load_id">{isLandstar ? 'Landstar Load ID' : 'Load ID'}</Label>
-                    <Input 
-                      id="landstar_load_id" 
-                      value={formData.landstar_load_id || ''} 
-                      onChange={(e) => setFormData({ ...formData, landstar_load_id: e.target.value })} 
-                      placeholder="8941232" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="agency_code">Agency Code</Label>
-                    <Input 
-                      id="agency_code" 
-                      value={formData.agency_code || ''} 
-                      onChange={(e) => setFormData({ ...formData, agency_code: e.target.value.toUpperCase().slice(0, 3) })} 
-                      placeholder="JNS"
-                      maxLength={3}
-                      className="font-mono uppercase"
-                    />
-                    <AgencyCRMStatusBadge agencyCode={formData.agency_code} onBlockedChange={setAgencyBlocked} />
+              return (
+                <Tabs defaultValue="trip" className="w-full">
+                  <div className="-mx-1 overflow-x-auto px-1 pb-1">
+                    <TabsList className="inline-flex h-11 w-max min-w-full justify-start">
+                      <TabsTrigger value="trip" className="h-9">Trip</TabsTrigger>
+                      <TabsTrigger value="money" className="h-9">Money</TabsTrigger>
+                      <TabsTrigger value="more" className="h-9">More</TabsTrigger>
+                      {editing && <TabsTrigger value="expenses" className="h-9">Expenses</TabsTrigger>}
+                      {editing && <TabsTrigger value="pod" className="h-9">Proof of delivery</TabsTrigger>}
+                      {editing && <TabsTrigger value="history" className="h-9">History</TabsTrigger>}
+                    </TabsList>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
-                    <Select value={formData.status || 'pending'} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="assigned">Assigned</SelectItem>
-                        <SelectItem value="at_pickup">At Pickup</SelectItem>
-                        <SelectItem value="loading">Loading</SelectItem>
-                        <SelectItem value="in_transit">In Transit</SelectItem>
-                        <SelectItem value="at_delivery">At Delivery</SelectItem>
-                        <SelectItem value="unloading">Unloading</SelectItem>
-                        <SelectItem value="delivered">Delivered</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* Auto Email Updates Toggle */}
-                <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/30">
-                  <div className="flex items-center gap-3">
-                    <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">Auto Email Updates</p>
-                      <p className="text-xs text-muted-foreground">Send status emails to the agent when this load's status changes</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={formData.auto_email_updates ?? true}
-                    onCheckedChange={(checked) => setFormData({ ...formData, auto_email_updates: checked })}
-                  />
-                </div>
-
-                {/* POD Required Toggle */}
-                <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/30">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">POD Required</p>
-                      <p className="text-xs text-muted-foreground">Require Transflo POD link and signature on delivery</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={formData.pod_required ?? true}
-                    onCheckedChange={(checked) => setFormData({ ...formData, pod_required: checked })}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="origin">Origin (Full Address) *</Label>
-                    <Input 
-                      id="origin" 
-                      value={formData.origin || ''} 
-                      onChange={(e) => setFormData({ ...formData, origin: e.target.value })} 
-                      placeholder="1234 Industrial Blvd, Lewisville, TX 75057" 
-                      required 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="destination">Destination (Full Address) *</Label>
-                    <Input 
-                      id="destination" 
-                      value={formData.destination || ''} 
-                      onChange={(e) => setFormData({ ...formData, destination: e.target.value })} 
-                      placeholder="5678 Commerce Dr, Evans, CO 80620" 
-                      required 
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="pickup_number">Pickup Number (PU#)</Label>
-                    <Input
-                      id="pickup_number"
-                      value={formData.pickup_number || ''}
-                      onChange={(e) => setFormData({ ...formData, pickup_number: e.target.value })}
-                      placeholder="e.g. PU-48291 (shown to driver at guard shack)"
-                    />
-                  </div>
-                </div>
-
-                {(() => {
-                  const pickupType = (formData as any).pickup_time_type || 'appointment';
-                  const deliveryType = (formData as any).delivery_time_type || 'appointment';
-                  const pickupLabel = pickupType === 'appointment' ? 'Appointment Time' : pickupType === 'fcfs' ? 'Start Time' : 'Window Start';
-                  const deliveryLabel = deliveryType === 'appointment' ? 'Appointment Time' : deliveryType === 'fcfs' ? 'Start Time' : 'Window Start';
-                  return (
-                    <>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="pickup_date">Pickup Date</Label>
+                  {/* TRIP: which load, where it goes, when, and who is driving */}
+                  <TabsContent value="trip" className="mt-4 space-y-6">
+                    <FormSection title="The load">
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <Field label={isLandstar ? 'Landstar load ID' : 'Load ID'} htmlFor="landstar_load_id">
+                          <Input id="landstar_load_id" value={formData.landstar_load_id || ''} onChange={(e) => set({ landstar_load_id: e.target.value })} placeholder="8941232" />
+                        </Field>
+                        <Field label="Agent code" htmlFor="agency_code">
                           <Input
-                            id="pickup_date"
-                            type="date"
-                            value={formData.pickup_date || ''}
-                            onChange={(e) => setFormData({ ...formData, pickup_date: e.target.value })}
+                            id="agency_code"
+                            value={formData.agency_code || ''}
+                            onChange={(e) => set({ agency_code: e.target.value.toUpperCase().slice(0, 3) })}
+                            placeholder="JNS"
+                            maxLength={3}
+                            className="font-mono uppercase"
                           />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="pickup_time_type">Pickup Time Type</Label>
-                          <Select
-                            value={pickupType}
-                            onValueChange={(v) =>
-                              setFormData({
-                                ...formData,
-                                pickup_time_type: v,
-                                // Clear stale end time when switching away from Open Window
-                                ...(v !== 'window' ? { pickup_end_time: null as any } : {}),
-                              })
-                            }
-                          >
-                            <SelectTrigger><SelectValue /></SelectTrigger>
+                          <AgencyCRMStatusBadge agencyCode={formData.agency_code} onBlockedChange={setAgencyBlocked} />
+                        </Field>
+                        <Field label="Status" htmlFor="status">
+                          <Select value={formData.status || 'pending'} onValueChange={(v) => set({ status: v })}>
+                            <SelectTrigger id="status"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="appointment">Strict Appointment</SelectItem>
-                              <SelectItem value="fcfs">First Come First Served</SelectItem>
-                              <SelectItem value="window">Open Window</SelectItem>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="assigned">Assigned</SelectItem>
+                              <SelectItem value="at_pickup">At pickup</SelectItem>
+                              <SelectItem value="loading">Loading</SelectItem>
+                              <SelectItem value="in_transit">In transit</SelectItem>
+                              <SelectItem value="at_delivery">At delivery</SelectItem>
+                              <SelectItem value="unloading">Unloading</SelectItem>
+                              <SelectItem value="delivered">Delivered</SelectItem>
+                              <SelectItem value="cancelled">Cancelled</SelectItem>
                             </SelectContent>
                           </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="pickup_time">{pickupLabel}</Label>
-                          <Input
-                            id="pickup_time"
-                            type="text"
-                            value={formData.pickup_time || ''}
-                            onChange={(e) => setFormData({ ...formData, pickup_time: e.target.value })}
-                            placeholder="8:00 AM"
-                          />
-                        </div>
-                        {pickupType === 'window' && (
-                          <div className="space-y-2">
-                            <Label htmlFor="pickup_end_time">Window End</Label>
-                            <Input
-                              id="pickup_end_time"
-                              type="text"
-                              value={(formData as any).pickup_end_time || ''}
-                              onChange={(e) => setFormData({ ...formData, pickup_end_time: e.target.value } as any)}
-                              placeholder="5:00 PM"
-                            />
-                          </div>
-                        )}
+                        </Field>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="delivery_date">Delivery Date</Label>
-                          <Input
-                            id="delivery_date"
-                            type="date"
-                            value={formData.delivery_date || ''}
-                            onChange={(e) => setFormData({ ...formData, delivery_date: e.target.value })}
-                          />
+                    </FormSection>
+
+                    <FormSection title="Pickup">
+                      <div className="grid gap-4">
+                        <Field label="Pickup address" htmlFor="origin">
+                          <Input id="origin" value={formData.origin || ''} onChange={(e) => set({ origin: e.target.value })} placeholder="1234 Industrial Blvd, Lewisville, TX 75057" required />
+                        </Field>
+                        <div className="grid gap-4 sm:grid-cols-4">
+                          <Field label="Date" htmlFor="pickup_date">
+                            <Input id="pickup_date" type="date" value={formData.pickup_date || ''} onChange={(e) => set({ pickup_date: e.target.value })} />
+                          </Field>
+                          <Field label="Time rule" htmlFor="pickup_time_type">
+                            <Select value={pickupType} onValueChange={(v) => set({ pickup_time_type: v, ...(v !== 'window' ? { pickup_end_time: null } : {}) })}>
+                              <SelectTrigger id="pickup_time_type"><SelectValue /></SelectTrigger>
+                              {appointmentOptions}
+                            </Select>
+                          </Field>
+                          <Field label={timeLabel(pickupType)} htmlFor="pickup_time">
+                            <Input id="pickup_time" value={formData.pickup_time || ''} onChange={(e) => set({ pickup_time: e.target.value })} placeholder="8:00 AM" />
+                          </Field>
+                          {pickupType === 'window' && (
+                            <Field label="Window closes" htmlFor="pickup_end_time">
+                              <Input id="pickup_end_time" value={(formData as any).pickup_end_time || ''} onChange={(e) => set({ pickup_end_time: e.target.value })} placeholder="5:00 PM" />
+                            </Field>
+                          )}
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="delivery_time_type">Delivery Time Type</Label>
-                          <Select
-                            value={deliveryType}
-                            onValueChange={(v) =>
-                              setFormData({
-                                ...formData,
-                                delivery_time_type: v,
-                                ...(v !== 'window' ? { delivery_end_time: null as any } : {}),
-                              })
-                            }
-                          >
-                            <SelectTrigger><SelectValue /></SelectTrigger>
+                        <Field label="Pickup number" htmlFor="pickup_number" hint="Shown to the driver at the guard shack.">
+                          <Input id="pickup_number" value={formData.pickup_number || ''} onChange={(e) => set({ pickup_number: e.target.value })} placeholder="PU-48291" />
+                        </Field>
+                      </div>
+                    </FormSection>
+
+                    <FormSection title="Delivery">
+                      <div className="grid gap-4">
+                        <Field label="Delivery address" htmlFor="destination">
+                          <Input id="destination" value={formData.destination || ''} onChange={(e) => set({ destination: e.target.value })} placeholder="5678 Commerce Dr, Evans, CO 80620" required />
+                        </Field>
+                        <div className="grid gap-4 sm:grid-cols-4">
+                          <Field label="Date" htmlFor="delivery_date">
+                            <Input id="delivery_date" type="date" value={formData.delivery_date || ''} onChange={(e) => set({ delivery_date: e.target.value })} />
+                          </Field>
+                          <Field label="Time rule" htmlFor="delivery_time_type">
+                            <Select value={deliveryType} onValueChange={(v) => set({ delivery_time_type: v, ...(v !== 'window' ? { delivery_end_time: null } : {}) })}>
+                              <SelectTrigger id="delivery_time_type"><SelectValue /></SelectTrigger>
+                              {appointmentOptions}
+                            </Select>
+                          </Field>
+                          <Field label={timeLabel(deliveryType)} htmlFor="delivery_time">
+                            <Input id="delivery_time" value={formData.delivery_time || ''} onChange={(e) => set({ delivery_time: e.target.value })} placeholder="2:00 PM" />
+                          </Field>
+                          {deliveryType === 'window' && (
+                            <Field label="Window closes" htmlFor="delivery_end_time">
+                              <Input id="delivery_end_time" value={(formData as any).delivery_end_time || ''} onChange={(e) => set({ delivery_end_time: e.target.value })} placeholder="6:00 PM" />
+                            </Field>
+                          )}
+                        </div>
+                      </div>
+                    </FormSection>
+
+                    <FormSection title="Who is hauling it">
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <Field label="Driver" htmlFor="driver_id">
+                          <Select value={formData.driver_id || 'none'} onValueChange={(v) => set({ driver_id: v === 'none' ? null : v })}>
+                            <SelectTrigger id="driver_id"><SelectValue placeholder="Select driver" /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="appointment">Strict Appointment</SelectItem>
-                              <SelectItem value="fcfs">First Come First Served</SelectItem>
-                              <SelectItem value="window">Open Window</SelectItem>
+                              <SelectItem value="none">Unassigned</SelectItem>
+                              {drivers.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.first_name} {d.last_name}</SelectItem>)}
                             </SelectContent>
                           </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="delivery_time">{deliveryLabel}</Label>
-                          <Input
-                            id="delivery_time"
-                            type="text"
-                            value={formData.delivery_time || ''}
-                            onChange={(e) => setFormData({ ...formData, delivery_time: e.target.value })}
-                            placeholder="2:00 PM"
-                          />
-                        </div>
-                        {deliveryType === 'window' && (
-                          <div className="space-y-2">
-                            <Label htmlFor="delivery_end_time">Window End</Label>
-                            <Input
-                              id="delivery_end_time"
-                              type="text"
-                              value={(formData as any).delivery_end_time || ''}
-                              onChange={(e) => setFormData({ ...formData, delivery_end_time: e.target.value } as any)}
-                              placeholder="6:00 PM"
-                            />
-                          </div>
-                        )}
+                        </Field>
+                        <Field label="Truck" htmlFor="truck_id">
+                          <Select value={formData.truck_id || 'none'} onValueChange={(v) => set({ truck_id: v === 'none' ? null : v })}>
+                            <SelectTrigger id="truck_id"><SelectValue placeholder="Select truck" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Unassigned</SelectItem>
+                              {trucks.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.unit_number}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </Field>
+                        <Field label="Trailer" htmlFor="trailer_id">
+                          <Select value={formData.trailer_id || 'none'} onValueChange={(v) => set({ trailer_id: v === 'none' ? null : v })}>
+                            <SelectTrigger id="trailer_id"><SelectValue placeholder="Select trailer" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Unassigned</SelectItem>
+                              {trailers.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.unit_number}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </Field>
                       </div>
-                    </>
-                  );
-                })()}
+                    </FormSection>
+                  </TabsContent>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="driver_id">Driver</Label>
-                    <Select value={formData.driver_id || 'none'} onValueChange={(v) => setFormData({ ...formData, driver_id: v === 'none' ? null : v })}>
-                      <SelectTrigger><SelectValue placeholder="Select driver" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Unassigned</SelectItem>
-                        {drivers.map((d: any) => <SelectItem key={d.id} value={d.id}>{d.first_name} {d.last_name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="truck_id">Truck</Label>
-                    <Select value={formData.truck_id || 'none'} onValueChange={(v) => setFormData({ ...formData, truck_id: v === 'none' ? null : v })}>
-                      <SelectTrigger><SelectValue placeholder="Select truck" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Unassigned</SelectItem>
-                        {trucks.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.unit_number}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="trailer_id">Trailer</Label>
-                    <Select value={formData.trailer_id || 'none'} onValueChange={(v) => setFormData({ ...formData, trailer_id: v === 'none' ? null : v })}>
-                      <SelectTrigger><SelectValue placeholder="Select trailer" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Unassigned</SelectItem>
-                        {trailers.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.unit_number}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                  {/* MONEY: what the customer pays, and what that comes to for you */}
+                  <TabsContent value="money" className="mt-4 space-y-6">
+                    <FormSection title="What the load pays">
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <Field label="Linehaul" htmlFor="rate">
+                          <CurrencyInput id="rate" value={formData.rate ?? ''} onChange={(v) => set({ rate: v === '' ? 0 : parseFloat(v) })} placeholder="0.00" />
+                        </Field>
+                        <Field label="Fuel surcharge" htmlFor="fuel_surcharge">
+                          <CurrencyInput id="fuel_surcharge" value={formData.fuel_surcharge ?? ''} onChange={(v) => set({ fuel_surcharge: v === '' ? 0 : parseFloat(v) })} placeholder="0.00" />
+                        </Field>
+                        <Field label="Booked miles" htmlFor="booked_miles">
+                          <IntegerInput id="booked_miles" value={formData.booked_miles ?? ''} onChange={(v) => set({ booked_miles: v === '' ? 0 : parseInt(v, 10) })} placeholder="0" />
+                        </Field>
+                        <Field label="Lumper" htmlFor="lumper">
+                          <CurrencyInput id="lumper" value={formData.lumper ?? ''} onChange={(v) => set({ lumper: v === '' ? 0 : parseFloat(v) })} placeholder="0.00" />
+                        </Field>
+                        <Field
+                          label="Detention hours"
+                          htmlFor="detention_hours"
+                          hint={detentionTrailer?.trailer_type ? `$${detentionRate.toFixed(2)} an hour, capped at $${detentionCap.toFixed(2)} a day (${detentionTrailer.trailer_type})` : 'Pick a trailer to fill in the rate.'}
+                        >
+                          <Input
+                            id="detention_hours"
+                            type="number"
+                            min={0}
+                            step="0.25"
+                            value={formData.detention_hours ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              const h = v === '' ? 0 : parseFloat(v);
+                              const days = h > 0 ? Math.ceil(h / 24) : 0;
+                              const owed = detentionCap > 0 ? Math.min(h * detentionRate, detentionCap * days) : h * detentionRate;
+                              set({ detention_hours: v === '' ? null : h, detention_pay: +owed.toFixed(2) });
+                            }}
+                            placeholder="0"
+                          />
+                        </Field>
+                        <Field label="Detention pay" htmlFor="detention_pay" hint="Worked out from the hours; change it if the paperwork says otherwise.">
+                          <CurrencyInput id="detention_pay" value={formData.detention_pay ?? ''} onChange={(v) => set({ detention_pay: v === '' ? 0 : parseFloat(v) })} placeholder="0.00" />
+                        </Field>
+                      </div>
+                      <div className="mt-4 flex items-center gap-3">
+                        <Checkbox id="is_power_only" checked={formData.is_power_only || false} onCheckedChange={(checked) => set({ is_power_only: checked })} />
+                        <Label htmlFor="is_power_only" className="cursor-pointer font-normal">Power only: {getSetting('power_only_percentage', '70')}% to the truck, no trailer share</Label>
+                      </div>
+                    </FormSection>
 
-                {/* Freight dimensions — drives Rule 670 Over-Dimension auto-billing */}
-                {(() => {
-                  const milesForPreview = (Number(formData.actual_miles) > 0 ? Number(formData.actual_miles) : Number(formData.booked_miles)) || 0;
-                  const preview = calcOverDimensionCharge({
-                    height_inches: formData.height_inches,
-                    width_inches: formData.width_inches,
-                    length_inches: formData.length_inches,
-                    miles: milesForPreview,
-                    rules: overDimRules as OverDimRule[],
-                  });
-                  const anyDim = !!(formData.height_inches || formData.width_inches || formData.length_inches);
-                  return (
-                    <div className="space-y-3 rounded-lg border border-border/60 p-3 bg-muted/20">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <Label className="text-sm font-semibold">Freight Dimensions <span className="text-xs font-normal text-muted-foreground">(Legal: 13'6" H × 8'6" W × 70' L)</span></Label>
-                        {anyDim && (
-                          preview.charge_amount > 0 ? (
-                            <span className="text-xs font-medium px-2 py-1 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300" title={preview.breakdown.map(b => `${b.dimension}: $${b.cpm.toFixed(2)}/mi`).join(' · ')}>
-                              Over-Dimension · +${preview.total_cpm.toFixed(2)}/mi · ${preview.charge_amount.toFixed(2)} on {milesForPreview} mi
+                    <FormSection
+                      title="Extra charges"
+                      description="Stop-offs, layover, just in time and the like. Landstar sets how much of each it pays you."
+                      aside={<Button type="button" variant="outline" className="h-11" onClick={addAccessorial}><Plus className="mr-1 h-4 w-4" /> Add charge</Button>}
+                    >
+                      {accessorials.length === 0 ? (
+                        <p className="py-2 text-sm text-muted-foreground">No extra charges on this load.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {accessorials.map((acc, index) => (
+                            <div key={index} className="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-[1.4fr_1fr_1fr_0.8fr_auto] sm:items-end">
+                              <Field label="Charge">
+                                <Select
+                                  value={acc.accessorial_type}
+                                  onValueChange={(v) => {
+                                    const match = accessorialTypes.find((t: any) => t.name === v);
+                                    const updated = [...accessorials];
+                                    updated[index] = { ...updated[index], accessorial_type: v, is_driver_pay: match ? !!match.default_is_driver_pay : updated[index].is_driver_pay };
+                                    setAccessorials(updated);
+                                  }}
+                                >
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {acc.accessorial_type && !accessorialTypes.some((t: any) => t.name === acc.accessorial_type) && (
+                                      <SelectItem value={acc.accessorial_type}>{acc.accessorial_type} (legacy)</SelectItem>
+                                    )}
+                                    {accessorialTypes.map((t: any) => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </Field>
+                              <Field label="Paid to">
+                                <Select value={acc.is_driver_pay ? 'driver' : 'company'} onValueChange={(v) => updateAccessorial(index, 'is_driver_pay', v === 'driver')}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="driver">Driver</SelectItem>
+                                    <SelectItem value="company">Company</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </Field>
+                              <Field label="Amount">
+                                <CurrencyInput value={acc.amount ?? ''} onChange={(v) => updateAccessorial(index, 'amount', v === '' ? 0 : parseFloat(v))} placeholder="0.00" />
+                              </Field>
+                              <Field label="% paid">
+                                <PercentageInput value={acc.percentage ?? ''} onChange={(v) => updateAccessorial(index, 'percentage', v === '' ? 100 : parseFloat(v))} placeholder="100" />
+                              </Field>
+                              <div className="flex items-center justify-between gap-2 sm:justify-end">
+                                <span className="text-sm text-muted-foreground sm:hidden">
+                                  {acc.is_driver_pay ? `You get ${formatCurrency(acc.amount * (acc.percentage / 100))}` : 'Company expense'}
+                                </span>
+                                <Button type="button" variant="ghost" size="icon" className="h-11 w-11 text-destructive" aria-label="Remove this charge" onClick={() => removeAccessorial(index)}>
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                          <p className="text-right text-sm text-muted-foreground">
+                            Total extra charges <span className="figure font-semibold text-foreground">{formatCurrency(calculateAccessorialsTotal())}</span>
+                            {' · '}to the driver{' '}
+                            <span className="figure font-semibold text-foreground">
+                              {formatCurrency(accessorials.filter((a) => a.is_driver_pay).reduce((s, a) => s + (Number(a.amount) || 0) * ((Number(a.percentage) || 0) / 100), 0))}
                             </span>
-                          ) : (
-                            <span className="text-xs font-medium px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">Legal</span>
-                          )
-                        )}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                          <Label htmlFor="height_inches" className="text-xs">Height</Label>
-                          <FeetInchesInput
-                            id="height_inches"
-                            valueInches={formData.height_inches}
-                            onChange={(v) => setFormData({ ...formData, height_inches: v })}
-                          />
+                          </p>
                         </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="width_inches" className="text-xs">Width</Label>
-                          <FeetInchesInput
-                            id="width_inches"
-                            valueInches={formData.width_inches}
-                            onChange={(v) => setFormData({ ...formData, width_inches: v })}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="length_inches" className="text-xs">Length</Label>
-                          <FeetInchesInput
-                            id="length_inches"
-                            valueInches={formData.length_inches}
-                            onChange={(v) => setFormData({ ...formData, length_inches: v })}
-                          />
-                        </div>
-                      </div>
-                      {preview.charge_amount > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          A <strong>Company</strong> accessorial of <strong>${preview.charge_amount.toFixed(2)}</strong> (Rule 670) will be added on save. Not paid to the driver.
-                        </p>
                       )}
-                    </div>
-                  );
-                })()}
+                    </FormSection>
 
-
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="empty_miles">Empty / Deadhead Miles</Label>
-                    <IntegerInput
-                      id="empty_miles"
-                      value={formData.empty_miles ?? ''}
-                      onChange={(v) => setFormData({ ...formData, empty_miles: v === '' ? 0 : parseInt(v, 10) })}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-
-              </TabsContent>
-
-              <TabsContent value="revenue" className="space-y-4 mt-4">
-                <div className="flex items-center space-x-2 pb-2">
-                  <Checkbox 
-                    id="is_power_only" 
-                    checked={formData.is_power_only || false}
-                    onCheckedChange={(checked) => setFormData({ ...formData, is_power_only: checked })}
-                  />
-                  <Label htmlFor="is_power_only" className="font-normal cursor-pointer">Power Only (70% truck revenue, no trailer)</Label>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="rate">Booked Linehaul ($)</Label>
-                    <CurrencyInput
-                      id="rate"
-                      value={formData.rate ?? ''}
-                      onChange={(v) => setFormData({ ...formData, rate: v === '' ? 0 : parseFloat(v) })}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="booked_miles">Booked Miles</Label>
-                    <IntegerInput
-                      id="booked_miles"
-                      value={formData.booked_miles ?? ''}
-                      onChange={(v) => setFormData({ ...formData, booked_miles: v === '' ? 0 : parseInt(v, 10) })}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fuel_surcharge">Fuel Surcharge ($)</Label>
-                    <CurrencyInput
-                      id="fuel_surcharge"
-                      value={formData.fuel_surcharge ?? ''}
-                      onChange={(v) => setFormData({ ...formData, fuel_surcharge: v === '' ? 0 : parseFloat(v) })}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-
-                {/* Lumper - shown for both modes */}
-                <div className="space-y-2">
-                  <Label htmlFor="lumper">Lumper ($)</Label>
-                  <CurrencyInput
-                    id="lumper"
-                    value={formData.lumper ?? ''}
-                    onChange={(v) => setFormData({ ...formData, lumper: v === '' ? 0 : parseFloat(v) })}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                {/* Detention - hours-based with auto-computed $ from trailer-type rule (Rule 500) */}
-                {(() => {
-                  const { rate, cap } = getDetentionRuleForLoad(formData);
-                  const hours = parseFloat(formData.detention_hours ?? '0') || 0;
-                  const uncapped = hours * rate;
-                  const days = hours > 0 ? Math.ceil(hours / 24) : 0;
-                  const capped = cap > 0 ? Math.min(uncapped, cap * days) : uncapped;
-                  const computed = +capped.toFixed(2);
-                  const trailer = trailers.find((t: any) => t.id === formData?.trailer_id);
-                  return (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                      <div className="space-y-2">
-                        <Label htmlFor="detention_hours">Detention Hours</Label>
-                        <Input
-                          id="detention_hours"
-                          type="number"
-                          min={0}
-                          step="0.25"
-                          value={formData.detention_hours ?? ''}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            const h = v === '' ? 0 : parseFloat(v);
-                            const u = h * rate;
-                            const d = h > 0 ? Math.ceil(h / 24) : 0;
-                            const c = cap > 0 ? Math.min(u, cap * d) : u;
-                            setFormData({ ...formData, detention_hours: v === '' ? null : h, detention_pay: +c.toFixed(2) });
-                          }}
-                          placeholder="0"
-                          className="pl-4 sm:pl-3 h-12"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          {trailer?.trailer_type
-                            ? `Rate: $${rate.toFixed(2)}/hr · Cap $${cap.toFixed(2)}/day (${trailer.trailer_type})`
-                            : 'Select a trailer to auto-fill the rate.'}
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="detention_pay">Detention Pay ($)</Label>
-                        <CurrencyInput
-                          id="detention_pay"
-                          value={formData.detention_pay ?? ''}
-                          onChange={(v) => setFormData({ ...formData, detention_pay: v === '' ? 0 : parseFloat(v) })}
-                          placeholder={computed ? computed.toFixed(2) : '0.00'}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Auto-calculated (Rule 500); override if needed.
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div className="border-t pt-4 mt-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <Label className="text-base font-medium">Accessorials</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addAccessorial}>
-                      <Plus className="h-4 w-4 mr-1" /> Add Accessorial
-                    </Button>
-                  </div>
-                  
-                  {accessorials.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">No accessorials added. Click "Add Accessorial" to add detention, layover, etc.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {accessorials.map((acc, index) => (
-                        <div key={index} className="grid grid-cols-12 gap-2 items-end p-3 bg-muted/50 rounded-lg">
-                          <div className="col-span-3 space-y-1">
-                            <Label className="text-xs">Type</Label>
-                            <Select
-                              value={acc.accessorial_type}
-                              onValueChange={(v) => {
-                                const match = accessorialTypes.find((t: any) => t.name === v);
-                                const updated = [...accessorials];
-                                updated[index] = {
-                                  ...updated[index],
-                                  accessorial_type: v,
-                                  // Auto-apply the catalog default; dispatcher can still override via the Payable To select.
-                                  is_driver_pay: match ? !!match.default_is_driver_pay : updated[index].is_driver_pay,
-                                };
-                                setAccessorials(updated);
-                              }}
-                            >
-                              <SelectTrigger className="h-9">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {/* Preserve legacy free-text values not in the catalog */}
-                                {acc.accessorial_type &&
-                                  !accessorialTypes.some((t: any) => t.name === acc.accessorial_type) && (
-                                    <SelectItem value={acc.accessorial_type}>
-                                      {acc.accessorial_type} (legacy)
-                                    </SelectItem>
-                                  )}
-                                {accessorialTypes.map((t: any) => (
-                                  <SelectItem key={t.id} value={t.name}>
-                                    {t.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                    {isIndependent && (
+                      <FormSection title="Negotiation">
+                        <div className="mb-4 flex items-baseline justify-between rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+                          <div>
+                            <div className="text-sm font-medium">Total negotiated rate</div>
+                            <div className="text-xs text-muted-foreground">Linehaul, fuel surcharge, extra charges and lumper</div>
                           </div>
-                          <div className="col-span-2 space-y-1">
-                            <Label className="text-xs">Payable To</Label>
-                            <Select
-                              value={acc.is_driver_pay ? 'driver' : 'company'}
-                              onValueChange={(v) => updateAccessorial(index, 'is_driver_pay', v === 'driver')}
-                            >
-                              <SelectTrigger className="h-9">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="driver">Driver</SelectItem>
-                                <SelectItem value="company">Company</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="col-span-2 space-y-1">
-                            <Label className="text-xs">Amount ($)</Label>
-                            <CurrencyInput
-                              className="h-9"
-                              value={acc.amount ?? ''}
-                              onChange={(v) => updateAccessorial(index, 'amount', v === '' ? 0 : parseFloat(v))}
-                              placeholder="0.00"
-                            />
-                          </div>
-                          <div className="col-span-2 space-y-1">
-                            <Label className="text-xs">% Paid</Label>
-                            <PercentageInput
-                              className="h-9"
-                              value={acc.percentage ?? ''}
-                              onChange={(v) => updateAccessorial(index, 'percentage', v === '' ? 100 : parseFloat(v))}
-                              placeholder="100"
-                            />
-                          </div>
-                          <div className="col-span-2 space-y-1">
-                            <Label className="text-xs">Net</Label>
-                            {acc.is_driver_pay ? (
-                              <div className="h-9 px-2 py-1.5 rounded-md border bg-muted text-sm font-medium">
-                                {formatCurrency(acc.amount * (acc.percentage / 100))}
-                              </div>
-                            ) : (
-                              <div className="h-9 px-2 py-1.5 rounded-md border bg-muted text-[11px] font-medium text-muted-foreground flex items-center">
-                                Company expense
-                              </div>
-                            )}
-                          </div>
-                          <div className="col-span-1">
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-9 w-9 text-destructive"
-                              onClick={() => removeAccessorial(index)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                      <div className="flex flex-col items-end gap-0.5 pt-2 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Total Accessorials: </span>
-                          <span className="font-bold">{formatCurrency(calculateAccessorialsTotal())}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Driver portion:{' '}
-                          <span className="font-semibold text-foreground">
-                            {formatCurrency(
-                              accessorials
-                                .filter((a) => a.is_driver_pay)
-                                .reduce((s, a) => s + (Number(a.amount) || 0) * ((Number(a.percentage) || 0) / 100), 0),
-                            )}
+                          <span className="figure text-xl font-bold text-primary">
+                            {formatCurrency((parseFloat(formData.rate) || 0) + (parseFloat(formData.fuel_surcharge) || 0) + calculateAccessorialsTotal() + (parseFloat(formData.lumper) || 0))}
                           </span>
                         </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Independent mode only: negotiation tools & broker history */}
-                {isIndependent && (
-                  <>
-                    {/* Total Negotiated Rate Calculator */}
-                    <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-foreground">Total Negotiated Rate</span>
-                        <span className="text-xl font-bold text-primary">
-                          {formatCurrency(
-                            (parseFloat(formData.rate) || 0) +
-                            (parseFloat(formData.fuel_surcharge) || 0) +
-                            calculateAccessorialsTotal() +
-                            (parseFloat(formData.lumper) || 0)
-                          )}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">Line Haul + FSC + Accessorials + Lumper</p>
-                    </div>
-
-                    {/* Negotiation Notes */}
-                    <div className="space-y-2">
-                      <Label htmlFor="negotiation_notes">Negotiation Notes</Label>
-                      <Textarea
-                        id="negotiation_notes"
-                        value={formData.negotiation_notes || ''}
-                        onChange={(e) => setFormData({ ...formData, negotiation_notes: e.target.value })}
-                        placeholder="Rate negotiation details, broker counter-offers, etc."
-                        rows={3}
-                      />
-                    </div>
-
-                    {/* Broker Rate History Badge */}
-                    {formData.agency_code && (
-                      <BrokerRateHistoryCard agencyCode={formData.agency_code} currentLoads={loads} />
+                        <Field label="Notes" htmlFor="negotiation_notes">
+                          <Textarea id="negotiation_notes" value={formData.negotiation_notes || ''} onChange={(e) => set({ negotiation_notes: e.target.value })} placeholder="Counter-offers, what the broker agreed to" rows={3} />
+                        </Field>
+                        {formData.agency_code && <div className="mt-4"><BrokerRateHistoryCard agencyCode={formData.agency_code} currentLoads={loads} /></div>}
+                      </FormSection>
                     )}
-                  </>
-                )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="advance_taken">Advance Taken ($)</Label>
-                    <CurrencyInput
-                      id="advance_taken"
-                      value={formData.advance_taken ?? ''}
-                      onChange={(v) => setFormData({ ...formData, advance_taken: v === '' ? 0 : parseFloat(v) })}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Advance Available (FSC + 30% Rate)</Label>
-                    <div className="h-10 px-3 py-2 rounded-md border bg-muted text-muted-foreground">
-                      {formatCurrency((parseFloat(formData.fuel_surcharge) || 0) + ((parseFloat(formData.rate) || 0) * (parseFloat(getSetting('advance_percentage', '30')) / 100)))}
-                    </div>
-                  </div>
-                </div>
+                    <FormSection title="Advance">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Advance taken" htmlFor="advance_taken">
+                          <CurrencyInput id="advance_taken" value={formData.advance_taken ?? ''} onChange={(v) => set({ advance_taken: v === '' ? 0 : parseFloat(v) })} placeholder="0.00" />
+                        </Field>
+                        <Field label="Advance available" hint={`Fuel surcharge plus ${getSetting('advance_percentage', '30')}% of linehaul`}>
+                          <div className="flex h-10 items-center rounded-md border bg-muted px-3 text-muted-foreground figure">
+                            {formatCurrency((parseFloat(formData.fuel_surcharge) || 0) + ((parseFloat(formData.rate) || 0) * (parseFloat(getSetting('advance_percentage', '30')) / 100)))}
+                          </div>
+                        </Field>
+                      </div>
+                    </FormSection>
 
-                {/* Preview calculations */}
-                <div className="border-t pt-4 mt-4">
-                  <h4 className="font-medium mb-3">Revenue Preview</h4>
-                  <div className="grid grid-cols-4 gap-4 text-sm">
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-muted-foreground">Gross Revenue</p>
-                      <p className="font-bold">{formatCurrency(calculateRevenueLocal(formData).gross_revenue)}</p>
-                    </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-muted-foreground">Truck ({formData.is_power_only ? '70' : getSetting('truck_percentage', '65')}%)</p>
-                      <p className="font-bold">{formatCurrency(calculateRevenueLocal(formData).truck_revenue)}</p>
-                    </div>
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-muted-foreground">Trailer ({getSetting('trailer_percentage', '7')}%)</p>
-                      <p className="font-bold">{formatCurrency(calculateRevenueLocal(formData).trailer_revenue)}</p>
-                    </div>
-                    <div className="p-3 bg-primary/10 rounded-lg">
-                      <p className="text-muted-foreground">Net Revenue</p>
-                      <p className="font-bold text-primary">{formatCurrency(calculateRevenueLocal(formData).net_revenue)}</p>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
+                    <Panel title="What this comes to" description="Worked out from the figures above, using your pay settings.">
+                      <StatementLine label="Billed in all" note="Linehaul, fuel surcharge and extra charges" value={formatCurrency(revenuePreview.gross_revenue)} />
+                      <StatementLine label={`Truck share (${formData.is_power_only ? getSetting('power_only_percentage', '70') : getSetting('truck_percentage', '65')}%)`} value={formatCurrency(revenuePreview.truck_revenue)} rule="single" />
+                      <StatementLine label={`Trailer share (${getSetting('trailer_percentage', '7')}%)`} value={formatCurrency(revenuePreview.trailer_revenue)} rule="single" />
+                      <StatementLine label="Your revenue" value={formatCurrency(revenuePreview.net_revenue)} strong rule="double" />
+                    </Panel>
+                  </TabsContent>
 
-              <TabsContent value="miles" className="space-y-4 mt-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="start_miles">Starting Odometer</Label>
-                    <IntegerInput
-                      id="start_miles"
-                      value={formData.start_miles ?? ''}
-                      onChange={(v) => setFormData({ ...formData, start_miles: v === '' ? 0 : parseInt(v, 10) })}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="end_miles">Ending Odometer</Label>
-                    <IntegerInput
-                      id="end_miles"
-                      value={formData.end_miles ?? ''}
-                      onChange={(v) => setFormData({ ...formData, end_miles: v === '' ? 0 : parseInt(v, 10) })}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Actual Miles (calculated)</Label>
-                    <div className="h-10 px-3 py-2 rounded-md border bg-muted text-muted-foreground">
-                      {((parseInt(formData.end_miles) || 0) - (parseInt(formData.start_miles) || 0)).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
+                  {/* MORE: customs, freight size, miles, notices and notes */}
+                  <TabsContent value="more" className="mt-4 space-y-6">
+                    <FormSection title="Miles">
+                      <div className="grid gap-4 sm:grid-cols-4">
+                        <Field label="Starting odometer" htmlFor="start_miles">
+                          <IntegerInput id="start_miles" value={formData.start_miles ?? ''} onChange={(v) => set({ start_miles: v === '' ? 0 : parseInt(v, 10) })} placeholder="0" />
+                        </Field>
+                        <Field label="Ending odometer" htmlFor="end_miles">
+                          <IntegerInput id="end_miles" value={formData.end_miles ?? ''} onChange={(v) => set({ end_miles: v === '' ? 0 : parseInt(v, 10) })} placeholder="0" />
+                        </Field>
+                        <Field label="Miles driven" hint="Ending minus starting">
+                          <div className="flex h-10 items-center rounded-md border bg-muted px-3 text-muted-foreground figure">
+                            {((parseInt(formData.end_miles) || 0) - (parseInt(formData.start_miles) || 0)).toLocaleString()}
+                          </div>
+                        </Field>
+                        <Field label="Empty miles" htmlFor="empty_miles" hint="Deadhead to the pickup">
+                          <IntegerInput id="empty_miles" value={formData.empty_miles ?? ''} onChange={(v) => set({ empty_miles: v === '' ? 0 : parseInt(v, 10) })} placeholder="0" />
+                        </Field>
+                      </div>
+                    </FormSection>
 
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes / Comments</Label>
-                  <Textarea 
-                    id="notes" 
-                    value={formData.notes || ''} 
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })} 
-                    placeholder="Stop over in Denver, etc." 
-                    rows={4}
-                  />
-                </div>
-              </TabsContent>
+                    <FormSection
+                      title="Freight size"
+                      description={`Legal is 13'6" high, 8'6" wide and 70' long. Over that, Landstar's over-dimension charge is added for you.`}
+                      aside={
+                        anyDim ? (
+                          dims.charge_amount > 0 ? (
+                            <span className="rounded-md bg-warning/15 px-2 py-1 text-xs font-medium text-warning" title={dims.breakdown.map((b) => `${b.dimension}: $${b.cpm.toFixed(2)}/mi`).join(' · ')}>
+                              Over-dimension: ${dims.charge_amount.toFixed(2)} on {milesForPreview} miles
+                            </span>
+                          ) : (
+                            <span className="rounded-md bg-success/15 px-2 py-1 text-xs font-medium text-success">Legal size</span>
+                          )
+                        ) : undefined
+                      }
+                    >
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <Field label="Height" htmlFor="height_inches"><FeetInchesInput id="height_inches" valueInches={formData.height_inches} onChange={(v) => set({ height_inches: v })} /></Field>
+                        <Field label="Width" htmlFor="width_inches"><FeetInchesInput id="width_inches" valueInches={formData.width_inches} onChange={(v) => set({ width_inches: v })} /></Field>
+                        <Field label="Length" htmlFor="length_inches"><FeetInchesInput id="length_inches" valueInches={formData.length_inches} onChange={(v) => set({ length_inches: v })} /></Field>
+                      </div>
+                      {dims.charge_amount > 0 && (
+                        <p className="mt-3 text-xs text-muted-foreground">A company charge of ${dims.charge_amount.toFixed(2)} (Rule 670) is added when you save. It is not paid to the driver.</p>
+                      )}
+                    </FormSection>
 
-              <TabsContent value="expenses" className="mt-4">
-                {editingLoad?.id ? (
-                  <ExpensesList
-                    relatedType="load"
-                    relatedId={editingLoad.id}
-                    title="Load Expenses"
-                  />
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>Save the load first to add expenses.</p>
-                  </div>
-                )}
-              </TabsContent>
+                    <FormSection title="Customs">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="is_in_bond"
+                          className="mt-1"
+                          checked={!!formData.is_in_bond}
+                          onCheckedChange={(checked) => setFormData((prev: any) => ({ ...prev, is_in_bond: !!checked, cf_7512_number: checked ? prev.cf_7512_number ?? '' : null }))}
+                        />
+                        <div>
+                          <Label htmlFor="is_in_bond" className="cursor-pointer font-medium">In-bond or international shipment (Rule 480)</Label>
+                          <p className="text-xs text-muted-foreground">
+                            Adds a company charge of ${parseFloat(getSetting('in_bond_fee', '100')).toFixed(2)} and tells the driver not to break the customs seal.
+                          </p>
+                        </div>
+                      </div>
+                      {formData.is_in_bond && (
+                        <div className="mt-3 sm:max-w-sm sm:pl-7">
+                          <Field label="CF 7512 number" htmlFor="cf_7512_number">
+                            <Input id="cf_7512_number" value={formData.cf_7512_number ?? ''} onChange={(e) => set({ cf_7512_number: e.target.value })} placeholder="123-45678901" maxLength={64} required className="font-mono" />
+                          </Field>
+                        </div>
+                      )}
+                    </FormSection>
 
-              <TabsContent value="pod" className="mt-4">
-                <PODViewer
-                  podSignaturePath={editingLoad?.pod_signature_path}
-                  podTransfloLink={editingLoad?.pod_transflo_link}
-                />
-              </TabsContent>
+                    <FormSection title="Notices">
+                      <div className="divide-y rounded-lg border">
+                        <div className="flex items-center justify-between gap-4 px-4 py-3">
+                          <div>
+                            <Label htmlFor="auto_email_updates" className="cursor-pointer font-medium">Email the agent when the status changes</Label>
+                            <p className="text-xs text-muted-foreground">Sends an update each time this load moves.</p>
+                          </div>
+                          <Switch id="auto_email_updates" checked={formData.auto_email_updates ?? true} onCheckedChange={(checked) => set({ auto_email_updates: checked })} />
+                        </div>
+                        <div className="flex items-center justify-between gap-4 px-4 py-3">
+                          <div>
+                            <Label htmlFor="pod_required" className="cursor-pointer font-medium">Require proof of delivery</Label>
+                            <p className="text-xs text-muted-foreground">The driver must add the Transflo link and signature on delivery.</p>
+                          </div>
+                          <Switch id="pod_required" checked={formData.pod_required ?? true} onCheckedChange={(checked) => set({ pod_required: checked })} />
+                        </div>
+                      </div>
+                    </FormSection>
 
-              <TabsContent value="history" className="mt-4">
-                {editingLoad?.id ? (
-                  <div className="space-y-4">
-                    <IntermediateStopsView loadId={editingLoad.id} />
-                    <StatusHistoryLog
-                      loadId={editingLoad.id}
-                      pickupDate={editingLoad.pickup_date}
-                      pickupTime={editingLoad.pickup_time}
-                      deliveryDate={editingLoad.delivery_date}
-                      deliveryTime={editingLoad.delivery_time}
-                    />
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>Save the load first to view status history.</p>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+                    <FormSection title="Notes">
+                      <Textarea id="notes" aria-label="Notes" value={formData.notes || ''} onChange={(e) => set({ notes: e.target.value })} placeholder="Anything the next person should know" rows={4} />
+                    </FormSection>
+                  </TabsContent>
 
-            <DialogFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-              <Button type="submit" className="gradient-gold text-primary-foreground" disabled={agencyBlocked}>
-                {editingLoad ? 'Save Changes' : 'Add Load'}
+                  {editing && (
+                    <TabsContent value="expenses" className="mt-4">
+                      <ExpensesList relatedType="load" relatedId={editingLoad.id} title="Load expenses" />
+                    </TabsContent>
+                  )}
+                  {editing && (
+                    <TabsContent value="pod" className="mt-4">
+                      <PODViewer podSignaturePath={editingLoad?.pod_signature_path} podTransfloLink={editingLoad?.pod_transflo_link} />
+                    </TabsContent>
+                  )}
+                  {editing && (
+                    <TabsContent value="history" className="mt-4">
+                      <div className="space-y-4">
+                        <IntermediateStopsView loadId={editingLoad.id} />
+                        <StatusHistoryLog
+                          loadId={editingLoad.id}
+                          pickupDate={editingLoad.pickup_date}
+                          pickupTime={editingLoad.pickup_time}
+                          deliveryDate={editingLoad.delivery_date}
+                          deliveryTime={editingLoad.delivery_time}
+                        />
+                      </div>
+                    </TabsContent>
+                  )}
+                </Tabs>
+              );
+            })()}
+
+            <DialogFooter className="sticky -bottom-4 z-10 -mx-4 mt-6 flex-row justify-end gap-2 border-t bg-background px-4 py-3 sm:-bottom-6 sm:-mx-6 sm:space-x-0 sm:px-6">
+              <Button type="button" variant="outline" className="h-11 flex-1 sm:flex-none" onClick={closeDialog}>Cancel</Button>
+              <Button type="submit" className="h-11 flex-1 gradient-gold sm:flex-none text-primary-foreground" disabled={agencyBlocked}>
+                {editingLoad ? 'Save changes' : 'Add load'}
               </Button>
-
             </DialogFooter>
           </form>
           )}
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+
+/** A label above a control, with an optional hint underneath. */
+function Field({ label, htmlFor, hint, className, children }: { label: string; htmlFor?: string; hint?: string; className?: string; children: React.ReactNode }) {
+  return (
+    <div className={cn('space-y-1.5', className)}>
+      <Label htmlFor={htmlFor}>{label}</Label>
+      {children}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+/** A titled group of fields, ruled from the one above. */
+function FormSection({ title, description, aside, children }: { title: string; description?: string; aside?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="border-t pt-4 first:border-t-0 first:pt-0">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="font-condensed text-lg font-bold leading-tight">{title}</h3>
+          {description && <p className="text-[13px] text-muted-foreground">{description}</p>}
+        </div>
+        {aside}
+      </div>
+      {children}
+    </section>
   );
 }
