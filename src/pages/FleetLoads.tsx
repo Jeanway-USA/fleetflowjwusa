@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { Roster, RosterToolbar, RosterBulkBar, downloadCsv, type RosterEntry } from '@/components/fleet/Roster';
 import { Panel, StatementLine } from '@/components/finance/statement-ui';
+import { Field, FormSection } from '@/components/shared/FormParts';
 import { summarize } from '@/lib/revenue-overview';
 import { ExpensesList } from '@/components/shared/ExpensesList';
 import { RateConfirmationUpload } from '@/components/loads/RateConfirmationUpload';
@@ -1615,33 +1616,5 @@ export default function FleetLoads() {
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-
-/** A label above a control, with an optional hint underneath. */
-function Field({ label, htmlFor, hint, className, children }: { label: string; htmlFor?: string; hint?: string; className?: string; children: React.ReactNode }) {
-  return (
-    <div className={cn('space-y-1.5', className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  );
-}
-
-/** A titled group of fields, ruled from the one above. */
-function FormSection({ title, description, aside, children }: { title: string; description?: string; aside?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <section className="border-t pt-4 first:border-t-0 first:pt-0">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="font-condensed text-lg font-bold leading-tight">{title}</h3>
-          {description && <p className="text-[13px] text-muted-foreground">{description}</p>}
-        </div>
-        {aside}
-      </div>
-      {children}
-    </section>
   );
 }
