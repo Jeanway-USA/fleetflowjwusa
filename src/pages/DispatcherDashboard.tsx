@@ -1,14 +1,14 @@
-import { useEffect, lazy, Suspense, useMemo } from 'react';
+import { useEffect, lazy, Suspense, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Package, Users, Truck, Clock, Plus, ArrowRight } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { addHours } from 'date-fns';
+import { addDays, format } from 'date-fns';
+import { OPEN_STATUSES, ON_ROAD_STATUSES, dispatchCounts, isPastDue } from '@/lib/dispatch';
 import { ActiveLoadsBoard } from '@/components/dispatcher/ActiveLoadsBoard';
 
 import { DriverStatusGrid } from '@/components/dispatcher/DriverStatusGrid';
@@ -60,49 +60,30 @@ export default function DispatcherDashboard() {
     enabled: !!user?.id,
   });
 
-  // Fetch stats data
+  // The numbers across the top: counted from loads that are open and not archived.
   const { data: stats } = useQuery({
     queryKey: ['dispatcher-stats'],
     queryFn: async () => {
       const now = new Date();
-      const in48Hours = addHours(now, 48);
+      const today = format(now, 'yyyy-MM-dd');
+      const soon = format(addDays(now, 2), 'yyyy-MM-dd');
 
-      const { count: activeLoads } = await supabase
+      const { data: open, error } = await supabase
         .from('fleet_loads')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ['assigned', 'loading', 'in_transit', 'unloading']);
+        .select('status, driver_id, pickup_date, delivery_date')
+        .is('deleted_at', null)
+        .in('status', [...OPEN_STATUSES]);
+      if (error) throw error;
+      const loads = open ?? [];
 
-      const { data: drivers } = await supabase
-        .from('drivers_public_view')
-        .select('id')
-        .eq('status', 'active');
+      const { data: drivers } = await supabase.from('drivers_public_view').select('id').eq('status', 'active');
+      // A driver is busy while holding an open load that is not past due.
+      const busy = new Set(loads.filter((l) => !isPastDue(l, today) && (l.status === 'assigned' || (ON_ROAD_STATUSES as readonly string[]).includes(l.status))).map((l) => l.driver_id).filter(Boolean));
+      const availableDrivers = (drivers ?? []).filter((d) => !busy.has(d.id)).length;
 
-      const { data: assignedLoads } = await supabase
-        .from('fleet_loads')
-        .select('driver_id')
-        .in('status', ['assigned', 'loading', 'in_transit', 'unloading']);
+      const { count: activeTrucks } = await supabase.from('trucks').select('*', { count: 'exact', head: true }).is('deleted_at', null).eq('status', 'active');
 
-      const assignedDriverIds = new Set(assignedLoads?.map(l => l.driver_id).filter(Boolean));
-      const availableDrivers = drivers?.filter(d => !assignedDriverIds.has(d.id)).length || 0;
-
-      const { count: activeTrucks } = await supabase
-        .from('trucks')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
-
-      const { count: upcomingPickups } = await supabase
-        .from('fleet_loads')
-        .select('*', { count: 'exact', head: true })
-        .in('status', ['booked', 'assigned'])
-        .gte('pickup_date', now.toISOString())
-        .lte('pickup_date', in48Hours.toISOString());
-
-      return {
-        activeLoads: activeLoads || 0,
-        availableDrivers,
-        activeTrucks: activeTrucks || 0,
-        upcomingPickups: upcomingPickups || 0,
-      };
+      return { ...dispatchCounts(loads, today, soon), availableDrivers, activeTrucks: activeTrucks || 0 };
     },
     staleTime: 2 * 60 * 1000,
   });
@@ -144,142 +125,98 @@ export default function DispatcherDashboard() {
 
   const displayName = profile?.first_name || user?.email?.split('@')[0] || 'Dispatcher';
 
-  const timezone = useMemo(() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
-    } catch {
-      return 'Local';
-    }
-  }, []);
+  const [tab, setTab] = useState('command-center');
 
-  const statCards = [
-    { label: 'Active Loads', value: stats?.activeLoads ?? 0, icon: Package, color: 'text-primary' },
-    { label: 'Available Drivers', value: stats?.availableDrivers ?? 0, icon: Users, color: 'text-primary' },
-    { label: 'Active Trucks', value: stats?.activeTrucks ?? 0, icon: Truck, color: 'text-primary' },
-    { label: 'Timezone', value: timezone.split('/').pop()?.replace(/_/g, ' ') ?? timezone, title: timezone, icon: Clock, color: 'text-primary' },
+  const cells: Array<{ key: string; label: string; value: number; note: string; tone?: 'bad' | 'warn'; tab: string }> = [
+    { key: 'road', label: 'On the road', value: stats?.onRoad ?? 0, note: 'Working a load now', tab: 'command-center' },
+    { key: 'driver', label: 'Need a driver', value: stats?.needDriver ?? 0, note: 'Booked, nobody assigned', tone: (stats?.needDriver ?? 0) > 0 ? 'warn' : undefined, tab: 'dispatch-board' },
+    { key: 'soon', label: 'Pickups in 48 hours', value: stats?.pickupsSoon ?? 0, note: 'Not yet started', tab: 'dispatch-board' },
+    { key: 'late', label: 'Past due', value: stats?.pastDue ?? 0, note: 'Delivery date has passed', tone: (stats?.pastDue ?? 0) > 0 ? 'bad' : undefined, tab: 'dispatch-board' },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {getGreeting()}, <span className="text-gradient-gold">{displayName}</span>
-          </h1>
-          <p className="text-muted-foreground mt-1">Dispatcher Operations Center</p>
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-condensed text-[28px] font-bold leading-tight tracking-tight sm:text-[32px]">Dispatch</h1>
+          <p className="mt-0.5 text-[15px] text-muted-foreground">
+            {getGreeting()}, {displayName}. {format(new Date(), 'EEEE, MMMM d')}.
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => navigate('/fleet-loads')} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Load
-          </Button>
-        </div>
+        <Button onClick={() => navigate('/fleet-loads')} className="h-11 gap-2 sm:h-10">
+          <Plus className="h-4 w-4" />
+          New load
+        </Button>
       </div>
 
-      {/* Pinned KPI Grid */}
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat) => (
-          <Card key={stat.label} className="card-elevated">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold mt-1 truncate" title={(stat as { title?: string }).title}>{stat.value}</p>
-                </div>
-                <stat.icon className={`h-8 w-8 ${stat.color} opacity-80 shrink-0`} />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <div>
+        <dl className="grid grid-cols-2 divide-x divide-y rounded-lg border bg-card lg:grid-cols-4 lg:divide-y-0">
+          {cells.map((c) => (
+            <div key={c.key} className="min-w-0">
+              <button
+                type="button"
+                onClick={() => setTab(c.tab)}
+                className="block min-h-[84px] w-full px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <dt className="text-[13px] text-muted-foreground">{c.label}</dt>
+                <dd className={`figure text-3xl font-bold leading-tight ${c.tone === 'bad' ? 'text-destructive' : c.tone === 'warn' ? 'text-warning' : ''}`}>{stats ? c.value : '…'}</dd>
+                <dd className="truncate text-xs text-muted-foreground">{c.note}</dd>
+              </button>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          {stats ? `${stats.availableDrivers} ${stats.availableDrivers === 1 ? 'driver' : 'drivers'} free, ${stats.activeTrucks} ${stats.activeTrucks === 1 ? 'truck' : 'trucks'} in service` : ' '}
+        </p>
       </div>
 
-      {/* Tabbed Interface */}
-      <Tabs defaultValue="command-center" className="w-full">
-        <TabsList className="w-full justify-start overflow-x-auto bg-transparent p-0 h-auto border-b border-border rounded-none gap-1">
-          <TabsTrigger
-            value="command-center"
-            className="rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
-          >
-            Command Center
-          </TabsTrigger>
-          <TabsTrigger
-            value="dispatch-board"
-            className="rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
-          >
-            Dispatch Board
-          </TabsTrigger>
-          <TabsTrigger
-            value="fleet-roster"
-            className="rounded-none border-b-2 border-transparent bg-transparent px-3 sm:px-4 py-3 text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors"
-          >
-            Fleet Roster
-          </TabsTrigger>
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-0">
+          {[
+            ['command-center', 'Overview'],
+            ['dispatch-board', 'Schedule and loads'],
+            ['fleet-roster', 'Drivers and trucks'],
+          ].map(([value, label]) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className="h-11 rounded-none border-b-2 border-transparent bg-transparent px-3 text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none sm:px-4"
+            >
+              {label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        {/* Command Center */}
-        <TabsContent value="command-center" className="mt-6 space-y-6">
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3 items-stretch">
-            {/* Map - 2/3 width on large screens */}
-            <div className="lg:col-span-2 h-full flex flex-col" data-tour="fleet-map">
+        <TabsContent value="command-center" className="mt-5 space-y-5">
+          <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
+            <div className="flex h-full flex-col lg:col-span-2" data-tour="fleet-map">
               <ErrorBoundary compact>
                 <Suspense fallback={<MapSkeleton height={360} />}>
                   <FleetMapView />
                 </Suspense>
               </ErrorBoundary>
             </div>
-
-            {/* Right column: Alerts stretched to Map height */}
-            <div className="h-full flex flex-col">
+            <div className="flex h-full flex-col">
               <ErrorBoundary compact>
                 <DispatcherAlerts />
               </ErrorBoundary>
             </div>
           </div>
-
-          {/* Quick Actions - full width beneath map/alerts */}
-          <Card className="card-elevated">
-            <CardContent className="p-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm font-medium text-muted-foreground">Quick Actions:</span>
-                <Button variant="outline" size="sm" onClick={() => navigate('/fleet-loads')} className="gap-2">
-                  <Package className="h-4 w-4" />
-                  All Loads
-                  <ArrowRight className="h-3 w-3" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => navigate('/drivers')} className="gap-2">
-                  <Users className="h-4 w-4" />
-                  All Drivers
-                  <ArrowRight className="h-3 w-3" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => navigate('/trucks')} className="gap-2">
-                  <Truck className="h-4 w-4" />
-                  All Trucks
-                  <ArrowRight className="h-3 w-3" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
-        {/* Dispatch Board */}
-        <TabsContent value="dispatch-board" className="mt-6 space-y-6">
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-4 items-start">
-            <div className="lg:col-span-3 space-y-6">
+        <TabsContent value="dispatch-board" className="mt-5 space-y-5">
+          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-4">
+            <div className="space-y-5 lg:col-span-3">
               <ErrorBoundary compact>
                 <FleetTimelineScheduler hideUnassignedTray />
               </ErrorBoundary>
-
               <div data-tour="active-loads">
                 <ErrorBoundary compact>
                   <ActiveLoadsBoard />
                 </ErrorBoundary>
               </div>
             </div>
-            <div className="lg:col-span-1 space-y-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                Planning &amp; Scheduling
-              </h3>
+            <div className="space-y-4 lg:col-span-1">
               <ErrorBoundary compact>
                 <UnassignedLoadsDrawer />
               </ErrorBoundary>
@@ -290,13 +227,11 @@ export default function DispatcherDashboard() {
           </div>
         </TabsContent>
 
-        {/* Fleet Roster */}
-        <TabsContent value="fleet-roster" className="mt-6 space-y-6">
-          <div data-tour="driver-status" className="grid gap-6 grid-cols-1 md:grid-cols-2 items-stretch">
+        <TabsContent value="fleet-roster" className="mt-5 space-y-5">
+          <div data-tour="driver-status" className="grid grid-cols-1 items-stretch gap-5 md:grid-cols-2">
             <DriverStatusGrid />
             <TruckStatusGrid />
           </div>
-
           <ErrorBoundary compact>
             <DriverLeaderboard />
           </ErrorBoundary>

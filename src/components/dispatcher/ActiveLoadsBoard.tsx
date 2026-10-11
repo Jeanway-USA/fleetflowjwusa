@@ -1,22 +1,21 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Package, MapPin, User, Truck, Eye, MoreHorizontal, Calendar, DollarSign, Route, Pencil, Trash2, LayoutGrid, Table as TableIcon, ChevronDown, ShieldAlert } from 'lucide-react';
-import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
+import { Package, MapPin, Truck, Eye, MoreHorizontal, Calendar, DollarSign, Route, ChevronDown, ShieldAlert, ExternalLink, CheckCircle2, Archive } from 'lucide-react';
 import { StopTime } from '@/components/shared/StopTime';
-import { format, parseISO } from 'date-fns';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 import { useNavigate } from 'react-router-dom';
 const LoadRouteMap = lazy(() =>
   import('@/components/driver/LoadRouteMap').then(m => ({ default: m.LoadRouteMap })),
 );
 import { MapSkeleton } from '@/components/shared/LazyFallbacks';
-import { DataTable } from '@/components/shared/DataTable';
 import { IntermediateStopsView } from '@/components/loads/IntermediateStopsView';
+import { Panel } from '@/components/finance/statement-ui';
+import { Roster, RosterBulkBar, type RosterEntry } from '@/components/fleet/Roster';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -27,6 +26,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useLoadDiscrepancies } from '@/hooks/useSettlementDiscrepancies';
 import { StatementDiscrepancyPanel } from '@/components/finance/StatementDiscrepancyPanel';
+import { cityState } from '@/lib/formatters';
+import { GROUP_LABELS, OPEN_STATUSES, dispatchGroup, type DispatchGroup } from '@/lib/dispatch';
+import { format, parseISO } from 'date-fns';
 
 function LoadDiscrepancyPanel({ loadId }: { loadId: string }) {
   const { data } = useLoadDiscrepancies(loadId);
@@ -40,6 +42,7 @@ interface ActiveLoad {
   origin: string;
   destination: string;
   status: string;
+  driver_id: string | null;
   pickup_date: string | null;
   pickup_time: string | null;
   pickup_end_time?: string | null;
@@ -63,13 +66,6 @@ interface ActiveLoad {
   has_statement_discrepancy?: boolean | null;
 }
 
-const statusColors: Record<string, string> = {
-  assigned: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-  loading: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-  in_transit: 'bg-green-500/10 text-green-500 border-green-500/20',
-  unloading: 'bg-purple-500/10 text-purple-500 border-purple-500/20',
-};
-
 const detailStatusColors: Record<string, string> = {
   pending: 'bg-amber-500',
   assigned: 'bg-blue-500',
@@ -86,7 +82,7 @@ function getStatusLabel(status: string): string {
     case 'loading': return 'Loading';
     case 'in_transit': return 'In Transit';
     case 'delivered': return 'Delivered';
-    default: return status.replace('_', ' ');
+    default: return status.replace(/_/g, ' ');
   }
 }
 
@@ -107,7 +103,7 @@ function formatSpecialInstructions(notes: string | null): React.ReactNode {
       )}
       {intermediateStops && (
         <div className="border-t border-warning/30 pt-2 mt-2">
-          <p className="text-xs font-semibold text-warning mb-1">📍 Intermediate Stops</p>
+          <p className="text-xs font-semibold text-warning mb-1">Intermediate stops</p>
           <p className="text-sm whitespace-pre-wrap leading-relaxed">{intermediateStops}</p>
         </div>
       )}
@@ -118,21 +114,26 @@ function formatSpecialInstructions(notes: string | null): React.ReactNode {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 
+/** The statuses a dispatcher moves a load through by hand. */
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'assigned', label: 'Assigned' },
+  { value: 'at_pickup', label: 'At pickup' },
   { value: 'loading', label: 'Loading' },
-  { value: 'in_transit', label: 'In Transit' },
+  { value: 'in_transit', label: 'In transit' },
+  { value: 'at_delivery', label: 'At delivery' },
   { value: 'unloading', label: 'Unloading' },
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
 ];
+
+const GROUP_ORDER: DispatchGroup[] = ['past_due', 'no_driver', 'on_road', 'upcoming'];
+const todayIso = () => format(new Date(), 'yyyy-MM-dd');
 
 export function ActiveLoadsBoard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedLoad, setSelectedLoad] = useState<ActiveLoad | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [view, setView] = useState<'cards' | 'table'>('cards');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: loads, isLoading } = useQuery({
@@ -146,6 +147,7 @@ export function ActiveLoadsBoard() {
           origin,
           destination,
           status,
+          driver_id,
           pickup_date,
           pickup_time,
           pickup_end_time,
@@ -168,7 +170,8 @@ export function ActiveLoadsBoard() {
           truck:trucks!fleet_loads_truck_id_fkey(unit_number),
           load_accessorials(amount)
         `)
-        .in('status', ['assigned', 'loading', 'in_transit', 'unloading', 'pending'])
+        .is('deleted_at', null)
+        .in('status', [...OPEN_STATUSES])
         .order('pickup_date', { ascending: true });
 
       if (error) throw error;
@@ -192,299 +195,163 @@ export function ActiveLoadsBoard() {
     return () => { if (channel) supabase.removeChannel(channel); };
   }, [queryClient]);
 
-  const bulkStatusMutation = useMutation({
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
+    queryClient.invalidateQueries({ queryKey: ['dispatcher-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
+  };
+
+  const statusMutation = useMutation({
     mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
       const { error } = await supabase.from('fleet_loads').update({ status }).in('id', ids);
       if (error) throw error;
       return ids.length;
     },
     onSuccess: (count, vars) => {
-      const label = STATUS_OPTIONS.find(s => s.value === vars.status)?.label ?? vars.status;
-      queryClient.invalidateQueries({ queryKey: ['active-loads-dispatcher'] });
-      toast.success(`Updated ${count} load${count !== 1 ? 's' : ''} to ${label}`);
+      const label = STATUS_OPTIONS.find((s) => s.value === vars.status)?.label ?? vars.status;
+      refresh();
+      toast.success(`${count} ${count === 1 ? 'load' : 'loads'} set to ${label}`);
       setSelectedIds(new Set());
     },
-    onError: (err: any) => toast.error(err.message || 'Failed to update statuses'),
+    onError: (err: any) => toast.error(err.message || 'Could not change the status'),
   });
 
+  const archive = async (id: string) => {
+    const { archiveWithUndo } = await import('@/lib/soft-delete');
+    await archiveWithUndo({ table: 'fleet_loads', id, queryClient, invalidateKeys: [['active-loads-dispatcher'], ['dispatcher-stats'], ['fleet_loads']] });
+  };
 
-  if (isLoading) {
-    return (
-      <Card className="card-elevated">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" />
-            Active Loads
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
-          </div>
-        </CardContent>
-      </Card>
-    );
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const today = todayIso();
+  const grouped = new Map<DispatchGroup, ActiveLoad[]>();
+  for (const load of loads ?? []) {
+    const group = dispatchGroup(load, today);
+    (grouped.get(group) ?? grouped.set(group, []).get(group)!).push(load);
   }
+  // Past-due loads list oldest first, so the longest-overdue is at the top.
+  grouped.get('past_due')?.sort((a, b) => (a.delivery_date ?? '').localeCompare(b.delivery_date ?? ''));
+
+  const entryFor = (load: ActiveLoad, group: DispatchGroup): RosterEntry => {
+    const loadId = load.landstar_load_id || `#${load.id.slice(0, 8)}`;
+    const rpm = load.rate && load.booked_miles && load.booked_miles > 0 ? load.rate / load.booked_miles : null;
+    const driverName = load.driver ? `${load.driver.first_name} ${load.driver.last_name}` : null;
+    return {
+      id: load.id,
+      title: loadId,
+      onOpen: () => { setSelectedLoad(load); setDetailsOpen(true); },
+      chips: (
+        <>
+          <StatusBadge status={load.status} />
+          {group === 'past_due' && load.delivery_date && (
+            <span className="rounded-full bg-destructive/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-destructive">
+              Past due since {format(parseISO(load.delivery_date), 'MMM d')}
+            </span>
+          )}
+          {load.has_statement_discrepancy && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-destructive">
+              <ShieldAlert className="h-3 w-3" /> Statement mismatch
+            </span>
+          )}
+        </>
+      ),
+      subtitle: <span className="font-medium text-foreground">{cityState(load.origin) || load.origin} to {cityState(load.destination) || load.destination}</span>,
+      facts: [
+        {
+          label: 'Driver',
+          value: driverName ? `${driverName}${load.truck?.unit_number ? `, truck ${load.truck.unit_number}` : ''}` : <span className="font-normal text-destructive">Unassigned</span>,
+        },
+        {
+          label: 'Pickup',
+          value: load.pickup_at || load.pickup_date
+            ? <StopTime utcIso={load.pickup_at} tz={load.pickup_tz} legacyDate={load.pickup_date} legacyTime={load.pickup_time} legacyEndTime={load.pickup_end_time} withDate />
+            : <span className="font-normal text-muted-foreground">Not set</span>,
+        },
+        {
+          label: 'Delivery',
+          value: load.delivery_at || load.delivery_date
+            ? <StopTime utcIso={load.delivery_at} tz={load.delivery_tz} legacyDate={load.delivery_date} legacyTime={load.delivery_time} legacyEndTime={load.delivery_end_time} withDate />
+            : <span className="font-normal text-muted-foreground">Not set</span>,
+        },
+        { label: 'Rate', value: load.rate ? `${formatCurrency(load.rate)}${rpm ? `, $${rpm.toFixed(2)}/mi` : ''}` : <span className="font-normal text-muted-foreground">Not set</span> },
+      ],
+      menu: (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Actions for load ${loadId}`}>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => { setSelectedLoad(load); setDetailsOpen(true); }}><Eye className="mr-2 h-4 w-4" /> View details</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/fleet-loads?highlight=${load.id}`)}><ExternalLink className="mr-2 h-4 w-4" /> Open on the Loads page</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => statusMutation.mutate({ ids: [load.id], status: 'delivered' })}><CheckCircle2 className="mr-2 h-4 w-4" /> Mark delivered</DropdownMenuItem>
+            {STATUS_OPTIONS.filter((s) => s.value !== 'delivered' && s.value !== load.status).map((s) => (
+              <DropdownMenuItem key={s.value} onClick={() => statusMutation.mutate({ ids: [load.id], status: s.value })}>Set to {s.label.toLowerCase()}</DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={() => archive(load.id)}><Archive className="mr-2 h-4 w-4" /> Archive</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    };
+  };
+
+  const total = loads?.length ?? 0;
 
   return (
     <>
-      <Card className="card-elevated h-full">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-primary" />
-                Active Loads
-              </CardTitle>
-              <CardDescription>{loads?.length || 0} loads in pipeline</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="inline-flex rounded-md border border-border bg-muted/30 p-0.5">
-                <Button
-                  variant={view === 'cards' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 px-2"
-                  onClick={() => setView('cards')}
-                  aria-pressed={view === 'cards'}
-                  aria-label="Card view"
-                >
-                  <LayoutGrid className="h-4 w-4" />
+      <Panel
+        title="Open loads"
+        description={isLoading ? 'Loading…' : total === 0 ? 'Nothing open right now.' : `${total} ${total === 1 ? 'load' : 'loads'} not yet delivered, most urgent first.`}
+        flush
+        aside={<Button variant="outline" className="h-11" onClick={() => navigate('/fleet-loads')}>All loads</Button>}
+      >
+        <div className="px-4">
+          <RosterBulkBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-11" disabled={statusMutation.isPending}>
+                  Change status <ChevronDown className="ml-1 h-4 w-4" />
                 </Button>
-                <Button
-                  variant={view === 'table' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 px-2"
-                  onClick={() => setView('table')}
-                  aria-pressed={view === 'table'}
-                  aria-label="Table view"
-                >
-                  <TableIcon className="h-4 w-4" />
-                </Button>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => navigate('/fleet-loads')}>
-                View All
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {view === 'table' ? (
-            <DataTable<ActiveLoad>
-              tableId="active-loads-dispatcher"
-              data={loads || []}
-              emptyMessage="No active loads"
-              emptyIcon={Package}
-              onRowClick={(load) => { setSelectedLoad(load); setDetailsOpen(true); }}
-              selectable
-              selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
-              bulkActions={(ids) => (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" className="h-8" disabled={bulkStatusMutation.isPending}>
-                      Change Status
-                      <ChevronDown className="ml-1 h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {STATUS_OPTIONS.map(s => (
-                      <DropdownMenuItem
-                        key={s.value}
-                        onClick={() => bulkStatusMutation.mutate({ ids: Array.from(ids), status: s.value })}
-                      >
-                        {s.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              columns={[
-                {
-                  key: 'landstar_load_id',
-                  header: 'Load #',
-                  width: '12%',
-                  render: (l) => (
-                    <span className="flex items-center gap-1">
-                      <span className="font-medium">{l.landstar_load_id || l.id.slice(0, 8)}</span>
-                      {l.has_statement_discrepancy && (
-                        <Badge variant="destructive" className="gap-1 h-5 px-1.5 text-[10px]">
-                          <ShieldAlert className="h-3 w-3" />
-                          MISMATCH
-                        </Badge>
-                      )}
-                    </span>
-                  ),
-                  filter: { type: 'text', accessor: (l) => l.landstar_load_id || l.id },
-                },
-                {
-                  key: 'origin',
-                  header: 'Origin',
-                  width: '16%',
-                  render: (l) => <span className="truncate">{l.origin}</span>,
-                  filter: { type: 'text', accessor: (l) => l.origin },
-                },
-                {
-                  key: 'destination',
-                  header: 'Destination',
-                  width: '16%',
-                  render: (l) => <span className="truncate">{l.destination}</span>,
-                  filter: { type: 'text', accessor: (l) => l.destination },
-                },
-                {
-                  key: 'driver',
-                  header: 'Driver',
-                  width: '14%',
-                  hiddenOnMobile: true,
-                  render: (l) => l.driver ? `${l.driver.first_name} ${l.driver.last_name}` : <span className="text-muted-foreground">Unassigned</span>,
-                  filter: { type: 'text', accessor: (l) => l.driver ? `${l.driver.first_name} ${l.driver.last_name}` : '' },
-                },
-                {
-                  key: 'truck',
-                  header: 'Truck',
-                  width: '8%',
-                  hiddenOnMobile: true,
-                  render: (l) => l.truck?.unit_number || <span className="text-muted-foreground">—</span>,
-                },
-                {
-                  key: 'pickup_date',
-                  header: 'Pickup',
-                  width: '12%',
-                  render: (l) => (l.pickup_at || l.pickup_date)
-                    ? <StopTime utcIso={l.pickup_at} tz={l.pickup_tz} legacyDate={l.pickup_date} legacyTime={l.pickup_time} dateOnly />
-                    : '—',
-                  filter: { type: 'date-range', accessor: (l) => l.pickup_date },
-                },
-                {
-                  key: 'status',
-                  header: 'Status',
-                  width: '12%',
-                  render: (l) => (
-                    <Badge variant="outline" className={statusColors[l.status] || ''}>
-                      {l.status.replace('_', ' ')}
-                    </Badge>
-                  ),
-                  filter: { type: 'text', accessor: (l) => l.status },
-                },
-                {
-                  key: 'rate',
-                  header: 'Rate',
-                  width: '10%',
-                  render: (l) => l.rate ? <span className="font-medium">${l.rate.toLocaleString()}</span> : '—',
-                },
-              ]}
-            />
-          ) : (
-            <>
-            {loads && loads.length > 0 ? (
-            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-              {loads.map((load) => {
-                const rpm = load.rate && load.booked_miles && load.booked_miles > 0
-                  ? (load.rate / load.booked_miles).toFixed(2)
-                  : null;
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {STATUS_OPTIONS.map((s) => (
+                  <DropdownMenuItem key={s.value} onClick={() => statusMutation.mutate({ ids: [...selectedIds], status: s.value })}>{s.label}</DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </RosterBulkBar>
+        </div>
 
-                return (
-                  <div key={load.id} className={`p-3 rounded-lg border ${load.has_statement_discrepancy ? 'border-destructive bg-destructive/5' : 'border-border bg-muted/30'} hover:bg-muted/50 transition-colors`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-sm">{load.landstar_load_id || load.id.slice(0, 8)}</span>
-                          <Badge variant="outline" className={statusColors[load.status] || ''}>{load.status.replace('_', ' ')}</Badge>
-                          {load.has_statement_discrepancy && (
-                            <Badge variant="destructive" className="gap-1 animate-pulse">
-                              <ShieldAlert className="h-3 w-3" />
-                              STATEMENT MISMATCH
-                            </Badge>
-                          )}
-                          {rpm && <span className="text-xs text-muted-foreground">${rpm}/mi</span>}
-                        </div>
-                        <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
-                          <MapPin className="h-3 w-3 shrink-0" />
-                          <span className="truncate">{load.origin}</span>
-                          <span className="mx-1">→</span>
-                          <span className="truncate">{load.destination}</span>
-                        </div>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            <span>{load.driver ? `${load.driver.first_name} ${load.driver.last_name}` : 'Unassigned'}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Truck className="h-3 w-3" />
-                            <span>{load.truck?.unit_number || 'No truck'}</span>
-                          </div>
-                          {load.agency_code && <span className="text-xs">Agent: {load.agency_code}</span>}
-                        </div>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => { setSelectedLoad(load); setDetailsOpen(true); }}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate('/fleet-loads')}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive" onClick={() => { /* TODO: wire delete */ }}>
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    {(load.pickup_at || load.pickup_date || load.delivery_at || load.delivery_date) && (
-                      <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border text-xs text-muted-foreground flex-wrap">
-                        {(load.pickup_at || load.pickup_date) && (
-                          <span className="inline-flex items-center gap-1 flex-wrap">
-                            Pickup:{' '}
-                            <StopTime
-                              utcIso={load.pickup_at}
-                              tz={load.pickup_tz}
-                              legacyDate={load.pickup_date}
-                              legacyTime={load.pickup_time}
-                              legacyEndTime={load.pickup_end_time}
-                              withDate
-                            />
-                            {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} endTime={load.pickup_end_time} variant="compact" />}
-                          </span>
-                        )}
-                        {(load.delivery_at || load.delivery_date) && (
-                          <span className="inline-flex items-center gap-1 flex-wrap">
-                            Delivery:{' '}
-                            <StopTime
-                              utcIso={load.delivery_at}
-                              tz={load.delivery_tz}
-                              legacyDate={load.delivery_date}
-                              legacyTime={load.delivery_time}
-                              legacyEndTime={load.delivery_end_time}
-                              withDate
-                            />
-                            {load.delivery_time && <TimeTypeBadge timeType={load.delivery_time_type} time={load.delivery_time} endTime={load.delivery_end_time} variant="compact" />}
-                          </span>
-                        )}
-                        {load.rate && <span className="ml-auto font-medium text-foreground">${load.rate.toLocaleString()}</span>}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No active loads at the moment</p>
-            </div>
-          )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+        {isLoading ? (
+          <div className="space-y-3 border-t p-4">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}</div>
+        ) : total === 0 ? (
+          <div className="border-t px-4 py-10 text-center text-sm text-muted-foreground">
+            <Package className="mx-auto mb-2 h-8 w-8 opacity-50" />
+            No open loads. New loads show up here as soon as they are booked.
+          </div>
+        ) : (
+          GROUP_ORDER.filter((g) => (grouped.get(g)?.length ?? 0) > 0).map((g) => (
+            <section key={g} className="border-t">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-4 pt-3">
+                <h4 className={`font-condensed text-lg font-bold ${g === 'past_due' ? 'text-destructive' : ''}`}>
+                  {GROUP_LABELS[g].title} <span className="text-muted-foreground">({grouped.get(g)!.length})</span>
+                </h4>
+                <p className="text-[13px] text-muted-foreground">{GROUP_LABELS[g].hint}</p>
+              </div>
+              <Roster bordered={false} entries={grouped.get(g)!.map((l) => entryFor(l, g))} selectedIds={selectedIds} onToggle={toggleSelect} />
+            </section>
+          ))
+        )}
+      </Panel>
 
       {/* Unified Load Details Dialog — matches Driver Dashboard */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
@@ -512,7 +379,7 @@ export function ActiveLoadsBoard() {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="h-4 w-4 text-success" />
-                    Origin
+                    Pickup
                   </div>
                   <p className="font-medium pl-6">{selectedLoad.origin}</p>
                   {(selectedLoad.pickup_at || selectedLoad.pickup_date) && (

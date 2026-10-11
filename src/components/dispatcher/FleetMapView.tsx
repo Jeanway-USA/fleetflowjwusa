@@ -148,6 +148,16 @@ function simplifyLine(points: [number, number][], tolerance: number): [number, n
   return points.filter((_, i) => keep[i] === 1);
 }
 
+/** Resizing a map that was removed (its tab closed) throws; skip it. */
+function safeResize(map: mapboxgl.Map) {
+  try {
+    if ((map as any)._removed) return;
+    map.resize();
+  } catch {
+    /* the map is gone */
+  }
+}
+
 export function FleetMapView() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -695,7 +705,7 @@ export function FleetMapView() {
               In Transit
             </CardTitle>
             <CardDescription className="text-xs">
-              {loads.length} loads on the road
+              {loads.length} {loads.length === 1 ? 'load' : 'loads'} on the road
               {liveCount > 0 && (
                 <span className="ml-1 text-green-500">• {liveCount} live</span>
               )}
@@ -826,7 +836,7 @@ function MapboxCanvas({
     clearStyleReadyTimer();
     setMapError(null);
     setStyleReady(true);
-    requestAnimationFrame(() => map.resize());
+    requestAnimationFrame(() => safeResize(map));
   }, [clearStyleReadyTimer]);
 
   const armStyleReadyFallback = useCallback(
@@ -893,8 +903,8 @@ function MapboxCanvas({
       mapRef.current = map;
       armStyleReadyFallback(map, initialStyle);
       requestAnimationFrame(() => {
-        map.resize();
-        window.setTimeout(() => map.resize(), 250);
+        safeResize(map);
+        window.setTimeout(() => safeResize(map), 250);
       });
     } catch (err: any) {
       console.error(err);
@@ -917,7 +927,7 @@ function MapboxCanvas({
     const container = containerRef.current;
     if (!map || !container) return;
 
-    const resizeMap = () => requestAnimationFrame(() => map.resize());
+    const resizeMap = () => requestAnimationFrame(() => safeResize(map));
     resizeMap();
 
     if (typeof ResizeObserver === 'undefined') {
