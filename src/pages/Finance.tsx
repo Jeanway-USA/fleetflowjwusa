@@ -27,6 +27,7 @@ import { ChartSkeleton, DialogSkeleton } from '@/components/shared/LazyFallbacks
 import { YearToDateCheck } from '@/components/finance/YearToDateCheck';
 import { TrueUpLoads } from '@/components/finance/TrueUpLoads';
 import { WeeklyProof } from '@/components/finance/WeeklyProof';
+import { YearLedger } from '@/components/finance/YearLedger';
 import { RevenueOverview } from '@/components/finance/RevenueOverview';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
@@ -673,6 +674,9 @@ export default function Finance() {
             </div>
             <div className="mt-5">
               <WeeklyProof getSetting={getSetting} onTick={(ids) => setSelectedExpenseIds((prev) => new Set([...prev, ...ids]))} />
+            </div>
+            <div className="mt-5">
+              <YearLedger />
             </div>
           </div>
         </TabsContent>

@@ -13,6 +13,11 @@ describe('truckRevenueOf', () => {
 });
 
 describe('expenseCost', () => {
+  it('keeps escrow released back to you out of profit, but still credits escrow interest', () => {
+    expect(expenseCost({ expense_type: 'Reimbursement', description: 'REIMB VOLUNTARY ESCROW', amount: -6015.35 })).toBe(0);
+    expect(expenseCost({ expense_type: 'Reimbursement', description: '4TH QTR ESCROW INT PAY', amount: -24.88 })).toBe(-24.88);
+  });
+
   it('counts ordinary expenses as cost', () => {
     expect(expenseCost({ expense_type: 'Insurance', amount: 33.98 })).toBe(33.98);
     expect(expenseCost({ expense_type: 'Fuel', amount: 406.84 })).toBe(406.84);

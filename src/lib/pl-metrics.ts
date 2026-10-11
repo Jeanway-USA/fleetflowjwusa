@@ -1,4 +1,4 @@
-import { isAdvanceExpense, isCreditExpense } from '@/lib/expense-types';
+import { isAdvanceExpense, isCreditExpense, isEscrowReturn } from '@/lib/expense-types';
 
 /**
  * Profit and loss rules shared by every figure on the Money page, so the summary, the
@@ -28,6 +28,7 @@ interface CostExpense {
   expense_type?: string | null;
   amount?: number | string | null;
   notes?: string | null;
+  description?: string | null;
 }
 
 /**
@@ -37,7 +38,7 @@ interface CostExpense {
  */
 export function expenseCost(expense: CostExpense): number {
   const row = expense as never;
-  if (isAdvanceExpense(row)) return 0;
+  if (isAdvanceExpense(row) || isEscrowReturn(expense)) return 0;
   const amount = Number(expense.amount) || 0;
   if (isCreditExpense(row)) return -Math.abs(amount);
   return amount;

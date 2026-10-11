@@ -23,10 +23,15 @@ export const isAdvanceExpense = (expense: Expense): boolean => {
     (expense.notes?.includes('Advance (Non-P&L)') ?? false);
 };
 
+/** Escrow released back to you is your own money returning, not income: it stays out of profit, credits and costs alike. */
+export const isEscrowReturn = (expense: { description?: string | null }): boolean =>
+  /reimb\s*voluntary\s*escrow|escrow\s*(return|release|refund)/i.test(expense.description ?? '');
+
 export const isCreditExpense = (expense: Expense): boolean => {
+  if (isEscrowReturn(expense)) return false;
   return CREDIT_EXPENSE_TYPES.includes(expense.expense_type) || expense.amount < 0;
 };
 
 export const isActualExpense = (expense: Expense): boolean => {
-  return !isAdvanceExpense(expense) && !isCreditExpense(expense);
+  return !isAdvanceExpense(expense) && !isCreditExpense(expense) && !isEscrowReturn(expense);
 };

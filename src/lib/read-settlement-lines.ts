@@ -44,3 +44,25 @@ export async function readSettlementLines(buffer: ArrayBuffer): Promise<Settleme
   }
   return lines;
 }
+
+/** Reads a Settlement Details export: every line of money that moved, and the total Landstar prints under it. */
+export async function readSettlementDetails(buffer: ArrayBuffer): Promise<{ lines: Array<{ description: string; trip: string | null; amount: number }>; printedTotal: number | null }> {
+  const xlsx = await loadXLSX();
+  const workbook = xlsx.read(buffer, { type: 'array' });
+  const rows = xlsx.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[workbook.SheetNames[0]], { defval: '' });
+  const headers = rows.length ? Object.keys(rows[0]) : [];
+  if (!headers.includes('Settlement Description') || !headers.includes('Transaction Amt')) {
+    throw new Error('This is not a Settlement Details export. Use the Settlement Details file from Landstar.');
+  }
+  const lines: Array<{ description: string; trip: string | null; amount: number }> = [];
+  let printedTotal: number | null = null;
+  for (const row of rows) {
+    const description = String(row['Settlement Description'] ?? '').trim();
+    const amount = Number(row['Transaction Amt']);
+    if (!description || /^applied filters/i.test(description) || !Number.isFinite(amount)) continue;
+    if (/^total$/i.test(description)) { printedTotal = amount; continue; }
+    const trip = String(row['Freight Bill #'] ?? '').trim();
+    lines.push({ description, trip: trip && trip !== '0' ? trip : null, amount });
+  }
+  return { lines, printedTotal };
+}
