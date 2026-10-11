@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Panel } from '@/components/finance/statement-ui';
+import { cityState } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar, MapPin, AlertTriangle, Clock, User, Truck } from 'lucide-react';
-import { formatDistanceToNow, addHours, isBefore } from 'date-fns';
+import { Calendar } from 'lucide-react';
+import { format, formatDistanceToNow, addHours, isBefore } from 'date-fns';
 import { TimeTypeBadge } from '@/components/shared/TimeTypeBadge';
 import { StopTime } from '@/components/shared/StopTime';
 import { useNavigate } from 'react-router-dom';
@@ -42,8 +43,8 @@ export function UpcomingPickups() {
     queryFn: async () => {
       const now = new Date();
       const in48Hours = addHours(now, 48);
-      const nowDate = now.toISOString().split('T')[0];
-      const futureDate = in48Hours.toISOString().split('T')[0];
+      const nowDate = format(now, 'yyyy-MM-dd');
+      const futureDate = format(in48Hours, 'yyyy-MM-dd');
       
       const { data, error } = await supabase
         .from('fleet_loads')
@@ -64,6 +65,7 @@ export function UpcomingPickups() {
           driver:drivers!fleet_loads_driver_id_fkey(first_name, last_name),
           truck:trucks!fleet_loads_truck_id_fkey(unit_number)
         `)
+        .is('deleted_at', null)
         .in('status', ['pending', 'booked', 'assigned'])
         .gte('pickup_date', nowDate)
         .lte('pickup_date', futureDate)
@@ -74,158 +76,64 @@ export function UpcomingPickups() {
     },
   });
 
-  if (isLoading) {
-    return (
-      <Card className="card-elevated">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            Upcoming Pickups
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-24 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const needsAttention = (load: UpcomingLoad) => !load.driver_id || !load.truck_id;
+  const missing = (load: UpcomingLoad) => [!load.driver_id ? 'a driver' : null, !load.truck_id ? 'a truck' : null].filter(Boolean) as string[];
   const isUrgent = (load: UpcomingLoad) => {
     if (!load.pickup_date) return false;
     return isBefore(parsePickupDate(load.pickup_date), addHours(new Date(), 6));
   };
+  const count = loads?.length ?? 0;
 
   return (
-    <Card className="card-elevated">
-      <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Calendar className="h-4 w-4 text-primary shrink-0" />
-              Upcoming Pickups
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Next 48 hours • {loads?.length || 0} scheduled
-            </CardDescription>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs shrink-0"
-            onClick={() => navigate('/fleet-loads')}
-          >
-            View All
-          </Button>
+    <Panel
+      title="Next 48 hours"
+      description={isLoading ? 'Loading…' : count === 0 ? 'No pickups scheduled.' : `${count} ${count === 1 ? 'pickup' : 'pickups'} coming up.`}
+      flush
+      aside={<Button variant="outline" className="h-11" onClick={() => navigate('/fleet-loads')}>All loads</Button>}
+    >
+      {isLoading ? (
+        <div className="space-y-2 border-t p-4">{[1, 2].map((i) => <Skeleton key={i} className="h-24 w-full" />)}</div>
+      ) : count === 0 ? (
+        <div className="border-t px-4 py-8 text-center text-sm text-muted-foreground">
+          <Calendar className="mx-auto mb-2 h-8 w-8 opacity-50" />
+          No pickups scheduled in the next 48 hours.
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {loads && loads.length > 0 ? (
-          <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-            {loads.map((load) => (
-              <div
-                key={load.id}
-                className={`p-2.5 rounded-lg border transition-colors cursor-pointer hover:bg-muted/50 ${
-                  needsAttention(load)
-                    ? 'border-warning bg-warning/5'
-                    : isUrgent(load)
-                    ? 'border-destructive/50 bg-destructive/5'
-                    : 'border-border bg-muted/30'
-                }`}
-                onClick={() => navigate(`/fleet-loads?loadId=${load.id}`)}
-              >
-                {/* Line 1: load number + relative time */}
-                <div className="flex items-center justify-between gap-2 min-w-0">
-                  <span className="font-semibold text-sm truncate flex items-center gap-1.5">
-                    {needsAttention(load) && (
-                      <AlertTriangle
-                        className="h-3.5 w-3.5 text-warning shrink-0"
-                        aria-label="Needs assignment"
-                      />
+      ) : (
+        <ul className="max-h-[420px] divide-y overflow-y-auto border-t">
+          {loads!.map((load) => {
+            const lacks = missing(load);
+            return (
+              <li key={load.id}>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/fleet-loads?highlight=${load.id}`)}
+                  className="block w-full px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-condensed text-lg font-bold leading-tight">{load.landstar_load_id || `#${load.id.slice(0, 8)}`}</span>
+                    {load.pickup_date && (
+                      <span className={`text-[13px] ${isUrgent(load) ? 'font-semibold text-destructive' : 'text-muted-foreground'}`}>
+                        {formatDistanceToNow(parsePickupDate(load.pickup_date), { addSuffix: true })}
+                      </span>
                     )}
-                    {load.landstar_load_id || load.id.slice(0, 8)}
-                  </span>
+                  </div>
+                  <div className="text-[13px] font-medium">{cityState(load.origin) || load.origin} to {cityState(load.destination) || load.destination}</div>
                   {load.pickup_date && (
-                    <span
-                      className={`text-[11px] shrink-0 ${
-                        isUrgent(load) ? 'text-destructive font-medium' : 'text-muted-foreground'
-                      }`}
-                    >
-                      {formatDistanceToNow(parsePickupDate(load.pickup_date), { addSuffix: true })}
-                    </span>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
+                      <StopTime utcIso={load.pickup_at} tz={load.pickup_tz} legacyDate={load.pickup_date} legacyTime={load.pickup_time} legacyEndTime={load.pickup_end_time} withDate />
+                      {load.pickup_time && <TimeTypeBadge timeType={load.pickup_time_type} time={load.pickup_time} endTime={load.pickup_end_time} variant="compact" />}
+                    </div>
                   )}
-                </div>
-
-                {/* Line 2: origin → destination */}
-                <div className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1 min-w-0" title={load.origin || ''}>
-                    <MapPin className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
-                    <span className="truncate">{load.origin || '—'}</span>
+                  <div className={`mt-1 text-[13px] ${lacks.length > 0 ? 'font-medium text-warning' : 'text-muted-foreground'}`}>
+                    {lacks.length > 0
+                      ? `Still needs ${lacks.join(' and ')}`
+                      : `${load.driver?.first_name} ${load.driver?.last_name}, truck ${load.truck?.unit_number}`}
                   </div>
-                  <div className="flex items-center gap-1 min-w-0" title={load.destination || ''}>
-                    <MapPin className="h-2.5 w-2.5 text-red-500 shrink-0" />
-                    <span className="truncate">{load.destination || '—'}</span>
-                  </div>
-                </div>
-
-                {/* Line 3: absolute stop time */}
-                {load.pickup_date && (
-                  <div className="mt-1.5 flex items-center flex-wrap gap-x-1.5 gap-y-1 text-[11px] text-muted-foreground">
-                    <Clock
-                      className={`h-3 w-3 shrink-0 ${
-                        isUrgent(load) ? 'text-destructive' : 'text-muted-foreground'
-                      }`}
-                    />
-                    <StopTime
-                      utcIso={load.pickup_at}
-                      tz={load.pickup_tz}
-                      legacyDate={load.pickup_date}
-                      legacyTime={load.pickup_time}
-                      legacyEndTime={load.pickup_end_time}
-                      withDate
-                    />
-                    {load.pickup_time && (
-                      <TimeTypeBadge
-                        timeType={load.pickup_time_type}
-                        time={load.pickup_time}
-                        endTime={load.pickup_end_time}
-                        variant="compact"
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Line 4: driver + truck */}
-                <div className="flex items-center gap-3 mt-1.5 text-[11px] text-muted-foreground min-w-0">
-                  <div className="flex items-center gap-1 min-w-0">
-                    <User className="h-3 w-3 shrink-0" />
-                    <span className={`truncate ${!load.driver ? 'text-warning' : ''}`}>
-                      {load.driver
-                        ? `${load.driver.first_name} ${load.driver.last_name.charAt(0)}.`
-                        : 'No driver'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 min-w-0">
-                    <Truck className="h-3 w-3 shrink-0" />
-                    <span className={`truncate ${!load.truck ? 'text-warning' : ''}`}>
-                      {load.truck?.unit_number || 'No truck'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8 text-muted-foreground">
-            <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No pickups scheduled in the next 48 hours</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Panel>
   );
 }

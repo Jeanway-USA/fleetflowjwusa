@@ -141,6 +141,7 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
         .from('fleet_loads')
         .select('id, landstar_load_id, origin, destination, status, pickup_date, delivery_date, driver_id, booked_miles')
         .not('driver_id', 'is', null)
+        .is('deleted_at', null)
         .in('status', ['assigned', 'loading', 'in_transit', 'unloading', 'booked'])
         .or(`pickup_date.lte.${windowEndIso},delivery_date.gte.${windowStartIso},and(pickup_date.gte.${windowStartIso},pickup_date.lte.${windowEndIso})`);
 
@@ -157,7 +158,8 @@ export function FleetTimelineScheduler({ hideUnassignedTray = false }: FleetTime
         .from('fleet_loads')
         .select('id, landstar_load_id, origin, destination, status, pickup_date, delivery_date, driver_id, booked_miles')
         .is('driver_id', null)
-        .in('status', ['pending', 'booked'])
+        .is('deleted_at', null)
+        .in('status', ['pending', 'booked', 'assigned'])
         .order('pickup_date', { ascending: true })
         .limit(20);
 
