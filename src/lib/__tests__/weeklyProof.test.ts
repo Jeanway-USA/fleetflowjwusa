@@ -58,6 +58,19 @@ describe('proveTrips', () => {
     expect(r.trips[0].issues).toEqual(['missing_load']);
   });
 
+  it('treats a trip with charges and advances but no revenue as advance-only, proven by tagged expenses', () => {
+    const adv = [line('2136455', 'TRKSTP SCN GDR 2136455', 'B', -2), line('2136455', 'CARD PRE-TRIP', 'V', -2016)];
+    const none = proveTrips(adv, [], []);
+    expect(none.trips[0]).toMatchObject({ advanceOnly: true, issues: ['charges', 'advances'] });
+    expect(none.trips[0].gaps.advances.missing).toEqual([{ description: 'CARD PRE-TRIP', amount: 2016 }]);
+    const tagged: ProofExpense[] = [
+      { load_id: null, expense_type: 'Trip Scanning', amount: 2, notes: 'Landstar trip 2136455 (advance only, no load)' },
+      { load_id: null, expense_type: 'Advance', amount: 2016, notes: 'Landstar trip 2136455 (advance only, no load)' },
+      { load_id: null, expense_type: 'Tolls', amount: 9, notes: null },
+    ];
+    expect(proveTrips(adv, [], tagged).trips[0].issues).toEqual([]);
+  });
+
   it('does not compare revenue for a trip the file only partly shows', () => {
     const partial = [line('8357683', 'FUEL SURCHARGE', '3', 12), line('8357683', 'FUEL SURCHARGE', 'X', -9), line('8357683', 'CARD FEE', 'B', -3.5), line('8357683', 'TRKSTP SCN GDR 8357683', 'B', -2), line('8357683', 'CARD PRE-TRIP', 'V', -1900)];
     const r = proveTrips(partial, [load], matching);
@@ -108,5 +121,14 @@ describe('adding a trip the app is missing', () => {
   it('does not build a load when the file shows no linehaul for the trip', () => {
     const t = proveTrips([line('3815418', 'CARD PRE-TRIP', 'V', -3000)], [], []).trips[0];
     expect(loadForMissingTrip(t, settings, new Map())).toBeNull();
+  });
+});
+
+describe('advance-only trips and card fees', () => {
+  it('leaves card fees to the ledger when the trip has no load', () => {
+    const adv = [line('2136455', 'CARD FEE', 'B', -3.5), line('2136455', 'CARD PRE-TRIP', 'V', -2016)];
+    const r = proveTrips(adv, [], []);
+    expect(r.trips[0].landstar.charges).toBe(0);
+    expect(r.trips[0].issues).toEqual(['advances']);
   });
 });

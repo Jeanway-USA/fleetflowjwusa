@@ -46,6 +46,8 @@ export interface TripProof {
   /** The Wednesday of the trip's first settlement line. */
   week: string | null;
   loadFound: boolean;
+  /** Settled with charges and advances only, no revenue: recorded as expenses, not as a load. */
+  advanceOnly: boolean;
   loadId: string | null;
   /** The trip's pickup date from the file; statement lines are dated by it. */
   pickup: string | null;
@@ -78,6 +80,10 @@ export interface ProofResult {
 }
 
 const cents = (v: number) => Math.round(v * 100);
+
+/** The note that ties an expense to an advance-only Landstar trip. */
+export const advanceOnlyNote = (trip: string) => `Landstar trip ${trip} (advance only, no load)`;
+export const advanceOnlyTrip = (notes: string | null | undefined): string | null => notes?.match(/^Landstar trip (\d+) \(advance only/)?.[1] ?? null;
 
 /** The expense row for a Landstar line the app is missing. */
 export function expenseForMissingLine(
@@ -121,7 +127,9 @@ export function proveTrips(lines: SettlementLine[], loads: ProofLoad[], expenses
 
   const trips: TripProof[] = [];
   for (const [trip, group] of byTrip) {
-    const chargeLines = group.filter((l) => l.code === 'B').map((l) => ({ description: l.description, amount: roundCents(Math.abs(l.amount)) }));
+    // Card fees of a trip with no load sit among the card's other unlinked fees, so the year-to-date ledger checks them.
+    const hasRevenue = settled.has(trip);
+    const chargeLines = group.filter((l) => l.code === 'B' && (hasRevenue || loadByTrip.has(trip) || !/^card\s*fee$/i.test(l.description.trim()))).map((l) => ({ description: l.description, amount: roundCents(Math.abs(l.amount)) }));
     const advanceLines = group.filter((l) => l.code === 'V').map((l) => ({ description: l.description, amount: roundCents(Math.abs(l.amount)) }));
     const charges = roundCents(chargeLines.reduce((s, l) => s + l.amount, 0));
     const advances = roundCents(advanceLines.reduce((s, l) => s + l.amount, 0));
@@ -130,8 +138,11 @@ export function proveTrips(lines: SettlementLine[], loads: ProofLoad[], expenses
     const revenueComparable = !!revenueLines?.hasLinehaul;
     const dates = group.map((l) => l.settled).filter((d): d is string => !!d).sort();
     const load = loadByTrip.get(trip);
+    // A trip Landstar settled only with charges and advances (no revenue at all) is not a load. Its lines are
+    // recorded on their own, tagged with the trip number in their notes.
+    const advanceOnly = !load && !revenueLines;
 
-    const linked = load ? expensesByLoad.get(load.id) ?? [] : [];
+    const linked = load ? expensesByLoad.get(load.id) ?? [] : advanceOnly ? expenses.filter((e) => !e.load_id && advanceOnlyTrip(e.notes) === trip) : [];
     const toLine = (e: ProofExpense) => ({ id: e.id, date: e.expense_date ?? null, description: e.description || e.expense_type, amount: roundCents(Math.abs(Number(e.amount) || 0)) });
     const appAdvanceLines = linked.filter((e) => isAdvanceExpense(e as never)).map(toLine);
     const appChargeLines = linked.filter((e) => !isAdvanceExpense(e as never) && !NOT_TRIP_CHARGE_TYPES.has(e.expense_type) && (Number(e.amount) || 0) > 0).map(toLine);
@@ -140,9 +151,9 @@ export function proveTrips(lines: SettlementLine[], loads: ProofLoad[], expenses
     const appRevenue = roundCents(Number(load?.net_revenue) || 0);
 
     const issues: ProofIssue[] = [];
-    if (!load) issues.push('missing_load');
+    if (!load && !advanceOnly) issues.push('missing_load');
     else {
-      if (revenueComparable && cents(appRevenue) !== cents(revenue)) issues.push('revenue');
+      if (!advanceOnly && revenueComparable && cents(appRevenue) !== cents(revenue)) issues.push('revenue');
       if (cents(appCharges) !== cents(charges)) issues.push('charges');
       if (cents(appAdvances) !== cents(advances)) issues.push('advances');
     }
@@ -151,6 +162,7 @@ export function proveTrips(lines: SettlementLine[], loads: ProofLoad[], expenses
       trip,
       week: dates[0] ?? null,
       loadFound: !!load,
+      advanceOnly,
       loadId: load?.id ?? null,
       pickup: group.map((l) => l.pickup).find((d): d is string => !!d) ?? null,
       meta: {

@@ -8,7 +8,7 @@ import { formatCurrency } from '@/lib/formatters';
 import { readSettlementLines } from '@/lib/read-settlement-lines';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { expenseForMissingLine, loadForMissingTrip, proveTrips, type LineGap, type ProofResult, type TripProof } from '@/lib/weekly-proof';
+import { advanceOnlyNote, expenseForMissingLine, loadForMissingTrip, proveTrips, type LineGap, type ProofResult, type TripProof } from '@/lib/weekly-proof';
 import { settingsFrom } from '@/components/finance/TrueUpLoads';
 import type { SettlementLine } from '@/lib/settlement-trueup';
 import { Panel, StatementLine } from '@/components/finance/statement-ui';
@@ -19,6 +19,7 @@ const money = (v: number) => (v < 0 ? `−${formatCurrency(-v)}` : formatCurrenc
 function issueText(t: TripProof): string[] {
   const out: string[] = [];
   if (t.issues.includes('missing_load')) out.push('Landstar settled it but it is not in your loads.');
+  if (t.advanceOnly && t.issues.length > 0) out.push('Landstar settled this trip with charges and advances only, no revenue, so it is recorded as expenses, not as a load.');
   if (t.issues.includes('revenue')) out.push(`Revenue: Landstar ${money(t.landstar.revenue)}, your load ${money(t.app.revenue)}. Run the match above.`);
   const describe = (label: string, l: number, a: number, gap: LineGap) => {
     const lines = (rows: Array<{ description: string; amount: number; date?: string | null }>) =>
@@ -60,7 +61,7 @@ export function WeeklyProof({ onTick, getSetting }: WeeklyProofProps) {
   const check = async (settlementLines: SettlementLine[]) => {
     const [{ data: loads, error: loadsError }, { data: expenses, error: expensesError }] = await Promise.all([
       supabase.from('fleet_loads').select('id, landstar_load_id, net_revenue, truck_id').is('deleted_at', null),
-      supabase.from('expenses').select('id, expense_date, load_id, expense_type, amount, description, notes').is('deleted_at', null).not('load_id', 'is', null).limit(10000),
+      supabase.from('expenses').select('id, expense_date, load_id, expense_type, amount, description, notes').is('deleted_at', null).or('load_id.not.is.null,notes.ilike.Landstar trip%').limit(10000),
     ]);
     if (loadsError) throw loadsError;
     if (expensesError) throw expensesError;
@@ -82,9 +83,9 @@ export function WeeklyProof({ onTick, getSetting }: WeeklyProofProps) {
     }
   };
 
-  /** Adds the Landstar lines the app is missing for one trip, linked to its load. */
+  /** Adds the Landstar lines the app is missing for one trip: linked to its load, or tagged with the trip number when it is advance-only. */
   const addMissing = async (t: TripProof) => {
-    if (!orgId || !t.loadId) return;
+    if (!orgId || (!t.loadId && !t.advanceOnly)) return;
     const rows = [
       ...t.gaps.charges.missing.map((m) => expenseForMissingLine(m, 'charge')),
       ...t.gaps.advances.missing.map((m) => expenseForMissingLine(m, 'advance')),
@@ -92,8 +93,9 @@ export function WeeklyProof({ onTick, getSetting }: WeeklyProofProps) {
       ...r,
       org_id: orgId,
       load_id: t.loadId,
-      truck_id: trucks.get(t.loadId!) ?? null,
+      truck_id: t.loadId ? trucks.get(t.loadId) ?? null : (t.meta.tractor ? truckByUnit.get(t.meta.tractor) ?? null : null),
       expense_date: t.pickup ?? t.week ?? new Date().toISOString().slice(0, 10),
+      ...(t.advanceOnly ? { notes: advanceOnlyNote(t.trip) } : {}),
     }));
     setBusy(true);
     try {
@@ -178,7 +180,7 @@ export function WeeklyProof({ onTick, getSetting }: WeeklyProofProps) {
                       Add this load ({money(t.landstar.revenue)})
                     </Button>
                   )}
-                  {t.loadId && t.gaps.charges.missing.length + t.gaps.advances.missing.length > 0 && (
+                  {(t.loadId || t.advanceOnly) && t.gaps.charges.missing.length + t.gaps.advances.missing.length > 0 && (
                     <Button variant="outline" className="mr-2 mt-1 h-11" disabled={busy} onClick={() => addMissing(t)}>
                       Add {t.gaps.charges.missing.length + t.gaps.advances.missing.length} missing {t.gaps.charges.missing.length + t.gaps.advances.missing.length === 1 ? 'line' : 'lines'}
                     </Button>
