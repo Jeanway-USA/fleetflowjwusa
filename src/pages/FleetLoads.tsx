@@ -9,7 +9,9 @@ import { calculateRevenue as calculateRevenueFn } from '@/lib/revenue-calculator
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { DataTable } from '@/components/shared/DataTable';
+import { Roster, RosterToolbar, RosterBulkBar, downloadCsv, type RosterEntry } from '@/components/fleet/Roster';
+import { Panel, StatementLine } from '@/components/finance/statement-ui';
+import { summarize } from '@/lib/revenue-overview';
 import { ExpensesList } from '@/components/shared/ExpensesList';
 import { RateConfirmationUpload } from '@/components/loads/RateConfirmationUpload';
 import { SmartLoadCreator } from '@/components/loads/SmartLoadCreator';
@@ -34,7 +36,7 @@ import { useHighlightRow } from '@/hooks/useHighlightRow';
 import { cityState } from '@/lib/formatters';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search, Archive, CheckCircle2, Upload } from 'lucide-react';
+import { Pencil, Trash2, TrendingUp, DollarSign, Truck, MapPin, Plus, X, Receipt, History, MoreHorizontal, Mail, FileText, FileCheck, ExternalLink, Image, Search, Archive, CheckCircle2, Upload, Download } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 
@@ -83,6 +85,7 @@ export default function FleetLoads() {
   const [editingLoad, setEditingLoad] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showRateConUpload, setShowRateConUpload] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -731,6 +734,8 @@ export default function FleetLoads() {
     };
   });
 
+  const PENDING_STATUS_LIST = ['pending', 'assigned', 'dispatched', 'at_pickup', 'loading', 'in_transit', 'at_delivery', 'unloading'];
+
   // Omni-search: case-insensitive contains across multiple fields
   const SEARCH_FIELDS = ['landstar_load_id', 'origin', 'destination', 'status', 'notes', 'pickup_number', 'driver_name', 'truck_unit'];
   const enrichedLoads = searchTerm
@@ -741,7 +746,9 @@ export default function FleetLoads() {
         })
       )
     : enrichedAll;
-  const filteredLoads = enrichedLoads;
+  const filteredLoads = enrichedLoads.filter((l: any) =>
+    statusFilter === 'all' ? true : statusFilter === 'open' ? PENDING_STATUS_LIST.includes(l.status) : l.status === statusFilter,
+  );
 
   // Helper to get display miles (actual if valid, otherwise booked)
   const getDisplayMiles = (load: any) => {
@@ -894,413 +901,210 @@ export default function FleetLoads() {
     );
   }
 
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const deliveredLoads = filteredLoads.filter((l: any) => l.status === 'delivered');
+  const overview = summarize(deliveredLoads as any[]);
+  const day = (d: string | null) => (d ? format(parseISO(d), 'EEE MMM d') : 'Not set');
+  const noLoadsAtAll = !isLoading && loads.length === 0;
+
+  const entries: RosterEntry[] = filteredLoads.map((load: any) => {
+    const loadId = load.landstar_load_id || load.load_reference || (load.id ? `#${String(load.id).slice(0, 8)}` : 'No trip #');
+    const miles = getDisplayMiles(load);
+    const lane = `${cityState(load.origin) || 'Origin not set'} to ${cityState(load.destination) || 'Destination not set'}`;
+    const dates = load.pickup_date || load.delivery_date ? `${day(load.pickup_date)} to ${day(load.delivery_date)}` : null;
+    const yours = load.net_revenue ?? load.rate;
+    return {
+      id: load.id,
+      title: loadId,
+      onOpen: () => openDialog(load),
+      chips: (
+        <>
+          <StatusBadge status={load.status} />
+          {load.is_in_bond && (
+            <span className="rounded-full bg-destructive/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-destructive" title={load.cf_7512_number ? `CF 7512: ${load.cf_7512_number}` : 'In-bond shipment'}>
+              In-bond
+            </span>
+          )}
+        </>
+      ),
+      subtitle: (
+        <>
+          <span className="font-medium text-foreground">{lane}</span>
+          <span className="block tabular-nums">{[dates, load.agency_code ? `Agent ${load.agency_code}` : null].filter(Boolean).join(', ')}</span>
+        </>
+      ),
+      facts: [
+        { label: 'Your share', value: formatCurrency(yours), tone: 'good' as const },
+        { label: 'Billed in all', value: formatCurrency(load.gross_revenue ?? load.rate) },
+        { label: 'Miles', value: miles > 0 ? `${Number(miles).toLocaleString()}${load.actual_miles > 0 ? '' : ' booked'}` : <span className="font-normal text-muted-foreground">Not set</span> },
+        { label: 'Driver', value: load.driver_id ? load.driver_name : <span className="font-normal text-muted-foreground">Unassigned</span> },
+      ],
+      menu: (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={`Actions for load ${loadId}`}>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openDialog(load)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}><Archive className="mr-2 h-4 w-4" /> Archive</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    };
+  });
+
+  const exportCsv = () =>
+    downloadCsv(
+      'loads',
+      ['Date', isLandstar ? 'Landstar ID' : 'Load ID', 'Agent', 'Origin', 'Destination', 'Linehaul', 'Fuel surcharge', 'Accessorials', 'Billed in all', 'Your share', 'Miles', 'Status', 'Driver', 'Truck'],
+      filteredLoads.map((l: any) => [l.pickup_date, l.landstar_load_id, l.agency_code, l.origin, l.destination, l.rate, l.fuel_surcharge, getLoadAccessorialsTotal(l.id), l.gross_revenue, l.net_revenue, getDisplayMiles(l), l.status, l.driver_name, l.truck_unit]),
+    );
+
   return (
     <>
-      <PageHeader title="Loads" description={timeframeLabel} />
+      <PageHeader title="Loads" description={timeframeLabel} action={{ label: 'Add load', onClick: () => openDialog() }}>
+        <Button variant="outline" className="h-11 sm:h-10" onClick={() => setShowRateConUpload((v) => !v)} aria-expanded={showRateConUpload}>
+          <FileText className="mr-2 h-4 w-4" /> Rate confirmation
+        </Button>
+        <Button variant="outline" className="hidden sm:inline-flex" onClick={() => bulkInputRef.current?.click()} disabled={bulkImporting}>
+          <Upload className="mr-2 h-4 w-4" /> {bulkImporting ? 'Uploading…' : 'Bulk upload'}
+        </Button>
+        <input ref={bulkInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={handleBulkUpload} />
+      </PageHeader>
 
-      {/* Rate Confirmation Upload: always on desktop, behind the "Rate con" button on phones */}
-      <div className={cn('mb-4', !showRateConUpload && 'hidden md:block')}>
-        {isIndependent ? (
-          <SmartLoadCreator
-            onDataExtracted={handleRateConfirmationData}
-            existingLoads={loads.map((l: any) => ({
-              id: l.id,
-              landstar_load_id: l.landstar_load_id,
-              origin: l.origin,
-              destination: l.destination,
-              rate: l.rate,
-              pickup_date: l.pickup_date,
-            }))}
-            drivers={drivers}
-            trucks={trucks}
-          />
-        ) : (
-          <RateConfirmationUpload
-            onDataExtracted={handleRateConfirmationData}
-            existingLoads={loads.map((l: any) => ({
-              id: l.id,
-              landstar_load_id: l.landstar_load_id,
-              origin: l.origin,
-              destination: l.destination,
-              rate: l.rate,
-              pickup_date: l.pickup_date,
-            }))}
-            drivers={drivers}
-            trucks={trucks}
-          />
-        )}
-      </div>
-
-      {/* Summary as one statement strip */}
-      <dl className="mb-4 grid grid-cols-3 divide-x rounded-lg border bg-card">
-        {[
-          { label: 'Gross', value: wholeDollars(totals.grossRevenue), note: totals.actualMiles > 0 ? `${formatCurrency(totals.grossRevenue / totals.actualMiles)}/mi` : 'Rate + FSC + acc.' },
-          { label: 'On the books', value: wholeDollars(pendingIncome), note: `${pendingCount} not delivered` },
-          { label: 'Delivered', value: completedCount.toLocaleString(), note: selectedMonth === 'all' ? 'All time' : 'This month' },
-        ].map((cell) => (
-          <div key={cell.label} className="min-w-0 px-3 py-2 md:px-5 md:py-3">
-            <dt className="text-[13px] text-muted-foreground">{cell.label}</dt>
-            <dd className="figure truncate text-xl font-bold leading-tight md:text-2xl">
-              {isLoading ? <Skeleton className="h-6 w-16 my-0.5" /> : cell.value}
-            </dd>
-            <dd className="truncate text-xs text-muted-foreground tabular-nums">{isLoading ? ' ' : cell.note}</dd>
-          </div>
-        ))}
-      </dl>
-
-      {/* Action Bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-3 mb-4">
-        <div className="flex-1 flex flex-col sm:flex-row gap-2 md:gap-3">
-          <div className="flex-1">
-            <Input
-              leftIcon={<Search className="h-4 w-4" />}
-              rightIcon={
-                searchInput ? (
-                  <button
-                    type="button"
-                    onClick={() => { setSearchInput(''); setSearchTerm(''); }}
-                    className="text-muted-foreground hover:text-foreground"
-                    aria-label="Clear search"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                ) : undefined
-              }
-              placeholder="Search loads by ID or destination…"
-              value={searchInput}
-              onChange={(e) => { setSearchInput(e.target.value); debouncedSetSearch(e.target.value); }}
-            />
-          </div>
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="h-11 md:h-10 w-full sm:w-48" aria-label="Month">
-              <SelectValue placeholder="Filter by month" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All loads</SelectItem>
-              {loadMonths.map((m) => (
-                <SelectItem key={m} value={m}>{format(parseISO(`${m}-01`), 'MMMM yyyy')}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => openDialog()} className="h-11 md:h-10 flex-1 md:flex-none">
-            <Plus className="h-4 w-4 mr-2" />
-            Add load
-          </Button>
-          <Button
-            variant="outline"
-            className="h-11 flex-1 md:hidden"
-            onClick={() => setShowRateConUpload((v) => !v)}
-            aria-expanded={showRateConUpload}
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            Rate con
-          </Button>
-          <Button
-            variant="outline"
-            className="hidden md:inline-flex"
-            onClick={() => bulkInputRef.current?.click()}
-            disabled={bulkImporting}
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            {bulkImporting ? 'Uploading…' : 'Bulk Upload'}
-          </Button>
-          <input
-            ref={bulkInputRef}
-            type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="hidden"
-            onChange={handleBulkUpload}
-          />
-        </div>
-      </div>
-
-
-      {/* Loads Table */}
-      <Card className="card-elevated max-md:border-0 max-md:bg-transparent max-md:shadow-none">
-        <CardContent className="p-0 md:p-6">
-          {searchTerm && filteredLoads.length === 0 ? (
-            <EmptyState
-              icon={Search}
-              title={`No loads found matching "${searchInput}"`}
-              description="Try a different search term, or clear the search to see all loads."
-              action={{ label: 'Clear Search', onClick: () => { setSearchInput(''); setSearchTerm(''); } }}
+      {showRateConUpload && (
+        <div className="mb-5">
+          {isIndependent ? (
+            <SmartLoadCreator
+              onDataExtracted={handleRateConfirmationData}
+              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, pickup_date: l.pickup_date }))}
+              drivers={drivers}
+              trucks={trucks}
             />
           ) : (
-          <DataTable
-            columns={[
-              { key: 'pickup_date', width: '100px', header: 'Date', render: (load: any) => (load.pickup_at || load.pickup_date) ? <StopTime utcIso={load.pickup_at} tz={load.pickup_tz} legacyDate={load.pickup_date} legacyTime={load.pickup_time} dateOnly /> : '-' },
-              { key: 'landstar_load_id', width: '130px', header: isLandstar ? 'Landstar ID' : 'Load ID', hiddenOnMobile: true, render: (load: any) => (
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono">{load.landstar_load_id || '-'}</span>
-                  {load.is_in_bond && (
-                    <span className="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-destructive/15 text-destructive border border-destructive/30" title={load.cf_7512_number ? `CF 7512: ${load.cf_7512_number}` : 'In-Bond shipment'}>
-                      IN-BOND
-                    </span>
-                  )}
-                </div>
-              ) },
-              { key: 'tracking_id', width: '120px', header: 'Tracking ID', hiddenOnMobile: true, render: (load: any) => 
-                load.tracking_id ? (
-                  <span 
-                    className="font-mono text-xs cursor-pointer hover:text-primary truncate max-w-[120px] inline-block"
-                    title="Click to copy tracking link"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigator.clipboard.writeText(`${window.location.origin}/track?tracking_id=${load.tracking_id}`);
-                      toast.success('Tracking link copied!');
-                    }}
-                  >
-                    {load.tracking_id.slice(0, 8)}…
-                  </span>
-                ) : <span className="text-muted-foreground">-</span>
-              },
-              { key: 'agency_code', width: '80px', header: 'Agent', hiddenOnMobile: true, render: (load: any) => <span className="font-mono text-xs">{load.agency_code || '-'}</span> },
-              { key: 'origin', width: '160px', header: 'Origin', wrap: true, render: (load: any) => {
-                const addr = formatAddressDisplay(load.origin);
-                if (typeof addr === 'string') return addr;
-                return (
-                  <div className="flex flex-col leading-tight" title={addr.full}>
-                    <span className="font-medium break-words">{addr.city}{addr.state ? `, ${addr.state}` : ''}</span>
-                    {addr.zip && <span className="text-xs text-muted-foreground">{addr.zip}</span>}
-                  </div>
-                );
-              }},
-              { key: 'destination', width: '160px', header: 'Destination', wrap: true, render: (load: any) => {
-                const addr = formatAddressDisplay(load.destination);
-                if (typeof addr === 'string') return addr;
-                return (
-                  <div className="flex flex-col leading-tight" title={addr.full}>
-                    <span className="font-medium break-words">{addr.city}{addr.state ? `, ${addr.state}` : ''}</span>
-                    {addr.zip && <span className="text-xs text-muted-foreground">{addr.zip}</span>}
-                  </div>
-                );
-              }},
-              { key: 'rate', width: '100px', header: 'Rate', render: (load: any) => <span className="text-right">{formatCurrency(load.rate)}</span> },
-              { key: 'fuel_surcharge', width: '90px', header: 'FSC', hiddenOnMobile: true, render: (load: any) => formatCurrency(load.fuel_surcharge) },
-              { key: 'accessorials_total', width: '120px', header: 'Accessorials', hiddenOnMobile: true, render: (load: any) => formatCurrency(getLoadAccessorialsTotal(load.id)) },
-              { key: 'net_revenue', width: '120px', header: 'Net Revenue', render: (load: any) => <span className="font-medium text-success">{formatCurrency(load.net_revenue)}</span> },
-              { key: 'miles', width: '80px', header: 'Miles', render: (load: any) => 
-                (load.actual_miles && load.actual_miles > 0) 
-                  ? load.actual_miles.toLocaleString() 
-                  : (load.booked_miles ? `${load.booked_miles.toLocaleString()}*` : '-')
-              },
-              { key: 'status', width: '130px', header: 'Status', render: (load: any) => <StatusBadge status={load.status} /> },
-              {
-                key: 'driver_name', width: '150px',
-                header: 'Driver',
-                sortable: true,
-                filter: { type: 'text', accessor: (l: any) => l.driver_name },
-                render: (load: any) => (
-                  load.driver_id
-                    ? <span>{load.driver_name}</span>
-                    : <span className="text-muted-foreground italic">Unassigned</span>
-                ),
-              },
-              {
-                key: 'truck_unit', width: '100px',
-                header: 'Truck #',
-                sortable: true,
-                filter: { type: 'text', accessor: (l: any) => l.truck_unit },
-                render: (load: any) => (
-                  load.truck_id
-                    ? <span className="font-mono">{load.truck_unit}</span>
-                    : <span className="text-muted-foreground italic">Unassigned</span>
-                ),
-              },
-              { key: 'actions', width: '56px', header: '', render: (load: any) => (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openDialog(load)}>
-                      <Pencil className="mr-2 h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
-                      <Archive className="mr-2 h-4 w-4" /> Archive
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )},
-            ]}
-            data={enrichedLoads}
-            loading={isLoading}
-            emptyMessage="No loads yet"
-            emptyDescription="Create your first load to start tracking revenue and miles."
-            emptyIcon={Truck}
-            emptyAction={{ label: 'Add First Load', onClick: () => openDialog() }}
-            tableId="fleet-loads"
-            exportFilename="fleet-loads"
-            onRowDoubleClick={(load) => openDialog(load)}
-            selectable
-            selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            bulkActions={(ids) => (
-              <>
-                <Button size="sm" variant="outline" onClick={() => setMassEditOpen(true)}>
-                  <Pencil className="mr-1 h-3 w-3" /> Edit ({ids.size})
-                </Button>
-                <Button size="sm" variant="destructive" onClick={() => setMassDeleteOpen(true)}>
-                  <Archive className="mr-1 h-3 w-3" /> Archive ({ids.size})
-                </Button>
-              </>
-            )}
-            wrapCells
-            expandable
-            renderExpanded={(load: any) => {
-              const originAddr = formatAddressDisplay(load.origin);
-              const destAddr = formatAddressDisplay(load.destination);
-              const detail = (label: string, value: React.ReactNode) => (
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
-                  <span className="text-sm break-words">{value ?? <span className="text-muted-foreground">Not set</span>}</span>
-                </div>
-              );
-              return (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {detail('Origin (full)', typeof originAddr === 'string' ? originAddr : originAddr.full)}
-                  {detail('Destination (full)', typeof destAddr === 'string' ? destAddr : destAddr.full)}
-                  {detail('Broker', load.broker_name)}
-                  {detail('Commodity', load.commodity)}
-                  {detail('Weight', load.weight ? `${Number(load.weight).toLocaleString()} lbs` : null)}
-                  {detail('Pieces', load.pieces)}
-                  {detail('Dimensions', load.dimensions)}
-                  {detail('Trailer Type', load.trailer_type)}
-                  {detail('Pickup #', load.pickup_number)}
-                  {detail('Delivery #', load.delivery_number)}
-                  {detail('Rate', formatCurrency(load.rate))}
-                  {detail('Fuel Surcharge', formatCurrency(load.fuel_surcharge))}
-                  {load.notes && (
-                    <div className="col-span-2 md:col-span-4">
-                      {detail('Notes', <span className="whitespace-pre-wrap">{load.notes}</span>)}
-                    </div>
-                  )}
-                </div>
-              );
-            }}
-            renderMobileCard={(load: any) => {
-              const loadId = load.landstar_load_id || load.load_reference || (load.id ? `#${String(load.id).slice(0, 8)}` : 'No trip #');
-              const miles = (load.actual_miles && load.actual_miles > 0)
-                ? load.actual_miles.toLocaleString()
-                : (load.booked_miles ? `${load.booked_miles.toLocaleString()} booked` : null);
-              const day = (d: string | null) => (d ? format(parseISO(d), 'EEE MMM d') : 'Not set');
-              return (
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="figure text-xl font-bold leading-tight">{loadId}</div>
-                      <StateMark status={load.status} className="mt-0.5" />
-                    </div>
-                    <div className="flex items-start gap-1 shrink-0">
-                      <div className="text-right">
-                        <div className="figure text-xl font-bold leading-tight">{formatCurrency(load.net_revenue ?? load.rate)}</div>
-                        <div className="text-xs text-muted-foreground">truck share</div>
-                      </div>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-11 w-11 -mr-2.5 -mt-1.5" aria-label={`Actions for load ${loadId}`}>
-                              <MoreHorizontal className="h-5 w-5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openDialog(load)}>
-                              <Pencil className="mr-2 h-4 w-4" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive" onClick={() => deleteMutation.mutate(load.id)}>
-                              <Archive className="mr-2 h-4 w-4" /> Archive
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-2 text-[15px] font-medium leading-snug">
-                    {cityState(load.origin) || 'Origin not set'} <span className="text-muted-foreground">to</span> {cityState(load.destination) || 'Destination not set'}
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground tabular-nums">
-                    <span>{day(load.pickup_date)} to {day(load.delivery_date)}</span>
-                    {miles && <span>{miles} mi</span>}
-                    <span className="truncate">{load.driver_id ? load.driver_name : 'Unassigned'}</span>
-                  </div>
-                </div>
-              );
-            }}
-          />
+            <RateConfirmationUpload
+              onDataExtracted={handleRateConfirmationData}
+              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, pickup_date: l.pickup_date }))}
+              drivers={drivers}
+              trucks={trucks}
+            />
           )}
-          <ConfirmDeleteDialog
-            open={massDeleteOpen}
-            onOpenChange={setMassDeleteOpen}
-            onConfirm={async () => {
-              setBulkUpdating(true);
-              try {
-                const { archiveManyWithUndo } = await import('@/lib/soft-delete');
-                await archiveManyWithUndo({
-                  table: 'fleet_loads',
-                  ids: [...selectedIds],
-                  queryClient,
-                  invalidateKeys: [['fleet_loads']],
-                });
-                setSelectedIds(new Set());
-                setMassDeleteOpen(false);
-              } catch (e: any) { toast.error(e.message); }
-              finally { setBulkUpdating(false); }
-            }}
-            title="Archive Selected Loads"
-            description={`Archive ${selectedIds.size} load(s)? They can be restored from the Archive page.`}
-            isDeleting={bulkUpdating}
-          />
-          <BulkStatusEditDialog
-            open={massEditOpen}
-            onOpenChange={setMassEditOpen}
-            onConfirm={async (status) => {
-              setBulkUpdating(true);
-              try {
-                const { error } = await supabase.from('fleet_loads').update({ status }).in('id', [...selectedIds]);
-                if (error) throw error;
-                queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
-                toast.success(`${selectedIds.size} load(s) updated`);
-                setSelectedIds(new Set());
-                setMassEditOpen(false);
-              } catch (e: any) { toast.error(e.message); }
-              finally { setBulkUpdating(false); }
-            }}
-            count={selectedIds.size}
-            entityName="loads"
-            isUpdating={bulkUpdating}
-            statusOptions={[
-              { value: 'pending', label: 'Pending' },
-              { value: 'assigned', label: 'Assigned' },
-              { value: 'in_transit', label: 'In Transit' },
-              { value: 'delivered', label: 'Delivered' },
-              { value: 'cancelled', label: 'Cancelled' },
-            ]}
-          />
-          {filteredLoads.length > 0 && (
-            <dl className="mt-3 grid grid-cols-2 gap-x-6 rounded-lg border bg-card px-4 py-2 text-[15px] sm:grid-cols-3 lg:grid-cols-6">
-              {[
-                ['Loads', totals.loads.toLocaleString()],
-                ['Linehaul', formatCurrency(totals.rate)],
-                ['Fuel surcharge', formatCurrency(totals.fuelSurcharge)],
-                ['Accessorials', formatCurrency(totals.accessorials)],
-                ['Miles', totals.actualMiles.toLocaleString()],
-                ['Truck share', formatCurrency(totals.netRevenue)],
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-baseline justify-between gap-2 border-b py-2 lg:flex-col lg:items-start lg:border-b-0">
-                  <dt className="text-muted-foreground">{label}</dt>
-                  <dd className="figure text-lg font-semibold">{value}</dd>
-                </div>
-              ))}
-            </dl>
+        </div>
+      )}
+
+      {noLoadsAtAll ? (
+        <EmptyState icon={Truck} title="No loads yet" description="Create your first load to start tracking revenue and miles." action={{ label: 'Add First Load', onClick: () => openDialog() }} />
+      ) : (
+        <>
+          <Panel title="Delivered loads" description={selectedMonth === 'all' ? 'Every delivered load shown below, counted the way Landstar counts it.' : 'Delivered loads in this month.'} className="mb-5">
+            <StatementLine label="Billed to customers" note={`All-in gross before Landstar's cut. ${overview.shipments.toLocaleString()} loads, ${overview.billedMiles.toLocaleString()} billed miles.`} value={isLoading ? '…' : wholeDollars(overview.gross)} />
+            <StatementLine label="Landstar's cut" note="Their share of linehaul" value={isLoading ? '…' : `−${wholeDollars(overview.landstarCut)}`} rule="single" />
+            <StatementLine label="Your revenue" note={overview.billedMiles > 0 ? `${formatCurrency(overview.netRate)} a mile, ${formatCurrency(overview.allInRate)} a mile all-in` : undefined} value={isLoading ? '…' : wholeDollars(overview.yours)} strong rule="double" />
+            <StatementLine label="Not delivered yet" note="Booked, assigned or on the road" value={`${pendingCount} ${pendingCount === 1 ? 'load' : 'loads'}, ${wholeDollars(pendingIncome)}`} muted rule="single" />
+          </Panel>
+
+          <RosterToolbar
+            search={searchInput}
+            onSearch={(v) => { setSearchInput(v); debouncedSetSearch(v); }}
+            placeholder="Search trip, city, driver"
+          >
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="h-11 w-full sm:w-[170px]" aria-label="Month">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All months</SelectItem>
+                {loadMonths.map((m) => (
+                  <SelectItem key={m} value={m}>{format(parseISO(`${m}-01`), 'MMMM yyyy')}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-11 w-full sm:w-[170px]" aria-label="Status">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="open">Not delivered</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" className="h-11" onClick={exportCsv}>
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+          </RosterToolbar>
+
+          <RosterBulkBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>
+            <Button variant="outline" className="h-11" onClick={() => setMassEditOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" /> Change status
+            </Button>
+            <Button variant="outline" className="h-11 text-destructive" onClick={() => setMassDeleteOpen(true)}>
+              <Archive className="mr-2 h-4 w-4" /> Archive
+            </Button>
+          </RosterBulkBar>
+
+          {isLoading ? (
+            <div className="py-12 text-center text-muted-foreground">Loading…</div>
+          ) : (
+            <Roster entries={entries} selectedIds={selectedIds} onToggle={toggleSelect} empty={searchTerm ? `No loads match "${searchInput}".` : 'No loads match your filters.'} />
           )}
-        </CardContent>
-      </Card>
+        </>
+      )}
+
+      <ConfirmDeleteDialog
+        open={massDeleteOpen}
+        onOpenChange={setMassDeleteOpen}
+        onConfirm={async () => {
+          setBulkUpdating(true);
+          try {
+            const { archiveManyWithUndo } = await import('@/lib/soft-delete');
+            await archiveManyWithUndo({ table: 'fleet_loads', ids: [...selectedIds], queryClient, invalidateKeys: [['fleet_loads']] });
+            setSelectedIds(new Set());
+            setMassDeleteOpen(false);
+          } catch (e: any) { toast.error(e.message); }
+          finally { setBulkUpdating(false); }
+        }}
+        title="Archive Selected Loads"
+        description={`Archive ${selectedIds.size} load(s)? They can be restored from the Archive page.`}
+        isDeleting={bulkUpdating}
+      />
+      <BulkStatusEditDialog
+        open={massEditOpen}
+        onOpenChange={setMassEditOpen}
+        onConfirm={async (status) => {
+          setBulkUpdating(true);
+          try {
+            const { error } = await supabase.from('fleet_loads').update({ status }).in('id', [...selectedIds]);
+            if (error) throw error;
+            queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
+            toast.success(`${selectedIds.size} load(s) updated`);
+            setSelectedIds(new Set());
+            setMassEditOpen(false);
+          } catch (e: any) { toast.error(e.message); }
+          finally { setBulkUpdating(false); }
+        }}
+        count={selectedIds.size}
+        entityName="loads"
+        isUpdating={bulkUpdating}
+        statusOptions={[
+          { value: 'pending', label: 'Pending' },
+          { value: 'assigned', label: 'Assigned' },
+          { value: 'in_transit', label: 'In Transit' },
+          { value: 'delivered', label: 'Delivered' },
+          { value: 'cancelled', label: 'Cancelled' },
+        ]}
+      />
 
       {/* Add/Edit Load Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
