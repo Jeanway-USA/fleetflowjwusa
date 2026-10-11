@@ -173,7 +173,7 @@ export function SettlementStatementTab({ loads, expenses, truckId, isLoading, on
   const adjustments = statement.charges.filter((c) => c.group === 'adjustment');
   const scheduledTotal = scheduled.reduce((s, c) => s + c.amount, 0);
   const adjustmentTotal = adjustments.reduce((s, c) => s + c.amount, 0);
-  const hasAnything = statement.trips.length > 0 || statement.hasStatementLines;
+  const hasAnything = statement.trips.length > 0 || statement.hasStatementLines || statement.waiting.length > 0;
   const inProgress = offset >= 0;
   const avgPerGallon = card.fuelGallons > 0 ? (card.fuelSpend - card.discounts) / card.fuelGallons : 0;
 
@@ -261,6 +261,18 @@ export function SettlementStatementTab({ loads, expenses, truckId, isLoading, on
                 Trips
               </SectionHeading>
               <TripRows trips={statement.trips} />
+            </section>
+          )}
+
+          {statement.waiting.length > 0 && (
+            <section aria-labelledby="statement-waiting" className="overflow-hidden rounded-lg border border-dashed bg-card">
+              <SectionHeading id="statement-waiting" aside={`${statement.waiting.length} ${statement.waiting.length === 1 ? 'trip' : 'trips'}`}>
+                Delivered, waiting for Landstar
+              </SectionHeading>
+              <p className="px-4 pb-2 text-[13px] text-muted-foreground">
+                Landstar has not settled {statement.waiting.length === 1 ? 'this trip' : 'these trips'} yet, so {statement.waiting.length === 1 ? 'it is' : 'they are'} not in the totals above. {statement.waiting.length === 1 ? 'It' : 'They'} will land on the statement for the week Landstar scans and settles {statement.waiting.length === 1 ? 'it' : 'them'}.
+              </p>
+              <TripRows trips={statement.waiting} />
             </section>
           )}
 

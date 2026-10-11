@@ -91,6 +91,8 @@ export interface CardActivity {
   discounts: number;
   /** Cash moved from the card to the bank. */
   cashToBank: number;
+  /** What the card charged to move that cash. */
+  cardFees: number;
 }
 
 export interface SettlementStatement {
@@ -98,6 +100,8 @@ export interface SettlementStatement {
   weekEnd: string;
   trips: StatementTripLine[];
   charges: StatementCharge[];
+  /** Delivered this week with no statement lines yet: Landstar has not settled them, so they are not in the totals. */
+  waiting: StatementTripLine[];
   card: CardActivity;
   totals: {
     revenue: number;
@@ -149,7 +153,30 @@ export function buildSettlementStatement({ loads, expenses, weekStart, weekEnd, 
   const inWeek = (d: string | null | undefined) => !!d && d >= weekStart && d <= weekEnd;
   const forTruck = <T extends { truck_id: string | null }>(row: T) => !truckId || truckId === 'all' || row.truck_id === truckId;
 
-  const weekLoads = loads.filter(l => l.status === 'delivered' && inWeek(l.delivery_date) && forTruck(l));
+  // Landstar settles a trip in the week of its paperwork scan, which is the day after delivery, so a trip delivered on
+  // the last day of a week settles the next one. The scan line on the trip says which week; a trip with no statement
+  // lines at all has not settled yet and waits, instead of being counted before Landstar has paid it.
+  const linkedByLoad = new Map<string, StatementExpense[]>();
+  for (const e of expenses) {
+    if (!e.load_id || !forTruck(e) || isCardPurchase(e)) continue;
+    (linkedByLoad.get(e.load_id) ?? linkedByLoad.set(e.load_id, []).get(e.load_id)!).push(e);
+  }
+  const scanDateOf = (loadId: string) => {
+    const dates = (linkedByLoad.get(loadId) ?? []).filter(e => e.expense_type === 'Trip Scanning' || /trkstp\s*scn/i.test(e.description ?? '')).map(e => e.expense_date).sort();
+    return dates[0] ?? null;
+  };
+  const weekHasLines = expenses.some(e => forTruck(e) && inWeek(e.expense_date) && !isCardPurchase(e));
+
+  const delivered = loads.filter(l => l.status === 'delivered' && forTruck(l));
+  const weekLoads = delivered.filter(l => {
+    const scan = scanDateOf(l.id);
+    if (scan) return inWeek(scan);
+    if ((linkedByLoad.get(l.id) ?? []).length > 0) return inWeek(l.delivery_date);
+    return !weekHasLines && inWeek(l.delivery_date);
+  });
+  const waitingLoads = weekHasLines
+    ? delivered.filter(l => !(linkedByLoad.get(l.id)?.length) && inWeek(l.delivery_date))
+    : [];
   // The date in front of a statement line is the trip's pickup date, not when the charge posted,
   // so a charge on a trip settling this week belongs to that trip whatever its date. Charges
   // with no trip, or on a trip not settling this week, fall back to the week by date.
@@ -186,6 +213,7 @@ export function buildSettlementStatement({ loads, expenses, weekStart, weekEnd, 
   const fuel: FuelPurchase[] = [];
   let loaded = 0;
   let cashToBank = 0;
+  let cardFees = 0;
   let discounts = 0;
   let defSpend = 0;
   let fuelSpend = 0;
@@ -212,6 +240,9 @@ export function buildSettlementStatement({ loads, expenses, weekStart, weekEnd, 
     hasStatementLines = true;
 
     if (isCashToBank(e)) { cashToBank += Math.abs(amount); continue; }
+
+    // The card charges $1 each time money moves from it to the bank. That comes off the card, not off the settlement.
+    if (e.expense_type === 'Direct Deposit Fee' && /^direct-?\s*deposit fee/i.test(e.description ?? '')) { cardFees += Math.abs(amount); continue; }
 
     if (isPreTripAdvance(e)) {
       loaded += Math.abs(amount);
@@ -287,7 +318,9 @@ export function buildSettlementStatement({ loads, expenses, weekStart, weekEnd, 
       defSpend: roundCents(defSpend),
       discounts: roundCents(discounts),
       cashToBank: roundCents(cashToBank),
+      cardFees: roundCents(cardFees),
     },
+    waiting: waitingLoads.map(l => lineFor(l, l.id)),
     totals: { revenue, advances, fees, charges: chargesTotal, deductions, net: roundCents(revenue - deductions) },
     hasStatementLines,
   };

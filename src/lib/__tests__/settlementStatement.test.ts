@@ -119,3 +119,48 @@ describe('buildSettlementStatement edge cases', () => {
     expect(s.totals.net).toBe(0);
   });
 });
+
+// Week ending 10/7/26: Landstar settled three trips for $7,880.92 and left 1894988 outstanding.
+describe('buildSettlementStatement against the 10/7/26 Landstar statement', () => {
+  const l = (id: string, trip: string, delivery: string, net: number, fsc: number, acc = 0): StatementLoad => ({ ...load(id, trip, delivery, net, fsc), accessorials: acc });
+  const week = {
+    loads: [
+      l('a', '1456639', '2026-10-01', 2325, 700),
+      l('b', '1369039', '2026-10-05', 3824.67, 937.17, 81.25),
+      l('c', '1644247', '2026-10-02', 1731.25, 670, 200),
+      l('d', '1894988', '2026-10-07', 1543.3, 385.01), // delivered Wednesday, not settled yet
+    ],
+    expenses: [
+      exp('s1', '2026-10-02', 'Trip Scanning', 2, 'TRKSTP SCN NHD 1456639', 'a'),
+      exp('s2', '2026-10-01', 'Card Fee', 1.75, 'CARD FEE', 'b'), exp('s3', '2026-10-06', 'Trip Scanning', 2, 'TRKSTP SCN LTL 1369039', 'b'), advance('s4', '2026-10-01', 2714.09, 'CARD PRE-TRIP', 'b'),
+      exp('s5', '2026-10-02', 'Card Fee', 1.75, 'CARD FEE', 'c'), exp('s6', '2026-10-03', 'Trip Scanning', 2, 'TRKSTP SCN RKV 1644247', 'c'), advance('s7', '2026-10-02', 1280, 'CARD PRE-TRIP', 'c'),
+      exp('s8', '2026-10-07', 'Insurance', 33.98, 'UNLADEN LIABILITY STD P'),
+      // The card moves money to the bank for $1 a time; that is the card's fee, not a settlement deduction.
+      exp('s9', '2026-10-01', 'Direct Deposit Fee', 1, 'Direct-Deposit Fee'),
+    ],
+    weekStart: '2026-10-01', weekEnd: '2026-10-07', truckId: 't1',
+  };
+  const s = buildSettlementStatement(week);
+
+  it('counts only the trips Landstar settled and lists the rest as waiting', () => {
+    expect(s.trips.map(t => t.trip).sort()).toEqual(['1369039', '1456639', '1644247']);
+    expect(s.totals.revenue).toBe(7880.92);
+    expect(s.waiting.map(t => t.trip)).toEqual(['1894988']);
+  });
+
+  it("keeps the card's direct-deposit fee out of the settlement deductions", () => {
+    expect(s.totals.charges).toBe(33.98);
+    expect(s.card.cardFees).toBe(1);
+  });
+
+  it('settles a trip in the week of its scan, not the week it delivered', () => {
+    // Delivered Wednesday 10/7, scanned Thursday 10/8: it belongs to the next week.
+    const next = buildSettlementStatement({
+      ...week,
+      expenses: [...week.expenses, exp('n1', '2026-10-08', 'Trip Scanning', 2, 'TRKSTP SCN PRM 1894988', 'd')],
+      weekStart: '2026-10-08', weekEnd: '2026-10-14',
+    });
+    expect(next.trips.map(t => t.trip)).toEqual(['1894988']);
+    expect(buildSettlementStatement({ ...week, expenses: [...week.expenses, exp('n1', '2026-10-08', 'Trip Scanning', 2, 'TRKSTP SCN PRM 1894988', 'd')] }).trips.map(t => t.trip)).not.toContain('1894988');
+  });
+});
