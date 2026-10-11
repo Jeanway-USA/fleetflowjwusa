@@ -20,7 +20,7 @@ interface TrueUpLoadsProps {
 const money = (v: number) => (v < 0 ? `−${formatCurrency(-v)}` : formatCurrency(v));
 const day = (d: string | null) => (d ? format(parseISO(d), 'MMM d') : '');
 
-function settingsFrom(getSetting: TrueUpLoadsProps['getSetting']): RevenueSettings {
+export function settingsFrom(getSetting: TrueUpLoadsProps['getSetting']): RevenueSettings {
   return {
     truckPct: (parseFloat(getSetting('truck_percentage', '65')) || 0) / 100,
     trailerPct: (parseFloat(getSetting('trailer_percentage', '7')) || 0) / 100,

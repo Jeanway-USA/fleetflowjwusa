@@ -8,7 +8,8 @@ import { formatCurrency } from '@/lib/formatters';
 import { readSettlementLines } from '@/lib/read-settlement-lines';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { expenseForMissingLine, proveTrips, type LineGap, type ProofResult, type TripProof } from '@/lib/weekly-proof';
+import { expenseForMissingLine, loadForMissingTrip, proveTrips, type LineGap, type ProofResult, type TripProof } from '@/lib/weekly-proof';
+import { settingsFrom } from '@/components/finance/TrueUpLoads';
 import type { SettlementLine } from '@/lib/settlement-trueup';
 import { Panel, StatementLine } from '@/components/finance/statement-ui';
 import { Roster, type RosterEntry } from '@/components/fleet/Roster';
@@ -38,11 +39,13 @@ function surplusIds(t: TripProof): string[] {
 }
 
 interface WeeklyProofProps {
+  /** The pay rates, to work out your share of a trip that has to be added as a load. */
+  getSetting: (key: string, defaultValue?: string) => string;
   /** Tick expense rows in the Expenses tab; archiving them stays a deliberate step there. */
   onTick?: (ids: string[]) => void;
 }
 
-export function WeeklyProof({ onTick }: WeeklyProofProps) {
+export function WeeklyProof({ onTick, getSetting }: WeeklyProofProps) {
   const queryClient = useQueryClient();
   const fileInput = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
@@ -50,6 +53,7 @@ export function WeeklyProof({ onTick }: WeeklyProofProps) {
   const [busy, setBusy] = useState(false);
   const [lines, setLines] = useState<SettlementLine[] | null>(null);
   const [trucks, setTrucks] = useState<Map<string, string | null>>(new Map());
+  const [truckByUnit, setTruckByUnit] = useState<Map<string, string>>(new Map());
   const { orgId } = useAuth();
 
   /** Reads your loads and expenses fresh and checks them against Landstar's lines. */
@@ -60,6 +64,8 @@ export function WeeklyProof({ onTick }: WeeklyProofProps) {
     ]);
     if (loadsError) throw loadsError;
     if (expensesError) throw expensesError;
+    const { data: truckRows } = await supabase.from('trucks').select('id, unit_number').is('deleted_at', null);
+    setTruckByUnit(new Map((truckRows ?? []).map((t: any) => [String(t.unit_number), t.id as string])));
     setTrucks(new Map((loads ?? []).map((l: any) => [l.id, l.truck_id ?? null])));
     setResult(proveTrips(settlementLines, (loads ?? []) as any[], (expenses ?? []) as any[]));
   };
@@ -98,6 +104,28 @@ export function WeeklyProof({ onTick }: WeeklyProofProps) {
       if (lines) await check(lines);
     } catch (err: any) {
       toast.error(`Could not add the lines: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Adds a settled trip as a delivered load, with its settled accessorials. Its charges and advances come next, from the buttons that follow. */
+  const addLoad = async (t: TripProof) => {
+    const built = loadForMissingTrip(t, settingsFrom(getSetting), truckByUnit);
+    if (!built || !orgId) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.from('fleet_loads').insert({ ...built.load, org_id: orgId } as any).select('id').single();
+      if (error) throw error;
+      if (built.accessorials.length > 0) {
+        const { error: accError } = await supabase.from('load_accessorials').insert(built.accessorials.map((a) => ({ ...a, load_id: data.id, org_id: orgId })) as any);
+        if (accError) throw accError;
+      }
+      queryClient.invalidateQueries({ queryKey: ['fleet_loads'] });
+      toast.success(`Added load ${t.trip}. Check its driver, then add its charges and advances here.`);
+      if (lines) await check(lines);
+    } catch (err: any) {
+      toast.error(`Could not add the load: ${err.message}`);
     } finally {
       setBusy(false);
     }
@@ -145,6 +173,11 @@ export function WeeklyProof({ onTick }: WeeklyProofProps) {
                 <li key={t.trip}>
                   <span className="font-medium tabular-nums">Trip {t.trip}</span>
                   {issueText(t).map((line) => <span key={line} className="block text-[13px] text-muted-foreground">{line}</span>)}
+                  {!t.loadFound && t.settledTrip?.hasLinehaul && (
+                    <Button variant="outline" className="mr-2 mt-1 h-11" disabled={busy} onClick={() => addLoad(t)}>
+                      Add this load ({money(t.landstar.revenue)})
+                    </Button>
+                  )}
                   {t.loadId && t.gaps.charges.missing.length + t.gaps.advances.missing.length > 0 && (
                     <Button variant="outline" className="mr-2 mt-1 h-11" disabled={busy} onClick={() => addMissing(t)}>
                       Add {t.gaps.charges.missing.length + t.gaps.advances.missing.length} missing {t.gaps.charges.missing.length + t.gaps.advances.missing.length === 1 ? 'line' : 'lines'}

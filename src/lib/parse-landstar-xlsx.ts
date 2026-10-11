@@ -1,3 +1,4 @@
+import { settleTrips, type SettlementLine } from '@/lib/settlement-trueup';
 // xlsx is large (~140 KB gz). Load it lazily only when parsing.
 type XLSXModule = typeof import('xlsx');
 let xlsxPromise: Promise<XLSXModule> | null = null;
@@ -25,6 +26,8 @@ interface ParsedStatement {
   period_end: string | null;
   unit_number: string | null;
   expenses: ExtractedExpense[];
+  /** Freight Bill Details only: what Landstar settled for each trip, from its structured lines. */
+  revenue?: Array<{ date: string | null; trip_number: string | null; flat_rate: number; reimbursement_total: number; description: string }>;
 }
 
 // Revenue patterns to skip entirely
@@ -144,6 +147,7 @@ export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStat
   let periodStart: string | null = null;
   let periodEnd: string | null = null;
   const expenses: ExtractedExpense[] = [];
+  const revenueLines: SettlementLine[] = [];
 
   for (const row of rows) {
     const description = String(
@@ -155,6 +159,11 @@ export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStat
     // Freight Bill Details codes: B = charge, V = advance, C = escrow,
     // 1/3 = linehaul/FSC/accessorial revenue, X = reversal. Only B and V are costs.
     const code = hasCodeColumn ? String(row['Code'] ?? '').trim().toUpperCase() : '';
+    if (hasCodeColumn && ['1', '2', '3', 'X'].includes(code)) {
+      const trip = String(row['Freight Bill #'] ?? '').trim();
+      const amt = parseAmount(row['Transaction Amt'] ?? 0);
+      if (trip && trip !== '0') revenueLines.push({ trip, description, code, amount: amt, delivery: null, lane: null });
+    }
     if (hasCodeColumn && code !== 'B' && code !== 'V') continue;
 
     // Skip general revenue/income lines entirely
@@ -210,11 +219,18 @@ export async function parseLandstarXlsx(buffer: ArrayBuffer): Promise<ParsedStat
     });
   }
 
+  const revenue = hasCodeColumn
+    ? settleTrips(revenueLines)
+        .filter((t) => t.hasLinehaul)
+        .map((t) => ({ date: null, trip_number: t.trip, flat_rate: t.total, reimbursement_total: 0, description: 'SETTLED REVENUE' }))
+    : undefined;
+
   return {
     statement_type: isFreightBill ? 'contractor' : 'card_activity',
     period_start: periodStart,
     period_end: periodEnd,
     unit_number: unitNumber,
     expenses,
+    revenue,
   };
 }

@@ -37,6 +37,8 @@ export async function readSettlementLines(buffer: ArrayBuffer): Promise<Settleme
       delivery: isoDate(row['Delivery Date'], xlsx),
       settled: isoDate(row['Settlement Date'], xlsx),
       pickup: isoDate(row['Pickup Date'], xlsx),
+      agency: String(row['Agency'] ?? '').trim() || null,
+      tractor: String(row['Tractor #'] ?? '').trim() || null,
       lane: String(row['OD Lane'] ?? '').trim() || null,
     });
   }

@@ -22,6 +22,7 @@ interface FleetLoad {
   origin: string;
   destination: string;
   rate?: number | null;
+  net_revenue?: number | null;
   delivery_date?: string | null;
 }
 

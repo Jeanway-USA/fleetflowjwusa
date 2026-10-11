@@ -46,3 +46,10 @@ describe('classifyStatementLine', () => {
     expect(classifyStatementLine('')).toBeNull();
   });
 });
+
+describe('escrow interest', () => {
+  it('is money coming back, not a cost', () => {
+    expect(classifyStatementLine('3RD QTR ESCROW INT PAY')).toMatchObject({ action: 'retype', toType: 'Reimbursement', group: 'credit' });
+    expect(classifyStatementLine('3RD QTR ADV INT DED')).toMatchObject({ toType: 'Interest' });
+  });
+});

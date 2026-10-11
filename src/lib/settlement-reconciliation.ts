@@ -237,11 +237,13 @@ export function reconcileDocuments(
       if (verdict?.action === 'skip') continue;
       let expense_type = exp.expense_type === 'Misc' && /\bcat\s*scale\b/i.test(exp.description) ? 'PrePass/Scale' : exp.expense_type;
       let is_advance = exp.is_advance;
+      let is_reimbursement = exp.is_reimbursement;
       if (verdict?.action === 'retype' && (!expense_type || expense_type === 'Misc')) {
         expense_type = verdict.toType;
         if (verdict.group === 'advance') is_advance = true;
+        if (verdict.group === 'credit') is_reimbursement = true;
       }
-      const line = { ...exp, expense_type, is_advance, source: sourceLabel, sourceType: sf.type };
+      const line = { ...exp, expense_type, is_advance, is_reimbursement, source: sourceLabel, sourceType: sf.type };
       if (isXlsx && hasContractorPdf) xlsxLines.push(line);
       else allExpenses.push(line);
     }
@@ -278,6 +280,14 @@ export function reconcileDocuments(
     : null;
   if (crossCheck) {
     for (const missing of crossCheck.missingFromPdf) allExpenses.push(missing as SourcedExpense);
+    // Where the PDF read disagrees with the spreadsheet, the spreadsheet's amount is used.
+    for (const swap of crossCheck.replaced) {
+      for (const line of swap.remove) {
+        const at = allExpenses.indexOf(line as unknown as SourcedExpense);
+        if (at >= 0) allExpenses.splice(at, 1);
+      }
+      allExpenses.push(swap.add as unknown as SourcedExpense);
+    }
   }
 
   // Fallback: apply advance detection for items missing the flag (e.g. from PDF sources)
@@ -424,6 +434,7 @@ function crossCheckStatement<T extends ExtractedExpense>(pdfLines: T[], xlsxLine
   const claimed = new Set<number>();
   const missingFromPdf: T[] = [];
   const mismatches: CrossCheckMismatch[] = [];
+  const replaced: Array<{ remove: T[]; add: T }> = [];
   const cents = (v: number) => Math.round(Math.abs(v) * 100);
   const norm = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim();
   const trip = (t: string | null) => (t ?? '').replace(/\D/g, '');
@@ -457,19 +468,45 @@ function crossCheckStatement<T extends ExtractedExpense>(pdfLines: T[], xlsxLine
       continue;
     }
 
+    // The spreadsheet sums a description per day (a toll agency's lines for one date) while the PDF
+    // read may not carry the date, so look for the PDF lines that add up to the spreadsheet's amount.
+    const exact = findSubsetSum(group.map(({ p }) => cents(p.amount)), cents(x.amount));
+    if (exact) {
+      exact.forEach((k) => claimed.add(group[k].i));
+      continue;
+    }
+
+    // No lines add up: the PDF read has a wrong digit somewhere. The spreadsheet is structured data,
+    // so its amount wins and replaces those PDF lines.
     const sum = group.reduce((s, { p }) => s + cents(p.amount), 0);
     group.forEach(({ i }) => claimed.add(i));
-    if (sum !== cents(x.amount)) {
-      mismatches.push({
-        description: x.description,
-        trip_number: x.trip_number,
-        xlsxAmount: cents(x.amount) / 100,
-        pdfAmount: sum / 100,
-      });
-    }
+    mismatches.push({
+      description: x.description,
+      trip_number: x.trip_number,
+      xlsxAmount: cents(x.amount) / 100,
+      pdfAmount: sum / 100,
+    });
+    replaced.push({ remove: group.map(({ p }) => p), add: { ...group[0].p, description: x.description, amount: Math.abs(x.amount) } });
   }
 
-  return { missingFromPdf, mismatches };
+  return { missingFromPdf, mismatches, replaced };
+}
+
+/** Indexes of some subset of `amounts` (in cents) that adds up to `target`, or null. Small inputs only. */
+function findSubsetSum(amounts: number[], target: number): number[] | null {
+  if (amounts.length === 0 || amounts.length > 16) return null;
+  const pick: number[] = [];
+  const search = (from: number, remaining: number): boolean => {
+    if (remaining === 0) return pick.length > 0;
+    if (remaining < 0) return false;
+    for (let k = from; k < amounts.length; k++) {
+      pick.push(k);
+      if (search(k + 1, remaining - amounts[k])) return true;
+      pick.pop();
+    }
+    return false;
+  };
+  return search(0, target) ? [...pick] : null;
 }
 
 // --------------------------------------------------------------------------
@@ -482,6 +519,8 @@ export interface RevenueReconcileLoad {
   origin: string;
   destination: string;
   rate?: number | null;
+  /** Your revenue on the load, compared with what Landstar settled when a Freight Bill Details file is uploaded. */
+  net_revenue?: number | null;
   delivery_date?: string | null;
 }
 
@@ -547,6 +586,36 @@ export function reconcileRevenue(
   landstarSplit: number = 0.65,
 ): RevenueReconciliation {
   const tripMismatches: RevenueTripMismatch[] = [];
+
+  // A Freight Bill Details export lists what Landstar settled for each trip as structured lines, so it is
+  // the reliable statement figure; the PDF read can drop digits. When it is uploaded, each trip's settled
+  // revenue is compared with the revenue on the load, and the PDF's revenue is not used.
+  const settledByTrip = new Map<string, number>();
+  for (const sf of stagedFiles) {
+    if (sf.status !== 'parsed' || !sf.data || sf.type !== 'freight_bill_xlsx') continue;
+    for (const r of sf.data.revenue || []) settledByTrip.set(normalizeTrip(r.trip_number), Number(r.flat_rate) || 0);
+  }
+  if (settledByTrip.size > 0) {
+    let expectedTotal = 0;
+    let actualTotal = 0;
+    for (const [trip, settled] of settledByTrip) {
+      const load = loads.find((l) => normalizeTrip(l.landstar_load_id) === trip);
+      actualTotal += settled;
+      if (!load) {
+        tripMismatches.push({ trip_number: trip, load_id: null, load_label: null, expected_amount: 0, expected_gross_amount: 0, landstar_split: 1, actual_amount: settled, actual_source_label: 'Freight Bill Details', delta_amount: settled, reason: 'no_load_match' });
+        continue;
+      }
+      const mine = Math.round((Number(load.net_revenue) || 0) * 100) / 100;
+      expectedTotal += mine;
+      const delta = settled - mine;
+      if (Math.abs(delta) > 0.01) {
+        tripMismatches.push({ trip_number: trip, load_id: load.id, load_label: load.landstar_load_id || `${load.origin} → ${load.destination}`, expected_amount: mine, expected_gross_amount: 0, landstar_split: 1, actual_amount: settled, actual_source_label: 'Freight Bill Details', delta_amount: delta, reason: 'rate_mismatch' });
+      }
+    }
+    const delta = actualTotal - expectedTotal;
+    const period: RevenuePeriodCheck = { expected_total: expectedTotal, actual_total: actualTotal, delta, exceedsTolerance: Math.abs(delta) > 0.01 };
+    return { tripMismatches, period, hasBlockingDiscrepancy: tripMismatches.length > 0 || period.exceedsTolerance };
+  }
 
   // Normalise split to fraction in case a caller passes 65 instead of 0.65
   const splitFraction = landstarSplit > 1 ? landstarSplit / 100 : landstarSplit;

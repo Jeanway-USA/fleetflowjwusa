@@ -231,6 +231,7 @@ export function PLSummaryTab({
             <Ratio label="Revenue per load" note="With fuel surcharge" value={hasLoads ? formatCurrency(metrics.avgRevenuePerLoad) : 'None yet'} />
             <Ratio label="Revenue per load" note="Without fuel surcharge" value={hasLoads ? formatCurrency(metrics.avgRevenuePerLoadWithoutFsc) : 'None yet'} />
             <Ratio label="Profit per load" value={hasLoads ? money(netProfit / revenueTotals.loadCount) : 'None yet'} />
+            <Ratio label="All-in rate" note="Billed to customers over actual miles, before Landstar's cut" value={perMile(grossRevenue, totalActualMilesWithDeadhead)} />
             <Ratio label="Revenue per mile" note="Your revenue over actual miles" value={perMile(yourRevenue, totalActualMilesWithDeadhead)} />
             <Ratio label="Profit per mile" value={revenueTotals.actualMiles > 0 ? money(netProfit / revenueTotals.actualMiles) : 'No miles yet'} />
             <Ratio label="Cost per mile" note="Recorded costs over actual miles" value={totalActualMilesWithDeadhead > 0 ? (recordedCosts > 0 ? formatCurrency(recordedCostPerMile) : 'None yet') : 'No miles yet'} />

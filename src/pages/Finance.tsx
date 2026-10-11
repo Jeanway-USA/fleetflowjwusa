@@ -27,6 +27,7 @@ import { ChartSkeleton, DialogSkeleton } from '@/components/shared/LazyFallbacks
 import { YearToDateCheck } from '@/components/finance/YearToDateCheck';
 import { TrueUpLoads } from '@/components/finance/TrueUpLoads';
 import { WeeklyProof } from '@/components/finance/WeeklyProof';
+import { RevenueOverview } from '@/components/finance/RevenueOverview';
 import { ConfirmDeleteDialog } from '@/components/shared/ConfirmDeleteDialog';
 import { PLSummaryTab } from '@/components/finance/PLSummaryTab';
 import { SettlementStatementTab } from '@/components/finance/SettlementStatementTab';
@@ -591,7 +592,7 @@ export default function Finance() {
       </div>
   );
 
-  const VIEWS = ['settlement', 'pnl', 'expenses', 'payroll', 'settings'];
+  const VIEWS = ['settlement', 'overview', 'pnl', 'expenses', 'payroll', 'settings'];
   // Old links used these names; keep them working.
   const VIEW_ALIASES: Record<string, string> = { payouts: 'payroll', compliance: 'expenses', analytics: 'pnl', settlements: 'settlement', 'inhouse-payroll': 'payroll' };
   const rawView = searchParams.get('view') ?? searchParams.get('tab') ?? 'settlement';
@@ -626,6 +627,7 @@ export default function Finance() {
         <TabsList className="mb-5 h-auto w-full justify-start gap-1 overflow-x-auto bg-muted p-1">
           {([
             ['settlement', 'Settlement'],
+            ['overview', 'Overview'],
             ['pnl', 'Profit & loss'],
             ['expenses', 'Expenses'],
             ['payroll', 'Payroll'],
@@ -670,8 +672,15 @@ export default function Finance() {
               <TrueUpLoads getSetting={getSetting} />
             </div>
             <div className="mt-5">
-              <WeeklyProof onTick={(ids) => setSelectedExpenseIds((prev) => new Set([...prev, ...ids]))} />
+              <WeeklyProof getSetting={getSetting} onTick={(ids) => setSelectedExpenseIds((prev) => new Set([...prev, ...ids]))} />
             </div>
+          </div>
+        </TabsContent>
+
+        {/* ===== OVERVIEW: the all-in rate and the year against last year ===== */}
+        <TabsContent value="overview">
+          <div className="animate-in fade-in-50">
+            <RevenueOverview />
           </div>
         </TabsContent>
 
@@ -859,7 +868,7 @@ export default function Finance() {
           </DialogHeader>
           <Suspense fallback={<DialogSkeleton />}>
             <StatementUpload
-              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, delivery_date: l.delivery_date }))}
+              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, net_revenue: l.net_revenue, delivery_date: l.delivery_date }))}
               trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
               existingExpenses={expenses.filter((e: any) => !e.deleted_at).map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id, description: e.description }))}
               onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setUploadDialogOpen(false); }}

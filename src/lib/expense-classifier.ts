@@ -4,11 +4,13 @@
  * were reversed and reissued when a freight bill was revised. Only the first are costs.
  */
 
+export type LineGroup = 'advance' | 'cost' | 'credit';
+
 export type LineVerdict =
   /** Not a cost: leave it out, or archive it if it was already imported. */
   | { action: 'skip'; group: 'total' | 'reversal'; reason: string }
   /** A real line, filed under the wrong type. */
-  | { action: 'retype'; toType: string; group: 'advance' | 'cost'; reason: string };
+  | { action: 'retype'; toType: string; group: LineGroup; reason: string };
 
 // Revenue lines. When a freight bill is revised Landstar reverses the old line and issues a new one;
 // the reversal is not a cost, and the loads already carry the final settled amounts.
@@ -33,7 +35,9 @@ const REVENUE_LINE_PATTERNS: RegExp[] = [
   /^deadhead$/i,
 ];
 
-const RULES: Array<{ pattern: RegExp; toType: string; group: 'advance' | 'cost'; reason: string }> = [
+const RULES: Array<{ pattern: RegExp; toType: string; group: LineGroup; reason: string }> = [
+  // Interest Landstar pays you on your escrow comes back as money, and offsets the advance interest it charges.
+  { pattern: /escrow\s*int(erest)?\s*pay/i, toType: 'Reimbursement', group: 'credit', reason: 'Interest paid to you on your escrow: money coming back, not a cost.' },
   { pattern: /cont\.?\s*spec\s*adv|partial\s*final\s*s(ett|t)|card\s*contractor\s*pay|card\s*pre-trip/i, toType: 'Advance', group: 'advance', reason: 'An advance: early access to your money, not a cost.' },
   // Landstar's "TOLL CHARGES" are charges to you (code B), not reversed revenue: the weekly proof showed it.
   { pattern: /^bp\s+\S+|masspike|deldot|\be-?z\s*pass\b|^toll\s*charges$/i, toType: 'Tolls', group: 'cost', reason: 'A toll.' },

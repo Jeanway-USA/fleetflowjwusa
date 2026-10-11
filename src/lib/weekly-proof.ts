@@ -1,7 +1,7 @@
 import { classifyStatementLine } from '@/lib/expense-classifier';
 import { isAdvanceExpense } from '@/lib/expense-types';
-import { roundCents } from '@/lib/revenue-calculator';
-import { settleTrips, type SettlementLine } from '@/lib/settlement-trueup';
+import { calculateRevenue, roundCents, type RevenueSettings } from '@/lib/revenue-calculator';
+import { settleTrips, type SettledTrip, type SettlementLine } from '@/lib/settlement-trueup';
 
 /**
  * Proves the app against Landstar's own Freight Bill Details export, trip by trip and week by week.
@@ -49,6 +49,9 @@ export interface TripProof {
   loadId: string | null;
   /** The trip's pickup date from the file; statement lines are dated by it. */
   pickup: string | null;
+  /** Everything the file says about the trip, enough to add it as a load. */
+  meta: { delivery: string | null; lane: string | null; agency: string | null; tractor: string | null };
+  settledTrip: SettledTrip | null;
   landstar: { revenue: number; charges: number; advances: number };
   app: { revenue: number; charges: number; advances: number };
   /** Revenue is only compared when the file holds the whole trip. */
@@ -150,6 +153,13 @@ export function proveTrips(lines: SettlementLine[], loads: ProofLoad[], expenses
       loadFound: !!load,
       loadId: load?.id ?? null,
       pickup: group.map((l) => l.pickup).find((d): d is string => !!d) ?? null,
+      meta: {
+        delivery: group.map((l) => l.delivery).find((d): d is string => !!d) ?? null,
+        lane: group.map((l) => l.lane).find((d): d is string => !!d) ?? null,
+        agency: group.map((l) => l.agency).find((d): d is string => !!d) ?? null,
+        tractor: group.map((l) => l.tractor).find((d): d is string => !!d) ?? null,
+      },
+      settledTrip: revenueLines ?? null,
       landstar: { revenue, charges, advances },
       app: { revenue: appRevenue, charges: appCharges, advances: appAdvances },
       revenueComparable,
@@ -183,5 +193,67 @@ export function proveTrips(lines: SettlementLine[], loads: ProofLoad[], expenses
     weeks: weekRows,
     provenTrips: trips.filter((t) => t.issues.length === 0).length,
     openTrips: trips.filter((t) => t.issues.length > 0).length,
+  };
+}
+
+const SMALL_CASE = (word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+
+/** "ORLANDO, FL" or "EDISON         ,MI" to "Orlando, FL". */
+function place(raw: string): string {
+  const parts = raw.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return raw.trim();
+  const state = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : '';
+  const city = parts.slice(0, parts.length > 1 ? -1 : undefined).join(', ').split(/\s+/).map(SMALL_CASE).join(' ');
+  return state ? `${city}, ${state}` : city;
+}
+
+/** Landstar's lane text, "ORLANDO, FL - READING, PA", as an origin and a destination. */
+export function lanePlaces(lane: string | null | undefined): { origin: string; destination: string } | null {
+  const [from, to] = String(lane ?? '').split(/\s+-\s+/);
+  return from && to ? { origin: place(from), destination: place(to) } : null;
+}
+
+/**
+ * A load built from what Landstar settled for a trip the app does not have: its dates, lane and agency from the
+ * file, and its money from the settled lines (your share of linehaul, fuel surcharge, accessorials). Only trips
+ * whose whole revenue is in the file qualify.
+ */
+export function loadForMissingTrip(
+  t: TripProof,
+  settings: RevenueSettings,
+  truckByUnit: Map<string, string>,
+): { load: Record<string, unknown>; accessorials: Array<{ accessorial_type: string; amount: number; percentage: number }> } | null {
+  const settled = t.settledTrip;
+  const places = lanePlaces(t.meta.lane);
+  if (t.loadFound || !settled?.hasLinehaul || !places || !settings.truckPct) return null;
+
+  const accessorials = settled.accessorials.map((a) => ({ accessorial_type: a.label, amount: a.amount, percentage: 100 }));
+  const rate = roundCents(settled.linehaul / settings.truckPct);
+  const result = calculateRevenue(
+    { rate, fuel_surcharge: settled.fsc, lumper: 0, advance_taken: 0, is_power_only: false, accessorialsTotal: roundCents(settled.accessorials.reduce((s, a) => s + a.amount, 0)) },
+    settings,
+  );
+  return {
+    load: {
+      landstar_load_id: t.trip,
+      origin: places.origin,
+      destination: places.destination,
+      pickup_date: t.pickup,
+      delivery_date: t.meta.delivery,
+      status: t.meta.delivery ? 'delivered' : 'assigned',
+      agency_code: t.meta.agency ? t.meta.agency.split(/\s+-\s+/)[0].trim() : null,
+      truck_id: t.meta.tractor ? truckByUnit.get(t.meta.tractor) ?? null : null,
+      rate,
+      fuel_surcharge: settled.fsc,
+      accessorials: result.accessorials,
+      gross_revenue: result.gross_revenue,
+      truck_revenue: result.truck_revenue,
+      trailer_revenue: result.trailer_revenue,
+      net_revenue: result.net_revenue,
+      settlement: result.settlement,
+      advance_available: result.advance_available,
+      notes: "Added from Landstar's Freight Bill Details. Check the driver and trailer.",
+    },
+    accessorials,
   };
 }

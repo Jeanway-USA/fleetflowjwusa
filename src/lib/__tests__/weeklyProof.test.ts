@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expenseForMissingLine, proveTrips, type ProofExpense, type ProofLoad } from '@/lib/weekly-proof';
+import { expenseForMissingLine, lanePlaces, loadForMissingTrip, proveTrips, type ProofExpense, type ProofLoad } from '@/lib/weekly-proof';
 import type { SettlementLine } from '@/lib/settlement-trueup';
 
 const line = (trip: string, description: string, code: string, amount: number, settled = '2026-09-30'): SettlementLine => ({ trip, description, code, amount, delivery: null, lane: null, settled, pickup: null });
@@ -80,5 +80,33 @@ describe('expenseForMissingLine', () => {
     expect(expenseForMissingLine({ description: 'AD VALOREM TAX CHARGES', amount: 4.81 }, 'charge').expense_type).toBe('Taxes');
     expect(expenseForMissingLine({ description: 'CARD PRE-TRIP', amount: 410 }, 'advance').expense_type).toBe('Advance');
     expect(expenseForMissingLine({ description: 'SOMETHING NEW', amount: 5 }, 'charge').expense_type).toBe('Misc');
+  });
+});
+
+describe('adding a trip the app is missing', () => {
+  const settings = { truckPct: 0.65, trailerPct: 0.07, advancePct: 0.3, ownsTrailer: false, powerOnlyPct: 0.7 };
+  const lines: SettlementLine[] = [
+    { ...line('2086140', 'TRACTOR L/H', '1', 390, '2026-09-02'), pickup: '2026-08-24', delivery: '2026-08-26', lane: 'ORLANDO, FL - READING, PA', agency: 'DLE - GWYNN LOGISTICS LLC', tractor: '433780' },
+    { ...line('2086140', 'FUEL SURCHARGE', '3', 272.21, '2026-09-02'), pickup: '2026-08-24', delivery: '2026-08-26', lane: 'ORLANDO, FL - READING, PA', agency: 'DLE - GWYNN LOGISTICS LLC', tractor: '433780' },
+  ];
+
+  it('turns Landstar lane text into places', () => {
+    expect(lanePlaces('ORLANDO, FL - READING, PA')).toEqual({ origin: 'Orlando, FL', destination: 'Reading, PA' });
+    expect(lanePlaces('EDISON         ,MI, NJ - DALLAS, TX')?.destination).toBe('Dallas, TX');
+    expect(lanePlaces('nothing')).toBeNull();
+  });
+
+  it('builds a delivered load from the settled money', () => {
+    const t = proveTrips(lines, [], []).trips[0];
+    const built = loadForMissingTrip(t, settings, new Map([['433780', 'truck-1']]))!;
+    expect(built.load).toMatchObject({
+      landstar_load_id: '2086140', origin: 'Orlando, FL', destination: 'Reading, PA', pickup_date: '2026-08-24', delivery_date: '2026-08-26',
+      status: 'delivered', agency_code: 'DLE', truck_id: 'truck-1', rate: 600, fuel_surcharge: 272.21, net_revenue: 662.21,
+    });
+  });
+
+  it('does not build a load when the file shows no linehaul for the trip', () => {
+    const t = proveTrips([line('3815418', 'CARD PRE-TRIP', 'V', -3000)], [], []).trips[0];
+    expect(loadForMissingTrip(t, settings, new Map())).toBeNull();
   });
 });

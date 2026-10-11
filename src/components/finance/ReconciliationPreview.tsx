@@ -516,7 +516,7 @@ export function ReconciliationPreview({
                     <TableRow>
                       <TableHead>Trip #</TableHead>
                       <TableHead>Dispatch Load</TableHead>
-                      <TableHead className="text-right">Expected (dispatch)</TableHead>
+                      <TableHead className="text-right">Your load</TableHead>
                       <TableHead className="text-right">Statement</TableHead>
                       <TableHead className="text-right">Δ</TableHead>
                     </TableRow>
@@ -562,7 +562,9 @@ export function ReconciliationPreview({
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              Tolerance: ±$1 per trip, ±$5 per pay cycle. Logging the line errors will block this settlement until an owner or payroll admin resolves each row.
+              {revenue.tripMismatches.some((m) => m.actual_source_label === 'Freight Bill Details')
+                ? "These loads do not match what Landstar settled. Open the Settlement tab, use Match your loads to Landstar's settlement with the same Freight Bill Details file, then upload again."
+                : 'Tolerance: ±$1 per trip, ±$5 per pay cycle. Logging the line errors will block this settlement until an owner or payroll admin resolves each row.'}
             </p>
             <div className="flex justify-end">
               <Button variant="destructive" size="sm" onClick={persistDiscrepanciesAndHalt} disabled={isImporting}>
@@ -623,12 +625,12 @@ export function ReconciliationPreview({
               <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 space-y-1">
                 <div className="flex items-center gap-2 font-medium">
                   <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
-                  Check these lines against the PDF before importing
+                  The PDF read disagreed with the spreadsheet on these lines, so the spreadsheet amount is used
                 </div>
                 <ul className="pl-6 space-y-0.5 text-muted-foreground">
                   {result.crossCheck.mismatches.map((m, i) => (
                     <li key={i} className="tabular-nums">
-                      {m.description}{m.trip_number ? ` (trip ${m.trip_number})` : ''}: spreadsheet {formatCurrency(m.xlsxAmount)}, PDF read {formatCurrency(m.pdfAmount)}
+                      {m.description}{m.trip_number ? ` (trip ${m.trip_number})` : ''}: using {formatCurrency(m.xlsxAmount)} (the PDF read gave {formatCurrency(m.pdfAmount)})
                     </li>
                   ))}
                 </ul>

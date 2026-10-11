@@ -10,6 +10,9 @@ import { SETTLEMENT_WEEK_START } from '@/lib/settlement-week';
 import { LogbookWeek } from '@/components/executive/LogbookWeek';
 import { MoneyLines } from '@/components/executive/MoneyLines';
 import { ChartSkeleton } from '@/components/shared/LazyFallbacks';
+const RevenueOverview = lazy(() =>
+  import('@/components/finance/RevenueOverview').then(m => ({ default: m.RevenueOverview })),
+);
 const RevenueTrendsChart = lazy(() =>
   import('@/components/executive/RevenueTrendsChart').then(m => ({ default: m.RevenueTrendsChart })),
 );
@@ -716,6 +719,13 @@ export default function ExecutiveDashboard() {
         <ErrorBoundary compact>
           <Suspense fallback={<ChartSkeleton height={320} />}>
             <RevenueTrendsChart data={trendsData} isLoading={trendsLoading} />
+          </Suspense>
+        </ErrorBoundary>
+
+        {/* Row 4b: the all-in rate and the year against last year, the way Landstar's BCO Analytics shows it */}
+        <ErrorBoundary compact>
+          <Suspense fallback={<ChartSkeleton height={320} />}>
+            <RevenueOverview />
           </Suspense>
         </ErrorBoundary>
 

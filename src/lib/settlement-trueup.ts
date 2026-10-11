@@ -18,6 +18,8 @@ export interface SettlementLine {
   /** The Wednesday Landstar settled the line. */
   settled?: string | null;
   pickup?: string | null;
+  agency?: string | null;
+  tractor?: string | null;
 }
 
 export interface SettledAccessorial {
