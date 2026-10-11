@@ -872,7 +872,7 @@ export default function Finance() {
           </DialogHeader>
           <Suspense fallback={<DialogSkeleton />}>
             <StatementUpload
-              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, net_revenue: l.net_revenue, delivery_date: l.delivery_date }))}
+              existingLoads={loads.map((l: any) => ({ id: l.id, landstar_load_id: l.landstar_load_id, origin: l.origin, destination: l.destination, rate: l.rate, net_revenue: l.net_revenue, delivery_date: l.delivery_date, truck_id: l.truck_id }))}
               trucks={trucks.map((t: any) => ({ id: t.id, unit_number: t.unit_number }))}
               existingExpenses={expenses.filter((e: any) => !e.deleted_at).map((e: any) => ({ id: e.id, expense_date: e.expense_date, expense_type: e.expense_type, amount: e.amount, load_id: e.load_id, description: e.description }))}
               onExpensesImported={() => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setUploadDialogOpen(false); }}

@@ -29,6 +29,8 @@ interface Alert {
   title: string;
   description: string;
   link: string;
+  /** What to do about it, in a sentence. */
+  next: string;
   requestData?: {
     requestId: string;
     driverId: string;
@@ -120,6 +122,7 @@ export function DispatcherAlerts() {
           title: `${typeLabel} — ${driverName}`,
           description: req.subject || 'No subject',
           link: '/fleet-loads',
+          next: 'Approve or deny. The driver is told either way.',
           requestData: {
             requestId: req.id,
             driverId: req.driver_id,
@@ -148,6 +151,7 @@ export function DispatcherAlerts() {
             title: `Load ${ref} is past due`,
             description: `${lane(load)}. Delivery was ${format(new Date(`${load.delivery_date}T00:00:00`), 'MMM d')} and it is still ${String(load.status).replace(/_/g, ' ')}.`,
             link: `/fleet-loads?highlight=${load.id}`,
+            next: 'Open the load. If it was delivered, mark it delivered; if not, fix the delivery date.',
           });
         } else if (!load.driver_id && load.pickup_date && load.pickup_date <= format(addDays(now, 2), 'yyyy-MM-dd')) {
           alertsList.push({
@@ -157,6 +161,7 @@ export function DispatcherAlerts() {
             title: `Load ${ref} has no driver`,
             description: `${lane(load)}. Picks up ${format(new Date(`${load.pickup_date}T00:00:00`), 'EEE, MMM d')}.`,
             link: `/fleet-loads?highlight=${load.id}`,
+            next: 'Open the load, or assign a driver from the Schedule tab.',
           });
         }
       });
@@ -178,6 +183,7 @@ export function DispatcherAlerts() {
             title: `${isBefore(new Date(driver.license_expiry), now) ? 'License expired' : 'License expiring'}: ${driver.first_name} ${driver.last_name}`,
             description: `${isBefore(new Date(driver.license_expiry), now) ? 'Expired' : 'Expires'} ${format(new Date(driver.license_expiry), 'MMM d, yyyy')}`,
             link: '/drivers',
+            next: 'Get the renewed license from the driver, then update it on the Drivers page.',
           });
         }
         if (driver.medical_card_expiry && isBefore(new Date(driver.medical_card_expiry), in30Days)) {
@@ -188,6 +194,7 @@ export function DispatcherAlerts() {
             title: `${isBefore(new Date(driver.medical_card_expiry), now) ? 'Medical card expired' : 'Medical card expiring'}: ${driver.first_name} ${driver.last_name}`,
             description: `${isBefore(new Date(driver.medical_card_expiry), now) ? 'Expired' : 'Expires'} ${format(new Date(driver.medical_card_expiry), 'MMM d, yyyy')}`,
             link: '/drivers',
+            next: 'Get the new medical card from the driver, then update it on the Drivers page.',
           });
         }
       });
@@ -213,6 +220,7 @@ export function DispatcherAlerts() {
             title: `${isBefore(nextDue, now) ? 'Inspection overdue' : 'Inspection due'}: unit ${truck.unit_number}`,
             description: `${isBefore(nextDue, now) ? 'Was due' : 'Due'} ${format(nextDue, 'MMM d, yyyy')}`,
             link: '/trucks',
+            next: 'Book the 120-day inspection, then record it on the Trucks page.',
           });
         }
       });
@@ -283,6 +291,7 @@ export function DispatcherAlerts() {
             title: `Detention accruing — ${driverName}`,
             description: `${route} • ${overHrs}h past ${rule.free_time_minutes}m free time (${trailerType})`,
             link: `/fleet-loads?highlight=${load.id}`,
+            next: 'Add the detention charge to the load before the driver leaves.',
           });
         });
       }
@@ -439,6 +448,7 @@ export function DispatcherAlerts() {
                         <div className="min-w-0 flex-1">
                           <p className="text-[15px] font-medium leading-snug">{alert.title}</p>
                           <p className="text-[13px] text-muted-foreground">{alert.description}</p>
+                          <p className="text-[13px] text-foreground/80"><span className="font-medium">Next:</span> {alert.next}</p>
                           {alert.requestData?.startDate && (
                             <p className="text-[13px] font-medium text-primary">
                               {format(new Date(alert.requestData.startDate + 'T00:00:00'), 'MMM d')}

@@ -19,6 +19,7 @@ interface FleetLoad {
   landstar_load_id: string | null;
   origin: string;
   destination: string;
+  truck_id?: string | null;
 }
 
 interface Truck {
@@ -134,6 +135,12 @@ export function ReconciliationPreview({
   onCancel,
 }: ReconciliationPreviewProps) {
   const [isImporting, setIsImporting] = useState(false);
+  // Statement files rarely name the truck. With one truck every line is its own; with several, the dispatcher picks.
+  const [truckChoice, setTruckChoice] = useState<string>(() => {
+    const named = findMatchingTruck(result.unitNumber, trucks);
+    if (named) return named.id;
+    return trucks.length === 1 ? trucks[0].id : 'none';
+  });
   const [editingIndex, setEditingIndex] = useState<{ tab: string; index: number } | null>(null);
 
   const [initialDupIds] = useState(() =>
@@ -197,6 +204,10 @@ export function ReconciliationPreview({
     setter(prev => prev.map((r, i) => i === index ? { ...r, date: newDate } : r));
   };
 
+  /** The line's own truck: named in the file, then its load's truck, then the one chosen above. */
+  const truckFor = (exp: ExpenseRow): string | null =>
+    exp.matchedTruck?.id || exp.matchedLoad?.truck_id || (truckChoice !== 'none' ? truckChoice : null);
+
   const handleImport = async () => {
     const allSelected = [
       ...selectedExpenses.map(e => ({ ...e, importType: 'expense' as const })),
@@ -238,7 +249,7 @@ export function ReconciliationPreview({
           vendor: exp.vendor,
           gallons: exp.gallons,
           load_id: exp.matchedLoad?.id || null,
-          truck_id: exp.matchedTruck?.id || null,
+          truck_id: truckFor(exp),
           notes: exp.importType === 'advance' ? 'Advance (Non-P&L)'
             : exp.is_reimbursement ? 'Reimbursement/Refund'
             : exp.is_discount ? 'Discount/Credit'
@@ -264,7 +275,7 @@ export function ReconciliationPreview({
             vendor: exp.vendor,
             gallons: exp.gallons,
             load_id: exp.matchedLoad?.id || null,
-            truck_id: exp.matchedTruck?.id || null,
+            truck_id: truckFor(exp),
             notes: exp.importType === 'advance' ? 'Advance (Non-P&L)'
               : exp.is_reimbursement ? 'Reimbursement/Refund'
               : exp.is_discount ? 'Discount/Credit'
@@ -646,6 +657,26 @@ export function ReconciliationPreview({
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {trucks.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">Which truck are these lines for?</p>
+              <p className="text-xs text-muted-foreground">
+                {trucks.length === 1 ? 'You have one truck, so every line goes to it.' : 'The file does not name a truck. Lines tied to a load use the truck of its load.'}
+              </p>
+            </div>
+            <Select value={truckChoice} onValueChange={setTruckChoice}>
+              <SelectTrigger className="h-11 w-full sm:w-[220px]" aria-label="Truck for these lines">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No truck (whole company)</SelectItem>
+                {trucks.map((t) => <SelectItem key={t.id} value={t.id}>Truck {t.unit_number}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
         )}
 

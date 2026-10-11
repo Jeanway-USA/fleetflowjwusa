@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import {
-  Lock, Loader2, RefreshCw, CheckCircle2, Pencil, Trash2, Ban, ChevronLeft, ChevronRight,
+  Lock, Loader2, RefreshCw, CheckCircle2, Pencil, Archive, Ban, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import { useTaxYearConfig } from '@/hooks/useTaxYearConfig';
@@ -457,21 +457,7 @@ export function ActiveBatchTab() {
     onError: (e: Error) => toast.error(e.message ?? 'Failed to finalize'),
   });
 
-  const deleteRow = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('internal_payroll_ledger')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Row deleted');
-      qc.invalidateQueries({ queryKey: ['w2_ledger'] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
+  // Nothing here is ever deleted for good: removing a draft marks it voided, and Restore brings it back.
   const voidRow = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -485,7 +471,24 @@ export function ActiveBatchTab() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Row voided');
+      toast.success('Row removed from the batch. You can restore it.');
+      qc.invalidateQueries({ queryKey: ['w2_ledger'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const restoreRow = useMutation({
+    mutationFn: async (row: LedgerRow) => {
+      // A row that was ever finalized goes back to finalized; a removed draft goes back to a draft.
+      const wasFinalized = !!(row as unknown as { finalized_at?: string | null }).finalized_at;
+      const { error } = await supabase
+        .from('internal_payroll_ledger')
+        .update({ status: wasFinalized ? 'finalized' : 'draft', voided_at: null, voided_by: null })
+        .eq('id', row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Row restored');
       qc.invalidateQueries({ queryKey: ['w2_ledger'] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -611,17 +614,22 @@ export function ActiveBatchTab() {
             <Pencil className="h-4 w-4" />
           </Button>
           <ConfirmButton
-            label="Delete row"
-            description="This deletes the draft payroll row and its withholding record."
-            onConfirm={() => deleteRow.mutate(r.id)}
-            icon={<Trash2 className="h-4 w-4" />}
+            label="Remove row"
+            description="Takes this draft out of the batch. Nothing is deleted, and you can restore it."
+            onConfirm={() => voidRow.mutate(r.id)}
+            icon={<Archive className="h-4 w-4" />}
           />
         </>
+      )}
+      {r.status === 'voided' && (
+        <Button variant="outline" className="h-11" onClick={() => restoreRow.mutate(r)} disabled={restoreRow.isPending}>
+          Restore
+        </Button>
       )}
       {r.status === 'finalized' && (
         <ConfirmButton
           label="Void row"
-          description="Voiding marks the row as voided so it won't count toward YTD. Finalized rows can't be deleted."
+          description="Voiding marks the row as voided so it won't count toward YTD. Nothing is deleted, and you can restore it."
           onConfirm={() => voidRow.mutate(r.id)}
           icon={<Ban className="h-4 w-4" />}
         />
@@ -690,7 +698,7 @@ export function ActiveBatchTab() {
         </div>
       </Panel>
 
-      <Panel title="Pay by employee" description="Draft rows can be edited or deleted. Finalized rows can only be voided." flush>
+      <Panel title="Pay by employee" description="Draft rows can be edited or removed. Finalized rows can be voided. Removed and voided rows can always be restored." flush>
         {isLoading ? (
           <div className="flex justify-center border-t py-6"><Loader2 className="h-5 w-5 animate-spin" /></div>
         ) : rowViews.length === 0 ? (
