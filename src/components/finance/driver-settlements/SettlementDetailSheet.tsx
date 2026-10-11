@@ -463,21 +463,21 @@ function LineItemColumn({
     onError: (e: any) => toast.error(e.message ?? 'Failed to add line item'),
   });
 
+  // Removing a line changes the settlement's totals, so they are recalculated now and again if you press Undo.
   const delMut = useMutation({
     mutationFn: async (itemId: string) => {
-      const { error } = await supabase
-        .from('driver_settlement_items')
-        .delete()
-        .eq('id', itemId);
-      if (error) throw error;
-      const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', {
-        _settlement_id: settlementId,
+      const { deleteWithUndo } = await import('@/lib/soft-delete');
+      await deleteWithUndo({
+        table: 'driver_settlement_items',
+        id: itemId,
+        label: 'Line item',
+        queryClient: qc,
+        afterChange: async () => {
+          const { error: rpcErr } = await supabase.rpc('recalc_settlement_totals', { _settlement_id: settlementId });
+          if (rpcErr) throw rpcErr;
+          invalidate();
+        },
       });
-      if (rpcErr) throw rpcErr;
-    },
-    onSuccess: () => {
-      toast.success('Removed');
-      invalidate();
     },
     onError: (e: any) => toast.error(e.message ?? 'Failed to remove'),
   });

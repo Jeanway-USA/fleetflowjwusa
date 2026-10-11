@@ -72,14 +72,17 @@ export function TruckLoanPaymentsSection({ truckId, loanBalance, originalLoanAmo
     onError: (e: any) => toast.error(e.message || 'Failed to record payment'),
   });
 
+  // The loan balance follows the payments, so removing one raises the balance again and Undo lowers it back.
   const deletePayment = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from('truck_loan_payments').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Payment removed');
-      invalidate();
+      const { deleteWithUndo } = await import('@/lib/soft-delete');
+      await deleteWithUndo({
+        table: 'truck_loan_payments',
+        id,
+        label: 'Loan payment',
+        queryClient: qc,
+        invalidateKeys: [['truck_loan_payments', truckId], ['trucks']],
+      });
     },
     onError: (e: any) => toast.error(e.message || 'Failed to remove payment'),
   });

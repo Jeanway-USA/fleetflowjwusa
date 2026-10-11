@@ -213,3 +213,54 @@ export async function restoreRecord(table: ArchivableTable, id: string) {
   const { error } = await supabase.rpc('restore_record', { _table: table, _id: id });
   if (error) throw error;
 }
+
+/**
+ * For records that have no archive (a loan payment, a settlement line): the row is copied first, then removed,
+ * and the toast offers Undo, which puts the very same row back. The database's audit log also keeps the old row.
+ * `afterChange` runs after the remove and after the undo, to refresh totals that depend on the row.
+ */
+export async function deleteWithUndo(opts: {
+  table: 'truck_loan_payments' | 'driver_settlement_items';
+  id: string;
+  label: string;
+  queryClient: QueryClient;
+  invalidateKeys?: (string | readonly unknown[])[];
+  afterChange?: () => Promise<void>;
+}): Promise<boolean> {
+  const { table, id, label, queryClient, invalidateKeys = [], afterChange } = opts;
+  const client = supabase as any;
+
+  const { data: row, error: readError } = await client.from(table).select('*').eq('id', id).maybeSingle();
+  if (readError || !row) {
+    toast.error(`Could not remove ${label.toLowerCase()}: ${readError?.message ?? 'it was not found'}`);
+    return false;
+  }
+  const { error } = await client.from(table).delete().eq('id', id);
+  if (error) {
+    toast.error(`Could not remove ${label.toLowerCase()}: ${error.message}`);
+    return false;
+  }
+  const refresh = () => {
+    for (const key of invalidateKeys) queryClient.invalidateQueries({ queryKey: Array.isArray(key) ? key : [key] });
+  };
+  await afterChange?.();
+  refresh();
+
+  toast.success(`${label} removed`, {
+    duration: 15_000,
+    action: {
+      label: 'Undo',
+      onClick: async () => {
+        const { error: putBack } = await client.from(table).insert(row);
+        if (putBack) {
+          toast.error(`Could not restore ${label.toLowerCase()}: ${putBack.message}`);
+          return;
+        }
+        await afterChange?.();
+        refresh();
+        toast.success(`${label} restored`);
+      },
+    },
+  });
+  return true;
+}
