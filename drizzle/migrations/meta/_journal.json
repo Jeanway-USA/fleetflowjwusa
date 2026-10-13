@@ -15,6 +15,13 @@
       "when": 1791857497065,
       "tag": "0001_fix_positions_rls_insert",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791857529102,
+      "tag": "0002_staff_pay_statements",
+      "breakpoints": true
     }
   ]
 }

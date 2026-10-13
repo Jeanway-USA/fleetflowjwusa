@@ -6004,6 +6004,107 @@ export type Database = {
           },
         ]
       }
+      staff_pay_statements: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          archived_at: string | null
+          archived_by: string | null
+          assignment_id: string | null
+          created_at: string
+          created_by: string | null
+          deductions: number
+          gross_pay: number
+          id: string
+          lines: Json
+          net_pay: number
+          non_taxable: number
+          note: string | null
+          org_id: string
+          package_id: string | null
+          package_name: string | null
+          paid_at: string | null
+          paid_by: string | null
+          period_end: string
+          period_start: string
+          snapshot: Json | null
+          status: string
+          updated_at: string
+          user_id: string
+          version_id: string | null
+          version_number: number | null
+          week: Json | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          assignment_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deductions?: number
+          gross_pay?: number
+          id?: string
+          lines?: Json
+          net_pay?: number
+          non_taxable?: number
+          note?: string | null
+          org_id: string
+          package_id?: string | null
+          package_name?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          period_end: string
+          period_start: string
+          snapshot?: Json | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          version_id?: string | null
+          version_number?: number | null
+          week?: Json | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          assignment_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deductions?: number
+          gross_pay?: number
+          id?: string
+          lines?: Json
+          net_pay?: number
+          non_taxable?: number
+          note?: string | null
+          org_id?: string
+          package_id?: string | null
+          package_name?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          period_end?: string
+          period_start?: string
+          snapshot?: Json | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          version_id?: string | null
+          version_number?: number | null
+          week?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_pay_statements_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "pay_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       state_tax_configurations: {
         Row: {
           agency_notes: string | null
@@ -7738,6 +7839,45 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "positions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_staff_pay_statement_status: {
+        Args: { _action: string; _id: string }
+        Returns: {
+          approved_at: string | null
+          approved_by: string | null
+          archived_at: string | null
+          archived_by: string | null
+          assignment_id: string | null
+          created_at: string
+          created_by: string | null
+          deductions: number
+          gross_pay: number
+          id: string
+          lines: Json
+          net_pay: number
+          non_taxable: number
+          note: string | null
+          org_id: string
+          package_id: string | null
+          package_name: string | null
+          paid_at: string | null
+          paid_by: string | null
+          period_end: string
+          period_start: string
+          snapshot: Json | null
+          status: string
+          updated_at: string
+          user_id: string
+          version_id: string | null
+          version_number: number | null
+          week: Json | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "staff_pay_statements"
           isOneToOne: true
           isSetofReturn: false
         }
