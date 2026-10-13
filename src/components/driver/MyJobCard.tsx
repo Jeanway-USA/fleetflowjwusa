@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useQuery } from '@tanstack/react-query';
 import { Briefcase, Check, Circle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,7 +19,7 @@ export function MyJobCard({ driverId }: { driverId: string }) {
 
   const current = assignments.find((a) => !a.effective_end) ?? null;
   const position = positions.find((p) => p.id === current?.position_id) ?? null;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const payNow = assignmentOn(pay, today);
   const pkg = packages.find((p) => p.id === payNow?.package_id) ?? null;
 

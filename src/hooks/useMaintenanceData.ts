@@ -1,6 +1,7 @@
+import { todayLocal, toLocalIso } from '@/lib/datetime';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { startOfMonth, endOfMonth, differenceInDays, addDays, subDays } from 'date-fns';
+import { startOfMonth, endOfMonth, differenceInDays, addDays, subDays, parseISO } from 'date-fns';
 
 // Opportunity-cost math uses the org's configured
 // `company_settings.avg_daily_truck_revenue`. When unset we treat the
@@ -304,7 +305,7 @@ export function useComplianceAlerts() {
           return true; // Flag as needing attention
         }
         
-        const lastDate = new Date(schedule.last_performed_date);
+        const lastDate = parseISO(schedule.last_performed_date);
         const dueDate = addDays(lastDate, schedule.interval_days);
         const daysRemaining = differenceInDays(dueDate, today);
         
@@ -325,7 +326,7 @@ export function useComplianceAlerts() {
           }
           
           const daysRemaining = differenceInDays(
-            addDays(new Date(s.last_performed_date), s.interval_days || 120),
+            addDays(parseISO(s.last_performed_date), s.interval_days || 120),
             today
           );
           
@@ -383,7 +384,7 @@ export function useTodaysWorkOrders() {
   return useQuery({
     queryKey: ['todays-work-orders'],
     queryFn: async (): Promise<TodaysWorkOrder[]> => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayLocal();
       const { data, error } = await supabase
         .from('work_orders')
         .select(`*, trucks (unit_number, make, model)`)
@@ -1008,7 +1009,7 @@ export function useCompleteWorkOrder() {
       if (fetchError) throw fetchError;
 
       // Calculate days down
-      const daysDown = differenceInDays(new Date(), new Date(workOrder.entry_date));
+      const daysDown = differenceInDays(new Date(), parseISO(workOrder.entry_date));
 
       // Complete the work order
       const { data, error } = await supabase
@@ -1297,7 +1298,7 @@ export function useChronicIssueTrucks() {
     queryKey: ['chronic-issue-trucks'],
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const thirtyAgoIso = subDays(new Date(), 30).toISOString().slice(0, 10);
+      const thirtyAgoIso = toLocalIso(subDays(new Date(), 30));
       const [logsRes, wosRes] = await Promise.all([
         supabase
           .from('maintenance_logs')
@@ -1338,7 +1339,7 @@ export function useTruckProfitability(truckId: string | null) {
 
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-      const ninetyDaysAgoStr = ninetyDaysAgo.toISOString().split('T')[0];
+      const ninetyDaysAgoStr = toLocalIso(ninetyDaysAgo);
 
       const [{ data: loads, error: loadsError }, { data: workOrders, error: woError }, { data: expenses, error: expensesError }, { data: dailyRevSetting }] = await Promise.all([
         supabase
@@ -1685,7 +1686,7 @@ export function useLogPartUsage() {
       if (fetchError) throw fetchError;
 
       const newQty = Math.max(0, Number(current.quantity_on_hand) - Number(input.quantity));
-      const stamp = new Date().toISOString().slice(0, 10);
+      const stamp = todayLocal();
       const target =
         input.work_order_id
           ? `WO ${input.work_order_id.slice(0, 8)}`

@@ -74,6 +74,32 @@ export function buildWeekInput(loads: LoadRow[], incidents: number, periodStart:
   };
 }
 
+export interface SettlementOverlap {
+  driverId: string;
+  periodStart: string;
+  periodEnd: string;
+  status: string;
+}
+
+/**
+ * Settlements that already cover some of the same days for these drivers, other than one ending on the very same
+ * day (that one is simply replaced). Generating over them would pay the same loads twice.
+ */
+export async function findOverlaps(orgId: string, driverIds: string[], periodStart: string, periodEnd: string): Promise<SettlementOverlap[]> {
+  if (driverIds.length === 0) return [];
+  const { data, error } = await db
+    .from('driver_settlements')
+    .select('driver_id, period_start, period_end, status')
+    .eq('org_id', orgId)
+    .in('driver_id', driverIds)
+    .is('deleted_at', null)
+    .lte('period_start', periodEnd)
+    .gte('period_end', periodStart)
+    .neq('period_end', periodEnd);
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((r) => ({ driverId: r.driver_id, periodStart: r.period_start, periodEnd: r.period_end, status: r.status }));
+}
+
 export interface PackageGenerationResult {
   /** The settlement rows created, in the same shape the existing generator returns. */
   rows: any[];
@@ -113,6 +139,12 @@ export async function generatePackageSettlements(args: {
     const pkg = resolved.version.snapshot.package;
     if (!pkg.is_active || !packageCovers(pkg, periodEnd)) {
       skipped.push({ driverId, reason: `${pkg.name} is not in effect for this period. Change its dates or assign another package.` });
+      continue;
+    }
+
+    const overlap = (await findOverlaps(orgId, [driverId], periodStart, periodEnd))[0];
+    if (overlap) {
+      skipped.push({ driverId, reason: `Overlaps the settlement for ${overlap.periodStart} to ${overlap.periodEnd}, so some loads would be paid twice. Choose dates after it.` });
       continue;
     }
 
@@ -182,12 +214,14 @@ export async function generatePackageSettlements(args: {
         status: 'draft',
         generated_by: userId,
         generated_at: new Date().toISOString(),
-        notes: `Pay package: ${resolved.version.snapshot.package.name} (version ${resolved.version.version_number})`,
+        notes: `Pay package: ${resolved.version.snapshot.package.name} (version ${resolved.version.version_number})${week.loadCount === 0 ? '. No delivered loads in this period.' : ''}`,
       })
       .select('*')
       .single();
     if (settlementError) throw settlementError;
 
+    let totals: any = null;
+    try {
     const items = result.lines
       .filter((l) => l.amount > 0)
       .map((l) => ({
@@ -204,10 +238,16 @@ export async function generatePackageSettlements(args: {
     }
 
     // The settlement's own totals come from the same function every other settlement uses.
-    const { data: totals, error: recalcError } = await db.rpc('recalc_settlement_totals', { _settlement_id: settlement.id });
-    if (recalcError) throw recalcError;
+    const recalc = await db.rpc('recalc_settlement_totals', { _settlement_id: settlement.id });
+    if (recalc.error) throw recalc.error;
+    totals = recalc.data;
 
     await saveSettlementSnapshot({ org_id: orgId, settlement_id: settlement.id, driver_id: driverId, snapshot: snapshotFor(resolved), result });
+    } catch (failure) {
+      // Do not leave a half-built draft behind: archive it (it stays restorable) and report the real error.
+      await db.rpc('archive_record', { _table: 'driver_settlements', _id: settlement.id });
+      throw failure;
+    }
     rows.push(totals ?? settlement);
   }
 

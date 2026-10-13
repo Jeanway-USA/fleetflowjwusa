@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -97,7 +98,7 @@ export function useConvertFaultReportToWorkOrder() {
           service_type: mapIssueToServiceType(report.issue_type),
           service_types: [mapIssueToServiceType(report.issue_type)],
           description: woDescription,
-          entry_date: new Date().toISOString().slice(0, 10),
+          entry_date: todayLocal(),
           status: 'open',
         })
         .select('id')

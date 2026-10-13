@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -29,7 +29,8 @@ import { useTaxYearConfig } from '@/hooks/useTaxYearConfig';
 import { applyW2WithholdingToSettlements } from '@/lib/payroll/applySettlementWithholding';
 import { formatCurrency } from '@/lib/formatters';
 import { useAuth } from '@/contexts/AuthContext';
-import { driversOnPackages, generatePackageSettlements, loadPackageContext, type PackageContext } from '@/lib/pay-packages/generate';
+import { settlementWeek } from '@/lib/settlement-week';
+import { driversOnPackages, findOverlaps, generatePackageSettlements, loadPackageContext, type PackageContext } from '@/lib/pay-packages/generate';
 import { cn } from '@/lib/utils';
 import { addDays, format } from 'date-fns';
 import { CalendarIcon, Check, ChevronsUpDown, X, Users } from 'lucide-react';
@@ -59,23 +60,31 @@ function nextThursday(from = new Date()): Date {
   return addDays(from, diff);
 }
 
+/** The most recent Landstar settlement week (Thursday to Wednesday) that has ended, or is ending today. */
+function lastSettlementWeek() {
+  const now = new Date();
+  const current = settlementWeek(now);
+  const endsToday = format(current.end, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd');
+  return endsToday ? current : settlementWeek(now, -1);
+}
+
 export function GenerateSettlementsDialog({
   open,
   onOpenChange,
   drivers,
   onGenerated,
 }: Props) {
-  const [periodEnd, setPeriodEnd] = useState<Date>(new Date());
-  const [periodStart, setPeriodStart] = useState<Date>(addDays(new Date(), -6));
+  const [periodEnd, setPeriodEnd] = useState<Date>(lastSettlementWeek().end);
+  const [periodStart, setPeriodStart] = useState<Date>(lastSettlementWeek().start);
   const [paymentDate, setPaymentDate] = useState<Date>(nextThursday());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
-      const end = new Date();
-      setPeriodEnd(end);
-      setPeriodStart(addDays(end, -6));
+      const week = lastSettlementWeek();
+      setPeriodEnd(week.end);
+      setPeriodStart(week.start);
       setPaymentDate(nextThursday());
       setSelected(new Set());
       setPickerOpen(false);
@@ -103,6 +112,13 @@ export function GenerateSettlementsDialog({
   };
 
   const { data: taxConfig } = useTaxYearConfig();
+  const startIso = format(periodStart, 'yyyy-MM-dd');
+  const endIso = format(periodEnd, 'yyyy-MM-dd');
+  const { data: overlaps = [] } = useQuery({
+    queryKey: ['settlement-overlaps', taxConfig?.orgId, Array.from(selected).sort().join(','), startIso, endIso],
+    enabled: open && !!taxConfig?.orgId && selected.size > 0 && startIso <= endIso,
+    queryFn: () => findOverlaps(taxConfig!.orgId, Array.from(selected), startIso, endIso),
+  });
   const { user } = useAuth();
 
   const generate = useMutation({
@@ -296,6 +312,19 @@ export function GenerateSettlementsDialog({
                 </Command>
               </PopoverContent>
             </Popover>
+
+            {overlaps.length > 0 && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+                <p className="font-medium">These dates overlap a settlement that already exists, so some loads could be paid twice:</p>
+                <ul className="mt-1 list-disc pl-4">
+                  {overlaps.slice(0, 5).map((o) => {
+                    const d = drivers.find((x) => x.id === o.driverId);
+                    return <li key={`${o.driverId}-${o.periodEnd}`}>{d ? driverName(d) : 'Driver'}: {o.periodStart} to {o.periodEnd} ({o.status})</li>;
+                  })}
+                </ul>
+                <p className="mt-1">Pay package drivers are skipped automatically. Change the dates to start the day after the last settlement.</p>
+              </div>
+            )}
 
             {selectedDrivers.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-1">

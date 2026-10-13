@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Archive, Copy, Eye, History, Pencil, Plus, RotateCcw, Wallet } from 'lucide-react';
@@ -15,7 +16,7 @@ import type { PayPackage } from '@/lib/pay-packages/types';
 
 function statusOf(p: PayPackage): { label: string; variant: 'default' | 'secondary' | 'outline' } {
   if (p.archived_at) return { label: 'Archived', variant: 'secondary' };
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   if (!p.is_active) return { label: 'Inactive', variant: 'outline' };
   if (p.effective_start && p.effective_start > today) return { label: 'Starts later', variant: 'outline' };
   if (p.effective_end && p.effective_end < today) return { label: 'Ended', variant: 'secondary' };

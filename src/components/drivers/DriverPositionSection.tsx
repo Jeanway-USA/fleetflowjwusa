@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -18,7 +19,7 @@ import { suggestFromPosition } from '@/lib/positions/defaults';
 import { APP_ROLE_LABELS, PERMISSION_AREAS, type AppRoleKey } from '@/lib/positions/types';
 import { formatDate } from '@/lib/formatters';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayLocal();
 const areaLabel = (k: string) => PERMISSION_AREAS.find((a) => a.key === k)?.label ?? k;
 
 interface Props {

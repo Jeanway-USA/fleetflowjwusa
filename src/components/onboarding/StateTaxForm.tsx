@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useEffect } from 'react';
 import { MapPin, ShieldCheck } from 'lucide-react';
 
@@ -84,7 +85,7 @@ interface StateTaxFormProps {
   audience?: 'w2' | '1099';
 }
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => todayLocal();
 
 function StateSelect({
   id,

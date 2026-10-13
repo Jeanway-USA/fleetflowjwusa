@@ -177,3 +177,16 @@ export function getBrowserTimezone(): string {
     return 'America/Chicago';
   }
 }
+
+/**
+ * Dates in the viewer's own time zone as YYYY-MM-DD (`toLocalIso` for any Date, `todayLocal` for today). Do not use `new Date().toISOString().slice(0, 10)` for
+ * this: that is the UTC date, which is already "tomorrow" in the US evening.
+ */
+export function toLocalIso(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+export function todayLocal(): string {
+  return toLocalIso(new Date());
+}

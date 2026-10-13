@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { compressImage } from '@/lib/compress-image';
 import { Loader2, Upload, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, parseISO } from 'date-fns';
 
 interface CompleteJobModalProps {
   workOrder: WorkOrder | null;
@@ -116,7 +116,7 @@ export function CompleteJobModal({ workOrder, open, onOpenChange }: CompleteJobM
               <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="text-muted-foreground">Days Down:</span>
               <span className="font-semibold">
-                {differenceInDays(new Date(), new Date(workOrder.entry_date))} days
+                {differenceInDays(new Date(), parseISO(workOrder.entry_date))} days
               </span>
             </div>
           )}

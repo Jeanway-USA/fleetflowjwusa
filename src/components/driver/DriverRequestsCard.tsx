@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Clock, Home, CalendarDays, Wrench, Plus, MessageSquare } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow, format, parseISO } from 'date-fns';
 import { DriverRequestForm } from './DriverRequestForm';
 
 type RequestType = 'detention' | 'home_time' | 'pto' | 'maintenance';
@@ -114,8 +114,8 @@ export function DriverRequestsCard({ driverId, truckId, activeLoadId, activeLoad
                       <span className="truncate block font-medium">{req.subject}</span>
                       {req.start_date && (
                         <span className="text-xs text-muted-foreground">
-                          {format(new Date(req.start_date), 'MMM d')}
-                          {req.end_date ? ` – ${format(new Date(req.end_date), 'MMM d')}` : ''}
+                          {format(parseISO(req.start_date), 'MMM d')}
+                          {req.end_date ? ` – ${format(parseISO(req.end_date), 'MMM d')}` : ''}
                         </span>
                       )}
                     </div>
@@ -139,8 +139,8 @@ export function DriverRequestsCard({ driverId, truckId, activeLoadId, activeLoad
                       <span className="truncate block">{req.subject}</span>
                       {req.start_date && (
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(req.start_date), 'MMM d')}
-                          {req.end_date ? ` – ${format(new Date(req.end_date), 'MMM d')}` : ''}
+                          {format(parseISO(req.start_date), 'MMM d')}
+                          {req.end_date ? ` – ${format(parseISO(req.end_date), 'MMM d')}` : ''}
                         </p>
                       )}
                       {req.response_notes && (

@@ -1,3 +1,4 @@
+import { todayLocal } from '@/lib/datetime';
 import { useEffect } from 'react';
 import { FileText, Landmark, ShieldCheck } from 'lucide-react';
 
@@ -145,7 +146,7 @@ export function isW2DocsValid(s: W2DocsState): boolean {
 // Shared subcomponents
 // ---------------------------------------------------------------------------
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => todayLocal();
 
 function DocCardShell({
   Icon,
