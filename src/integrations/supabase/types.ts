@@ -7572,6 +7572,8 @@ export type Database = {
         Returns: boolean
       }
       has_safety_access: { Args: { _user_id: string }; Returns: boolean }
+      holds_pay_package: { Args: { _package_id: string }; Returns: boolean }
+      holds_position: { Args: { _position_id: string }; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       parse_legacy_time: { Args: { _t: string }; Returns: string }
