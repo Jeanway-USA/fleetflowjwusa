@@ -23,7 +23,8 @@ import {
   Archive,
   ShieldCheck,
   ChevronRight,
-  LucideIcon
+  LucideIcon,
+  Tablet,
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAreaAccess } from '@/hooks/useAreaAccess';
@@ -231,19 +232,21 @@ export function AppSidebar() {
     { title: 'Today', icon: Crown, path: '/executive-dashboard', roles: ['owner'] },
     { title: 'Dispatcher View', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['owner'] },
     { title: 'Driver View', icon: Truck, path: '/driver-dashboard', roles: ['owner'] },
-    { title: 'Shop View', icon: Wrench, path: '/maintenance-home', roles: ['owner'], feature: 'maintenance_full' },
+    { title: 'Shop', icon: Wrench, path: '/shop', roles: ['owner'], feature: 'maintenance_full' },
+    { title: 'Shop Floor', icon: Tablet, path: '/shop/floor', roles: ['owner'], feature: 'maintenance_full' },
   ] : [
     { title: 'My Dashboard', icon: LayoutDashboard, path: '/dispatcher-dashboard', roles: ['dispatcher'] },
     { title: 'My Dashboard', icon: Truck, path: '/driver-dashboard', roles: ['driver'] },
-    { title: 'My Dashboard', icon: Wrench, path: '/maintenance-home', roles: ['maintenance'], feature: 'maintenance_full' },
+    { title: 'Shop Floor', icon: Tablet, path: '/shop/floor', roles: ['maintenance'], feature: 'maintenance_full' },
+    { title: 'Shop Board', icon: Wrench, path: '/shop', roles: ['maintenance'], feature: 'maintenance_full' },
   ];
 
   const pathToRole: Record<string, 'owner' | 'dispatcher' | 'driver' | 'maintenance'> = {
     '/executive-dashboard': 'owner',
     '/dispatcher-dashboard': 'dispatcher',
     '/driver-dashboard': 'driver',
-    '/maintenance-home': 'maintenance',
-    '/maintenance': 'maintenance',
+    '/shop': 'maintenance',
+    '/shop/floor': 'maintenance',
   };
 
   // --- Collapsible groups ---
@@ -265,7 +268,6 @@ export function AppSidebar() {
     { title: 'Safety', icon: Shield, path: '/safety', roles: ['owner', 'safety'], feature: 'safety' },
     { title: 'Incidents', icon: AlertTriangle, path: '/incidents', roles: ['owner', 'safety'], feature: 'incidents' },
     { title: 'Driver Performance', icon: Award, path: '/driver-performance', roles: ['owner', 'safety'], feature: 'driver_performance' },
-    { title: 'Maintenance', icon: Wrench, path: '/maintenance', roles: ['owner', 'maintenance'], feature: 'maintenance_full' },
     { title: 'Documents', icon: FileText, path: '/documents', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety'], feature: 'documents' },
     { title: 'Document Signing', icon: FileText, path: '/documents/signing', roles: ['owner', 'payroll_admin', 'dispatcher', 'safety', 'driver', 'maintenance'] },
   ];

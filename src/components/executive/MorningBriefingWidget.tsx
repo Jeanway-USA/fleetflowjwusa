@@ -133,7 +133,7 @@ export function MorningBriefingWidget() {
           icon: Wrench,
           colorClass: 'bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20',
           action: 'navigate',
-          route: '/maintenance',
+          route: '/shop/planner',
         });
       }
 

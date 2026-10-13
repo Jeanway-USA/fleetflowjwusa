@@ -29,14 +29,14 @@ export function MobileTabBar() {
   const isDriverOnly = hasRole('driver') && !hasRole('owner') && !hasRole('dispatcher');
   // hasRole('owner') is false while the owner is "viewing as" maintenance.
   const isMaintenanceOnly = hasRole('maintenance') && !hasRole('owner') && !hasRole('dispatcher');
-  const inShopSection = location.pathname === '/maintenance' || location.pathname.startsWith('/maintenance-');
+  const inShopSection = location.pathname === '/shop' || location.pathname.startsWith('/shop/');
   const home = getRoleHomePath(roles, subscriptionTier);
 
   const tabs: Tab[] = isMaintenanceOnly || inShopSection
     ? [
-        { label: 'Shop', icon: Gauge, path: '/maintenance-home' },
-        { label: 'Work orders', icon: Wrench, path: '/maintenance', tabs: [null, 'active', 'history'] },
-        { label: 'PM', icon: CalendarClock, path: '/maintenance?tab=pm', match: ['/maintenance'], tabs: ['pm', 'predictive'] },
+        { label: 'Board', icon: Gauge, path: '/shop', match: ['/shop/jobs'] },
+        { label: 'Parts', icon: Wrench, path: '/shop/parts' },
+        { label: 'Planner', icon: CalendarClock, path: '/shop/planner', match: ['/shop/history'] },
         { label: 'Trucks', icon: Truck, path: '/trucks', match: ['/trailers'] },
       ]
     : isDriverOnly

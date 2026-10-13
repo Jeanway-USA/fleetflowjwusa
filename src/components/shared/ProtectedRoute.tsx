@@ -15,9 +15,11 @@ interface ProtectedRouteProps {
   children: ReactNode;
   allowedRoles: AppRole[];
   requiredFeature?: string;
+  /** Render the page on its own, without the office sidebar and top bar (the tablet app brings its own). */
+  bare?: boolean;
 }
 
-export function ProtectedRoute({ children, allowedRoles, requiredFeature }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, allowedRoles, requiredFeature, bare }: ProtectedRouteProps) {
   const {
     user,
     loading,
@@ -89,5 +91,5 @@ export function ProtectedRoute({ children, allowedRoles, requiredFeature }: Prot
     <>{children}</>
   );
 
-  return <DashboardLayout>{content}</DashboardLayout>;
+  return bare ? <>{content}</> : <DashboardLayout>{content}</DashboardLayout>;
 }
