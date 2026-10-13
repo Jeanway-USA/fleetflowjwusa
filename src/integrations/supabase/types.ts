@@ -1445,6 +1445,67 @@ export type Database = {
           },
         ]
       }
+      driver_pay_package_assignments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          effective_end: string | null
+          effective_start: string
+          id: string
+          note: string | null
+          org_id: string
+          package_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          effective_end?: string | null
+          effective_start: string
+          id?: string
+          note?: string | null
+          org_id: string
+          package_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          effective_end?: string | null
+          effective_start?: string
+          id?: string
+          note?: string | null
+          org_id?: string
+          package_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_pay_package_assignments_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_pay_package_assignments_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_pay_package_assignments_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "pay_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_payroll: {
         Row: {
           additional_medicare_tax: number | null
@@ -3238,6 +3299,66 @@ export type Database = {
           },
         ]
       }
+      hire_plans: {
+        Row: {
+          applied_at: string | null
+          apply_note: string | null
+          areas: Json
+          created_at: string
+          created_by: string | null
+          effective_start: string
+          email: string
+          id: string
+          limit_to_areas: boolean
+          org_id: string
+          pay_package_id: string | null
+          position_id: string | null
+        }
+        Insert: {
+          applied_at?: string | null
+          apply_note?: string | null
+          areas?: Json
+          created_at?: string
+          created_by?: string | null
+          effective_start?: string
+          email: string
+          id?: string
+          limit_to_areas?: boolean
+          org_id: string
+          pay_package_id?: string | null
+          position_id?: string | null
+        }
+        Update: {
+          applied_at?: string | null
+          apply_note?: string | null
+          areas?: Json
+          created_at?: string
+          created_by?: string | null
+          effective_start?: string
+          email?: string
+          id?: string
+          limit_to_areas?: boolean
+          org_id?: string
+          pay_package_id?: string | null
+          position_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hire_plans_pay_package_id_fkey"
+            columns: ["pay_package_id"]
+            isOneToOne: false
+            referencedRelation: "pay_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hire_plans_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ifta_records: {
         Row: {
           created_at: string
@@ -4761,6 +4882,230 @@ export type Database = {
         }
         Relationships: []
       }
+      pay_package_components: {
+        Row: {
+          calculation_method: string
+          component_type: string
+          created_at: string
+          formula: string | null
+          id: string
+          is_active: boolean
+          is_deduction: boolean
+          is_taxable: boolean
+          label: string
+          org_id: string
+          package_id: string
+          removed_at: string | null
+          sort_order: number
+          unit: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          calculation_method: string
+          component_type: string
+          created_at?: string
+          formula?: string | null
+          id?: string
+          is_active?: boolean
+          is_deduction?: boolean
+          is_taxable?: boolean
+          label: string
+          org_id: string
+          package_id: string
+          removed_at?: string | null
+          sort_order?: number
+          unit?: string
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          calculation_method?: string
+          component_type?: string
+          created_at?: string
+          formula?: string | null
+          id?: string
+          is_active?: boolean
+          is_deduction?: boolean
+          is_taxable?: boolean
+          label?: string
+          org_id?: string
+          package_id?: string
+          removed_at?: string | null
+          sort_order?: number
+          unit?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_package_components_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "pay_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pay_package_overrides: {
+        Row: {
+          component_overrides: Json
+          created_at: string
+          created_by: string | null
+          driver_id: string
+          extra_lines: Json
+          id: string
+          org_id: string
+          package_id: string | null
+          period_end: string
+          period_start: string
+          reason: string | null
+          voided_at: string | null
+        }
+        Insert: {
+          component_overrides?: Json
+          created_at?: string
+          created_by?: string | null
+          driver_id: string
+          extra_lines?: Json
+          id?: string
+          org_id: string
+          package_id?: string | null
+          period_end: string
+          period_start: string
+          reason?: string | null
+          voided_at?: string | null
+        }
+        Update: {
+          component_overrides?: Json
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string
+          extra_lines?: Json
+          id?: string
+          org_id?: string
+          package_id?: string | null
+          period_end?: string
+          period_start?: string
+          reason?: string | null
+          voided_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_package_overrides_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_package_overrides_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers_public_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_package_overrides_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "pay_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pay_package_versions: {
+        Row: {
+          change_note: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          org_id: string
+          package_id: string
+          snapshot: Json
+          version_number: number
+        }
+        Insert: {
+          change_note?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id: string
+          package_id: string
+          snapshot: Json
+          version_number: number
+        }
+        Update: {
+          change_note?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id?: string
+          package_id?: string
+          snapshot?: Json
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_package_versions_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "pay_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pay_packages: {
+        Row: {
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          effective_end: string | null
+          effective_start: string | null
+          id: string
+          is_active: boolean
+          name: string
+          org_id: string
+          position_type: string
+          updated_at: string
+          version_number: number
+        }
+        Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          effective_end?: string | null
+          effective_start?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          org_id: string
+          position_type?: string
+          updated_at?: string
+          version_number?: number
+        }
+        Update: {
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          effective_end?: string | null
+          effective_start?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          org_id?: string
+          position_type?: string
+          updated_at?: string
+          version_number?: number
+        }
+        Relationships: []
+      }
       payroll_settings: {
         Row: {
           additional_medicare_rate: number
@@ -4907,6 +5252,130 @@ export type Database = {
             columns: ["truck_id"]
             isOneToOne: false
             referencedRelation: "trucks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      position_assignments: {
+        Row: {
+          checklist_progress: Json
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          effective_end: string | null
+          effective_start: string
+          id: string
+          note: string | null
+          org_id: string
+          position_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          checklist_progress?: Json
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          effective_end?: string | null
+          effective_start?: string
+          id?: string
+          note?: string | null
+          org_id: string
+          position_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          checklist_progress?: Json
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          effective_end?: string | null
+          effective_start?: string
+          id?: string
+          note?: string | null
+          org_id?: string
+          position_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "position_assignments_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      positions: {
+        Row: {
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          created_by: string | null
+          default_pay_package_id: string | null
+          default_permissions: Json
+          default_role: string | null
+          description: string | null
+          id: string
+          is_builtin: boolean
+          key: string
+          name: string
+          onboarding_checklist: Json
+          org_id: string
+          required_documents: Json
+          requires_onboarding: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_pay_package_id?: string | null
+          default_permissions?: Json
+          default_role?: string | null
+          description?: string | null
+          id?: string
+          is_builtin?: boolean
+          key: string
+          name: string
+          onboarding_checklist?: Json
+          org_id: string
+          required_documents?: Json
+          requires_onboarding?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_pay_package_id?: string | null
+          default_permissions?: Json
+          default_role?: string | null
+          description?: string | null
+          id?: string
+          is_builtin?: boolean
+          key?: string
+          name?: string
+          onboarding_checklist?: Json
+          org_id?: string
+          required_documents?: Json
+          requires_onboarding?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "positions_default_pay_package_id_fkey"
+            columns: ["default_pay_package_id"]
+            isOneToOne: false
+            referencedRelation: "pay_packages"
             referencedColumns: ["id"]
           },
         ]
@@ -5374,6 +5843,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      settlement_pay_snapshots: {
+        Row: {
+          assignment_id: string | null
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          id: string
+          lines: Json
+          org_id: string
+          override_id: string | null
+          package_id: string | null
+          package_name: string | null
+          settlement_id: string
+          snapshot: Json
+          totals: Json
+          version_id: string | null
+          version_number: number | null
+        }
+        Insert: {
+          assignment_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          lines: Json
+          org_id: string
+          override_id?: string | null
+          package_id?: string | null
+          package_name?: string | null
+          settlement_id: string
+          snapshot: Json
+          totals: Json
+          version_id?: string | null
+          version_number?: number | null
+        }
+        Update: {
+          assignment_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          lines?: Json
+          org_id?: string
+          override_id?: string | null
+          package_id?: string | null
+          package_name?: string | null
+          settlement_id?: string
+          snapshot?: Json
+          totals?: Json
+          version_id?: string | null
+          version_number?: number | null
+        }
+        Relationships: []
       }
       settlements: {
         Row: {
@@ -6244,6 +6767,50 @@ export type Database = {
           },
         ]
       }
+      user_area_access: {
+        Row: {
+          areas: Json
+          changed_by: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          org_id: string
+          position_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          areas?: Json
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          org_id: string
+          position_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          areas?: Json
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          org_id?: string
+          position_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_area_access_position_id_fkey"
+            columns: ["position_id"]
+            isOneToOne: false
+            referencedRelation: "positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_feedback: {
         Row: {
           created_at: string
@@ -6764,11 +7331,71 @@ export type Database = {
       }
     }
     Functions: {
+      _pay_package_snapshot: { Args: { _package_id: string }; Returns: Json }
       archive_record: {
         Args: { _id: string; _table: string }
         Returns: undefined
       }
+      assign_pay_package: {
+        Args: {
+          _driver_id: string
+          _note?: string
+          _package_id: string
+          _start: string
+          _user_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          effective_end: string | null
+          effective_start: string
+          id: string
+          note: string | null
+          org_id: string
+          package_id: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "driver_pay_package_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      assign_position: {
+        Args: {
+          _driver_id: string
+          _note: string
+          _position_id: string
+          _start: string
+          _user_id: string
+        }
+        Returns: {
+          checklist_progress: Json
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          effective_end: string | null
+          effective_start: string
+          id: string
+          note: string | null
+          org_id: string
+          position_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "position_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       auto_cleanup_empty_orgs: { Args: never; Returns: number }
+      can_manage_pay_packages: { Args: { _uid: string }; Returns: boolean }
+      can_view_pay_package: { Args: { _package_id: string }; Returns: boolean }
+      can_view_position: { Args: { _position_id: string }; Returns: boolean }
       create_audit_log: {
         Args: {
           p_action: string
@@ -6934,6 +7561,7 @@ export type Database = {
         Args: { _table: string; _user_id: string }
         Returns: boolean
       }
+      has_area: { Args: { _area: string; _uid: string }; Returns: boolean }
       has_operations_access: { Args: { _user_id: string }; Returns: boolean }
       has_payroll_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
@@ -7001,9 +7629,141 @@ export type Database = {
         Args: { _id: string; _table: string }
         Returns: undefined
       }
+      save_pay_package: {
+        Args: {
+          _components: Json
+          _note?: string
+          _package: Json
+          _package_id: string
+        }
+        Returns: {
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          effective_end: string | null
+          effective_start: string | null
+          id: string
+          is_active: boolean
+          name: string
+          org_id: string
+          position_type: string
+          updated_at: string
+          version_number: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "pay_packages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       seed_state_tax_configurations: {
         Args: { _org_id: string }
         Returns: undefined
+      }
+      set_checklist_item: {
+        Args: { _assignment_id: string; _done: boolean; _item_id: string }
+        Returns: {
+          checklist_progress: Json
+          created_at: string
+          created_by: string | null
+          driver_id: string | null
+          effective_end: string | null
+          effective_start: string
+          id: string
+          note: string | null
+          org_id: string
+          position_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "position_assignments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_pay_package_archived: {
+        Args: { _archived: boolean; _package_id: string }
+        Returns: {
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          effective_end: string | null
+          effective_start: string | null
+          id: string
+          is_active: boolean
+          name: string
+          org_id: string
+          position_type: string
+          updated_at: string
+          version_number: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "pay_packages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_position_archived: {
+        Args: { _archived: boolean; _position_id: string }
+        Returns: {
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string
+          created_by: string | null
+          default_pay_package_id: string | null
+          default_permissions: Json
+          default_role: string | null
+          description: string | null
+          id: string
+          is_builtin: boolean
+          key: string
+          name: string
+          onboarding_checklist: Json
+          org_id: string
+          required_documents: Json
+          requires_onboarding: boolean
+          sort_order: number
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "positions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_user_area_access: {
+        Args: {
+          _active: boolean
+          _areas: Json
+          _position_id?: string
+          _user_id: string
+        }
+        Returns: {
+          areas: Json
+          changed_by: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          org_id: string
+          position_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_area_access"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       state_to_iana: { Args: { _location: string }; Returns: string }
       storage_user_same_org: {

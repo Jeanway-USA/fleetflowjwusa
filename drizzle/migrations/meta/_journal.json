@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791856975177,
+      "tag": "0000_pay_system_packages_positions_hire_plans_area_limits",
+      "breakpoints": true
+    }
+  ]
+}
