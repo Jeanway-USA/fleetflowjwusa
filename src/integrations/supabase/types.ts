@@ -4839,6 +4839,7 @@ export type Database = {
           reorder_requested_at: string | null
           reorder_url: string | null
           unit: string
+          unit_cost: number | null
           updated_at: string
           vendor_name: string | null
         }
@@ -4858,6 +4859,7 @@ export type Database = {
           reorder_requested_at?: string | null
           reorder_url?: string | null
           unit?: string
+          unit_cost?: number | null
           updated_at?: string
           vendor_name?: string | null
         }
@@ -4877,6 +4879,7 @@ export type Database = {
           reorder_requested_at?: string | null
           reorder_url?: string | null
           unit?: string
+          unit_cost?: number | null
           updated_at?: string
           vendor_name?: string | null
         }
@@ -7013,9 +7016,201 @@ export type Database = {
           },
         ]
       }
+      work_order_events: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          kind: string
+          org_id: string
+          photo_path: string | null
+          user_id: string | null
+          user_name: string | null
+          work_order_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          org_id: string
+          photo_path?: string | null
+          user_id?: string | null
+          user_name?: string | null
+          work_order_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          org_id?: string
+          photo_path?: string | null
+          user_id?: string | null
+          user_name?: string | null
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_events_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_order_parts: {
+        Row: {
+          id: string
+          logged_at: string
+          logged_by: string | null
+          logged_by_name: string | null
+          org_id: string
+          part_id: string | null
+          part_name: string
+          part_number: string | null
+          quantity: number
+          unit_cost: number
+          voided_at: string | null
+          voided_by: string | null
+          work_order_id: string
+        }
+        Insert: {
+          id?: string
+          logged_at?: string
+          logged_by?: string | null
+          logged_by_name?: string | null
+          org_id: string
+          part_id?: string | null
+          part_name: string
+          part_number?: string | null
+          quantity: number
+          unit_cost?: number
+          voided_at?: string | null
+          voided_by?: string | null
+          work_order_id: string
+        }
+        Update: {
+          id?: string
+          logged_at?: string
+          logged_by?: string | null
+          logged_by_name?: string | null
+          org_id?: string
+          part_id?: string | null
+          part_name?: string
+          part_number?: string | null
+          quantity?: number
+          unit_cost?: number
+          voided_at?: string | null
+          voided_by?: string | null
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_parts_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_order_tasks: {
+        Row: {
+          created_at: string
+          done_at: string | null
+          done_by_name: string | null
+          hidden_at: string | null
+          id: string
+          is_done: boolean
+          label: string
+          org_id: string
+          sort_order: number
+          work_order_id: string
+        }
+        Insert: {
+          created_at?: string
+          done_at?: string | null
+          done_by_name?: string | null
+          hidden_at?: string | null
+          id?: string
+          is_done?: boolean
+          label: string
+          org_id: string
+          sort_order?: number
+          work_order_id: string
+        }
+        Update: {
+          created_at?: string
+          done_at?: string | null
+          done_by_name?: string | null
+          hidden_at?: string | null
+          id?: string
+          is_done?: boolean
+          label?: string
+          org_id?: string
+          sort_order?: number
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_tasks_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_order_time_entries: {
+        Row: {
+          ended_at: string | null
+          id: string
+          note: string | null
+          org_id: string
+          started_at: string
+          user_id: string
+          user_name: string | null
+          work_order_id: string
+        }
+        Insert: {
+          ended_at?: string | null
+          id?: string
+          note?: string | null
+          org_id: string
+          started_at?: string
+          user_id: string
+          user_name?: string | null
+          work_order_id: string
+        }
+        Update: {
+          ended_at?: string | null
+          id?: string
+          note?: string | null
+          org_id?: string
+          started_at?: string
+          user_id?: string
+          user_name?: string | null
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_time_entries_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_orders: {
         Row: {
           archived_by: string | null
+          assigned_name: string | null
+          assigned_to: string | null
+          bay: string | null
+          blocked_reason: string | null
           completed_at: string | null
           cost_estimate: number | null
           created_at: string
@@ -7031,8 +7226,10 @@ export type Database = {
           notes: string | null
           odometer_reading: number | null
           org_id: string | null
+          priority: string
           service_type: string
           service_types: string[] | null
+          started_at: string | null
           status: string
           truck_id: string
           updated_at: string
@@ -7040,6 +7237,10 @@ export type Database = {
         }
         Insert: {
           archived_by?: string | null
+          assigned_name?: string | null
+          assigned_to?: string | null
+          bay?: string | null
+          blocked_reason?: string | null
           completed_at?: string | null
           cost_estimate?: number | null
           created_at?: string
@@ -7055,8 +7256,10 @@ export type Database = {
           notes?: string | null
           odometer_reading?: number | null
           org_id?: string | null
+          priority?: string
           service_type: string
           service_types?: string[] | null
+          started_at?: string | null
           status?: string
           truck_id: string
           updated_at?: string
@@ -7064,6 +7267,10 @@ export type Database = {
         }
         Update: {
           archived_by?: string | null
+          assigned_name?: string | null
+          assigned_to?: string | null
+          bay?: string | null
+          blocked_reason?: string | null
           completed_at?: string | null
           cost_estimate?: number | null
           created_at?: string
@@ -7079,8 +7286,10 @@ export type Database = {
           notes?: string | null
           odometer_reading?: number | null
           org_id?: string | null
+          priority?: string
           service_type?: string
           service_types?: string[] | null
+          started_at?: string | null
           status?: string
           truck_id?: string
           updated_at?: string
@@ -7497,6 +7706,8 @@ export type Database = {
       can_manage_pay_packages: { Args: { _uid: string }; Returns: boolean }
       can_view_pay_package: { Args: { _package_id: string }; Returns: boolean }
       can_view_position: { Args: { _position_id: string }; Returns: boolean }
+      can_view_shop: { Args: { _uid: string }; Returns: boolean }
+      can_work_shop: { Args: { _uid: string }; Returns: boolean }
       create_audit_log: {
         Args: {
           p_action: string
@@ -7903,6 +8114,97 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "user_area_access"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      shop_log_part: {
+        Args: {
+          _part_id: string
+          _quantity: number
+          _user_name?: string
+          _work_order_id: string
+        }
+        Returns: {
+          id: string
+          logged_at: string
+          logged_by: string | null
+          logged_by_name: string | null
+          org_id: string
+          part_id: string | null
+          part_name: string
+          part_number: string | null
+          quantity: number
+          unit_cost: number
+          voided_at: string | null
+          voided_by: string | null
+          work_order_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "work_order_parts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      shop_start_timer: {
+        Args: { _user_name?: string; _work_order_id: string }
+        Returns: {
+          ended_at: string | null
+          id: string
+          note: string | null
+          org_id: string
+          started_at: string
+          user_id: string
+          user_name: string | null
+          work_order_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "work_order_time_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      shop_stop_timer: {
+        Args: { _user_name?: string }
+        Returns: {
+          ended_at: string | null
+          id: string
+          note: string | null
+          org_id: string
+          started_at: string
+          user_id: string
+          user_name: string | null
+          work_order_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "work_order_time_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      shop_void_part: {
+        Args: { _id: string; _user_name?: string }
+        Returns: {
+          id: string
+          logged_at: string
+          logged_by: string | null
+          logged_by_name: string | null
+          org_id: string
+          part_id: string | null
+          part_name: string
+          part_number: string | null
+          quantity: number
+          unit_cost: number
+          voided_at: string | null
+          voided_by: string | null
+          work_order_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "work_order_parts"
           isOneToOne: true
           isSetofReturn: false
         }
