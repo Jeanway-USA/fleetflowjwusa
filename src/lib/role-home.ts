@@ -28,7 +28,7 @@ export function getRoleHomePath(
   }
   if (has('dispatcher')) return '/dispatcher-dashboard';
   if (has('driver')) return '/driver-dashboard';
-  if (has('maintenance')) return '/maintenance-home';
+  if (has('maintenance')) return '/shop/floor';
   if (has('safety') || has('payroll_admin')) return '/executive-dashboard';
   return '/pending-access';
 }

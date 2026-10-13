@@ -434,7 +434,7 @@ export default function ExecutiveDashboard() {
           title: 'Maintenance Requests',
           count: maintenanceRequests.length,
           priority: highPriority > 0 ? 'high' : 'medium',
-          link: '/maintenance',
+          link: '/shop',
         });
       }
 

@@ -27,8 +27,17 @@ const FleetLoads = lazy(() => import("./pages/FleetLoads"));
 const AgencyLoads = lazy(() => import("./pages/AgencyLoads"));
 const Finance = lazy(() => import("./pages/Finance"));
 const CompanyInsights = lazy(() => import("./pages/CompanyInsights"));
-const MaintenanceManagement = lazy(() => import("./pages/MaintenanceManagement"));
-const MaintenanceDashboardHome = lazy(() => import("./pages/MaintenanceDashboardHome"));
+const MaintenanceRedirect = lazy(() => import("./pages/shop/MaintenanceRedirect"));
+const ShopPartsPage = lazy(() => import("./pages/shop/ShopPartsPage"));
+const ShopPlannerPage = lazy(() => import("./pages/shop/ShopPlannerPage"));
+const ShopHistoryPage = lazy(() => import("./pages/shop/ShopHistoryPage"));
+const ShopBoardPage = lazy(() => import("./pages/shop/ShopBoardPage"));
+const ShopJobPage = lazy(() => import("./pages/shop/ShopJobPage"));
+const FloorLayout = lazy(() => import("./components/shop/floor/FloorLayout").then((m) => ({ default: m.FloorLayout })));
+const FloorJobsPage = lazy(() => import("./pages/shop/floor/FloorJobsPage"));
+const FloorJobPage = lazy(() => import("./pages/shop/floor/FloorJobPage"));
+const FloorPartsPage = lazy(() => import("./pages/shop/floor/FloorPartsPage"));
+const FloorTrucksPage = lazy(() => import("./pages/shop/floor/FloorTrucksPage"));
 const Documents = lazy(() => import("./pages/Documents"));
 const Safety = lazy(() => import("./pages/Safety"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -209,16 +218,45 @@ const App = () => {
                       </ProtectedRoute>
                     } />
                     <Route path="/resources" element={<Navigate to="/crm" replace />} />
-                    <Route path="/maintenance" element={
+                    {/* Shop: the board for the office, and the tablet app for the floor */}
+                    <Route path="/shop" element={
                       <ProtectedRoute allowedRoles={['owner', 'maintenance']} requiredFeature="maintenance_full">
-                        <MaintenanceManagement />
+                        <ShopBoardPage />
                       </ProtectedRoute>
                     } />
-                    <Route path="/maintenance-home" element={
+                    <Route path="/shop/jobs/:id" element={
                       <ProtectedRoute allowedRoles={['owner', 'maintenance']} requiredFeature="maintenance_full">
-                        <MaintenanceDashboardHome />
+                        <ShopJobPage />
                       </ProtectedRoute>
                     } />
+                    <Route path="/shop/floor" element={
+                      <ProtectedRoute allowedRoles={['owner', 'maintenance']} requiredFeature="maintenance_full" bare>
+                        <FloorLayout />
+                      </ProtectedRoute>
+                    }>
+                      <Route index element={<FloorJobsPage />} />
+                      <Route path="jobs/:id" element={<FloorJobPage />} />
+                      <Route path="parts" element={<FloorPartsPage />} />
+                      <Route path="trucks" element={<FloorTrucksPage />} />
+                    </Route>
+                    <Route path="/shop/parts" element={
+                      <ProtectedRoute allowedRoles={['owner', 'maintenance']} requiredFeature="maintenance_full">
+                        <ShopPartsPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/shop/planner" element={
+                      <ProtectedRoute allowedRoles={['owner', 'maintenance']} requiredFeature="maintenance_full">
+                        <ShopPlannerPage />
+                      </ProtectedRoute>
+                    } />
+                    <Route path="/shop/history" element={
+                      <ProtectedRoute allowedRoles={['owner', 'maintenance']} requiredFeature="maintenance_full">
+                        <ShopHistoryPage />
+                      </ProtectedRoute>
+                    } />
+                    {/* The old maintenance addresses still work: they land on the matching shop screen */}
+                    <Route path="/maintenance" element={<MaintenanceRedirect />} />
+                    <Route path="/maintenance-home" element={<MaintenanceRedirect />} />
                     <Route path="/documents" element={
                       <ProtectedRoute allowedRoles={['owner', 'payroll_admin', 'dispatcher', 'safety']} requiredFeature="documents">
                         <Documents />

@@ -54,7 +54,8 @@ const ROUTES: RouteEntry[] = [
   { path: '/finance', label: 'Finance', icon: Banknote, roles: ['owner', 'payroll_admin'] },
   { path: '/insights', label: 'Company Insights', icon: CircleGauge, roles: ['owner', 'payroll_admin'] },
   { path: '/ifta', label: 'IFTA', icon: Map, roles: ['owner', 'payroll_admin'] },
-  { path: '/maintenance-home', label: 'Maintenance', icon: Wrench, roles: ['owner', 'maintenance'] },
+  { path: '/shop', label: 'Shop', icon: Wrench, roles: ['owner', 'maintenance'] },
+  { path: '/shop/floor', label: 'Shop floor', icon: Wrench, roles: ['owner', 'maintenance'] },
   { path: '/documents', label: 'Documents', icon: FileText },
   { path: '/safety', label: 'Safety', icon: Shield, roles: ['owner', 'safety'] },
   { path: '/incidents', label: 'Incidents', icon: Shield, roles: ['owner', 'safety'] },
@@ -64,7 +65,7 @@ const ROUTES: RouteEntry[] = [
 
 const QUICK_ACTIONS = [
   { id: 'new-load', label: 'New Load', icon: PlusCircle, route: '/fleet-loads' },
-  { id: 'new-work-order', label: 'New Work Order', icon: PlusCircle, route: '/maintenance-home' },
+  { id: 'new-work-order', label: 'New Job (shop)', icon: PlusCircle, route: '/shop?new=1' },
   { id: 'new-contact', label: 'New CRM Contact', icon: PlusCircle, route: '/crm' },
   { id: 'new-driver', label: 'Invite Driver', icon: PlusCircle, route: '/drivers' },
 ];
